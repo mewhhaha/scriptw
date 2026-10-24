@@ -102,8 +102,16 @@ pub(crate) struct LocalBindingId {
 
 pub(crate) struct LocalBindingLocals {
     value: ValueLocals,
-    initialized: I32Local,
+    initialization: LocalBindingInitialization,
     role: LocalBindingRole,
+}
+/// Only the constructors that publish an initialized value can omit a TDZ
+/// flag. Declaration spelling alone cannot prove a captured snapshot ready.
+#[derive(Clone, Copy)]
+enum LocalBindingInitialization {
+    Checked(I32Local),
+    HoistedVar,
+    CompilerTemporary,
 }
 enum LocalBindingRole {
     Source {
@@ -115,8 +123,18 @@ impl LocalBindingLocals {
     pub(crate) fn value(&self) -> &ValueLocals {
         &self.value
     }
-    pub(crate) fn initialized(&self) -> I32Local {
-        self.initialized
+    pub(crate) fn initialization_check(&self) -> Option<I32Local> {
+        match self.initialization {
+            LocalBindingInitialization::Checked(initialized) => Some(initialized),
+            LocalBindingInitialization::HoistedVar
+            | LocalBindingInitialization::CompilerTemporary => None,
+        }
+    }
+    pub(crate) fn mark_initialized(&self, function: &mut Function) {
+        if let Some(initialized) = self.initialization_check() {
+            function.instruction(&Instruction::I32Const(1));
+            initialized.store(function);
+        }
     }
     fn private_argument_list(&self) -> Option<&GcLocal<ValueArray, Nullable>> {
         match &self.role {
@@ -975,7 +993,27 @@ impl<'a> FunctionBuilder<'a> {
         };
         self.local_bindings.push(Some(LocalBindingLocals {
             value,
-            initialized,
+            initialization: LocalBindingInitialization::Checked(initialized),
+            role: LocalBindingRole::Source {
+                private_argument_list: None,
+            },
+        }));
+        BindingStorage::Local(id)
+    }
+    /// FunctionDeclarationInstantiation initializes every new local var to
+    /// undefined before its name becomes visible to source body emission.
+    pub(crate) fn allocate_initialized_var_binding(
+        &mut self,
+        function: &mut Function,
+    ) -> BindingStorage {
+        let value = self.schema.reserve_value_local(function);
+        value.set_undefined(function);
+        let id = LocalBindingId {
+            ordinal: self.local_bindings.len(),
+        };
+        self.local_bindings.push(Some(LocalBindingLocals {
+            value,
+            initialization: LocalBindingInitialization::HoistedVar,
             role: LocalBindingRole::Source {
                 private_argument_list: None,
             },
@@ -991,15 +1029,12 @@ impl<'a> FunctionBuilder<'a> {
     ) -> BindingStorage {
         let value = self.schema.reserve_value_local(function);
         value.copy_from(source, function);
-        let initialized = self.schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(1));
-        initialized.store(function);
         let id = LocalBindingId {
             ordinal: self.local_bindings.len(),
         };
         self.local_bindings.push(Some(LocalBindingLocals {
             value,
-            initialized,
+            initialization: LocalBindingInitialization::CompilerTemporary,
             role: LocalBindingRole::CompilerTemporary,
         }));
         BindingStorage::Local(id)
@@ -1013,13 +1048,16 @@ impl<'a> FunctionBuilder<'a> {
         let binding = self.local_bindings[id.ordinal]
             .take()
             .expect("local binding released once");
+        let initialized = binding.initialization_check();
         if let LocalBindingRole::Source {
             private_argument_list: Some(list),
         } = binding.role
         {
             list.clear(function);
         }
-        self.schema.release_i32_local(binding.initialized, function);
+        if let Some(initialized) = initialized {
+            self.schema.release_i32_local(initialized, function);
+        }
         binding.value.clear(function);
     }
     /// The paired IR capture has compiler-private storage. Its ValueArray is
@@ -1069,8 +1107,7 @@ impl<'a> FunctionBuilder<'a> {
                         .initialize_null(schema, function)
                 });
                 list.replace(arguments.load(schema, function).nullable(), function);
-                function.instruction(&Instruction::I32Const(1));
-                binding.initialized.store(function);
+                binding.mark_initialized(function);
                 if let Some(frame) = self
                     .body_entry_locals
                     .as_ref()

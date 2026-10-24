@@ -195,7 +195,7 @@ impl<'a> FunctionBuilder<'a> {
             let storage = if let Some(slot) = self.owned_env_slot(&name) {
                 BindingStorage::EnvSlot { slot, hops: 0 }
             } else {
-                self.allocate_local_binding(scriptw_ir::BindingMode::Var, &mut function)
+                self.allocate_initialized_var_binding(&mut function)
             };
             self.initialize_function_var_binding(&name, storage, &mut function)?;
             self.binding_scopes

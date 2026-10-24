@@ -179,6 +179,52 @@ fn runtime_helper<'a>(module: &'a NumericModule, name: &str) -> (u32, &'a Numeri
 }
 
 #[test]
+fn literal_string_additions_emit_pooled_values_without_runtime_concatenation_calls() {
+    let source = r#"
+function literal() { return ('left' + 'right') + ('\ud83d' + '\ude00'); }
+function dynamic(left, right) { return left + right; }
+[literal, dynamic];
+"#;
+    let parsed = parse(source, ParseOptions::script()).expect("addition fixture parses");
+    let artifact = emit(&lower(&parsed)).expect("addition fixture emits real Wasm");
+    let program = numeric_module(&artifact.bytes, true);
+    let runtime = numeric_module(
+        artifact.runtime().expect("string additions link R").bytes(),
+        true,
+    );
+    let (add_index, _) = runtime_helper(&runtime, "helper::coercive_add");
+    let add_export = runtime
+        .exports
+        .iter()
+        .find_map(|(name, &index)| (index == add_index).then_some(name))
+        .expect("R exports the actual addition helper");
+    let add_imports = program
+        .imports
+        .iter()
+        .filter_map(|(&index, (namespace, name))| {
+            (namespace == scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE && name == add_export)
+                .then_some(index)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(add_imports.len(), 1);
+    assert!(
+        !source_body(&program, "js::literal#")
+            .calls
+            .contains(&add_imports[0]),
+        "the literal result must come from the pool without a concatenation allocation"
+    );
+    assert_eq!(
+        source_body(&program, "js::dynamic#")
+            .calls
+            .iter()
+            .filter(|&&index| index == add_imports[0])
+            .count(),
+        1,
+        "dynamic operands must retain the complete runtime operation"
+    );
+}
+
+#[test]
 fn coercive_add_sites_reuse_linked_conversion_bodies_with_bounded_growth() {
     const REPEATED_SITES: usize = 33;
     std::thread::Builder::new()

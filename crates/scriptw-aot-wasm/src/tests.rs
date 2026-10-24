@@ -10,6 +10,7 @@ mod numeric_imul;
 mod numeric_leaf;
 mod plain_data_literals;
 mod program_cache_pages;
+mod scalar_predicates;
 mod scalar_regions;
 mod unobserved_arguments;
 

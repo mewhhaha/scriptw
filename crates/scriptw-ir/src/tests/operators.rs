@@ -77,12 +77,77 @@ fn lowers_coercive_compound_add_in_reduce_callback() {
 #[test]
 fn lowers_dynamic_primitive_ir() {
     let program =
-        lower_script("let x = 0; x || \"fallback\"; null ?? 3; typeof missingName; \"a\" + \"b\";");
+        lower_script("let x = 0; x || \"fallback\"; null ?? 3; typeof missingName; \"a\" + x;");
     assert!(program.is_wasm_supported());
     let summary = program.ir_summary();
     assert!(summary.contains("string_concats=1"));
     assert!(summary.contains("typeof_uses=1"));
     assert!(summary.contains("nullish_ops=1"));
+}
+
+#[test]
+fn literal_string_addition_folds_semantic_utf16_and_canonicalizes_surrogate_pairs() {
+    for (source, expected) in [
+        (r#""left" + "right";"#, "leftright".encode_utf16().collect()),
+        (r#""" + "\0";"#, vec![0]),
+        (r#""\ud83d" + "\ude00";"#, vec![0xd83d, 0xde00]),
+        (r#""\ud800" + "x";"#, vec![0xd800, 0x78]),
+        (
+            r#""\u{F0000}" + "D800";"#,
+            "\u{f0000}D800".encode_utf16().collect(),
+        ),
+        (
+            r#"("a" + "\ud83d") + ("\ude00" + "b");"#,
+            vec![0x61, 0xd83d, 0xde00, 0x62],
+        ),
+    ] {
+        let program = lower_script(source);
+        assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+        let script = program.script.as_ref().expect("script IR");
+        let StatementIr::Expression(expression) = &script.body.statements[0] else {
+            panic!("expression statement: {source}");
+        };
+        let ExprIr::String(text) = &expression.expr else {
+            panic!(
+                "expected literal string, got {:?}: {source}",
+                expression.expr
+            );
+        };
+        assert_eq!(decode_js_string_utf16(text), expected, "{source}");
+        assert_eq!(*text, encode_js_string_utf16(&expected), "{source}");
+    }
+}
+
+#[test]
+fn string_addition_fold_keeps_a_bounded_copy_budget_and_effectful_operands() {
+    let left = "a".repeat(2048);
+    for (right, folded) in [("b".repeat(2048), true), ("b".repeat(2049), false)] {
+        let source = format!("'{left}' + '{right}';");
+        let program = lower_script(&source);
+        let script = program.script.as_ref().expect("script IR");
+        let StatementIr::Expression(expression) = &script.body.statements[0] else {
+            panic!("expression statement");
+        };
+        assert_eq!(matches!(expression.expr, ExprIr::String(_)), folded);
+        assert_eq!(
+            matches!(expression.expr, ExprIr::StringConcat { .. }),
+            !folded
+        );
+    }
+    for source in [
+        "function value(){return 'x';} value() + 'y';",
+        "const object={get value(){return 'x';}}; object.value + 'y';",
+        "let value='x'; (value='z', value) + 'y';",
+        "'x' + Symbol('y');",
+        "'x' + {toString(){return 'y';}};",
+    ] {
+        let program = lower_script(source);
+        let script = program.script.as_ref().expect("script IR");
+        let StatementIr::Expression(expression) = script.body.statements.last().unwrap() else {
+            panic!("expression statement: {source}");
+        };
+        assert!(!matches!(expression.expr, ExprIr::String(_)), "{source}");
+    }
 }
 
 #[test]
@@ -114,7 +179,8 @@ fn operations_lowers_boolean_call_to_to_boolean_spec_operation() {
 
 #[test]
 fn operations_lowers_host_is_constructor_call_to_spec_operation() {
-    let program = lower_test262_script("let value = function C() {}; __scriptwIsConstructor(value);");
+    let program =
+        lower_test262_script("let value = function C() {}; __scriptwIsConstructor(value);");
     assert!(program.is_wasm_supported());
     assert!(program.ir_summary().contains("spec_operations=1"));
     let script = program.script.as_ref().expect("script ir should exist");

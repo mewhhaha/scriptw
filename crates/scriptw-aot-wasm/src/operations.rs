@@ -352,6 +352,9 @@ impl<'a> FunctionBuilder<'a> {
         expr: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if let ExprIr::CompareNumber { op, lhs, rhs } = &expr.expr {
+            return self.compile_number_comparison_i32(*op, lhs, rhs, function);
+        }
         let input = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(expr, &input, function)?;
         if expr.kind == ValueKind::Boolean {

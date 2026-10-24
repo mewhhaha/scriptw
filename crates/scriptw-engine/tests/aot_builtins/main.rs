@@ -10,6 +10,7 @@ mod aot_array_find;
 mod aot_array_flat_forward;
 mod aot_array_from_iterator_close;
 mod aot_array_index_storage;
+mod aot_array_private_buffers;
 mod aot_array_property_regressions;
 mod aot_array_sort_typed_array_presence;
 mod aot_array_species_consumers;

@@ -1,0 +1,94 @@
+{
+  "schema": "scriptw-v8-workloads-v1",
+  "startup": {
+    "file": "startup.js",
+    "stdout": "scriptw-startup-ok\n"
+  },
+  "execution": [
+    {
+      "file": "sort-reverse-128.js",
+      "stdout": "707264\n",
+      "work": "128 reverse Number entries, stable comparator sort; includes construction and weighted checksum"
+    },
+    {
+      "file": "sort-reverse-512.js",
+      "stdout": "44870400\n",
+      "work": "512 reverse Number entries, stable comparator sort; includes construction and weighted checksum"
+    },
+    {
+      "file": "sort-sorted-512.js",
+      "stdout": "44870400\n",
+      "work": "already sorted control; insertion sort best case"
+    },
+    {
+      "file": "to-sorted-512.js",
+      "stdout": "44870912\n",
+      "work": "copying sort; original receiver retained in checked result"
+    },
+    {
+      "file": "join-1024.js",
+      "stdout": "60415\n",
+      "work": "UTF16 join scaling; NUL and separate lone surrogates; includes construction"
+    },
+    {
+      "file": "join-4096.js",
+      "stdout": "75775\n",
+      "work": "UTF16 join scaling; NUL and separate lone surrogates; includes construction"
+    },
+    {
+      "file": "join-mixed-1024.js",
+      "stdout": "1791\n",
+      "work": "mixed empty/string join control"
+    },
+    {
+      "file": "numeric-loop-10000.js",
+      "stdout": "149995000\n",
+      "work": "proven numeric leaves and predicate; whole invocation"
+    },
+    {
+      "file": "numeric-loop-50000.js",
+      "stdout": "3749975000\n",
+      "work": "proven numeric leaves and predicate; whole invocation"
+    },
+    {
+      "file": "folded-string-4096.js",
+      "stdout": "24576\n",
+      "work": "literal UTF16 concatenation inside repeated calls"
+    },
+    {
+      "file": "dynamic-string-4096.js",
+      "stdout": "32768\n",
+      "work": "both-string runtime addition with changing operands"
+    },
+    {
+      "file": "integer.js",
+      "stdout": "730532261\n",
+      "work": "10000 integer recurrence steps"
+    },
+    {
+      "file": "objects.js",
+      "stdout": "149600\n",
+      "work": "500 object allocations and property traversal"
+    },
+    {
+      "file": "retained-objects.js",
+      "stdout": "134250496\n",
+      "work": "8192 retained objects, strings and four-element arrays; 32768 indexed reads"
+    },
+    {
+      "file": "join-empty-1024.js",
+      "stdout": "0\n",
+      "work": "empty join repeated1024 times; construction+call overhead control"
+    },
+    {
+      "file": "join-singleton-1024.js",
+      "stdout": "4096\n",
+      "work": "singleton join repeated1024 times; small buffer overhead control"
+    },
+    {
+      "file": "join-small-1024.js",
+      "stdout": "7168\n",
+      "work": "four-element join repeated1024 times; small buffer overhead control"
+    }
+  ]
+}

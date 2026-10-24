@@ -164,7 +164,7 @@
     },
     {
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "9c26aadfff587abda6e77471fd88b1f6cff7a3bb429a81474e3f579c84ca4fb7"
+      "sha256": "54d2e1e01a6d16111c603db83e3ce45d340ab6a3ae6cec2cd39c92212e2674c7"
     },
     {
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
@@ -253,5 +253,5 @@
   "utf16_policy": "direct pinned compare_utf16; isolated units have ICU replacement weights, valid pairs are scalar; raw units preserved; no lexical tie-breaker",
   "available_locales_count": null,
   "available_sort_collations_count": null,
-  "data_sha256": "20d26ca3f6c5df4b9361e611f2ac7790a5369c27b3ff1374e735de42824323bf"
+  "data_sha256": "ec787143bec700c182b82dcf7b05205a8719f4331e24fb610606e7a99b15f4af"
 }

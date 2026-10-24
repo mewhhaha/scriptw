@@ -20,6 +20,9 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 The [compiler efficiency batch](docs/rust-rewrite/compiler-efficiency-20261024.md)
 tracks subsequent compiler/runtime changes and their verification separately
 from the measured compiler shown in the graphic.
+The [execution hot-path contract](docs/rust-rewrite/contracts/execution-hotpaths.md)
+describes stable Array sorting, private UTF-16 buffers, scalar predicates and
+literal string folding.
 
 ## Tests
 

@@ -12,6 +12,8 @@ mod copy_within;
 mod find_via_predicate;
 mod flat;
 mod literal;
+mod sort;
+mod string_buffer;
 use callback_iteration::ArrayCallbackIterationKind;
 use copy_within::ArrayCopyWithinDirection;
 
@@ -3033,17 +3035,13 @@ impl FunctionBuilder<'_> {
         let receiver = s.reserve_value_local(f);
         let comparator = s.reserve_value_local(f);
         let element = s.reserve_value_local(f);
-        let previous = s.reserve_value_local(f);
         let target = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
         let length = s.reserve_i64_local(f);
         let index = s.reserve_i64_local(f);
         let count = s.reserve_i64_local(f);
-        let position = s.reserve_i64_local(f);
-        let preceding = s.reserve_i64_local(f);
         let slot = s.reserve_i32_local(f);
         let present = s.reserve_i32_local(f);
-        let greater = s.reserve_i32_local(f);
         // The compare function is admitted before ToObject and length access.
         self.emit_builtin_arg_to_value(0, &comparator, f);
         comparator.tag().load(f);
@@ -3105,60 +3103,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let list = collected.finish(self, f);
-        // Insertion moves only strictly greater elements, retaining source order
-        // for equal comparisons and all comparator NaN results.
-        f.instruction(&Instruction::I64Const(1));
-        index.store(f);
-        let sorted = self.open_frame(ControlFrameKind::Block, f);
-        let sort = self.open_frame(ControlFrameKind::Loop, f);
-        index.load(f);
-        count.load(f);
-        f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(sorted, f);
-        index.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        self.emit_argument_vector_entry_to_value(&list, slot, &element, f);
-        index.load(f);
-        position.store(f);
-        let placed = self.open_frame(ControlFrameKind::Block, f);
-        let shift = self.open_frame(ControlFrameKind::Loop, f);
-        position.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        self.emit_branch_if_to_target(placed, f);
-        position.load(f);
-        f.instruction(&Instruction::I64Const(1));
-        f.instruction(&Instruction::I64Sub);
-        preceding.store(f);
-        preceding.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        self.emit_argument_vector_entry_to_value(&list, slot, &previous, f);
-        self.emit_array_sort_greater(&previous, &element, &comparator, greater, &pending, f)?;
-        greater.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(placed, f);
-        position.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        self.emit_array_private_list_write(&list, slot, &previous, f);
-        preceding.load(f);
-        position.store(f);
-        self.emit_branch_to_target(shift, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        position.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        self.emit_array_private_list_write(&list, slot, &element, f);
-        self.emit_increment_local(index, 1, f);
-        self.emit_branch_to_target(sort, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        let list = self.emit_array_private_values_sort(list, count, &comparator, &pending, f)?;
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let written = self.open_frame(ControlFrameKind::Block, f);
@@ -3205,43 +3150,17 @@ impl FunctionBuilder<'_> {
         }
         self.completion().set_normal(&target, f);
         list.clear(f);
-        s.release_i32_local(greater, f);
         s.release_i32_local(present, f);
         s.release_i32_local(slot, f);
-        s.release_i64_local(preceding, f);
-        s.release_i64_local(position, f);
         s.release_i64_local(count, f);
         s.release_i64_local(index, f);
         s.release_i64_local(length, f);
         pending.clear(f);
         target.clear(f);
-        previous.clear(f);
         element.clear(f);
         comparator.clear(f);
         receiver.clear(f);
         Ok(())
-    }
-    fn emit_array_private_list_write(
-        &self,
-        list: &crate::gc_types::GcLocal<crate::gc_types::ValueArray>,
-        index: I32Local,
-        value: &ValueLocals,
-        f: &mut Function,
-    ) {
-        let s = self.runtime_schema();
-        let stored = s.reserve_gc_local(f).initialize(
-            s.struct_type::<crate::gc_types::StoredValue>()
-                .from_value(value, f),
-            f,
-        );
-        s.array_type::<crate::gc_types::ValueArray>().write(
-            list,
-            index,
-            GcOperand::reference(&stored, s),
-            s,
-            f,
-        );
-        stored.clear(f);
     }
     fn emit_array_sort_greater(
         &mut self,
@@ -4016,9 +3935,7 @@ impl FunctionBuilder<'_> {
                 self.emit_builtin_arg_to_value(1, &options, f);
             }
         }
-        let text = s
-            .reserve_gc_local(f)
-            .initialize(self.emit_interned_string_reference("", f)?, f);
+        let text = string_buffer::ArrayStringBuffer::new(s, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let finished = self.open_frame(ControlFrameKind::Block, f);
@@ -4031,7 +3948,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Eqz);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        text.replace(self.emit_concat_gc_strings(&text, &separator, f), f);
+        text.append(&separator, s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
@@ -4076,7 +3993,7 @@ impl FunctionBuilder<'_> {
                 .cast_reference::<crate::gc_types::StringValue>(s, f),
             f,
         );
-        text.replace(self.emit_concat_gc_strings(&text, &part, f), f);
+        text.append(&part, s, f);
         part.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -4086,6 +4003,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        let text = text.finish(s, f);
         result.set_reference(&text, s, f);
         self.completion().set_normal(&result, f);
         text.clear(f);

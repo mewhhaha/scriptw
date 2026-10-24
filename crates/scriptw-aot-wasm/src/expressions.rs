@@ -1137,30 +1137,11 @@ impl<'a> FunctionBuilder<'a> {
                 self.compile_string_concat_payload(lhs, rhs, output, function)?
             }
             ExprIr::CompareNumber { op, lhs, rhs } => {
-                let left = schema.reserve_i64_local(function);
-                let right = schema.reserve_i64_local(function);
                 let result = schema.reserve_i32_local(function);
-                self.compile_number_payload(lhs, left, function)?;
-                self.compile_number_payload(rhs, right, function)?;
-                left.load(function);
-                function.instruction(&Instruction::F64ReinterpretI64);
-                right.load(function);
-                function.instruction(&Instruction::F64ReinterpretI64);
-                match op {
-                    RelationalBinaryOp::LessThan => function.instruction(&Instruction::F64Lt),
-                    RelationalBinaryOp::LessThanOrEqual => {
-                        function.instruction(&Instruction::F64Le)
-                    }
-                    RelationalBinaryOp::GreaterThan => function.instruction(&Instruction::F64Gt),
-                    RelationalBinaryOp::GreaterThanOrEqual => {
-                        function.instruction(&Instruction::F64Ge)
-                    }
-                };
+                self.compile_number_comparison_i32(*op, lhs, rhs, function)?;
                 result.store(function);
                 output.set_boolean(result, function);
                 schema.release_i32_local(result, function);
-                schema.release_i64_local(right, function);
-                schema.release_i64_local(left, function);
             }
             ExprIr::CompareValue { op, lhs, rhs } => {
                 let result = schema.reserve_i32_local(function);

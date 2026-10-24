@@ -12639,6 +12639,27 @@ impl<'a> ScriptLowerer<'a> {
     ) -> TypedExpr {
         match arithmetic {
             ArithmeticOp::Add => {
+                if let (ExprIr::String(left), ExprIr::String(right)) = (&lhs.expr, &rhs.expr) {
+                    // Bound work and temporary storage per expression. Larger
+                    // constants retain ordinary runtime concatenation rather
+                    // than repeatedly copying an unbounded literal chain.
+                    const MAX_FOLDED_STRING_TRANSPORT_BYTES: usize = 4096;
+                    if left
+                        .len()
+                        .checked_add(right.len())
+                        .is_some_and(|bytes| bytes <= MAX_FOLDED_STRING_TRANSPORT_BYTES)
+                    {
+                        // Transport strings encode isolated surrogates and a
+                        // sentinel. Concatenate semantic UTF-16, then encode
+                        // once so a pair formed at the boundary is canonical.
+                        let mut units = decode_js_string_utf16(left);
+                        units.extend(decode_js_string_utf16(right));
+                        return TypedExpr::from_info(
+                            ValueInfo::new(ValueKind::String),
+                            ExprIr::String(encode_js_string_utf16(&units)),
+                        );
+                    }
+                }
                 if let (ExprIr::BigInt(lhs), ExprIr::BigInt(rhs)) = (&lhs.expr, &rhs.expr) {
                     return TypedExpr::from_info(
                         ValueInfo::new(ValueKind::BigInt),

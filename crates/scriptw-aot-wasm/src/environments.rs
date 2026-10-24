@@ -643,8 +643,7 @@ impl<'a> FunctionBuilder<'a> {
             BindingStorage::Local(id) => {
                 let binding = self.local_binding(id);
                 binding.value().set_undefined(function);
-                function.instruction(&Instruction::I32Const(1));
-                binding.initialized().store(function);
+                binding.mark_initialized(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 let schema = self.runtime_schema();
@@ -667,7 +666,10 @@ impl<'a> FunctionBuilder<'a> {
                 let binding = self.local_binding(id);
                 binding.value().set_undefined(function);
                 function.instruction(&Instruction::I32Const(0));
-                binding.initialized().store(function);
+                binding
+                    .initialization_check()
+                    .expect("only checked lexical storage can be uninitialized")
+                    .store(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 let environment = self.resolve_env_handle_local(hops, function);
@@ -696,8 +698,7 @@ impl<'a> FunctionBuilder<'a> {
             BindingStorage::Local(id) => {
                 let binding = self.local_binding(id);
                 binding.value().copy_from(value, function);
-                function.instruction(&Instruction::I32Const(1));
-                binding.initialized().store(function);
+                binding.mark_initialized(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 self.write_env_slot_from_locals(slot, hops, value, function);
@@ -790,7 +791,10 @@ impl<'a> FunctionBuilder<'a> {
                 self.write_binding_from_locals(storage, &value, function);
                 if let BindingStorage::Local(id) = storage {
                     initialized.load(function);
-                    self.local_binding(id).initialized().store(function);
+                    self.local_binding(id)
+                        .initialization_check()
+                        .expect("captured arguments preserve their source initialization state")
+                        .store(function);
                 }
                 schema.release_i32_local(initialized, function);
                 value.clear(function);
@@ -1194,13 +1198,7 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         match storage {
             BindingStorage::Local(id) => {
-                self.local_binding(id).initialized().load(function);
-                function.instruction(&Instruction::I32Eqz);
-                self.open_frame(ControlFrameKind::If, function);
-                self.emit_lexical_binding_uninitialized(value, function)?;
-                self.emit_propagate_current_throw_if_needed(function);
-                self.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
+                self.check_local_binding_initialized(id, function)?;
                 value.copy_from(self.local_binding(id).value(), function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
@@ -1219,6 +1217,27 @@ impl<'a> FunctionBuilder<'a> {
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
             }
+        }
+        Ok(())
+    }
+
+    /// Both tagged reads and proven scalar reads share the same live lexical
+    /// initialization check. The error value exists only on the abrupt edge.
+    pub(crate) fn check_local_binding_initialized(
+        &mut self,
+        id: crate::emit::LocalBindingId,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        if let Some(initialized) = self.local_binding(id).initialization_check() {
+            initialized.load(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            let error = self.runtime_schema().reserve_value_local(function);
+            self.emit_lexical_binding_uninitialized(&error, function)?;
+            self.emit_propagate_current_throw_if_needed(function);
+            error.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
         }
         Ok(())
     }

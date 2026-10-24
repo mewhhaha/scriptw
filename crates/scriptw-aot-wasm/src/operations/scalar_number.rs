@@ -17,6 +17,18 @@ impl FunctionBuilder<'_> {
                 function.instruction(&Instruction::I64Const(*bits as i64));
                 output.store(function);
             }
+            ExprIr::Identifier(name)
+                if expression.kind == ValueKind::Number
+                    && name != LEXICAL_THIS_NAME
+                    && matches!(self.lookup_binding(name), Some(BindingStorage::Local(_))) =>
+            {
+                let Some(BindingStorage::Local(id)) = self.lookup_binding(name) else {
+                    unreachable!("the scalar read guard selects an actual local binding")
+                };
+                self.check_local_binding_initialized(id, function)?;
+                self.local_binding(id).value().scalar().load(function);
+                output.store(function);
+            }
             ExprIr::BinaryNumber { op, lhs, rhs } if expression.kind == ValueKind::Number => {
                 self.compile_number_arithmetic_payload(*op, lhs, rhs, output, function)?;
             }
@@ -44,6 +56,35 @@ impl FunctionBuilder<'_> {
                 value.clear(function);
             }
         }
+        Ok(())
+    }
+
+    /// Consume an ordered Number comparison directly as a Wasm predicate.
+    /// Value-producing comparisons and branch conditions use this same owner.
+    pub(crate) fn compile_number_comparison_i32(
+        &mut self,
+        op: RelationalBinaryOp,
+        lhs: &TypedExpr,
+        rhs: &TypedExpr,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let left = schema.reserve_i64_local(function);
+        let right = schema.reserve_i64_local(function);
+        self.compile_number_payload(lhs, left, function)?;
+        self.compile_number_payload(rhs, right, function)?;
+        left.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        right.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&match op {
+            RelationalBinaryOp::LessThan => Instruction::F64Lt,
+            RelationalBinaryOp::LessThanOrEqual => Instruction::F64Le,
+            RelationalBinaryOp::GreaterThan => Instruction::F64Gt,
+            RelationalBinaryOp::GreaterThanOrEqual => Instruction::F64Ge,
+        });
+        schema.release_i64_local(right, function);
+        schema.release_i64_local(left, function);
         Ok(())
     }
 

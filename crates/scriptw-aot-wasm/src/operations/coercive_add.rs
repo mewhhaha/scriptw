@@ -59,12 +59,47 @@ impl FunctionBuilder<'_> {
         self.push_scope();
         self.completion().initialize(&mut function);
         let output = self.runtime_schema().reserve_value_local(&mut function);
+        // Both whole operands have already completed evaluation in P. Actual
+        // String tags prove ToPrimitive and ToString are identities; keep this
+        // dispatch and the copy CFG in R rather than at every source `+` site.
+        parameters.left.tag().load(&mut function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        parameters.right.tag().load(&mut function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, &mut function);
+        let schema = self.runtime_schema();
+        let left = schema.reserve_gc_local(&mut function).initialize(
+            parameters
+                .left
+                .cast_reference::<StringValue>(schema, &mut function),
+            &mut function,
+        );
+        let right = schema.reserve_gc_local(&mut function).initialize(
+            parameters
+                .right
+                .cast_reference::<StringValue>(schema, &mut function),
+            &mut function,
+        );
+        let string = schema.reserve_gc_local(&mut function).initialize(
+            self.emit_concat_gc_strings(&left, &right, &mut function),
+            &mut function,
+        );
+        output.set_reference(&string, schema, &mut function);
+        string.clear(&mut function);
+        right.clear(&mut function);
+        left.clear(&mut function);
+        function.instruction(&Instruction::Else);
         self.emit_coercive_add_from_values_inner(
             &parameters.left,
             &parameters.right,
             &output,
             &mut function,
         )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.completion().set_normal(&output, &mut function);
         output.clear(&mut function);
         self.pop_scope();
