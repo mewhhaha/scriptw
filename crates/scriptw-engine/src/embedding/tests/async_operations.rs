@@ -112,6 +112,9 @@ export function invalid() {
   try { number({valueOf(){throw 'coerced'}}, print('extra')); return false; }
   catch(reason) { return reason instanceof TypeError; }
 }
+const sharedView=new Int32Array(new SharedArrayBuffer(4));
+export function waiting() { return Atomics.waitAsync(sharedView,0,0).value; }
+export function notify() { return Atomics.notify(sharedView,0,1); }
 print('sync');
 "#,
         declarations(),
@@ -248,6 +251,32 @@ print('sync');
     assert_eq!(
         instance.take_output(&mut store).unwrap(),
         [HostOutputEvent::PrintLine("extra".into())]
+    );
+
+    let waiting = invoke(&instance, &mut store, "waiting", &[]);
+    assert!(matches!(
+        instance.promise_state(&mut store, &waiting).unwrap(),
+        JsPromiseState::Pending
+    ));
+    settled(instance.pump(&mut store).unwrap());
+    assert!(
+        matches!(
+            instance.promise_state(&mut store, &waiting).unwrap(),
+            JsPromiseState::Pending
+        ),
+        "an infinite wait must leave the Store pump nonblocking"
+    );
+    store.gc(None).unwrap();
+    assert_eq!(
+        invoke(&instance, &mut store, "notify", &[]).as_number(),
+        Some(1.0)
+    );
+    settled(instance.pump(&mut store).unwrap());
+    assert_eq!(
+        fulfilled(&instance, &mut store, &waiting)
+            .to_utf16(&mut store)
+            .unwrap(),
+        "ok".encode_utf16().collect::<Vec<_>>()
     );
 
     let argument = instance

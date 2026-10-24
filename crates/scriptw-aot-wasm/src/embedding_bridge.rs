@@ -61,6 +61,16 @@ impl FunctionBuilder<'_> {
         self.emit_finish_weak_job(function)?;
         self.completion().copy_from(&pending, function);
         pending.clear(function);
+        if self
+            .functions
+            .monotonic_clock_nanos_import_function_index()
+            .is_some()
+        {
+            // Notifications and elapsed waitAsync deadlines do not enqueue a
+            // Promise job themselves. Poll even when the job queue is empty;
+            // the blocking drain would wait indefinitely on an infinite wait.
+            self.emit_poll_atomics_wait_async_timeouts(function)?;
+        }
         self.emit_drain_promise_jobs(function)
     }
 
