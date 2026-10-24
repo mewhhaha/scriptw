@@ -338,7 +338,7 @@ fn emitter_consumes_the_package_through_the_reviewed_lifecycle() {
     assert!(compact(EMIT_SOURCE).contains(concat!(
         "entry_exports.append(module_package.schema(),",
         "module_package.global_prelude_phase(),",
-        "script.module_entry_evaluation().is_some(),&mutexports,);"
+        "script.module_entry_evaluation().is_some(),runtime_helper_base,&mutexports,);"
     )));
     let export_plan = bounded(
         ENTRY_EXPORTS_SOURCE,

@@ -314,7 +314,19 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
         }
         assert_eq!(
             exports,
-            ["main", "memory", "scriptw.program_init"],
+            [
+                "main",
+                "memory",
+                scriptw_aot_wasm::EMBEDDING_BYTES,
+                scriptw_aot_wasm::EMBEDDING_BYTES_READ,
+                scriptw_aot_wasm::EMBEDDING_CALL,
+                scriptw_aot_wasm::EMBEDDING_CANCEL,
+                scriptw_aot_wasm::EMBEDDING_CHECKPOINT,
+                scriptw_aot_wasm::EMBEDDING_PROMISE,
+                scriptw_aot_wasm::EMBEDDING_READ,
+                scriptw_aot_wasm::EMBEDDING_STRING,
+                "scriptw.program_init",
+            ],
             "{label} program exports"
         );
         assert!(

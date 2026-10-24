@@ -111,12 +111,12 @@ fn retained_exports_preserve_live_bindings_receivers_proxies_throws_and_gc_roots
         r#"
 export let count=0;
 export function next(n) { count+=n; return count; }
-export { next as "\ud800" };
+export { next as "\ud83d\ude00" };
 export const bound=next.bind(null,2);
 export const proxy=new Proxy(next,{apply(target,receiver,args){return Reflect.apply(target,receiver,args)+100;}});
 export function strictThis(){return this===undefined;}
 export function echo(value){return value;}
-export default {base:40, fetch(delta){return this.base+delta;}, get bad(){throw 'getter-error';}};
+export default {base:40, ["\ud800"]:42, fetch(delta){return this.base+delta;}, get bad(){throw 'getter-error';}};
 print('initialized');
 "#,
         ForeignModuleRegistry::default(),
@@ -148,7 +148,11 @@ print('initialized');
         normal(instance.get_export(&mut store, "count").unwrap()).as_number(),
         Some(3.0)
     );
-    let named = normal(instance.get_export_utf16(&mut store, &[0xd800]).unwrap());
+    let named = normal(
+        instance
+            .get_export_utf16(&mut store, &[0xd83d, 0xde00])
+            .unwrap(),
+    );
     let zero = instance
         .value(&mut store, ForeignValue::Number(0.0))
         .unwrap();
@@ -175,6 +179,15 @@ print('initialized');
         Some(true)
     );
     let object = normal(instance.get_export(&mut store, "default").unwrap());
+    assert_eq!(
+        normal(
+            instance
+                .get_property(&mut store, &object, &[0xd800])
+                .unwrap()
+        )
+        .as_number(),
+        Some(42.0)
+    );
     let fetch = normal(
         instance
             .get_property(

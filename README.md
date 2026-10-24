@@ -48,13 +48,13 @@ The [performance checkpoint](docs/rust-rewrite/performance-six-workstreams-20261
 reports its own native checks and selected original-case replay. The full
 chart below remains bound to `b9ecfe64b`.
 
-The [foreign-module checkpoint](docs/rust-rewrite/contracts/foreign-modules.md#verified-checkpoint-2026-10-24),
-refreshed 2026-10-24 at `559151e32`, passed **5,662 affected native checks**
-and the ordinary custom-Linker example (`42`). Its complete module-code and
-Function apply/bind/call subsets plus known-failure controls passed
-**980 / 984 executions**, with the same four failures
-and zero crashes, unsupported cases or timeouts. The linked checkpoint retains
-refresh commands and exact inventories; it does not replace the full chart.
+The [retained-embedding checkpoint](docs/rust-rewrite/embedding-bridge-20261024.md),
+refreshed 2026-10-25, passed **5,700 affected native checks** and both standalone
+embedding examples. Its complete module-code and Function apply/bind/call
+subsets plus known-failure controls passed **980 / 984 executions**, with the
+same four failures and zero crashes, unsupported cases or timeouts. Verification
+used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
+and exact inventories; the full chart and V8 measurements remain historical.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)

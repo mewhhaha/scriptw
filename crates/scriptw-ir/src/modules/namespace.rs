@@ -1193,16 +1193,11 @@ mod tests {
         assert!(object < alias, "got {prelude}");
     }
 
-    /// A graph nobody takes a namespace of pays nothing.
+    /// An unobserved Script entry needs no host module namespace.
     #[test]
     fn the_prelude_is_empty_when_no_namespace_is_observed() {
-        let graph = linked_graph(
-            &[
-                ("a", "export const value = 41;"),
-                ("b", "import { value } from \"./a.mjs\";\nprint(value);"),
-            ],
-            vec![(1, request_key("./a.mjs"), 0)],
-        );
+        let mut graph = graph_of(&[("entry", "print(41);")]);
+        graph.entry_is_script = true;
         assert_eq!(
             namespace_prelude_source(&graph).expect("prelude should build"),
             ""

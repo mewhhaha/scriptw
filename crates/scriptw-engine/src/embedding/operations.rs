@@ -175,7 +175,7 @@ impl EmbeddedInstance {
         self.get_export_utf16(store, &name.encode_utf16().collect::<Vec<_>>())
     }
 
-    /// Read an export whose name may contain isolated UTF-16 surrogates.
+    /// Look up a live module export using a UTF-16 key.
     pub fn get_export_utf16(
         &self,
         store: &mut WasmtimeStore<WasmStoreState>,

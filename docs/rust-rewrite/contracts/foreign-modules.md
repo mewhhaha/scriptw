@@ -60,6 +60,10 @@ the closed schema and requires those exact canonical bytes, including rejecting
 unknown fields and noncanonical duplicate-key spellings. This API decodes
 artifact requirements; it is not a permissive JSON configuration loader.
 
+This is a pre-1.0 breaking change: foreign ABI v1 declarations and Portable
+bundles using the previous private runtime ABI must be recompiled. Foreign ABI
+v2 and private runtime ABI 20 are checked at artifact admission.
+
 ## Modules and first-class functions
 
 The registry loader resolves exact declared specifiers before its fallback
@@ -171,7 +175,8 @@ use ordinary `Linker::func_wrap`.
 ## Retained exports and invocation
 
 After successful entry, `get_export(store, name)` reads the live module binding.
-`get_export_utf16` also accepts export names containing lone surrogates.
+`get_export_utf16` accepts a UTF-16 lookup key; module export names follow the
+ECMAScript requirement for well-formed Unicode.
 `get_property(store, target, utf16_key)` performs ordinary JavaScript Get,
 including getters and Proxy traps. `call(store, callable, receiver, arguments)`
 uses the compiler runtime's ordinary callable/Proxy dispatch, preserving bound
@@ -216,12 +221,24 @@ and leaving a reusable instance with permanently pending Promises.
 `promise_state` adopts and
 inspects a returned intrinsic Promise as Pending, Fulfilled or Rejected; exact
 settled values remain retained. Ordinary JavaScript rejection handling and
-unhandled-rejection policy still apply at checkpoints.
+unhandled-rejection policy still apply at checkpoints. Checkpoints also poll
+ready `Atomics.waitAsync` notifications and timeouts without waiting for a
+pending waiter.
 
 This supplies the Scriptw-side gates for replacing a V8 embedding. The
 consumer still needs integration tests for its particular Wasmtime configuration,
 web APIs, I/O cancellation and request lifecycle; it does not imply that every
 V8 or web-platform API exists in Scriptw.
+
+## Retained-embedding checkpoint, 2026-10-25
+
+The [verified retained-embedding checkpoint](../embedding-bridge-20261024.md)
+records **5,700 native checks across 23 complete targets**, both standalone
+examples, and **980 successes / 984 selected pinned Test262 executions** with
+the same four known failures. It includes exact inventories, refresh commands,
+source and executable identities, and resource receipts. This extends the
+historical numeric-only checkpoint below; full-suite and performance charts
+keep their original measured compilers.
 
 ## Verified checkpoint, 2026-10-24
 
