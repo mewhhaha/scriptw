@@ -4,7 +4,7 @@ use scriptw_aot_wasm::{
 };
 use scriptw_ir::foreign::{
     ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
-    ForeignScalarType,
+    ForeignValueType,
 };
 use scriptw_ir::{
     lower_module_graph, ModuleGraphSources, ModuleKey, ModuleRequestKeyIr, ModuleSourceIr,
@@ -18,10 +18,15 @@ fn compile(export: &str, native_name: &str, fallible: bool) -> WasmArtifact {
         export,
         "dd",
         native_name,
-        vec![ForeignScalarType::Number; 2],
+        vec![ForeignValueType::Number; 2],
         ForeignResultType::Number,
     )
     .unwrap();
+    compile_declaration(declaration, fallible)
+}
+
+fn compile_declaration(declaration: ForeignFunctionDeclaration, fallible: bool) -> WasmArtifact {
+    let export = declaration.js_export().to_owned();
     let module = ForeignModuleDeclaration::new("dd:host", vec![declaration]).unwrap();
     let sources = ModuleGraphSources {
         realm_requests: Default::default(),
@@ -43,6 +48,86 @@ fn compile(export: &str, native_name: &str, fallible: bool) -> WasmArtifact {
     let program = lower_module_graph(&sources);
     assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
     emit(&program).expect("declared imported wrapper emits real Wasm")
+}
+
+#[test]
+fn asynchronous_foreign_wrapper_emits_intrinsic_capability_and_void_host_signature() {
+    std::thread::Builder::new()
+        .name("async-foreign-emission".into())
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let declaration = ForeignFunctionDeclaration::new_async(
+                "later",
+                "dd",
+                "later",
+                vec![
+                    ForeignValueType::Number,
+                    ForeignValueType::StringUtf16,
+                    ForeignValueType::Bytes,
+                ],
+                ForeignResultType::Bytes,
+            )
+            .unwrap();
+            let artifact = compile_declaration(declaration, true);
+            let mut validator = Validator::new_with_features(WasmFeatures::all());
+            validator
+                .validate_all(&artifact.bytes)
+                .expect("actual async wrapper and EH catch validate");
+            let registry = foreign_registry_from_module(&artifact.bytes).unwrap();
+            let (_, declaration) = registry.functions().next().unwrap();
+            assert_eq!(
+                declaration.mode(),
+                scriptw_ir::foreign::ForeignFunctionMode::Asynchronous
+            );
+            assert_eq!(declaration.result(), ForeignResultType::Bytes);
+            let types = types(&artifact.bytes);
+            let mut foreign_index = None;
+            let mut next = 0;
+            for payload in Parser::new(0).parse_all(&artifact.bytes) {
+                if let Payload::ImportSection(imports) = payload.unwrap() {
+                    for import in imports.into_imports() {
+                        let import = import.unwrap();
+                        if let TypeRef::Func(index) | TypeRef::FuncExact(index) = import.ty {
+                            if import.module == "dd" {
+                                foreign_index = Some(next);
+                                let CompositeInnerType::Func(signature) =
+                                    &types[index as usize].composite_type.inner
+                                else {
+                                    panic!("host import must be function");
+                                };
+                                assert_eq!(signature.params().len(), 5);
+                                assert_eq!(signature.params()[0], wasmparser::ValType::F64);
+                                assert_eq!(
+                                    &signature.params()[3..],
+                                    [
+                                        wasmparser::ValType::Ref(
+                                            wasmparser::RefType::EQREF.as_non_null()
+                                        ),
+                                        wasmparser::ValType::Ref(
+                                            wasmparser::RefType::EQREF.as_non_null()
+                                        ),
+                                    ]
+                                );
+                                assert!(
+                                    signature.results().is_empty(),
+                                    "fulfillment bytes travel through the owning Store checkpoint"
+                                );
+                            }
+                            next += 1;
+                        }
+                    }
+                }
+            }
+            let bodies = crate::linked_bodies::module_bodies(&artifact.bytes);
+            let wrapper = bodies
+                .iter()
+                .find(|body| body.name.starts_with("js::later#"))
+                .unwrap();
+            assert!(wrapper.calls().contains(&foreign_index.unwrap()));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }
 
 fn types(bytes: &[u8]) -> Vec<SubType> {

@@ -1633,7 +1633,7 @@ impl<'a> FunctionBuilder<'a> {
         stored.clear(function);
     }
 
-    pub(in crate::builtins) fn emit_call_promise_capability(
+    pub(crate) fn emit_call_promise_capability(
         &mut self,
         capability: &GcLocal<PromiseCapability>,
         settlement: PromiseSettlement,

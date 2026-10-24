@@ -77,7 +77,7 @@ pub(super) fn observe(
     })
 }
 
-fn field(
+pub(super) fn field(
     store: &mut impl AsContextMut<Data = WasmHostState>,
     reference: Rooted<EqRef>,
     field: GcHostField,

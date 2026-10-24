@@ -497,6 +497,15 @@ impl RuntimeModuleTypes {
         }
     }
 
+    /// Admission uses the same canonical recursive-group indices as emission.
+    pub(crate) fn canonical_layouts() -> Arc<GcLayoutRegistry> {
+        Self::register(crate::runtime_artifact::ModuleKind::Runtime(
+            crate::RuntimeSourceCompilationProfile::Portable,
+        ))
+        .runtime
+        .layouts
+    }
+
     fn build_declarations(program_globals: bool) -> RuntimeTypeDeclarations {
         use crate::{
             module::StaticSignature,
@@ -590,7 +599,7 @@ impl RuntimeModuleTypes {
         self
     }
 
-    /// Append only P's declared scalar ABI, after the complete shared GC and
+    /// Append only P's declared foreign ABI, after the complete shared GC and
     /// program-helper prefix. R's recursive identity and declaration bytes do
     /// not depend on an application's registry.
     pub(crate) fn with_foreign_modules(
@@ -612,15 +621,27 @@ impl RuntimeModuleTypes {
             self.next_type_index = index.checked_add(1).ok_or_else(|| {
                 crate::EmitError::unsupported("foreign function type exceeds the Wasm index space")
             })?;
-            let parameters = declaration
+            let mut parameters = declaration
                 .parameters()
                 .iter()
-                .map(|parameter| match parameter {
-                    scriptw_ir::foreign::ForeignScalarType::Number => ValType::F64,
-                });
-            let results = match declaration.result() {
-                scriptw_ir::foreign::ForeignResultType::Number => Some(ValType::F64),
-                scriptw_ir::foreign::ForeignResultType::Void => None,
+                .map(|parameter| {
+                    crate::foreign::foreign_value_abi_type(*parameter)
+                        .resolve(&self.runtime.layouts)
+                })
+                .collect::<Vec<_>>();
+            let results = match declaration.mode() {
+                scriptw_ir::foreign::ForeignFunctionMode::Synchronous => {
+                    crate::foreign::foreign_result_abi_type(declaration.result())
+                        .map(|result| result.resolve(&self.runtime.layouts))
+                }
+                scriptw_ir::foreign::ForeignFunctionMode::Asynchronous => {
+                    let resolver = ValType::Ref(RefType {
+                        nullable: false,
+                        heap_type: RefType::EQREF.heap_type,
+                    });
+                    parameters.extend([resolver, resolver]);
+                    None
+                }
             };
             section.ty().function(parameters, results);
             registered.register_function(id, index);

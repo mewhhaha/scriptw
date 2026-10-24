@@ -1,20 +1,20 @@
-//! Program-owned synchronous scalar imports and their persisted authority.
+//! Program-owned synchronous and asynchronous imports and their persisted authority.
 use std::collections::BTreeMap;
 
 use scriptw_ir::foreign::{
-    ForeignFunctionDeclaration, ForeignFunctionId, ForeignModuleRegistry, ForeignResultType,
-    ForeignScalarType,
+    ForeignFunctionDeclaration, ForeignFunctionId, ForeignFunctionMode, ForeignModuleRegistry,
+    ForeignResultType, ForeignValueType,
 };
 use wasm_encoder::{EntityType, ImportSection, TagKind, TagType};
 
 use crate::function_layout::{ForeignImportFunctionIndex, FunctionIndexLayout};
 use crate::EmitError;
 
-/// Canonical ABI-v1 linked requirements. Empty registries emit no section.
-pub const FOREIGN_MODULES_CUSTOM_SECTION: &str = "scriptw.foreign.v1";
+/// Canonical ABI-v2 linked requirements. Empty registries emit no section.
+pub const FOREIGN_MODULES_CUSTOM_SECTION: &str = "scriptw.foreign.v2";
 const _: () = assert!(
-    scriptw_ir::foreign::FOREIGN_ABI_VERSION == 1,
-    "AOT scalar signatures and persisted metadata must track the declared foreign ABI version"
+    scriptw_ir::foreign::FOREIGN_ABI_VERSION == 2,
+    "AOT foreign signatures and persisted metadata must track the declared foreign ABI version"
 );
 
 /// Native import type indices cannot be confused with callable function indices.
@@ -61,8 +61,9 @@ impl ForeignErrorTagIndex {
 #[derive(Clone)]
 pub(crate) struct PlannedForeignFunction {
     pub(crate) index: ForeignImportFunctionIndex,
-    pub(crate) parameters: Vec<ForeignScalarType>,
+    pub(crate) parameters: Vec<ForeignValueType>,
     pub(crate) result: ForeignResultType,
+    pub(crate) mode: ForeignFunctionMode,
 }
 
 /// Compilation-time declarations only; never Rust callbacks or ambient state.
@@ -93,6 +94,7 @@ impl ForeignImportPlan {
                     index: layout.foreign_import_index(id)?,
                     parameters: declaration.parameters().to_vec(),
                     result: declaration.result(),
+                    mode: declaration.mode(),
                 },
             );
         }
@@ -173,7 +175,7 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
                 ..
             } => {}
             Payload::Version { .. } => {
-                return Err(foreign_error("expected a core Wasm program module"))
+                return Err(foreign_error("expected a core Wasm program module"));
             }
             Payload::TypeSection(groups) => {
                 for group in groups {
@@ -216,7 +218,9 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
                             if import.module != crate::module::HOST_IMPORT_MODULE
                                 && import.module != crate::RUNTIME_IMPORT_NAMESPACE
                             {
-                                return Err(foreign_error("v1 permits only declared scalar functions and the optional error tag"));
+                                return Err(foreign_error(
+                                    "v2 permits only declared foreign functions and the optional error tag",
+                                ));
                             }
                         }
                     }
@@ -259,7 +263,7 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
             .get(*type_index as usize)
             .and_then(Option::as_ref)
             .ok_or_else(|| foreign_error("foreign import does not name a function type"))?;
-        require_scalar_signature(signature, declaration)?;
+        require_foreign_signature(signature, declaration)?;
     }
     match (registry.error_tag(), tags.as_slice()) {
         (None, []) => {}
@@ -281,26 +285,89 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
         _ => {
             return Err(foreign_error(
                 "actual error tag inventory differs from linked requirements",
-            ))
+            ));
         }
     }
     Ok(registry)
 }
 
-fn require_scalar_signature(
+/// One closed mapping drives emitted signatures and persisted admission.
+pub(crate) fn foreign_value_abi_type(value: ForeignValueType) -> crate::gc_types::AbiType {
+    use crate::gc_types::{AbiType, GcLayout, GcNullability};
+    match value {
+        ForeignValueType::Number => AbiType::F64,
+        ForeignValueType::StringUtf16 => {
+            AbiType::Gc(GcLayout::CodeUnitArray, GcNullability::NonNullable)
+        }
+        ForeignValueType::Bytes => AbiType::Gc(GcLayout::ByteArray, GcNullability::NonNullable),
+    }
+}
+
+pub(crate) fn foreign_result_abi_type(
+    result: ForeignResultType,
+) -> Option<crate::gc_types::AbiType> {
+    match result {
+        ForeignResultType::Number => Some(foreign_value_abi_type(ForeignValueType::Number)),
+        ForeignResultType::StringUtf16 => {
+            Some(foreign_value_abi_type(ForeignValueType::StringUtf16))
+        }
+        ForeignResultType::Bytes => Some(foreign_value_abi_type(ForeignValueType::Bytes)),
+        ForeignResultType::Void => None,
+    }
+}
+
+fn require_foreign_signature(
     actual: &wasmparser::FuncType,
     declaration: &ForeignFunctionDeclaration,
 ) -> Result<(), EmitError> {
-    let parameters = declaration
+    use crate::gc_types::{AbiType, RuntimeModuleTypes};
+    // Concrete references must identify the shared canonical schema slot,
+    // rather than any structurally similar array in an unrelated type group.
+    let parser_type = |value: AbiType| match value {
+        AbiType::F64 => wasmparser::ValType::F64,
+        AbiType::Gc(layout, nullable) => {
+            let layouts = RuntimeModuleTypes::canonical_layouts();
+            let wasm_encoder::HeapType::Concrete(index) =
+                layouts.reference(layout, nullable).heap_type
+            else {
+                unreachable!("registered GC layouts always have concrete indices")
+            };
+            wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    nullable.is_nullable(),
+                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index)),
+                )
+                .expect("the emitted canonical type index fits Wasm"),
+            )
+        }
+        AbiType::I32 | AbiType::I64 | AbiType::EqRef | AbiType::ExternRef(_) => {
+            unreachable!("foreign transfer types have only numeric or canonical array storage")
+        }
+    };
+    let mut parameters = declaration
         .parameters()
         .iter()
-        .map(|parameter| match parameter {
-            ForeignScalarType::Number => wasmparser::ValType::F64,
-        })
+        .map(|parameter| parser_type(foreign_value_abi_type(*parameter)))
         .collect::<Vec<_>>();
-    let results = match declaration.result() {
-        ForeignResultType::Number => vec![wasmparser::ValType::F64],
-        ForeignResultType::Void => Vec::new(),
+    let results = match declaration.mode() {
+        ForeignFunctionMode::Synchronous => foreign_result_abi_type(declaration.result())
+            .map(parser_type)
+            .into_iter()
+            .collect::<Vec<_>>(),
+        ForeignFunctionMode::Asynchronous => {
+            let resolver = wasmparser::ValType::Ref(
+                wasmparser::RefType::new(
+                    false,
+                    wasmparser::HeapType::Abstract {
+                        shared: false,
+                        ty: wasmparser::AbstractHeapType::Eq,
+                    },
+                )
+                .expect("eqref has a valid representation"),
+            );
+            parameters.extend([resolver, resolver]);
+            Vec::new()
+        }
     };
     if actual.params() != parameters || actual.results() != results {
         return Err(foreign_error(

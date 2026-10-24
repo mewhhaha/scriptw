@@ -6,11 +6,11 @@
 
 use scriptw_ir::ToPrimitiveHint;
 
-use crate::RuntimeErrorMessage;
 use crate::code_sink::Function;
 use crate::gc_types::*;
 use crate::module::StaticSignature;
 use crate::program_hooks::InstalledHook;
+use crate::RuntimeErrorMessage;
 use wasm_encoder::Instruction;
 
 /// Maximum bytes for one RegExp matcher's transient choice-frame arena.
@@ -1055,6 +1055,15 @@ macro_rules! runtime_helper_domain {
 }
 
 runtime_helper_domain! {
+    EmbeddingExport / EmbeddingExportArguments / EmbeddingExportParameters / "embedding_export" { key:(Ref StringValue NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
+    EmbeddingCall / EmbeddingCallArguments / EmbeddingCallParameters / "embedding_call" { callee:Value,this_value:Value,arguments:(Ref ValueArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    EmbeddingRead / EmbeddingReadArguments / EmbeddingReadParameters / "embedding_read" { target:Value,key:(Ref StringValue NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    EmbeddingCheckpoint / EmbeddingCheckpointArguments / EmbeddingCheckpointParameters / "embedding_checkpoint" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
+    EmbeddingString / EmbeddingStringArguments / EmbeddingStringParameters / "embedding_string" { units:(Ref CodeUnitArray NonNullable) } => Completion;
+    EmbeddingBytes / EmbeddingBytesArguments / EmbeddingBytesParameters / "embedding_bytes" { bytes:(Ref ByteArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
+    EmbeddingBytesRead / EmbeddingBytesReadArguments / EmbeddingBytesReadParameters / "embedding_bytes_read" { value:Value } => (Ref ByteArray Nullable);
+    EmbeddingPromise / EmbeddingPromiseArguments / EmbeddingPromiseParameters / "embedding_promise" { value:Value } => StatusCompletion;
+    EmbeddingCancel / EmbeddingCancelArguments / EmbeddingCancelParameters / "embedding_cancel" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
     TransientByteAlloc / TransientByteAllocArguments / TransientByteAllocParameters / "transient_byte_alloc" { size:I64 } => I64;
     ArrayIndexedPublishDefaultData / ArrayIndexedPublishDefaultDataArguments / ArrayIndexedPublishDefaultDataParameters / "array_indexed_publish_default_data" { array:(Ref ArrayObject NonNullable),index:I64,value:Value } => Void;
     ArrayIndexedPublish / ArrayIndexedPublishArguments / ArrayIndexedPublishParameters / "array_indexed_publish" { storage:(Ref ArrayIndexStorage NonNullable),index:I64,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
@@ -1201,6 +1210,14 @@ impl RuntimeHelperId {
     }
     pub(crate) const fn owner(self) -> HelperOwner {
         match self {
+            Self::EmbeddingExport | Self::EmbeddingCheckpoint => HelperOwner::Program,
+            Self::EmbeddingCall
+            | Self::EmbeddingRead
+            | Self::EmbeddingString
+            | Self::EmbeddingBytes
+            | Self::EmbeddingBytesRead
+            | Self::EmbeddingPromise
+            | Self::EmbeddingCancel => HelperOwner::Runtime,
             Self::TransientByteAlloc => HelperOwner::Runtime,
             Self::ArrayIndexedPublishDefaultData => HelperOwner::Runtime,
             Self::ArrayIndexedPublish => HelperOwner::Runtime,
@@ -1333,6 +1350,15 @@ impl RuntimeHelperId {
     }
     pub(crate) const fn is_emitted(self, emission: RuntimeHelperEmission) -> bool {
         match self {
+            Self::EmbeddingExport
+            | Self::EmbeddingCheckpoint
+            | Self::EmbeddingCall
+            | Self::EmbeddingRead
+            | Self::EmbeddingString
+            | Self::EmbeddingBytes
+            | Self::EmbeddingBytesRead
+            | Self::EmbeddingPromise
+            | Self::EmbeddingCancel => true,
             Self::TransientByteAlloc => true,
             Self::ArrayIndexedPublishDefaultData => true,
             Self::ArrayIndexedPublish => true,
@@ -1570,12 +1596,10 @@ mod tests {
             vec!["generic-error", "current-function-realm-range-error"]
         );
         for failure in RegExpMatcherFailure::ALL {
-            assert!(
-                failure
-                    .message()
-                    .catalog_text()
-                    .is_some_and(|text| !text.is_empty())
-            );
+            assert!(failure
+                .message()
+                .catalog_text()
+                .is_some_and(|text| !text.is_empty()));
         }
     }
 
@@ -1696,11 +1720,9 @@ mod tests {
                 ))
             );
         }
-        assert!(
-            RuntimeHelperId::PooledStringsInitialize
-                .parameter_types()
-                .is_empty()
-        );
+        assert!(RuntimeHelperId::PooledStringsInitialize
+            .parameter_types()
+            .is_empty());
     }
 
     #[test]

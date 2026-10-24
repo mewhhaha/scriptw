@@ -86,7 +86,7 @@ impl FunctionBuilder<'_> {
         Ok(record)
     }
 
-    pub(super) fn module_namespace_cell(
+    pub(crate) fn module_namespace_cell(
         &self,
         record: &GcLocal<ModuleRecord>,
         mode: ModuleNamespaceModeIr,

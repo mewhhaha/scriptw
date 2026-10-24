@@ -26,6 +26,7 @@ pub enum GcHostLayout {
     Environment,
     ProgramInstance,
     RealmRecord,
+    ModuleGraph,
 }
 
 impl GcHostLayout {
@@ -39,6 +40,7 @@ impl GcHostLayout {
             Self::Environment => Some(Environment::FIELD_COUNT),
             Self::ProgramInstance => Some(ProgramInstance::FIELD_COUNT),
             Self::RealmRecord => Some(RealmRecord::FIELD_COUNT),
+            Self::ModuleGraph => Some(ModuleGraph::FIELD_COUNT),
             Self::PrivateEnvironment => Some(PrivateEnvironment::FIELD_COUNT),
             Self::FunctionObject => Some(FunctionObject::FIELD_COUNT),
             Self::DirectEvalExecutionContext => Some(DirectEvalExecutionContext::FIELD_COUNT),
@@ -83,6 +85,7 @@ impl GcHostLayout {
             | Self::Environment
             | Self::ProgramInstance
             | Self::RealmRecord
+            | Self::ModuleGraph
             | Self::PrivateEnvironment
             | Self::FunctionObject
             | Self::DirectEvalExecutionContext
@@ -116,6 +119,7 @@ impl GcHostLayout {
             | Self::Environment
             | Self::ProgramInstance
             | Self::RealmRecord
+            | Self::ModuleGraph
             | Self::PrivateEnvironment
             | Self::FunctionObject
             | Self::DirectEvalExecutionContext
@@ -158,6 +162,7 @@ host_targets!(StringValue => String, CodeUnitArray => CodeUnits,
     ImmutableByteArray => ImmutableByteArray, PrivateNameTable => PrivateNameTable,
     PrivateEnvironment => PrivateEnvironment,
     FunctionObject => FunctionObject,
+    ModuleGraph => ModuleGraph,
     DirectEvalExecutionContext => DirectEvalExecutionContext,
     DirectEvalDerivedBindings => DirectEvalDerivedBindings,
     BindingCell => BindingCell,
@@ -218,6 +223,7 @@ pub enum GcHostField {
     CompletionNext,
     CompletionReturnStage,
     ContextDefiningProgram,
+    ContextRealm,
     ContextInstanceElementsInitializer,
     PrivateEnvironmentParent,
     PrivateEnvironmentClassScope,
@@ -236,6 +242,9 @@ pub enum GcHostField {
     ContextActiveFunction,
     FunctionObjectContext,
     FunctionObjectDerivedConstructor,
+    RealmModules,
+    RealmGlobalEnvironment,
+    ModuleGraphProgram,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -312,6 +321,9 @@ where
 impl GcHostField {
     pub const fn definition(self) -> GcHostFieldDefinition {
         match self {
+            Self::RealmModules => reference_field(&RealmRecordSchema::MODULES),
+            Self::RealmGlobalEnvironment => reference_field(&RealmRecordSchema::GLOBAL_ENVIRONMENT),
+            Self::ModuleGraphProgram => reference_field(&ModuleGraphSchema::PROGRAM),
             Self::ContextInstanceElementsInitializer => {
                 function_field(&FunctionContextSchema::INSTANCE_ELEMENTS_INITIALIZER)
             }
@@ -364,6 +376,7 @@ impl GcHostField {
             Self::FunctionObjectDerivedConstructor => {
                 scalar_field(&FunctionObjectSchema::DERIVED_CONSTRUCTOR)
             }
+            Self::ContextRealm => reference_field(&FunctionContextSchema::REALM),
             Self::ContextDefiningProgram => {
                 reference_field(&FunctionContextSchema::DEFINING_PROGRAM)
             }
@@ -414,7 +427,7 @@ impl GcHostValue {
         };
         match storage {
             GcHostValueStorage::Scalar if has_reference => {
-                return Err("scalar value has a GC reference")
+                return Err("scalar value has a GC reference");
             }
             GcHostValueStorage::Scalar => {}
             GcHostValueStorage::String

@@ -1,4 +1,4 @@
-//! Explicit, normalized capabilities for synchronous foreign scalar modules.
+//! Explicit, normalized capabilities for foreign host modules.
 //!
 //! These declarations authorize emitted Wasm imports. They are independent of
 //! the compiler-owned JavaScript builtin catalog and contain no host closures.
@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use crate::TypedExpr;
 
-pub const FOREIGN_ABI_VERSION: u32 = 1;
+pub const FOREIGN_ABI_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForeignDeclarationError(String);
@@ -23,19 +23,32 @@ impl std::fmt::Display for ForeignDeclarationError {
 }
 impl std::error::Error for ForeignDeclarationError {}
 
-/// A strict JavaScript Number maps to one Wasm f64. No ToNumber is performed.
+/// Strict boundary types. Strings preserve every UTF-16 code unit; bytes are
+/// copied Uint8Array contents. Marshalling never invokes user coercion hooks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ForeignScalarType {
+pub enum ForeignValueType {
     Number,
+    StringUtf16,
+    Bytes,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ForeignResultType {
     Number,
+    StringUtf16,
+    Bytes,
     Void,
 }
 
-/// The only supported expected-error tag in ABI v1. Its payload is one i32.
+/// Async imports receive two GC-rooted resolving functions and return no Wasm
+/// result. Their declared result describes the eventual Promise fulfillment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForeignFunctionMode {
+    Synchronous,
+    Asynchronous,
+}
+
+/// The explicitly declared numerical `error_v1` tag. Its payload is one i32.
 /// Absence of this explicit declaration leaves ordinary host failures as traps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ForeignErrorTag(());
@@ -56,8 +69,9 @@ pub struct ForeignFunctionDeclaration {
     js_export: String,
     import_module: String,
     import_name: String,
-    parameters: Vec<ForeignScalarType>,
+    parameters: Vec<ForeignValueType>,
     result: ForeignResultType,
+    mode: ForeignFunctionMode,
 }
 
 fn nonempty(value: &str, role: &str) -> Result<(), ForeignDeclarationError> {
@@ -74,8 +88,43 @@ impl ForeignFunctionDeclaration {
         js_export: impl Into<String>,
         import_module: impl Into<String>,
         import_name: impl Into<String>,
-        parameters: Vec<ForeignScalarType>,
+        parameters: Vec<ForeignValueType>,
         result: ForeignResultType,
+    ) -> Result<Self, ForeignDeclarationError> {
+        Self::with_mode(
+            js_export,
+            import_module,
+            import_name,
+            parameters,
+            result,
+            ForeignFunctionMode::Synchronous,
+        )
+    }
+
+    pub fn new_async(
+        js_export: impl Into<String>,
+        import_module: impl Into<String>,
+        import_name: impl Into<String>,
+        parameters: Vec<ForeignValueType>,
+        result: ForeignResultType,
+    ) -> Result<Self, ForeignDeclarationError> {
+        Self::with_mode(
+            js_export,
+            import_module,
+            import_name,
+            parameters,
+            result,
+            ForeignFunctionMode::Asynchronous,
+        )
+    }
+
+    fn with_mode(
+        js_export: impl Into<String>,
+        import_module: impl Into<String>,
+        import_name: impl Into<String>,
+        parameters: Vec<ForeignValueType>,
+        result: ForeignResultType,
+        mode: ForeignFunctionMode,
     ) -> Result<Self, ForeignDeclarationError> {
         let js_export = js_export.into();
         let import_module = import_module.into();
@@ -91,15 +140,26 @@ impl ForeignFunctionDeclaration {
                 "foreign import namespace {import_module:?} is reserved by Scriptw"
             )));
         }
-        u32::try_from(parameters.len()).map_err(|_| {
-            ForeignDeclarationError::new("foreign parameter count exceeds the Wasm index domain")
-        })?;
+        u32::try_from(parameters.len())
+            .ok()
+            .and_then(|count| {
+                count.checked_add(match mode {
+                    ForeignFunctionMode::Synchronous => 0,
+                    ForeignFunctionMode::Asynchronous => 2,
+                })
+            })
+            .ok_or_else(|| {
+                ForeignDeclarationError::new(
+                    "foreign parameter count exceeds the Wasm index domain",
+                )
+            })?;
         Ok(Self {
             js_export,
             import_module,
             import_name,
             parameters,
             result,
+            mode,
         })
     }
     pub fn js_export(&self) -> &str {
@@ -111,11 +171,14 @@ impl ForeignFunctionDeclaration {
     pub fn import_name(&self) -> &str {
         &self.import_name
     }
-    pub fn parameters(&self) -> &[ForeignScalarType] {
+    pub fn parameters(&self) -> &[ForeignValueType] {
         &self.parameters
     }
     pub const fn result(&self) -> ForeignResultType {
         self.result
+    }
+    pub const fn mode(&self) -> ForeignFunctionMode {
+        self.mode
     }
 }
 
@@ -294,8 +357,9 @@ impl ForeignModuleRegistry {
             "modules": self.modules.iter().map(|module| serde_json::json!({
                 "specifier": module.specifier(), "functions": module.functions().iter().map(|function| serde_json::json!({
                     "export": function.js_export(), "module": function.import_module(), "name": function.import_name(),
-                    "mode": "sync", "parameters": function.parameters().iter().map(|parameter| match parameter { ForeignScalarType::Number => "number" }).collect::<Vec<_>>(),
-                    "result": match function.result() { ForeignResultType::Number => "number", ForeignResultType::Void => "void" }
+                    "mode": match function.mode() { ForeignFunctionMode::Synchronous => "sync", ForeignFunctionMode::Asynchronous => "async" },
+                    "parameters": function.parameters().iter().map(|parameter| match parameter { ForeignValueType::Number => "number", ForeignValueType::StringUtf16 => "utf16", ForeignValueType::Bytes => "bytes" }).collect::<Vec<_>>(),
+                    "result": match function.result() { ForeignResultType::Number => "number", ForeignResultType::StringUtf16 => "utf16", ForeignResultType::Bytes => "bytes", ForeignResultType::Void => "void" }
                 })).collect::<Vec<_>>()
             })).collect::<Vec<_>>()
         })).expect("validated registry serializes")
@@ -348,29 +412,48 @@ impl ForeignModuleRegistry {
                     function,
                     &["export", "module", "name", "mode", "parameters", "result"],
                 )?;
-                if text(function, "mode")? != "sync" {
-                    return Err(ForeignDeclarationError::new(
-                        "asynchronous foreign functions are unsupported by scalar ABI v1",
-                    ));
-                }
-                let parameters = function["parameters"].as_array().ok_or_else(|| ForeignDeclarationError::new("foreign parameters must be an array"))?.iter().map(|parameter| match parameter.as_str() {
-                    Some("number") => Ok(ForeignScalarType::Number),
-                    _ => Err(ForeignDeclarationError::new("unsupported foreign parameter type; scalar ABI v1 accepts strict number only"))
-                }).collect::<Result<Vec<_>, _>>()?;
-                let result =
-                    match text(function, "result")? {
-                        "number" => ForeignResultType::Number,
-                        "void" => ForeignResultType::Void,
-                        _ => return Err(ForeignDeclarationError::new(
-                            "unsupported foreign result type; scalar ABI v1 accepts number or void",
+                let mode = match text(function, "mode")? {
+                    "sync" => ForeignFunctionMode::Synchronous,
+                    "async" => ForeignFunctionMode::Asynchronous,
+                    _ => {
+                        return Err(ForeignDeclarationError::new(
+                            "unsupported foreign function mode",
+                        ))
+                    }
+                };
+                let parameters = function["parameters"]
+                    .as_array()
+                    .ok_or_else(|| {
+                        ForeignDeclarationError::new("foreign parameters must be an array")
+                    })?
+                    .iter()
+                    .map(|parameter| match parameter.as_str() {
+                        Some("number") => Ok(ForeignValueType::Number),
+                        Some("utf16") => Ok(ForeignValueType::StringUtf16),
+                        Some("bytes") => Ok(ForeignValueType::Bytes),
+                        _ => Err(ForeignDeclarationError::new(
+                            "unsupported foreign parameter type",
                         )),
-                    };
-                functions.push(ForeignFunctionDeclaration::new(
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let result = match text(function, "result")? {
+                    "number" => ForeignResultType::Number,
+                    "utf16" => ForeignResultType::StringUtf16,
+                    "bytes" => ForeignResultType::Bytes,
+                    "void" => ForeignResultType::Void,
+                    _ => {
+                        return Err(ForeignDeclarationError::new(
+                            "unsupported foreign result type",
+                        ))
+                    }
+                };
+                functions.push(ForeignFunctionDeclaration::with_mode(
                     text(function, "export")?,
                     text(function, "module")?,
                     text(function, "name")?,
                     parameters,
                     result,
+                    mode,
                 )?);
             }
             modules.push(ForeignModuleDeclaration::new(

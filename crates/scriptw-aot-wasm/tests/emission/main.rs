@@ -14,6 +14,7 @@ mod async_generator_scheduling_size;
 mod async_labelled_region_emission;
 mod class_initializer_function_identity;
 mod constant_number_condition_emission;
+mod embedding;
 mod emit_golden;
 mod foreign_functions;
 mod host_html_dda_structure;

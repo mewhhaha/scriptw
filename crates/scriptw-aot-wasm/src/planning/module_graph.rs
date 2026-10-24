@@ -106,6 +106,10 @@ impl ModuleGraphPlan {
         self.script_import_dispatchers.get(&phase)
     }
 
+    pub(crate) fn module_entry(&self) -> Option<scriptw_ir::ModuleUnitId> {
+        self.graph.module_entry()
+    }
+
     pub(crate) fn record_count(&self) -> u32 {
         self.graph.record_count()
     }

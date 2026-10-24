@@ -1,26 +1,22 @@
 use super::*;
 use crate::foreign::{
     ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
-    ForeignScalarType,
+    ForeignValueType,
 };
 
 fn registry(import: &str, count: usize, result: ForeignResultType) -> ForeignModuleRegistry {
-    ForeignModuleRegistry::new(vec![
-        ForeignModuleDeclaration::new(
-            "dd:host",
-            vec![
-                ForeignFunctionDeclaration::new(
-                    "add",
-                    "dd",
-                    import,
-                    vec![ForeignScalarType::Number; count],
-                    result,
-                )
-                .unwrap(),
-            ],
+    ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "dd:host",
+        vec![ForeignFunctionDeclaration::new(
+            "add",
+            "dd",
+            import,
+            vec![ForeignValueType::Number; count],
+            result,
         )
-        .unwrap(),
-    ])
+        .unwrap()],
+    )
+    .unwrap()])
     .unwrap()
 }
 
@@ -65,16 +61,14 @@ fn foreign_artifact_roundtrip_keeps_only_linked_capabilities_without_sources() {
     let add = registry("add", 2, ForeignResultType::Number);
     let unused = ForeignModuleDeclaration::new(
         "dd:unused",
-        vec![
-            ForeignFunctionDeclaration::new(
-                "unused",
-                "unused",
-                "unused",
-                vec![],
-                ForeignResultType::Void,
-            )
-            .unwrap(),
-        ],
+        vec![ForeignFunctionDeclaration::new(
+            "unused",
+            "unused",
+            "unused",
+            vec![],
+            ForeignResultType::Void,
+        )
+        .unwrap()],
     )
     .unwrap();
     let available = ForeignModuleRegistry::new(vec![add.modules()[0].clone(), unused]).unwrap();

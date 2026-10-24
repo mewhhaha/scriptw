@@ -61,8 +61,13 @@ mod call_rows;
 mod code_sink;
 mod control_flow;
 mod data;
+mod embedding_bridge;
 mod emission_sites;
 mod emit;
+pub use embedding_bridge::{
+    EMBEDDING_BYTES, EMBEDDING_BYTES_READ, EMBEDDING_CALL, EMBEDDING_CANCEL, EMBEDDING_CHECKPOINT,
+    EMBEDDING_EXPORT, EMBEDDING_PROMISE, EMBEDDING_READ, EMBEDDING_STRING,
+};
 mod emitted_function;
 mod environments;
 mod expressions;

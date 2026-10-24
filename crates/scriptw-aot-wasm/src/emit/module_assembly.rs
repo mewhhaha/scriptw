@@ -5,7 +5,7 @@ use crate::runtime_artifact::{EmittedModule, ModuleKind, RuntimeLayout};
 use crate::runtime_helpers::ProgramHook;
 
 use super::*;
-use scriptw_intl::{INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION, IntlDataSelection};
+use scriptw_intl::{IntlDataSelection, INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION};
 use wasm_encoder::{
     ConstExpr, DataSection, ExportKind, ExportSection, GlobalType, ImportSection, MemorySection,
     MemoryType, Module,
@@ -22,9 +22,9 @@ use native_program::NativeProgramFactory;
 pub(crate) use native_program::{
     emit_runtime_direct_eval_module, emit_runtime_global_script_module,
 };
-use program_entries::ProgramExports;
 pub(crate) use program_entries::emit_runtime_function_module;
 pub(super) use program_entries::emit_script_module;
+use program_entries::ProgramExports;
 
 fn emit_script_module_with_factory(
     script: &ScriptIr,
@@ -1406,6 +1406,13 @@ fn emit_script_module_with_factory(
             AsyncGeneratorYieldReactions, compile_async_generator_yield_reactions_helper;
             AsyncGeneratorYieldReturnReactions, compile_async_generator_yield_return_reactions_helper;
             AsyncGeneratorAwaitReturnReactions, compile_async_generator_await_return_reactions_helper;
+            EmbeddingCall, compile_embedding_call;
+            EmbeddingRead, compile_embedding_read;
+            EmbeddingString, compile_embedding_string;
+            EmbeddingBytes, compile_embedding_bytes;
+            EmbeddingBytesRead, compile_embedding_bytes_read;
+            EmbeddingPromise, compile_embedding_promise;
+            EmbeddingCancel, compile_embedding_cancel;
         );
     }
     if compile_program_helpers {
@@ -1417,6 +1424,7 @@ fn emit_script_module_with_factory(
             &runtime_bootstrap_plan,
             runtime_helper_base,
             provided_hooks,
+            promise_rejection_policy,
             &mut helper_bodies,
         )?;
     }
@@ -1437,6 +1445,7 @@ fn emit_script_module_with_factory(
         module_package.schema(),
         module_package.global_prelude_phase(),
         script.module_entry_evaluation().is_some(),
+        runtime_helper_base,
         &mut exports,
     );
 

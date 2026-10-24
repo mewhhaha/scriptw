@@ -104,13 +104,21 @@ impl ScriptLowerer<'_> {
             let Expression::ArrayLiteral(arguments) = expression else {
                 panic!("foreign operation is owned by its trusted argument scaffold");
             };
-            let result = self
+            let declaration = self
                 .analysis
                 .module_execution
                 .foreign_modules
                 .function(function)
-                .expect("linked foreign declaration")
-                .result();
+                .expect("linked foreign declaration");
+            let kind = match declaration.mode() {
+                crate::foreign::ForeignFunctionMode::Asynchronous => ValueKind::Object,
+                crate::foreign::ForeignFunctionMode::Synchronous => match declaration.result() {
+                    crate::foreign::ForeignResultType::Number => ValueKind::Number,
+                    crate::foreign::ForeignResultType::StringUtf16 => ValueKind::String,
+                    crate::foreign::ForeignResultType::Bytes => ValueKind::Object,
+                    crate::foreign::ForeignResultType::Void => ValueKind::Undefined,
+                },
+            };
             let operands = arguments
                 .as_ref()
                 .iter()
@@ -125,10 +133,7 @@ impl ScriptLowerer<'_> {
             );
             self.invalidate_unknown_user_code_effects();
             return Some(TypedExpr::from_info(
-                ValueInfo::new(match result {
-                    crate::foreign::ForeignResultType::Number => ValueKind::Number,
-                    crate::foreign::ForeignResultType::Void => ValueKind::Undefined,
-                }),
+                ValueInfo::new(kind),
                 ExprIr::ForeignCall(Box::new(call)),
             ));
         }

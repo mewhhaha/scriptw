@@ -8,6 +8,7 @@ mod array_buffer;
 mod backing;
 mod data_view;
 mod float16;
+mod foreign_value;
 mod module_value;
 mod typed_array;
 
@@ -90,7 +91,7 @@ impl FunctionBuilder<'_> {
         exit: ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_throw_current_function_realm_type_error(message, output, f)?;
+        self.emit_throw_runtime_error(scriptw_ir::NativeErrorKind::TypeError, message, output, f)?;
         self.emit_branch_to_target(exit, f);
         Ok(())
     }
@@ -101,7 +102,7 @@ impl FunctionBuilder<'_> {
         exit: ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_throw_current_function_realm_range_error(message, output, f)?;
+        self.emit_throw_runtime_error(scriptw_ir::NativeErrorKind::RangeError, message, output, f)?;
         self.emit_branch_to_target(exit, f);
         Ok(())
     }

@@ -5,7 +5,7 @@ use crate::{FunctionId, ModuleNamespaceModeIr, ModuleUnitId};
 /// Source-goal authority for the root that owns a compiled module graph.
 /// A Module entry evaluates its activation; a Script runs in its own root
 /// environment and only its import jobs evaluate module activations.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ModuleExecutionEntry {
     Module(ModuleUnitId),
     Script(ModuleUnitId),
@@ -122,7 +122,7 @@ pub struct ModuleExecutionGraphIr {
     realm_requests:
         std::collections::BTreeMap<super::ModuleRequestKeyIr, super::RealmModuleResolutionIr>,
     realm_import_dispatcher: Option<FunctionId>,
-    script_entry: Option<ModuleUnitId>,
+    entry: ModuleExecutionEntry,
     script_import_dispatchers: std::collections::BTreeMap<super::ImportPhaseIr, FunctionId>,
 }
 
@@ -199,10 +199,7 @@ impl ModuleExecutionGraphIr {
             initializer: None,
             realm_requests: Default::default(),
             realm_import_dispatcher: None,
-            script_entry: match entry {
-                ModuleExecutionEntry::Script(script) => Some(script),
-                ModuleExecutionEntry::Module(_) => None,
-            },
+            entry,
             script_import_dispatchers: Default::default(),
         }
     }
@@ -253,7 +250,7 @@ impl ModuleExecutionGraphIr {
         dispatchers: std::collections::BTreeMap<super::ImportPhaseIr, FunctionId>,
     ) -> Self {
         assert!(
-            self.script_entry.is_some() || dispatchers.is_empty(),
+            matches!(self.entry, ModuleExecutionEntry::Script(_)) || dispatchers.is_empty(),
             "Script-origin imports require an actual Script record"
         );
         self.script_import_dispatchers = dispatchers;
@@ -269,9 +266,17 @@ impl ModuleExecutionGraphIr {
         referrer: ModuleUnitId,
         phase: super::ImportPhaseIr,
     ) -> Option<&FunctionId> {
-        (self.script_entry == Some(referrer))
+        (self.entry == ModuleExecutionEntry::Script(referrer))
             .then(|| self.script_import_dispatchers.get(&phase))
             .flatten()
+    }
+
+    /// The actual Module entry, distinguished from a Script importing modules.
+    pub const fn module_entry(&self) -> Option<ModuleUnitId> {
+        match self.entry {
+            ModuleExecutionEntry::Module(module) => Some(module),
+            ModuleExecutionEntry::Script(_) => None,
+        }
     }
 
     pub fn realm_requests(

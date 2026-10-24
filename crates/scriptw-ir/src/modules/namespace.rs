@@ -688,6 +688,12 @@ pub(crate) fn ensure_namespace(
 /// object too even though nobody imports it directly.
 pub(crate) fn collect_observed_namespaces(graph: &mut ModuleGraphIr) {
     let mut observed = BTreeSet::new();
+    // The host may retain the entry namespace after its one evaluation. Use
+    // the same canonical readers and cells as import * and import(), so reads
+    // remain live without replaying initialization or copying export values.
+    if !graph.entry_is_script && graph.link_errors.is_empty() {
+        observed.insert((graph.entry, ModuleNamespaceModeIr::Eager));
+    }
     for (_, _, unit) in graph.materialized_units() {
         // `import * as ns from "m"`, and `export * as ns from "m"` re-exported
         // onward. Both hand `m`'s `UnitCellRole::Namespace` cell to a reader, so
@@ -776,6 +782,33 @@ mod tests {
         let mut graph = super::super::build_graph(&sources).expect("graph should build");
         super::super::link(&mut graph);
         graph
+    }
+
+    #[test]
+    fn host_observes_only_the_actual_module_entry_namespace() {
+        let mut graph = graph_of(&[
+            ("entry", "export let live = 1; export default () => ++live;"),
+            ("unobserved", "export const value = 2;"),
+        ]);
+        collect_observed_namespaces(&mut graph);
+        let namespace = graph.units[0]
+            .namespaces
+            .get(&ModuleNamespaceModeIr::Eager)
+            .expect("Module entry has its canonical eager namespace");
+        assert!(namespace
+            .own_property_keys()
+            .contains(&&ExportName::new("live")));
+        assert!(namespace
+            .own_property_keys()
+            .contains(&&ExportName::default_export()));
+        assert!(graph.units[1].namespaces.is_empty());
+        let mut script = graph_of(&[("entry", "export const value = 1;")]);
+        script.entry_is_script = true;
+        collect_observed_namespaces(&mut script);
+        assert!(
+            script.units[0].namespaces.is_empty(),
+            "Script roots have no host module namespace"
+        );
     }
 
     /// `[[OwnPropertyKeys]]` sorts by UTF-16 code unit, which differs from the

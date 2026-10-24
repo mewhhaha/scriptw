@@ -1,7 +1,7 @@
 use super::*;
 use scriptw_ir::foreign::{
     ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignModuleRegistry, ForeignResultType,
-    ForeignScalarType,
+    ForeignValueType,
 };
 
 fn registry() -> ForeignModuleRegistry {
@@ -11,7 +11,7 @@ fn registry() -> ForeignModuleRegistry {
             "add",
             "dd",
             "add",
-            vec![ForeignScalarType::Number; 2],
+            vec![ForeignValueType::Number; 2],
             ForeignResultType::Number,
         )
         .unwrap()],

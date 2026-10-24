@@ -16,22 +16,22 @@ use std::sync::{Arc, Mutex, OnceLock};
 use sha2::{Digest, Sha256};
 use wasm_encoder::{EntityType, ExportKind, ExportSection, GlobalType, ImportSection};
 
-use crate::EmitError;
 use crate::data::{PoolBoundary, StringPool};
+use crate::EmitError;
 
 mod build_package;
 mod cache;
 mod residency;
 mod source_compilation;
 pub use source_compilation::{
-    RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION, RuntimeSourceCompilationProfile,
+    RuntimeSourceCompilationProfile, RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
 };
 mod validated_profile;
 mod validation;
 pub use build_package::{
-    RuntimeArtifactInputs, RuntimeBuildArtifact, admit_portable_runtime_package,
-    build_runtime_artifact, build_runtime_artifact_with_source_compilation_profile,
-    encode_portable_runtime_package,
+    admit_portable_runtime_package, build_runtime_artifact,
+    build_runtime_artifact_with_source_compilation_profile, encode_portable_runtime_package,
+    RuntimeArtifactInputs, RuntimeBuildArtifact,
 };
 pub use cache::{RuntimeArtifactCache, RuntimeArtifactCacheKey};
 pub use validated_profile::ValidatedRuntimeArtifact;
@@ -59,7 +59,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Its read-cache boundary carries lookup, original receiver and canonical key.
 // Version 19 indexes per-program cache metadata directly and gives Map/Set
 // cursors stable insertion ordinals across bounded history compaction.
-const LAYOUT_VERSION: u32 = 19;
+// Version 20 adds the checked retained embedding call/read/checkpoint kernels.
+const LAYOUT_VERSION: u32 = 20;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

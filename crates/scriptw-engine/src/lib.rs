@@ -1,18 +1,18 @@
 use scriptw_aot_wasm::{
-    MODULE_EVALUATION_STATUS_EXPORT, WasmModuleEvaluationStatus, WasmRuntimeValueTag,
+    WasmModuleEvaluationStatus, WasmRuntimeValueTag, MODULE_EVALUATION_STATUS_EXPORT,
 };
-use scriptw_front::{ParseDiagnostic, ParseGoal, ParseOptions, ParsedSource, SourceUnit, parse};
+use scriptw_front::{parse, ParseDiagnostic, ParseGoal, ParseOptions, ParsedSource, SourceUnit};
 use scriptw_intl::{
-    CanonicalizeLocale, EmbeddedIntlProvider, INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
-    IntlDataIdentity, IntlHostOp, IntlKernel, LocaleId, LocaleTransformError,
-    LocaleTransformRequest, MaximizeLocale, MinimizeLocale,
+    CanonicalizeLocale, EmbeddedIntlProvider, IntlDataIdentity, IntlHostOp, IntlKernel, LocaleId,
+    LocaleTransformError, LocaleTransformRequest, MaximizeLocale, MinimizeLocale,
+    INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
 };
 use scriptw_ir::{
-    CompletionKindIr, DynamicSourceRuntimeOperation, IrDiagnostic, ProgramIr, RuntimeSemanticGap,
-    RuntimeSemanticRejection, ValueKind, script_has_dynamic_import,
+    script_has_dynamic_import, CompletionKindIr, DynamicSourceRuntimeOperation, IrDiagnostic,
+    ProgramIr, RuntimeSemanticGap, RuntimeSemanticRejection, ValueKind,
 };
-use scriptw_runtime::AgentHostOperation;
 pub use scriptw_runtime::rooted_snapshot::{SnapshotCompletion, SnapshotLimits, SnapshotOutcome};
+use scriptw_runtime::AgentHostOperation;
 use sha2::{Digest, Sha256};
 use wasmparser::{Parser as WasmParser, Payload as WasmPayload};
 use wasmtime::{
@@ -40,28 +40,30 @@ pub use compilation_profile::{
 pub use compiler_inspection::{CompilerInspectionFailure, CompilerInspectionStage};
 mod runtime_profile;
 pub use compiler_cache_identity::{
-    CompilerCacheIdentity, CompilerCacheImageHashAlgorithm, compiler_cache_identity,
+    compiler_cache_identity, CompilerCacheIdentity, CompilerCacheImageHashAlgorithm,
 };
 pub use compiler_identity::{
     CompilerCommitId, CompilerDigest, CompilerIdentity, CompilerSourceRevision,
 };
 pub use memory_module_cache::{
-    WasmRuntimeModuleCacheObservation, wasm_runtime_module_cache_observation,
+    wasm_runtime_module_cache_observation, WasmRuntimeModuleCacheObservation,
 };
 pub use runtime_profile::{
-    WasmProcessMemoryObservation, WasmProcessMemorySample, WasmProcessMemoryScope,
-    WasmProcessMemoryUnavailable, WasmProfileGcInitialCapacity, WasmProfileInlining,
-    WasmProfileInliningLimits, WasmProfileNativeMode, WasmProfileRegisterAllocation,
-    WasmProgramNativeCompilationProfile, WasmRuntimeEmbeddedImageTimings,
-    WasmRuntimeHeapObservation, WasmRuntimeHostImportCacheOutcome,
+    wasm_runtime_profile_policy, WasmProcessMemoryObservation, WasmProcessMemorySample,
+    WasmProcessMemoryScope, WasmProcessMemoryUnavailable, WasmProfileGcInitialCapacity,
+    WasmProfileInlining, WasmProfileInliningLimits, WasmProfileNativeMode,
+    WasmProfileRegisterAllocation, WasmProgramNativeCompilationProfile,
+    WasmRuntimeEmbeddedImageTimings, WasmRuntimeHeapObservation, WasmRuntimeHostImportCacheOutcome,
     WasmRuntimeMatchedImageCacheOutcome, WasmRuntimeMetricUnavailable,
     WasmRuntimeModuleCacheOutcome, WasmRuntimeModuleLoading, WasmRuntimeProfile,
-    WasmRuntimeProfileOptions, WasmRuntimeTimings, wasm_runtime_profile_policy,
+    WasmRuntimeProfileOptions, WasmRuntimeTimings,
 };
 mod embedding;
 mod execution_failure;
 pub use embedding::{
-    EmbeddedInstance, EmbeddedRuntime, WasmStoreState, configure_wasm_runtime, throw_foreign_error,
+    configure_wasm_runtime, throw_foreign_error, EmbeddedEvaluation, EmbeddedInstance,
+    EmbeddedRuntime, ForeignCompleter, ForeignValue, JsCompletion, JsPromiseState, JsValue,
+    JsValueKind, WasmStoreState,
 };
 mod global_script_prelude;
 mod graph_observation;
@@ -72,7 +74,7 @@ pub use graph_observation::GraphRunOutcome;
 mod wasm_rooted_snapshot;
 mod wasm_runtime_link;
 pub use execution_failure::WasmExecutionFailureKind;
-use execution_failure::{EngineExecutionFailure, finish_wasm_execution};
+use execution_failure::{finish_wasm_execution, EngineExecutionFailure};
 pub use wasm_runtime_link::LinkedRuntime;
 use wasm_runtime_link::WasmProgramRef;
 mod intl_collator_host;
@@ -109,7 +111,7 @@ mod wasm_gc_byte_array_host;
 #[cfg(test)]
 use wasmtime_config::WASM_MAX_STACK_SIZE;
 use wasmtime_config::{
-    ENGINE_WORKER_STACK_SIZE, WASM_STORE_MEMORY_CAP_BYTES, WasmNativeCompilationMode,
+    WasmNativeCompilationMode, ENGINE_WORKER_STACK_SIZE, WASM_STORE_MEMORY_CAP_BYTES,
 };
 #[cfg(test)]
 #[path = "../tests/unit/native_compilation_dispatch.rs"]
@@ -138,10 +140,10 @@ mod wasm_gc_weak_host;
 use wasm_gc_completion::GcMainCompletion;
 use wasmtime::AsContext;
 
-pub use cache::{CacheDirectoryStatus, CachePruneReport, CacheStatus, cache_status, prune_caches};
+pub use cache::{cache_status, prune_caches, CacheDirectoryStatus, CachePruneReport, CacheStatus};
 pub use module_loader::{
-    FilesystemModuleLoader, HostModuleLoader, LoadedModule, LoadedModuleKind, ModuleEntry,
-    ModuleKey, ModuleLoadError, ModuleRequestKeyIr, load_module_graph,
+    load_module_graph, FilesystemModuleLoader, HostModuleLoader, LoadedModule, LoadedModuleKind,
+    ModuleEntry, ModuleKey, ModuleLoadError, ModuleRequestKeyIr,
 };
 pub use scriptw_aot_wasm::PromiseRejectionPolicy;
 pub use scriptw_intl::{
@@ -156,7 +158,7 @@ pub use scriptw_ir::{
 pub use scriptw_ir::{RuntimeUnavailableCapability, WasmWeakReachabilityCapability};
 pub use scriptw_runtime::OracleExceptionPhase;
 pub use wasmtime_policy::WasmGcCapability;
-use wasmtime_policy::{PRODUCT_WASMTIME_POLICY, WasmtimeRuntimePolicy};
+use wasmtime_policy::{WasmtimeRuntimePolicy, PRODUCT_WASMTIME_POLICY};
 
 const WASM_THROW_ERROR_NAME_EXPORT: &str = "throw_error_name";
 const WASM_THROW_ERROR_MESSAGE_EXPORT: &str = "throw_error_message";
@@ -1692,20 +1694,18 @@ fn ensure_wasm_epoch_ticker(engine: &WasmtimeEngine) {
     STARTED.get_or_init(|| {
         std::thread::Builder::new()
             .name("scriptw-wasm-epoch-ticker".to_string())
-            .spawn(move || {
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(WASM_EPOCH_TICK_MS));
-                    let mut engines = registered_wasm_epoch_engines()
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner());
-                    engines.retain(|registered| {
-                        let Some(engine) = registered.upgrade() else {
-                            return false;
-                        };
-                        engine.increment_epoch();
-                        true
-                    });
-                }
+            .spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_millis(WASM_EPOCH_TICK_MS));
+                let mut engines = registered_wasm_epoch_engines()
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                engines.retain(|registered| {
+                    let Some(engine) = registered.upgrade() else {
+                        return false;
+                    };
+                    engine.increment_epoch();
+                    true
+                });
             })
             .expect("scriptw wasm epoch ticker thread should spawn");
     });
@@ -1725,14 +1725,13 @@ pub use scriptw_runtime::{
     EmbeddedModuleKind, EmbeddedModuleReferrer, EmbeddedModuleRequest,
     EmbeddedModuleResolutionInput, EmbeddedModuleSourceInput, EmbeddedModuleSourceValueInput,
     GlobalEnvironmentId, HostClock, HostHooks, HostOutputEvent, HostRandom, HostRandomError,
-    INTRINSIC_DESCRIPTORS, INTRINSIC_PROPERTY_DESCRIPTORS, IntrinsicDescriptor,
-    IntrinsicFunctionMetadata, IntrinsicId, IntrinsicKind, IntrinsicLink,
+    IntrinsicDescriptor, IntrinsicFunctionMetadata, IntrinsicId, IntrinsicKind, IntrinsicLink,
     IntrinsicPropertyAttributes, IntrinsicPropertyDescriptor, IntrinsicPropertyKey,
     IntrinsicPropertyValue, IntrinsicRole, InvalidObservedBigInt, ModuleLoadingPolicy,
     MonotonicClockDuration, MonotonicClockInstant, NullHostHooks, ObservedBigInt,
     ObservedCompletion, ObservedJsValue, ObservedNumber, RandomUnitInterval, Realm, RealmBuilder,
     RealmGlobal, RealmId, RealmIntrinsics, RealmObjectId, RealmObjectKind, SystemHostClock,
-    SystemHostRandom, UtcEpochMilliseconds,
+    SystemHostRandom, UtcEpochMilliseconds, INTRINSIC_DESCRIPTORS, INTRINSIC_PROPERTY_DESCRIPTORS,
 };
 
 /// The product execution backend selector.

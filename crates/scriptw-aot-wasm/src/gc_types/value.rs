@@ -3103,6 +3103,18 @@ impl StringConstruction {
         schema.release_i32_local(zero, function);
         exact.publish(schema, function)
     }
+    /// Transfer a completed private snapshot without publishing a JS String.
+    /// Consuming construction prevents later compiler writes through this owner.
+    pub(crate) fn publish_units(
+        self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<CodeUnitArray> {
+        let result = self.units.load(schema, function);
+        self.units.clear(function);
+        result
+    }
+
     pub(crate) fn publish(
         self,
         schema: &RuntimeSchema,
@@ -3645,5 +3657,39 @@ impl BigIntConstruction {
         schema.release_i32_local(length, function);
         self.limbs.clear(function);
         result
+    }
+}
+
+// Only a declared synchronous import can mint these canonical stack witnesses.
+// The result discriminant is checked before emitting the direct native call.
+impl crate::foreign::PlannedForeignFunction {
+    pub(crate) fn call_string_utf16(
+        &self,
+        function: &mut Function,
+    ) -> Result<GcStackReference<CodeUnitArray>, crate::EmitError> {
+        if self.mode != scriptw_ir::foreign::ForeignFunctionMode::Synchronous
+            || self.result != scriptw_ir::foreign::ForeignResultType::StringUtf16
+        {
+            return Err(crate::EmitError::unsupported(
+                "foreign call has no synchronous UTF-16 result",
+            ));
+        }
+        self.index.emit_call(function);
+        Ok(GcStackReference::new())
+    }
+
+    pub(crate) fn call_bytes(
+        &self,
+        function: &mut Function,
+    ) -> Result<GcStackReference<ByteArray>, crate::EmitError> {
+        if self.mode != scriptw_ir::foreign::ForeignFunctionMode::Synchronous
+            || self.result != scriptw_ir::foreign::ForeignResultType::Bytes
+        {
+            return Err(crate::EmitError::unsupported(
+                "foreign call has no synchronous byte result",
+            ));
+        }
+        self.index.emit_call(function);
+        Ok(GcStackReference::new())
     }
 }

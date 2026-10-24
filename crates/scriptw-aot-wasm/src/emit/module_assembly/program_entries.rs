@@ -93,6 +93,7 @@ impl ProgramExports {
         schema: &RuntimeSchema,
         global_prelude: Option<crate::gc_types::GlobalScriptPreludePhase>,
         has_module_entry: bool,
+        helper_base: Option<crate::runtime_helpers::RuntimeHelperFunctionBase>,
         exports: &mut ExportSection,
     ) {
         if let Some(main) = self.main {
@@ -117,6 +118,36 @@ impl ProgramExports {
         }
         if let Some((index, name)) = self.factory {
             exports.export(name, ExportKind::Func, index);
+        }
+        if let Some(base) = helper_base {
+            use crate::embedding_bridge::*;
+            // These names expose checked semantic operations, never raw
+            // source function indices or mutable compiler ownership state.
+            for (name, helper) in [
+                (EMBEDDING_CALL, RuntimeHelperId::EmbeddingCall),
+                (EMBEDDING_READ, RuntimeHelperId::EmbeddingRead),
+                (EMBEDDING_STRING, RuntimeHelperId::EmbeddingString),
+                (EMBEDDING_BYTES, RuntimeHelperId::EmbeddingBytes),
+                (EMBEDDING_BYTES_READ, RuntimeHelperId::EmbeddingBytesRead),
+                (EMBEDDING_PROMISE, RuntimeHelperId::EmbeddingPromise),
+                (EMBEDDING_CANCEL, RuntimeHelperId::EmbeddingCancel),
+            ] {
+                exports.export(name, ExportKind::Func, helper.index(base));
+            }
+            if self.main.is_some() {
+                exports.export(
+                    EMBEDDING_CHECKPOINT,
+                    ExportKind::Func,
+                    RuntimeHelperId::EmbeddingCheckpoint.index(base),
+                );
+                if has_module_entry {
+                    exports.export(
+                        EMBEDDING_EXPORT,
+                        ExportKind::Func,
+                        RuntimeHelperId::EmbeddingExport.index(base),
+                    );
+                }
+            }
         }
         // Diagnostics/snapshot roots remain in the instance owning the globals.
         if self.owns_globals {

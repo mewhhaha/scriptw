@@ -11,8 +11,45 @@ pub(super) fn compile_program_helper_bodies(
     runtime_bootstrap_plan: &RuntimeBootstrapPlan,
     runtime_helper_base: Option<crate::runtime_helpers::RuntimeHelperFunctionBase>,
     provided_hooks: ProvidedHooks,
+    promise_rejection_policy: PromiseRejectionPolicy,
     helper_bodies: &mut BTreeMap<RuntimeHelperId, Function>,
 ) -> Result<(), EmitError> {
+    let export = if function_metas
+        .module_graph()
+        .and_then(|graph| graph.module_entry())
+        .is_some()
+    {
+        let mut builder = FunctionBuilder::new_runtime_operation_helper(
+            schema,
+            RuntimeHelperId::EmbeddingExport,
+            string_pool,
+            function_metas,
+            uses_heap,
+            runtime_bootstrap_plan.clone(),
+            runtime_helper_base,
+        );
+        builder.compile_embedding_export()?
+    } else {
+        let mut body = Function::new(LocalDeclarations::from_types([]));
+        body.instruction(&Instruction::Unreachable);
+        body.instruction(&Instruction::End);
+        body
+    };
+    helper_bodies.insert(RuntimeHelperId::EmbeddingExport, export);
+    let mut checkpoint = FunctionBuilder::new_runtime_operation_helper(
+        schema,
+        RuntimeHelperId::EmbeddingCheckpoint,
+        string_pool,
+        function_metas,
+        uses_heap,
+        runtime_bootstrap_plan.clone(),
+        runtime_helper_base,
+    );
+    helper_bodies.insert(
+        RuntimeHelperId::EmbeddingCheckpoint,
+        checkpoint.compile_embedding_checkpoint(promise_rejection_policy)?,
+    );
+
     let compact_array_body = if string_pool.has_compact_array_recipes() {
         let mut builder = FunctionBuilder::new_runtime_operation_helper(
             schema,

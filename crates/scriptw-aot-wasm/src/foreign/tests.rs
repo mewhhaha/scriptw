@@ -8,7 +8,7 @@ fn registry(error_tag: bool) -> ForeignModuleRegistry {
         "add",
         "dd",
         "add",
-        vec![ForeignScalarType::Number; 2],
+        vec![ForeignValueType::Number; 2],
         ForeignResultType::Number,
     )
     .unwrap();
@@ -145,7 +145,7 @@ fn foreign_metadata_rejects_empty_or_unsupported_version_sections() {
     });
     assert!(foreign_registry_from_module(&module.finish()).is_err());
     let bytes = self::module(Some(&registry(false)), ValType::F64, None, false, false);
-    let version = b"\"abi_version\":1";
+    let version = b"\"abi_version\":2";
     let mut changed = bytes.clone();
     let matches = bytes
         .windows(version.len())
@@ -158,6 +158,170 @@ fn foreign_metadata_rejects_empty_or_unsupported_version_sections() {
         1,
         "canonical actual metadata has one ABI version"
     );
-    changed[matches[0] + version.len() - 1] = b'2';
+    changed[matches[0] + version.len() - 1] = b'1';
     assert!(foreign_registry_from_module(&changed).is_err());
+}
+
+#[test]
+fn asynchronous_metadata_requires_two_nonnull_eqref_resolvers_and_no_wasm_result() {
+    let declaration = ForeignFunctionDeclaration::new_async(
+        "later",
+        "dd",
+        "later",
+        vec![ForeignValueType::Number],
+        ForeignResultType::Number,
+    )
+    .unwrap();
+    let registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "dd:host",
+        vec![declaration],
+    )
+    .unwrap()])
+    .unwrap();
+    let resolver = ValType::Ref(wasm_encoder::RefType {
+        nullable: false,
+        heap_type: wasm_encoder::HeapType::Abstract {
+            shared: false,
+            ty: wasm_encoder::AbstractHeapType::Eq,
+        },
+    });
+    let any = ValType::Ref(wasm_encoder::RefType {
+        nullable: false,
+        heap_type: wasm_encoder::HeapType::Abstract {
+            shared: false,
+            ty: wasm_encoder::AbstractHeapType::Any,
+        },
+    });
+    for (parameters, results, accepted) in [
+        (vec![ValType::F64, resolver, resolver], vec![], true),
+        (vec![ValType::F64, resolver], vec![], false),
+        (
+            vec![
+                ValType::F64,
+                ValType::Ref(wasm_encoder::RefType::EQREF),
+                resolver,
+            ],
+            vec![],
+            false,
+        ),
+        (vec![ValType::F64, any, resolver], vec![], false),
+        (
+            vec![ValType::F64, resolver, resolver],
+            vec![ValType::F64],
+            false,
+        ),
+    ] {
+        let mut types = TypeSection::new();
+        types.ty().function(parameters, results);
+        let mut imports = ImportSection::new();
+        imports.import("dd", "later", EntityType::Function(0));
+        let mut module = Module::new();
+        module.section(&types);
+        module.section(&imports);
+        module.section(&CustomSection {
+            name: Cow::Borrowed(FOREIGN_MODULES_CUSTOM_SECTION),
+            data: Cow::Owned(registry.to_normalized_json()),
+        });
+        let bytes = module.finish();
+        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
+            .validate_all(&bytes)
+            .unwrap();
+        assert_eq!(foreign_registry_from_module(&bytes).is_ok(), accepted);
+    }
+}
+
+#[test]
+fn transfer_signatures_require_the_emitted_nonnull_canonical_array_types() {
+    use crate::gc_types::RuntimeModuleTypes;
+    use crate::module::GlobalLedger;
+    use crate::runtime_artifact::ModuleKind;
+    for (value, result) in [
+        (
+            ForeignValueType::StringUtf16,
+            ForeignResultType::StringUtf16,
+        ),
+        (ForeignValueType::Bytes, ForeignResultType::Bytes),
+    ] {
+        let declaration =
+            ForeignFunctionDeclaration::new("echo", "dd", "echo", vec![value], result).unwrap();
+        let registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+            "dd:host",
+            vec![declaration.clone()],
+        )
+        .unwrap()])
+        .unwrap();
+        let (types, imports) = RuntimeModuleTypes::register(ModuleKind::Standalone)
+            .with_foreign_modules(&registry)
+            .unwrap();
+        let (id, _) = registry.functions().next().unwrap();
+        let index = imports.functions[&id].0;
+        let runtime = types.finalize_globals(GlobalLedger::new(), false, 0);
+        let mut imports = ImportSection::new();
+        imports.import("dd", "echo", EntityType::Function(index));
+        let mut module = Module::new();
+        module.section(runtime.types());
+        module.section(&imports);
+        module.section(&CustomSection {
+            name: Cow::Borrowed(FOREIGN_MODULES_CUSTOM_SECTION),
+            data: Cow::Owned(registry.to_normalized_json()),
+        });
+        let bytes = module.finish();
+        wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
+            .validate_all(&bytes)
+            .unwrap();
+        assert_eq!(foreign_registry_from_module(&bytes).unwrap(), registry);
+        let signature = wasmparser::Parser::new(0)
+            .parse_all(&bytes)
+            .find_map(|payload| {
+                if let wasmparser::Payload::TypeSection(groups) = payload.unwrap() {
+                    let subtypes = groups
+                        .into_iter()
+                        .flat_map(|group| group.unwrap().into_types())
+                        .collect::<Vec<_>>();
+                    let wasmparser::CompositeInnerType::Func(signature) =
+                        &subtypes[index as usize].composite_type.inner
+                    else {
+                        panic!("foreign import uses a function type");
+                    };
+                    Some(signature.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        let wasmparser::ValType::Ref(reference) = signature.params()[0] else {
+            panic!("transfer ABI requires a concrete array reference");
+        };
+        assert!(!reference.is_nullable());
+        let nullable = wasmparser::ValType::Ref(
+            wasmparser::RefType::new(true, reference.heap_type()).unwrap(),
+        );
+        for bad in [
+            wasmparser::FuncType::new([nullable], signature.results().iter().copied()),
+            wasmparser::FuncType::new(signature.params().iter().copied(), [nullable]),
+            wasmparser::FuncType::new(
+                [wasmparser::ValType::Ref(wasmparser::RefType::EQREF)],
+                signature.results().iter().copied(),
+            ),
+        ] {
+            assert!(require_foreign_signature(&bad, &declaration).is_err());
+        }
+        let wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(canonical)) =
+            reference.heap_type()
+        else {
+            panic!("transfer array owns its exact module type index");
+        };
+        let unrelated = wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                false,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(canonical + 1)),
+            )
+            .unwrap(),
+        );
+        assert!(require_foreign_signature(
+            &wasmparser::FuncType::new([unrelated], signature.results().iter().copied(),),
+            &declaration
+        )
+        .is_err());
+    }
 }

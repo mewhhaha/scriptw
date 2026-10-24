@@ -14,7 +14,7 @@ fn function(
         export,
         module,
         name,
-        vec![ForeignScalarType::Number; 2],
+        vec![ForeignValueType::Number; 2],
         result,
     )
     .unwrap()
@@ -89,13 +89,13 @@ fn duplicate_exports_modules_imports_and_reserved_namespaces_reject() {
 }
 
 #[test]
-fn persisted_schema_rejects_unsupported_async_types_versions_and_unknown_fields() {
+fn persisted_schema_rejects_unknown_modes_types_versions_and_fields() {
     let registry = ForeignModuleRegistry::new(vec![module("dd:host", "add")]).unwrap();
     let value: serde_json::Value = serde_json::from_slice(&registry.to_normalized_json()).unwrap();
     for (field, replacement) in [
-        ("mode", serde_json::json!("async")),
+        ("mode", serde_json::json!("future")),
         ("parameters", serde_json::json!(["string"])),
-        ("result", serde_json::json!("bytes")),
+        ("result", serde_json::json!("symbol")),
     ] {
         let mut corrupt = value.clone();
         corrupt["modules"][0]["functions"][0][field] = replacement;
@@ -105,7 +105,7 @@ fn persisted_schema_rejects_unsupported_async_types_versions_and_unknown_fields(
         .is_err());
     }
     let mut corrupt = value.clone();
-    corrupt["abi_version"] = serde_json::json!(2);
+    corrupt["abi_version"] = serde_json::json!(1);
     assert!(
         ForeignModuleRegistry::from_normalized_json(&serde_json::to_vec(&corrupt).unwrap())
             .is_err()
@@ -120,9 +120,113 @@ fn persisted_schema_rejects_unsupported_async_types_versions_and_unknown_fields(
     pretty.push(b' ');
     assert!(ForeignModuleRegistry::from_normalized_json(&pretty).is_err());
     assert!(ForeignModuleRegistry::from_normalized_json(
-        b"{\"abi_version\":2,\"abi_version\":1,\"error_tag\":null,\"modules\":[]}"
+        b"{\"abi_version\":2,\"abi_version\":2,\"error_tag\":null,\"modules\":[]}"
     )
     .is_err());
+}
+
+#[test]
+fn async_mode_and_lossless_transfer_types_have_distinct_canonical_authority() {
+    let parameters = vec![
+        ForeignValueType::Number,
+        ForeignValueType::StringUtf16,
+        ForeignValueType::Bytes,
+    ];
+    for result in [
+        ForeignResultType::Number,
+        ForeignResultType::StringUtf16,
+        ForeignResultType::Bytes,
+        ForeignResultType::Void,
+    ] {
+        let synchronous = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+            "dd:host",
+            vec![ForeignFunctionDeclaration::new(
+                "exchange",
+                "dd",
+                "exchange",
+                parameters.clone(),
+                result,
+            )
+            .unwrap()],
+        )
+        .unwrap()])
+        .unwrap();
+        let asynchronous = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+            "dd:host",
+            vec![ForeignFunctionDeclaration::new_async(
+                "exchange",
+                "dd",
+                "exchange",
+                parameters.clone(),
+                result,
+            )
+            .unwrap()],
+        )
+        .unwrap()])
+        .unwrap();
+        assert_eq!(asynchronous.abi_version(), 2);
+        assert_eq!(
+            asynchronous.functions().next().unwrap().1.mode(),
+            ForeignFunctionMode::Asynchronous
+        );
+        assert_ne!(
+            synchronous.to_normalized_json(),
+            asynchronous.to_normalized_json()
+        );
+        assert_eq!(
+            ForeignModuleRegistry::from_normalized_json(&asynchronous.to_normalized_json())
+                .unwrap(),
+            asynchronous
+        );
+        assert_eq!(
+            ForeignModuleRegistry::from_normalized_json(&synchronous.to_normalized_json()).unwrap(),
+            synchronous
+        );
+    }
+}
+
+#[test]
+fn asynchronous_number_declaration_lowers_as_a_promise_instead_of_a_number() {
+    let module = ForeignModuleDeclaration::new(
+        "dd:host",
+        vec![ForeignFunctionDeclaration::new_async(
+            "later",
+            "dd",
+            "later",
+            vec![ForeignValueType::Number],
+            ForeignResultType::Number,
+        )
+        .unwrap()],
+    )
+    .unwrap();
+    let program = crate::lower_module_graph(&graph(
+        module,
+        "import {later} from 'dd:host'; export const promise=later(42);",
+    ));
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let script = program.script.unwrap();
+    let declaration = script
+        .functions
+        .iter()
+        .find(|function| function.name == "later")
+        .unwrap();
+    let returned = declaration
+        .body
+        .statements
+        .iter()
+        .find_map(|statement| match statement {
+            StatementIr::Return(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(returned.expr, ExprIr::ForeignCall(_)));
+    assert_eq!(returned.kind, crate::ValueKind::Object);
+    assert_eq!(
+        declaration.params.len(),
+        1,
+        "private resolver parameters do not change JS function.length"
+    );
+    assert_eq!(declaration.protocol, FunctionProtocolIr::OrdinaryCallOnly);
 }
 
 fn graph(module: ForeignModuleDeclaration, source: &str) -> ModuleGraphSources {

@@ -1,8 +1,12 @@
 use super::*;
+mod realm_async;
+mod transfer_retained;
 use scriptw_ir::foreign::{
     ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
-    ForeignScalarType,
+    ForeignValueType,
 };
+
+mod async_operations;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {
     let mut registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
@@ -12,7 +16,7 @@ fn registry(error_tag: bool) -> ForeignModuleRegistry {
                 "add",
                 "dd",
                 "add",
-                vec![ForeignScalarType::Number; 2],
+                vec![ForeignValueType::Number; 2],
                 ForeignResultType::Number,
             )
             .unwrap(),
@@ -20,7 +24,7 @@ fn registry(error_tag: bool) -> ForeignModuleRegistry {
                 "record",
                 "dd",
                 "record",
-                vec![ForeignScalarType::Number],
+                vec![ForeignValueType::Number],
                 ForeignResultType::Void,
             )
             .unwrap(),
@@ -164,7 +168,10 @@ print('foreign-ok');
 
 #[test]
 fn persisted_artifact_and_two_owned_stores_keep_their_own_userdata_and_realms() {
-    let artifact = artifact("import {add} from 'dd:host'; if (globalThis.seen) throw 'shared Realm'; globalThis.seen=true; print(add(20,22));", registry(false));
+    let artifact = artifact(
+        "import {add} from 'dd:host'; if (globalThis.seen) throw 'shared Realm'; globalThis.seen=true; print(add(20,22));",
+        registry(false),
+    );
     let bundle = artifact
         .encode_portable_bundle(&IntlCompilationProfile::Minimal)
         .unwrap();
@@ -448,7 +455,7 @@ fn embedder_fuel_limit_is_not_reset_and_different_foreign_programs_share_unchang
             "multiply",
             "tools",
             "multiply",
-            vec![ForeignScalarType::Number; 2],
+            vec![ForeignValueType::Number; 2],
             ForeignResultType::Number,
         )
         .unwrap()],

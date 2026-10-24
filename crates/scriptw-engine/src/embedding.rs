@@ -1,12 +1,22 @@
 //! Real compiled P/R in an embedder-owned Wasmtime Engine, Store and Linker.
 //!
-//! This synchronous Portable boundary retains no source compiler or closure
-//! registry. Implementations of declared foreign functions live only in the
-//! embedder's linker; mutable application data belongs to its actual Store.
+//! This Portable boundary retains no source compiler. Declared foreign
+//! implementations live in the embedder's linker; mutable application data,
+//! retained JavaScript roots and pending resolvers belong to its actual Store.
 use super::*;
 use scriptw_ir::foreign::ForeignModuleRegistry;
 use std::any::Any;
 use wasmtime::{AsContext, AsContextMut, ExnRef, ExnRefPre, ExnType, FuncType, Instance, ValType};
+
+mod async_host;
+mod foreign_host;
+mod operations;
+mod values;
+use async_host::ForeignAsyncState;
+pub use async_host::ForeignCompleter;
+pub use foreign_host::ForeignValue;
+use values::{embedded_error, retained_completion};
+pub use values::{EmbeddedEvaluation, JsCompletion, JsPromiseState, JsValue, JsValueKind};
 
 #[cfg(test)]
 mod tests;
@@ -69,6 +79,7 @@ pub(super) struct StoreEmbeddingState {
     store: Arc<()>,
     phase: StorePhase,
     error_tag: Option<wasmtime::Tag>,
+    async_host: ForeignAsyncState,
 }
 
 /// Initialize Scriptw's required Wasmtime configuration. Apply any embedder
@@ -118,12 +129,12 @@ impl EmbeddedRuntime {
                 Some(other) => {
                     return Err(EngineError::new(format!(
                         "unsupported embedding optimization level: {other:?}"
-                    )))
+                    )));
                 }
                 None => {
                     return Err(EngineError::new(
                         "embedding requires a Wasmtime native compiler",
-                    ))
+                    ));
                 }
             };
             // P/R must be inert until explicit embedder instantiation. Generated
@@ -225,6 +236,7 @@ impl EmbeddedRuntime {
                 store: Arc::new(()),
                 phase: StorePhase::Fresh,
                 error_tag: None,
+                async_host: ForeignAsyncState::new(),
             }),
         })
     }
@@ -393,8 +405,8 @@ impl EmbeddedRuntime {
     }
 }
 
-/// One initialized P/R pair. Evaluation consumes this handle so module entry
-/// cannot accidentally replay. Retained export invocation is a separate API.
+/// One P/R pair in its owning Store. Initialize once, then retain values and
+/// invoke exports repeatedly without replaying module entry.
 pub struct EmbeddedInstance {
     main: wasmtime::TypedFunc<(), GcMainCompletion>,
     program: Instance,
@@ -403,82 +415,88 @@ pub struct EmbeddedInstance {
 }
 
 impl EmbeddedInstance {
-    /// Execute real compiled main in the caller's Store. The caller must set
-    /// its epoch deadline/fuel policy beforehand; neither is reset here. The
-    /// synchronous call uses Scriptw's bounded compiler/execution stack and
-    /// joins before returning the same caller-owned Store.
-    pub fn evaluate(
-        self,
+    /// Initialize real compiled main once. Pending top-level await retains the
+    /// instance; deliver host completions with `pump` until it settles.
+    pub fn initialize(
+        &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
-    ) -> Result<ObservedRunOutcome, EngineError> {
-        run_on_sized_stack(|| self.evaluate_inner(store))
+    ) -> Result<EmbeddedEvaluation, EngineError> {
+        run_on_sized_stack(|| {
+            let state = store
+                .data_mut()
+                .embedding
+                .as_mut()
+                .ok_or_else(|| EngineError::new("Store has no embedding authority"))?;
+            if !Arc::ptr_eq(&state.store, &self.store) || state.phase != StorePhase::Instantiated {
+                return Err(EngineError::new(
+                    "instance belongs to a different Store or was already evaluated",
+                ));
+            }
+            state.phase = StorePhase::Evaluated;
+            let mut roots = wasmtime::RootScope::new(store);
+            let completion = match self.main.call(&mut roots, ()) {
+                Ok(completion) => completion,
+                Err(error) => {
+                    roots
+                        .as_context_mut()
+                        .data_mut()
+                        .embedding
+                        .as_mut()
+                        .unwrap()
+                        .phase = StorePhase::Failed;
+                    return Err(embedded_error(error));
+                }
+            };
+            if global_script_prelude::failed(&self.program, &mut roots)? {
+                roots
+                    .as_context_mut()
+                    .data_mut()
+                    .embedding
+                    .as_mut()
+                    .unwrap()
+                    .phase = StorePhase::Failed;
+                return Err(global_script_prelude::completion_error(
+                    &self.roots,
+                    &mut roots,
+                    completion,
+                )?);
+            }
+            match read_module_entry_status(&self.program, &mut roots)? {
+                Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
+                Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(
+                    "embedded Module did not reach evaluation completion",
+                )),
+                Some(WasmModuleEvaluationStatus::Settled) | None => Ok(
+                    EmbeddedEvaluation::Settled(retained_completion(&mut roots, completion)?),
+                ),
+            }
+        })
     }
 
-    fn evaluate_inner(
-        self,
+    /// Convenience for a synchronously completing entry and diagnostic output.
+    /// Use `initialize` to retain exports or resume asynchronous module entry.
+    pub fn evaluate(
+        mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<ObservedRunOutcome, EngineError> {
-        let state = store
-            .data_mut()
-            .embedding
-            .as_mut()
-            .ok_or_else(|| EngineError::new("Store has no embedding authority"))?;
-        if !Arc::ptr_eq(&state.store, &self.store) || state.phase != StorePhase::Instantiated {
-            return Err(EngineError::new(
-                "instance belongs to a different Store or was already evaluated",
-            ));
-        }
-        state.phase = StorePhase::Evaluated;
-        let mut roots = wasmtime::RootScope::new(store);
-        let completion = self.main.call(&mut roots, ()).map_err(|error| {
-            if let Some(rejection) = error.downcast_ref::<RuntimeSemanticRejection>() {
-                return EngineError::from_runtime_semantic_rejection(*rejection);
-            }
-            if let Some(cause) = error.downcast_ref::<EngineError>() {
-                let mut retained = cause.clone();
-                retained.message = format!("embedded Wasm/host execution failed: {error:#}");
-                return retained;
-            }
-            let kind = if is_wasm_epoch_interrupt(&error) {
-                EngineExecutionFailure::Timeout
-            } else {
-                EngineExecutionFailure::Trap
-            };
-            EngineError::from_execution_failure(
-                kind,
-                format!("embedded Wasm/host execution failed: {error:#}"),
-            )
-        })?;
-        if global_script_prelude::failed(&self.program, &mut roots)? {
-            return Err(global_script_prelude::completion_error(
-                &self.roots,
-                &mut roots,
-                completion,
-            )?);
-        }
-        match read_module_entry_status(&self.program, &mut roots)? {
-            Some(WasmModuleEvaluationStatus::Pending) => {
+        let completion = match self.initialize(store)? {
+            EmbeddedEvaluation::Pending => {
                 return Err(EngineError::from_execution_failure(
                     EngineExecutionFailure::IncompleteModuleEvaluation,
-                    "embedded Module evaluation remained pending",
-                ))
+                    "embedded Module evaluation remained pending; use initialize and pump",
+                ));
             }
-            Some(WasmModuleEvaluationStatus::NotStarted) => {
-                return Err(EngineError::new(
-                    "embedded Module did not reach evaluation completion",
-                ))
+            EmbeddedEvaluation::Settled(JsCompletion::Normal(value)) => {
+                ObservedCompletion::Normal(value.observe(store)?)
             }
-            Some(WasmModuleEvaluationStatus::Settled) | None => {}
-        }
-        let (_, kind, value) = wasm_gc_completion::observe(&mut roots, completion)?.into_parts();
-        let completion = match kind {
-            WasmTopLevelCompletionKind::Normal => ObservedCompletion::Normal(value),
-            WasmTopLevelCompletionKind::Throw => ObservedCompletion::Throw(value),
+            EmbeddedEvaluation::Settled(JsCompletion::Throw(value)) => {
+                ObservedCompletion::Throw(value.observe(store)?)
+            }
         };
         Ok(ObservedRunOutcome {
             backend_used: ExecutionBackend::WasmAot,
             completion,
-            output_events: roots.as_context().data().output_events.take(),
+            output_events: store.data().output_events.take(),
             note: "embedder-owned Wasmtime Store/Linker execution".into(),
         })
     }
@@ -488,10 +506,11 @@ impl EmbeddedInstance {
 /// wrapper catches only this tag and creates its ordinary JavaScript Error.
 /// Returning any unrelated `wasmtime::Error` from a host function stays fatal.
 pub fn throw_foreign_error<R>(
-    mut caller: wasmtime::Caller<'_, WasmStoreState>,
+    mut caller: impl AsContextMut<Data = WasmStoreState>,
     code: i32,
 ) -> wasmtime::Result<R> {
     let tag = caller
+        .as_context()
         .data()
         .embedding
         .as_ref()

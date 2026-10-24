@@ -4,10 +4,10 @@ Scriptw is an experimental JavaScript-to-WebAssembly compiler written in Rust.
 Compile JavaScript and its builtins to Wasm, run it through Wasmtime, or embed
 it in a Rust application. WebAssembly is the sole output target.
 
-Rust embedders can explicitly declare synchronous numeric foreign modules,
-compile ordinary JavaScript imports, and supply implementations through their
-own Wasmtime `Store` and `Linker`. ABI requirements persist in source-free
-Portable bundles. See the [foreign-module contract and runnable example](docs/rust-rewrite/contracts/foreign-modules.md).
+Rust embedders can declare numeric, lossless UTF-16 string and byte foreign
+functions, retain and call JavaScript exports, and settle async host operations
+through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
+source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
 
 ## Benchmarks vs V8
 

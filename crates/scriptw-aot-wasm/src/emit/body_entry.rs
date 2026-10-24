@@ -43,6 +43,19 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeHelperId::ValueToString => self.outline_value_to_string = false,
             RuntimeHelperId::ValueToNumber => self.outline_value_to_number = false,
             RuntimeHelperId::ValueToNumeric => self.outline_value_to_numeric = false,
+            // Embedding entries are host boundaries, never an inline facade
+            // of a JavaScript operation. Their declarations bind explicit
+            // Realm/program operands; transfers and Promise inspection consume
+            // only their declared GC values and require no callable context.
+            RuntimeHelperId::EmbeddingExport
+            | RuntimeHelperId::EmbeddingCall
+            | RuntimeHelperId::EmbeddingRead
+            | RuntimeHelperId::EmbeddingCheckpoint
+            | RuntimeHelperId::EmbeddingString
+            | RuntimeHelperId::EmbeddingBytes
+            | RuntimeHelperId::EmbeddingBytesRead
+            | RuntimeHelperId::EmbeddingPromise
+            | RuntimeHelperId::EmbeddingCancel => {}
             // These storage kernels have no inline facade to disable. The
             // cached-read parameter owner binds its caller's ProgramInstance
             // and Environment before its body; allocation takes the source
