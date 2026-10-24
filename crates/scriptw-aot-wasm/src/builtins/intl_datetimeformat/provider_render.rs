@@ -51,7 +51,7 @@ impl FunctionBuilder<'_> {
         };
         let list = match mode {
             DtfFormatMode::String => None,
-            DtfFormatMode::Parts => Some(ArgumentListConstruction::new(schema, f)),
+            DtfFormatMode::Parts => Some(ArgumentListConstruction::new(self, f)),
         };
         let value = schema.reserve_value_local(f);
         let kind = GcI32DomainLocal::new(schema, DateTimePartKind::Literal, f);
@@ -273,7 +273,7 @@ impl FunctionBuilder<'_> {
         let index = schema.reserve_i64_local(f);
         reader.read_u64(count, schema, f);
         reader.require_records(count, 8, f);
-        let list = ArgumentListConstruction::new(schema, f);
+        let list = ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let done = self.open_frame(ControlFrameKind::Block, f);

@@ -2,18 +2,22 @@
 
 Map/Set native dispatch consumes actual MapObject/SetObject, entry and iterator
 schemas. A separate GC hash index supplies lookup; the ordered GC entry table
-supplies insertion history. Bucket links encode entry offsets plus one, never
+and raw i64 ordinal array preserve insertion order. Bucket links encode entry
+offsets plus one, never
 reference addresses. Completed insertion appends; deletion unlinks before it
-drops both retained key/value roots. Table growth copies tombstones and rebuilds
-bucket links. Clear drops all entries and links while retaining history length.
-A cursor reads the current table and history after each callback or next call;
-exhaustion clears its collection edge and is permanent.
+drops both retained key/value roots. Full tables compact live entries in order
+before growing and rebuild bucket links. Clear drops old backing references
+and resets physical extent without resetting insertion ordinals. Cursors retain
+the next ordinal plus a physical hint and version; replacement invalidates the
+hint and triggers a binary lower-bound seek. Exhaustion clears the collection
+edge and is permanent.
 
 String/BigInt hashes derive from primitive contents. Number hashing unifies
 NaNs and signed zero consistently with SameValueZero. Object/Symbol keys receive
 stable private IDs from one typed module counter, retained in GC fields without
 observable property access. Counter exhaustion traps before reuse. The hash
-index remains bounded by geometrically grown history capacity. The native
+index remains bounded by geometrically grown physical capacity; lifetime
+insertion/deletion history does not force indefinite table growth. The native
 receiver gate accepts the exact concrete reference and rejects a Proxy.
 
 Constructors observe newTarget/prototype before their adder, then acquire one
@@ -34,11 +38,10 @@ Results use the executing builtin's Realm and actual intrinsic prototypes.
 
 Nine finite paired strict/sloppy Engine controls are authored for keys, GC,
 live cursors, callbacks, constructor Close, computed insertion, grouping,
-Set-like branch mutation, predicate Close and borrowed Realms. They are unrun.
-Only source review and isolated formatting can be reported for this draft.
-The atomic T05 cutover, compilation, emitted Wasm and task/conformance acceptance
-remain open. Complete all task source before verified 4096 MiB aggregate capped,
-serial verification. No README count or full conformance claim changes here.
+Set-like branch mutation, predicate Close and borrowed Realms. Current native
+and selected original-case verification belongs to the
+[efficiency checkpoint](../compiler-efficiency-20261024.md), with its exact
+source and resource limits. This contract does not refresh the full-suite chart.
 
 Normative algorithms: [TC39 keyed collections](https://tc39.es/ecma262/multipage/keyed-collections.html),
 [FromEntries](https://tc39.es/ecma262/multipage/fundamental-objects.html#sec-object.fromentries),

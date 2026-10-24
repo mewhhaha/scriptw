@@ -6,7 +6,8 @@ results, and declaration order. Body/function indices keep their existing
 Runtime versus Program/Hook ranks. Type indices use a separate closed region:
 
 - Runtime helpers and program hooks belong to the core type region. The shared
-  runtime calls hooks through typed global function references, so their
+  runtime calls hooks through immutable typed reference fields of the selected
+  ProgramInstance, so their
   signatures remain part of the runtime contract even though P owns the bodies.
 - Direct Program helpers belong to a suffix after the complete core GC graph.
   Runtime modules omit those signatures and bodies. Program and standalone
@@ -28,7 +29,7 @@ The ABI 3 to 4 migration reindexed the existing core once. Layout version 4
 invalidated old raw caches, build packages, and runtime keys coherently. Existing
 package, Intl profile, pool, Wasm validation, source and native admission checks
 remain authoritative. Tests decode real R/P bytes, compare core groups and
-import signatures, validate every actual helper row, and retain hook globals
+import signatures, validate every actual helper row, and retain hook field
 and `call_ref` signatures in the core.
 
 That ownership split does not narrow compiler source fingerprints or introduce a

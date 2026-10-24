@@ -97,6 +97,7 @@ mod for_of;
 mod function_declaration;
 mod function_definition;
 mod function_environment;
+mod function_inference;
 mod global_script_prelude;
 mod if_statement;
 mod intrinsic_method;
@@ -154,8 +155,8 @@ use async_disposable::LoweredStatementListItemIr;
 use call_candidate_analysis::{CallCandidateAnalysis, CallCandidateSource};
 use define_property_call::InvocationTargetProvenance;
 use dynamic_source::{
-    already_accounted_optional_calls, BuiltinCallContext, OptionalCallSource,
-    ResolvedDynamicSourceCall,
+    BuiltinCallContext, OptionalCallSource, ResolvedDynamicSourceCall,
+    already_accounted_optional_calls,
 };
 use generator_identifier_reference::RetainedGeneratorIdentifierReference;
 use intrinsic_method::{IntrinsicMethodLookup, IntrinsicPrototype};
@@ -171,13 +172,13 @@ use static_string_binding_facts::StaticStringBindingFacts;
 /// file is traceable to one import. See
 /// `docs/rust-rewrite/contracts/reference-records.md`.
 use crate::ir::reference::{
-    reference_base_of_lowered_read, CapturedBindingPosition, CapturedCursorDepth,
-    CapturedObjectPosition, Composition, CurrentScopeDepth, DeclarativeEnvironmentPosition,
-    DeleteSuperReferencePlan, EagerCompoundAssignmentBindings, EagerCompoundAssignmentOp,
-    NumericUpdateBindings, ObjectEnvironmentBindingObject, OrderedWithEnvironmentChain,
-    OrdinaryPropertyReferencePlan, PositionedWithEnvironment, PutValueBindings, ReferenceBase,
-    ReferenceOperand, ReferencePins, ReferenceRecord, SelectedWithEnvironmentObjects,
-    SuperPropertyReferencePlan, WithEnvironmentReferencePlan,
+    CapturedBindingPosition, CapturedCursorDepth, CapturedObjectPosition, Composition,
+    CurrentScopeDepth, DeclarativeEnvironmentPosition, DeleteSuperReferencePlan,
+    EagerCompoundAssignmentBindings, EagerCompoundAssignmentOp, NumericUpdateBindings,
+    ObjectEnvironmentBindingObject, OrderedWithEnvironmentChain, OrdinaryPropertyReferencePlan,
+    PositionedWithEnvironment, PutValueBindings, ReferenceBase, ReferenceOperand, ReferencePins,
+    ReferenceRecord, SelectedWithEnvironmentObjects, SuperPropertyReferencePlan,
+    WithEnvironmentReferencePlan, reference_base_of_lowered_read,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -252,11 +253,7 @@ enum PrototypeToStringState {
 
 impl PrototypeToStringState {
     fn join(self, other: Self) -> Self {
-        if self == other {
-            self
-        } else {
-            Self::Unknown
-        }
+        if self == other { self } else { Self::Unknown }
     }
 }
 
@@ -1872,11 +1869,25 @@ impl<'a> ScriptLowerer<'a> {
             &mut prepass,
             script.statements().statements(),
         );
-        let _ = prepass.lower_root_statement_items(
+        match function_inference::InferenceStatementList::root(
             script.statements().statements(),
-            self.analysis.script_root_functions.as_slice(),
-            prepass_scope,
-        );
+            &prepass,
+        ) {
+            Some(items) => {
+                prepass.infer_root_statement_items(
+                    items,
+                    self.analysis.script_root_functions.as_slice(),
+                    prepass_scope,
+                );
+            }
+            None => {
+                let _ = prepass.lower_root_statement_items(
+                    script.statements().statements(),
+                    self.analysis.script_root_functions.as_slice(),
+                    prepass_scope,
+                );
+            }
+        }
         prepass.script_global_call_observation_mode =
             ScriptGlobalCallObservationMode::DormantSummary;
         if let Some(root_scope) = prepass.scopes.first() {
@@ -1908,7 +1919,7 @@ impl<'a> ScriptLowerer<'a> {
                 .function_plans
                 .get(function_id)
                 .expect("function plan must exist");
-            let _ = prepass.lower_function(plan, None, None);
+            prepass.infer_function(plan, None);
         }
         // Carry analysis summaries out of the prepass, but keep the root-entry
         // global facts. The final pass replays live effects in source order.

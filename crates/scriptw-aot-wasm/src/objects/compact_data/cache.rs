@@ -5,51 +5,19 @@ use super::*;
 impl FunctionBuilder<'_> {
     fn emit_own_data_cache_site(
         &mut self,
-        site: I64Local,
+        site: I32Local,
         key: &ValueLocals,
         f: &mut Function,
     ) -> GcLocal<OwnDataReadCache> {
         let schema = self.runtime_schema();
-        let head = schema
-            .reserve_gc_local(f)
-            .initialize(self.current_program().own_data_read_caches(schema, f), f);
-        let cursor = schema
-            .reserve_gc_local(f)
-            .initialize(head.load(schema, f), f);
-        let found = schema
-            .reserve_gc_local::<OwnDataReadCache, Nullable>(f)
-            .initialize_null(schema, f);
-        let actual = schema.reserve_i64_local(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let repeat = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(schema, f).is_null(f);
-        self.emit_branch_if_to_target(exit, f);
-        schema
-            .field(OwnDataReadCacheSchema::SITE)
-            .read(&cursor, schema, f)
-            .store_i64(actual, f);
-        site.load(f);
-        actual.load(f);
-        f.instruction(&Instruction::I64Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        found.replace(cursor.load(schema, f), f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        found.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(exit, f);
-        cursor.replace(
+        let (table, slot) = self.current_program().own_data_read_caches(site, schema, f);
+        let found = schema.reserve_gc_local(f).initialize(
             schema
-                .field(OwnDataReadCacheSchema::NEXT)
-                .read(&cursor, schema, f)
+                .array_type::<OwnDataReadCacheTable>()
+                .read(&table, slot, schema, f)
                 .reference(),
             f,
         );
-        self.emit_branch_to_target(repeat, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
         found.load(schema, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
         let name = schema
@@ -58,18 +26,21 @@ impl FunctionBuilder<'_> {
         let cache = schema.reserve_gc_local(f).initialize(
             schema.struct_type::<OwnDataReadCache>().construct(
                 (
-                    GcOperand::i64_local(site),
                     GcOperand::reference(&name, schema),
                     GcOperand::null(schema),
                     GcOperand::i32(0),
-                    GcOperand::reference(&head, schema),
                 ),
                 f,
             ),
             f,
         );
-        self.current_program()
-            .publish_own_data_read_cache(&cache, schema, f);
+        schema.array_type::<OwnDataReadCacheTable>().write(
+            &table,
+            slot,
+            GcOperand::nullable_reference(&cache, schema),
+            schema,
+            f,
+        );
         found.replace(cache.load(schema, f).nullable(), f);
         cache.clear(f);
         name.clear(f);
@@ -79,9 +50,8 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(found.load(schema, f).require_non_null(f), f);
         found.clear(f);
-        cursor.clear(f);
-        head.clear(f);
-        schema.release_i64_local(actual, f);
+        table.clear(f);
+        schema.release_i32_local(slot, f);
         result
     }
 

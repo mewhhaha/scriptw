@@ -2,6 +2,17 @@ use super::*;
 
 mod receiver_info;
 
+#[derive(Clone, Copy)]
+enum FunctionLoweringPurpose {
+    Emit,
+    Infer,
+}
+
+enum LoweredFunctionBody {
+    Complete(BlockIr),
+    Inferred(super::function_inference::InferenceBodySummary),
+}
+
 impl<'a> ScriptLowerer<'a> {
     pub(super) fn lower_function(
         &mut self,
@@ -9,6 +20,40 @@ impl<'a> ScriptLowerer<'a> {
         output_id: Option<FunctionId>,
         context_key_override: Option<ExactCallbackContextKey>,
     ) -> FunctionIr {
+        self.lower_function_for_purpose(
+            function,
+            output_id,
+            context_key_override,
+            FunctionLoweringPurpose::Emit,
+        )
+        .expect("emission retains the complete function")
+    }
+
+    pub(super) fn infer_function(
+        &mut self,
+        function: &FunctionPlan<'a>,
+        context_key_override: Option<ExactCallbackContextKey>,
+    ) {
+        #[cfg(test)]
+        if super::function_inference::retain_complete_inference() {
+            let _ = self.lower_function(function, None, context_key_override);
+            return;
+        }
+        let _ = self.lower_function_for_purpose(
+            function,
+            None,
+            context_key_override,
+            FunctionLoweringPurpose::Infer,
+        );
+    }
+
+    fn lower_function_for_purpose(
+        &mut self,
+        function: &FunctionPlan<'a>,
+        output_id: Option<FunctionId>,
+        context_key_override: Option<ExactCallbackContextKey>,
+        purpose: FunctionLoweringPurpose,
+    ) -> Option<FunctionIr> {
         let output_id = output_id.unwrap_or_else(|| function.id.clone());
         let resumable_plan = if function.protocol.execution_kind()
             == FunctionExecutionKind::AsyncGenerator
@@ -246,7 +291,10 @@ impl<'a> ScriptLowerer<'a> {
                 lowerer.exact_context_function_specializations;
             self.merge_called_script_global_value_infos(&lowerer.called_script_global_value_infos);
             self.completed_direct_call_propagations = lowerer.completed_direct_call_propagations;
-            return FunctionIr {
+            if matches!(purpose, FunctionLoweringPurpose::Infer) {
+                return None;
+            }
+            return Some(FunctionIr {
                 template_source: self.analysis.template_source,
                 eval_environment: self.analysis.owner_eval_environment(&function.id),
                 id: output_id.clone(),
@@ -294,7 +342,7 @@ impl<'a> ScriptLowerer<'a> {
                 constructor_instance: ValueInfo::undefined(),
                 owned_env_bindings: Vec::new(),
                 captured_bindings: Vec::new(),
-            };
+            });
         };
         if let Some(self_binding_name) = function.self_binding_name.as_ref() {
             let function_info = lowerer.function_value_info(&function.id);
@@ -569,11 +617,24 @@ impl<'a> ScriptLowerer<'a> {
             &mut lowerer,
             function.body.statements(),
         );
-        let lowered_body = lowerer.lower_root_statement_items(
-            function.body.statements(),
-            function.root_functions.as_slice(),
-            body_scope,
-        );
+        let inference_list = match purpose {
+            FunctionLoweringPurpose::Infer => {
+                super::function_inference::InferenceStatementList::new(function)
+            }
+            FunctionLoweringPurpose::Emit => None,
+        };
+        let lowered_body = match inference_list {
+            Some(items) => LoweredFunctionBody::Inferred(lowerer.infer_root_statement_items(
+                items,
+                function.root_functions.as_slice(),
+                body_scope,
+            )),
+            None => LoweredFunctionBody::Complete(lowerer.lower_root_statement_items(
+                function.body.statements(),
+                function.root_functions.as_slice(),
+                body_scope,
+            )),
+        };
         if let Some(planned_suspensions) = lowerer
             .current_resumable_plan
             .as_ref()
@@ -597,24 +658,49 @@ impl<'a> ScriptLowerer<'a> {
                 "async-generator resume environments must retain their checked source owner",
             );
         }
-        let mut body_statements = parameter_prefix_statements;
-        let result_kind = lowered_body.result_kind;
-        body_statements
-            .extend(lowerer.finish_function_body_environment(lowered_body, body_environment));
-        let body = BlockIr {
-            result_kind,
-            statements: body_statements,
-            lexical_environment: None,
+        let (body, final_statement_is_return, finalized_effects) = match lowered_body {
+            LoweredFunctionBody::Complete(lowered_body) => {
+                let mut body_statements = parameter_prefix_statements;
+                let result_kind = lowered_body.result_kind;
+                body_statements.extend(
+                    lowerer.finish_function_body_environment(lowered_body, body_environment),
+                );
+                let body = BlockIr {
+                    result_kind,
+                    statements: body_statements,
+                    lexical_environment: None,
+                };
+                let final_statement_is_return =
+                    Self::statement_list_ends_in_return(&body.statements);
+                let effects = SourceCallFlowEffects::for_finalized_invocation(&params, &body);
+                (Some(body), final_statement_is_return, effects)
+            }
+            LoweredFunctionBody::Inferred(summary) => {
+                let mut prefix = super::function_inference::InferenceBodySummary::new();
+                for statement in parameter_prefix_statements {
+                    prefix.observe(&statement);
+                }
+                prefix.append(summary);
+                // This is the lifecycle half of finish_function_body_environment;
+                // inference has no retained BlockIr to attach the owner to.
+                if body_environment.is_some() {
+                    lowerer.pop_scope();
+                }
+                (
+                    None,
+                    prefix.ends_in_return(),
+                    prefix.invocation_effects(&params),
+                )
+            }
         };
-        lowerer.source_call_flow_effects = lowerer.source_call_flow_effects.merge_observation(
-            SourceCallFlowEffects::for_finalized_invocation(&params, &body),
-        );
+        lowerer.source_call_flow_effects = lowerer
+            .source_call_flow_effects
+            .merge_observation(finalized_effects);
         let mut return_info = lowerer
             .current_return
             .as_ref()
             .map(|returned| returned.info.clone())
             .unwrap_or_else(ValueInfo::undefined);
-        let final_statement_is_return = Self::statement_list_ends_in_return(&body.statements);
         if !final_statement_is_return {
             return_info = lowerer.merge_value_infos(return_info, ValueInfo::undefined());
         }
@@ -676,14 +762,18 @@ impl<'a> ScriptLowerer<'a> {
         }
         let resumable_plan = lowerer.current_resumable_plan.clone().or(resumable_plan);
 
-        let generator_plan =
-            (function.protocol.execution_kind() == FunctionExecutionKind::Generator).then(|| {
+        let generator_plan = (matches!(purpose, FunctionLoweringPurpose::Emit)
+            && function.protocol.execution_kind() == FunctionExecutionKind::Generator)
+            .then(|| {
                 if function.protocol == FunctionProtocolIr::ModuleActivation {
                     GeneratorPlanIr::module_instantiation()
                 } else {
                     let source_plan = linear_generator_plan(function.body)
                         .unwrap_or_else(GeneratorPlanIr::without_suspensions);
-                    lowerer.generator_plan_for_lowered_named_environment(&body, source_plan)
+                    lowerer.generator_plan_for_lowered_named_environment(
+                        body.as_ref().expect("emission retains the body"),
+                        source_plan,
+                    )
                 }
             });
 
@@ -708,9 +798,13 @@ impl<'a> ScriptLowerer<'a> {
         self.host_builtin_calls += lowerer.host_builtin_calls;
         self.top_level_this_uses += lowerer.top_level_this_uses;
 
+        if matches!(purpose, FunctionLoweringPurpose::Infer) {
+            return None;
+        }
+        let body = body.expect("emission retains the body");
         let body_uses_super = summarize_block(&body).super_uses > 0;
 
-        FunctionIr {
+        Some(FunctionIr {
             template_source: self.analysis.template_source,
             eval_environment: self.analysis.owner_eval_environment(&function.id),
             id: output_id,
@@ -786,6 +880,6 @@ impl<'a> ScriptLowerer<'a> {
                     hops: capture.hops,
                 })
                 .collect(),
-        }
+        })
     }
 }

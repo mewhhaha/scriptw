@@ -1,4 +1,4 @@
-use boa_ast::{scope::Scope, Module, Script};
+use boa_ast::{Module, Script, scope::Scope};
 use boa_interner::Interner;
 use boa_parser::{Parser, Source};
 use std::ops::Deref;
@@ -19,20 +19,20 @@ mod utf16_source;
 // Re-export the authority instead of maintaining another Unicode classifier.
 pub use boa_parser::lexer::{is_identifier_part, is_identifier_start};
 pub use dynamic_function::{
-    prepare_dynamic_function, prepare_dynamic_function_utf16, FunctionParseKind,
+    FunctionParseKind, prepare_dynamic_function, prepare_dynamic_function_utf16,
 };
 pub use eval_source::{
-    prepare_eval_source, prepare_eval_source_utf16, DirectEvalParseContext, EvalInvocationContext,
-    EvalParseContext,
+    DirectEvalParseContext, EvalInvocationContext, EvalParseContext, prepare_eval_source,
+    prepare_eval_source_utf16,
 };
-pub use json::{parse_json, JsonParseError, JsonValue, ParsedJson};
+pub use json::{JsonParseError, JsonValue, ParsedJson, parse_json};
 pub use utf16_source::{
-    decode_js_string_utf16, encode_js_string_utf16, SourceTextEncoding,
-    JS_STRING_SURROGATE_SENTINEL,
+    JS_STRING_SURROGATE_SENTINEL, SourceTextEncoding, decode_js_string_utf16,
+    encode_js_string_utf16,
 };
 
 pub use early_error_code::{
-    classify_parse_failure, EarlyErrorCode, ParseClassified, NO_EARLY_ERROR_CODE,
+    EarlyErrorCode, NO_EARLY_ERROR_CODE, ParseClassified, classify_parse_failure,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,9 +109,34 @@ impl PartialEq for ParsedScriptIdentity {
 
 impl Eq for ParsedScriptIdentity {}
 
+impl std::hash::Hash for ParsedScriptIdentity {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::hash(Rc::as_ptr(&self.0).cast::<()>(), state);
+    }
+}
+
 impl core::fmt::Debug for ParsedScriptIdentity {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("ParsedScriptIdentity")
+    }
+}
+
+/// Identity retaining one Module AST/interner allocation, independently of
+/// source-text metadata equality. The owner cannot expose either syntax half.
+#[derive(Clone)]
+pub struct ParsedModuleIdentity(Rc<dyn std::any::Any>);
+
+impl PartialEq for ParsedModuleIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ParsedModuleIdentity {}
+
+impl core::fmt::Debug for ParsedModuleIdentity {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("ParsedModuleIdentity")
     }
 }
 
@@ -223,6 +248,13 @@ impl ParsedModule {
     #[must_use]
     pub const fn source(&self) -> &SourceUnit {
         &self.source
+    }
+
+    /// Retains this Module's exact syntax/interner owner without copying text.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn syntax_identity(&self) -> ParsedModuleIdentity {
+        ParsedModuleIdentity(self.syntax.clone())
     }
 
     /// Exact semantic source units retained with the AST/interner allocation.
@@ -1633,22 +1665,26 @@ var ref = async (aFalse = falseCount +=1, aString = stringCount += 1, aNaN = nan
             EarlyErrorCode::GeneratorDeclarationParametersContainYield,
         )
         .is_some());
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::AsyncDeclarationParametersContainAwait,
-        )
-        .is_some());
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::GeneratorExpressionParametersContainYield,
-        )
-        .is_some());
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::AsyncGeneratorExpressionParametersContainYield,
-        )
-        .is_some());
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::AsyncGeneratorExpressionParametersContainAwait,
-        )
-        .is_some());
+        assert!(
+            ParseClassified::from_early(EarlyErrorCode::AsyncDeclarationParametersContainAwait,)
+                .is_some()
+        );
+        assert!(
+            ParseClassified::from_early(EarlyErrorCode::GeneratorExpressionParametersContainYield,)
+                .is_some()
+        );
+        assert!(
+            ParseClassified::from_early(
+                EarlyErrorCode::AsyncGeneratorExpressionParametersContainYield,
+            )
+            .is_some()
+        );
+        assert!(
+            ParseClassified::from_early(
+                EarlyErrorCode::AsyncGeneratorExpressionParametersContainAwait,
+            )
+            .is_some()
+        );
         assert!(
             ParseClassified::from_early(EarlyErrorCode::GeneratorMethodParametersContainYield,)
                 .is_some()
@@ -1663,18 +1699,22 @@ var ref = async (aFalse = falseCount +=1, aString = stringCount += 1, aNaN = nan
         .is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::ArrowParametersContainYield).is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::ArrowParametersContainAwait).is_some());
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::AsyncFunctionExpressionParametersContainAwait,
-        )
-        .is_some());
+        assert!(
+            ParseClassified::from_early(
+                EarlyErrorCode::AsyncFunctionExpressionParametersContainAwait,
+            )
+            .is_some()
+        );
         assert!(
             ParseClassified::from_early(EarlyErrorCode::AsyncMethodParametersContainAwait)
                 .is_some()
         );
-        assert!(ParseClassified::from_early(
-            EarlyErrorCode::CallableNonSimpleParametersContainUseStrict,
-        )
-        .is_some());
+        assert!(
+            ParseClassified::from_early(
+                EarlyErrorCode::CallableNonSimpleParametersContainUseStrict,
+            )
+            .is_some()
+        );
         assert!(ParseClassified::from_early(EarlyErrorCode::DuplicateFormalParameter).is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::DuplicateCatchParameter).is_some());
         assert!(

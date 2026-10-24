@@ -264,7 +264,7 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<StringValue, Nullable>(function)
             .initialize_null(schema, function);
         let value = schema.reserve_value_local(function);
-        let list = crate::functions::ArgumentListConstruction::new(schema, function);
+        let list = crate::functions::ArgumentListConstruction::new(self, function);
         function.instruction(&Instruction::Block(BlockType::Empty));
         function.instruction(&Instruction::Loop(BlockType::Empty));
         index.load(function);

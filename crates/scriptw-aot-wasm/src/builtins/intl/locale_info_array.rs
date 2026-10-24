@@ -11,7 +11,7 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let value = schema.reserve_value_local(function);
         value.set_reference(text, schema, function);
-        let list = ArgumentListConstruction::new(schema, function);
+        let list = ArgumentListConstruction::new(self, function);
         list.append(&value, schema, function);
         let list = list.finish(self, function);
         let array = self.emit_array_from_argument_list(&list, function)?;

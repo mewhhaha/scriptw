@@ -53,7 +53,7 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let iterator =
             self.emit_get_sync_iterator(source, SyncIteratorConsumer::AggregateError, function)?;
-        let list = ArgumentListConstruction::new(schema, function);
+        let list = ArgumentListConstruction::new(self, function);
         let done = schema.reserve_i32_local(function);
         let value = schema.reserve_value_local(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);

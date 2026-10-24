@@ -87,6 +87,28 @@ impl FunctionBuilder<'_> {
             }
             None => receiver.set_undefined(function),
         }
+        let targets = callee_expression.function_targets.known_targets();
+        let numeric_leaf = (targets.len() == 1)
+            .then(|| targets.iter().next().and_then(|id| self.functions.get(id)))
+            .flatten()
+            .filter(|meta| meta.numeric_leaf.is_some())
+            .cloned();
+        if let Some(meta) = numeric_leaf {
+            if self.try_emit_numeric_leaf_call(
+                &meta,
+                meta.numeric_leaf.as_ref().expect("selected pure leaf plan"),
+                &callee,
+                &receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )? {
+                receiver.clear(function);
+                callee.clear(function);
+                return Ok(());
+            }
+        }
         // Target knowledge selects a candidate only. The actual once-read
         // callee and evaluated operands still prove the guarded route at runtime.
         let numeric_imul_candidate = callee_expression

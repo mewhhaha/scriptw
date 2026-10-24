@@ -7,8 +7,8 @@ use crate::gc_types::{CodeUnitArray, Nullable, StringConstruction, StringValueSc
 pub(super) struct SubstitutionPieces(ArgumentListConstruction);
 
 impl SubstitutionPieces {
-    pub(super) fn new(s: &RuntimeSchema, f: &mut Function) -> Self {
-        Self(ArgumentListConstruction::new(s, f))
+    pub(super) fn new(b: &FunctionBuilder<'_>, f: &mut Function) -> Self {
+        Self(ArgumentListConstruction::new(b, f))
     }
 
     pub(super) fn append(
@@ -136,7 +136,7 @@ impl ReplacementPieces {
         let count = s.reserve_i32_local(f);
         count.set_constant(0, f);
         Self {
-            pieces: SubstitutionPieces::new(s, f),
+            pieces: SubstitutionPieces::new(b, f),
             inline: std::array::from_fn(|_| s.reserve_gc_local(f).initialize_null(s, f)),
             count,
             total,

@@ -16,22 +16,22 @@ use std::sync::{Arc, Mutex, OnceLock};
 use sha2::{Digest, Sha256};
 use wasm_encoder::{EntityType, ExportKind, ExportSection, GlobalType, ImportSection};
 
-use crate::data::{PoolBoundary, StringPool};
 use crate::EmitError;
+use crate::data::{PoolBoundary, StringPool};
 
 mod build_package;
 mod cache;
 mod residency;
 mod source_compilation;
 pub use source_compilation::{
-    RuntimeSourceCompilationProfile, RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
+    RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION, RuntimeSourceCompilationProfile,
 };
 mod validated_profile;
 mod validation;
 pub use build_package::{
-    admit_portable_runtime_package, build_runtime_artifact,
-    build_runtime_artifact_with_source_compilation_profile, encode_portable_runtime_package,
-    RuntimeArtifactInputs, RuntimeBuildArtifact,
+    RuntimeArtifactInputs, RuntimeBuildArtifact, admit_portable_runtime_package,
+    build_runtime_artifact, build_runtime_artifact_with_source_compilation_profile,
+    encode_portable_runtime_package,
 };
 pub use cache::{RuntimeArtifactCache, RuntimeArtifactCacheKey};
 pub use validated_profile::ValidatedRuntimeArtifact;
@@ -57,7 +57,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 18 adds sealed compact ordinary storage, ProgramInstance metadata-only
 // shapes/read caches, packed Number arrays, and their typed runtime kernels.
 // Its read-cache boundary carries lookup, original receiver and canonical key.
-const LAYOUT_VERSION: u32 = 18;
+// Version 19 indexes per-program cache metadata directly and gives Map/Set
+// cursors stable insertion ordinals across bounded history compaction.
+const LAYOUT_VERSION: u32 = 19;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

@@ -186,3 +186,67 @@ try{other.Map.prototype.get.call(proxy,1);throw new Error('proxy brand');}catch(
 "#,
     );
 }
+
+#[test]
+fn compacted_collection_cursors_resume_by_ordinal_and_exhaust_permanently() {
+    assert_collections(
+        r#"
+var map=new Map(),set=new Set(),mapEarly=map.keys(),setEarly=set.values();
+for(var i=0;i<96;i++){map.set(i,{n:i});set.add(i);}
+var mapMiddle=map.keys(),setMiddle=set.values();
+for(var i=0;i<48;i++){assert(mapMiddle.next().value===i,'Map prefix');assert(setMiddle.next().value===i,'Set prefix');}
+for(var i=0;i<95;i++){map.delete(i);set.delete(i);}
+// Repeated append/delete forces physical compaction while old cursors remain.
+for(var i=96;i<400;i++){map.set(i,i);set.add(i);if(i!==399){map.delete(i);set.delete(i);}}
+$262.gc();
+assert(mapEarly.next().value===95 && mapMiddle.next().value===95,'Map stale physical positions');
+assert(setEarly.next().value===95 && setMiddle.next().value===95,'Set stale physical positions');
+assert(mapMiddle.next().value===399 && setMiddle.next().value===399,'surviving appended tail');
+map.delete(399);set.delete(399);map.set(400,'last');set.add(400);
+assert(mapMiddle.next().value===400 && setMiddle.next().value===400,'deleted tail followed by append');
+assert(mapMiddle.next().done && setMiddle.next().done,'cursor exhausted');
+map.clear();set.clear();map.set(401,'new');set.add(401);
+assert(mapMiddle.next().done && setMiddle.next().done,'exhausted cursors never resurrect');
+assert(mapEarly.next().value===401 && setEarly.next().value===401,'unexhausted cursor survives clear');
+var untouchedMap=map.keys(),untouchedSet=set.values();
+for(var i=0;i<256;i++){map.clear();set.clear();map.set(i,i);set.add(i);}
+assert(untouchedMap.next().value===255 && untouchedSet.next().value===255,'clear drops history without dropping live cursors');
+assert(Array.from(map.keys()).join(',')==='255' && Array.from(set.values()).join(',')==='255','fresh cursors begin at current first entry');
+map.clear();map.clear();set.clear();set.clear();map.set(-0,NaN);set.add(-0);
+assert(1/map.keys().next().value===Infinity && Number.isNaN(map.get(0)) && 1/set.values().next().value===Infinity,'clear preserves canonical keys and values');
+"#,
+    );
+}
+
+#[test]
+fn collection_callbacks_reload_compacted_and_cleared_storage() {
+    assert_collections(
+        r#"
+var map=new Map([[0,'first'],[1,'removed']]),set=new Set([0,1]),mapSeen=[],setSeen=[];
+map.forEach(function(value,key,owner){
+  mapSeen.push(key);
+  if(key===0){
+    owner.delete(1);
+    for(var i=2;i<40;i++){owner.set(i,i);owner.delete(i);}
+    owner.set(40,'retained');$262.gc();
+  }else if(key===40){owner.clear();owner.set(41,'after clear');}
+});
+set.forEach(function(value,key,owner){
+  assert(value===key,'Set callback pair');setSeen.push(value);
+  if(value===0){
+    owner.delete(1);
+    for(var i=2;i<40;i++){owner.add(i);owner.delete(i);}
+    owner.add(40);$262.gc();
+  }else if(value===40){owner.clear();owner.add(41);}
+});
+assert(mapSeen.join(',')==='0,40,41' && setSeen.join(',')==='0,40,41','forEach uses live ordinal across repack and clear');
+var source=new Set([0,1]),hasCalls=[];
+var other={size:100,has:function(value){
+  hasCalls.push(value);
+  if(value===0){source.clear();for(var j=2;j<20;j++){source.add(j);source.delete(j);}source.add(20);}
+  return true;
+},keys:function(){throw new Error('unexpected keys branch');}};
+assert(Array.from(source.intersection(other)).join(',')==='0,20' && hasCalls.join(',')==='0,20','Set algebra callbacks observe replacement storage');
+"#,
+    );
+}

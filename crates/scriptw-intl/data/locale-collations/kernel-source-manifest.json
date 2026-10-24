@@ -372,7 +372,7 @@
     {
       "bytes": 10008,
       "path": "crates/scriptw-intl/data/collator-icu-2/manifest.json",
-      "sha256": "4018ac0ce1f967775d02d152dbcdb6e44809f076f96388ebb3bbc06c4c19982f"
+      "sha256": "467234aee67888336232f2403a656eec43a88d4b4e0764392c0e1148c796f138"
     },
     {
       "bytes": 8076,
@@ -413,7 +413,7 @@
   ],
   "formatting_DefaultLocale_selection": false,
   "global_union_selection": false,
-  "kernel_sha256": "01dc7d85d2f88758e89e49d1d5035e233bee1bf270204281120d2d6ec01eeefa",
+  "kernel_sha256": "37ce816c2ad5c63083d26e5b5a44aec7cb361e8d95b6eabb0a357684836d36d6",
   "locale_independent_profile_admission": {
     "current_native_admission": "Setup loads and retains both profiles through existing checked ICU constructors; source-only recipe does not claim current execution.",
     "historical_admission_receipt_sha256": "3fe60ad649669c2e0a99e4374e3871bfaef222e339ebb3b6f1c808dd710f46e6",
@@ -525,9 +525,9 @@
   "producer_checks": "read-only historical genuine export/constructor ancestry; no new Cargo reexport or runtime admission",
   "production_sources": [
     {
-      "bytes": 76245,
+      "bytes": 76969,
       "path": "Cargo.lock",
-      "sha256": "ae8634e7e3f98127df51bf1245d40681ae136e5a65c78ed5593d8fa47d6764e0"
+      "sha256": "8e7307f73ef5080eb868c1995d5387b5099a0f7b5b30f695714d9a487e88a026"
     },
     {
       "bytes": 6103,
@@ -535,14 +535,14 @@
       "sha256": "21489eb8f4d29f716f7e198db81686d30dc7ffbd808e839b8ca7419bf1d5bf2f"
     },
     {
-      "bytes": 87544,
+      "bytes": 89062,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "69d7b19a9e5c84cfbbce2f21af2d85f704b0c670fbb996dee092cf731c4fa113"
+      "sha256": "9c26aadfff587abda6e77471fd88b1f6cff7a3bb429a81474e3f579c84ca4fb7"
     },
     {
-      "bytes": 81271,
+      "bytes": 83454,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "b7d6a11c10c601fc153122a829e3ba0b8d8600d7e463351145bf43d84708303a"
+      "sha256": "5fd7b75eeebdc132dedc9402e85845fdb1cac3ba224f83b707bf571a738928b3"
     },
     {
       "bytes": 33833,
@@ -592,7 +592,7 @@
     {
       "bytes": 324,
       "path": "crates/scriptw-intl/src/collator/identity.rs",
-      "sha256": "1488f4ca121bc9bfed6537ca238b332affda71ffc987caa8fb386e7271699ed9"
+      "sha256": "44322fb0be98d55ea4b04c55c0e7faeee43618a8beba3b7e73c5bee69205b2b7"
     },
     {
       "bytes": 37655,

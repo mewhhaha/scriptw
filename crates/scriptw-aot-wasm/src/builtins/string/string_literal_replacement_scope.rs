@@ -231,7 +231,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         // Complete the position List before the first replacement callback.
-        let positions = ArgumentListConstruction::new(s, f);
+        let positions = ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         cursor.store(f);
         let positions_done = self.open_frame(ControlFrameKind::Block, f);
@@ -443,7 +443,7 @@ impl FunctionBuilder<'_> {
             .initialize(pending.value().cast_reference::<StringValue>(s, f), f);
         self.emit_native_gc_string_length(input, input_length, f);
         self.emit_native_gc_string_length(&needle, needle_length, f);
-        let list = ArgumentListConstruction::new(s, f);
+        let list = ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         count.store(f);
         f.instruction(&Instruction::I64Const(0));

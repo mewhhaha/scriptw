@@ -27,6 +27,62 @@ fn assert_leaf_semantics(source: &str) {
 }
 
 #[test]
+fn guarded_numeric_leaves_preserve_once_evaluated_arguments_and_fallbacks() {
+    assert_leaf_semantics(
+        r#"
+function arithmetic(a,b){return a*b+1;}
+var original=arithmetic, log=[];
+var first=arithmetic((log.push('left'),3),(log.push('right'),gc(),4));
+var receiver={value:6}, converted={valueOf(){log.push('coerce');return 5;}};
+var coerced=arithmetic(converted,2);
+var replaced=arithmetic((arithmetic=function(a,b){return this.value+a+b;},2),3);
+var changed=arithmetic.call(receiver,2,3);
+var missing=original(2), extra=original(2,3,99);
+var bound=original.bind(null,2), proxy=new Proxy(original,{apply(target,receiver,args){log.push('proxy');return Reflect.apply(target,receiver,args);}});
+var proxied=proxy(2,4);
+var negative=original(-0,3), nan=original(NaN,2), infinite=original(Infinity,0);
+first===13 && coerced===11 && replaced===7 && changed===11 &&
+Number.isNaN(missing) && extra===7 && bound(4)===9 && proxied===9 &&
+negative===1 && Number.isNaN(nan) && Number.isNaN(infinite) &&
+log.join('|')==='left|right|coerce|proxy' && original.arguments===null;
+"#,
+    );
+}
+
+#[test]
+fn numeric_leaf_callee_from_another_program_keeps_its_actual_code() {
+    assert_leaf_semantics(
+        r#"
+function arithmetic(a,b){return a*b;}
+var original=arithmetic;
+var source='function arithmetic(a,b){return a+b;}';
+(0,eval)(source);
+var changed=arithmetic(3,4);
+changed===7 && original(3,4)===12;
+"#,
+    );
+}
+
+#[test]
+fn private_argument_buffer_growth_keeps_exact_lengths_and_rooted_snapshots() {
+    assert_leaf_semantics(
+        r#"
+function capture(){return arguments;}
+var first={},last=Symbol('last'),visits=0,log=[];
+var source={ [Symbol.iterator](){var i=0;return {next(){visits++;gc();return i<33?{done:false,value:i++}:{done:true};}};} };
+var values=capture((log.push('first'),first),...source,(log.push('last'),last));
+var original=[first,undefined,-0,NaN,11n,last], repeated=capture(...original,...original);
+var empty=capture(...[]), one=capture(...[first]), exact=capture(...[0,1,2,3,4,5,6,7]);
+gc();
+values.length===35 && values[0]===first && values[1]===0 && values[33]===32 && values[34]===last &&
+visits===34 && log.join('|')==='first|last' && empty.length===0 && one.length===1 && one[0]===first && exact.length===8 && exact[7]===7 &&
+repeated.length===12 && repeated[0]===first && repeated[6]===first && repeated[1]===undefined &&
+Object.is(repeated[2],-0) && Number.isNaN(repeated[3]) && repeated[4]===11n && repeated[11]===last;
+"#,
+    );
+}
+
+#[test]
 fn leaf_returns_still_execute_copy_values_and_make_fresh_rooted_objects() {
     assert_leaf_semantics(
         r#"

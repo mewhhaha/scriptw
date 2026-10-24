@@ -56,9 +56,9 @@ impl FunctionBuilder<'_> {
         match PropertyReadPlan::for_read(target, key) {
             PropertyReadPlan::General => Ok(false),
             PropertyReadPlan::CachedStaticString => {
-                let site = self.next_program_site()?;
+                let site = self.next_program_site(crate::emit::ProgramSiteKind::OwnDataRead)?;
                 let schema = self.runtime_schema();
-                let id = schema.reserve_i64_local(f);
+                let id = schema.reserve_i32_local(f);
                 site.emit(id, f);
                 // Selection admits only a compiler-owned static String key.
                 // The helper accepts a completed key, never raw coercible input.
@@ -83,7 +83,7 @@ impl FunctionBuilder<'_> {
                     )
                     .store(result, f);
                 canonical_key.clear(f);
-                schema.release_i64_local(id, f);
+                schema.release_i32_local(id, f);
                 Ok(true)
             }
         }

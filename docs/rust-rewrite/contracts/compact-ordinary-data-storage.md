@@ -1,10 +1,13 @@
 # Compact ordinary data storage
 
-Layout 18 adds a bounded prototype inside the single Wasm GC object model.
+Layout 18 introduced compact storage inside the single Wasm GC object model;
+the current private ABI is layout 19.
 It requires the experimental Wasmtime GC/reference feature baseline. The
 [measured checkpoint](../performance-six-workstreams-20261024.md) records native
 verification, controlled gains and regressions. Its selected conformance campaign
-does not refresh the historical full pinned Test262 result.
+does not refresh the historical full pinned Test262 result. The subsequent
+[efficiency checkpoint](../compiler-efficiency-20261024.md) records layout 19's
+indexed metadata and its separate verification.
 
 A genuine source literal with 1–16 unique static string data keys creates
 fresh `CompactDataStorage`. Every field has writable, enumerable and configurable
@@ -28,10 +31,10 @@ edge; Number payloads preserve their exact bits. Object and Symbol identity
 remain normal GC references.
 
 The immutable shape belongs to one literal site and physical ProgramInstance.
-It contains only source string keys in insertion order, an injective checked
-(function owner, site ordinal) identifier, and a metadata link. Main owns owner
-zero; planned callable indices plus one are checked before packing the pair in
-64 bits. Shapes never contain a receiver, prototype, Symbol or property value.
+It contains only source string keys in insertion order. Literal shapes and
+own-data reads have separate checked dense u32 site namespaces, shared across
+all source bodies in P. Shapes never contain a receiver, prototype, Symbol or
+property value.
 
 An existing own data Set can overwrite the three value arrays when target and
 receiver are the same concrete ordinary object. It works on a nonextensible
@@ -65,15 +68,18 @@ live storage subtype and actual immutable shape before loading the current
 slot value. Every later read repeats those checks, including reads after calls.
 Value-only Set keeps the shape and the cache reads the new value. Dictionary
 conversion makes the old shape check fail. Inherited/absent properties and
-proxies use full Get and are not cached. Cache nodes retain only primitive
-string/shape metadata, slot and site identity; they cannot retain a user object,
+proxies use full Get and are not cached. Cache records retain only primitive
+string/shape metadata and a slot; they cannot retain a user object,
 prototype, Symbol or value.
 
-The prototype lazily registers one metadata node per executed source site in
-bounded linked lists, only after seeing a compact receiver. Other receivers
-never allocate or search cache nodes. Registry lookup is linear in registered
-sites; cache polymorphism, startup allocation and large-program effects need
-measurement.
+Each ProgramInstance owns a typed directory for each cache kind. Indexed
+directories grow geometrically; nullable 64-slot leaf pages allocate on first
+use. Untouched pages allocate no leaf slots, while a touched page reserves all
+64 nullable slots. Individual metadata records allocate only when admitted.
+Warmed lookup uses the checked site index rather than traversing a registry.
+Directory storage scales with the highest per-kind site index divided by 64;
+leaf storage scales with touched pages. Cache polymorphism, startup allocation
+and large-program timing effects still need measurement.
 No cache default-policy or V8 performance claim follows from this change.
 Encoded declaration and actual imported-call-edge tests establish reachability
 and representation guards; native semantic and snapshot tests establish the
@@ -81,8 +87,10 @@ observable mutation, descriptor, key-order and rooting behavior.
 
 Source/layout accounting for an admitted literal is six per-object GC records:
 the object header, its prototype StoredValue, compact storage and three value
-arrays. Two shape records are shared per literal/ProgramInstance, with one lazy
-metadata cache node per admitted executed read site. The descriptor-append
+arrays. The shape and its key array are shared per literal/ProgramInstance,
+with one lazy metadata record per admitted executed read site. Each physical
+ProgramInstance additionally owns the shared directories and touched leaf pages
+described above. The descriptor-append
 dictionary path retains `5 + 4n` records for `n` nondeleted fields: header,
 prototype, storage, ordered table, index, and key/value/descriptor/entry records
 per field. Value-expression allocations and shared pooled strings are excluded.

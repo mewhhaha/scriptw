@@ -1,7 +1,7 @@
 use scriptw_ir::{
-    direct_await_sequence_resume_state, AsyncDisposableScopeExecutionIr, AwaitSequenceError,
-    DerivedConstructorActivationIr, FunctionExecutionKind, HostBuiltinId, ProgramIr, ScriptIr,
-    StandardBuiltinId, SyncDisposableScopeExecutionIr, ValueKind,
+    AsyncDisposableScopeExecutionIr, AwaitSequenceError, DerivedConstructorActivationIr,
+    FunctionExecutionKind, HostBuiltinId, ProgramIr, ScriptIr, StandardBuiltinId,
+    SyncDisposableScopeExecutionIr, ValueKind, direct_await_sequence_resume_state,
 };
 // `CodeSection` is deliberately absent from this list. Every code-section entry
 // now goes through `ModuleCode::push(EmittedFunction)`, which cannot be called
@@ -286,13 +286,17 @@ mod runtime_operations;
 mod template_objects;
 pub(crate) use template_objects::TemplateSourceExecution;
 
-/// Injective (function owner, source-site ordinal) identity within one P.
-/// Main owns zero; planned entries own their checked Wasm index plus one.
+/// Dense cache-table index minted by the shared registry of one emitted P.
+pub(crate) enum ProgramSiteKind {
+    CompactShape,
+    OwnDataRead,
+}
+
 #[derive(Clone, Copy)]
-pub(crate) struct ProgramSiteId(u64);
+pub(crate) struct ProgramSiteId(u32);
 impl ProgramSiteId {
-    pub(crate) fn emit(self, output: crate::gc_types::I64Local, function: &mut Function) {
-        function.instruction(&Instruction::I64Const(self.0 as i64));
+    pub(crate) fn emit(self, output: crate::gc_types::I32Local, function: &mut Function) {
+        function.instruction(&Instruction::I32Const(self.0 as i32));
         output.store(function);
     }
 }
@@ -340,7 +344,6 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) uses_heap: bool,
     pub(crate) completion_exit: CompletionExit,
     module_state: FunctionModuleState<'a>,
-    next_program_site: u32,
     pub(crate) binding_scopes: Vec<BTreeMap<String, BindingStorage>>,
     pub(crate) hoisted_vars: Vec<String>,
     emitted_local_count: u32,
@@ -1993,7 +1996,6 @@ impl<'a> FunctionBuilder<'a> {
             uses_heap,
             completion_exit: CompletionExit::for_return_abi(return_abi),
             module_state,
-            next_program_site: 0,
             hoisted_vars,
             binding_scopes: Vec::new(),
             emitted_local_count: 0,
@@ -2033,14 +2035,19 @@ impl<'a> FunctionBuilder<'a> {
         matches!(self.module_state, FunctionModuleState::ProgramInitialize)
     }
 
-    pub(crate) fn next_program_site(&mut self) -> Result<ProgramSiteId, EmitError> {
-        let owner = match &self.module_state {
-            FunctionModuleState::Main(_, _) => 0,
+    pub(crate) fn next_program_site(
+        &mut self,
+        kind: ProgramSiteKind,
+    ) -> Result<ProgramSiteId, EmitError> {
+        match &self.module_state {
+            FunctionModuleState::Main(_, _) => {}
             FunctionModuleState::PreparedScript(_, entry)
             | FunctionModuleState::Internal(entry)
                 if self.has_source_execution_environment() =>
             {
-                entry.source_site_owner()?
+                // Retain the planned-source proof even though table slots no
+                // longer encode the callable's Wasm index.
+                entry.source_site_owner()?;
             }
             FunctionModuleState::PreparedScript(_, _)
             | FunctionModuleState::Internal(_)
@@ -2048,14 +2055,10 @@ impl<'a> FunctionBuilder<'a> {
             | FunctionModuleState::ProgramInitialize => {
                 return Err(EmitError::unsupported(
                     "program caches require a genuine source site",
-                ))
+                ));
             }
-        };
-        let ordinal = self.next_program_site;
-        self.next_program_site = ordinal
-            .checked_add(1)
-            .ok_or_else(|| EmitError::unsupported("source-site ordinal exceeds u32"))?;
-        Ok(ProgramSiteId((u64::from(owner) << 32) | u64::from(ordinal)))
+        }
+        Ok(ProgramSiteId(self.functions.next_program_site_index(kind)?))
     }
 
     pub(crate) fn has_source_execution_environment(&self) -> bool {

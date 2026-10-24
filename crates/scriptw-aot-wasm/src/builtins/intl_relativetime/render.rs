@@ -112,7 +112,7 @@ impl FunctionBuilder<'_> {
         };
         let parts = match mode {
             RelativeTimeFormatOutput::String => None,
-            RelativeTimeFormatOutput::Parts => Some(ArgumentListConstruction::new(schema, f)),
+            RelativeTimeFormatOutput::Parts => Some(ArgumentListConstruction::new(self, f)),
         };
         f.instruction(&Instruction::I64Const(0));
         index.store(f);

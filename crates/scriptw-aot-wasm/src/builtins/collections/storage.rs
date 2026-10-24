@@ -1,4 +1,5 @@
 use super::*;
+use crate::runtime_helpers::HelperParameters;
 
 /// A raw hash stays paired with an owned, immutable local snapshot of its key. Primitive contents
 /// and assigned identity hashes are stable even across user callbacks/GC.
@@ -16,8 +17,46 @@ impl PreparedCollectionKey {
     }
 }
 
-// Every table index is an offset in a GC array. Tombstones retain history order.
+// Physical positions may compact. Stable insertion ordinals let live cursors
+// recover their position without retaining old tables or registering cursors.
+pub(super) struct CollectionCursorLocals {
+    pub(super) index: I64Local,
+    pub(super) next_ordinal: I64Local,
+    pub(super) version: I64Local,
+}
+impl CollectionCursorLocals {
+    pub(super) fn reserve(schema: &RuntimeSchema, f: &mut Function) -> Self {
+        let cursor = Self {
+            index: schema.reserve_i64_local(f),
+            next_ordinal: schema.reserve_i64_local(f),
+            version: schema.reserve_i64_local(f),
+        };
+        f.instruction(&Instruction::I64Const(0));
+        cursor.index.store(f);
+        f.instruction(&Instruction::I64Const(0));
+        cursor.next_ordinal.store(f);
+        f.instruction(&Instruction::I64Const(-1));
+        cursor.version.store(f);
+        cursor
+    }
+    pub(super) fn release(self, schema: &RuntimeSchema, f: &mut Function) {
+        schema.release_i64_local(self.version, f);
+        schema.release_i64_local(self.next_ordinal, f);
+        schema.release_i64_local(self.index, f);
+    }
+}
 impl FunctionBuilder<'_> {
+    /// These are private bounded-resource counters, never observable JS sizes.
+    fn emit_collection_advance_counter(&self, counter: I64Local, f: &mut Function) {
+        counter.load(f);
+        f.instruction(&Instruction::I64Const(-1));
+        f.instruction(&Instruction::I64Eq);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        self.emit_increment_local(counter, 1, f);
+    }
+
     pub(super) fn emit_collection_prepare_key(
         &mut self,
         key: &ValueLocals,
@@ -51,6 +90,7 @@ impl FunctionBuilder<'_> {
                 .filled(GcOperand::i64(0), zero, f),
             f,
         );
+        let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
         let record = s.reserve_gc_local(f).initialize(
             s.struct_type::<MapObject>().construct(
                 (
@@ -59,11 +99,15 @@ impl FunctionBuilder<'_> {
                     GcOperand::i64(0),
                     GcOperand::i64(0),
                     GcOperand::reference(&buckets, s),
+                    GcOperand::reference(&ordinals, s),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
                 ),
                 f,
             ),
             f,
         );
+        ordinals.clear(f);
         buckets.clear(f);
         entries.clear(f);
         s.release_i32_local(zero, f);
@@ -181,106 +225,209 @@ impl FunctionBuilder<'_> {
     fn emit_collection_grow_map(
         &mut self,
         record: &GcLocal<MapObject>,
+        table: &GcLocal<MapEntryTable>,
         count: I64Local,
         f: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let capacity = s.reserve_i32_local(f);
-        let cursor = s.reserve_i32_local(f);
-        let next_capacity = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<MapObject>()
-                .field(MapObjectSchema::ENTRIES)
+        // Physical history, rather than live occupancy, owns the next slot.
+        // Below this u32 array length the helper's address-limit trap is inert.
+        count.load(f);
+        s.array_type::<MapEntryTable>().length(table, s, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        s.call_helper(
+            crate::runtime_helpers::CollectionPrepareMapArguments::new(record, count),
+            self.runtime_helper_base()?,
+            f,
+        )
+        .store(count, f);
+        table.replace(
+            s.field(MapObjectSchema::ENTRIES)
                 .read(record, s, f)
                 .reference(),
             f,
         );
-        s.array_type::<MapEntryTable>().length(&table, s, f);
-        capacity.store(f);
-        count.load(f);
-        f.instruction(&Instruction::I64Const(u32::MAX as i64));
-        f.instruction(&Instruction::I64GeU);
-        self.open_frame(ControlFrameKind::If, f);
-        f.instruction(&Instruction::Unreachable);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        count.load(f);
-        capacity.load(f);
+        Ok(())
+    }
+
+    pub(crate) fn compile_collection_prepare_map_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CollectionPrepareMap);
+        let p = self
+            .helper_parameters::<crate::runtime_helpers::CollectionPrepareMapParameters>(&mut f);
+        let s = self.runtime_schema();
+        let capacity = s.reserve_i32_local(&mut f);
+        let source = s.reserve_i32_local(&mut f);
+        let destination = s.reserve_i32_local(&mut f);
+        let live = s.reserve_i64_local(&mut f);
+        let version = s.reserve_i64_local(&mut f);
+        let table = s.reserve_gc_local(&mut f).initialize(
+            s.field(MapObjectSchema::ENTRIES)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        s.array_type::<MapEntryTable>().length(&table, s, &mut f);
+        capacity.store(&mut f);
+        p.count.load(&mut f);
+        capacity.load(&mut f);
         f.instruction(&Instruction::I64ExtendI32U);
         f.instruction(&Instruction::I64GeU);
-        self.open_frame(ControlFrameKind::If, f);
-        capacity.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        // Bound physical history by live occupancy, preserving insertion order.
+        s.field(MapObjectSchema::LIVE_COUNT)
+            .read(&p.record, s, &mut f)
+            .store_i64(live, &mut f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(2));
         f.instruction(&Instruction::I64Mul);
-        next_capacity.store(f);
-        next_capacity.load(f);
+        live.store(&mut f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(4));
         f.instruction(&Instruction::I64LtU);
-        self.open_frame(ControlFrameKind::If, f);
+        self.open_frame(ControlFrameKind::If, &mut f);
         f.instruction(&Instruction::I64Const(4));
-        next_capacity.store(f);
+        live.store(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        next_capacity.load(f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(u32::MAX as i64));
         f.instruction(&Instruction::I64GtU);
-        self.open_frame(ControlFrameKind::If, f);
+        self.open_frame(ControlFrameKind::If, &mut f);
         f.instruction(&Instruction::I64Const(u32::MAX as i64));
-        next_capacity.store(f);
+        live.store(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        next_capacity.load(f);
+        live.load(&mut f);
         f.instruction(&Instruction::I32WrapI64);
-        capacity.store(f);
-        let grown = s.reserve_gc_local(f).initialize(
+        capacity.store(&mut f);
+        let old_ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.field(MapObjectSchema::ORDINALS)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let replacement = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<MapEntryTable>()
-                .filled(GcOperand::null(s), capacity, f),
-            f,
+                .filled(GcOperand::null(s), capacity, &mut f),
+            &mut f,
+        );
+        let ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.array_type::<NumberBitsI64Array>()
+                .filled(GcOperand::i64(0), capacity, &mut f),
+            &mut f,
         );
         f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
+        source.store(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        destination.store(&mut f);
+        let exit = self.open_frame(ControlFrameKind::Block, &mut f);
+        let again = self.open_frame(ControlFrameKind::Loop, &mut f);
+        source.load(&mut f);
         f.instruction(&Instruction::I64ExtendI32U);
-        count.load(f);
+        p.count.load(&mut f);
         f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        let entry = s.reserve_gc_local(f).initialize(
+        self.emit_branch_if_to_target(exit, &mut f);
+        let entry = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<MapEntryTable>()
-                .read(&table, cursor, s, f)
+                .read(&table, source, s, &mut f)
                 .reference(),
-            f,
+            &mut f,
         );
+        entry.load(s, &mut f).is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
         s.array_type::<MapEntryTable>().write(
-            &grown,
-            cursor,
+            &replacement,
+            destination,
             GcOperand::reference(&entry, s),
             s,
-            f,
+            &mut f,
         );
-        entry.clear(f);
-        cursor.load(f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&old_ordinals, source, s, &mut f)
+            .store_i64(live, &mut f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &ordinals,
+            destination,
+            GcOperand::i64_local(live),
+            s,
+            &mut f,
+        );
+        destination.load(&mut f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
+        destination.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        entry.clear(&mut f);
+        source.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        source.store(&mut f);
+        self.emit_branch_to_target(again, &mut f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.struct_type::<MapObject>()
-            .field(MapObjectSchema::ENTRIES)
-            .write(record, GcOperand::reference(&grown, s), s, f);
-        grown.clear(f);
-        self.emit_collection_rehash_map(record, capacity, f);
+        destination.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        p.count.store(&mut f);
+        s.field(MapObjectSchema::ENTRIES).write(
+            &p.record,
+            GcOperand::reference(&replacement, s),
+            s,
+            &mut f,
+        );
+        s.field(MapObjectSchema::ORDINALS).write(
+            &p.record,
+            GcOperand::reference(&ordinals, s),
+            s,
+            &mut f,
+        );
+        s.field(MapObjectSchema::HISTORY_LENGTH).write(
+            &p.record,
+            GcOperand::i64_local(p.count),
+            s,
+            &mut f,
+        );
+        s.field(MapObjectSchema::VERSION)
+            .read(&p.record, s, &mut f)
+            .store_i64(version, &mut f);
+        self.emit_collection_advance_counter(version, &mut f);
+        s.field(MapObjectSchema::VERSION).write(
+            &p.record,
+            GcOperand::i64_local(version),
+            s,
+            &mut f,
+        );
+        self.emit_collection_rehash_map(&p.record, capacity, &mut f);
+        ordinals.clear(&mut f);
+        replacement.clear(&mut f);
+        old_ordinals.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        table.clear(f);
-        s.release_i64_local(next_capacity, f);
-        s.release_i32_local(cursor, f);
-        s.release_i32_local(capacity, f);
+        // This private array address limit is a resource trap, not a JS error.
+        p.count.load(&mut f);
+        f.instruction(&Instruction::I64Const(u32::MAX as i64));
+        f.instruction(&Instruction::I64GeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        f.instruction(&Instruction::Unreachable);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        table.clear(&mut f);
+        s.release_i64_local(version, &mut f);
+        s.release_i64_local(live, &mut f);
+        s.release_i32_local(destination, &mut f);
+        s.release_i32_local(source, &mut f);
+        s.release_i32_local(capacity, &mut f);
+        p.count.load(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
     pub(super) fn emit_collection_clear_map(
         &mut self,
@@ -288,77 +435,54 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        let cursor = s.reserve_i32_local(f);
         let count = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<MapObject>()
-                .field(MapObjectSchema::ENTRIES)
-                .read(record, s, f)
-                .reference(),
-            f,
-        );
-        s.struct_type::<MapObject>()
-            .field(MapObjectSchema::HISTORY_LENGTH)
+        s.field(MapObjectSchema::HISTORY_LENGTH)
             .read(record, s, f)
             .store_i64(count, f);
-        f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
         count.load(f);
-        f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        s.array_type::<MapEntryTable>()
-            .write(&table, cursor, GcOperand::null(s), s, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.struct_type::<MapObject>()
-            .field(MapObjectSchema::LIVE_COUNT)
-            .write(record, GcOperand::i64(0), s, f);
-        let buckets = s.reserve_gc_local(f).initialize(
-            s.struct_type::<MapObject>()
-                .field(MapObjectSchema::HASH_INDEX)
-                .read(record, s, f)
-                .reference(),
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let capacity = s.reserve_i32_local(f);
+        f.instruction(&Instruction::I32Const(0));
+        capacity.store(f);
+        let entries = s.reserve_gc_local(f).initialize(
+            s.array_type::<MapEntryTable>()
+                .filled(GcOperand::null(s), capacity, f),
             f,
         );
-        let capacity = s.reserve_i32_local(f);
-        s.array_type::<CollectionHashTable>().length(&buckets, s, f);
+        f.instruction(&Instruction::I32Const(4));
         capacity.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let cleared = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
-        capacity.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(cleared, f);
-        s.array_type::<CollectionHashTable>()
-            .write(&buckets, cursor, GcOperand::i64(0), s, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.release_i32_local(capacity, f);
+        let buckets = s.reserve_gc_local(f).initialize(
+            s.array_type::<CollectionHashTable>()
+                .filled(GcOperand::i64(0), capacity, f),
+            f,
+        );
+        let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
+        s.field(MapObjectSchema::ENTRIES)
+            .write(record, GcOperand::reference(&entries, s), s, f);
+        s.field(MapObjectSchema::HASH_INDEX)
+            .write(record, GcOperand::reference(&buckets, s), s, f);
+        s.field(MapObjectSchema::ORDINALS)
+            .write(record, GcOperand::reference(&ordinals, s), s, f);
+        s.field(MapObjectSchema::LIVE_COUNT)
+            .write(record, GcOperand::i64(0), s, f);
+        s.field(MapObjectSchema::HISTORY_LENGTH)
+            .write(record, GcOperand::i64(0), s, f);
+        s.field(MapObjectSchema::VERSION)
+            .read(record, s, f)
+            .store_i64(count, f);
+        self.emit_collection_advance_counter(count, f);
+        s.field(MapObjectSchema::VERSION)
+            .write(record, GcOperand::i64_local(count), s, f);
+        // NEXT_ORDINAL survives: existing cursors still observe later inserts.
+        ordinals.clear(f);
         buckets.clear(f);
-        // HISTORY_LENGTH intentionally survives Clear; active cursors are live.
-        table.clear(f);
+        entries.clear(f);
+        s.release_i32_local(capacity, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         s.release_i64_local(count, f);
-        s.release_i32_local(cursor, f);
     }
     pub(super) fn emit_collection_delete_map(
         &mut self,
@@ -472,7 +596,6 @@ impl FunctionBuilder<'_> {
         table.clear(f);
         f.instruction(&Instruction::Else);
         // Append never reuses a tombstone: deletion/reinsertion moves to the end.
-        self.emit_collection_grow_map(record, index, f);
         let table = s.reserve_gc_local(f).initialize(
             s.struct_type::<MapObject>()
                 .field(MapObjectSchema::ENTRIES)
@@ -480,6 +603,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        self.emit_collection_grow_map(record, &table, index, f)?;
         let hash = prepared.hash;
         let head = s.reserve_i64_local(f);
         let bucket = s.reserve_i32_local(f);
@@ -522,6 +646,28 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
+        let ordinals = s.reserve_gc_local(f).initialize(
+            s.field(MapObjectSchema::ORDINALS)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        let ordinal = s.reserve_i64_local(f);
+        s.field(MapObjectSchema::NEXT_ORDINAL)
+            .read(record, s, f)
+            .store_i64(ordinal, f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &ordinals,
+            cursor,
+            GcOperand::i64_local(ordinal),
+            s,
+            f,
+        );
+        self.emit_collection_advance_counter(ordinal, f);
+        s.field(MapObjectSchema::NEXT_ORDINAL)
+            .write(record, GcOperand::i64_local(ordinal), s, f);
+        s.release_i64_local(ordinal, f);
+        ordinals.clear(f);
         self.emit_increment_local(index, 1, f);
         s.array_type::<CollectionHashTable>().write(
             &buckets,
@@ -608,52 +754,154 @@ impl FunctionBuilder<'_> {
     pub(super) fn emit_collection_next_map(
         &mut self,
         record: &GcLocal<MapObject>,
-        index: I64Local,
+        cursor: &CollectionCursorLocals,
         found: I32Local,
         f: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
+        self.runtime_schema()
+            .call_helper(
+                crate::runtime_helpers::CollectionNextMapArguments::new(
+                    record,
+                    cursor.index,
+                    cursor.next_ordinal,
+                    cursor.version,
+                ),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .store(cursor.index, cursor.next_ordinal, cursor.version, found, f);
+        Ok(())
+    }
+
+    pub(crate) fn compile_collection_next_map_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CollectionNextMap);
+        let p =
+            self.helper_parameters::<crate::runtime_helpers::CollectionNextMapParameters>(&mut f);
         let s = self.runtime_schema();
-        let cursor = s.reserve_i32_local(f);
-        let count = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<MapObject>()
-                .field(MapObjectSchema::ENTRIES)
-                .read(record, s, f)
+        let count = s.reserve_i64_local(&mut f);
+        let version = s.reserve_i64_local(&mut f);
+        let low = s.reserve_i64_local(&mut f);
+        let high = s.reserve_i64_local(&mut f);
+        let middle = s.reserve_i64_local(&mut f);
+        let index = s.reserve_i32_local(&mut f);
+        let found = s.reserve_i32_local(&mut f);
+        let table = s.reserve_gc_local(&mut f).initialize(
+            s.field(MapObjectSchema::ENTRIES)
+                .read(&p.record, s, &mut f)
                 .reference(),
-            f,
+            &mut f,
         );
-        s.struct_type::<MapObject>()
-            .field(MapObjectSchema::HISTORY_LENGTH)
-            .read(record, s, f)
-            .store_i64(count, f);
-        f.instruction(&Instruction::I32Const(0));
-        found.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        index.load(f);
-        count.load(f);
+        let ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.field(MapObjectSchema::ORDINALS)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        s.field(MapObjectSchema::HISTORY_LENGTH)
+            .read(&p.record, s, &mut f)
+            .store_i64(count, &mut f);
+        s.field(MapObjectSchema::VERSION)
+            .read(&p.record, s, &mut f)
+            .store_i64(version, &mut f);
+        version.load(&mut f);
+        p.version.load(&mut f);
+        f.instruction(&Instruction::I64Ne);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        // Only storage replacement invalidates the O(1) physical cursor. The
+        // strictly increasing ordinal array admits a lower-bound search.
+        f.instruction(&Instruction::I64Const(0));
+        low.store(&mut f);
+        count.load(&mut f);
+        high.store(&mut f);
+        let searched = self.open_frame(ControlFrameKind::Block, &mut f);
+        let search = self.open_frame(ControlFrameKind::Loop, &mut f);
+        low.load(&mut f);
+        high.load(&mut f);
         f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        index.load(f);
+        self.emit_branch_if_to_target(searched, &mut f);
+        low.load(&mut f);
+        high.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64ShrU);
+        middle.store(&mut f);
+        middle.load(&mut f);
         f.instruction(&Instruction::I32WrapI64);
-        cursor.store(f);
-        s.array_type::<MapEntryTable>()
-            .read(&table, cursor, s, f)
-            .reference()
-            .is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        found.store(f);
-        found.load(f);
-        self.emit_branch_if_to_target(exit, f);
-        self.emit_increment_local(index, 1, f);
-        self.emit_branch_to_target(again, f);
+        index.store(&mut f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&ordinals, index, s, &mut f)
+            .store_i64(p.version, &mut f);
+        p.version.load(&mut f);
+        p.next_ordinal.load(&mut f);
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        middle.load(&mut f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        low.store(&mut f);
+        f.instruction(&Instruction::Else);
+        middle.load(&mut f);
+        high.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(search, &mut f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        table.clear(f);
-        s.release_i64_local(count, f);
-        s.release_i32_local(cursor, f);
+        low.load(&mut f);
+        p.index.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::I32Const(0));
+        found.store(&mut f);
+        let exit = self.open_frame(ControlFrameKind::Block, &mut f);
+        let again = self.open_frame(ControlFrameKind::Loop, &mut f);
+        p.index.load(&mut f);
+        count.load(&mut f);
+        f.instruction(&Instruction::I64GeU);
+        self.emit_branch_if_to_target(exit, &mut f);
+        p.index.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        index.store(&mut f);
+        s.array_type::<MapEntryTable>()
+            .read(&table, index, s, &mut f)
+            .reference()
+            .is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        found.store(&mut f);
+        found.load(&mut f);
+        self.emit_branch_if_to_target(exit, &mut f);
+        self.emit_increment_local(p.index, 1, &mut f);
+        self.emit_branch_to_target(again, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        found.load(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&ordinals, index, s, &mut f)
+            .store_i64(p.next_ordinal, &mut f);
+        self.emit_collection_advance_counter(p.next_ordinal, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        ordinals.clear(&mut f);
+        table.clear(&mut f);
+        s.release_i32_local(index, &mut f);
+        s.release_i64_local(middle, &mut f);
+        s.release_i64_local(high, &mut f);
+        s.release_i64_local(low, &mut f);
+        s.release_i64_local(count, &mut f);
+        p.index.load(&mut f);
+        p.next_ordinal.load(&mut f);
+        version.load(&mut f);
+        found.load(&mut f);
+        s.release_i32_local(found, &mut f);
+        s.release_i64_local(version, &mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
     pub(super) fn emit_collection_alloc_set(
         &mut self,
@@ -676,6 +924,7 @@ impl FunctionBuilder<'_> {
                 .filled(GcOperand::i64(0), zero, f),
             f,
         );
+        let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
         let record = s.reserve_gc_local(f).initialize(
             s.struct_type::<SetObject>().construct(
                 (
@@ -684,11 +933,15 @@ impl FunctionBuilder<'_> {
                     GcOperand::i64(0),
                     GcOperand::i64(0),
                     GcOperand::reference(&buckets, s),
+                    GcOperand::reference(&ordinals, s),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
                 ),
                 f,
             ),
             f,
         );
+        ordinals.clear(f);
         buckets.clear(f);
         entries.clear(f);
         s.release_i32_local(zero, f);
@@ -806,106 +1059,209 @@ impl FunctionBuilder<'_> {
     fn emit_collection_grow_set(
         &mut self,
         record: &GcLocal<SetObject>,
+        table: &GcLocal<SetEntryTable>,
         count: I64Local,
         f: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let capacity = s.reserve_i32_local(f);
-        let cursor = s.reserve_i32_local(f);
-        let next_capacity = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<SetObject>()
-                .field(SetObjectSchema::ENTRIES)
+        // Physical history, rather than live occupancy, owns the next slot.
+        // Below this u32 array length the helper's address-limit trap is inert.
+        count.load(f);
+        s.array_type::<SetEntryTable>().length(table, s, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        s.call_helper(
+            crate::runtime_helpers::CollectionPrepareSetArguments::new(record, count),
+            self.runtime_helper_base()?,
+            f,
+        )
+        .store(count, f);
+        table.replace(
+            s.field(SetObjectSchema::ENTRIES)
                 .read(record, s, f)
                 .reference(),
             f,
         );
-        s.array_type::<SetEntryTable>().length(&table, s, f);
-        capacity.store(f);
-        count.load(f);
-        f.instruction(&Instruction::I64Const(u32::MAX as i64));
-        f.instruction(&Instruction::I64GeU);
-        self.open_frame(ControlFrameKind::If, f);
-        f.instruction(&Instruction::Unreachable);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        count.load(f);
-        capacity.load(f);
+        Ok(())
+    }
+
+    pub(crate) fn compile_collection_prepare_set_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CollectionPrepareSet);
+        let p = self
+            .helper_parameters::<crate::runtime_helpers::CollectionPrepareSetParameters>(&mut f);
+        let s = self.runtime_schema();
+        let capacity = s.reserve_i32_local(&mut f);
+        let source = s.reserve_i32_local(&mut f);
+        let destination = s.reserve_i32_local(&mut f);
+        let live = s.reserve_i64_local(&mut f);
+        let version = s.reserve_i64_local(&mut f);
+        let table = s.reserve_gc_local(&mut f).initialize(
+            s.field(SetObjectSchema::ENTRIES)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        s.array_type::<SetEntryTable>().length(&table, s, &mut f);
+        capacity.store(&mut f);
+        p.count.load(&mut f);
+        capacity.load(&mut f);
         f.instruction(&Instruction::I64ExtendI32U);
         f.instruction(&Instruction::I64GeU);
-        self.open_frame(ControlFrameKind::If, f);
-        capacity.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        // Bound physical history by live occupancy, preserving insertion order.
+        s.field(SetObjectSchema::LIVE_COUNT)
+            .read(&p.record, s, &mut f)
+            .store_i64(live, &mut f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(2));
         f.instruction(&Instruction::I64Mul);
-        next_capacity.store(f);
-        next_capacity.load(f);
+        live.store(&mut f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(4));
         f.instruction(&Instruction::I64LtU);
-        self.open_frame(ControlFrameKind::If, f);
+        self.open_frame(ControlFrameKind::If, &mut f);
         f.instruction(&Instruction::I64Const(4));
-        next_capacity.store(f);
+        live.store(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        next_capacity.load(f);
+        live.load(&mut f);
         f.instruction(&Instruction::I64Const(u32::MAX as i64));
         f.instruction(&Instruction::I64GtU);
-        self.open_frame(ControlFrameKind::If, f);
+        self.open_frame(ControlFrameKind::If, &mut f);
         f.instruction(&Instruction::I64Const(u32::MAX as i64));
-        next_capacity.store(f);
+        live.store(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        next_capacity.load(f);
+        live.load(&mut f);
         f.instruction(&Instruction::I32WrapI64);
-        capacity.store(f);
-        let grown = s.reserve_gc_local(f).initialize(
+        capacity.store(&mut f);
+        let old_ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.field(SetObjectSchema::ORDINALS)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let replacement = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<SetEntryTable>()
-                .filled(GcOperand::null(s), capacity, f),
-            f,
+                .filled(GcOperand::null(s), capacity, &mut f),
+            &mut f,
+        );
+        let ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.array_type::<NumberBitsI64Array>()
+                .filled(GcOperand::i64(0), capacity, &mut f),
+            &mut f,
         );
         f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
+        source.store(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        destination.store(&mut f);
+        let exit = self.open_frame(ControlFrameKind::Block, &mut f);
+        let again = self.open_frame(ControlFrameKind::Loop, &mut f);
+        source.load(&mut f);
         f.instruction(&Instruction::I64ExtendI32U);
-        count.load(f);
+        p.count.load(&mut f);
         f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        let entry = s.reserve_gc_local(f).initialize(
+        self.emit_branch_if_to_target(exit, &mut f);
+        let entry = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<SetEntryTable>()
-                .read(&table, cursor, s, f)
+                .read(&table, source, s, &mut f)
                 .reference(),
-            f,
+            &mut f,
         );
+        entry.load(s, &mut f).is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
         s.array_type::<SetEntryTable>().write(
-            &grown,
-            cursor,
+            &replacement,
+            destination,
             GcOperand::reference(&entry, s),
             s,
-            f,
+            &mut f,
         );
-        entry.clear(f);
-        cursor.load(f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&old_ordinals, source, s, &mut f)
+            .store_i64(live, &mut f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &ordinals,
+            destination,
+            GcOperand::i64_local(live),
+            s,
+            &mut f,
+        );
+        destination.load(&mut f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
+        destination.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        entry.clear(&mut f);
+        source.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        source.store(&mut f);
+        self.emit_branch_to_target(again, &mut f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.struct_type::<SetObject>()
-            .field(SetObjectSchema::ENTRIES)
-            .write(record, GcOperand::reference(&grown, s), s, f);
-        grown.clear(f);
-        self.emit_collection_rehash_set(record, capacity, f);
+        destination.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        p.count.store(&mut f);
+        s.field(SetObjectSchema::ENTRIES).write(
+            &p.record,
+            GcOperand::reference(&replacement, s),
+            s,
+            &mut f,
+        );
+        s.field(SetObjectSchema::ORDINALS).write(
+            &p.record,
+            GcOperand::reference(&ordinals, s),
+            s,
+            &mut f,
+        );
+        s.field(SetObjectSchema::HISTORY_LENGTH).write(
+            &p.record,
+            GcOperand::i64_local(p.count),
+            s,
+            &mut f,
+        );
+        s.field(SetObjectSchema::VERSION)
+            .read(&p.record, s, &mut f)
+            .store_i64(version, &mut f);
+        self.emit_collection_advance_counter(version, &mut f);
+        s.field(SetObjectSchema::VERSION).write(
+            &p.record,
+            GcOperand::i64_local(version),
+            s,
+            &mut f,
+        );
+        self.emit_collection_rehash_set(&p.record, capacity, &mut f);
+        ordinals.clear(&mut f);
+        replacement.clear(&mut f);
+        old_ordinals.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        table.clear(f);
-        s.release_i64_local(next_capacity, f);
-        s.release_i32_local(cursor, f);
-        s.release_i32_local(capacity, f);
+        // This private array address limit is a resource trap, not a JS error.
+        p.count.load(&mut f);
+        f.instruction(&Instruction::I64Const(u32::MAX as i64));
+        f.instruction(&Instruction::I64GeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        f.instruction(&Instruction::Unreachable);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        table.clear(&mut f);
+        s.release_i64_local(version, &mut f);
+        s.release_i64_local(live, &mut f);
+        s.release_i32_local(destination, &mut f);
+        s.release_i32_local(source, &mut f);
+        s.release_i32_local(capacity, &mut f);
+        p.count.load(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
     pub(super) fn emit_collection_clear_set(
         &mut self,
@@ -913,77 +1269,54 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        let cursor = s.reserve_i32_local(f);
         let count = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<SetObject>()
-                .field(SetObjectSchema::ENTRIES)
-                .read(record, s, f)
-                .reference(),
-            f,
-        );
-        s.struct_type::<SetObject>()
-            .field(SetObjectSchema::HISTORY_LENGTH)
+        s.field(SetObjectSchema::HISTORY_LENGTH)
             .read(record, s, f)
             .store_i64(count, f);
-        f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
         count.load(f);
-        f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        s.array_type::<SetEntryTable>()
-            .write(&table, cursor, GcOperand::null(s), s, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.struct_type::<SetObject>()
-            .field(SetObjectSchema::LIVE_COUNT)
-            .write(record, GcOperand::i64(0), s, f);
-        let buckets = s.reserve_gc_local(f).initialize(
-            s.struct_type::<SetObject>()
-                .field(SetObjectSchema::HASH_INDEX)
-                .read(record, s, f)
-                .reference(),
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let capacity = s.reserve_i32_local(f);
+        f.instruction(&Instruction::I32Const(0));
+        capacity.store(f);
+        let entries = s.reserve_gc_local(f).initialize(
+            s.array_type::<SetEntryTable>()
+                .filled(GcOperand::null(s), capacity, f),
             f,
         );
-        let capacity = s.reserve_i32_local(f);
-        s.array_type::<CollectionHashTable>().length(&buckets, s, f);
+        f.instruction(&Instruction::I32Const(4));
         capacity.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        cursor.store(f);
-        let cleared = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
-        capacity.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(cleared, f);
-        s.array_type::<CollectionHashTable>()
-            .write(&buckets, cursor, GcOperand::i64(0), s, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        cursor.store(f);
-        self.emit_branch_to_target(again, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.release_i32_local(capacity, f);
+        let buckets = s.reserve_gc_local(f).initialize(
+            s.array_type::<CollectionHashTable>()
+                .filled(GcOperand::i64(0), capacity, f),
+            f,
+        );
+        let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
+        s.field(SetObjectSchema::ENTRIES)
+            .write(record, GcOperand::reference(&entries, s), s, f);
+        s.field(SetObjectSchema::HASH_INDEX)
+            .write(record, GcOperand::reference(&buckets, s), s, f);
+        s.field(SetObjectSchema::ORDINALS)
+            .write(record, GcOperand::reference(&ordinals, s), s, f);
+        s.field(SetObjectSchema::LIVE_COUNT)
+            .write(record, GcOperand::i64(0), s, f);
+        s.field(SetObjectSchema::HISTORY_LENGTH)
+            .write(record, GcOperand::i64(0), s, f);
+        s.field(SetObjectSchema::VERSION)
+            .read(record, s, f)
+            .store_i64(count, f);
+        self.emit_collection_advance_counter(count, f);
+        s.field(SetObjectSchema::VERSION)
+            .write(record, GcOperand::i64_local(count), s, f);
+        // NEXT_ORDINAL survives: existing cursors still observe later inserts.
+        ordinals.clear(f);
         buckets.clear(f);
-        // HISTORY_LENGTH intentionally survives Clear; active cursors are live.
-        table.clear(f);
+        entries.clear(f);
+        s.release_i32_local(capacity, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         s.release_i64_local(count, f);
-        s.release_i32_local(cursor, f);
     }
     pub(super) fn emit_collection_delete_set(
         &mut self,
@@ -1068,7 +1401,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         // Append never reuses a tombstone: deletion/reinsertion moves to the end.
-        self.emit_collection_grow_set(record, index, f);
         let table = s.reserve_gc_local(f).initialize(
             s.struct_type::<SetObject>()
                 .field(SetObjectSchema::ENTRIES)
@@ -1076,6 +1408,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        self.emit_collection_grow_set(record, &table, index, f)?;
         let hash = prepared.hash;
         let head = s.reserve_i64_local(f);
         let bucket = s.reserve_i32_local(f);
@@ -1113,6 +1446,28 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
+        let ordinals = s.reserve_gc_local(f).initialize(
+            s.field(SetObjectSchema::ORDINALS)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        let ordinal = s.reserve_i64_local(f);
+        s.field(SetObjectSchema::NEXT_ORDINAL)
+            .read(record, s, f)
+            .store_i64(ordinal, f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &ordinals,
+            cursor,
+            GcOperand::i64_local(ordinal),
+            s,
+            f,
+        );
+        self.emit_collection_advance_counter(ordinal, f);
+        s.field(SetObjectSchema::NEXT_ORDINAL)
+            .write(record, GcOperand::i64_local(ordinal), s, f);
+        s.release_i64_local(ordinal, f);
+        ordinals.clear(f);
         self.emit_increment_local(index, 1, f);
         s.array_type::<CollectionHashTable>().write(
             &buckets,
@@ -1189,52 +1544,154 @@ impl FunctionBuilder<'_> {
     pub(super) fn emit_collection_next_set(
         &mut self,
         record: &GcLocal<SetObject>,
-        index: I64Local,
+        cursor: &CollectionCursorLocals,
         found: I32Local,
         f: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
+        self.runtime_schema()
+            .call_helper(
+                crate::runtime_helpers::CollectionNextSetArguments::new(
+                    record,
+                    cursor.index,
+                    cursor.next_ordinal,
+                    cursor.version,
+                ),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .store(cursor.index, cursor.next_ordinal, cursor.version, found, f);
+        Ok(())
+    }
+
+    pub(crate) fn compile_collection_next_set_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CollectionNextSet);
+        let p =
+            self.helper_parameters::<crate::runtime_helpers::CollectionNextSetParameters>(&mut f);
         let s = self.runtime_schema();
-        let cursor = s.reserve_i32_local(f);
-        let count = s.reserve_i64_local(f);
-        let table = s.reserve_gc_local(f).initialize(
-            s.struct_type::<SetObject>()
-                .field(SetObjectSchema::ENTRIES)
-                .read(record, s, f)
+        let count = s.reserve_i64_local(&mut f);
+        let version = s.reserve_i64_local(&mut f);
+        let low = s.reserve_i64_local(&mut f);
+        let high = s.reserve_i64_local(&mut f);
+        let middle = s.reserve_i64_local(&mut f);
+        let index = s.reserve_i32_local(&mut f);
+        let found = s.reserve_i32_local(&mut f);
+        let table = s.reserve_gc_local(&mut f).initialize(
+            s.field(SetObjectSchema::ENTRIES)
+                .read(&p.record, s, &mut f)
                 .reference(),
-            f,
+            &mut f,
         );
-        s.struct_type::<SetObject>()
-            .field(SetObjectSchema::HISTORY_LENGTH)
-            .read(record, s, f)
-            .store_i64(count, f);
-        f.instruction(&Instruction::I32Const(0));
-        found.store(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let again = self.open_frame(ControlFrameKind::Loop, f);
-        index.load(f);
-        count.load(f);
+        let ordinals = s.reserve_gc_local(&mut f).initialize(
+            s.field(SetObjectSchema::ORDINALS)
+                .read(&p.record, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        s.field(SetObjectSchema::HISTORY_LENGTH)
+            .read(&p.record, s, &mut f)
+            .store_i64(count, &mut f);
+        s.field(SetObjectSchema::VERSION)
+            .read(&p.record, s, &mut f)
+            .store_i64(version, &mut f);
+        version.load(&mut f);
+        p.version.load(&mut f);
+        f.instruction(&Instruction::I64Ne);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        // Only storage replacement invalidates the O(1) physical cursor. The
+        // strictly increasing ordinal array admits a lower-bound search.
+        f.instruction(&Instruction::I64Const(0));
+        low.store(&mut f);
+        count.load(&mut f);
+        high.store(&mut f);
+        let searched = self.open_frame(ControlFrameKind::Block, &mut f);
+        let search = self.open_frame(ControlFrameKind::Loop, &mut f);
+        low.load(&mut f);
+        high.load(&mut f);
         f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(exit, f);
-        index.load(f);
+        self.emit_branch_if_to_target(searched, &mut f);
+        low.load(&mut f);
+        high.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64ShrU);
+        middle.store(&mut f);
+        middle.load(&mut f);
         f.instruction(&Instruction::I32WrapI64);
-        cursor.store(f);
-        s.array_type::<SetEntryTable>()
-            .read(&table, cursor, s, f)
-            .reference()
-            .is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        found.store(f);
-        found.load(f);
-        self.emit_branch_if_to_target(exit, f);
-        self.emit_increment_local(index, 1, f);
-        self.emit_branch_to_target(again, f);
+        index.store(&mut f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&ordinals, index, s, &mut f)
+            .store_i64(p.version, &mut f);
+        p.version.load(&mut f);
+        p.next_ordinal.load(&mut f);
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        middle.load(&mut f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        low.store(&mut f);
+        f.instruction(&Instruction::Else);
+        middle.load(&mut f);
+        high.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(search, &mut f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        table.clear(f);
-        s.release_i64_local(count, f);
-        s.release_i32_local(cursor, f);
+        low.load(&mut f);
+        p.index.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::I32Const(0));
+        found.store(&mut f);
+        let exit = self.open_frame(ControlFrameKind::Block, &mut f);
+        let again = self.open_frame(ControlFrameKind::Loop, &mut f);
+        p.index.load(&mut f);
+        count.load(&mut f);
+        f.instruction(&Instruction::I64GeU);
+        self.emit_branch_if_to_target(exit, &mut f);
+        p.index.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        index.store(&mut f);
+        s.array_type::<SetEntryTable>()
+            .read(&table, index, s, &mut f)
+            .reference()
+            .is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        found.store(&mut f);
+        found.load(&mut f);
+        self.emit_branch_if_to_target(exit, &mut f);
+        self.emit_increment_local(p.index, 1, &mut f);
+        self.emit_branch_to_target(again, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        found.load(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        s.array_type::<NumberBitsI64Array>()
+            .read(&ordinals, index, s, &mut f)
+            .store_i64(p.next_ordinal, &mut f);
+        self.emit_collection_advance_counter(p.next_ordinal, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        ordinals.clear(&mut f);
+        table.clear(&mut f);
+        s.release_i32_local(index, &mut f);
+        s.release_i64_local(middle, &mut f);
+        s.release_i64_local(high, &mut f);
+        s.release_i64_local(low, &mut f);
+        s.release_i64_local(count, &mut f);
+        p.index.load(&mut f);
+        p.next_ordinal.load(&mut f);
+        version.load(&mut f);
+        found.load(&mut f);
+        s.release_i32_local(found, &mut f);
+        s.release_i64_local(version, &mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
     fn emit_collection_rehash_map(
         &mut self,

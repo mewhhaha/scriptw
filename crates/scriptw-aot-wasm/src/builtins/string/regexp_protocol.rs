@@ -1415,7 +1415,7 @@ impl FunctionBuilder<'_> {
             zero.store(f);
             b.emit_native_regexp_set_last_index(regexp, zero, &pending, f)?;
             b.emit_native_string_abrupt_exit(&pending, output, exit, f);
-            let list = crate::functions::ArgumentListConstruction::new(s, f);
+            let list = crate::functions::ArgumentListConstruction::new(b, f);
             let done = b.open_frame(ControlFrameKind::Block, f);
             let next = b.open_frame(ControlFrameKind::Loop, f);
             b.emit_native_regexp_observed_exec(regexp, input, &pending, f)?;
@@ -1539,7 +1539,7 @@ impl FunctionBuilder<'_> {
             b.emit_native_string_abrupt_exit(&pending, output, exit, f);
             b.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
-            let results = crate::functions::ArgumentListConstruction::new(s, f);
+            let results = crate::functions::ArgumentListConstruction::new(b, f);
             let collected = b.open_frame(ControlFrameKind::Block, f);
             let collect_next = b.open_frame(ControlFrameKind::Loop, f);
             b.emit_native_regexp_observed_exec(regexp, input, &pending, f)?;
@@ -1640,7 +1640,7 @@ impl FunctionBuilder<'_> {
                 f,
             );
             b.emit_to_integer_clamped_to_string_len(integer_bits, input_length, position, f);
-            let captures = SubstitutionCaptureList::new(s, f);
+            let captures = SubstitutionCaptureList::new(b, f);
             f.instruction(&Instruction::I64Const(1));
             capture_index.store(f);
             let captures_done = b.open_frame(ControlFrameKind::Block, f);
@@ -1684,7 +1684,7 @@ impl FunctionBuilder<'_> {
             named_value.copy_from(pending.value(), f);
             functional.load(f);
             b.open_frame(ControlFrameKind::If, f);
-            let arguments = crate::functions::ArgumentListConstruction::new(s, f);
+            let arguments = crate::functions::ArgumentListConstruction::new(b, f);
             capture_value.set_reference(&matched, s, f);
             arguments.append(&capture_value, s, f);
             f.instruction(&Instruction::I64Const(0));
@@ -1923,7 +1923,7 @@ impl FunctionBuilder<'_> {
             b.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
             b.emit_native_gc_string_length(input, size, f);
-            let list = crate::functions::ArgumentListConstruction::new(s, f);
+            let list = crate::functions::ArgumentListConstruction::new(b, f);
             f.instruction(&Instruction::I64Const(0));
             count.store(f);
             f.instruction(&Instruction::I64Const(0));

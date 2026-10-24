@@ -319,7 +319,7 @@ impl FunctionBuilder<'_> {
         duplicate.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let construction = ArgumentListConstruction::new(s, f);
+        let construction = ArgumentListConstruction::new(self, f);
         self.emit_json_copy_list(&construction, &normalized, f);
         construction.append(&element, s, f);
         let completed = construction.finish(self, f);
@@ -701,7 +701,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let path = ArgumentListConstruction::new(s, f);
+        let path = ArgumentListConstruction::new(self, f);
         self.emit_json_copy_list(&path, seen, f);
         path.append(value, s, f);
         let descendants = path.finish(self, f);

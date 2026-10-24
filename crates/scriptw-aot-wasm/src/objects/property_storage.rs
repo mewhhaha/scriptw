@@ -124,9 +124,8 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
-    /// Appends the actual GC entry and preserves existing table order and holes.
-    /// Capacity doubles only when full; the storage retains a replacement
-    /// before temporary roots retire. Deletion holes never become new slots.
+    /// Appends the actual GC entry in insertion order. Full tables compact
+    /// live entries before growing, so delete/reinsert history stays bounded.
     fn emit_ordinary_append_property_entry_inner(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
@@ -185,6 +184,13 @@ impl FunctionBuilder<'_> {
     ) {
         let schema = self.runtime_schema();
         let key = prepared.key;
+        let hash = prepared.hash;
+        let length = schema.reserve_i32_local(function);
+        let new_length = schema.reserve_i32_local(function);
+        schema
+            .field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(storage, schema, function)
+            .store(length, function);
         let table = schema.reserve_gc_local(function).initialize(
             schema
                 .field(OrdinaryPropertyStorageSchema::ENTRIES)
@@ -192,6 +198,30 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        let entries = schema.array_type::<PropertyTable>();
+        length.load(function);
+        entries.length(&table, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, function);
+        schema
+            .call_helper(
+                crate::runtime_helpers::OrdinaryPropertyPrepareArguments::new(storage, length),
+                self.runtime_helper_base()
+                    .expect("dictionary mutation requires registered runtime kernels"),
+                function,
+            )
+            .store(length, function);
+        // Preparation may compact or replace storage. Retain the original
+        // rooted table when there is room; reload only after that mutation.
+        table.replace(
+            schema
+                .field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(storage, schema, function)
+                .reference(),
+            function,
+        );
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         let buckets = schema.reserve_gc_local(function).initialize(
             schema
                 .field(OrdinaryPropertyStorageSchema::INDEX)
@@ -199,77 +229,10 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let hash = prepared.hash;
-        let new_index_capacity = schema.reserve_i32_local(function);
-        let length = schema.reserve_i32_local(function);
-        let new_length = schema.reserve_i32_local(function);
-        let capacity = schema.reserve_i32_local(function);
-        let new_capacity = schema.reserve_i32_local(function);
-        let entries = schema.array_type::<PropertyTable>();
-        schema
-            .field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(storage, schema, function)
-            .store(length, function);
         length.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
         new_length.store(function);
-        entries.length(&table, schema, function);
-        capacity.store(function);
-        length.load(function);
-        capacity.load(function);
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_property_table_growth_capacity(capacity, new_length, new_capacity, function);
-        // The index has twice the ordered capacity: a probe always reaches
-        // an empty bucket, even with every historical entry still present.
-        new_capacity.load(function);
-        function.instruction(&Instruction::I32Const(i32::MIN));
-        function.instruction(&Instruction::I32GeU);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::Unreachable);
-        function.instruction(&Instruction::End);
-        new_capacity.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Shl);
-        new_index_capacity.store(function);
-        let replacement_slot = schema.reserve_gc_local(function);
-        let replacement = replacement_slot.initialize(
-            entries.filled(GcOperand::null(schema), new_capacity, function),
-            function,
-        );
-        entries.copy_prefix_from(&replacement, &table, length, schema, function);
-        let replacement_index = schema.reserve_gc_local(function).initialize(
-            schema.array_type::<OrdinaryPropertyIndex>().filled(
-                GcOperand::i32(0),
-                new_index_capacity,
-                function,
-            ),
-            function,
-        );
-        self.emit_ordinary_property_index_rehash(
-            &replacement_index,
-            &replacement,
-            length,
-            function,
-        );
-        schema.field(OrdinaryPropertyStorageSchema::ENTRIES).write(
-            storage,
-            GcOperand::reference(&replacement, schema),
-            schema,
-            function,
-        );
-        schema.field(OrdinaryPropertyStorageSchema::INDEX).write(
-            storage,
-            GcOperand::reference(&replacement_index, schema),
-            schema,
-            function,
-        );
-        buckets.replace(replacement_index.load(schema, function), function);
-        replacement_index.clear(function);
-        table.replace(replacement.load(schema, function), function);
-        replacement.clear(function);
-        function.instruction(&Instruction::End);
         let stored_key_slot = schema.reserve_gc_local(function);
         let stored_key = stored_key_slot.initialize(
             schema
@@ -306,13 +269,270 @@ impl FunctionBuilder<'_> {
         );
         entry.clear(function);
         stored_key.clear(function);
-        schema.release_i32_local(new_index_capacity, function);
-        schema.release_i32_local(new_capacity, function);
-        schema.release_i32_local(capacity, function);
         schema.release_i32_local(new_length, function);
         schema.release_i32_local(length, function);
         buckets.clear(function);
         table.clear(function);
+    }
+
+    /// Sole physical table-compaction body. No JS callback can observe its
+    /// unpublished replacement, and immutable entry positions are rebuilt.
+    pub(crate) fn compile_ordinary_property_prepare_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut f = self
+            .begin_helper_body(crate::runtime_helpers::RuntimeHelperId::OrdinaryPropertyPrepare);
+        let p = self
+            .helper_parameters::<crate::runtime_helpers::OrdinaryPropertyPrepareParameters>(&mut f);
+        let schema = self.runtime_schema();
+        let capacity = schema.reserve_i32_local(&mut f);
+        let index_capacity = schema.reserve_i32_local(&mut f);
+        let source = schema.reserve_i32_local(&mut f);
+        let destination = schema.reserve_i32_local(&mut f);
+        let live = schema.reserve_i32_local(&mut f);
+        let hash = schema.reserve_i64_local(&mut f);
+        let old = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(&p.storage, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        schema
+            .array_type::<PropertyTable>()
+            .length(&old, schema, &mut f);
+        capacity.store(&mut f);
+        p.count.load(&mut f);
+        capacity.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        f.instruction(&Instruction::I32Const(0));
+        source.store(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        live.store(&mut f);
+        let counted = self.open_frame(ControlFrameKind::Block, &mut f);
+        let counting = self.open_frame(ControlFrameKind::Loop, &mut f);
+        source.load(&mut f);
+        p.count.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(counted, &mut f);
+        schema
+            .array_type::<PropertyTable>()
+            .read(&old, source, schema, &mut f)
+            .reference()
+            .is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        live.load(&mut f);
+        f.instruction(&Instruction::I32Add);
+        live.store(&mut f);
+        source.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        source.store(&mut f);
+        self.emit_branch_to_target(counting, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_dictionary_storage_capacity(live, capacity, index_capacity, &mut f);
+        let table = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .array_type::<PropertyTable>()
+                .filled(GcOperand::null(schema), capacity, &mut f),
+            &mut f,
+        );
+        let buckets = schema.reserve_gc_local(&mut f).initialize(
+            schema.array_type::<OrdinaryPropertyIndex>().filled(
+                GcOperand::i32(0),
+                index_capacity,
+                &mut f,
+            ),
+            &mut f,
+        );
+        f.instruction(&Instruction::I32Const(0));
+        source.store(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        destination.store(&mut f);
+        let copied = self.open_frame(ControlFrameKind::Block, &mut f);
+        let copying = self.open_frame(ControlFrameKind::Loop, &mut f);
+        source.load(&mut f);
+        p.count.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(copied, &mut f);
+        let maybe = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .array_type::<PropertyTable>()
+                .read(&old, source, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        maybe.load(schema, &mut f).is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let entry = schema
+            .reserve_gc_local(&mut f)
+            .initialize(maybe.load(schema, &mut f).require_non_null(&mut f), &mut f);
+        let key = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .field(PropertyEntrySchema::KEY)
+                .read(&entry, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let descriptor = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .field(PropertyEntrySchema::DESCRIPTOR)
+                .read(&entry, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        schema
+            .field(PropertyEntrySchema::HASH)
+            .read(&entry, schema, &mut f)
+            .store_i64(hash, &mut f);
+        // A dense growth keeps its existing immutable entry records. Only a
+        // moved live property needs a new POSITION; descriptor/key records
+        // remain shared in both cases.
+        let replacement = schema
+            .reserve_gc_local(&mut f)
+            .initialize(entry.load(schema, &mut f), &mut f);
+        source.load(&mut f);
+        destination.load(&mut f);
+        f.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        replacement.replace(
+            schema.struct_type::<PropertyEntry>().construct(
+                (
+                    GcOperand::reference(&key, schema),
+                    GcOperand::reference(&descriptor, schema),
+                    GcOperand::i64_local(hash),
+                    GcOperand::i32_local(destination),
+                ),
+                &mut f,
+            ),
+            &mut f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.array_type::<PropertyTable>().write(
+            &table,
+            destination,
+            GcOperand::nullable_reference(&replacement, schema),
+            schema,
+            &mut f,
+        );
+        self.emit_ordinary_property_index_publish(&buckets, &table, hash, destination, &mut f);
+        destination.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        destination.store(&mut f);
+        replacement.clear(&mut f);
+        descriptor.clear(&mut f);
+        key.clear(&mut f);
+        entry.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        maybe.clear(&mut f);
+        source.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        source.store(&mut f);
+        self.emit_branch_to_target(copying, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        schema.field(OrdinaryPropertyStorageSchema::ENTRIES).write(
+            &p.storage,
+            GcOperand::reference(&table, schema),
+            schema,
+            &mut f,
+        );
+        schema.field(OrdinaryPropertyStorageSchema::INDEX).write(
+            &p.storage,
+            GcOperand::reference(&buckets, schema),
+            schema,
+            &mut f,
+        );
+        schema.field(OrdinaryPropertyStorageSchema::LENGTH).write(
+            &p.storage,
+            GcOperand::i32_local(destination),
+            schema,
+            &mut f,
+        );
+        destination.load(&mut f);
+        p.count.store(&mut f);
+        buckets.clear(&mut f);
+        table.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        old.clear(&mut f);
+        schema.release_i64_local(hash, &mut f);
+        schema.release_i32_local(live, &mut f);
+        schema.release_i32_local(destination, &mut f);
+        schema.release_i32_local(source, &mut f);
+        schema.release_i32_local(index_capacity, &mut f);
+        schema.release_i32_local(capacity, &mut f);
+        p.count.load(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
+
+    /// Mask-based probes need power-of-two capacities; reserving twice the live
+    /// extent leaves spare slots between compactions. Clamp that reservation
+    /// before rounding, and produce the ordered/index pair at one allocation
+    /// seam so both invariants hold even near the private address limit.
+    fn emit_dictionary_storage_capacity(
+        &self,
+        live: I32Local,
+        ordered: I32Local,
+        index: I32Local,
+        function: &mut Function,
+    ) {
+        // At this live extent the maximum ordered capacity has no append slot.
+        // Below it, doubling live itself cannot wrap an unsigned i32.
+        live.load(function);
+        function.instruction(&Instruction::I32Const(1 << 30));
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::Unreachable);
+        function.instruction(&Instruction::End);
+        live.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Shl);
+        ordered.store(function);
+        // An unrepresentable 2x reservation must not reject a representable
+        // live extent plus its next property: retain the maximum capacity.
+        ordered.load(function);
+        function.instruction(&Instruction::I32Const(1 << 30));
+        function.instruction(&Instruction::I32GtU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Const(1 << 30));
+        ordered.store(function);
+        function.instruction(&Instruction::End);
+        ordered.load(function);
+        function.instruction(&Instruction::I32Const(4));
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Const(4));
+        ordered.store(function);
+        function.instruction(&Instruction::End);
+        // ceil(log2(reserved)) = 32 - clz(reserved - 1). The reservation is
+        // already within [4, 2^30], so neither subtraction nor shift can wrap.
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Const(32));
+        ordered.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Sub);
+        function.instruction(&Instruction::I32Clz);
+        function.instruction(&Instruction::I32Sub);
+        function.instruction(&Instruction::I32Shl);
+        ordered.store(function);
+        ordered.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Shl);
+        index.store(function);
     }
 
     /// Chooses max(4, required, 2 * capacity), without unsigned i32 wrap.

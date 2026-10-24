@@ -11,6 +11,7 @@ use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone)]
 pub(crate) struct WasmFunctionMeta {
+    pub(crate) numeric_leaf: Option<crate::functions::NumericLeafPlan>,
     pub(crate) async_generator_resume_environment_plan:
         Option<scriptw_ir::AsyncGeneratorResumeEnvironmentPlanIr>,
     pub(crate) template_source: Option<scriptw_ir::TemplateSourceIr>,
@@ -5421,6 +5422,9 @@ impl ModuleUnitGuard {
 }
 
 pub(crate) struct FunctionMetaRegistry {
+    /// Each cache kind has a dense namespace shared by all source bodies in P.
+    next_compact_shape_site: std::cell::Cell<u32>,
+    next_own_data_read_site: std::cell::Cell<u32>,
     foreign_imports: crate::foreign::ForeignImportPlan,
     module_graph: Option<ModuleGraphPlan>,
     prepared_dynamic_functions: Vec<scriptw_ir::PreparedDynamicFunction>,
@@ -5433,6 +5437,22 @@ pub(crate) struct FunctionMetaRegistry {
 }
 
 impl FunctionMetaRegistry {
+    pub(crate) fn next_program_site_index(
+        &self,
+        kind: crate::emit::ProgramSiteKind,
+    ) -> Result<u32, EmitError> {
+        let next = match kind {
+            crate::emit::ProgramSiteKind::CompactShape => &self.next_compact_shape_site,
+            crate::emit::ProgramSiteKind::OwnDataRead => &self.next_own_data_read_site,
+        };
+        let site = next.get();
+        next.set(
+            site.checked_add(1)
+                .ok_or_else(|| EmitError::unsupported("program cache sites exceed u32"))?,
+        );
+        Ok(site)
+    }
+
     pub(crate) fn with_foreign_imports(mut self, plan: crate::foreign::ForeignImportPlan) -> Self {
         self.foreign_imports = plan;
         self
@@ -5476,6 +5496,8 @@ impl FunctionMetaRegistry {
         module_graph: Option<ModuleGraphPlan>,
     ) -> Self {
         Self {
+            next_compact_shape_site: std::cell::Cell::new(0),
+            next_own_data_read_site: std::cell::Cell::new(0),
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,
             prepared_dynamic_functions,
@@ -5725,6 +5747,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             function.id.clone(),
             WasmFunctionMeta {
+                numeric_leaf: crate::functions::NumericLeafPlan::for_function(function),
                 async_generator_resume_environment_plan: function
                     .resumable_plan
                     .as_ref()
@@ -5760,6 +5783,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             unit.id.function_id(),
             WasmFunctionMeta {
+                numeric_leaf: None,
                 // Prepared Script thunks receive a lexical environment directly;
                 // their entry creates its own source instance.
                 async_generator_resume_environment_plan: None,
@@ -5791,6 +5815,7 @@ pub(crate) fn build_function_metas<'a>(
     }
 
     let standard_builtin_meta = |builtin: StandardBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        numeric_leaf: None,
         async_generator_resume_environment_plan: None,
         template_source: None,
         name: builtin
@@ -5820,6 +5845,7 @@ pub(crate) fn build_function_metas<'a>(
         needs_active_function_identity: false,
     };
     let host_builtin_meta = |builtin: HostBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        numeric_leaf: None,
         async_generator_resume_environment_plan: None,
         template_source: None,
         name: builtin.as_str().to_string(),

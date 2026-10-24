@@ -1,3 +1,4 @@
+use super::storage::CollectionCursorLocals;
 use super::*;
 impl FunctionBuilder<'_> {
     fn emit_collection_map_iterator(
@@ -17,6 +18,8 @@ impl FunctionBuilder<'_> {
                     GcOperand::i64(0),
                     GcOperand::boolean(false),
                     GcOperand::constant(kind),
+                    GcOperand::i64(0),
+                    GcOperand::i64(-1),
                 ),
                 f,
             ),
@@ -46,7 +49,7 @@ impl FunctionBuilder<'_> {
         let value = s.reserve_value_local(f);
         let key = s.reserve_value_local(f);
         let result = s.reserve_completion(f);
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         let kind = s.reserve_i32_local(f);
         self.compile_this_to_locals(&receiver, f)?;
@@ -91,15 +94,33 @@ impl FunctionBuilder<'_> {
         s.struct_type::<MapIteratorObject>()
             .field(MapIteratorObjectSchema::NEXT_INDEX)
             .read(&iterator, s, f)
-            .store_i64(index, f);
-        self.emit_collection_next_map(&record, index, found, f);
+            .store_i64(cursor.index, f);
+        s.field(MapIteratorObjectSchema::NEXT_ORDINAL)
+            .read(&iterator, s, f)
+            .store_i64(cursor.next_ordinal, f);
+        s.field(MapIteratorObjectSchema::VERSION)
+            .read(&iterator, s, f)
+            .store_i64(cursor.version, f);
+        self.emit_collection_next_map(&record, &cursor, found, f)?;
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_collection_read_map(&record, index, &key, &value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_collection_read_map(&record, cursor.index, &key, &value, f);
+        self.emit_increment_local(cursor.index, 1, f);
         s.struct_type::<MapIteratorObject>()
             .field(MapIteratorObjectSchema::NEXT_INDEX)
-            .write(&iterator, GcOperand::i64_local(index), s, f);
+            .write(&iterator, GcOperand::i64_local(cursor.index), s, f);
+        s.field(MapIteratorObjectSchema::NEXT_ORDINAL).write(
+            &iterator,
+            GcOperand::i64_local(cursor.next_ordinal),
+            s,
+            f,
+        );
+        s.field(MapIteratorObjectSchema::VERSION).write(
+            &iterator,
+            GcOperand::i64_local(cursor.version),
+            s,
+            f,
+        );
         s.struct_type::<MapIteratorObject>()
             .field(MapIteratorObjectSchema::KIND)
             .read(&iterator, s, f)
@@ -159,7 +180,7 @@ impl FunctionBuilder<'_> {
         self.completion().copy_from(&result, f);
         s.release_i32_local(kind, f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         result.clear(f);
         key.clear(f);
         value.clear(f);
@@ -178,7 +199,7 @@ impl FunctionBuilder<'_> {
         let key = s.reserve_value_local(f);
         let value = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         self.emit_builtin_arg_to_value(0, &callback, f);
         self.emit_builtin_arg_to_value(1, &this, f);
@@ -188,16 +209,14 @@ impl FunctionBuilder<'_> {
             RuntimeErrorMessage::MAP_PROTOTYPE_FOREACH_CALLBACK_MUST_BE_CALLABLE,
             f,
         )?;
-        f.instruction(&Instruction::I64Const(0));
-        index.store(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
-        self.emit_collection_next_map(&record, index, found, f);
+        self.emit_collection_next_map(&record, &cursor, found, f)?;
         found.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
-        self.emit_collection_read_map(&record, index, &key, &value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_collection_read_map(&record, cursor.index, &key, &value, f);
+        self.emit_increment_local(cursor.index, 1, f);
         let args = self.emit_pre_evaluated_arg_vector(&[&value, &key, &receiver], f);
         self.emit_function_or_proxy_call_with_argv(&callback, &this, &args, &pending, f)?;
         args.clear(f);
@@ -212,7 +231,7 @@ impl FunctionBuilder<'_> {
         value.set_undefined(f);
         self.completion().set_normal(&value, f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         pending.clear(f);
         value.clear(f);
         key.clear(f);
@@ -239,6 +258,8 @@ impl FunctionBuilder<'_> {
                     GcOperand::i64(0),
                     GcOperand::boolean(false),
                     GcOperand::constant(kind),
+                    GcOperand::i64(0),
+                    GcOperand::i64(-1),
                 ),
                 f,
             ),
@@ -265,7 +286,7 @@ impl FunctionBuilder<'_> {
         let value = s.reserve_value_local(f);
         let key = s.reserve_value_local(f);
         let result = s.reserve_completion(f);
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         let kind = s.reserve_i32_local(f);
         self.compile_this_to_locals(&receiver, f)?;
@@ -310,16 +331,34 @@ impl FunctionBuilder<'_> {
         s.struct_type::<SetIteratorObject>()
             .field(SetIteratorObjectSchema::NEXT_INDEX)
             .read(&iterator, s, f)
-            .store_i64(index, f);
-        self.emit_collection_next_set(&record, index, found, f);
+            .store_i64(cursor.index, f);
+        s.field(SetIteratorObjectSchema::NEXT_ORDINAL)
+            .read(&iterator, s, f)
+            .store_i64(cursor.next_ordinal, f);
+        s.field(SetIteratorObjectSchema::VERSION)
+            .read(&iterator, s, f)
+            .store_i64(cursor.version, f);
+        self.emit_collection_next_set(&record, &cursor, found, f)?;
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_collection_read_set(&record, index, &value, f);
+        self.emit_collection_read_set(&record, cursor.index, &value, f);
         key.copy_from(&value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_increment_local(cursor.index, 1, f);
         s.struct_type::<SetIteratorObject>()
             .field(SetIteratorObjectSchema::NEXT_INDEX)
-            .write(&iterator, GcOperand::i64_local(index), s, f);
+            .write(&iterator, GcOperand::i64_local(cursor.index), s, f);
+        s.field(SetIteratorObjectSchema::NEXT_ORDINAL).write(
+            &iterator,
+            GcOperand::i64_local(cursor.next_ordinal),
+            s,
+            f,
+        );
+        s.field(SetIteratorObjectSchema::VERSION).write(
+            &iterator,
+            GcOperand::i64_local(cursor.version),
+            s,
+            f,
+        );
         s.struct_type::<SetIteratorObject>()
             .field(SetIteratorObjectSchema::KIND)
             .read(&iterator, s, f)
@@ -368,7 +407,7 @@ impl FunctionBuilder<'_> {
         self.completion().copy_from(&result, f);
         s.release_i32_local(kind, f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         result.clear(f);
         key.clear(f);
         value.clear(f);
@@ -387,7 +426,7 @@ impl FunctionBuilder<'_> {
         let key = s.reserve_value_local(f);
         let value = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         self.emit_builtin_arg_to_value(0, &callback, f);
         self.emit_builtin_arg_to_value(1, &this, f);
@@ -397,17 +436,15 @@ impl FunctionBuilder<'_> {
             RuntimeErrorMessage::SET_PROTOTYPE_FOREACH_CALLBACK_MUST_BE_CALLABLE,
             f,
         )?;
-        f.instruction(&Instruction::I64Const(0));
-        index.store(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
-        self.emit_collection_next_set(&record, index, found, f);
+        self.emit_collection_next_set(&record, &cursor, found, f)?;
         found.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
-        self.emit_collection_read_set(&record, index, &value, f);
+        self.emit_collection_read_set(&record, cursor.index, &value, f);
         key.copy_from(&value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_increment_local(cursor.index, 1, f);
         let args = self.emit_pre_evaluated_arg_vector(&[&value, &key, &receiver], f);
         self.emit_function_or_proxy_call_with_argv(&callback, &this, &args, &pending, f)?;
         args.clear(f);
@@ -422,7 +459,7 @@ impl FunctionBuilder<'_> {
         value.set_undefined(f);
         self.completion().set_normal(&value, f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         pending.clear(f);
         value.clear(f);
         key.clear(f);

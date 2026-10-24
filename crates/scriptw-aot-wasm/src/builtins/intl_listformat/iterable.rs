@@ -28,7 +28,7 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(f);
         let done = schema.reserve_i32_local(f);
         self.emit_builtin_arg_to_value(0, &source, f);
-        let list = ArgumentListConstruction::new(schema, f);
+        let list = ArgumentListConstruction::new(self, f);
         emit_tag_is(&source, WasmRuntimeValueTag::Undefined, f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);

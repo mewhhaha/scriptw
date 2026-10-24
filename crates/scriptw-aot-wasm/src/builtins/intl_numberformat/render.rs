@@ -44,7 +44,7 @@ impl FunctionBuilder<'_> {
             NfFormatMode::Parts => None,
         };
         let parts = match mode {
-            NfFormatMode::Parts => Some(ArgumentListConstruction::new(schema, function)),
+            NfFormatMode::Parts => Some(ArgumentListConstruction::new(self, function)),
             NfFormatMode::String => None,
         };
         let part_type = schema

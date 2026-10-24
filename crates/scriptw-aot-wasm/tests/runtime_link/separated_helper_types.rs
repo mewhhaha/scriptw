@@ -290,12 +290,12 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
             else {
                 panic!("the selected ProgramInstance is an actual encoded struct");
             };
-            // GC18 appends two mutable, nullable metadata roots. Code/data and
-            // the original five hook fields remain immutable; selecting an
-            // owner by requiring every field immutable would discard it.
+            // The two mutable metadata roots now select page directories.
+            // Code/data and the original five hook fields remain immutable;
+            // selecting an owner by requiring every field immutable loses P.
             let immutable_fields = owner_field_count
                 .checked_sub(2)
-                .expect("ProgramInstance retains its two GC18 metadata roots");
+                .expect("ProgramInstance retains its two metadata roots");
             assert!(immutable_fields >= 5);
             assert!(
                 owner.fields[..immutable_fields]
@@ -303,6 +303,19 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                     .all(|field| !field.mutable),
                 "ProgramInstance hook and code/data ownership remain immutable"
             );
+            let metadata_index = |reference: wasmparser::RefType| {
+                let HeapType::Concrete(index) = reference.heap_type() else {
+                    panic!("metadata cannot retain opaque or abstract callable references");
+                };
+                index
+                    .as_module_index()
+                    .or_else(|| {
+                        index
+                            .as_rec_group_index()
+                            .map(|index| recursive_types.start as u32 + index)
+                    })
+                    .expect("metadata uses the actual module/recursion-group type")
+            };
             let mut metadata_types = BTreeSet::new();
             for field in &owner.fields[immutable_fields..] {
                 assert!(
@@ -316,31 +329,58 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                     reference.is_nullable(),
                     "metadata registration starts empty"
                 );
-                let HeapType::Concrete(index) = reference.heap_type() else {
-                    panic!("metadata roots cannot be opaque references");
-                };
-                let index = index
-                    .as_module_index()
-                    .or_else(|| {
-                        index
-                            .as_rec_group_index()
-                            .map(|index| recursive_types.start as u32 + index)
-                    })
-                    .expect("metadata root uses the actual module/recursion-group type");
+                let root = metadata_index(reference);
+                let mut index = root;
+                for layer in ["directory", "leaf page"] {
+                    let CompositeInnerType::Array(array) =
+                        &core_types[index as usize].composite_type.inner
+                    else {
+                        panic!("metadata {layer} must be an indexed GC array");
+                    };
+                    assert!(array.0.mutable, "metadata {layer} admits lazy publication");
+                    let StorageType::Val(ValType::Ref(element)) = array.0.element_type else {
+                        panic!("metadata {layer} contains typed references");
+                    };
+                    assert!(element.is_nullable(), "unused metadata slots begin empty");
+                    index = metadata_index(element);
+                }
                 assert!(
                     matches!(
                         &core_types[index as usize].composite_type.inner,
                         CompositeInnerType::Struct(_)
                     ),
-                    "metadata roots select records, never callable hooks"
+                    "metadata directory and leaf arrays end in records, never callable hooks"
                 );
-                metadata_types.insert(index);
+                metadata_types.insert(root);
             }
             assert_eq!(
                 metadata_types.len(),
                 2,
                 "shape and read-site cache metadata retain distinct typed roots"
             );
+            // Follow all concrete metadata edges too: a record wrapping a
+            // funcref, or an opaque StoredValue/receiver edge, is no substitute
+            // for the original boundary against callable hook ownership.
+            let mut pending = metadata_types.iter().copied().collect::<Vec<_>>();
+            let mut visited = BTreeSet::new();
+            while let Some(index) = pending.pop() {
+                if !visited.insert(index) {
+                    continue;
+                }
+                assert!(recursive_types.contains(&(index as usize)));
+                let fields = match &core_types[index as usize].composite_type.inner {
+                    CompositeInnerType::Struct(record) => record.fields.as_ref(),
+                    CompositeInnerType::Array(array) => std::slice::from_ref(&array.0),
+                    CompositeInnerType::Func(_) | CompositeInnerType::Cont(_) => {
+                        panic!("metadata graph cannot own callable hook types")
+                    }
+                };
+                for field in fields {
+                    if let StorageType::Val(ValType::Ref(reference)) = field.element_type {
+                        pending.push(metadata_index(reference));
+                    }
+                }
+            }
             let mut called_fields = BTreeSet::new();
             for &(owner, field, type_index) in &core.owner_reference_calls {
                 if owner != owner_type {

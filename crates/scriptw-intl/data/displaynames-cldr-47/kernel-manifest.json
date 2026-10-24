@@ -6,14 +6,14 @@
       "sha256": "21489eb8f4d29f716f7e198db81686d30dc7ffbd808e839b8ca7419bf1d5bf2f"
     },
     {
-      "bytes": 87544,
+      "bytes": 89062,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "69d7b19a9e5c84cfbbce2f21af2d85f704b0c670fbb996dee092cf731c4fa113"
+      "sha256": "9c26aadfff587abda6e77471fd88b1f6cff7a3bb429a81474e3f579c84ca4fb7"
     },
     {
-      "bytes": 81271,
+      "bytes": 83454,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "b7d6a11c10c601fc153122a829e3ba0b8d8600d7e463351145bf43d84708303a"
+      "sha256": "5fd7b75eeebdc132dedc9402e85845fdb1cac3ba224f83b707bf571a738928b3"
     },
     {
       "bytes": 33833,
@@ -618,7 +618,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "6ccbad98978502d1daaa4c6c9c63543d04979971e01dd53d9689431acfe9e7ad",
+  "provider_data_sha256": "91d93c5a9ca6f0092f44e56c87b51b4d364f97de3cd6b1419f5051c30762b857",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "DisplayNames",

@@ -69,8 +69,11 @@ Descriptor consumers materialize complete descriptors before exposing
 mutable descriptor references. Specialized backing changes and cache placement
 need their own paired measurements; native-policy defaults remain unchanged.
 
-Layout 18 versions these GC subtypes, primitive arrays, ProgramInstance metadata
-roots and shared operation signatures. R/P identity checks reject older layouts.
+Layout 18 introduced these GC subtypes and primitive arrays. Current private
+layout 19 versions indexed ProgramInstance metadata and shared operation
+signatures; R/P identity checks reject older layouts. The
+[efficiency checkpoint](compiler-efficiency-20261024.md) records those changes
+separately from the historical layout-18 measurements.
 The private undefined snapshot remains immutable; observable objects and
 reflective descriptor snapshots remain fresh.
 
@@ -103,12 +106,15 @@ next, then the appropriate native and original pinned Test262 campaign. Keep
 the four recorded original failures visible. A complete new Test262 result
 must use the native status publisher; this document does not refresh its counts.
 
-Small-arity entry ABIs, source-body inlining and profile-guided AOT compilation
-remain measured follow-up decisions. A source-known function binding alone
+General small-arity entry ABIs, broader source-body inlining and profile-guided
+AOT compilation remain measured follow-up decisions. A source-known function binding alone
 cannot authorize bypassing legacy arguments/caller, source-depth, Realm or
 capture state. Proven unobservable leaf entries can avoid argument objects and
 unnecessary parameter environments while retaining the normal source body and
-activation protocol. Native Wasm inlining can preserve that protocol; its
+activation protocol. The separate bounded numeric leaf plan can additionally
+avoid argv and substitute its pure expression after actual code/program,
+Number and depth guards; it does not establish a general entry ABI or inliner.
+Native Wasm inlining can preserve the general activation protocol; its
 explicit bounded cohort requires separate code-size and compilation controls.
 Its first whole-program experiment was OOM-killed at the unchanged 4-GiB cap;
 it remains disabled by default.

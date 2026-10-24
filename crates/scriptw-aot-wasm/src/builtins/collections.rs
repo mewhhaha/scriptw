@@ -1,4 +1,4 @@
-//! Ordered collections retain actual GC entries and monotone cursor history.
+//! Ordered collections retain actual GC entries and stable insertion ordinals.
 use super::super::*;
 use crate::control_flow::{OwnedSyncIterator, SyncIteratorConsumer};
 use crate::functions::{NonArrayRealmIntrinsicSlot, OrdinaryDefaultPrototype};

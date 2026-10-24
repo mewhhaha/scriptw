@@ -42,7 +42,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Const(0));
         seen.store(function);
         let value = schema.reserve_value_local(function);
-        let list = crate::functions::ArgumentListConstruction::new(schema, function);
+        let list = crate::functions::ArgumentListConstruction::new(self, function);
         for index in 0..4 {
             packed.load(function);
             function.instruction(&Instruction::I64Const(index * 8));

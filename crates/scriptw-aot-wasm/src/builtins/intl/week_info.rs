@@ -39,7 +39,7 @@ impl FunctionBuilder<'_> {
             self.emit_intl_locale_provider_fault_if(function);
         }
         let value = schema.reserve_value_local(function);
-        let list = crate::functions::ArgumentListConstruction::new(schema, function);
+        let list = crate::functions::ArgumentListConstruction::new(self, function);
         for day in 1..=7 {
             mask.load(function);
             function.instruction(&Instruction::I64Const(1 << (day - 1)));

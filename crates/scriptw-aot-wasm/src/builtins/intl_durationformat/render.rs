@@ -61,7 +61,7 @@ impl FunctionBuilder<'_> {
         };
         let parts = match mode {
             DurationFormatOutput::String => None,
-            DurationFormatOutput::Parts => Some(ArgumentListConstruction::new(schema, f)),
+            DurationFormatOutput::Parts => Some(ArgumentListConstruction::new(self, f)),
         };
         reader.read_u64(count, schema, f);
         reader.require_records(count, 24, f);

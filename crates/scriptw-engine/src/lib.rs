@@ -1037,6 +1037,11 @@ struct ParsedCompilation {
     modules: PreparedModuleCompilation,
 }
 
+#[cfg(test)]
+thread_local! {
+    static LOWERING_ATTEMPTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 struct PreparedCompilation {
     source: ParsedSource,
     module_prelude: Option<scriptw_front::ParsedScript>,
@@ -3081,17 +3086,14 @@ impl Engine {
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<ProgramWasmArtifact, EngineError> {
         let parsed = self.parse_compilation_for_role(source, goal, &options, role)?;
-        // This is an exact candidate, not a claim that the first AST scan has
-        // closed every finite-source dependency. A successful prior None key
-        // was stored only after full catalog preparation with the retained
-        // ambient loader. Any discovered request made that graph Some (or
-        // failed compilation), so its artifact cannot match this candidate.
-        let candidate_key = match (&parsed.source, &parsed.modules) {
-            (ParsedSource::Script(_), PreparedModuleCompilation::Ambient { graph: None, .. }) => {
-                program_cache_key_for_role(source, goal, &options, None, role)
-            }
-            _ => None,
-        };
+        // A candidate is the exact graph just admitted by the current loader,
+        // including dependency bytes, resolutions, options and compiler image.
+        // Only successful *final* catalog preparation publishes an artifact.
+        // If finite-source discovery extends this graph, its final digest is
+        // different and cannot be reached through this candidate. A previously
+        // closed static graph can therefore hit without rebuilding its IR.
+        let candidate_key =
+            program_cache_key_for_role(source, goal, &options, parsed.modules.graph(), role);
         if let (Some(cache), Some(key)) = (&cache, candidate_key) {
             if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
                 return Ok(artifact);
@@ -3426,6 +3428,8 @@ impl Engine {
         parsed: ParsedCompilation,
         options: &CompileOptions,
     ) -> Result<PreparedCompilation, EngineError> {
+        #[cfg(test)]
+        LOWERING_ATTEMPTS.with(|attempts| attempts.set(attempts.get() + 1));
         let ParsedCompilation {
             source,
             module_prelude,

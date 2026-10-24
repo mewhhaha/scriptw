@@ -275,7 +275,7 @@ impl FunctionBuilder<'_> {
         let record = self
             .emit_helper_direct_record(&receiver, &output, exit, f)?
             .into_record();
-        let construction = ArgumentListConstruction::new(schema, f);
+        let construction = ArgumentListConstruction::new(self, f);
         let collected = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
         self.emit_helper_step(&record, done, Some(&value), &pending, f)?;

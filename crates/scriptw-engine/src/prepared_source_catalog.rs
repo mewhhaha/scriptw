@@ -4,6 +4,12 @@
 
 use super::*;
 
+#[cfg(test)]
+thread_local! {
+    static FULL_CATALOG_LOWERINGS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static RETAIN_WHOLE_GRAPH_DISCOVERY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 pub(super) fn prepare_source_catalog(
     source: &ParsedSource,
     prelude: Option<&scriptw_front::ParsedScript>,
@@ -12,6 +18,8 @@ pub(super) fn prepare_source_catalog(
 ) -> Result<ProgramIr, EngineError> {
     let session = scriptw_ir::LoweringSession::default();
     loop {
+        #[cfg(test)]
+        FULL_CATALOG_LOWERINGS.with(|count| count.set(count.get() + 1));
         let ir = match &*modules {
             PreparedModuleCompilation::Embedded { graph, .. } => {
                 session.lower_complete_catalog(graph, options.host_surface_policy, prelude)
@@ -122,6 +130,39 @@ pub(super) fn prepare_source_catalog(
                 "module loader omitted a prepared Realm-request resolution",
             ));
         }
+        // Ordinary lowering admitted the current requests. For a closed,
+        // mutation-free set of independent fresh-Realm bodies, process only
+        // new retained sources until the loader reaches request closure. A
+        // prelude or an unproved body keeps the original semantic retry path.
+        let use_worklist = prelude.is_none() && ir.is_wasm_supported();
+        #[cfg(test)]
+        let use_worklist = use_worklist && !RETAIN_WHOLE_GRAPH_DISCOVERY.get();
+        if use_worklist {
+            while session.discover_pure_realm_sources(graph) {
+                let requests = session
+                    .realm_module_requests()
+                    .into_iter()
+                    .filter(|request| !graph.realm_requests.contains_key(request))
+                    .collect::<Vec<_>>();
+                if requests.is_empty() {
+                    break;
+                }
+                module_loader::extend_module_graph_realm_requests(
+                    graph,
+                    &requests,
+                    loader.as_ref(),
+                )
+                .map_err(|error| EngineError::new(error.to_string()))?;
+                if requests
+                    .iter()
+                    .any(|request| !graph.realm_requests.contains_key(request))
+                {
+                    return Err(EngineError::new(
+                        "module loader omitted a prepared Realm-request resolution",
+                    ));
+                }
+            }
+        }
         // Newly loaded modules can themselves contain finite prepared source.
         // Reuse all old parse products while closing those requests as well.
     }
@@ -166,6 +207,87 @@ mod tests {
         }
     }
 
+    fn prepare_with_discovery(
+        engine: &Engine,
+        source: &str,
+        options: &CompileOptions,
+        retain: bool,
+    ) -> PreparedCompilation {
+        struct Restore(bool);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                RETAIN_WHOLE_GRAPH_DISCOVERY.set(self.0);
+            }
+        }
+        let _restore = Restore(RETAIN_WHOLE_GRAPH_DISCOVERY.replace(retain));
+        engine
+            .prepare_compilation(source, ParseGoal::Script, options)
+            .unwrap()
+    }
+
+    #[test]
+    fn pure_prepared_module_chains_use_two_whole_graph_lowerings() {
+        for depth in [2, 6] {
+            let files = ModuleFiles::new();
+            let source = r#"new ShadowRealm().evaluate('void new ShadowRealm().importValue("./0.js", "value")'); new ShadowRealm().evaluate('\uD800'); true;"#;
+            files.write("entry.js", source);
+            for index in 0..depth {
+                let next = if index + 1 == depth {
+                    String::new()
+                } else {
+                    format!(
+                        r#"new ShadowRealm().evaluate('void new ShadowRealm().importValue("./{}.js", "value")');"#,
+                        index + 1
+                    )
+                };
+                files.write(
+                    &format!("{index}.js"),
+                    &format!("{next} export const value = {index};"),
+                );
+            }
+            let engine = Engine::new(RealmBuilder::new().build());
+            let options = files.options();
+            FULL_CATALOG_LOWERINGS.set(0);
+            let worklist = prepare_with_discovery(&engine, source, &options, false);
+            assert_eq!(FULL_CATALOG_LOWERINGS.get(), 2, "depth {depth}");
+            assert_eq!(worklist.modules.graph().unwrap().modules.len(), depth + 1);
+            FULL_CATALOG_LOWERINGS.set(0);
+            let retained = prepare_with_discovery(&engine, source, &options, true);
+            assert_eq!(FULL_CATALOG_LOWERINGS.get(), depth + 1, "depth {depth}");
+            assert_eq!(worklist.modules.graph(), retained.modules.graph());
+            assert_eq!(worklist.ir, retained.ir);
+        }
+    }
+
+    #[test]
+    fn prepared_source_aliases_keep_semantic_discovery_fallback() {
+        let files = ModuleFiles::new();
+        let source = r#"new ShadowRealm().evaluate('void new ShadowRealm().importValue("./0.js", "value")'); true;"#;
+        files.write("entry.js", source);
+        for index in 0..3 {
+            let next = if index == 2 {
+                String::new()
+            } else {
+                format!(
+                    r#"const next = 'void new ShadowRealm().importValue("./{}.js", "value")'; new ShadowRealm().evaluate(next);"#,
+                    index + 1
+                )
+            };
+            files.write(
+                &format!("{index}.js"),
+                &format!("{next} export const value = {index};"),
+            );
+        }
+        let engine = Engine::new(RealmBuilder::new().build());
+        let options = files.options();
+        FULL_CATALOG_LOWERINGS.set(0);
+        let worklist = prepare_with_discovery(&engine, source, &options, false);
+        assert_eq!(FULL_CATALOG_LOWERINGS.get(), 4);
+        let retained = prepare_with_discovery(&engine, source, &options, true);
+        assert_eq!(worklist.modules.graph(), retained.modules.graph());
+        assert_eq!(worklist.ir, retained.ir);
+    }
+
     #[test]
     fn prepared_requests_close_before_artifact_identity_and_keep_the_final_ir() {
         let files = ModuleFiles::new();
@@ -206,21 +328,23 @@ export const value = 1;
             );
         }
         assert_eq!(graph.modules.len(), 4);
-        assert!(prepared
-            .ir
-            .script
-            .as_ref()
-            .unwrap()
-            .prepared_scripts
-            .iter()
-            .any(|script| {
-                script.kind == scriptw_ir::PreparedScriptKind::ShadowRealmEvaluate
-                    && script.source == "new.target"
-                    && matches!(
-                        script.outcome,
-                        scriptw_ir::PreparedScriptOutcome::DeferredSyntaxError { .. }
-                    )
-            }));
+        assert!(
+            prepared
+                .ir
+                .script
+                .as_ref()
+                .unwrap()
+                .prepared_scripts
+                .iter()
+                .any(|script| {
+                    script.kind == scriptw_ir::PreparedScriptKind::ShadowRealmEvaluate
+                        && script.source == "new.target"
+                        && matches!(
+                            script.outcome,
+                            scriptw_ir::PreparedScriptOutcome::DeferredSyntaxError { .. }
+                        )
+                })
+        );
         let first_key = program_cache_key(source, ParseGoal::Script, &options, Some(graph));
         let final_ir = prepared.ir.clone();
         let unit = engine.compile_prepared_on_current_thread(prepared).unwrap();
@@ -365,12 +489,14 @@ export const value = 1;
             .expect("prepared import owns its Script graph");
         assert_eq!(graph.modules.len(), 2);
         assert_eq!(graph.modules[0].goal(), ParseGoal::Script);
-        assert!(graph
-            .resolutions
-            .iter()
-            .any(|(owner, request, target)| *owner == graph.entry
-                && request.specifier() == "./value.js"
-                && *target == 1));
+        assert!(
+            graph
+                .resolutions
+                .iter()
+                .any(|(owner, request, target)| *owner == graph.entry
+                    && request.specifier() == "./value.js"
+                    && *target == 1)
+        );
         assert!(
             graph.realm_requests.is_empty(),
             "an eval import is not a Realm-origin request"

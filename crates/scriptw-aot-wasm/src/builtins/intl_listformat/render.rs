@@ -63,7 +63,7 @@ impl FunctionBuilder<'_> {
         };
         let parts = match mode {
             ListFormatOutput::String => None,
-            ListFormatOutput::Parts => Some(ArgumentListConstruction::new(schema, f)),
+            ListFormatOutput::Parts => Some(ArgumentListConstruction::new(self, f)),
         };
         f.instruction(&Instruction::I64Const(0));
         index.store(f);

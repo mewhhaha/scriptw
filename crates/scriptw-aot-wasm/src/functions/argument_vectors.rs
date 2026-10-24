@@ -1,30 +1,35 @@
 use super::*;
 use crate::gc_types::{
-    ArgumentListNode, ArgumentListNodeSchema, ArrayObject, ArrayObjectSchema, GcLocal,
-    GcNullability, GcOperand, I32Local, Nullable, StoredValue, ValueArray, ValueLocals,
+    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local, Nullable,
+    StoredValue, ValueArray, ValueLocals,
 };
 
-/// Only finish can publish the completed List. Append retains whole values;
-/// the owner cannot be copied or mistaken for a JavaScript object.
+/// A private GC buffer snapshots each evaluated value once. Capacity is never
+/// observable as argument count: finish alone publishes an exact-length List.
 #[must_use]
 pub(crate) struct ArgumentListConstruction {
-    head: GcLocal<ArgumentListNode, Nullable>,
-    tail: GcLocal<ArgumentListNode, Nullable>,
+    values: GcLocal<ValueArray>,
     length: I32Local,
+    helper_base: crate::runtime_helpers::RuntimeHelperFunctionBase,
 }
 
 impl ArgumentListConstruction {
-    pub(crate) fn new(schema: &crate::gc_types::RuntimeSchema, function: &mut Function) -> Self {
-        let head = schema
+    pub(crate) fn new(builder: &FunctionBuilder<'_>, function: &mut Function) -> Self {
+        let schema = builder.runtime_schema();
+        let helper_base = builder
+            .runtime_helper_base()
+            .expect("argument construction requires runtime helpers");
+        let values = schema
             .reserve_gc_local(function)
-            .initialize_null(schema, function);
-        let tail = schema
-            .reserve_gc_local(function)
-            .initialize_null(schema, function);
+            .initialize(schema.empty_value_array(function), function);
         let length = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(0));
         length.store(function);
-        Self { head, tail, length }
+        Self {
+            values,
+            length,
+            helper_base,
+        }
     }
 
     pub(crate) fn append(
@@ -33,57 +38,100 @@ impl ArgumentListConstruction {
         schema: &crate::gc_types::RuntimeSchema,
         function: &mut Function,
     ) {
-        self.length.load(function);
-        function.instruction(&Instruction::I32Const(-1));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::Unreachable);
-        function.instruction(&Instruction::End);
         let stored = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<StoredValue>()
                 .from_value(value, function),
             function,
         );
-        let node = schema.reserve_gc_local(function).initialize(
-            schema.struct_type::<ArgumentListNode>().construct(
-                (
-                    GcOperand::reference(&stored, schema),
-                    GcOperand::null(schema),
-                ),
-                function,
+        self.append_snapshot(&stored, schema, function);
+        stored.clear(function);
+    }
+
+    /// StoredValue is immutable. Captured Lists can share these snapshots
+    /// without unpacking or allocating another wrapper around the same value.
+    fn append_snapshot(
+        &self,
+        stored: &GcLocal<StoredValue>,
+        schema: &crate::gc_types::RuntimeSchema,
+        function: &mut Function,
+    ) {
+        let result = schema.helper_reference_on_stack(schema.call_helper(
+            crate::runtime_helpers::ArgumentListAppendArguments::new(
+                &self.values,
+                self.length,
+                stored,
             ),
+            self.helper_base,
             function,
-        );
-        self.tail.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        self.head
-            .replace(node.load(schema, function).nullable(), function);
-        function.instruction(&Instruction::Else);
-        let tail = schema.reserve_gc_local(function).initialize(
-            self.tail.load(schema, function).require_non_null(function),
-            function,
-        );
-        schema
-            .struct_type::<ArgumentListNode>()
-            .field(ArgumentListNodeSchema::NEXT)
-            .write(
-                &tail,
-                GcOperand::nullable_reference(&node, schema),
-                schema,
-                function,
-            );
-        tail.clear(function);
-        function.instruction(&Instruction::End);
-        self.tail
-            .replace(node.load(schema, function).nullable(), function);
+        ));
+        self.values.replace(result, function);
         self.length.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
         self.length.store(function);
-        node.clear(function);
-        stored.clear(function);
+    }
+
+    fn append_snapshot_inline(
+        &self,
+        stored: &GcLocal<StoredValue>,
+        schema: &crate::gc_types::RuntimeSchema,
+        function: &mut Function,
+    ) {
+        let array = schema.array_type::<ValueArray>();
+        let capacity = schema.reserve_i32_local(function);
+        self.length.load(function);
+        function.instruction(&Instruction::I32Const(-1));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::Unreachable);
+        function.instruction(&Instruction::End);
+        array.length(&self.values, schema, function);
+        capacity.store(function);
+        self.length.load(function);
+        capacity.load(function);
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        capacity.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Shl);
+        capacity.store(function);
+        capacity.load(function);
+        function.instruction(&Instruction::I32Const(8));
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Const(8));
+        capacity.store(function);
+        function.instruction(&Instruction::End);
+        // If doubling overflowed, grow just enough; length+1 was checked above.
+        capacity.load(function);
+        self.length.load(function);
+        function.instruction(&Instruction::I32LeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        self.length.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        capacity.store(function);
+        function.instruction(&Instruction::End);
+        // Spare slots are private. Reusing this rooted snapshot as their fill
+        // avoids a fresh Undefined wrapper for every buffer growth.
+        let replacement = schema.reserve_gc_local(function).initialize(
+            array.filled(GcOperand::reference(stored, schema), capacity, function),
+            function,
+        );
+        array.copy_prefix_from(&replacement, &self.values, self.length, schema, function);
+        self.values
+            .replace(replacement.load(schema, function), function);
+        replacement.clear(function);
+        function.instruction(&Instruction::End);
+        array.write(
+            &self.values,
+            self.length,
+            GcOperand::reference(stored, schema),
+            schema,
+            function,
+        );
+        schema.release_i32_local(capacity, function);
     }
 
     pub(super) fn append_list(
@@ -93,14 +141,12 @@ impl ArgumentListConstruction {
         function: &mut Function,
     ) {
         let schema = builder.runtime_schema();
+        let array = schema.array_type::<ValueArray>();
         let index = schema.reserve_i32_local(function);
         let count = schema.reserve_i32_local(function);
-        let value = schema.reserve_value_local(function);
         function.instruction(&Instruction::I32Const(0));
         index.store(function);
-        schema
-            .array_type::<ValueArray>()
-            .length(list, schema, function);
+        array.length(list, schema, function);
         count.store(function);
         let done = builder.open_frame(ControlFrameKind::Block, function);
         let next = builder.open_frame(ControlFrameKind::Loop, function);
@@ -111,8 +157,12 @@ impl ArgumentListConstruction {
         builder.emit_branch_to_target(done, function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        builder.emit_argument_vector_entry_to_value(list, index, &value, function);
-        self.append(&value, schema, function);
+        let stored = schema.reserve_gc_local(function).initialize(
+            array.read(list, index, schema, function).reference(),
+            function,
+        );
+        self.append_snapshot(&stored, schema, function);
+        stored.clear(function);
         index.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
@@ -122,7 +172,6 @@ impl ArgumentListConstruction {
         function.instruction(&Instruction::End);
         builder.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        value.clear(function);
         schema.release_i32_local(count, function);
         schema.release_i32_local(index, function);
     }
@@ -133,93 +182,67 @@ impl ArgumentListConstruction {
         function: &mut Function,
     ) -> GcLocal<ValueArray> {
         let schema = builder.runtime_schema();
-        let list = schema
-            .reserve_gc_local(function)
-            .initialize(schema.empty_value_array(function), function);
+        let array = schema.array_type::<ValueArray>();
+        let capacity = schema.reserve_i32_local(function);
+        array.length(&self.values, schema, function);
+        capacity.store(function);
         self.length.load(function);
-        builder.open_frame(ControlFrameKind::If, function);
-        let value = schema.reserve_value_local(function);
-        value.set_undefined(function);
-        let empty = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&value, function),
+        capacity.load(function);
+        function.instruction(&Instruction::I32Ne);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        // Empty construction still owns the shared empty array. Any nonempty
+        // buffer has a first snapshot available for allocation's fill operand.
+        let zero = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        zero.store(function);
+        let initial = schema.reserve_gc_local(function).initialize(
+            array.read(&self.values, zero, schema, function).reference(),
             function,
         );
-        list.replace(
-            schema.array_type::<ValueArray>().filled(
-                GcOperand::reference(&empty, schema),
+        let exact = schema.reserve_gc_local(function).initialize(
+            array.filled(
+                GcOperand::reference(&initial, schema),
                 self.length,
                 function,
             ),
             function,
         );
-        let cursor = schema
-            .reserve_gc_local::<ArgumentListNode, Nullable>(function)
-            .initialize(self.head.load(schema, function), function);
-        let index = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(0));
-        index.store(function);
-        let done = builder.open_frame(ControlFrameKind::Block, function);
-        let next = builder.open_frame(ControlFrameKind::Loop, function);
-        cursor.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
-        builder.open_frame(ControlFrameKind::If, function);
-        builder.emit_branch_to_target(done, function);
-        builder.pop_control(ControlFrameKind::If);
+        array.copy_prefix_from(&exact, &self.values, self.length, schema, function);
+        self.values.replace(exact.load(schema, function), function);
+        exact.clear(function);
+        initial.clear(function);
+        schema.release_i32_local(zero, function);
         function.instruction(&Instruction::End);
-        let node = schema.reserve_gc_local(function).initialize(
-            cursor.load(schema, function).require_non_null(function),
-            function,
-        );
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<ArgumentListNode>()
-                .field(ArgumentListNodeSchema::VALUE)
-                .read(&node, schema, function)
-                .reference(),
-            function,
-        );
-        schema.array_type::<ValueArray>().write(
-            &list,
-            index,
-            GcOperand::reference(&stored, schema),
-            schema,
-            function,
-        );
-        cursor.replace(
-            schema
-                .struct_type::<ArgumentListNode>()
-                .field(ArgumentListNodeSchema::NEXT)
-                .read(&node, schema, function)
-                .reference(),
-            function,
-        );
-        stored.clear(function);
-        node.clear(function);
-        index.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        index.store(function);
-        builder.emit_branch_to_target(next, function);
-        builder.pop_control(ControlFrameKind::Loop);
-        function.instruction(&Instruction::End);
-        builder.pop_control(ControlFrameKind::Block);
-        function.instruction(&Instruction::End);
-        schema.release_i32_local(index, function);
-        cursor.clear(function);
-        empty.clear(function);
-        value.clear(function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        schema.release_i32_local(capacity, function);
         schema.release_i32_local(self.length, function);
-        self.tail.clear(function);
-        self.head.clear(function);
-        list
+        self.values
     }
 }
 
 impl FunctionBuilder<'_> {
+    pub(crate) fn compile_argument_list_append_helper(&mut self) -> Result<Function, EmitError> {
+        use crate::runtime_helpers::HelperParameters;
+        let mut function = self.begin_helper_body(RuntimeHelperId::ArgumentListAppend);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::ArgumentListAppendParameters>(
+                &mut function,
+            );
+        let schema = self.runtime_schema();
+        let construction = ArgumentListConstruction {
+            values: schema
+                .reserve_gc_local(&mut function)
+                .initialize(parameters.values.load(schema, &mut function), &mut function),
+            length: parameters.length,
+            helper_base: self.runtime_helper_base()?,
+        };
+        construction.append_snapshot_inline(&parameters.stored, schema, &mut function);
+        construction.values.load(schema, &mut function);
+        construction.values.clear(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     pub(crate) fn emit_argument_list_capture(
         &mut self,
         capture: &scriptw_ir::ArgumentListCaptureIr,

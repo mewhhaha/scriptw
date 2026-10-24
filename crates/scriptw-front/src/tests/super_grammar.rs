@@ -2644,11 +2644,14 @@ fn known_script_and_class_super_producers_stay_structurally_reviewed() {
     let product_parse_call = ["classify_parse_", "failure(&err)"].concat();
     let dependency_test_helper_call =
         ["scriptw_front::classify_parse_", "failure(message)"].concat();
-    let classifier_reexport = [
-        "pubuseearly_error_code::{classify_parse_",
-        "failure,EarlyErrorCode,ParseClassified,NO_EARLY_ERROR_CODE,};",
-    ]
-    .concat();
+    let classifier_reexport_prefix = "pubuseearly_error_code::";
+    let mut classifier_reexport_members = vec![
+        classifier_identifier.clone(),
+        "EarlyErrorCode".to_string(),
+        "ParseClassified".to_string(),
+        "NO_EARLY_ERROR_CODE".to_string(),
+    ];
+    classifier_reexport_members.sort();
     let front_glob_import = ["scriptw_front", "::*"].concat();
     let classifier_module_glob_import = ["early_error_code", "::*"].concat();
     let mut all_classifier_identifier_owners = Vec::new();
@@ -2693,11 +2696,32 @@ fn known_script_and_class_super_producers_stay_structurally_reviewed() {
         if dependency_test_helper_count != 0 {
             dependency_test_helper_owners.push((relative.clone(), dependency_test_helper_count));
         }
-        let reexport_count = compact(product)
-            .matches(classifier_reexport.as_str())
-            .count();
-        if reexport_count != 0 {
-            classifier_reexport_owners.push((relative.clone(), reexport_count));
+        let compact_product = compact(product);
+        let reexports = compact_product
+            .split(classifier_reexport_prefix)
+            .skip(1)
+            .map(|suffix| {
+                let statement = suffix.split_once(';').expect("complete public re-export").0;
+                let members = statement
+                    .strip_prefix('{')
+                    .and_then(|members| members.strip_suffix('}'))
+                    .unwrap_or(statement);
+                let mut members = members
+                    .split(',')
+                    .filter(|member| !member.is_empty())
+                    .map(str::to_string)
+                    .collect::<Vec<_>>();
+                members.sort();
+                members
+            })
+            .collect::<Vec<_>>();
+        if !reexports.is_empty() {
+            assert_eq!(
+                reexports,
+                vec![classifier_reexport_members.clone()],
+                "{relative} must retain the exact reviewed exports without aliases or extra declarations"
+            );
+            classifier_reexport_owners.push((relative.clone(), reexports.len()));
         }
         let compact_source = compact(&source);
         let glob_count = compact_source.matches(front_glob_import.as_str()).count()

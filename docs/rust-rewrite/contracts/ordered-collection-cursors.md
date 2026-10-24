@@ -1,19 +1,22 @@
 # Ordered collection cursor contract
 
-Actual GC MapObject/SetObject retain append-only entry positions and a separate
+Actual GC MapObject/SetObject retain stable insertion ordinals and a separate
 live size. Their concrete iterator schemas retain the collection edge, next
-index, closed iteration kind and terminal done state. Bucket lookup is separate
-from this history and cannot compact or reorder positions.
+ordinal, a physical index hint and storage version, closed iteration kind and
+terminal done state. Bucket lookup is separate from semantic insertion order.
 
-An update keeps its existing Map position. An absent insertion appends.
-Deletion/clear remove retained entries while preserving history length.
-Reinsertion appends a new position. Each iterator step and callback walk reloads
-the actual collection table and current history length; table growth copies all
-positions. Therefore appends made before exhaustion remain visible, including
-after clear, and appends made after terminal exhaustion remain invisible.
+An update keeps its existing Map ordinal. An absent insertion receives a fresh
+ordinal. Deletion retires its retained key/value roots. Full physical tables
+compact live entries in order before growing. Clear drops the old backing-array
+references and resets physical extent while preserving ordinal progression.
+Reinsertion therefore receives a later ordinal. After storage replacement,
+cursors use a binary lower-bound search to recover their next physical position;
+otherwise they continue from the physical hint. Appends made before exhaustion
+remain visible, including after clear, while terminal exhaustion stays permanent.
 
-A yielded live entry advances the saved index before producing its result.
-A tombstone advances the working index before another position is inspected.
+A yielded live entry advances the saved ordinal and physical hint before
+producing its result. A tombstone advances the physical scan before another
+entry is inspected.
 Exhaustion permanently clears the collection edge and sets done. Entry pairs
 and iterator-result objects use the executing builtin's intrinsic Realm.
 
@@ -24,6 +27,7 @@ shapes; they cannot select a foreign collection layout.
 
 The native collection controls author meaningful mutation/GC/Realm cases,
 including pinned cases such as MapIteratorPrototype/next/iteration-mutable.js,
-SetIteratorPrototype/next/iteration-mutable.js and clear preserving list history.
-Their source is unrun; no native runtime, pinned green status, weak reachability
-or full T05/T21 acceptance follows from this draft.
+SetIteratorPrototype/next/iteration-mutable.js and live iteration across clear.
+The [efficiency checkpoint](../compiler-efficiency-20261024.md) records the
+current source-bound verification and its limits; this contract does not publish
+a new full pinned-suite result.

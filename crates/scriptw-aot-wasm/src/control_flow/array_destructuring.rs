@@ -164,7 +164,7 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let list = crate::functions::ArgumentListConstruction::new(schema, function);
+        let list = crate::functions::ArgumentListConstruction::new(self, function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
         let next = self.open_frame(ControlFrameKind::Loop, function);
         self.emit_sync_iterator_step_value(iterator, done, value, function)?;

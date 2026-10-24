@@ -1,0 +1,650 @@
+{
+  "schema": "scriptw-compiler-efficiency-checkpoint-v1",
+  "refresh_date": "2026-10-24",
+  "source_commit": "91ad82c6a5098c2658f68cf73f555f73fcb52aa8",
+  "review_base": "0443509f370dde7ed1a2c690770e9111ddb5a1f9",
+  "native": {
+    "scope_count": 66,
+    "inventory_count": 8407,
+    "passed": 8406,
+    "incomplete": 1,
+    "inventory_sha256": "e62d465b088f61a82d00a49a09b7c65a46b040917f9684b3a6b438e8fc050bb4",
+    "complete": false,
+    "targets": [
+      {
+        "target": "scriptw-aot-wasm:scriptw_aot_wasm",
+        "kind": "lib",
+        "inventoried": 470,
+        "passed": 470,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:scriptw_front",
+        "kind": "lib",
+        "inventoried": 181,
+        "passed": 181,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:class_initializer_grammar_context",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:comment_line_terminators",
+        "kind": "test",
+        "inventoried": 2,
+        "passed": 2,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:dynamic_function_preparation",
+        "kind": "test",
+        "inventoried": 6,
+        "passed": 6,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:eval_source",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:lexical_declaration_context_structure",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:module_source_ranges",
+        "kind": "test",
+        "inventoried": 6,
+        "passed": 6,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:nul_source",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:object_assignment_cover_patterns",
+        "kind": "test",
+        "inventoried": 5,
+        "passed": 5,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:object_rest_trailing_comma",
+        "kind": "test",
+        "inventoried": 7,
+        "passed": 7,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:parse_failure_pattern_structure",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:regexp_legacy_astral_ranges",
+        "kind": "test",
+        "inventoried": 6,
+        "passed": 6,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:short_circuit_previous_expression_structure",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:strict_callable_bindings",
+        "kind": "test",
+        "inventoried": 11,
+        "passed": 11,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:unicode_identifier_authority",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-ir:scriptw_ir",
+        "kind": "lib",
+        "inventoried": 1623,
+        "passed": 1623,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-ir:scriptw_ir_integration",
+        "kind": "test",
+        "inventoried": 742,
+        "passed": 742,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:emission",
+        "kind": "test",
+        "inventoried": 29,
+        "passed": 29,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:intl_temporal",
+        "kind": "test",
+        "inventoried": 89,
+        "passed": 89,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:modules_realms",
+        "kind": "test",
+        "inventoried": 74,
+        "passed": 74,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:runtime_link",
+        "kind": "test",
+        "inventoried": 30,
+        "passed": 30,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:structure_async",
+        "kind": "test",
+        "inventoried": 115,
+        "passed": 115,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:structure_builtins",
+        "kind": "test",
+        "inventoried": 166,
+        "passed": 166,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:structure_language",
+        "kind": "test",
+        "inventoried": 152,
+        "passed": 152,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_async",
+        "kind": "test",
+        "inventoried": 248,
+        "passed": 248,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_async_generator_returns",
+        "kind": "test",
+        "inventoried": 2,
+        "passed": 2,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_builtins",
+        "kind": "test",
+        "inventoried": 541,
+        "passed": 541,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_gc_entries",
+        "kind": "test",
+        "inventoried": 193,
+        "passed": 193,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_generators",
+        "kind": "test",
+        "inventoried": 167,
+        "passed": 167,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_intl",
+        "kind": "test",
+        "inventoried": 299,
+        "passed": 299,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_language",
+        "kind": "test",
+        "inventoried": 338,
+        "passed": 338,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_module_sources",
+        "kind": "test",
+        "inventoried": 7,
+        "passed": 7,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_native_program_templates",
+        "kind": "test",
+        "inventoried": 21,
+        "passed": 21,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_realm_modules",
+        "kind": "test",
+        "inventoried": 428,
+        "passed": 428,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-front:doc",
+        "kind": "doc",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-ir:doc",
+        "kind": "doc",
+        "inventoried": 6,
+        "passed": 6,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-aot-wasm:doc",
+        "kind": "doc",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:aot_temporal",
+        "kind": "test",
+        "inventoried": 202,
+        "passed": 202,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:runtime_cache",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:structure",
+        "kind": "test",
+        "inventoried": 36,
+        "passed": 36,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:weak_gc_facility",
+        "kind": "test",
+        "inventoried": 14,
+        "passed": 14,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:doc",
+        "kind": "doc",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:scriptw_cli",
+        "kind": "lib",
+        "inventoried": 91,
+        "passed": 91,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:scriptw",
+        "kind": "bin",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:async_generator",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:cache",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:cli",
+        "kind": "test",
+        "inventoried": 861,
+        "passed": 861,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:cli_output_ending_structure",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:conformance_closure",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:differential_corpus",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:differential_robustness",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:differential_scenario_pair",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:differential_worker",
+        "kind": "test",
+        "inventoried": 1,
+        "passed": 1,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:fake_suite_publication",
+        "kind": "test",
+        "inventoried": 2,
+        "passed": 2,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:perf",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:product_artifact_execution",
+        "kind": "test",
+        "inventoried": 2,
+        "passed": 2,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:test262_case_deadline",
+        "kind": "test",
+        "inventoried": 5,
+        "passed": 5,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:test262_execution_list",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:test262_verdict_command_structure",
+        "kind": "test",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-cli:doc",
+        "kind": "doc",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-runtime-image:scriptw_runtime_image",
+        "kind": "lib",
+        "inventoried": 3,
+        "passed": 3,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-runtime-image:output_publication",
+        "kind": "test",
+        "inventoried": 4,
+        "passed": 4,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-runtime-image:doc",
+        "kind": "doc",
+        "inventoried": 0,
+        "passed": 0,
+        "incomplete": 0
+      },
+      {
+        "target": "scriptw-engine:scriptw_engine",
+        "inventoried": 1020,
+        "passed": 1020,
+        "incomplete": 0,
+        "incomplete_ids": []
+      },
+      {
+        "target": "scriptw-engine:aot_regexp",
+        "inventoried": 152,
+        "passed": 151,
+        "incomplete": 1,
+        "incomplete_ids": [
+          "aot_regexp_iv_class_strings::property_and_direct_strings_fold_circled_m_before_algebra"
+        ]
+      }
+    ]
+  },
+  "baseline_memory_control": {
+    "identity": {
+      "baseline_binary": "/home/mewhhaha/src/porffor/target/performance-work-20261024/issue54/559151/build/bin/scriptw",
+      "sha256": "298aad24ef711bf65845f2aaa68afbb501258dc1f6bb6aa9b1a145569203bbd5",
+      "source": "559151e323dfba7a85d046dc0e1394d83798df69",
+      "product_sources_equal_task_base_0443509f3": true,
+      "fixture": "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/regexp-baseline-check/circled-m.js",
+      "fixture_sha256": "667130456580378811979558cbb3ab3833939df1ff4b8a3b10c1053c1a0c8299"
+    },
+    "result": {
+      "source": "559151e323dfba7a85d046dc0e1394d83798df69",
+      "product_source_matches_task_base": true,
+      "actual_launcher_exit_code": 137,
+      "last_phase": "program-module loading",
+      "emitted_program_bytes": 1547371,
+      "largest_native_code_body_bytes": 1043341,
+      "fast_to_size_optimized_threshold_bytes": 1048576,
+      "runtime_native_bundle_admitted": true,
+      "execution_reached": false,
+      "interpretation": "Same semantic10-regex input exceeds4GiB on retained pre-task product during native P compilation, before execution. CLI diagnostic differs from native test in filename/cache wrapper and lacks its execution timeout, which was not reached.",
+      "kernel_unit": "run-p3511617-i3508090.scope",
+      "kernel_oom_confirmed": true
+    },
+    "incomplete_native_test_id": "aot_regexp_iv_class_strings::property_and_direct_strings_fold_circled_m_before_algebra"
+  },
+  "test262": {
+    "source": "91ad82c6a5098c2658f68cf73f555f73fcb52aa8",
+    "binary": "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/product-build-91ad82c6a/scriptw",
+    "native_inventory": {
+      "count": 102994,
+      "sha256": "e66ae6c5c34702d64a5fc19b8288ac6685b8e05bbd60e38a9cdd2caeb1ec534c",
+      "matches_prior_complete_inventory": true
+    },
+    "selection": {
+      "count": 14931,
+      "sha256": "3278ce281ca9f72735a29df26a2b56dbe8d6a56ab0e0ff0c5af56b57310c0f93"
+    },
+    "complete": true,
+    "replay_command": [
+      "python3",
+      "-B",
+      "scripts/replay-test262-executions.py",
+      "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/selected.executions",
+      "--binary",
+      "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/product-build-91ad82c6a/scriptw",
+      "--suite-root",
+      "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/source/test262/vendor/test262",
+      "--output-dir",
+      "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/original-replay-91ad82c6a/native",
+      "--workers",
+      "1",
+      "--reuse-case-workers"
+    ],
+    "actual_suite_exit_code": 1,
+    "elapsed_seconds": 9537.571208093024,
+    "timeout_execution_ids": [],
+    "pinned_revisions": {
+      "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+      "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+    },
+    "outcomes": {
+      "Success": 14927,
+      "NotImplemented": 0,
+      "Crash": 0,
+      "Bug": 4
+    },
+    "failed_execution_ids": [
+      "sloppy-script:annexB/language/function-code/block-decl-func-skip-arguments.js",
+      "sloppy-script:intl402/Temporal/ZonedDateTime/links.js",
+      "sloppy-script:staging/sm/lexical-environment/block-scoped-functions-annex-b-label.js",
+      "strict-script:intl402/Temporal/ZonedDateTime/links.js"
+    ],
+    "matches_known_failures": true,
+    "resources": {
+      "affinity": [
+        0
+      ],
+      "memory.max": "4294967296",
+      "memory.peak": "3657621504",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "workload_checks": {
+    "count": 16,
+    "passed": 16,
+    "purpose": "Output/completion validation only. No idle-machine timing or performance publication."
+  },
+  "product_build": {
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--offline",
+      "--release",
+      "-p",
+      "scriptw-cli",
+      "--bin",
+      "scriptw",
+      "--example",
+      "runtime_baseline",
+      "--jobs",
+      "1",
+      "--message-format=json"
+    ],
+    "source": "91ad82c6a5098c2658f68cf73f555f73fcb52aa8",
+    "exit": 0,
+    "elapsed_seconds": 3.6581670120358467,
+    "affinity": [
+      0
+    ],
+    "resources": {
+      "memory.max": "4294967296",
+      "memory.peak": "2618970112",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "products": [
+      {
+        "name": "scriptw",
+        "producer_executable": "/tmp/scriptw-v8-target-20261024/release/scriptw",
+        "retained_executable": "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/product-build-91ad82c6a/scriptw",
+        "sha256": "c3f40ba581c865ab501ec8e486c38d7e2c5eb53c2d8d95a7b7dc7f669199ca8b",
+        "bytes": 276724616
+      },
+      {
+        "name": "runtime_baseline",
+        "producer_executable": "/tmp/scriptw-v8-target-20261024/release/examples/runtime_baseline",
+        "retained_executable": "/home/mewhhaha/src/porffor/target/compiler-efficiency-20261024/product-build-91ad82c6a/runtime_baseline",
+        "sha256": "a9bd808f4db47b3f86de8aed0509dd7e077d44f4065ca90c8febc20ab7af6418",
+        "bytes": 269766984
+      }
+    ]
+  },
+  "resources": {
+    "memory_max_bytes": 4294967296,
+    "swap_max_bytes": 0,
+    "cpu_affinity": [
+      0
+    ],
+    "cargo_jobs": 1,
+    "libtest_threads": 1,
+    "test262_workers": 1,
+    "retained_module_cache_entries": 1,
+    "retained_module_cache_image_bytes": 67108864
+  },
+  "performance": {
+    "new_idle_machine_measurement": false,
+    "readme_graph": "Historical measured source retained; no timing speedup claimed."
+  },
+  "limitations": [
+    "One existing large-function RegExp native compilation exceeds4GiB on both current and product-source-identical pre-task compiler.",
+    "Selected Test262 executions do not replace the historical full pinned-suite chart.",
+    "See change documentation for boxed generic calls, conservative discovery and inference fallbacks."
+  ],
+  "archive": {
+    "file": "compiler-efficiency-20261024.tar.gz",
+    "sha256": "e7d9e3f99478b212cd2118deac3e6b4659519268656cafd8a3cf3d4ef350b0a2",
+    "bytes": 18351722,
+    "member_count": 15729,
+    "manifest_sha256": "17fd9976cb64b5ff265f18444f88100bcdf160af2b21746d9a64fd88b060dc8b",
+    "expanded_bytes": 142145312
+  },
+  "source_bundle": {
+    "member": "compiler-efficiency-20261024/tested-source.bundle",
+    "sha256": "3cf4e9a8ab3a57b6e6af1d74c26b34839dd457a1c21b10e3a2c5a5edbab851e0",
+    "prerequisite": "0443509f370dde7ed1a2c690770e9111ddb5a1f9"
+  }
+}

@@ -20,6 +20,11 @@ pub(super) struct SourceActivationDepthGlobal {
 }
 
 impl SourceActivationDepthGlobal {
+    fn emit_admission_test(&self, function: &mut Function) {
+        function.instruction(&Instruction::GlobalGet(self.index));
+        function.instruction(&Instruction::I32Const(MAX_ACTIVE_SOURCE_BODIES));
+        function.instruction(&Instruction::I32LtU);
+    }
     pub(super) fn declare(globals: &mut GlobalLedger) -> Self {
         let index = globals.len();
         globals.global(
@@ -88,6 +93,10 @@ impl SourceActivationDepth {
 }
 
 impl RuntimeSchema {
+    pub(crate) fn emit_source_activation_admission_test(&self, function: &mut Function) {
+        self.source_activation_depth.emit_admission_test(function);
+    }
+
     pub(crate) fn enter_source_activation_depth<E>(
         &self,
         function: &mut Function,

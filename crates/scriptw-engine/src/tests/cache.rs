@@ -452,18 +452,20 @@ fn component_projection_cache_keys_bind_each_filter_presence_and_order_independe
         key(profile("same-id", Some(&["fr"]), None)),
         key(profile("same-id", None, Some(&["fr"]))),
     );
-    assert!(CustomIntlProfile::new(
-        CustomProfileId::parse("same-id").unwrap(),
-        Some(&[]),
-        Some(&["fr"]),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .is_err());
+    assert!(
+        CustomIntlProfile::new(
+            CustomProfileId::parse("same-id").unwrap(),
+            Some(&[]),
+            Some(&["fr"]),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -1134,6 +1136,130 @@ fn program_wasm_cache_evicts_only_invalid_cached_artifacts() {
     assert!(!cache.contains(&key));
 
     let _ = std::fs::remove_dir_all(cache_root);
+}
+
+struct ModuleCacheFiles(std::path::PathBuf);
+
+impl ModuleCacheFiles {
+    fn new(label: &str) -> Self {
+        let root = std::env::temp_dir().join(format!(
+            "scriptw-module-cache-{label}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        Self(root)
+    }
+
+    fn options(&self) -> CompileOptions {
+        CompileOptions {
+            filename: Some(self.0.join("entry.js").to_str().unwrap().into()),
+            module_root: Some(self.0.to_str().unwrap().into()),
+            ..CompileOptions::default()
+        }
+    }
+
+    fn write(&self, name: &str, source: &str) {
+        std::fs::write(self.0.join(name), source).unwrap();
+    }
+}
+
+impl Drop for ModuleCacheFiles {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn closed_module_cache_hit_skips_lowering_and_rechecks_dependency_bytes() {
+    run_on_sized_stack(|| {
+        let files = ModuleCacheFiles::new("closed");
+        let source = "import { value } from './dep.js'; export const doubled = value * 2;";
+        files.write("dep.js", "export const value = 21;");
+        let cache = Arc::new(
+            crate::cache::FunctionCache::new(files.0.join("cache"), 256 * 1024 * 1024).unwrap(),
+        );
+        let engine = engine();
+        let load = || {
+            engine.load_or_compile_program_wasm_on_current_thread(
+                source,
+                ParseGoal::Module,
+                files.options(),
+                Some(Arc::clone(&cache)),
+            )
+        };
+        let before = LOWERING_ATTEMPTS.with(|attempts| attempts.get());
+        let first = load().expect("cold module should compile");
+        assert!(first.cached_entry.is_none());
+        let after_cold = LOWERING_ATTEMPTS.with(|attempts| attempts.get());
+        assert_eq!(after_cold, before + 1);
+        let warm = load().expect("closed graph should load from cache");
+        assert!(warm.cached_entry.is_some());
+        assert_eq!(first.bytes, warm.bytes);
+        assert_eq!(
+            LOWERING_ATTEMPTS.with(|attempts| attempts.get()),
+            after_cold
+        );
+
+        files.write("dep.js", "export const value = 22;");
+        let changed = load().expect("changed dependency should recompile");
+        assert!(changed.cached_entry.is_none());
+        assert_ne!(first.bytes, changed.bytes);
+        assert_eq!(
+            LOWERING_ATTEMPTS.with(|attempts| attempts.get()),
+            after_cold + 1
+        );
+
+        files.write("dep.js", "export const value = ;");
+        assert!(
+            load().is_err(),
+            "cache must not mask a dependency parse error"
+        );
+    });
+}
+
+#[test]
+fn initial_module_cache_candidate_does_not_name_a_prepared_source_closure() {
+    run_on_sized_stack(|| {
+        let files = ModuleCacheFiles::new("prepared");
+        let source = r#"new ShadowRealm().evaluate('void new ShadowRealm().importValue("./hidden.js", "value")'); export const value = 1;"#;
+        files.write("hidden.js", "export const value = 42;");
+        let options = files.options();
+        let engine = engine();
+        let role = module_loader::EmbeddedSourceRole::Entry;
+        let parsed = engine
+            .parse_compilation_for_role(source, ParseGoal::Module, &options, role)
+            .unwrap();
+        let candidate = program_cache_key_for_role(
+            source,
+            ParseGoal::Module,
+            &options,
+            parsed.modules.graph(),
+            role,
+        )
+        .unwrap();
+        let prepared = Engine::lower_parsed_compilation(parsed, &options).unwrap();
+        let closed = program_cache_key_for_role(
+            source,
+            ParseGoal::Module,
+            &options,
+            prepared.modules.graph(),
+            role,
+        )
+        .unwrap();
+        assert_ne!(
+            candidate, closed,
+            "newly discovered authority must change the key"
+        );
+        assert!(
+            prepared
+                .modules
+                .graph()
+                .unwrap()
+                .realm_requests
+                .contains_key(&scriptw_ir::ModuleRequestKeyIr::plain("./hidden.js"))
+        );
+    });
 }
 
 #[test]

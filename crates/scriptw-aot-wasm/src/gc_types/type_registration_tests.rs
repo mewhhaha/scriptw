@@ -399,14 +399,11 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         ))
     };
     let shape = fields(GcLayout::CompactDataShape);
+    assert_eq!(shape.len(), 1);
     assert!(shape.iter().all(|field| !field.mutable));
     assert_eq!(
-        shape[1].element_type,
+        shape[0].element_type,
         reference(GcLayout::CompactShapeKeys, false)
-    );
-    assert_eq!(
-        shape[2].element_type,
-        reference(GcLayout::CompactDataShape, true)
     );
     let CompositeInnerType::Array(keys) = &types[index(GcLayout::CompactShapeKeys) as usize]
         .composite_type
@@ -417,20 +414,32 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
     assert!(!keys.0.mutable);
     assert_eq!(keys.0.element_type, reference(GcLayout::StringValue, false));
     let cache = fields(GcLayout::OwnDataReadCache);
-    assert_eq!(cache.len(), 5);
+    assert_eq!(cache.len(), 3);
     assert_eq!(
-        cache[1].element_type,
+        cache[0].element_type,
         reference(GcLayout::StringValue, false)
     );
-    assert!(!cache[1].mutable);
+    assert!(!cache[0].mutable);
     assert_eq!(
-        cache[2].element_type,
+        cache[1].element_type,
         reference(GcLayout::CompactDataShape, true)
     );
-    assert_eq!(
-        cache[4].element_type,
-        reference(GcLayout::OwnDataReadCache, true)
-    );
+    for (table, element) in [
+        (GcLayout::CompactShapeTable, GcLayout::CompactDataShape),
+        (GcLayout::OwnDataReadCacheTable, GcLayout::OwnDataReadCache),
+        (GcLayout::CompactShapePageTable, GcLayout::CompactShapeTable),
+        (
+            GcLayout::OwnDataReadCachePageTable,
+            GcLayout::OwnDataReadCacheTable,
+        ),
+    ] {
+        let CompositeInnerType::Array(table) = &types[index(table) as usize].composite_type.inner
+        else {
+            panic!("program cache sites require direct indexed GC tables");
+        };
+        assert!(table.0.mutable);
+        assert_eq!(table.0.element_type, reference(element, true));
+    }
     // The encoded metadata has no eqref/StoredValue/receiver edge. Only the
     // actual per-object reference SoA can retain arbitrary JavaScript values.
     for layout in [GcLayout::CompactDataShape, GcLayout::OwnDataReadCache] {
@@ -616,14 +625,18 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
         global: Some(global),
         non_null: true,
     };
-    assert_eq!(operands, vec![
-        empty(schema.empty_arrays.array_buckets.index()),
-        Operand::I64(0),
-        empty(schema.empty_arrays.array_elements.index()),
-        Operand::I32(ArrayIndexedStorageMode::PackedNumbers.encode()),
-        empty(schema.empty_arrays.number_bits.index()),
-        empty(schema.empty_arrays.number_presence.index()),
-    ], "StructNew consumes exactly the declared BUCKETS/COUNT/DENSE/MODE/NUMBERS/NUMBER_PRESENT values");
+    assert_eq!(
+        operands,
+        vec![
+            empty(schema.empty_arrays.array_buckets.index()),
+            Operand::I64(0),
+            empty(schema.empty_arrays.array_elements.index()),
+            Operand::I32(ArrayIndexedStorageMode::PackedNumbers.encode()),
+            empty(schema.empty_arrays.number_bits.index()),
+            empty(schema.empty_arrays.number_presence.index()),
+        ],
+        "StructNew consumes exactly the declared BUCKETS/COUNT/DENSE/MODE/NUMBERS/NUMBER_PRESENT values"
+    );
 }
 
 #[test]

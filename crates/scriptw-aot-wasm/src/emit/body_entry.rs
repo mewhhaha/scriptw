@@ -50,6 +50,7 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeHelperId::OrdinaryPropertyStorageEnsure
             | RuntimeHelperId::OrdinaryOwnDescriptor
             | RuntimeHelperId::CompactLiteralAllocate
+            | RuntimeHelperId::ArgumentListAppend
             | RuntimeHelperId::CachedPropertyRead => {}
             // These bodies call their physical typed kernel directly. Their
             // public facades retain registered call boundaries for recursion.
@@ -62,6 +63,11 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::ObjectDefineData
             | RuntimeHelperId::OrdinaryPropertyFind
             | RuntimeHelperId::OrdinaryPropertyAppend
+            | RuntimeHelperId::OrdinaryPropertyPrepare
+            | RuntimeHelperId::CollectionPrepareMap
+            | RuntimeHelperId::CollectionPrepareSet
+            | RuntimeHelperId::CollectionNextMap
+            | RuntimeHelperId::CollectionNextSet
             | RuntimeHelperId::ObjectHeaderProjection
             | RuntimeHelperId::OrdinaryObjectAllocate
             | RuntimeHelperId::ValueToObject

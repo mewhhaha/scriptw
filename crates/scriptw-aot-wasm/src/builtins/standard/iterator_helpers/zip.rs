@@ -552,7 +552,7 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<GcLocal<ValueArray>, EmitError> {
         let s = self.runtime_schema();
-        let list = ArgumentListConstruction::new(s, f);
+        let list = ArgumentListConstruction::new(self, f);
         let index = s.reserve_i32_local(f);
         f.instruction(&Instruction::I32Const(0));
         index.store(f);
@@ -1189,7 +1189,7 @@ impl FunctionBuilder<'_> {
                 self.emit_branch_to_target(stop, f);
                 self.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
-                let list = ArgumentListConstruction::new(s, f);
+                let list = ArgumentListConstruction::new(self, f);
                 f.instruction(&Instruction::I32Const(0));
                 index.store(f);
                 let collected = self.open_frame(ControlFrameKind::Block, f);

@@ -6,11 +6,11 @@
 
 use scriptw_ir::ToPrimitiveHint;
 
+use crate::RuntimeErrorMessage;
 use crate::code_sink::Function;
 use crate::gc_types::*;
 use crate::module::StaticSignature;
 use crate::program_hooks::InstalledHook;
-use crate::RuntimeErrorMessage;
 use wasm_encoder::Instruction;
 
 /// Maximum bytes for one RegExp matcher's transient choice-frame arena.
@@ -480,6 +480,27 @@ impl I64HelperResult {
         destination.store(function);
     }
 }
+/// A collection cursor carries both its stable insertion ordinal and a cached
+/// physical position. The complete tuple must cross compaction together.
+#[must_use = "all collection cursor projections must be stored together"]
+pub(crate) struct CollectionCursorCallResult {
+    private: (),
+}
+impl CollectionCursorCallResult {
+    pub(crate) fn store(
+        self,
+        index: I64Local,
+        next_ordinal: I64Local,
+        version: I64Local,
+        found: I32Local,
+        function: &mut Function,
+    ) {
+        found.store(function);
+        version.store(function);
+        next_ordinal.store(function);
+        index.store(function);
+    }
+}
 /// Only the calendar year owner can project this complete seven-word result.
 #[must_use = "the completed year must initialize its owned calendar record"]
 pub(crate) struct EastAsianYearCallResult {
@@ -773,6 +794,7 @@ macro_rules! helper_field {
     (@result_type Void) => { () };
     (@result_type I32) => { I32HelperResult };
     (@result_type I64) => { I64HelperResult };
+    (@result_type CollectionCursor) => { CollectionCursorCallResult };
     (@result_type EastAsianYear) => { EastAsianYearCallResult };
     (@result_type UmmAlQuraYear) => { UmmAlQuraYearCallResult };
     (@result_type CalendarDate) => { CalendarDateCallResult };
@@ -791,6 +813,7 @@ macro_rules! helper_field {
     (@result_abi Void) => { Vec::new() };
     (@result_abi I32) => { vec![AbiType::I32] };
     (@result_abi I64) => { vec![AbiType::I64] };
+    (@result_abi CollectionCursor) => { vec![AbiType::I64, AbiType::I64, AbiType::I64, AbiType::I32] };
     (@result_abi EastAsianYear) => { vec![AbiType::I64; 7] };
     (@result_abi UmmAlQuraYear) => { vec![AbiType::I64; 2] };
     (@result_abi CalendarDate) => { vec![AbiType::I64; 8] };
@@ -819,6 +842,7 @@ macro_rules! helper_field {
     (@result Void) => { () };
     (@result I32) => { I32HelperResult { private: () } };
     (@result I64) => { I64HelperResult { private: () } };
+    (@result CollectionCursor) => { CollectionCursorCallResult { private: () } };
     (@result EastAsianYear) => { EastAsianYearCallResult { private: () } };
     (@result UmmAlQuraYear) => { UmmAlQuraYearCallResult { private: () } };
     (@result CalendarDate) => { CalendarDateCallResult { private: () } };
@@ -1041,9 +1065,15 @@ runtime_helper_domain! {
     OrdinaryPropertyStorageEnsure / OrdinaryPropertyStorageEnsureArguments / OrdinaryPropertyStorageEnsureParameters / "ordinary_property_storage_ensure" { object:(Ref OrdinaryObject NonNullable) } => (Ref OrdinaryPropertyStorage NonNullable);
     OrdinaryOwnDescriptor / OrdinaryOwnDescriptorArguments / OrdinaryOwnDescriptorParameters / "ordinary_own_descriptor" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyDescriptor Nullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
-    CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I64,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
+    CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     OrdinaryPropertyFind / OrdinaryPropertyFindArguments / OrdinaryPropertyFindParameters / "ordinary_property_find" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyEntry Nullable);
     OrdinaryPropertyAppend / OrdinaryPropertyAppendArguments / OrdinaryPropertyAppendParameters / "ordinary_property_append" { object:(Ref OrdinaryObject NonNullable),key:Key,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
+    OrdinaryPropertyPrepare / OrdinaryPropertyPrepareArguments / OrdinaryPropertyPrepareParameters / "ordinary_property_prepare" { storage:(Ref OrdinaryPropertyStorage NonNullable),count:I32 } => I32;
+    CollectionPrepareMap / CollectionPrepareMapArguments / CollectionPrepareMapParameters / "collection_prepare_map" { record:(Ref MapObject NonNullable),count:I64 } => I64;
+    CollectionPrepareSet / CollectionPrepareSetArguments / CollectionPrepareSetParameters / "collection_prepare_set" { record:(Ref SetObject NonNullable),count:I64 } => I64;
+    CollectionNextMap / CollectionNextMapArguments / CollectionNextMapParameters / "collection_next_map" { record:(Ref MapObject NonNullable),index:I64,next_ordinal:I64,version:I64 } => CollectionCursor;
+    CollectionNextSet / CollectionNextSetArguments / CollectionNextSetParameters / "collection_next_set" { record:(Ref SetObject NonNullable),index:I64,next_ordinal:I64,version:I64 } => CollectionCursor;
     ObjectHeaderProjection / ObjectHeaderProjectionArguments / ObjectHeaderProjectionParameters / "object_header_projection" { value:Value } => (Ref OrdinaryObject NonNullable);
     OrdinaryObjectAllocate / OrdinaryObjectAllocateArguments / OrdinaryObjectAllocateParameters / "ordinary_object_allocate" { prototype:Value,immutable_prototype:I32 } => (Ref OrdinaryObject NonNullable);
     ValueToObject / ValueToObjectArguments / ValueToObjectParameters / "value_to_object" { realm:(Ref RealmRecord NonNullable),input:Value } => Completion;
@@ -1181,9 +1211,15 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => HelperOwner::Runtime,
             Self::OrdinaryOwnDescriptor => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
+            Self::ArgumentListAppend => HelperOwner::Runtime,
             Self::CachedPropertyRead => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
             Self::OrdinaryPropertyAppend => HelperOwner::Runtime,
+            Self::OrdinaryPropertyPrepare => HelperOwner::Runtime,
+            Self::CollectionPrepareMap => HelperOwner::Runtime,
+            Self::CollectionPrepareSet => HelperOwner::Runtime,
+            Self::CollectionNextMap => HelperOwner::Runtime,
+            Self::CollectionNextSet => HelperOwner::Runtime,
             Self::ObjectHeaderProjection => HelperOwner::Runtime,
             Self::OrdinaryObjectAllocate => HelperOwner::Runtime,
             Self::ValueToObject => HelperOwner::Runtime,
@@ -1307,9 +1343,15 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => true,
             Self::OrdinaryOwnDescriptor => true,
             Self::CompactLiteralAllocate => true,
+            Self::ArgumentListAppend => true,
             Self::CachedPropertyRead => true,
             Self::OrdinaryPropertyFind => true,
             Self::OrdinaryPropertyAppend => true,
+            Self::OrdinaryPropertyPrepare => true,
+            Self::CollectionPrepareMap => true,
+            Self::CollectionPrepareSet => true,
+            Self::CollectionNextMap => true,
+            Self::CollectionNextSet => true,
             Self::ObjectHeaderProjection => true,
             Self::OrdinaryObjectAllocate => true,
             Self::ValueToObject => true,
@@ -1528,10 +1570,12 @@ mod tests {
             vec!["generic-error", "current-function-realm-range-error"]
         );
         for failure in RegExpMatcherFailure::ALL {
-            assert!(failure
-                .message()
-                .catalog_text()
-                .is_some_and(|text| !text.is_empty()));
+            assert!(
+                failure
+                    .message()
+                    .catalog_text()
+                    .is_some_and(|text| !text.is_empty())
+            );
         }
     }
 
@@ -1652,9 +1696,11 @@ mod tests {
                 ))
             );
         }
-        assert!(RuntimeHelperId::PooledStringsInitialize
-            .parameter_types()
-            .is_empty());
+        assert!(
+            RuntimeHelperId::PooledStringsInitialize
+                .parameter_types()
+                .is_empty()
+        );
     }
 
     #[test]

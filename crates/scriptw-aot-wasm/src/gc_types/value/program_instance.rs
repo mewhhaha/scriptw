@@ -2,11 +2,11 @@
 
 use super::*;
 mod native_payload;
+use crate::EmitError;
 use crate::data::{PooledStringIndex, StringPool};
 use crate::program_hooks::ProvidedHooks;
 use crate::runtime_artifact::ModuleKind;
 use crate::runtime_helpers::RuntimeHelperFunctionBase;
-use crate::EmitError;
 
 mod language_features;
 mod literal_index;
@@ -216,6 +216,137 @@ pub(crate) struct ProgramInstanceLocals {
     owner: GcLocal<ProgramInstance>,
 }
 
+// Fixed 64-slot leaf pages keep dormant source sites from allocating one
+// metadata reference each. Only the directory scales with highest_site / 64.
+const PROGRAM_CACHE_PAGE_SHIFT: i32 = 6;
+const PROGRAM_CACHE_PAGE_SIZE: i32 = 1 << PROGRAM_CACHE_PAGE_SHIFT;
+
+macro_rules! program_site_table {
+    ($method:ident, $table:ident, $pages:ident, $field:ident) => {
+        pub(crate) fn $method(
+            &self,
+            site: I32Local,
+            schema: &RuntimeSchema,
+            function: &mut Function,
+        ) -> (GcLocal<$table>, I32Local) {
+            let directory = schema.array_type::<$pages>();
+            let pages = schema.reserve_gc_local(function).initialize(
+                schema
+                    .field(ProgramInstanceSchema::$field)
+                    .read(&self.owner, schema, function)
+                    .reference(),
+                function,
+            );
+            let page_index = schema.reserve_i32_local(function);
+            let length = schema.reserve_i32_local(function);
+            let capacity = schema.reserve_i32_local(function);
+            let required = schema.reserve_i32_local(function);
+            site.load(function);
+            function.instruction(&Instruction::I32Const(PROGRAM_CACHE_PAGE_SHIFT));
+            function.instruction(&Instruction::I32ShrU);
+            page_index.store(function);
+            function.instruction(&Instruction::I32Const(0));
+            length.store(function);
+            pages.load(schema, function).is_null(function);
+            function.instruction(&Instruction::I32Eqz);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            directory.length(&pages, schema, function);
+            length.store(function);
+            function.instruction(&Instruction::End);
+            page_index.load(function);
+            length.load(function);
+            function.instruction(&Instruction::I32GeU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            page_index.load(function);
+            function.instruction(&Instruction::I32Const(1));
+            function.instruction(&Instruction::I32Add);
+            required.store(function);
+            length.load(function);
+            function.instruction(&Instruction::I32Const(1));
+            function.instruction(&Instruction::I32Shl);
+            capacity.store(function);
+            capacity.load(function);
+            function.instruction(&Instruction::I32Const(8));
+            function.instruction(&Instruction::I32LtU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            function.instruction(&Instruction::I32Const(8));
+            capacity.store(function);
+            function.instruction(&Instruction::End);
+            capacity.load(function);
+            required.load(function);
+            function.instruction(&Instruction::I32LtU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            required.load(function);
+            capacity.store(function);
+            function.instruction(&Instruction::End);
+            let replacement = schema.reserve_gc_local(function).initialize(
+                directory.filled(GcOperand::null(schema), capacity, function),
+                function,
+            );
+            length.load(function);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            let previous = schema.reserve_gc_local(function).initialize(
+                pages.load(schema, function).require_non_null(function),
+                function,
+            );
+            directory.copy_prefix_from(&replacement, &previous, length, schema, function);
+            previous.clear(function);
+            function.instruction(&Instruction::End);
+            schema.field(ProgramInstanceSchema::$field).write(
+                &self.owner,
+                GcOperand::nullable_reference(&replacement, schema),
+                schema,
+                function,
+            );
+            pages.replace(replacement.load(schema, function).nullable(), function);
+            replacement.clear(function);
+            function.instruction(&Instruction::End);
+            let page = schema.reserve_gc_local(function).initialize(
+                directory
+                    .read(&pages, page_index, schema, function)
+                    .reference(),
+                function,
+            );
+            page.load(schema, function).is_null(function);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            function.instruction(&Instruction::I32Const(PROGRAM_CACHE_PAGE_SIZE));
+            capacity.store(function);
+            let fresh = schema.reserve_gc_local(function).initialize(
+                schema
+                    .array_type::<$table>()
+                    .filled(GcOperand::null(schema), capacity, function),
+                function,
+            );
+            directory.write(
+                &pages,
+                page_index,
+                GcOperand::nullable_reference(&fresh, schema),
+                schema,
+                function,
+            );
+            page.replace(fresh.load(schema, function).nullable(), function);
+            fresh.clear(function);
+            function.instruction(&Instruction::End);
+            let result = schema.reserve_gc_local(function).initialize(
+                page.load(schema, function).require_non_null(function),
+                function,
+            );
+            let slot = schema.reserve_i32_local(function);
+            site.load(function);
+            function.instruction(&Instruction::I32Const(PROGRAM_CACHE_PAGE_SIZE - 1));
+            function.instruction(&Instruction::I32And);
+            slot.store(function);
+            page.clear(function);
+            pages.clear(function);
+            schema.release_i32_local(required, function);
+            schema.release_i32_local(capacity, function);
+            schema.release_i32_local(length, function);
+            schema.release_i32_local(page_index, function);
+            (result, slot)
+        }
+    };
+}
+
 impl ProgramInstanceLocals {
     pub(crate) fn publish(
         schema: &RuntimeSchema,
@@ -266,54 +397,18 @@ impl ProgramInstanceLocals {
         Ok(Self { owner })
     }
 
-    pub(crate) fn compact_shapes(
-        &self,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) -> GcStackReference<CompactDataShape, Nullable> {
-        schema
-            .field(ProgramInstanceSchema::COMPACT_SHAPES)
-            .read(&self.owner, schema, function)
-            .reference()
-    }
-    pub(crate) fn publish_compact_shape(
-        &self,
-        shape: &GcLocal<CompactDataShape>,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) {
-        schema.field(ProgramInstanceSchema::COMPACT_SHAPES).write(
-            &self.owner,
-            GcOperand::nullable_reference(shape, schema),
-            schema,
-            function,
-        );
-    }
-    pub(crate) fn own_data_read_caches(
-        &self,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) -> GcStackReference<OwnDataReadCache, Nullable> {
-        schema
-            .field(ProgramInstanceSchema::OWN_DATA_READ_CACHES)
-            .read(&self.owner, schema, function)
-            .reference()
-    }
-    pub(crate) fn publish_own_data_read_cache(
-        &self,
-        cache: &GcLocal<OwnDataReadCache>,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) {
-        schema
-            .field(ProgramInstanceSchema::OWN_DATA_READ_CACHES)
-            .write(
-                &self.owner,
-                GcOperand::nullable_reference(cache, schema),
-                schema,
-                function,
-            );
-    }
+    program_site_table!(
+        compact_shapes,
+        CompactShapeTable,
+        CompactShapePageTable,
+        COMPACT_SHAPES
+    );
+    program_site_table!(
+        own_data_read_caches,
+        OwnDataReadCacheTable,
+        OwnDataReadCachePageTable,
+        OWN_DATA_READ_CACHES
+    );
 
     pub(crate) fn bind(
         schema: &RuntimeSchema,

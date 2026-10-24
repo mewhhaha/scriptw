@@ -122,14 +122,14 @@ python3 -B scripts/tests/test_source_guard_runner.py
 
 The first command compiles independent Rust test harnesses without Cargo's
 dependency graph. It reads both structural targets' actual module lists:
-55 builtin source-only modules (143 tests) and 39 language modules (134 tests).
+55 builtin source-only modules (143 tests) and 39 language modules (135 tests).
 The eight complete typed IR/Wasm modules remain deferred to Cargo. Combined
 compilation/execution took about ten seconds on this cloud checkout. Nine
 tooling controls pass. Use `--target structure_builtins` or
 `--target structure_language` for a focused diagnostic; the default runs both
 and retains a failing first target while still checking the second.
 
-This diagnostic does not replace the complete 166-test and 151-test Cargo
+This diagnostic does not replace the complete 166-test and 152-test Cargo
 targets. The language target caught a stale exact API-call count left behind
 by string optimizations. Its repaired check requires a live definition and
 caller instead of a frozen number of references; obsolete APIs must still have

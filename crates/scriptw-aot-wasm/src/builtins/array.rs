@@ -2440,7 +2440,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_builtin_arg_to_value(1, &this_arg, f);
-        let kept = crate::functions::ArgumentListConstruction::new(s, f);
+        let kept = crate::functions::ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         f.instruction(&Instruction::I64Const(0));
@@ -3069,7 +3069,7 @@ impl FunctionBuilder<'_> {
             ArraySortOutput::Receiver => target.copy_from(&receiver, f),
             ArraySortOutput::Copy => self.emit_array_native_create(length, &target, f)?,
         }
-        let collected = crate::functions::ArgumentListConstruction::new(s, f);
+        let collected = crate::functions::ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         f.instruction(&Instruction::I64Const(0));

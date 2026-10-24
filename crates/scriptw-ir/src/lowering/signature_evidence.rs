@@ -59,7 +59,7 @@ impl ScriptLowerer<'_> {
                     .function_plans
                     .get(&function.id)
                     .expect("function plan must exist");
-                let _ = pass.lower_function(plan, None, None);
+                pass.infer_function(plan, None);
             }
 
             self.merge_function_source_binding_candidates(pass.function_source_binding_candidates);
@@ -275,7 +275,7 @@ impl ScriptLowerer<'_> {
             let Some(plan) = self.analysis.function_plans.get(&function_id) else {
                 continue;
             };
-            let _ = pass.lower_function(plan, None, Some(key));
+            pass.infer_function(plan, Some(key));
         }
 
         self.merge_function_source_binding_candidates(pass.function_source_binding_candidates);
@@ -393,7 +393,7 @@ impl ScriptLowerer<'_> {
             .function_plans
             .get(function_id)
             .expect("function plan must exist");
-        let _ = pass.lower_function(plan, None, None);
+        pass.infer_function(plan, None);
         let observed_signature = pass.function_signatures.get(function_id).cloned();
         self.merge_called_script_global_value_infos(&pass.called_script_global_value_infos);
         self.completed_direct_call_propagations = pass.completed_direct_call_propagations.clone();

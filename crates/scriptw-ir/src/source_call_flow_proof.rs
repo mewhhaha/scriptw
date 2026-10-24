@@ -30,6 +30,24 @@ impl SourceCallFlowEffects {
         }
     }
 
+    /// The same proof used by a complete invocation, consumed a statement at a
+    /// time by inference. No source effect rule is duplicated by that consumer.
+    pub(crate) fn for_finalized_statement(statement: &StatementIr) -> Self {
+        if statement_preserves_caller_flow(statement) {
+            Self::from_proof(ProvenNoCallerFlowInvalidation { _private: () })
+        } else {
+            Self::may_invalidate_caller_flow()
+        }
+    }
+
+    pub(crate) fn for_finalized_parameters(params: &[FunctionParamIr]) -> Self {
+        if parameter_defaults_preserve_caller_flow(params) {
+            Self::from_proof(ProvenNoCallerFlowInvalidation { _private: () })
+        } else {
+            Self::may_invalidate_caller_flow()
+        }
+    }
+
     pub(crate) const fn proves_no_flow_invalidation(self) -> bool {
         matches!(self.0, SourceCallFlowState::ProvenNoFlowInvalidation)
     }
@@ -68,12 +86,15 @@ pub(crate) fn prove_no_caller_flow_invalidation(
     params: &[FunctionParamIr],
     block: &BlockIr,
 ) -> Option<ProvenNoCallerFlowInvalidation> {
-    let defaults_preserve_caller_flow = params
+    (parameter_defaults_preserve_caller_flow(params) && block_preserves_caller_flow(block))
+        .then_some(ProvenNoCallerFlowInvalidation { _private: () })
+}
+
+fn parameter_defaults_preserve_caller_flow(params: &[FunctionParamIr]) -> bool {
+    params
         .iter()
         .filter_map(|param| param.default_init.as_ref())
-        .all(expr_preserves_caller_flow);
-    (defaults_preserve_caller_flow && block_preserves_caller_flow(block))
-        .then_some(ProvenNoCallerFlowInvalidation { _private: () })
+        .all(expr_preserves_caller_flow)
 }
 
 fn block_preserves_caller_flow(block: &BlockIr) -> bool {
@@ -734,8 +755,10 @@ mod tests {
     fn a_literal_return_proves_caller_flow_preservation() {
         let body = body_with(StatementIr::Return(TypedExpr::undefined()));
 
-        assert!(SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-            .proves_no_flow_invalidation());
+        assert!(
+            SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+                .proves_no_flow_invalidation()
+        );
     }
 
     #[test]
@@ -749,8 +772,10 @@ mod tests {
         );
         let body = body_with(StatementIr::Return(call));
 
-        assert!(!SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-            .proves_no_flow_invalidation());
+        assert!(
+            !SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+                .proves_no_flow_invalidation()
+        );
     }
 
     #[test]
@@ -802,8 +827,10 @@ mod tests {
         let conversion = TypedExpr::spec_to_string(TypedExpr::undefined());
         let body = body_with(StatementIr::Return(conversion));
 
-        assert!(SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-            .proves_no_flow_invalidation());
+        assert!(
+            SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+                .proves_no_flow_invalidation()
+        );
     }
 
     #[test]
@@ -815,8 +842,10 @@ mod tests {
         let conversion = TypedExpr::spec_to_string(object);
         let body = body_with(StatementIr::Return(conversion));
 
-        assert!(!SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-            .proves_no_flow_invalidation());
+        assert!(
+            !SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+                .proves_no_flow_invalidation()
+        );
     }
 
     #[test]

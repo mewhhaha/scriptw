@@ -252,7 +252,7 @@ impl FunctionBuilder<'_> {
     ) -> Result<GcLocal<ValueArray>, EmitError> {
         let s = self.runtime_schema();
         let keys = self.emit_object_own_property_keys(holder, f)?;
-        let list = ArgumentListConstruction::new(s, f);
+        let list = ArgumentListConstruction::new(self, f);
         let count = s.reserve_i32_local(f);
         let index = s.reserve_i32_local(f);
         let flags = s.reserve_i64_local(f);

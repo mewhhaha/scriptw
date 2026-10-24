@@ -10,48 +10,16 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<GcLocal<CompactDataShape>, EmitError> {
         let schema = self.runtime_schema();
-        let id = schema.reserve_i64_local(f);
+        let id = schema.reserve_i32_local(f);
         site.emit(id, f);
-        let head = schema
-            .reserve_gc_local(f)
-            .initialize(self.current_program().compact_shapes(schema, f), f);
-        let cursor = schema
-            .reserve_gc_local(f)
-            .initialize(head.load(schema, f), f);
-        let result = schema
-            .reserve_gc_local::<CompactDataShape, Nullable>(f)
-            .initialize_null(schema, f);
-        let actual = schema.reserve_i64_local(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
-        let repeat = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(schema, f).is_null(f);
-        self.emit_branch_if_to_target(exit, f);
-        schema
-            .field(CompactDataShapeSchema::SITE)
-            .read(&cursor, schema, f)
-            .store_i64(actual, f);
-        id.load(f);
-        actual.load(f);
-        f.instruction(&Instruction::I64Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        result.replace(cursor.load(schema, f), f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        result.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(exit, f);
-        cursor.replace(
+        let (table, slot) = self.current_program().compact_shapes(id, schema, f);
+        let result = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataShapeSchema::NEXT)
-                .read(&cursor, schema, f)
+                .array_type::<CompactShapeTable>()
+                .read(&table, slot, schema, f)
                 .reference(),
             f,
         );
-        self.emit_branch_to_target(repeat, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
         result.load(schema, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
         let mut keys = Vec::with_capacity(names.len());
@@ -69,18 +37,18 @@ impl FunctionBuilder<'_> {
             f,
         );
         let shape = schema.reserve_gc_local(f).initialize(
-            schema.struct_type::<CompactDataShape>().construct(
-                (
-                    GcOperand::i64_local(id),
-                    GcOperand::reference(&key_table, schema),
-                    GcOperand::reference(&head, schema),
-                ),
-                f,
-            ),
+            schema
+                .struct_type::<CompactDataShape>()
+                .construct((GcOperand::reference(&key_table, schema),), f),
             f,
         );
-        self.current_program()
-            .publish_compact_shape(&shape, schema, f);
+        schema.array_type::<CompactShapeTable>().write(
+            &table,
+            slot,
+            GcOperand::nullable_reference(&shape, schema),
+            schema,
+            f,
+        );
         result.replace(shape.load(schema, f).nullable(), f);
         shape.clear(f);
         key_table.clear(f);
@@ -93,10 +61,9 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(result.load(schema, f).require_non_null(f), f);
         result.clear(f);
-        cursor.clear(f);
-        head.clear(f);
-        schema.release_i64_local(actual, f);
-        schema.release_i64_local(id, f);
+        table.clear(f);
+        schema.release_i32_local(slot, f);
+        schema.release_i32_local(id, f);
         Ok(shape)
     }
 

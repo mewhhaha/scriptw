@@ -36,14 +36,34 @@ fn code_without_whitespace(source: &str) -> String {
         .collect()
 }
 
+fn public_reexports(source: &str, owner: &str) -> Vec<Vec<String>> {
+    let source = code_without_whitespace(source);
+    source
+        .split(&format!("pubuse{owner}::"))
+        .skip(1)
+        .map(|suffix| {
+            let declaration = suffix.split_once(';').expect("complete public re-export").0;
+            let members = declaration
+                .strip_prefix('{')
+                .and_then(|members| members.strip_suffix('}'))
+                .unwrap_or(declaration);
+            let mut members = members
+                .split(',')
+                .filter(|member| !member.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            members.sort();
+            members
+        })
+        .collect()
+}
+
 #[test]
 fn loaded_sources_have_one_private_owner_and_narrow_public_facade() {
     assert_eq!(MODULES_SOURCE.matches("\nmod loaded_sources;\n").count(), 1);
     assert_eq!(
-        MODULES_SOURCE
-            .matches("pub use loaded_sources::{ModuleGraphSources, ModuleKindIr, ModuleSourceIr};")
-            .count(),
-        1
+        public_reexports(MODULES_SOURCE, "loaded_sources"),
+        vec![vec!["ModuleGraphSources", "ModuleKindIr", "ModuleSourceIr"]]
     );
     assert!(!MODULES_SOURCE.contains("\npub mod loaded_sources;\n"));
     assert!(!MODULES_SOURCE.contains("\nmod loaded_sources {\n"));
@@ -80,7 +100,9 @@ fn module_source_keeps_private_parse_state_and_the_exact_public_method_inventory
     );
     assert_eq!(
         code_without_whitespace(fields),
-        "key:ModuleKey,meta_url:String,pub(super)parse:ModuleParse,pub(super)prepared_script_import_sites:Vec<super::DynamicImportSiteIr>,}"
+        "pub(super)foreign:Option<crate::foreign::ForeignModuleSource>,\
+         key:ModuleKey,meta_url:String,pub(super)parse:ModuleParse,\
+         pub(super)prepared_script_import_sites:Vec<super::DynamicImportSiteIr>,}"
     );
 
     let parse = bounded(
@@ -89,17 +111,13 @@ fn module_source_keeps_private_parse_state_and_the_exact_public_method_inventory
         "impl ModuleSourceIr",
     );
     let parse = code_without_whitespace(parse);
-    for variant in [
-        "Module(ParsedModule)",
-        "ScriptEntry(ParsedScript)",
-        "Json(scriptw_front::ParsedJson)",
-        "Bytes(Vec<u8>)",
-        "ModuleSource{source_tag:String,}",
-        "JsonRejected{source_text:String,error:scriptw_front::JsonParseError",
-        "Rejected{source:SourceUnit,error:scriptw_front::ParseError,}",
-    ] {
-        assert!(parse.contains(variant));
-    }
+    assert_eq!(
+        parse,
+        "Module(ParsedModule),Json(scriptw_front::ParsedJson),Bytes(Vec<u8>),Text(String),\
+         ModuleSource{source_tag:String,},\
+         JsonRejected{source_text:String,error:scriptw_front::JsonParseError,},\
+         ScriptEntry(ParsedScript),Rejected{source:SourceUnit,error:scriptw_front::ParseError,},}"
+    );
     assert!(!OWNER_SOURCE.contains("pub enum ModuleParse"));
     assert_eq!(
         OWNER_SOURCE.matches("pub(super) enum ModuleParse").count(),
@@ -112,12 +130,40 @@ fn module_source_keeps_private_parse_state_and_the_exact_public_method_inventory
         1
     );
 
-    for method in [
+    let methods = bounded(
+        OWNER_SOURCE,
+        "impl ModuleSourceIr {",
+        "/// A request with no entry here",
+    );
+    let mut public_methods = methods
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if !line.starts_with("pub ") {
+                return None;
+            }
+            let (method, is_const) = line
+                .strip_prefix("pub fn ")
+                .map(|method| (method, false))
+                .or_else(|| {
+                    line.strip_prefix("pub const fn ")
+                        .map(|method| (method, true))
+                })
+                .unwrap_or_else(|| panic!("unreviewed public item: {line}"));
+            Some((method.split_once('(').expect("method name").0, is_const))
+        })
+        .collect::<Vec<_>>();
+    public_methods.sort();
+    let mut expected_methods = [
+        "foreign",
+        "foreign_modules",
         "may_contain_direct_eval_call",
         "include_prepared_script_import_sites",
+        "realm_module_requests",
         "new",
         "json",
         "bytes",
+        "text",
         "module_source",
         "record_key",
         "payload_bytes",
@@ -128,15 +174,19 @@ fn module_source_keeps_private_parse_state_and_the_exact_public_method_inventory
         "meta_url",
         "module_requests",
         "module_loading_requests",
+        "dynamic_import_sites",
         "script_has_dynamic_import_sites",
         "goal",
-    ] {
-        assert_eq!(
-            OWNER_SOURCE.matches(&format!("pub fn {method}(")).count(),
-            1,
-            "{method} must have one public owner"
-        );
-    }
+    ]
+    .into_iter()
+    .map(|method| (method, false))
+    .chain([("kind", true)])
+    .collect::<Vec<_>>();
+    expected_methods.sort();
+    assert_eq!(
+        public_methods, expected_methods,
+        "exact public method inventory"
+    );
     assert_eq!(OWNER_SOURCE.matches("#[doc(hidden)]").count(), 3);
     assert_eq!(
         OWNER_SOURCE.matches("scan_module_requests(source)").count(),
@@ -169,8 +219,8 @@ fn graph_sources_keep_the_exact_public_closure_record_and_single_constructor() {
         .expect("single parsed-source constructor")
         .1;
     assert_eq!(
-        single_constructor
-            .matches("realm_requests: Default::default()")
+        code_without_whitespace(single_constructor)
+            .matches("realm_requests:Default::default()")
             .count(),
         1
     );
@@ -183,10 +233,8 @@ fn graph_sources_keep_the_exact_public_closure_record_and_single_constructor() {
         1
     );
     assert_eq!(
-        MODULES_SOURCE
-            .matches("pub use module_key::{ModuleKey, ModuleRecordKey, ANONYMOUS_MODULE_KEY};")
-            .count(),
-        1
+        public_reexports(MODULES_SOURCE, "module_key"),
+        vec![vec!["ANONYMOUS_MODULE_KEY", "ModuleKey", "ModuleRecordKey"]]
     );
 }
 

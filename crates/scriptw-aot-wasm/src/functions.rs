@@ -39,6 +39,8 @@ mod function_object_allocation;
 mod native_direct_eval;
 mod native_direct_eval_factory;
 mod numeric_imul_call;
+mod numeric_leaf_call;
+pub(crate) use numeric_leaf_call::NumericLeafPlan;
 mod source_callable_factories;
 use function_object_allocation::FunctionAllocationInputs;
 mod function_realm;
@@ -1035,7 +1037,7 @@ impl FunctionBuilder<'_> {
             }
             return Ok(list);
         }
-        let construction = ArgumentListConstruction::new(schema, function);
+        let construction = ArgumentListConstruction::new(self, function);
         for argument in arguments {
             match &argument.expr {
                 ExprIr::SpreadArgument(source) => {

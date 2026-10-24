@@ -30,6 +30,41 @@ fn assert_compact(source: &str) {
 }
 
 #[test]
+fn dense_cache_sites_are_distinct_across_functions_and_table_growth() {
+    let mut source = String::from("var records=[];\n");
+    for index in 0..24 {
+        source.push_str(&format!(
+            "function make{index}(value){{return {{key{index}:value}};}}\nfunction read{index}(record){{return record.key{index};}}\nrecords[{index}]=make{index}({index});\n"
+        ));
+    }
+    source.push_str("gc();\n");
+    for index in (0..24).rev() {
+        source.push_str(&format!(
+            "assert(read{index}(records[{index}])==={index},'site {index}');records[{index}].key{index}={index}+100;\n"
+        ));
+    }
+    source.push_str("gc();\n");
+    for index in 0..24 {
+        source.push_str(&format!(
+            "assert(read{index}(records[{index}])==={index}+100,'updated site {index}');\n"
+        ));
+    }
+    assert_compact(&source);
+}
+
+#[test]
+fn a_late_cache_site_works_while_earlier_literal_and_read_sites_stay_dormant() {
+    let mut source = String::new();
+    for index in 0..130 {
+        source.push_str(&format!(
+            "function dormant{index}(value){{var object={{key{index}:value}};return object.key{index};}}\n"
+        ));
+    }
+    source.push_str("var marker={};assert(dormant129(marker)===marker,'late site');gc();assert(dormant129(7)===7,'warm late site');");
+    assert_compact(&source);
+}
+
+#[test]
 fn compact_literal_values_and_descriptor_snapshots_survive_gc_and_value_only_set() {
     assert_compact(
         r#"
@@ -184,6 +219,38 @@ try {
 } finally {
   delete Number.prototype.cacheReadValue;delete String.prototype.cacheReadValue;
 }
+"#,
+    );
+}
+
+#[test]
+fn dictionary_history_compacts_without_changing_descriptors_or_key_order() {
+    assert_compact(
+        r#"
+var firstSymbol=Symbol('first'),secondSymbol=Symbol('second'),token={mark:7},object=Object.create(null);
+Object.defineProperty(object,'stable',{value:token,writable:false,enumerable:false,configurable:true});
+Object.defineProperty(object,'accessor',{get:function(){gc();return token;},enumerable:true,configurable:true});
+object[firstSymbol]='symbol';object['12']='twelve';object['2']='two';
+var snapshot=Object.getOwnPropertyDescriptor(object,'stable');
+for(var i=0;i<512;i++){object['temporary'+i]=i;delete object['temporary'+i];}
+object.tail='last';object[secondSymbol]='second';gc();
+var keys=Reflect.ownKeys(object);
+assert(keys.length===7 && keys[0]==='2' && keys[1]==='12' && keys[2]==='stable' && keys[3]==='accessor' && keys[4]==='tail' && keys[5]===firstSymbol && keys[6]===secondSymbol,'compaction keeps specified key order');
+assert(object.stable===token && object.accessor===token && snapshot.value===token && snapshot.writable===false,'descriptor identity and snapshot survive rebuild');
+assert(!Reflect.set(object,'stable',5) && Object.getOwnPropertyDescriptor(object,'stable').enumerable===false,'attributes preserved');
+delete object.stable;object.stable='reinserted';delete object[firstSymbol];object[firstSymbol]='reinserted symbol';
+for(var i=0;i<128;i++){Object.defineProperty(object,'temporary',{value:i,configurable:true});delete object.temporary;}
+keys=Reflect.ownKeys(object);
+assert(keys[2]==='accessor' && keys[3]==='tail' && keys[4]==='stable' && keys[5]===secondSymbol && keys[6]===firstSymbol,'delete and reinsert move to end within key class');
+var empty=Object.create(null);
+for(var i=0;i<512;i++){empty.x=i;delete empty.x;}
+assert(Reflect.ownKeys(empty).length===0 && Object.keys(empty).length===0,'empty dictionary after repeated slot churn');
+empty.x=NaN;empty.y=-0;gc();assert(Number.isNaN(empty.x) && Object.is(empty.y,-0),'retired positions are reusable');
+var array=[];array.extra=token;
+for(var i=0;i<128;i++){array.temporary=i;delete array.temporary;}
+assert(array.extra===token && Reflect.ownKeys(array).join(',')==='length,extra','array named dictionary uses the same compaction');
+function mapped(value){for(var i=0;i<128;i++){arguments.temporary=i;delete arguments.temporary;}arguments[0]=9;return value;}
+assert(mapped(3)===9,'mapped Arguments preserve alias after named-table churn');
 "#,
     );
 }

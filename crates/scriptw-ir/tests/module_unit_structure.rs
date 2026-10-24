@@ -38,6 +38,7 @@ fn module_unit_has_one_private_owner_and_narrow_public_facade() {
     assert_eq!(
         code_without_whitespace(methods),
         "pub(super)fnpayload_bytes(&self)->&[u8]{\
+         ifletSome(foreign)=&self.foreign{return&foreign.canonical_bytes;}\
          ifletSome(tag)=self.record.module_source_tag(){returntag.as_bytes();}\
          self.record.bytes_source().unwrap_or_else(||self.source_text.as_bytes())}}"
     );
@@ -55,7 +56,8 @@ fn module_unit_preserves_the_exact_public_field_record() {
         .0;
     assert_eq!(
         code_without_whitespace(fields),
-        "pubrecord:ModuleRecordIr,pubsource_text:String,pubmeta_url:String,\
+        "pub(super)foreign:Option<crate::foreign::ForeignModuleSource>,\
+         pubrecord:ModuleRecordIr,pubsource_text:String,pubmeta_url:String,\
          pubhoist:Option<BlockIr>,pubbody:Option<BlockIr>,pubfunctions:Vec<FunctionIr>,\
          pubowned_env_bindings:Vec<OwnedEnvBindingIr>,\
          pubnamespaces:BTreeMap<ModuleNamespaceModeIr,ModuleNamespaceIr>,\

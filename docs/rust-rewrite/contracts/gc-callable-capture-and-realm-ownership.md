@@ -66,8 +66,12 @@ Async calls return their own actual Promise and route body completion through
 the Promise owner's settlement producer. Remaining Promise/drain/continuation
 source work must finish before those paths can be verified.
 
-ArgumentListEvaluation uses private GC list nodes and flattens once into a
-ValueArray. Compiler-captured Lists never become JavaScript Arrays or enter
+ArgumentListEvaluation uses a geometrically grown private GC ValueArray and
+publishes an exact-length vector. Captured Lists share immutable StoredValue
+snapshots; a partial buffer copies only its initialized prefix. Publication
+consumes the builder; later constructions can share immutable snapshots but do
+not mutate the published vector.
+Compiler-captured Lists never become JavaScript Arrays or enter
 ValueLocals. Environment bindings have a separate ARGUMENT_LIST edge; local
 captures persist through suspension in PRIVATE_ARGUMENT_LISTS. Scope and final
 activation retirement clear those roots, while suspension retains them. Spread

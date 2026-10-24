@@ -24,14 +24,34 @@ fn code_without_whitespace(source: &str) -> String {
         .collect()
 }
 
+fn public_reexports(source: &str, owner: &str) -> Vec<Vec<String>> {
+    let source = code_without_whitespace(source);
+    source
+        .split(&format!("pubuse{owner}::"))
+        .skip(1)
+        .map(|suffix| {
+            let declaration = suffix.split_once(';').expect("complete public re-export").0;
+            let members = declaration
+                .strip_prefix('{')
+                .and_then(|members| members.strip_suffix('}'))
+                .unwrap_or(declaration);
+            let mut members = members
+                .split(',')
+                .filter(|member| !member.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            members.sort();
+            members
+        })
+        .collect()
+}
+
 #[test]
 fn module_key_has_one_private_owner_and_narrow_public_facade() {
     assert_eq!(MODULES_SOURCE.matches("\nmod module_key;\n").count(), 1);
     assert_eq!(
-        MODULES_SOURCE
-            .matches("pub use module_key::{ModuleKey, ModuleRecordKey, ANONYMOUS_MODULE_KEY};")
-            .count(),
-        1
+        public_reexports(MODULES_SOURCE, "module_key"),
+        vec![vec!["ANONYMOUS_MODULE_KEY", "ModuleKey", "ModuleRecordKey"]]
     );
     assert!(!MODULES_SOURCE.contains("\npub mod module_key;\n"));
     assert!(!MODULES_SOURCE.contains("\nmod module_key {\n"));
@@ -126,9 +146,15 @@ fn module_key_callers_keep_the_public_identity_domain_without_compatibility_expo
     assert!(record.contains("pubkey:ModuleKey,"));
     assert!(record.contains("key:ModuleKey,"));
     let loader = code_without_whitespace(ENGINE_LOADER_SOURCE);
-    assert!(loader.contains(
-        "pubusescriptw_ir::{ModuleKey,ModuleKindIr,ModuleRecordKey,ModuleRequestKeyIr};"
-    ));
+    assert_eq!(
+        public_reexports(ENGINE_LOADER_SOURCE, "scriptw_ir"),
+        vec![vec![
+            "ModuleKey",
+            "ModuleKindIr",
+            "ModuleRecordKey",
+            "ModuleRequestKeyIr"
+        ]]
+    );
     assert!(loader.contains("referrer:Option<&ModuleKey>,"));
     assert!(loader.contains("Result<ModuleKey,ModuleLoadError>"));
     assert!(

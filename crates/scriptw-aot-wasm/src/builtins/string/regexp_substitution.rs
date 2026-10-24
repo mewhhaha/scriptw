@@ -16,8 +16,8 @@ pub(super) struct SubstitutionCaptureList(ArgumentListConstruction);
 #[must_use]
 pub(super) struct SubstitutionCaptures(GcLocal<ValueArray>);
 impl SubstitutionCaptureList {
-    pub(super) fn new(s: &RuntimeSchema, f: &mut Function) -> Self {
-        Self(ArgumentListConstruction::new(s, f))
+    pub(super) fn new(b: &FunctionBuilder<'_>, f: &mut Function) -> Self {
+        Self(ArgumentListConstruction::new(b, f))
     }
     pub(super) fn append_string(
         &self,
@@ -186,7 +186,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         total_length.set_constant(0, f);
-        let pieces = SubstitutionPieces::new(s, f);
+        let pieces = SubstitutionPieces::new(self, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);

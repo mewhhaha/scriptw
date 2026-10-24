@@ -167,9 +167,21 @@ impl PreparedSourceCache {
 #[derive(Debug, Default)]
 pub struct LoweringSession {
     pub(crate) prepared_sources: PreparedSourceCache,
+    pure_realm_discovery: RefCell<crate::modules::PureRealmDiscovery>,
 }
 
 impl LoweringSession {
+    /// Close literal prepared sources for a certified mutation-free collection
+    /// of independent Realm targets. Returns false when ordinary whole-graph
+    /// semantic discovery must handle the supplied graph instead. This grants
+    /// no host loading authority; the caller still resolves each discovered
+    /// request under its existing policy and confirms the final graph normally.
+    pub fn discover_pure_realm_sources(&self, sources: &crate::ModuleGraphSources) -> bool {
+        self.pure_realm_discovery
+            .borrow_mut()
+            .discover(sources, &self.prepared_sources)
+    }
+
     /// Literal imports from direct evals proved to retain this compilation's
     /// Script entry. Their sites retain phase and exact attribute eligibility.
     pub fn prepared_script_import_sites(&self) -> Vec<crate::DynamicImportSiteIr> {
@@ -214,18 +226,24 @@ mod tests {
         let count = cache.0.borrow().parsed.len();
         assert_eq!(cache.parse(outside).unwrap_err(), rejected);
         assert_eq!(cache.0.borrow().parsed.len(), count);
-        assert!(cache
-            .parse(PreparedSourceInput::DirectEval(
-                "new.target".encode_utf16().collect(),
-                context(scriptw_front::EvalInvocationContext::Function),
-            ))
-            .is_ok());
-        assert!(cache
-            .parse_function(DynamicFunctionKind::Ordinary, &["yield 1;".into()])
-            .is_err());
-        assert!(cache
-            .parse_function(DynamicFunctionKind::Generator, &["yield 1;".into()])
-            .is_ok());
+        assert!(
+            cache
+                .parse(PreparedSourceInput::DirectEval(
+                    "new.target".encode_utf16().collect(),
+                    context(scriptw_front::EvalInvocationContext::Function),
+                ))
+                .is_ok()
+        );
+        assert!(
+            cache
+                .parse_function(DynamicFunctionKind::Ordinary, &["yield 1;".into()])
+                .is_err()
+        );
+        assert!(
+            cache
+                .parse_function(DynamicFunctionKind::Generator, &["yield 1;".into()])
+                .is_ok()
+        );
     }
 
     #[test]
@@ -438,11 +456,13 @@ const realm = new ShadowRealm();
         let program = session.lower_loaded_graph(&graph, crate::HostSurfacePolicy::default(), None);
         assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
         let linked = program.modules.as_ref().unwrap();
-        assert!(linked
-            .dynamic_components()
-            .iter()
-            .any(|component| component.referrer() == linked.entry
-                && component.request().specifier() == "./target.js"));
+        assert!(
+            linked
+                .dynamic_components()
+                .iter()
+                .any(|component| component.referrer() == linked.entry
+                    && component.request().specifier() == "./target.js")
+        );
         let script = program.script.as_ref().unwrap();
         assert!(script.prepared_scripts.iter().any(|prepared| {
             let crate::PreparedScriptOutcome::Executable(unit) = &prepared.outcome else {
@@ -462,23 +482,25 @@ const realm = new ShadowRealm();
                     )
                 })
         }));
-        assert!(script
-            .executable_script_bodies()
-            .any(|body| body.statements.iter().any(|statement| {
-                let crate::StatementIr::Expression(crate::TypedExpr {
-                    expr: crate::ExprIr::ModuleExecutionGraph(execution),
-                    ..
-                }) = statement
-                else {
-                    return false;
-                };
-                execution
-                    .script_import_dispatcher(0, crate::ImportPhaseIr::Evaluation)
-                    .is_some()
-                    && execution
-                        .script_import_dispatcher(1, crate::ImportPhaseIr::Evaluation)
-                        .is_none()
-            })));
+        assert!(
+            script
+                .executable_script_bodies()
+                .any(|body| body.statements.iter().any(|statement| {
+                    let crate::StatementIr::Expression(crate::TypedExpr {
+                        expr: crate::ExprIr::ModuleExecutionGraph(execution),
+                        ..
+                    }) = statement
+                    else {
+                        return false;
+                    };
+                    execution
+                        .script_import_dispatcher(0, crate::ImportPhaseIr::Evaluation)
+                        .is_some()
+                        && execution
+                            .script_import_dispatcher(1, crate::ImportPhaseIr::Evaluation)
+                            .is_none()
+                }))
+        );
         let retained = session.prepared_sources.0.borrow();
         for (input, old) in parsed {
             let current = &retained

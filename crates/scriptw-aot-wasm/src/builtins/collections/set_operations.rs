@@ -1,3 +1,4 @@
+use super::storage::CollectionCursorLocals;
 use super::*;
 #[must_use]
 struct CompletedSetLikeRecord {
@@ -152,19 +153,17 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         let value = s.reserve_value_local(f);
-        f.instruction(&Instruction::I64Const(0));
-        index.store(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
-        self.emit_collection_next_set(source, index, found, f);
+        self.emit_collection_next_set(source, &cursor, found, f)?;
         found.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
-        self.emit_collection_read_set(source, index, &value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_collection_read_set(source, cursor.index, &value, f);
+        self.emit_increment_local(cursor.index, 1, f);
         self.emit_collection_put_set(target, &value, f)?;
         value.set_undefined(f);
         self.emit_branch_to_target(again, f);
@@ -174,7 +173,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         value.clear(f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         Ok(())
     }
     fn emit_collection_set_receiver_walk(
@@ -188,13 +187,11 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let index = s.reserve_i64_local(f);
+        let cursor = CollectionCursorLocals::reserve(s, f);
         let found = s.reserve_i32_local(f);
         let contained = s.reserve_i32_local(f);
         let value = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
-        f.instruction(&Instruction::I64Const(0));
-        index.store(f);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
         // Difference walks its private initial copy; other has callbacks cannot
@@ -205,12 +202,12 @@ impl FunctionBuilder<'_> {
             | SetReceiverOperation::Disjoint
             | SetReceiverOperation::Subset => source,
         };
-        self.emit_collection_next_set(walked, index, found, f);
+        self.emit_collection_next_set(walked, &cursor, found, f)?;
         found.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, f);
-        self.emit_collection_read_set(walked, index, &value, f);
-        self.emit_increment_local(index, 1, f);
+        self.emit_collection_read_set(walked, cursor.index, &value, f);
+        self.emit_increment_local(cursor.index, 1, f);
         let args = self.emit_pre_evaluated_arg_vector(&[&value], f);
         self.emit_function_or_proxy_call_with_argv(&other.has, &other.object, &args, &pending, f)?;
         args.clear(f);
@@ -255,7 +252,7 @@ impl FunctionBuilder<'_> {
         value.clear(f);
         s.release_i32_local(contained, f);
         s.release_i32_local(found, f);
-        s.release_i64_local(index, f);
+        cursor.release(s, f);
         Ok(())
     }
     fn emit_collection_set_keys_walk(

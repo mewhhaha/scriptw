@@ -26,7 +26,7 @@ impl FunctionBuilder<'_> {
             self.open_frame(ControlFrameKind::If, function);
             super::intl_number::set_i32(matched, 1, function);
             if let Some(source) = source {
-                let list = ArgumentListConstruction::new(schema, function);
+                let list = ArgumentListConstruction::new(self, function);
                 let value = schema.reserve_value_local(function);
                 for name in source.values() {
                     let text = schema.reserve_gc_local(function).initialize(

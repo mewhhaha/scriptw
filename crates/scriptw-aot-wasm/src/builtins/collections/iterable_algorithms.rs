@@ -1,3 +1,4 @@
+use super::storage::CollectionCursorLocals;
 use super::*;
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_map_constructor(&mut self, f: &mut Function) -> Result<(), EmitError> {
@@ -446,16 +447,15 @@ impl FunctionBuilder<'_> {
                     .initialize(self.emit_alloc_plain_object_with_prototype(None, f)?, f);
                 let object_value = s.reserve_value_local(f);
                 object_value.set_reference(&object, s, f);
-                f.instruction(&Instruction::I64Const(0));
-                index.store(f);
+                let cursor = CollectionCursorLocals::reserve(s, f);
                 let complete = self.open_frame(ControlFrameKind::Block, f);
                 let again = self.open_frame(ControlFrameKind::Loop, f);
-                self.emit_collection_next_map(&groups, index, found, f);
+                self.emit_collection_next_map(&groups, &cursor, found, f)?;
                 found.load(f);
                 f.instruction(&Instruction::I32Eqz);
                 self.emit_branch_if_to_target(complete, f);
-                self.emit_collection_read_map(&groups, index, &key, &list_value, f);
-                self.emit_increment_local(index, 1, f);
+                self.emit_collection_read_map(&groups, cursor.index, &key, &list_value, f);
+                self.emit_increment_local(cursor.index, 1, f);
                 let property = self.emit_value_to_property_key_locals(&key, f)?;
                 self.emit_create_data_property_or_throw(
                     &object_value,
@@ -473,6 +473,7 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::End);
                 output.set_normal(&object_value, f);
                 object_value.clear(f);
+                cursor.release(s, f);
                 object.clear(f);
             }
         }

@@ -1,9 +1,9 @@
 {
   "files": [
     {
-      "bytes": 76245,
+      "bytes": 76969,
       "path": "Cargo.lock",
-      "sha256": "ae8634e7e3f98127df51bf1245d40681ae136e5a65c78ed5593d8fa47d6764e0"
+      "sha256": "8e7307f73ef5080eb868c1995d5387b5099a0f7b5b30f695714d9a487e88a026"
     },
     {
       "bytes": 6103,
@@ -11,14 +11,14 @@
       "sha256": "21489eb8f4d29f716f7e198db81686d30dc7ffbd808e839b8ca7419bf1d5bf2f"
     },
     {
-      "bytes": 87544,
+      "bytes": 89062,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "69d7b19a9e5c84cfbbce2f21af2d85f704b0c670fbb996dee092cf731c4fa113"
+      "sha256": "9c26aadfff587abda6e77471fd88b1f6cff7a3bb429a81474e3f579c84ca4fb7"
     },
     {
-      "bytes": 81271,
+      "bytes": 83454,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "b7d6a11c10c601fc153122a829e3ba0b8d8600d7e463351145bf43d84708303a"
+      "sha256": "5fd7b75eeebdc132dedc9402e85845fdb1cac3ba224f83b707bf571a738928b3"
     },
     {
       "bytes": 33833,
@@ -193,7 +193,7 @@
     {
       "bytes": 13040,
       "path": "crates/scriptw-intl/data/list-icu-2/manifest.json",
-      "sha256": "cf1ded288e8bbb15914bf8bd4b0e58fadf97350e637705c6924a8ff39f411d58"
+      "sha256": "56f428d77e6635ddcf9fae445e537b50106fbf7ff3d2c28880be49b3cc319512"
     },
     {
       "bytes": 3359,
@@ -373,7 +373,7 @@
     {
       "bytes": 327,
       "path": "crates/scriptw-intl/src/list_format/identity.rs",
-      "sha256": "2e10fede736064134c7706ce3cff4eba6e9e36d4589060da0d7072c731983e7b"
+      "sha256": "463467f3991fe8212c1cc0f9af854e4d517f73f416d2658c0572e5121e6ef91f"
     },
     {
       "bytes": 5033,
@@ -1048,7 +1048,7 @@
       "version": "1.0.21"
     }
   ],
-  "provider_data_sha256": "057303c203ecc0820cff41e0a3b522578f939e8d49092cb1f3e18f10b7c9792e",
+  "provider_data_sha256": "98ac95c4fe910582054e70c7378a633fcb867f78f8cde46db119d4fa7501d4e8",
   "schema_version": 1,
   "scope": "actual immutable native Duration image, retained selected Number/List owners, global/native/host source, complete primitive codecs and primary CLDR47 authority; native and AOT execution pending",
   "service": "DurationFormat"

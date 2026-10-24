@@ -1,0 +1,1 @@
+print("scriptw-startup-ok");

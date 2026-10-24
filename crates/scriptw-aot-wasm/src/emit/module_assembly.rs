@@ -5,7 +5,7 @@ use crate::runtime_artifact::{EmittedModule, ModuleKind, RuntimeLayout};
 use crate::runtime_helpers::ProgramHook;
 
 use super::*;
-use scriptw_intl::{IntlDataSelection, INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION};
+use scriptw_intl::{INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION, IntlDataSelection};
 use wasm_encoder::{
     ConstExpr, DataSection, ExportKind, ExportSection, GlobalType, ImportSection, MemorySection,
     MemoryType, Module,
@@ -22,9 +22,9 @@ use native_program::NativeProgramFactory;
 pub(crate) use native_program::{
     emit_runtime_direct_eval_module, emit_runtime_global_script_module,
 };
+use program_entries::ProgramExports;
 pub(crate) use program_entries::emit_runtime_function_module;
 pub(super) use program_entries::emit_script_module;
-use program_entries::ProgramExports;
 
 fn emit_script_module_with_factory(
     script: &ScriptIr,
@@ -366,7 +366,7 @@ fn emit_script_module_with_factory(
         _ => {
             return Err(EmitError::unsupported(
                 "native pool proof must retain its exact linked runtime",
-            ))
+            ));
         }
     };
     match kind {
@@ -1336,6 +1336,7 @@ fn emit_script_module_with_factory(
             OrdinaryPropertyStorageEnsure, compile_ordinary_property_storage_ensure_helper;
             OrdinaryOwnDescriptor, compile_ordinary_own_descriptor_helper;
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
+            ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;
         );
         register_runtime_helper!(OrdinaryPropertyFind, compile_ordinary_property_find_helper);
@@ -1343,6 +1344,14 @@ fn emit_script_module_with_factory(
             OrdinaryPropertyAppend,
             compile_ordinary_property_append_helper
         );
+        register_runtime_helper!(
+            OrdinaryPropertyPrepare,
+            compile_ordinary_property_prepare_helper
+        );
+        register_runtime_helper!(CollectionPrepareMap, compile_collection_prepare_map_helper);
+        register_runtime_helper!(CollectionPrepareSet, compile_collection_prepare_set_helper);
+        register_runtime_helper!(CollectionNextMap, compile_collection_next_map_helper);
+        register_runtime_helper!(CollectionNextSet, compile_collection_next_set_helper);
         register_runtime_helper!(
             ObjectHeaderProjection,
             compile_object_header_projection_helper

@@ -46,10 +46,11 @@ normal V8. Neither source generator nor reference harness implements the
 Scriptw compiler/runtime.
 
 Array index and length reads retain the shared runtime's compiled Wasm Get
-dispatch. Layout 18's next source batch adds packed Number backing alongside
-complete dense/sparse descriptors and moves ordinary static-string cache guards
-into optimized R. Its compact ordinary storage and metadata-only site caches
-require their own native and paired performance checkpoints. The corpus and
+dispatch. Layout 18 introduced packed Number backing alongside complete
+dense/sparse descriptors and ordinary static-string cache guards in R.
+Layout 19 replaces linked site metadata with indexed paged tables. The
+[efficiency checkpoint](../compiler-efficiency-20261024.md) separates its native
+verification from the historical layout-18 timings. The corpus and
 scoreboard do not imply an array or cache speedup; native-policy defaults remain
 unchanged. See [compact ordinary storage](compact-ordinary-data-storage.md).
 

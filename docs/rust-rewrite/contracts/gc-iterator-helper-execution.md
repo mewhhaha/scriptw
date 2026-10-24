@@ -24,7 +24,7 @@ Concat caches opening methods without opening iterators until requested.
 Private entry array builders have no reference getter; publication consumes
 their write capability. Zip acquisition, padding and all three modes use
 the same cached whole protocol and explicit reverse close order; keyed
-results retain validated property keys. The actual linked Argument List
+results retain validated property keys. Geometric Argument List buffer
 construction owns terminal ToArray publication.
 
 Algorithms follow the [ECMA-262 iterator operations](https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-iterator-objects).

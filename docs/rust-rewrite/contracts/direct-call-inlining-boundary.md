@@ -1,7 +1,7 @@
 # Bounded native inlining and ordinary call costs
 
-Ordinary JS calls retain a real callable, receiver and immutable argument List.
-The current fixed-arity path uses one reusable evaluation value, roots each
+General JS calls retain a real callable, receiver and immutable argument List.
+The boxed fixed-arity path uses one reusable evaluation value, roots each
 argument snapshot before evaluating the next argument, then constructs one
 ValueArray. Zero arguments use the canonical empty vector. Spread/captured
 Lists retain their ordered iterator and completion protocol. The new encoded
@@ -10,7 +10,7 @@ final List construction by one; they do not require future implementations to
 keep unnecessary allocations.
 
 Static `FunctionTargetKnowledge` does not grant authority to replace a current
-callee. The source path still reads the real binding/property and receiver,
+callee. The general source path still reads the real binding/property and receiver,
 evaluates arguments, and dispatches through R's ProxyCall/FunctionCall kernels
 to the concrete typed entry. The emitted FunctionCall kernel retains
 call_ref/return_call_ref. A native inlining option cannot be assumed to remove
@@ -23,7 +23,17 @@ actual function identity, legacy caller/arguments publication and restoration,
 defining Realm, parameter/default/mapped state, captured environments and the
 normal/abrupt return protocol. The synchronous leaf proof only omits an
 unobservable arguments object and mapping-only storage; it keeps those call
-activation operations. It cannot authorize a JS body inliner.
+activation operations. That proof alone cannot authorize a JS body inliner.
+
+A separate NumericLeafPlan admits only noncapturing ordinary functions with
+1–4 unique simple parameters and a single return tree of at most 16 nodes:
+parameter reads, Number constants, unary plus/minus and addition, subtraction,
+multiplication or division. Exact arity, actual JavaScript code identity,
+defining ProgramInstance identity, runtime Number tags and source-depth admission
+guard the substitution. Arguments evaluate once into roots before admission;
+fallback dispatch consumes those same values. The admitted expression allocates
+neither StoredValue argument boxes nor argv and has no calls, coercion effects,
+captures or activation/Realm observers. Other calls retain the ordinary ABI.
 
 Pinned Wasmtime47 provides a separate native compiler inlining switch.
 `Config::compiler_inlining` and the pinned tunable defaults select `No` unless
@@ -61,6 +71,8 @@ recorded failure and does not increase the budget.
 
 The parent-owned arity/break-even workload compares compile latency, native
 size and correctly scoped execution under a separately labelled whole-Engine
-cohort. No native or JS inlining speedup is assumed. A source-body inliner stays
-gated on measured residual call cost and a separately designed consumed
-activation contract; it is not added merely because target knowledge is exact.
+cohort. No native or JS inlining speedup is assumed. General source-body inlining
+beyond the bounded numeric plan stays gated on measured residual call cost and
+a separately designed consumed activation contract; target knowledge alone is
+insufficient. See the [efficiency checkpoint](../compiler-efficiency-20261024.md)
+for the numeric plan's verification and limits.

@@ -17,6 +17,10 @@ Portable bundles. See the [foreign-module contract and runnable example](docs/ru
 
 [Methodology, evidence and reproduction](docs/rust-rewrite/v8-baseline.md).
 
+The [compiler efficiency batch](docs/rust-rewrite/compiler-efficiency-20261024.md)
+tracks subsequent compiler/runtime changes and their verification separately
+from the measured compiler shown in the graphic.
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /

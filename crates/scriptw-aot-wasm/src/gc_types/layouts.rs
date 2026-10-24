@@ -860,21 +860,21 @@ gc_layout_registry! {
         }
         // Shape graphs retain only immutable primitive string metadata.
         struct CompactDataShape => CompactDataShapeSchema {
-            SITE: I64Value, Immutable, NonNullable;
             KEYS: GcRef<CompactShapeKeys>, Immutable, NonNullable;
-            NEXT: GcRef<CompactDataShape>, Immutable, Nullable;
         }
+        array CompactShapeTable => CompactShapeTableSchema { ELEMENT: GcRef<CompactDataShape>, Mutable, Nullable; }
+        array CompactShapePageTable => CompactShapePageTableSchema { ELEMENT: GcRef<CompactShapeTable>, Mutable, Nullable; }
         array CompactShapeKeys => CompactShapeKeysSchema { ELEMENT: GcRef<StringValue>, Immutable, NonNullable; }
         array CompactTagArray => CompactTagArraySchema { ELEMENT: I8Value, Mutable, NonNullable; }
         array CompactScalarArray => CompactScalarArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         array CompactReferenceArray => CompactReferenceArraySchema { ELEMENT: AnyGcRef, Mutable, Nullable; }
         struct OwnDataReadCache => OwnDataReadCacheSchema {
-            SITE: I64Value, Immutable, NonNullable;
             KEY: GcRef<StringValue>, Immutable, NonNullable;
             SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
             SLOT: I32Value, Mutable, NonNullable;
-            NEXT: GcRef<OwnDataReadCache>, Immutable, Nullable;
         }
+        array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }
+        array OwnDataReadCachePageTable => OwnDataReadCachePageTableSchema { ELEMENT: GcRef<OwnDataReadCacheTable>, Mutable, Nullable; }
         struct OrdinaryPropertyStorage: ObjectPropertyStorage => OrdinaryPropertyStorageSchema {
             ENTRIES: GcRef<PropertyTable>, Mutable, NonNullable;
             LENGTH: I32Value, Mutable, NonNullable;
@@ -986,8 +986,8 @@ gc_layout_registry! {
             METADATA: GcRef<ImmutableByteArray>, Immutable, NonNullable;
             LANGUAGE_FEATURE_POLICY: scriptw_ir::LanguageFeaturePolicy, Immutable, NonNullable;
             NATIVE_SOURCE_PAYLOAD: GcRef<NativeSourcePayloadArray>, Immutable, NonNullable;
-            COMPACT_SHAPES: GcRef<CompactDataShape>, Mutable, Nullable;
-            OWN_DATA_READ_CACHES: GcRef<OwnDataReadCache>, Mutable, Nullable;
+            COMPACT_SHAPES: GcRef<CompactShapePageTable>, Mutable, Nullable;
+            OWN_DATA_READ_CACHES: GcRef<OwnDataReadCachePageTable>, Mutable, Nullable;
         }
         // Completed captures are immutable. The actual function/context cycle
         // is closed only after function allocation, so its back edge is mutable.
@@ -1390,6 +1390,9 @@ gc_layout_registry! {
             LIVE_COUNT: I64Value, Mutable, NonNullable;
             HISTORY_LENGTH: I64Value, Mutable, NonNullable;
             HASH_INDEX: GcRef<CollectionHashTable>, Mutable, NonNullable;
+            ORDINALS: GcRef<NumberBitsI64Array>, Mutable, NonNullable;
+            NEXT_ORDINAL: I64Value, Mutable, NonNullable;
+            VERSION: I64Value, Mutable, NonNullable;
         }
         // Native resources contain collector slot IDs, never strong JS keys.
         struct WeakMapObject => WeakMapObjectSchema {
@@ -1430,6 +1433,9 @@ gc_layout_registry! {
             LIVE_COUNT: I64Value, Mutable, NonNullable;
             HISTORY_LENGTH: I64Value, Mutable, NonNullable;
             HASH_INDEX: GcRef<CollectionHashTable>, Mutable, NonNullable;
+            ORDINALS: GcRef<NumberBitsI64Array>, Mutable, NonNullable;
+            NEXT_ORDINAL: I64Value, Mutable, NonNullable;
+            VERSION: I64Value, Mutable, NonNullable;
         }
         struct SetEntry => SetEntrySchema {
             VALUE: GcRef<StoredValue>, Immutable, NonNullable;
@@ -1747,6 +1753,8 @@ gc_layout_registry! {
             NEXT_INDEX: I64Value, Mutable, NonNullable;
             DONE: bool, Mutable, NonNullable;
             KIND: MapIterationKind, Immutable, NonNullable;
+            NEXT_ORDINAL: I64Value, Mutable, NonNullable;
+            VERSION: I64Value, Mutable, NonNullable;
         }
         struct SetIteratorObject => SetIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
@@ -1754,6 +1762,8 @@ gc_layout_registry! {
             NEXT_INDEX: I64Value, Mutable, NonNullable;
             DONE: bool, Mutable, NonNullable;
             KIND: SetIterationKind, Immutable, NonNullable;
+            NEXT_ORDINAL: I64Value, Mutable, NonNullable;
+            VERSION: I64Value, Mutable, NonNullable;
         }
         struct TypedArrayIteratorObject => TypedArrayIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;

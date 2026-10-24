@@ -339,7 +339,7 @@ impl FunctionBuilder<'_> {
         let index = schema.reserve_i64_local(function);
         reader.read_u64(count, schema, function);
         reader.require_records(count, 8, function);
-        let list = ArgumentListConstruction::new(schema, function);
+        let list = ArgumentListConstruction::new(self, function);
         function.instruction(&Instruction::I64Const(0));
         index.store(function);
         let done = self.open_frame(ControlFrameKind::Block, function);

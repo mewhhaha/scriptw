@@ -1,0 +1,49 @@
+{
+  "schema": "scriptw-v8-workloads-v1",
+  "startup": {
+    "file": "startup.js",
+    "stdout": "scriptw-startup-ok\n"
+  },
+  "execution": [
+    {
+      "file": "map-clear-10000.js",
+      "stdout": "10000\n",
+      "work": "10000 Map insert/clear cycles; at most one live entry, whole invocation including checks"
+    },
+    {
+      "file": "set-clear-10000.js",
+      "stdout": "10000\n",
+      "work": "10000 Set insert/clear cycles; at most one live entry, whole invocation including checks"
+    },
+    {
+      "file": "map-clear-20000.js",
+      "stdout": "20000\n",
+      "work": "20000 Map insert/clear cycles; at most one live entry, whole invocation including checks"
+    },
+    {
+      "file": "set-clear-20000.js",
+      "stdout": "20000\n",
+      "work": "20000 Set insert/clear cycles; at most one live entry, whole invocation including checks"
+    },
+    {
+      "file": "property-churn-2048.js",
+      "stdout": "2096128\n",
+      "work": "2048 dictionary insert/delete/enumerate cycles; whole invocation including checks"
+    },
+    {
+      "file": "property-churn-4096.js",
+      "stdout": "8386560\n",
+      "work": "4096 dictionary insert/delete/enumerate cycles; whole invocation including checks"
+    },
+    {
+      "file": "fixed-call-16384.js",
+      "stdout": "134225920\n",
+      "work": "16384 two-Number pure leaf calls; whole invocation including loop/checksum"
+    },
+    {
+      "file": "fixed-call-32768.js",
+      "stdout": "536887296\n",
+      "work": "32768 two-Number pure leaf calls; whole invocation including loop/checksum"
+    }
+  ]
+}
