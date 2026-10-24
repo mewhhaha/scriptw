@@ -39,6 +39,13 @@ payload after the same lexical initialization check used by ordinary reads.
 Operand evaluation remains ordered and floating-point operations are not
 reassociated.
 
+Ordinary source relations retain general comparison IR, so the predicate
+consumer handles that real path as well as explicit Number comparison IR.
+Only a certificate for an actual emitted Number result can bypass the shared
+runtime comparison. Singleton hints on local/property/environment reads or
+calls do not supply that certificate; those comparisons retain runtime tag
+handling and ordered primitive conversion.
+
 Checked lexical/captured initialization, initialized hoisted vars and private
 temporaries are distinct states. Only constructors that publish an initial
 value omit the initialization flag. A captured implicit-arguments snapshot

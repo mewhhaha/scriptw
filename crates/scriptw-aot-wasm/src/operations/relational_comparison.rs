@@ -3,6 +3,42 @@ use crate::runtime_helpers::{
     HelperParameters, RelationalComparisonArguments, RelationalComparisonParameters,
 };
 
+/// A result emitted as Number, rather than a mutable read/call whose inferred
+/// kind merely suggests Number. Arithmetic arms match the actual Number
+/// producers in the ordinary emitter; conversion operations retain their
+/// complete evaluation and abrupt behavior before the payload is consumed.
+fn emits_number_result(expression: &TypedExpr, depth: u8) -> bool {
+    let Some(depth) = depth.checked_sub(1) else {
+        return false;
+    };
+    match &expression.expr {
+        ExprIr::Number(_) => true,
+        ExprIr::SpecOperation {
+            operation:
+                SpecOperationIr::ToNumber
+                | SpecOperationIr::ToIntegerOrInfinity
+                | SpecOperationIr::ToLength
+                | SpecOperationIr::ToIndex,
+            ..
+        } => true,
+        ExprIr::BinaryNumber { .. } => expression.kind == ValueKind::Number,
+        ExprIr::CoerciveAdd { lhs, rhs }
+        | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
+        | ExprIr::BitwiseNumeric { lhs, rhs, .. } => {
+            lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number
+        }
+        ExprIr::UnaryMinusNumeric { expr } | ExprIr::UnaryBitwiseNumeric { expr, .. } => {
+            expr.kind == ValueKind::Number
+        }
+        ExprIr::UnaryPlus { expr } => {
+            expr.kind != ValueKind::Number || emits_number_result(expr, depth)
+        }
+        // In particular, singleton hints on identifiers, property reads,
+        // environment reads or calls cannot bypass their runtime tags.
+        _ => false,
+    }
+}
+
 impl FunctionBuilder<'_> {
     /// GetValue remains left-to-right in P. R owns both observable primitive
     /// conversions and the complete String/BigInt/Number comparison once.
@@ -13,6 +49,9 @@ impl FunctionBuilder<'_> {
         rhs: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if emits_number_result(lhs, 64) && emits_number_result(rhs, 64) {
+            return self.compile_number_comparison_i32(op, lhs, rhs, function);
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);

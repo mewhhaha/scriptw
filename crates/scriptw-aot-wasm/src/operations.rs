@@ -355,6 +355,12 @@ impl<'a> FunctionBuilder<'a> {
         if let ExprIr::CompareNumber { op, lhs, rhs } = &expr.expr {
             return self.compile_number_comparison_i32(*op, lhs, rhs, function);
         }
+        if let ExprIr::CompareValue { op, lhs, rhs } = &expr.expr {
+            // Ordinary source relations retain the general comparison IR,
+            // even for primitive operands. Its existing consumer already
+            // returns a canonical i32; no Boolean value is needed here.
+            return self.compile_compare_value_i32(*op, lhs, rhs, function);
+        }
         let input = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(expr, &input, function)?;
         if expr.kind == ValueKind::Boolean {

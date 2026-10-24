@@ -139,3 +139,38 @@ new Derived() instanceof Derived;
 "#,
     );
 }
+
+#[test]
+fn scalar_comparison_retains_live_property_and_call_result_tags() {
+    assert_scalar_execution(
+        r#"
+var order='';
+const marker={};
+const primitive={valueOf(){order+='v';return 2;}};
+const holder={value:1};
+Object.defineProperty(holder,'value',{get(){order+='g';return primitive;}});
+function right(){order+='R';return 3;}
+var selected=false;
+if(holder.value<right()) selected=true;
+var direct=selected && order==='gRv';
+order='';
+const alias=holder.value;
+var aliased=false;
+if(alias<right()) aliased=true;
+var retained=aliased && order==='gRv';
+order='';
+const callable={read(){return 1;}};
+function invoke(){order+='c';return callable.read();}
+callable.read=()=>primitive;
+var called=false;
+if(invoke()<right()) called=true;
+var returned=called && order==='cRv';
+order='';
+const abrupt={valueOf(){order+='a';throw marker;}};
+Object.defineProperty(holder,'value',{get(){order+='g';return abrupt;}});
+var exact=false;
+try { if(holder.value<right()) throw 'unreachable'; } catch(error) { exact=error===marker; }
+direct && retained && returned && exact && order==='gRa';
+"#,
+    );
+}
