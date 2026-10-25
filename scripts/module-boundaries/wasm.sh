@@ -381,15 +381,15 @@ wasm_runtime_string_roots="crates/scriptw-aot-wasm/src/emit/body_entry/literal_r
 require_file "$wasm_runtime_string_roots"
 require_exact_line_count "$wasm_literal_roots" 'mod runtime_strings;' 1 'private R string algorithm owner'
 require_fixed_string_count "$wasm_literal_roots" 'fn initialize_runtime_literal_roots(' 1 'literal-root runtime algorithm owner'
-for literal_root_entry in emit_pooled_string_slot compile_pooled_strings_initialize_helper; do
+for literal_root_entry in compile_pooled_strings_initialize_helper; do
   require_fixed_string_count "$wasm_runtime_string_roots" "fn ${literal_root_entry}(" 1 'literal-root R string algorithm owner'
 done
-for literal_root_entry in initialize_runtime_literal_roots emit_pooled_string_slot compile_pooled_strings_initialize_helper; do
+for literal_root_entry in initialize_runtime_literal_roots compile_pooled_strings_initialize_helper; do
   require_fixed_string_count "$wasm_body_entry" "fn ${literal_root_entry}(" 0 'no parent literal-root algorithm copy'
   require_tree_regex_count crates/scriptw-aot-wasm/src "^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?fn[[:space:]]+${literal_root_entry}[[:space:]]*[(]" 1 'sole canonical literal-root algorithm owner'
 done
 require_tree_regex_count crates/scriptw-aot-wasm/src 'fn[[:space:]]+initialize_gc_literal_roots[[:space:]]*[(]' 0 'no retired combined R/P literal-root entry'
-require_regex_count "$wasm_runtime_string_roots" '^[[:space:]]+fn emit_pooled_string_slot[(]' 1 'private runtime pooled-string slot implementation'
+require_tree_regex_count crates/scriptw-aot-wasm/src 'fn[[:space:]]+emit_pooled_string_slot[[:space:]]*[(]' 0 'no unrolled per-string runtime initialization owner'
 require_fixed_string_count "$wasm_runtime_string_roots" 'pub(crate) fn compile_pooled_strings_initialize_helper(' 1 'registered runtime helper implementation visibility'
 for literal_root_entry in produce_program_literal_roots emit_pooled_string_reference; do
   require_fixed_string_count "$wasm_literal_roots" "fn ${literal_root_entry}" 1 'actual literal-root algorithm owner'
@@ -452,7 +452,7 @@ check_raw_line_budget "$wasm_module_assembly" 1950
 wasm_module_metadata="crates/scriptw-aot-wasm/src/emit/module_assembly/metadata.rs"
 require_file "$wasm_module_metadata"
 require_exact_line_count "$wasm_module_assembly" 'mod metadata;' 1 'private completed-function metadata owner'
-for metadata_entry in append_function_attribution append_function_name_and_check_budget; do
+for metadata_entry in append_function_attribution append_function_name_and_check_budget append_memory_attribution append_module_declarations; do
   require_fixed_string_count "$wasm_module_metadata" "pub(super) fn ${metadata_entry}(" 1 'private completed-function metadata entry'
   require_fixed_string_count "$wasm_module_assembly" "metadata::${metadata_entry}(" 1 'assembly consumes each metadata phase once'
   require_fixed_string_count "$wasm_module_assembly" "fn ${metadata_entry}(" 0 'no parent metadata implementation copy'
@@ -538,17 +538,18 @@ require_fixed_string_count "$engine_embedded_images" 'use scriptw_runtime_image 
 require_fixed_string_count "$engine_embedded_runtime" 'Images::package_for_profile(source_compilation_profile)' 1 'raw candidate uses its exact source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'self.images.profile == runtime.source_compilation_profile()' 1 'native candidate rejects a foreign source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'include_bytes!' 0 'image bytes do not enter Engine initializers'
-require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 6 'six non-inline image accessors'
+require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 7 'seven non-inline image and Intl metadata accessors'
 require_fixed_string_count "$runtime_image_source" 'include_bytes!' 0 'no large Rust initializer in leaf metadata'
 require_fixed_string_count "$runtime_image_build" 'objects::embed(&out, &target);' 1 'checked images become immutable linked data'
 require_fixed_string_count "$runtime_image_objects" '"--emit=obj"' 1 'data compilation emits no Rust metadata'
 require_fixed_string_count "$runtime_image_objects" '"-Cembed-bitcode=no"' 1 'data-only object contains no duplicate bitcode image'
 require_fixed_string_count "$runtime_image_objects" '.compile("scriptw_runtime_images")' 1 'target archiver owns the complete linked image'
 for image_part in package native manifest; do
-  require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one data definition per NativeHost image'
   if [ "$image_part" = native ]; then
+    require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-native.packed' 1 'one compressed NativeHost native storage definition'
     require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-portable-native.packed' 1 'one compressed Portable native storage definition'
   else
+    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest definition'
     require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest'
   fi
 done
@@ -585,9 +586,9 @@ require_fixed_string_count crates/scriptw-engine/src/lib.rs 'cache::NativeFuncti
 engine_embedded_load="crates/scriptw-engine/src/embedded_runtime/load.rs"
 require_file "$engine_embedded_load"
 require_module_decl "$engine_embedded_runtime" load
-require_fixed_string_count "$engine_embedded_load" 'Module::deserialize(engine, bytes)' 1 'native load uses its admitted private Cargo-byte lease'
-require_fixed_string_count "$engine_embedded_load" 'if !self.accepts_portable_native(&image)' 1 'Portable decoded bytes match the independent native manifest'
-require_fixed_string_count "$engine_embedded_load" 'drop(lease);' 1 'copied mapping releases the transient decoded-byte owner'
+require_fixed_string_count "$engine_embedded_load" 'Module::deserialize(engine, bytes)' 2 'both file-unavailable fallbacks use the admitted private Cargo-byte lease'
+require_fixed_string_count "$engine_embedded_load" 'if !self.accepts_native(&lease)' 1 'both decoded profiles match their independent native manifest'
+require_fixed_string_count "$engine_embedded_load" 'drop(lease);' 1 'native mapping releases the transient decoded-byte owner'
 check_raw_line_budget "$engine_embedded_load" 120
 require_fixed_string_count "$engine_embedded_runtime" 'OnceLock<Option<EmbeddedNativeRuntime>>' 2 'independent lazy admission per source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'OnceLock<Module>' 0 'no hidden retained native module'
@@ -595,18 +596,22 @@ wasm_build_envelope="crates/scriptw-aot-wasm/src/runtime_artifact/build_package/
 require_file "$wasm_build_envelope"
 require_module_decl "$wasm_build_package" envelope
 check_raw_line_budget "$wasm_build_envelope" 110
-require_fixed_string_count "$wasm_build_envelope" 'cache::decode_payload(payload, identity, version, jobs, body_validation)?' 1 'canonical complete raw layout admission consumes checked version and explicit validation mode'
+require_fixed_string_count "$wasm_build_envelope" 'cache::admit_payload(payload, identity, version, jobs, body_validation)?' 1 'canonical complete raw layout admission consumes checked version and explicit validation mode'
 require_fixed_string_count "$wasm_build_envelope" 'CurrentRuntimeLayoutVersion::admit(u32::from_le_bytes(cache::take(&mut payload)?))?' 1 'build envelope admits actual current layout before raw payload'
 require_fixed_string_count "$wasm_build_envelope" 'actual_digest.as_slice() != digest' 1 'raw build envelope retains complete checksum admission'
-require_fixed_string_count "$wasm_build_envelope" 'runtime.key().as_bytes() == &expected_runtime' 1 'raw build envelope retains exact runtime key admission'
-require_fixed_string_count crates/scriptw-engine/src/wasm_runtime_link.rs 'wasm_module_for_execution_with_factory(source, policy, mode, || {' 1 'typed embedded R uses the shared bounded retention owner'
+require_fixed_string_count "$wasm_build_envelope" 'runtime.key().as_bytes() == &expected_runtime' 2 'both raw build storage owners retain exact runtime key admission'
+require_fixed_string_count crates/scriptw-engine/src/wasm_runtime_link.rs 'wasm_module_for_execution_with_factory(' 1 'typed embedded R uses the shared bounded retention owner'
+linked_runtime_code="$(tr -d '[:space:]' < crates/scriptw-engine/src/wasm_runtime_link.rs)"
+if [[ "$linked_runtime_code" != *'wasm_module_for_execution_with_factory(engine,source,policy,mode,||matchsource.runtime_image_policy()'* ]]; then
+  fail 'typed embedded R must use its actual Engine, source, policy and mode in the shared retention factory'
+fi
 check_raw_line_budget "$engine_native_config" 100
 check_raw_line_budget "$engine_embedded_runtime" 190
 check_raw_line_budget "$engine_embedded_images" 45
-check_raw_line_budget "$engine_embedded_build" 155
+check_raw_line_budget "$engine_embedded_build" 165
 require_file "$engine_embedded_publication"
 require_fixed_string_count "$engine_embedded_build" 'publication::publish(out,' 2 'publish unsupported-target and complete native bundles through one owner'
-require_fixed_string_count "$engine_embedded_publication" 'std::fs::write(out.join(format!("{prefix}-{suffix}.bin")), bytes)'  1 'one complete bundle writer'
+require_fixed_string_count "$engine_embedded_publication" 'output::write(&out.join(format!("{prefix}-{suffix}.bin")), bytes)'  1 'one atomic complete bundle writer'
 check_raw_line_budget "$engine_embedded_publication" 40
 check_raw_line_budget "$engine_embedded_compile" 100
 check_raw_line_budget "$engine_native_stencils" 120
@@ -616,12 +621,18 @@ require_module_decl "$runtime_image_source" native_lease
 require_module_decl "$runtime_image_source" lease_tests
 require_file crates/scriptw-runtime-image/src/native_lease.rs
 require_file crates/scriptw-runtime-image/src/lease_tests.rs
-require_fixed_string_count crates/scriptw-runtime-image/src/native_lease.rs 'Mutex<Result<Weak<NativeRuntimeBytes>, ()>>' 1 'weak cache retains no strong decoded bytes'
-check_raw_line_budget crates/scriptw-runtime-image/src/native_lease.rs 50
+require_fixed_string_count crates/scriptw-runtime-image/src/native_lease.rs 'Mutex<Result<Weak<NativeRuntimeBytes>, ()>>' 2 'each fixed profile has a weak cache with no strong decoded bytes'
+check_raw_line_budget crates/scriptw-runtime-image/src/native_lease.rs 70
 check_raw_line_budget crates/scriptw-runtime-image/src/lease_tests.rs 70
 check_raw_line_budget "$runtime_image_source" 90
 check_raw_line_budget "$runtime_image_objects" 120
 check_raw_line_budget "$wasm_build_package" 230
+require_module_decl "$wasm_build_package" inputs
+require_file crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs.rs
+check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs.rs 230
+require_module_decl "$wasm_build_envelope" intl
+require_file crates/scriptw-aot-wasm/src/runtime_artifact/build_package/envelope/intl.rs
+check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/envelope/intl.rs 80
 # The cache damage controls deliberately construct foreign Wasm layouts. The
 # file-level gate makes those constructors unavailable to production Rust,
 # even if a future parent accidentally drops its own test-only module gate.

@@ -29,6 +29,7 @@ impl StringPool {
     }
 
     /// R's complete stable prefix. A P literal cannot extend the shared table.
+    #[cfg(test)]
     pub(crate) fn runtime_pooled_string_initializers(
         &self,
     ) -> impl Iterator<Item = (PooledStringIndex, &PooledCodeUnits)> {

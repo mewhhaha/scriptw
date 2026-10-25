@@ -94,7 +94,7 @@ impl SystemZoneProbe {
                 monotonic_clock_origin: realm.host_clock().monotonic_instant(),
                 realm,
                 output_events: WasmOutputEvents::DelegateOnly,
-                intl_kernel: shared_embedded_intl_kernel().unwrap(),
+                intl_kernel: shared_embedded_intl_kernel().unwrap().into(),
                 can_block: true,
                 shared_memory_backing: None,
                 async_waiters: WasmStoreAsyncWaiters::new(None),

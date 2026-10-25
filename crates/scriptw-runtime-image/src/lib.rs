@@ -16,6 +16,15 @@ include!(concat!(env!("OUT_DIR"), "/image_bindings.rs"));
 // symbol and exact type as its generated declaration. The linked archive owns
 // its storage for the process lifetime. No initializer enters crate metadata.
 #[inline(never)]
+pub fn intl_metadata() -> &'static [u8] {
+    #[cfg(scriptw_runtime_image)]
+    // SAFETY: same target-defined immutable array contract as package().
+    return unsafe { &SCRIPTW_RUNTIME_INTL_METADATA };
+    #[cfg(not(scriptw_runtime_image))]
+    &[]
+}
+
+#[inline(never)]
 pub fn package() -> &'static [u8] {
     #[cfg(scriptw_runtime_image)]
     // SAFETY: Cargo's checked producer and target compiler define this exact
@@ -26,12 +35,11 @@ pub fn package() -> &'static [u8] {
 }
 
 #[inline(never)]
-pub fn native() -> &'static [u8] {
+pub fn native() -> Option<std::sync::Arc<NativeRuntimeBytes>> {
     #[cfg(scriptw_runtime_image)]
-    // SAFETY: same target-defined immutable array contract as package().
-    return unsafe { &SCRIPTW_RUNTIME_NATIVE };
+    return native_lease::acquire(native_lease::Image::NativeHost);
     #[cfg(not(scriptw_runtime_image))]
-    &[]
+    None
 }
 
 #[inline(never)]
@@ -56,7 +64,7 @@ pub fn portable_package() -> &'static [u8] {
 #[inline(never)]
 pub fn portable_native() -> Option<std::sync::Arc<NativeRuntimeBytes>> {
     #[cfg(scriptw_runtime_image)]
-    return native_lease::acquire();
+    return native_lease::acquire(native_lease::Image::Portable);
     #[cfg(not(scriptw_runtime_image))]
     None
 }

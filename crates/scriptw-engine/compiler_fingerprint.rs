@@ -34,6 +34,7 @@ pub(crate) const COMPILER_INPUTS: &[&str] = &[
     "crates/scriptw-runtime",
     "crates/scriptw-runtime-image", // Cargo producer and immutable image accessors.
     "crates/scriptw-intl",
+    "crates/scriptw-intl-build-data", // Opaque immutable Cargo Intl trust token.
     "crates/scriptw-engine/Cargo.toml",
     "crates/scriptw-engine/src",
     "crates/scriptw-engine/build.rs",

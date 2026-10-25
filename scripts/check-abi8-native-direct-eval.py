@@ -161,7 +161,7 @@ def check(sources):
             'returnOk(());' in external and '=>None' not in external,
             'execution-only external import preserves operand effects/abrupts before capability rejection')
     for name in ('runtime_artifact/cache/tests.rs', 'runtime_artifact/build_package/tests.rs'):
-        for version in (4,6,7,8):
+        for version in (15,6,7,8):
             require(a(name).count('letprevious_version='+str(version)+'u32;') == 1,
                     'authenticated old-ABI envelope rejection '+name+':'+str(version))
     tests = a('runtime_direct_eval/tests.rs')

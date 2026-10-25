@@ -1,7 +1,7 @@
 use scriptw_ir::{
-    AsyncDisposableScopeExecutionIr, AwaitSequenceError, DerivedConstructorActivationIr,
-    FunctionExecutionKind, HostBuiltinId, ProgramIr, ScriptIr, StandardBuiltinId,
-    SyncDisposableScopeExecutionIr, ValueKind, direct_await_sequence_resume_state,
+    direct_await_sequence_resume_state, AsyncDisposableScopeExecutionIr, AwaitSequenceError,
+    DerivedConstructorActivationIr, FunctionExecutionKind, HostBuiltinId, ProgramIr, ScriptIr,
+    StandardBuiltinId, SyncDisposableScopeExecutionIr, ValueKind,
 };
 // `CodeSection` is deliberately absent from this list. Every code-section entry
 // now goes through `ModuleCode::push(EmittedFunction)`, which cannot be called
@@ -579,7 +579,7 @@ fn emit_with_observation_mode(
             "compiler invariant violated: Module entry and trusted evaluation-completion operation must have the same owner",
         ));
     }
-    let intl_selection = scriptw_intl::IntlDataSelection::new(intl_profile.clone());
+    let intl_selection = inputs.intl_selection(intl_profile)?;
     emit_script(
         script,
         promise_rejection_policy,

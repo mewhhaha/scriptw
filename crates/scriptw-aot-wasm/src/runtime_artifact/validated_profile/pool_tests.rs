@@ -15,6 +15,7 @@ fn cold_and_warm_runtime_identity_ignore_the_owned_pool_memo_state() {
         ),
         actual.layout_admission.unwrap(),
         actual.source_compilation_profile(),
+        Arc::clone(actual.intl_compilation_data().unwrap()),
     ));
     assert!(cold.compiler_owned_pool.get().is_none());
     assert_eq!(actual.as_ref(), cold.as_ref());

@@ -13,6 +13,7 @@ mod images;
 mod load;
 mod manifest;
 mod matched_capacity;
+mod native_backing;
 use crate::wasmtime_config::{WasmNativeCompilationMode, CONFIGURATION_SCHEMA};
 pub(super) use matched_capacity::load as load_capacity_matched_native;
 use scriptw_aot_wasm::{
@@ -56,13 +57,20 @@ pub(super) fn inputs(
         // build-bound. No external slice, path or cache reaches this boundary.
         // AOT still checks source/profile/Intl identity, checksums, sections,
         // data and the reconstructed layout before using the candidate.
-        unsafe { inputs.with_immutable_build_package(package, expected_source()) }
+        unsafe {
+            inputs.with_immutable_minimal_build(
+                package,
+                expected_source(),
+                scriptw_runtime_image::intl_metadata(),
+            )
+        }
     }
 }
 
 struct EmbeddedNativeRuntime {
     manifest: manifest::Manifest,
     images: Images,
+    native_backing: OnceLock<Option<native_backing::NativeBacking>>,
 }
 
 impl EmbeddedNativeRuntime {
@@ -79,20 +87,9 @@ impl EmbeddedNativeRuntime {
             return None;
         }
         let started = std::env::var_os("SCRIPTW_WASM_TRACE").map(|_| std::time::Instant::now());
-        let package_digest = match images.profile {
-            RuntimeSourceCompilationProfile::NativeHost => {
-                let (package, native) = digests::images(
-                    images.package,
-                    scriptw_runtime_image::native(),
-                    crate::configured_compilation_jobs().unwrap_or(1),
-                )?;
-                if native != manifest.native_digest {
-                    return None;
-                }
-                package
-            }
-            RuntimeSourceCompilationProfile::Portable => digests::digest(images.package),
-        };
+        // Both native images are bounded compressed storage. Their exact
+        // decoded digest is independently admitted on the first actual load.
+        let package_digest = digests::digest(images.package);
         if let Some(started) = started {
             eprintln!(
                 "scriptw wasm trace: runtime-native-bundle digest admission: {:?}",
@@ -102,7 +99,11 @@ impl EmbeddedNativeRuntime {
         if manifest.package_digest != package_digest {
             return None;
         }
-        Some(Self { manifest, images })
+        Some(Self {
+            manifest,
+            images,
+            native_backing: OnceLock::new(),
+        })
     }
 
     fn matches(&self, runtime: &RuntimeArtifact, mode: WasmNativeCompilationMode) -> bool {

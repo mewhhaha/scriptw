@@ -1,5 +1,7 @@
 //! Complete raw build-package envelope admission; no native-code authority.
 use super::*;
+mod intl;
+pub(super) use intl::inert_build_frames;
 
 pub(super) fn encode(
     runtime: &RuntimeArtifact,

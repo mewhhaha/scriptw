@@ -106,8 +106,13 @@ fn link_intl(
                 let request = scriptw_intl::IntlGcHostRequest::decode(&bytes).map_err(|error| {
                     wasmtime::Error::msg(format!("invalid Intl GC request: {error}"))
                 })?;
-                let kernel = Arc::clone(&caller.data().intl_kernel);
-                let response = execute(&kernel, request)?;
+                let kernel = caller.data().intl_kernel.clone();
+                let response = execute(
+                    kernel
+                        .resolve()
+                        .map_err(|error| wasmtime::Error::msg(error.to_string()))?,
+                    request,
+                )?;
                 let [output] = outputs else {
                     return Err(wasmtime::Error::msg(
                         "Intl GC callback has invalid output arity",

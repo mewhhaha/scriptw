@@ -29,12 +29,13 @@ for case_data_owner in \
 done
 require_fixed_string_count crates/scriptw-aot-wasm/src/builtins/standard.rs 'self.emit_intl_supported_values_of(function)?;' 1 'actual supportedValuesOf dispatch'
 require_tree_regex_count crates/scriptw-aot-wasm/src '^[[:space:]]*pub\(crate\)[[:space:]]+fn[[:space:]]+emit_intl_supported_values_of[[:space:]]*\(' 1 'supportedValuesOf sole emitter owner'
-require_fixed_string_count crates/scriptw-aot-wasm/src/emit.rs 'let intl_selection = scriptw_intl::IntlDataSelection::new(intl_profile.clone());' 1 'one selected Intl owner outside builtin retries'
+require_fixed_string_count crates/scriptw-aot-wasm/src/emit.rs 'let intl_selection = inputs.intl_selection(intl_profile)?;' 1 'one lazy selected Intl owner outside builtin retries'
 require_fixed_string_count crates/scriptw-aot-wasm/src/lib.rs 'pub use emit::emit_with_intl_profile;' 1 'actual selected Intl compiler entry'
-require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly.rs 'string_pool.check_intl_supported_values()?' 1 'consumed checked selected catalogue admission'
-require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly.rs 'selected.identity().artifact_identity()' 1 'sole selected artifact identity owner'
-require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly.rs 'for (name, data) in selected.component_sections()' 1 'same selected physical frame inventory consumed by export and emission'
-require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly.rs 'if let Some(services) = selected.service_selection()' 1 'artifact carries its checked public service authority'
+require_module_decl crates/scriptw-aot-wasm/src/emit/module_assembly.rs intl
+require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly/intl.rs 'string_pool.check_intl_supported_values()?' 1 'consumed checked selected catalogue admission'
+require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly/intl.rs 'selected.identity().artifact_identity()' 1 'sole selected artifact identity owner'
+require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly/intl.rs 'for (name, data) in selected.component_sections()' 1 'same selected physical frame inventory consumed by export and emission'
+require_fixed_string_count crates/scriptw-aot-wasm/src/emit/module_assembly/intl.rs 'if let Some(services) = selected.service_selection()' 1 'artifact carries its checked public service authority'
 require_fixed_string_count crates/scriptw-aot-wasm/src/data/intl_supported_values.rs 'pub(crate) enum CompiledSupportedValuesTable {' 1 'closed per-key selected primitive catalogue owner'
 require_exact_line_count crates/scriptw-aot-wasm/src/data/intl_supported_values.rs '    Available(Arc<SupportedValuesList>),' 1 'available keys retain their admitted catalogue'
 require_exact_line_count crates/scriptw-aot-wasm/src/data/intl_supported_values.rs '    Unavailable,' 1 'omitted key data has explicit unavailable authority'

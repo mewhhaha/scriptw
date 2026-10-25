@@ -282,6 +282,7 @@ pub struct RuntimeArtifact {
     layout: RuntimeLayout,
     layout_admission: Option<CurrentRuntimeLayoutVersion>,
     source_compilation_profile: RuntimeSourceCompilationProfile,
+    compilation_data: Option<Arc<scriptw_intl::IntlCompilationData>>,
     compiler_owned_pool: OnceLock<Result<Arc<crate::data::CompilerOwnedPool>, EmitError>>,
 }
 
@@ -291,6 +292,7 @@ impl RuntimeArtifact {
         layout: RuntimeLayout,
         version: CurrentRuntimeLayoutVersion,
         source_compilation_profile: RuntimeSourceCompilationProfile,
+        compilation_data: Arc<scriptw_intl::IntlCompilationData>,
     ) -> Self {
         Self {
             key: runtime_key(&bytes),
@@ -299,6 +301,7 @@ impl RuntimeArtifact {
             layout,
             layout_admission: Some(version),
             source_compilation_profile,
+            compilation_data: Some(compilation_data),
             compiler_owned_pool: OnceLock::new(),
         }
     }
@@ -313,12 +316,18 @@ impl RuntimeArtifact {
             layout,
             layout_admission: None,
             source_compilation_profile: RuntimeSourceCompilationProfile::Portable,
+            compilation_data: None,
             compiler_owned_pool: OnceLock::new(),
         }
     }
 
     pub const fn source_compilation_profile(&self) -> RuntimeSourceCompilationProfile {
         self.source_compilation_profile
+    }
+
+    /// Compiler metadata whose exact physical frames passed this R's admission.
+    pub fn intl_compilation_data(&self) -> Option<&Arc<scriptw_intl::IntlCompilationData>> {
+        self.compilation_data.as_ref()
     }
 
     pub fn key(&self) -> RuntimeArtifactKey {
@@ -429,11 +438,15 @@ fn emit_runtime_artifact(
     let layout = module
         .runtime_layout
         .ok_or_else(|| EmitError::unsupported("the runtime module must describe its layout"))?;
+    let compilation = selection
+        .compilation_data()
+        .map_err(|error| EmitError::unsupported(error.to_string()))?;
     Ok(Arc::new(RuntimeArtifact::new(
         Cow::Owned(module.artifact.bytes),
         layout,
         CurrentRuntimeLayoutVersion::emitted_current(),
         source_compilation_profile,
+        Arc::clone(compilation),
     )))
 }
 

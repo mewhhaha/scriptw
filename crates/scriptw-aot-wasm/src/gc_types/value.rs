@@ -17,7 +17,9 @@ pub(crate) use program_instance::{
     ProgramMetadataView,
 };
 mod program_string_descriptors;
+mod runtime_string_descriptors;
 pub(crate) use program_string_descriptors::ProgramStringDescriptorTable;
+pub(crate) use runtime_string_descriptors::RuntimeStringDescriptorRowLocals;
 mod weak_host;
 
 macro_rules! scalar_local {
@@ -2893,22 +2895,6 @@ impl StringConstruction {
                     .fixed([GcOperand::i32_local(unit)], function),
                 function,
             ),
-        }
-    }
-
-    pub(crate) fn from_pooled_literal(
-        schema: &RuntimeSchema,
-        slot: GcLocalSlot<CodeUnitArray>,
-        literal: &crate::data::PooledCodeUnits,
-        function: &mut Function,
-    ) -> Self {
-        literal.emit_bounds(function);
-        function.instruction(&Instruction::ArrayNewData {
-            array_type_index: schema.array_type::<CodeUnitArray>().type_index().raw(),
-            array_data_index: crate::data::PooledCodeUnits::DATA_SEGMENT,
-        });
-        Self {
-            units: slot.initialize(GcStackReference::new(), function),
         }
     }
 

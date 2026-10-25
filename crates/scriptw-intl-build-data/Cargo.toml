@@ -1,0 +1,11 @@
+[package]
+name = "scriptw-intl-build-data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The sole trust constructor is explicitly unsafe. Consumer/admission code in
+# scriptw-intl continues inheriting the workspace's unsafe-code prohibition.
+[lib]
+path = "src/lib.rs"

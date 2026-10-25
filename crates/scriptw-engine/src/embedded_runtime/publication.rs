@@ -6,6 +6,11 @@ mod output;
 use scriptw_aot_wasm::RuntimeSourceCompilationProfile;
 use std::path::Path;
 
+pub(super) fn publish_intl_metadata(out: &Path, metadata: &[u8]) {
+    output::write(&out.join("scriptw-runtime-intl-metadata.bin"), metadata)
+        .expect("checked Intl build metadata writes completely");
+}
+
 pub(super) fn publish(
     out: &Path,
     profile: RuntimeSourceCompilationProfile,

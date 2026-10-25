@@ -11,19 +11,21 @@ pub(crate) fn require_runtime_profile(
     bytes: &[u8],
     selection: &IntlDataSelection,
 ) -> Result<(), EmitError> {
-    let selected = selection.selected().map_err(|error| {
+    let selected = selection.compilation_data().map_err(|error| {
         EmitError::unsupported(format!("failed to select native source Intl data: {error}"))
     })?;
-    let mut expected: BTreeMap<&str, Arc<[u8]>> =
+    let mut expected: BTreeMap<&str, scriptw_intl::IntlCompilationBytes> =
         selected.component_sections().into_iter().collect();
     expected.insert(
         INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
-        Arc::from(selected.identity().artifact_identity().as_bytes()),
+        scriptw_intl::IntlCompilationBytes::Shared(Arc::from(
+            selected.identity().artifact_identity().as_bytes(),
+        )),
     );
     if let Some(services) = selected.service_selection() {
         expected.insert(
             INTL_SERVICE_SELECTION_CUSTOM_SECTION,
-            Arc::from(services.wire().to_le_bytes()),
+            scriptw_intl::IntlCompilationBytes::Shared(Arc::from(services.wire().to_le_bytes())),
         );
     }
     for payload in Parser::new(0).parse_all(bytes) {

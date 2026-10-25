@@ -85,6 +85,8 @@ fn every_previously_omitted_compiler_input_invalidates_the_cache() {
         "crates/scriptw-runtime-image/build/objects.rs",
         "crates/scriptw-runtime-image/src/lib.rs",
         "crates/scriptw-intl/src/lib.rs",
+        "crates/scriptw-intl-build-data/Cargo.toml",
+        "crates/scriptw-intl-build-data/src/lib.rs",
         "crates/scriptw-engine/src/wasmtime_policy.rs",
         "crates/scriptw-engine/src/wasmtime_config.rs",
         "crates/scriptw-engine/src/wasm_native_function_compiler.rs",

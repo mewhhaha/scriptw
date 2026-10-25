@@ -11,6 +11,7 @@ pub mod collator;
 mod collator_image;
 mod collator_markers;
 mod collator_protocol;
+mod compilation_data;
 mod datetime;
 mod datetime_image;
 mod datetime_protocol;
@@ -50,6 +51,8 @@ mod relative_time_protocol;
 pub mod segmenter;
 mod segmenter_image;
 mod segmenter_protocol;
+pub use compilation_data::{IntlCompilationBytes, IntlCompilationData};
+pub use scriptw_intl_build_data::ImmutableIntlBuildData;
 mod selection;
 mod service_selection;
 pub use selection::{

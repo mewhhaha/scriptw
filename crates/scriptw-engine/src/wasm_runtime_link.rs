@@ -170,16 +170,14 @@ pub(super) fn decode_cache_entry(
         }
         (&ENTRY_LINKED, rest) => {
             let (recorded, program) = rest.split_at_checked(KEY_BYTES)?;
-            let selection = IntlDataSelection::new(intl_profile.clone());
             let runtime_cache = RuntimeWasmCache::new(cache)?;
-            let runtime = scriptw_aot_wasm::runtime_artifact_with_inputs(
-                &selection,
-                embedded_runtime::inputs(
-                    Some(&runtime_cache),
-                    scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
-                ),
-            )
-            .ok()?;
+            let inputs = embedded_runtime::inputs(
+                Some(&runtime_cache),
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
+            );
+            let selection = inputs.intl_selection(intl_profile).ok()?;
+            let runtime =
+                scriptw_aot_wasm::runtime_artifact_with_inputs(&selection, inputs).ok()?;
             (runtime.key().as_bytes().as_slice() == recorded
                 && scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(program).ok()?
                     == runtime.source_compilation_profile())
@@ -229,12 +227,12 @@ pub(super) fn plan_native_compilation(program: WasmProgramRef<'_>) -> WasmNative
 /// same runtime so the large module is not re-scanned per run.
 pub(super) fn intl_kernel_for(
     program: WasmProgramRef<'_>,
-) -> Result<Arc<IntlKernel<EmbeddedIntlProvider>>, EngineError> {
+) -> Result<intl_data_images::WasmIntlKernel, EngineError> {
     let Some(runtime) = program.runtime else {
-        return intl_data_images::kernel_for_artifact(program.bytes);
+        return intl_data_images::deferred_kernel_for_artifact(program.bytes);
     };
     static KERNELS: OnceLock<
-        Mutex<VecDeque<(RuntimeArtifactKey, Arc<IntlKernel<EmbeddedIntlProvider>>)>>,
+        Mutex<VecDeque<(RuntimeArtifactKey, intl_data_images::WasmIntlKernel)>>,
     > = OnceLock::new();
     let kernels = KERNELS.get_or_init(Default::default);
     {
@@ -243,12 +241,18 @@ pub(super) fn intl_kernel_for(
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(position) = kernels.iter().position(|(key, _)| *key == runtime.key()) {
             let entry = kernels.remove(position).unwrap();
-            let kernel = Arc::clone(&entry.1);
+            let kernel = entry.1.clone();
             kernels.push_back(entry);
             return Ok(kernel);
         }
     }
-    let kernel = intl_data_images::kernel_for_artifact(runtime.bytes())?;
+    let kernel = match runtime
+        .intl_compilation_data()
+        .and_then(|data| intl_data_images::WasmIntlKernel::minimal(Arc::clone(data)))
+    {
+        Some(kernel) => kernel,
+        None => intl_data_images::kernel_for_artifact(runtime.bytes())?.into(),
+    };
     let mut kernels = kernels
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -260,7 +264,7 @@ pub(super) fn intl_kernel_for(
     if kernels.len() == RETAINED_RUNTIME_PROFILES {
         kernels.pop_front();
     }
-    kernels.push_back((runtime.key(), Arc::clone(&kernel)));
+    kernels.push_back((runtime.key(), kernel.clone()));
     Ok(kernel)
 }
 

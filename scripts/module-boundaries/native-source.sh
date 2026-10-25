@@ -101,11 +101,11 @@ require_fixed_string_count "$native_global_compiler" \
 require_fixed_string_count "$native_global_script" \
   'let unit = require_root_source_row(program, first)?;' 1 'exact source/kind/root witness admission'
 require_fixed_string_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
-  'const LAYOUT_VERSION: u32 = 15;' 1 'current typed native global-source runtime contract'
+  'const LAYOUT_VERSION: u32 = 20;' 1 'current typed native global-source runtime contract'
 for native_global_raw_test in \
   crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs \
   crates/scriptw-aot-wasm/src/runtime_artifact/build_package/tests.rs; do
-  require_fixed_string_count "$native_global_raw_test" 'let previous_version = 4u32;' 1 'retained ABI4 envelope rejection'
+  require_fixed_string_count "$native_global_raw_test" 'let previous_version = 15u32;' 1 'authenticated previous ABI15 envelope rejection'
   require_fixed_string_count "$native_global_raw_test" 'let previous_version = 6u32;' 1 'new ABI6 envelope rejection'
 done
 native_global_dispatch="$(braced_rust_item_source crates/scriptw-aot-wasm/src/prepared_script.rs '^[[:space:]]*fn emit_prepared_script_dispatch_with_owner[(]')"

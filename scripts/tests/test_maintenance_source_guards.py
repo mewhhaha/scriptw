@@ -103,10 +103,17 @@ class EmbeddedProfileGuards(unittest.TestCase):
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_profile_proof")}))
         path = profile.E + "embedded_runtime/load.rs"
         source = (ROOT / path).read_text()
-        for before in ("if !self.matches(runtime, mode)", "if !self.accepts_portable_native(&image)", "image.digest() == &self.manifest.native_digest", "drop(lease);"):
+        for before in ("if !self.matches(runtime, mode)", "if !self.accepts_native(&lease)", "image.digest() == &self.manifest.native_digest", "drop(lease);"):
             with self.subTest(before=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_native_admission_proof")}))
+
+        path = profile.E + "embedded_runtime/native_backing.rs"
+        source = (ROOT / path).read_text()
+        for before in ("OFlags::EXCL", "file.sync_data().ok()?", "struct NativeBacking(File);"):
+            with self.subTest(before=before):
+                self.assertEqual(source.count(before), 1)
+                self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_immutable_backing_proof")}))
 
         path = profile.E + "embedded_runtime/images.rs"
         source = (ROOT / path).read_text()

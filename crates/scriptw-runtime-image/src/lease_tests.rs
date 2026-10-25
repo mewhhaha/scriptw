@@ -10,32 +10,38 @@ fn concurrent_loads_share_bytes_and_the_last_lease_releases_them() {
         )
     )) {
         assert!(portable_native().is_none());
+        assert!(native().is_none());
         return;
     }
     use std::sync::{Arc, Barrier};
-    let barrier = Arc::new(Barrier::new(4));
-    let threads = (0..4)
-        .map(|_| {
-            let barrier = barrier.clone();
-            std::thread::spawn(move || {
-                let bytes = portable_native().expect("supported Cargo image");
-                barrier.wait();
-                bytes
+    for acquire in [
+        native as fn() -> Option<Arc<NativeRuntimeBytes>>,
+        portable_native,
+    ] {
+        let barrier = Arc::new(Barrier::new(4));
+        let threads = (0..4)
+            .map(|_| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let bytes = acquire().expect("supported Cargo image");
+                    barrier.wait();
+                    bytes
+                })
             })
-        })
-        .collect::<Vec<_>>();
-    let leases = threads
-        .into_iter()
-        .map(|t| t.join().unwrap())
-        .collect::<Vec<_>>();
-    assert!(leases.iter().all(|image| Arc::ptr_eq(image, &leases[0])));
-    let digest = *leases[0].digest();
-    let weak = Arc::downgrade(&leases[0]);
-    drop(leases);
-    assert!(
-        weak.upgrade().is_none(),
-        "the cache must not retain a strong decoded-byte owner"
-    );
-    let later = portable_native().expect("a new actual load may decode again");
-    assert_eq!(later.digest(), &digest);
+            .collect::<Vec<_>>();
+        let leases = threads
+            .into_iter()
+            .map(|t| t.join().unwrap())
+            .collect::<Vec<_>>();
+        assert!(leases.iter().all(|image| Arc::ptr_eq(image, &leases[0])));
+        let digest = *leases[0].digest();
+        let weak = Arc::downgrade(&leases[0]);
+        drop(leases);
+        assert!(
+            weak.upgrade().is_none(),
+            "the cache must not retain a strong decoded-byte owner"
+        );
+        let later = acquire().expect("a new actual load may decode again");
+        assert_eq!(later.digest(), &digest);
+    }
 }

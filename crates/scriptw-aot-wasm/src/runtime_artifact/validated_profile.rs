@@ -40,7 +40,14 @@ impl ValidatedRuntimeArtifact {
                 "native source runtime has no checked current layout admission",
             ));
         }
-        let selection = IntlDataSelection::new(profile);
+        let selection = if profile == IntlCompilationProfile::Minimal {
+            runtime
+                .intl_compilation_data()
+                .and_then(|data| IntlDataSelection::from_minimal_compilation_data(Arc::clone(data)))
+        } else {
+            None
+        }
+        .unwrap_or_else(|| IntlDataSelection::new(profile));
         crate::runtime_function::runtime_profile::require_runtime_profile(
             runtime.bytes(),
             &selection,

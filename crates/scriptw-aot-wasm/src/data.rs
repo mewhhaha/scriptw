@@ -6,10 +6,12 @@ mod shared_pool_storage;
 pub(crate) use shared_pool_storage::PoolBytes;
 use shared_pool_storage::PoolStringRefs;
 mod compiler_owned_pool;
+mod runtime_string_descriptors;
 pub(crate) use program_metadata::{
     PooledLiteralOperand, ProgramMetadataSpan, POOLED_LITERAL_PROGRAM_DOMAIN,
     POOLED_LITERAL_RUNTIME_DOMAIN,
 };
+pub(crate) use runtime_string_descriptors::RuntimeStringDescriptors;
 mod pooled_literal_domain;
 pub(crate) use pooled_literal_domain::PooledLiteralDomain;
 mod program_string_descriptors;
@@ -117,11 +119,6 @@ impl PooledModuleBytes {
 
 impl PooledCodeUnits {
     pub(crate) const DATA_SEGMENT: u32 = 0;
-
-    pub(crate) fn emit_bounds(&self, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(self.byte_offset as i32));
-        function.instruction(&Instruction::I32Const(self.length as i32));
-    }
 }
 
 /// Compile-time storage locator for a validated descriptor. Executable P rows
@@ -379,6 +376,7 @@ impl PoolBoundary {
 pub(crate) struct StringPool {
     compiler_owned: PoolBoundary,
     shared_prefix: Option<std::sync::Arc<CompilerOwnedPool>>,
+    runtime_string_descriptors: Option<RuntimeStringDescriptors>,
     intl_supported_values: Option<Result<CompiledSupportedValuesTables, SupportedValuesPoolError>>,
     intl_default_locale: Option<scriptw_intl::CanonicalLocaleId>,
     pub(crate) bytes: PoolBytes,
@@ -506,7 +504,7 @@ impl CompilerOwnedPool {
         }) {
             pool.intl_default_locale = Some(
                 intl_selection
-                    .selected()
+                    .compilation_data()
                     .map_err(|error| {
                         EmitError::unsupported(format!(
                             "failed to select Unicode case DefaultLocale: {error}"
@@ -2140,6 +2138,7 @@ impl CompilerOwnedPool {
         ] {
             pool.intern_string(name);
         }
+        pool.append_runtime_string_descriptors()?;
         pool.compiler_owned = pool.boundary();
         Ok(Self(pool))
     }

@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+scriptw-intl-build-data = { path = "../scriptw-intl-build-data" }
 writeable = { version = "=0.6.3", default-features = false }
 icu_calendar = { version = "=2.0.6", default-features = false, features = ["serde", "alloc"] }
 icu_collator = { version = "=2.0.0", default-features = false, features = ["serde"] }

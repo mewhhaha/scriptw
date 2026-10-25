@@ -9,14 +9,17 @@ E = "crates/scriptw-engine/src/"
 FILES = tuple(A + name for name in (
     "runtime_artifact.rs", "runtime_artifact/source_compilation.rs",
     "runtime_artifact/cache.rs", "runtime_artifact/build_package.rs",
+    "runtime_artifact/build_package/inputs.rs",
     "runtime_artifact/build_package/envelope.rs",
     "runtime_artifact/validated_profile.rs", "emit/module_assembly.rs",
+    "emit/module_assembly/metadata.rs",
     "gc_types/host.rs", "prepared_script.rs", "functions/native_direct_eval.rs",
     "builtins/function/dynamic_constructor.rs",
 )) + tuple(E + name for name in (
     "lib.rs", "embedded_runtime.rs", "embedded_runtime/build.rs", "embedded_runtime/images.rs",
     "wasm_runtime_link.rs", "wasm_native_source_compiler.rs", "graph_observation.rs",
     "embedded_runtime/load.rs",
+    "embedded_runtime/native_backing.rs",
 )) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "native_storage.rs", "native_lease.rs"))
 
 
@@ -70,19 +73,23 @@ def check(root, overrides=None):
             "source_admission.import(&import).ok()?" in cache and
             "source_admission.section(section.data()).ok()?" in cache and
             "source_admission.finish().ok()?!=identity.source_compilation_profile" in cache and
-            "RuntimeArtifact::new(Arc::from(payload),layout,version,identity.source_compilation_profile,)" in cache,
+            "profile:identity.source_compilation_profile" in cache and
+            "RuntimeArtifact::new(Cow::Owned(self.bytes.to_vec()),self.layout,self.version,self.profile,self.compilation,)" in cache and
+            "RuntimeArtifact::new(Cow::Borrowed(self.bytes),self.layout,self.version,self.profile,self.compilation,)" in cache,
             "identity and full raw admission bind physical frame plus exact import capability")
     package = c[A + "runtime_artifact/build_package.rs"]
+    inputs = c[A + "runtime_artifact/build_package/inputs.rs"]
     envelope = c[A + "runtime_artifact/build_package/envelope.rs"]
-    require("source_compilation_profile:RuntimeSourceCompilationProfile::Portable" in package and
+    require("source_compilation_profile:RuntimeSourceCompilationProfile::Portable" in inputs and
             "build_runtime_artifact_with_source_compilation_profile(selection,compiler_source,RuntimeSourceCompilationProfile::Portable,)" in package and
             "RuntimeIdentity::admit(selection,source_compilation_profile)?" in package and
             "identity.digest()" in envelope and
-            "cache::decode_payload(payload,identity,version,jobs,body_validation)?" in envelope,
+            "cache::admit_payload(payload,identity,version,jobs,body_validation)?" in envelope,
             "ordinary build packages default Portable and retain profile-separated admission")
     assembly = c[A + "emit/module_assembly.rs"]
     require("uses_heap,kind.source_compilation_profile()," in assembly and
-            "data:Cow::Owned(vec![kind.source_compilation_profile().wire()])" in assembly,
+            "metadata::append_module_declarations(&mutmodule,kind,&script.foreign_modules);" in assembly and
+            "data:Cow::Owned(vec![kind.source_compilation_profile().wire()])" in c[A + "emit/module_assembly/metadata.rs"],
             "actual module role owns both import planning and physical profile frame")
     require("|GcHostImport::CompileDirectEval=>{source_compilation_profile==crate::RuntimeSourceCompilationProfile::NativeHost}" in c[A + "gc_types/host.rs"],
             "compiler hooks are selected solely by NativeHost authority")
@@ -111,18 +118,27 @@ def check(root, overrides=None):
             "each embedded image is selected and admitted only for its exact source profile")
     load = c[E + "embedded_runtime/load.rs"]
     require("if!self.matches(runtime,mode){returnNone;}" in load and
-            "letimage=scriptw_runtime_image::portable_native()?;" in load and
-            "if!self.accepts_portable_native(&image){returnNone;}" in load and
-            "self.images.profile==RuntimeSourceCompilationProfile::Portable&&image.digest()==&self.manifest.native_digest" in load and
-            "None=>scriptw_runtime_image::native()," in load and
+            "RuntimeSourceCompilationProfile::Portable=>scriptw_runtime_image::portable_native()?," in load and
+            "RuntimeSourceCompilationProfile::NativeHost=>scriptw_runtime_image::native()?," in load and
+            "if!self.accepts_native(&lease){returnNone;}" in load and
+            "image.digest()==&self.manifest.native_digest" in load and
+            load.index("self.accepts_native(&lease)") < load.index("NativeBacking::create(bytes)") and
             "Module::deserialize(engine,bytes)" in load and "drop(lease);" in load,
-            "per-load Portable bytes retain independent digest admission and transient immutable ownership")
+            "both native profiles retain independent digest admission before backing publication and transient byte ownership")
+    backing = c[E + "embedded_runtime/native_backing.rs"]
+    require("structNativeBacking(File);" in backing and "OFlags::TMPFILE|OFlags::EXCL|OFlags::CLOEXEC" in backing and
+            "file.write_all(bytes).ok()?" in backing and "file.sync_data().ok()?" in backing and
+            "0x0102_1994|0x8584_58f6" in backing and
+            "Module::deserialize_open_file(engine,self.0.try_clone()?)" in backing,
+            "native file backing remains private, unlinked, synced, non-tmpfs and owned by Wasmtime")
     image = "crates/scriptw-runtime-image/src/"
     lease = c[image + "native_lease.rs"]
     storage = c[image + "native_storage.rs"]
     require("Mutex<Result<Weak<NativeRuntimeBytes>,()>>" in lease and
             "Arc::downgrade(&image)" in lease and
-            "super::native_storage::decode(unsafe{&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE})" in lease and
+            "super::native_storage::decode(encoded)" in lease and
+            "&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE[..]" in lease and
+            "&super::SCRIPTW_RUNTIME_NATIVE[..]" in lease and
             "pubstructNativeRuntimeBytes{bytes:Box<[u8]>,digest:[u8;32],}" in storage and
             "pubfnbytes(&self)->&[u8]{&self.bytes}" in storage and
             "pubfndigest(&self)->&[u8;32]{&self.digest}" in storage and

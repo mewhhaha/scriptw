@@ -1130,7 +1130,8 @@ fn run_wasm_raw(source: &str) -> (i64, WasmRuntimeValueTag, i32, Option<Box<[u16
             realm: engine.realm.clone(),
             output_events: WasmOutputEvents::DelegateOnly,
             intl_kernel: shared_embedded_intl_kernel()
-                .expect("embedded Intl kernel should initialize"),
+                .expect("embedded Intl kernel should initialize")
+                .into(),
             can_block: true,
             monotonic_clock_origin: engine.realm.host_clock().monotonic_instant(),
             async_waiters: WasmStoreAsyncWaiters::new(shared_memory_backing.clone()),
@@ -1561,10 +1562,10 @@ mod cache;
 mod control_flow;
 #[path = "tests/execution.rs"]
 mod execution;
-#[path = "tests/functions.rs"]
-mod functions;
 #[path = "tests/foreign_capabilities.rs"]
 mod foreign_capabilities;
+#[path = "tests/functions.rs"]
+mod functions;
 #[path = "tests/intl.rs"]
 mod intl;
 #[path = "tests/modules.rs"]

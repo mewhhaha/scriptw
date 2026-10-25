@@ -1,11 +1,10 @@
-use std::borrow::Cow;
-
 use crate::function_layout::ModuleEntryRole;
 use crate::runtime_artifact::{EmittedModule, ModuleKind, RuntimeLayout};
 use crate::runtime_helpers::ProgramHook;
 
 use super::*;
-use scriptw_intl::{IntlDataSelection, INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION};
+mod intl;
+use scriptw_intl::IntlDataSelection;
 use wasm_encoder::{
     ConstExpr, DataSection, ExportKind, ExportSection, GlobalType, ImportSection, MemorySection,
     MemoryType, Module,
@@ -1902,68 +1901,24 @@ fn emit_script_module_with_factory(
         "import func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_REJECT_RUNTIME_SEMANTICS}"
     ));
 
-    if !string_pool.bytes.is_empty() || uses_heap {
-        if uses_shared_memory {
-            debug_dump.push("memory: exported private linear memory".to_string());
-        } else {
-            debug_dump.push("memory: exported linear memory".to_string());
-        }
+    metadata::append_memory_attribution(
+        &mut debug_dump,
+        &string_pool,
+        uses_heap,
+        uses_shared_memory,
+    );
 
-        if !string_pool.bytes.is_empty() {
-            debug_dump.push("data segments: 1".to_string());
-        } else {
-            debug_dump.push("data segments: 0".to_string());
-        }
-        if uses_heap {
-            debug_dump.push("heap: enabled".to_string());
-        }
-    } else {
-        debug_dump.push("memory: none".to_string());
-        debug_dump.push("data segments: 0".to_string());
-    }
+    intl::append_sections(
+        &mut module,
+        kind,
+        &string_pool,
+        intl_selection,
+        uses_intl_host,
+        uses_system_time_zone,
+        &mut debug_dump,
+    )?;
 
-    let uses_intl_catalogue = string_pool.check_intl_supported_values()?;
-    if kind.owns_globals() && (uses_intl_host || uses_system_time_zone || uses_intl_catalogue) {
-        let selected = intl_selection.selected().map_err(|error| {
-            EmitError::unsupported(format!("failed to select the Intl artifact data: {error}"))
-        })?;
-        let artifact_identity = selected.identity().artifact_identity();
-        module.section(&wasm_encoder::CustomSection {
-            name: Cow::Borrowed(INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION),
-            data: Cow::Borrowed(artifact_identity.as_bytes()),
-        });
-        debug_dump.push(format!(
-            "custom section: {INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION} ({} bytes)",
-            artifact_identity.as_bytes().len()
-        ));
-        if let Some(services) = selected.service_selection() {
-            let name = scriptw_intl::INTL_SERVICE_SELECTION_CUSTOM_SECTION;
-            let wire = services.wire().to_le_bytes();
-            module.section(&wasm_encoder::CustomSection {
-                name: Cow::Borrowed(name),
-                data: Cow::Borrowed(&wire),
-            });
-            debug_dump.push(format!("custom section: {name} ({} bytes)", wire.len()));
-        }
-        for (name, data) in selected.component_sections() {
-            module.section(&wasm_encoder::CustomSection {
-                name: Cow::Borrowed(name),
-                data: Cow::Borrowed(data.as_ref()),
-            });
-            debug_dump.push(format!("custom section: {name} ({} bytes)", data.len()));
-        }
-    }
-
-    module.section(&wasm_encoder::CustomSection {
-        name: Cow::Borrowed(crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION),
-        data: Cow::Owned(vec![kind.source_compilation_profile().wire()]),
-    });
-    if !script.foreign_modules.is_empty() {
-        module.section(&wasm_encoder::CustomSection {
-            name: Cow::Borrowed(crate::FOREIGN_MODULES_CUSTOM_SECTION),
-            data: Cow::Owned(script.foreign_modules.to_normalized_json()),
-        });
-    }
+    metadata::append_module_declarations(&mut module, kind, &script.foreign_modules);
     metadata::append_function_name_and_check_budget(&mut module, &mut debug_dump, &function_table)?;
     if let Some(section) = factory.and_then(|_| function_table.native_program_context_section()) {
         module.section(&section);

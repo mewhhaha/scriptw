@@ -68,6 +68,16 @@ pub struct SupportedValuesList {
 }
 
 impl SupportedValuesList {
+    /// Called only after immutable producer metadata admission in compilation_data.
+    pub(crate) fn from_build_catalogue(
+        values: Box<[Box<str>]>,
+        provider_identity: IntlDataIdentity,
+    ) -> Self {
+        Self {
+            values,
+            provider_identity,
+        }
+    }
     pub fn values(&self) -> &[Box<str>] {
         &self.values
     }

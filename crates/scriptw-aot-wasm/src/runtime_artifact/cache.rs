@@ -54,7 +54,8 @@ pub trait RuntimeArtifactCache {
 
 #[derive(Clone)]
 pub(super) struct RuntimeIdentity {
-    sections: BTreeMap<&'static str, Arc<[u8]>>,
+    sections: BTreeMap<&'static str, scriptw_intl::IntlCompilationBytes>,
+    compilation: Arc<scriptw_intl::IntlCompilationData>,
     digest: [u8; DIGEST_BYTES],
     source_compilation_profile: RuntimeSourceCompilationProfile,
 }
@@ -76,9 +77,11 @@ impl RuntimeIdentity {
         source_compilation_profile: RuntimeSourceCompilationProfile,
         jobs: std::num::NonZeroUsize,
     ) -> Result<Self, EmitError> {
-        let selected = selection.selected_with_jobs(jobs).map_err(|error| {
-            EmitError::unsupported(format!("failed to select the Intl artifact data: {error}"))
-        })?;
+        let selected = selection
+            .compilation_data_with_jobs(jobs)
+            .map_err(|error| {
+                EmitError::unsupported(format!("failed to select the Intl artifact data: {error}"))
+            })?;
         if matches!(
             selected.identity().profile().profile(),
             scriptw_intl::IntlDataProfile::Minimal
@@ -102,30 +105,37 @@ impl RuntimeIdentity {
     }
 
     fn from_selected(
-        selected: &scriptw_intl::SelectedIntlDataBundle,
+        selected: &Arc<scriptw_intl::IntlCompilationData>,
         source_compilation_profile: RuntimeSourceCompilationProfile,
     ) -> Self {
         let mut sections: BTreeMap<_, _> = selected.component_sections().into_iter().collect();
         sections.insert(
             INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
-            Arc::from(selected.identity().artifact_identity().as_bytes()),
+            scriptw_intl::IntlCompilationBytes::Shared(Arc::from(
+                selected.identity().artifact_identity().as_bytes(),
+            )),
         );
         if let Some(services) = selected.service_selection() {
             sections.insert(
                 INTL_SERVICE_SELECTION_CUSTOM_SECTION,
-                Arc::from(services.wire().to_le_bytes()),
+                scriptw_intl::IntlCompilationBytes::Shared(Arc::from(
+                    services.wire().to_le_bytes(),
+                )),
             );
         }
         sections.insert(
             RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
-            Arc::from([source_compilation_profile.wire()]),
+            scriptw_intl::IntlCompilationBytes::Shared(Arc::from([
+                source_compilation_profile.wire()
+            ])),
         );
-        Self::from_sections(sections, source_compilation_profile)
+        Self::from_sections(sections, source_compilation_profile, Arc::clone(selected))
     }
 
     fn from_sections(
-        sections: BTreeMap<&'static str, Arc<[u8]>>,
+        sections: BTreeMap<&'static str, scriptw_intl::IntlCompilationBytes>,
         source_compilation_profile: RuntimeSourceCompilationProfile,
+        compilation: Arc<scriptw_intl::IntlCompilationData>,
     ) -> Self {
         let mut hash = Sha256::new();
         hash.update(b"scriptw-runtime-intl-selection-v1");
@@ -133,10 +143,11 @@ impl RuntimeIdentity {
         // A custom profile reusing a textual name cannot reuse old data.
         for (name, bytes) in &sections {
             hash_field(&mut hash, name.as_bytes());
-            hash_field(&mut hash, bytes);
+            hash_field(&mut hash, bytes.as_ref());
         }
         Self {
             sections,
+            compilation,
             digest: hash.finalize().into(),
             source_compilation_profile,
         }
@@ -292,6 +303,7 @@ pub(super) struct RuntimePayload<'a> {
     layout: RuntimeLayout,
     version: CurrentRuntimeLayoutVersion,
     profile: RuntimeSourceCompilationProfile,
+    compilation: Arc<scriptw_intl::IntlCompilationData>,
 }
 
 impl RuntimePayload<'_> {
@@ -301,6 +313,7 @@ impl RuntimePayload<'_> {
             self.layout,
             self.version,
             self.profile,
+            self.compilation,
         )
     }
 }
@@ -312,6 +325,7 @@ impl RuntimePayload<'static> {
             self.layout,
             self.version,
             self.profile,
+            self.compilation,
         )
     }
 }
@@ -337,6 +351,7 @@ pub(super) fn admit_payload<'a>(
         layout,
         version,
         profile: identity.source_compilation_profile,
+        compilation: Arc::clone(&identity.compilation),
     })
 }
 

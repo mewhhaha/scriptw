@@ -50,7 +50,10 @@ def check(sources):
             "&mutself" not in proof,
             "opaque_pair", "private fields and immutable projections bind exact Arc R plus actual selected Intl frames")
     require("!runtime.layout_admission.is_some_and(|version|version.0==LAYOUT_VERSION)" in proof and
-            "letselection=IntlDataSelection::new(profile);" in proof and
+            "ifprofile==IntlCompilationProfile::Minimal" in proof and
+            "runtime.intl_compilation_data()" in proof and
+            "IntlDataSelection::from_minimal_compilation_data(Arc::clone(data))" in proof and
+            "unwrap_or_else(||IntlDataSelection::new(profile))" in proof and
             len(re.findall(r"require_runtime_profile\(runtime[.]bytes\(\),&selection,?\)\?;", proof)) == 1 and
             ordered(function(sources[P], "new"), ["runtime.layout_admission", "IntlDataSelection::new(profile)", "require_runtime_profile(", "Ok(Self{runtime,selection})"]),
             "single_profile_admission", "only the constructor validates actual layout and physical Intl pair before minting proof")
@@ -59,9 +62,9 @@ def check(sources):
             "structCurrentRuntimeLayoutVersion(u32);" in runtime and
             "(encoded==LAYOUT_VERSION).then_some(Self(encoded))" in runtime and
             "layout_admission:Option<CurrentRuntimeLayoutVersion>" in runtime and
-            "fnnew(bytes:Arc<[u8]>,layout:RuntimeLayout,version:CurrentRuntimeLayoutVersion,source_compilation_profile:RuntimeSourceCompilationProfile,)->Self" in runtime and
+            "fnnew(bytes:Cow<'static,[u8]>,layout:RuntimeLayout,version:CurrentRuntimeLayoutVersion,source_compilation_profile:RuntimeSourceCompilationProfile,compilation_data:Arc<scriptw_intl::IntlCompilationData>,)->Self" in runtime and
             "layout_admission:Some(version)" in runtime and
-            re.search(r"RuntimeArtifact::new\(bytes,layout,CurrentRuntimeLayoutVersion::emitted_current\(\),source_compilation_profile,?\)", runtime),
+            "RuntimeArtifact::new(Cow::Owned(module.artifact.bytes),layout,CurrentRuntimeLayoutVersion::emitted_current(),source_compilation_profile,Arc::clone(compilation),)" in runtime,
             "actual_layout9", "layout authority comes from actual ABI9 emission or checked current-version envelope")
     fixture = function(sources[A + "runtime_artifact.rs"], "unadmitted_fixture")
     require("#[cfg(test)]fnunadmitted_fixture(" in runtime and "layout_admission:None" in fixture and
@@ -72,9 +75,11 @@ def check(sources):
     require("CurrentRuntimeLayoutVersion::admit(u32::from_le_bytes(take(&mutpayload)?))?" in cache and
             "decode_payload(payload,identity,version,jobs,super::validation::FunctionBodyValidation::AtUse,)" in cache and
             "version:CurrentRuntimeLayoutVersion" in cache and
-            "RuntimeArtifact::new(Arc::from(payload),layout,version,identity.source_compilation_profile,)" in cache and
+            "profile:identity.source_compilation_profile" in cache and
+            "RuntimeArtifact::new(Cow::Owned(self.bytes.to_vec()),self.layout,self.version,self.profile,self.compilation,)" in cache and
+            "RuntimeArtifact::new(Cow::Borrowed(self.bytes),self.layout,self.version,self.profile,self.compilation,)" in cache and
             "CurrentRuntimeLayoutVersion::admit(u32::from_le_bytes(cache::take(&mutpayload)?))?" in build and
-            "cache::decode_payload(payload,identity,version,jobs,body_validation)?" in build,
+            "cache::admit_payload(payload,identity,version,jobs,body_validation)?" in build,
             "checked_envelopes", "both cache and build envelopes propagate the admitted actual version token")
     physical = c[A + "runtime_function/runtime_profile.rs"]
     require("selected.component_sections().into_iter().collect()" in physical and

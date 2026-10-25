@@ -3847,10 +3847,9 @@ impl Engine {
         // construction can run module start code.
         let admission_started = std::time::Instant::now();
         let intl_kernel = wasm_runtime_link::intl_kernel_for(program)?;
-        if !self
-            .realm
-            .system_time_zone()
-            .is_compatible_with(intl_kernel.identity())
+        if intl_kernel
+            .identity()
+            .is_some_and(|identity| !self.realm.system_time_zone().is_compatible_with(identity))
         {
             return Err(EngineError::new(
                 "configured system time zone does not match the executing Intl provider",

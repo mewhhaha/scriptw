@@ -112,15 +112,14 @@ fn embedded_manifest_rejects_metadata_and_native_mismatches_before_deserialize()
         extended.push(0);
         assert!(manifest::Manifest::decode(&extended).is_none());
         let bundle = EmbeddedNativeRuntime::admit(images).unwrap();
-        if profile == RuntimeSourceCompilationProfile::NativeHost {
-            assert_eq!(
-                digests::images(images.package, scriptw_runtime_image::native(), 1),
-                digests::images(images.package, scriptw_runtime_image::native(), 2)
-            );
-        } else {
-            let native = scriptw_runtime_image::portable_native().unwrap();
-            assert!(bundle.accepts_portable_native(&native));
-        }
+        let native = match profile {
+            RuntimeSourceCompilationProfile::NativeHost => scriptw_runtime_image::native().unwrap(),
+            RuntimeSourceCompilationProfile::Portable => {
+                scriptw_runtime_image::portable_native().unwrap()
+            }
+        };
+        assert_eq!(&digests::digest(native.bytes()), native.digest());
+        assert!(bundle.accepts_native(&native));
         let mut previous = images.manifest.to_vec();
         previous[8..12].copy_from_slice(&3_u32.to_le_bytes());
         assert!(manifest::Manifest::decode(&previous).is_none());
@@ -159,19 +158,11 @@ fn embedded_manifest_rejects_metadata_and_native_mismatches_before_deserialize()
         }
         let mut changed = manifest::Manifest::decode(images.manifest).unwrap();
         changed.native_digest[0] ^= 1;
-        match profile {
-            RuntimeSourceCompilationProfile::NativeHost => {
-                assert!(EmbeddedNativeRuntime::admit_manifest(images, changed).is_none())
-            }
-            RuntimeSourceCompilationProfile::Portable => {
-                let metadata = EmbeddedNativeRuntime::admit_manifest(images, changed).unwrap();
-                let native = scriptw_runtime_image::portable_native().unwrap();
-                assert!(
-                    !metadata.accepts_portable_native(&native),
-                    "native digest must reject before deserialize"
-                );
-            }
-        }
+        let metadata = EmbeddedNativeRuntime::admit_manifest(images, changed).unwrap();
+        assert!(
+            !metadata.accepts_native(&native),
+            "native digest must reject before deserialize"
+        );
         let other_profile = match profile {
             RuntimeSourceCompilationProfile::NativeHost => {
                 RuntimeSourceCompilationProfile::Portable
@@ -189,16 +180,8 @@ fn embedded_manifest_rejects_metadata_and_native_mismatches_before_deserialize()
         // independent expected digest instead; actual bytes remain Cargo-owned.
         let mut changed = manifest::Manifest::decode(images.manifest).unwrap();
         changed.native_digest = other_manifest.native_digest;
-        match profile {
-            RuntimeSourceCompilationProfile::NativeHost => {
-                assert!(EmbeddedNativeRuntime::admit_manifest(images, changed).is_none())
-            }
-            RuntimeSourceCompilationProfile::Portable => {
-                let metadata = EmbeddedNativeRuntime::admit_manifest(images, changed).unwrap();
-                assert!(!metadata
-                    .accepts_portable_native(&scriptw_runtime_image::portable_native().unwrap()));
-            }
-        }
+        let metadata = EmbeddedNativeRuntime::admit_manifest(images, changed).unwrap();
+        assert!(!metadata.accepts_native(&native));
         assert!(EmbeddedNativeRuntime::admit_manifest(
             Images {
                 package: other.package,

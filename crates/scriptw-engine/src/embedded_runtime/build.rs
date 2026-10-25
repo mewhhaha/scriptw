@@ -35,6 +35,7 @@ pub(crate) fn write_bundle(
         ] {
             publication::publish(out, profile, &[], &[], &[]);
         }
+        publication::publish_intl_metadata(out, &[]);
         return;
     }
     let source =
@@ -144,6 +145,12 @@ pub(crate) fn write_bundle(
                         started.elapsed()
                     );
                 }
+                let metadata = selection
+                    .selected()
+                    .expect("admitted Minimal components")
+                    .minimal_build_metadata(&source)
+                    .expect("consumer-admitted Minimal compiler metadata");
+                publication::publish_intl_metadata(out, &metadata);
             })
             .expect("bounded build-runtime compiler thread starts")
             .join()

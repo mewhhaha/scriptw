@@ -30,6 +30,9 @@ use scriptw_intl::{
 };
 use std::sync::Arc;
 use wasmparser::{Parser, Payload};
+mod deferred;
+pub(super) use deferred::for_standalone as deferred_kernel_for_artifact;
+pub(crate) use deferred::WasmIntlKernel;
 
 #[derive(Default)]
 struct ComponentSections<'a> {

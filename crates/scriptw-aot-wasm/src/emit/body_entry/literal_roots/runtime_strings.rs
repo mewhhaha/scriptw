@@ -1,34 +1,6 @@
 use super::*;
 
 impl FunctionBuilder<'_> {
-    /// Builds one pooled literal from the passive UTF-16 segment and stores it
-    /// at its slot.
-    fn emit_pooled_string_slot(
-        &self,
-        table: &GcLocal<PooledStringTable>,
-        index: I32Local,
-        ordinal: crate::data::PooledStringIndex,
-        literal: &crate::data::PooledCodeUnits,
-        function: &mut Function,
-    ) {
-        let schema = self.schema;
-        let units_slot = schema.reserve_gc_local::<CodeUnitArray, NonNullable>(function);
-        let builder =
-            StringConstruction::from_pooled_literal(schema, units_slot, literal, function);
-        let string_slot = schema.reserve_gc_local::<StringValue, NonNullable>(function);
-        let string = string_slot.initialize(builder.publish(schema, function), function);
-        function.instruction(&Instruction::I32Const(ordinal.ordinal() as i32));
-        index.store(function);
-        schema.array_type::<PooledStringTable>().write(
-            table,
-            index,
-            GcOperand::nullable_reference(&string, schema),
-            schema,
-            function,
-        );
-        string.clear(function);
-    }
-
     /// R owns exactly its stable prefix, the well-known symbols and registry.
     /// There is no parameter through which a P can resize the shared table.
     pub(crate) fn compile_pooled_strings_initialize_helper(
@@ -57,9 +29,51 @@ impl FunctionBuilder<'_> {
             ),
             function_body,
         );
-        for (ordinal, literal) in self.strings.runtime_pooled_string_initializers() {
-            self.emit_pooled_string_slot(&table, index, ordinal, literal, function_body);
-        }
+        let descriptors = self.strings.runtime_string_descriptors()?;
+        assert_eq!(
+            descriptors.count(),
+            self.strings.compiler_owned_boundary().strings()
+        );
+        let row_index = schema.reserve_i32_local(function_body);
+        row_index.set_constant(0, function_body);
+        function_body.instruction(&Instruction::Block(BlockType::Empty));
+        function_body.instruction(&Instruction::Loop(BlockType::Empty));
+        row_index.load(function_body);
+        function_body.instruction(&Instruction::I32Const(descriptors.count() as i32));
+        function_body.instruction(&Instruction::I32GeU);
+        function_body.instruction(&Instruction::BrIf(1));
+        let row = crate::gc_types::RuntimeStringDescriptorRowLocals::read(
+            descriptors,
+            schema,
+            row_index,
+            function_body,
+        );
+        let construction = StringConstruction::from_runtime_pooled_row(
+            schema,
+            schema.reserve_gc_local(function_body),
+            &row,
+            function_body,
+        );
+        let string = schema
+            .reserve_gc_local::<StringValue, NonNullable>(function_body)
+            .initialize(construction.publish(schema, function_body), function_body);
+        schema.array_type::<PooledStringTable>().write(
+            &table,
+            row.ordinal(),
+            GcOperand::nullable_reference(&string, schema),
+            schema,
+            function_body,
+        );
+        string.clear(function_body);
+        row.release(schema, function_body);
+        row_index.load(function_body);
+        function_body.instruction(&Instruction::I32Const(1));
+        function_body.instruction(&Instruction::I32Add);
+        row_index.store(function_body);
+        function_body.instruction(&Instruction::Br(0));
+        function_body.instruction(&Instruction::End);
+        function_body.instruction(&Instruction::End);
+        schema.release_i32_local(row_index, function_body);
         let mut symbols = Vec::new();
         for symbol in scriptw_ir::WellKnownSymbol::ALL {
             let description_slot =

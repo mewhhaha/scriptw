@@ -57,6 +57,10 @@ fn program_appendices_share_the_exact_immutable_prefix_storage() {
             prefix.0.refs.get("undefined").unwrap()
         ));
         assert_eq!(pool.compiler_owned_boundary(), boundary);
+        assert_eq!(
+            pool.runtime_string_descriptors().unwrap(),
+            prefix.0.runtime_string_descriptors().unwrap()
+        );
     }
     assert_ne!(first.program_utf16_bytes(), second.program_utf16_bytes());
     assert!(first.pooled_string_index("second-local").is_err());
@@ -89,6 +93,10 @@ fn shared_program_images_and_ordinals_match_fresh_collection_with_exact_utf16() 
             fresh.compiler_owned_boundary()
         );
         assert_eq!(shared.pooled_string_count(), fresh.pooled_string_count());
+        assert_eq!(
+            shared.runtime_string_descriptors().unwrap(),
+            fresh.runtime_string_descriptors().unwrap()
+        );
         assert_eq!(shared.program_utf16_bytes(), fresh.program_utf16_bytes());
         assert_eq!(
             shared.program_metadata_bytes(),
@@ -125,7 +133,8 @@ fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
     exact.section(&data);
     prefix.require_runtime_data(&exact.finish()).unwrap();
     let mut corrupt = prefix.0.bytes[..].to_vec();
-    corrupt[0] ^= 1;
+    let descriptors = prefix.0.runtime_string_descriptors().unwrap();
+    corrupt[(descriptors.address() - STATIC_DATA_OFFSET) as usize] ^= 1;
     let mut data = DataSection::new();
     data.passive(prefix.0.pooled_code_unit_bytes[..].iter().copied());
     data.active(0, &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32), corrupt);

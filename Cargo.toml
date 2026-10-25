@@ -4,6 +4,7 @@ members = [
   "crates/scriptw-front",
   "crates/scriptw-ir",
   "crates/scriptw-intl",
+  "crates/scriptw-intl-build-data",
   "crates/scriptw-intl-collator-data",
   "crates/scriptw-runtime",
   "crates/scriptw-runtime-image",

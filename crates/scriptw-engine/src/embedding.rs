@@ -35,7 +35,7 @@ pub struct WasmStoreState {
     pub(super) native_template_instances: memory_module_cache::MemoryNativeInstanceCache,
     pub(super) realm: Realm,
     pub(super) output_events: WasmOutputEvents,
-    pub(super) intl_kernel: Arc<IntlKernel<EmbeddedIntlProvider>>,
+    pub(super) intl_kernel: intl_data_images::WasmIntlKernel,
     pub(super) can_block: bool,
     pub(super) monotonic_clock_origin: MonotonicClockInstant,
     pub(super) shared_memory_backing: Option<Arc<WasmSharedMemoryBacking>>,
@@ -101,7 +101,7 @@ pub struct EmbeddedRuntime {
     engine: WasmtimeEngine,
     modules: wasm_runtime_link::WasmModules,
     foreign: ForeignModuleRegistry,
-    intl: Arc<IntlKernel<EmbeddedIntlProvider>>,
+    intl: intl_data_images::WasmIntlKernel,
     authority: Arc<()>,
 }
 
@@ -184,9 +184,10 @@ impl EmbeddedRuntime {
         realm: Realm,
         user_data: T,
     ) -> Result<WasmStoreState, EngineError> {
-        if !realm
-            .system_time_zone()
-            .is_compatible_with(self.intl.identity())
+        if self
+            .intl
+            .identity()
+            .is_some_and(|identity| !realm.system_time_zone().is_compatible_with(identity))
         {
             return Err(EngineError::new(
                 "configured system time zone differs from embedded Intl data",
@@ -220,7 +221,7 @@ impl EmbeddedRuntime {
             monotonic_clock_origin: realm.host_clock().monotonic_instant(),
             realm,
             output_events: WasmOutputEvents::for_mode(&WasmExecutionMode::Structured),
-            intl_kernel: Arc::clone(&self.intl),
+            intl_kernel: self.intl.clone(),
             can_block: false,
             async_waiters: WasmStoreAsyncWaiters::new(shared.as_ref().map(Arc::clone)),
             shared_memory_backing: shared,

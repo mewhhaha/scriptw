@@ -123,7 +123,7 @@ def check(root, overrides=None):
     require('Arc::ptr_eq(pool.shared_prefix.as_ref().unwrap(),&prefix)' in tests and
             'std::ptr::eq(pool.refs.get("undefined").unwrap(),prefix.0.refs.get("undefined").unwrap())' in tests and
             'assert_eq!(shared_module.finish(),fresh_module.finish())' in tests and
-            'corrupt[0]^=1' in tests,
+            'corrupt[(descriptors.address()-STATIC_DATA_OFFSET)asusize]^=1' in tests,
             'authored controls cover real sharing, P isolation, exact images and corrupted R data')
     require(c[A + 'runtime_artifact/validated_profile/tests.rs'].count('Arc::ptr_eq(&prefix,runtime.compiler_owned_pool.get().unwrap().as_ref().unwrap())') == 3,
             'two proofs and all three entry kinds retain the one R-owned prefix')

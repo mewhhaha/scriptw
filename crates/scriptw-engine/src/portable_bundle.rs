@@ -2,8 +2,8 @@
 //! emitter fallback, native compiler callback or native-image deserialization.
 use super::*;
 use scriptw_aot_wasm::{
-    RUNTIME_IMPORT_NAMESPACE, RuntimeSourceCompilationProfile, admit_portable_runtime_package,
-    encode_portable_runtime_package,
+    admit_portable_runtime_package, encode_portable_runtime_package,
+    RuntimeSourceCompilationProfile, RUNTIME_IMPORT_NAMESPACE,
 };
 
 const MAGIC: &[u8; 8] = b"SCRWPB01";
@@ -86,7 +86,10 @@ impl Artifact {
         };
         validate_program(&self.bytes, self.runtime.is_some())?;
         let source = source_identity()?;
-        let selection = IntlDataSelection::new(intl_profile.clone());
+        let selection =
+            super::embedded_runtime::inputs(None, RuntimeSourceCompilationProfile::Portable)
+                .intl_selection(intl_profile)
+                .map_err(|error| EngineError::new(error.to_string()))?;
         if self.runtime.is_none() {
             validate_standalone_intl(&self.bytes, &selection)?;
         }
@@ -164,7 +167,10 @@ impl Engine {
             return Err(invalid());
         }
         validate_program(program, !package.is_empty())?;
-        let selection = IntlDataSelection::new(profile);
+        let selection =
+            super::embedded_runtime::inputs(None, RuntimeSourceCompilationProfile::Portable)
+                .intl_selection(&profile)
+                .map_err(|error| EngineError::new(error.to_string()))?;
         let runtime = if package.is_empty() {
             if runtime_key != [0; 32] {
                 return Err(invalid());
@@ -195,7 +201,7 @@ fn validate_standalone_intl(
     selection: &IntlDataSelection,
 ) -> Result<(), EngineError> {
     let selected = selection
-        .selected()
+        .compilation_data()
         .map_err(|error| EngineError::new(error.to_string()))?;
     validate_wasm_intl_artifact_identity(
         program,

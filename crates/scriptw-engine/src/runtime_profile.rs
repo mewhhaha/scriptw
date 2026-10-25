@@ -24,11 +24,11 @@ pub enum WasmRuntimeModuleCacheOutcome {
 /// module cache avoids image access or a diagnostic matched image is selected.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct WasmRuntimeEmbeddedImageTimings {
-    /// Manifest/source/target/configuration checks and once-per-build digests.
+    /// Immutable manifest/source/target/configuration and package digest checks.
     pub admission: Duration,
-    /// Portable storage lease acquisition, including decoding and exact digest.
-    /// NativeHost uses immutable linked bytes and has no portable lease.
-    pub portable_lease_decode_and_digest: Duration,
+    /// Either profile's transient decoding and exact native digest check.
+    /// Reusing an admitted private backing file needs no decoded lease.
+    pub native_lease_decode_and_digest: Duration,
     pub deserialize: Duration,
 }
 
@@ -526,7 +526,7 @@ mod tests {
             assert!(image.deserialize > Duration::ZERO);
             assert!(
                 profile.module_loading.runtime
-                    >= image.admission + image.portable_lease_decode_and_digest + image.deserialize
+                    >= image.admission + image.native_lease_decode_and_digest + image.deserialize
             );
         }
         assert_eq!(

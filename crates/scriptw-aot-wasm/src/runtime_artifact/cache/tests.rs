@@ -13,7 +13,7 @@ use wasm_encoder::{
 fn immutable_minimal_identity_matches_full_frames_without_aliasing_custom_profiles() {
     let minimal =
         scriptw_intl::IntlDataSelection::new(scriptw_intl::IntlCompilationProfile::Minimal);
-    let selected = minimal.selected().unwrap();
+    let selected = minimal.compilation_data().unwrap();
     let full =
         RuntimeIdentity::from_selected(selected, crate::RuntimeSourceCompilationProfile::Portable);
     let cached =
@@ -32,7 +32,7 @@ fn immutable_minimal_identity_matches_full_frames_without_aliasing_custom_profil
             .unwrap();
     assert_ne!(cached.cache_key(&[17; 32]), native.cache_key(&[17; 32]));
     for (name, bytes) in &cached.sections {
-        assert!(Arc::ptr_eq(bytes, &again.sections[name]));
+        assert!(std::ptr::eq(bytes.as_ref(), again.sections[name].as_ref()));
     }
     let custom = scriptw_intl::CustomIntlProfile::for_services(
         scriptw_intl::CustomProfileId::parse("minimal-identity-control").unwrap(),
@@ -46,7 +46,7 @@ fn immutable_minimal_identity_matches_full_frames_without_aliasing_custom_profil
         RuntimeIdentity::admit(&selection, crate::RuntimeSourceCompilationProfile::Portable)
             .unwrap();
     let custom_full = RuntimeIdentity::from_selected(
-        selection.selected().unwrap(),
+        selection.compilation_data().unwrap(),
         crate::RuntimeSourceCompilationProfile::Portable,
     );
     assert_eq!(custom.digest(), custom_full.digest());
@@ -95,14 +95,21 @@ fn identity() -> RuntimeIdentity {
         BTreeMap::from([
             (
                 INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
-                Arc::<[u8]>::from(&b"checked fixture"[..]),
+                scriptw_intl::IntlCompilationBytes::Shared(Arc::<[u8]>::from(
+                    &b"checked fixture"[..],
+                )),
             ),
             (
                 crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
-                Arc::<[u8]>::from(&[0][..]),
+                scriptw_intl::IntlCompilationBytes::Shared(Arc::<[u8]>::from(&[0][..])),
             ),
         ]),
         crate::RuntimeSourceCompilationProfile::Portable,
+        Arc::clone(
+            scriptw_intl::IntlDataSelection::new(scriptw_intl::IntlCompilationProfile::Minimal)
+                .compilation_data()
+                .unwrap(),
+        ),
     )
 }
 
@@ -397,19 +404,21 @@ fn runtime_cache_identity_binds_compiler_and_exact_admitted_sections() {
     let mut changed_sections = first.sections.clone();
     changed_sections.insert(
         INTL_SERVICE_SELECTION_CUSTOM_SECTION,
-        Arc::from(&b"services"[..]),
+        scriptw_intl::IntlCompilationBytes::Shared(Arc::from(&b"services"[..])),
     );
     let services = RuntimeIdentity::from_sections(
         changed_sections.clone(),
         crate::RuntimeSourceCompilationProfile::Portable,
+        Arc::clone(&first.compilation),
     );
     changed_sections.insert(
         INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
-        Arc::from(&b"new data"[..]),
+        scriptw_intl::IntlCompilationBytes::Shared(Arc::from(&b"new data"[..])),
     );
     let data = RuntimeIdentity::from_sections(
         changed_sections,
         crate::RuntimeSourceCompilationProfile::Portable,
+        Arc::clone(&first.compilation),
     );
     assert_ne!(first.cache_key(&[17; 32]), first.cache_key(&[18; 32]));
     assert_ne!(first.cache_key(&[17; 32]), services.cache_key(&[17; 32]));

@@ -254,7 +254,7 @@ mod tests {
             monotonic_clock_origin: realm.host_clock().monotonic_instant(),
             realm,
             output_events: WasmOutputEvents::DelegateOnly,
-            intl_kernel: shared_embedded_intl_kernel().unwrap(),
+            intl_kernel: shared_embedded_intl_kernel().unwrap().into(),
             can_block,
             async_waiters: WasmStoreAsyncWaiters::new(None),
             shared_memory_backing: None,

@@ -79,7 +79,7 @@ fn execution_json(profile: &WasmRuntimeProfile, expected: &str) -> Result<Value,
             "program": profile.module_loading.program.as_nanos(),
             "embedded_image": profile.module_loading.embedded_image.as_ref().map(|image| json!({
                 "admission": image.admission.as_nanos(),
-                "portable_lease_decode_and_digest": image.portable_lease_decode_and_digest.as_nanos(),
+                "native_lease_decode_and_digest": image.native_lease_decode_and_digest.as_nanos(),
                 "deserialize": image.deserialize.as_nanos()}))},
         "host_import_cache": format!("{:?}", profile.host_import_cache),
         "matched_runtime_image_cache": format!("{:?}", profile.matched_runtime_image_cache),

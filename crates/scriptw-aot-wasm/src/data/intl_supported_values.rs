@@ -1,7 +1,7 @@
 //! The native catalogue owner retains checked names for rooted GC publication.
 use super::*;
 use scriptw_intl::{
-    IntlDataSelection, SelectedIntlDataBundle, SupportedValuesKey, SupportedValuesList,
+    IntlCompilationData, IntlDataSelection, SupportedValuesKey, SupportedValuesList,
     SupportedValuesSetupError,
 };
 use std::sync::Arc;
@@ -57,18 +57,18 @@ impl CompiledSupportedValuesTables {
         selection: &IntlDataSelection,
     ) -> Result<Self, SupportedValuesPoolError> {
         let selected = selection
-            .selected()
+            .compilation_data()
             .map_err(|error| SupportedValuesPoolError::Selection(error.to_string()))?;
         let identity = selected.identity().artifact_identity();
         fn table(
             pool: &mut StringPool,
             key: SupportedValuesKey,
-            selected: &SelectedIntlDataBundle,
+            selected: &IntlCompilationData,
             identity: &[u8],
         ) -> Result<CompiledSupportedValuesTable, SupportedValuesPoolError> {
             let source = match selected.supported_values(key) {
                 Ok(source) => source,
-                Err(SupportedValuesSetupError::UnavailableData(missing)) if *missing == key => {
+                Err(SupportedValuesSetupError::UnavailableData(missing)) if missing == key => {
                     return Ok(CompiledSupportedValuesTable::Unavailable)
                 }
                 Err(error) => return Err(SupportedValuesPoolError::Setup(error.to_string())),

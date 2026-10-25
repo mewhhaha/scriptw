@@ -19,6 +19,9 @@ sha2 = "0.10.9"
 wasmparser = "0.245.1"
 wasmtime = { version = "=47.0.0", default-features = false, features = ["cache", "cranelift", "gc", "gc-copying", "incremental-cache", "parallel-compilation", "runtime", "std", "threads"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs"] }
+
 [build-dependencies]
 sha2 = "0.10.9"
 

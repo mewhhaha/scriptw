@@ -122,6 +122,13 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 "unrelated source literals must preserve the shared coercion helper bytes");
             for artifact in [&short, &long] {
                 let runtime = artifact.runtime().expect("literal program links a runtime");
+                let runtime_initializer = named_function_body(runtime.bytes(), "helper::pooled_strings_initialize");
+                assert_eq!(array_data_initializers(&runtime_initializer), [1, 0, 0, 0],
+                    "R uses one UTF16 construction site for all compiler literals");
+                assert!(runtime_initializer.len() < 8192, "R bootstrap is bounded independently of its literal count");
+                let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&runtime_initializer, 0));
+                assert!(body.get_operators_reader().unwrap().into_iter().any(|operator| matches!(operator.unwrap(), Operator::Loop { .. })),
+                    "runtime string allocation iterates over the sealed descriptor table");
                 for bytes in [artifact.bytes.as_slice(), runtime.bytes()] {
                     Validator::new_with_features(WasmFeatures::all())
                         .validate_all(bytes)

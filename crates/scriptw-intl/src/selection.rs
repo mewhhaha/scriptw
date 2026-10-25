@@ -927,10 +927,26 @@ impl IntlCompilationProfile {
 
 /// One emission retains one immutable selection through all builtin retries.
 /// Construction is cheap; a program without Intl never resolves its data.
-#[derive(Debug)]
 pub struct IntlDataSelection {
     profile: IntlCompilationProfile,
     custom: OnceLock<Result<Arc<SelectedIntlDataBundle>, EmbeddedIntlProviderSetupError>>,
+    compilation: OnceLock<Result<Arc<crate::IntlCompilationData>, EmbeddedIntlProviderSetupError>>,
+    initialize_compilation: Option<
+        Box<
+            dyn Fn() -> Result<Arc<crate::IntlCompilationData>, EmbeddedIntlProviderSetupError>
+                + Send
+                + Sync,
+        >,
+    >,
+}
+
+impl core::fmt::Debug for IntlDataSelection {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("IntlDataSelection")
+            .field("profile", &self.profile)
+            .field("compilation_initialized", &self.compilation.get().is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl IntlDataSelection {
@@ -938,11 +954,85 @@ impl IntlDataSelection {
         Self {
             profile,
             custom: OnceLock::new(),
+            compilation: OnceLock::new(),
+            initialize_compilation: None,
         }
     }
 
     pub fn selected(&self) -> Result<&SelectedIntlDataBundle, &EmbeddedIntlProviderSetupError> {
         self.selected_with_jobs(std::num::NonZeroUsize::MIN)
+    }
+
+    pub fn compilation_data(
+        &self,
+    ) -> Result<&Arc<crate::IntlCompilationData>, &EmbeddedIntlProviderSetupError> {
+        self.compilation_data_with_jobs(std::num::NonZeroUsize::MIN)
+    }
+
+    pub fn compilation_data_with_jobs(
+        &self,
+        jobs: std::num::NonZeroUsize,
+    ) -> Result<&Arc<crate::IntlCompilationData>, &EmbeddedIntlProviderSetupError> {
+        self.compilation
+            .get_or_init(|| {
+                if let Some(initialize) = &self.initialize_compilation {
+                    let data = initialize()?;
+                    if data.identity().profile().profile() != &IntlDataProfile::Minimal
+                        || data.identity().profile().services() != IntlServiceSet::ALL
+                        || data.service_selection().is_some()
+                    {
+                        return Err(EmbeddedIntlProviderSetupError::DataImage(
+                            crate::IntlDataImageError::consumer(
+                                "deferred compiler metadata is not complete canonical Minimal",
+                            ),
+                        ));
+                    }
+                    return Ok(data);
+                }
+                crate::IntlCompilationData::from_selected(self.selected_with_jobs(jobs).map_err(
+                    |error| {
+                        EmbeddedIntlProviderSetupError::DataImage(
+                            crate::IntlDataImageError::consumer(error),
+                        )
+                    },
+                )?)
+                .map(Arc::new)
+            })
+            .as_ref()
+    }
+
+    /// Delay even frame hashing until a compiler operation needs metadata.
+    /// The initializer must return the same opaque admitted Minimal owner;
+    /// ordinary scalar compilation never invokes it.
+    pub fn defer_minimal_compilation_data(
+        initialize: impl Fn() -> Result<Arc<crate::IntlCompilationData>, EmbeddedIntlProviderSetupError>
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        Self {
+            profile: IntlCompilationProfile::Minimal,
+            custom: OnceLock::new(),
+            compilation: OnceLock::new(),
+            initialize_compilation: Some(Box::new(initialize)),
+        }
+    }
+
+    /// Reuse a previously admitted complete canonical Minimal compilation owner.
+    /// Custom projections must still resolve their exact requested frame closure.
+    pub fn from_minimal_compilation_data(data: Arc<crate::IntlCompilationData>) -> Option<Self> {
+        if data.identity().profile().profile() != &IntlDataProfile::Minimal
+            || data.identity().profile().services() != IntlServiceSet::ALL
+            || data.service_selection().is_some()
+        {
+            return None;
+        }
+        Some(Self {
+            profile: IntlCompilationProfile::Minimal,
+            custom: OnceLock::new(),
+            compilation: OnceLock::from(Ok(data)),
+            initialize_compilation: None,
+        })
     }
 
     /// Admit the same immutable data, with explicitly bounded concurrent

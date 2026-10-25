@@ -1486,186 +1486,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scriptw-aot-wasm"
-version = "0.1.0"
-dependencies = [
- "icu_calendar",
- "icu_normalizer",
- "icu_properties",
- "num-bigint",
- "scriptw-front",
- "scriptw-intl",
- "scriptw-ir",
- "scriptw-runtime",
- "sha2",
- "wasm-encoder 0.245.1",
- "wasmparser 0.245.1",
-]
-
-[[package]]
-name = "scriptw-cli"
-version = "0.1.0"
-dependencies = [
- "scriptw-engine",
- "scriptw-test262",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "scriptw-engine"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "rayon",
- "scriptw-aot-wasm",
- "scriptw-front",
- "scriptw-intl",
- "scriptw-ir",
- "scriptw-runtime",
- "scriptw-runtime-image",
- "scriptw-spec-exec",
- "sha2",
- "wasmparser 0.245.1",
- "wasmtime",
-]
-
-[[package]]
-name = "scriptw-front"
-version = "0.1.0"
-dependencies = [
- "boa_ast",
- "boa_interner",
- "boa_parser",
-]
-
-[[package]]
-name = "scriptw-intl"
-version = "0.1.0"
-dependencies = [
- "calendrical_calculations",
- "icu_calendar",
- "icu_calendar_data",
- "icu_collator",
- "icu_collections",
- "icu_list",
- "icu_list_data",
- "icu_locale",
- "icu_normalizer",
- "icu_provider",
- "icu_provider_adapters",
- "icu_provider_blob",
- "icu_segmenter",
- "icu_segmenter_data",
- "jiff-tzdb",
- "ryu-js",
- "scriptw-intl-collator-data",
- "serde",
- "serde_json",
- "sha2",
- "timezone_provider",
- "tinystr",
- "tzif",
- "writeable",
- "zerovec",
-]
-
-[[package]]
-name = "scriptw-intl-collator-data"
-version = "0.1.0"
-dependencies = [
- "icu_collator",
- "icu_collections",
- "icu_locale",
- "icu_normalizer",
- "icu_provider",
- "zerovec",
-]
-
-[[package]]
-name = "scriptw-ir"
-version = "0.1.0"
-dependencies = [
- "boa_ast",
- "boa_interner",
- "boa_parser",
- "icu_properties",
- "num-bigint",
- "num-traits",
- "regress",
- "ryu-js",
- "scriptw-front",
- "serde_json",
- "zerotrie",
-]
-
-[[package]]
-name = "scriptw-runtime"
-version = "0.1.0"
-dependencies = [
- "getrandom 0.3.4",
- "scriptw-intl",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "scriptw-runtime-image"
-version = "0.1.0"
-dependencies = [
- "cc",
- "scriptw-aot-wasm",
- "scriptw-intl",
- "scriptw-ir",
- "sha2",
- "wasmtime",
- "zstd",
-]
-
-[[package]]
-name = "scriptw-spec-exec"
-version = "0.1.0"
-dependencies = [
- "boa_engine",
- "scriptw-runtime",
- "serde_json",
-]
-
-[[package]]
-name = "scriptw-test262"
-version = "0.1.0"
-dependencies = [
- "libc",
- "scriptw-engine",
- "scriptw-front",
- "scriptw-ir",
- "scriptw-runtime",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "scriptw-verification-feature-roots"
-version = "0.1.0"
-dependencies = [
- "boa_parser",
- "scriptw-aot-wasm",
- "scriptw-cli",
- "scriptw-engine",
- "scriptw-front",
- "scriptw-intl-collator-data",
- "scriptw-ir",
- "scriptw-runtime",
- "scriptw-runtime-image",
- "scriptw-spec-exec",
- "scriptw-test262",
- "serde_json",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2177,6 +1997,192 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "scriptw-aot-wasm"
+version = "0.1.0"
+dependencies = [
+ "icu_calendar",
+ "icu_normalizer",
+ "icu_properties",
+ "num-bigint",
+ "scriptw-front",
+ "scriptw-intl",
+ "scriptw-ir",
+ "scriptw-runtime",
+ "sha2",
+ "wasm-encoder 0.245.1",
+ "wasmparser 0.245.1",
+]
+
+[[package]]
+name = "scriptw-cli"
+version = "0.1.0"
+dependencies = [
+ "scriptw-engine",
+ "scriptw-test262",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "scriptw-engine"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "rayon",
+ "rustix",
+ "scriptw-aot-wasm",
+ "scriptw-front",
+ "scriptw-intl",
+ "scriptw-ir",
+ "scriptw-runtime",
+ "scriptw-runtime-image",
+ "scriptw-spec-exec",
+ "sha2",
+ "wasmparser 0.245.1",
+ "wasmtime",
+]
+
+[[package]]
+name = "scriptw-front"
+version = "0.1.0"
+dependencies = [
+ "boa_ast",
+ "boa_interner",
+ "boa_parser",
+]
+
+[[package]]
+name = "scriptw-intl"
+version = "0.1.0"
+dependencies = [
+ "calendrical_calculations",
+ "icu_calendar",
+ "icu_calendar_data",
+ "icu_collator",
+ "icu_collections",
+ "icu_list",
+ "icu_list_data",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_provider",
+ "icu_provider_adapters",
+ "icu_provider_blob",
+ "icu_segmenter",
+ "icu_segmenter_data",
+ "jiff-tzdb",
+ "ryu-js",
+ "scriptw-intl-build-data",
+ "scriptw-intl-collator-data",
+ "serde",
+ "serde_json",
+ "sha2",
+ "timezone_provider",
+ "tinystr",
+ "tzif",
+ "writeable",
+ "zerovec",
+]
+
+[[package]]
+name = "scriptw-intl-build-data"
+version = "0.1.0"
+
+[[package]]
+name = "scriptw-intl-collator-data"
+version = "0.1.0"
+dependencies = [
+ "icu_collator",
+ "icu_collections",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_provider",
+ "zerovec",
+]
+
+[[package]]
+name = "scriptw-ir"
+version = "0.1.0"
+dependencies = [
+ "boa_ast",
+ "boa_interner",
+ "boa_parser",
+ "icu_properties",
+ "num-bigint",
+ "num-traits",
+ "regress",
+ "ryu-js",
+ "scriptw-front",
+ "serde_json",
+ "zerotrie",
+]
+
+[[package]]
+name = "scriptw-runtime"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "scriptw-intl",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "scriptw-runtime-image"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "scriptw-aot-wasm",
+ "scriptw-intl",
+ "scriptw-ir",
+ "sha2",
+ "wasmtime",
+ "zstd",
+]
+
+[[package]]
+name = "scriptw-spec-exec"
+version = "0.1.0"
+dependencies = [
+ "boa_engine",
+ "scriptw-runtime",
+ "serde_json",
+]
+
+[[package]]
+name = "scriptw-test262"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "scriptw-engine",
+ "scriptw-front",
+ "scriptw-ir",
+ "scriptw-runtime",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "scriptw-verification-feature-roots"
+version = "0.1.0"
+dependencies = [
+ "boa_parser",
+ "scriptw-aot-wasm",
+ "scriptw-cli",
+ "scriptw-engine",
+ "scriptw-front",
+ "scriptw-intl-collator-data",
+ "scriptw-ir",
+ "scriptw-runtime",
+ "scriptw-runtime-image",
+ "scriptw-spec-exec",
+ "scriptw-test262",
+ "serde_json",
+]
 
 [[package]]
 name = "semver"

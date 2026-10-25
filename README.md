@@ -23,6 +23,12 @@ post-execution process RSS (integer: **329.94 → 291.08 MiB**; retained objects
 little memory change. The linked checkpoint retains slower repeated-call
 controls and separates process RSS from JavaScript heap usage.
 
+The runtime now separates build-admitted Intl compilation metadata from
+provider initialization, loads providers on the first Intl operation, and uses
+private disk-backed native mappings where supported. Constant-string bootstrap
+uses a descriptor loop. The graph remains bound to the measured compiler and
+date shown in it; see the [memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /
