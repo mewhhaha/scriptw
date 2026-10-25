@@ -122,7 +122,7 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 "unrelated source literals must preserve the shared coercion helper bytes");
             for artifact in [&short, &long] {
                 let runtime = artifact.runtime().expect("literal program links a runtime");
-                for bytes in [artifact.bytes.as_slice(), runtime.bytes().as_ref()] {
+                for bytes in [artifact.bytes.as_slice(), runtime.bytes()] {
                     Validator::new_with_features(WasmFeatures::all())
                         .validate_all(bytes)
                         .expect("runtime and program GC literal data and their counts validate");

@@ -5,6 +5,7 @@
 //! boundary is serialized, bound by the entry digest and checked against the
 //! runtime's data segments and each newly collected program pool.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock};
 
@@ -275,12 +276,53 @@ fn decode_with_jobs(
 }
 
 pub(super) fn decode_payload(
-    mut payload: &[u8],
+    payload: &[u8],
     identity: &RuntimeIdentity,
     version: CurrentRuntimeLayoutVersion,
     jobs: std::num::NonZeroUsize,
     body_validation: super::validation::FunctionBodyValidation,
 ) -> Option<RuntimeArtifact> {
+    Some(admit_payload(payload, identity, version, jobs, body_validation)?.into_owned())
+}
+
+/// Completed raw admission retains the payload lifetime until storage is
+/// selected. A non-static package cannot become a borrowed runtime artifact.
+pub(super) struct RuntimePayload<'a> {
+    bytes: &'a [u8],
+    layout: RuntimeLayout,
+    version: CurrentRuntimeLayoutVersion,
+    profile: RuntimeSourceCompilationProfile,
+}
+
+impl RuntimePayload<'_> {
+    pub(super) fn into_owned(self) -> RuntimeArtifact {
+        RuntimeArtifact::new(
+            Cow::Owned(self.bytes.to_vec()),
+            self.layout,
+            self.version,
+            self.profile,
+        )
+    }
+}
+
+impl RuntimePayload<'static> {
+    pub(super) fn into_immutable_build(self) -> RuntimeArtifact {
+        RuntimeArtifact::new(
+            Cow::Borrowed(self.bytes),
+            self.layout,
+            self.version,
+            self.profile,
+        )
+    }
+}
+
+pub(super) fn admit_payload<'a>(
+    mut payload: &'a [u8],
+    identity: &RuntimeIdentity,
+    version: CurrentRuntimeLayoutVersion,
+    jobs: std::num::NonZeroUsize,
+    body_validation: super::validation::FunctionBodyValidation,
+) -> Option<RuntimePayload<'a>> {
     let static_len = usize::try_from(u64::from_le_bytes(take(&mut payload)?)).ok()?;
     let code_unit_len = usize::try_from(u64::from_le_bytes(take(&mut payload)?)).ok()?;
     let strings = u32::from_le_bytes(take(&mut payload)?);
@@ -290,12 +332,12 @@ pub(super) fn decode_payload(
     }
     let pool = PoolBoundary::from_runtime_cache(static_len, code_unit_len, strings)?;
     let layout = decode_layout(payload, pool, identity, jobs, body_validation)?;
-    Some(RuntimeArtifact::new(
-        Arc::from(payload),
+    Some(RuntimePayload {
+        bytes: payload,
         layout,
         version,
-        identity.source_compilation_profile,
-    ))
+        profile: identity.source_compilation_profile,
+    })
 }
 
 fn decode_layout(

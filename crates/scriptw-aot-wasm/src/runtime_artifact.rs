@@ -10,6 +10,7 @@
 //! foreign imports before its own defined bodies; that application-owned
 //! suffix never relocates an R function, global or export.
 
+use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -274,7 +275,9 @@ pub(crate) struct EmittedModule {
 
 pub struct RuntimeArtifact {
     key: RuntimeArtifactKey,
-    bytes: Arc<[u8]>,
+    // The artifact's outer Arc shares owned bytes. Immutable Cargo packages
+    // can instead retain their validated static payload without a second R.
+    bytes: Cow<'static, [u8]>,
     wasm_sha256: [u8; 32],
     layout: RuntimeLayout,
     layout_admission: Option<CurrentRuntimeLayoutVersion>,
@@ -284,7 +287,7 @@ pub struct RuntimeArtifact {
 
 impl RuntimeArtifact {
     fn new(
-        bytes: Arc<[u8]>,
+        bytes: Cow<'static, [u8]>,
         layout: RuntimeLayout,
         version: CurrentRuntimeLayoutVersion,
         source_compilation_profile: RuntimeSourceCompilationProfile,
@@ -302,11 +305,11 @@ impl RuntimeArtifact {
 
     /// Synthetic cache/residency fixtures carry no product layout authority.
     #[cfg(test)]
-    fn unadmitted_fixture(bytes: Arc<[u8]>, layout: RuntimeLayout) -> Self {
+    fn unadmitted_fixture(bytes: Vec<u8>, layout: RuntimeLayout) -> Self {
         Self {
             key: runtime_key(&bytes),
             wasm_sha256: Sha256::digest(&bytes).into(),
-            bytes,
+            bytes: Cow::Owned(bytes),
             layout,
             layout_admission: None,
             source_compilation_profile: RuntimeSourceCompilationProfile::Portable,
@@ -322,12 +325,13 @@ impl RuntimeArtifact {
         self.key
     }
 
-    pub fn bytes(&self) -> &Arc<[u8]> {
-        &self.bytes
+    /// Exact admitted immutable Wasm, shared through this runtime's owner.
+    pub fn bytes(&self) -> &[u8] {
+        self.bytes.as_ref()
     }
 
     /// SHA-256 of the exact immutable Wasm bytes, without the layout-key prefix.
-    /// Computed once when emitted or fully admitted runtime bytes are owned.
+    /// Computed once when runtime bytes are emitted or fully admitted.
     pub fn wasm_sha256(&self) -> [u8; 32] {
         self.wasm_sha256
     }
@@ -425,9 +429,8 @@ fn emit_runtime_artifact(
     let layout = module
         .runtime_layout
         .ok_or_else(|| EmitError::unsupported("the runtime module must describe its layout"))?;
-    let bytes: Arc<[u8]> = Arc::from(module.artifact.bytes);
     Ok(Arc::new(RuntimeArtifact::new(
-        bytes,
+        Cow::Owned(module.artifact.bytes),
         layout,
         CurrentRuntimeLayoutVersion::emitted_current(),
         source_compilation_profile,

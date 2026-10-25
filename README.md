@@ -156,6 +156,7 @@ When counts move, update this block in same change. Do not claim full Test262 `1
 
 [Project inventory](docs/rust-rewrite/current-inventory.md) ·
 [Rust architecture and development](docs/rust-rewrite/README.md) ·
+[Runtime memory ownership and profiling](docs/rust-rewrite/contracts/runtime-byte-ownership.md) ·
 [Conformance commands and shard syntax](docs/rust-rewrite/batch-workflow.md#full-test262-measurement-and-publication) ·
 [Contributing](CONTRIBUTING.md) ·
 [Development history](DEVELOPMENT_HISTORY.md).

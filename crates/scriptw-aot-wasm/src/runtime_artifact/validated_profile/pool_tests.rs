@@ -6,7 +6,7 @@ fn cold_and_warm_runtime_identity_ignore_the_owned_pool_memo_state() {
     let actual = super::tests::runtime();
     let layout = &actual.layout;
     let cold = Arc::new(RuntimeArtifact::new(
-        Arc::clone(actual.bytes()),
+        actual.bytes.clone(),
         RuntimeLayout::new(
             layout.imported_functions,
             layout.function_types.clone(),

@@ -21,10 +21,7 @@ fn emitted_native_function_is_only_p_with_typed_bootstrap_and_actual_factory_ali
     let artifact = emit_runtime_function(&request, &runtime, &profile).unwrap();
     assert!(Arc::ptr_eq(artifact.runtime(), &runtime));
     assert_eq!(artifact.runtime().key(), runtime.key());
-    assert_eq!(
-        artifact.runtime().bytes().as_ref(),
-        runtime.bytes().as_ref()
-    );
+    assert_eq!(artifact.runtime().bytes(), runtime.bytes());
     let mut types = Vec::new();
     let mut function_types = Vec::new();
     let mut exports = BTreeMap::new();

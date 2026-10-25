@@ -229,9 +229,8 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         name: crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION.into(),
         data: (&[0][..]).into(),
     });
-    let bytes: Arc<[u8]> = Arc::from(module.finish());
     Arc::new(RuntimeArtifact::unadmitted_fixture(
-        bytes,
+        module.finish(),
         RuntimeLayout::new(
             1,
             vec![0],

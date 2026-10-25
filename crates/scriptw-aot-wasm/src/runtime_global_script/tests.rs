@@ -117,10 +117,7 @@ fn emitted_native_global_scripts_are_fresh_valid_p_with_owned_hook_factory_and_i
             let artifact = emit_runtime_global_script(&program, &runtime, &profile).unwrap();
             assert!(Arc::ptr_eq(artifact.runtime(), &runtime));
             assert_eq!(artifact.runtime().key(), runtime.key());
-            assert_eq!(
-                artifact.runtime().bytes().as_ref(),
-                runtime.bytes().as_ref()
-            );
+            assert_eq!(artifact.runtime().bytes(), runtime.bytes());
             Validator::new_with_features(WasmFeatures::all())
                 .validate_all(artifact.bytes())
                 .unwrap();

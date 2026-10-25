@@ -17,7 +17,7 @@ use std::sync::Arc;
 mod envelope;
 #[cfg(test)]
 use envelope::decode_with_jobs;
-use envelope::{decode, decode_with_body_validation, encode};
+use envelope::{decode, decode_immutable_build, encode};
 
 const MAGIC: &[u8; 8] = b"SCRWRB01";
 const DIGEST_BYTES: usize = 32;
@@ -124,10 +124,15 @@ pub fn build_runtime_artifact_with_source_compilation_profile(
 }
 
 #[derive(Clone, Copy)]
-struct Candidate<'a> {
-    bytes: &'a [u8],
-    expected_source: &'a [u8; DIGEST_BYTES],
-    body_validation: FunctionBodyValidation,
+enum Candidate<'a> {
+    External {
+        bytes: &'a [u8],
+        expected_source: &'a [u8; DIGEST_BYTES],
+    },
+    ImmutableBuild {
+        bytes: &'static [u8],
+        expected_source: &'static [u8; DIGEST_BYTES],
+    },
 }
 
 /// Optional inputs to the one lazy runtime resolver. A package can be supplied
@@ -178,17 +183,17 @@ impl<'a> RuntimeArtifactInputs<'a> {
         bytes: &'a [u8],
         expected_source: &'a [u8; DIGEST_BYTES],
     ) -> Self {
-        self.package = Some(Candidate {
+        self.package = Some(Candidate::External {
             bytes,
             expected_source,
-            body_validation: FunctionBodyValidation::AtUse,
         });
         self
     }
 
     /// Reuse complete producer body validation for immutable build output.
     /// Identity, checksum, section, data and typed layout admission still run.
-    /// Construction is lazy and does not admit or hash the package.
+    /// Construction is lazy and does not admit or hash the package. After
+    /// admission the runtime borrows this static payload rather than copying R.
     ///
     /// # Safety
     ///
@@ -204,10 +209,9 @@ impl<'a> RuntimeArtifactInputs<'a> {
         bytes: &'static [u8],
         expected_source: &'static [u8; DIGEST_BYTES],
     ) -> Self {
-        self.package = Some(Candidate {
+        self.package = Some(Candidate::ImmutableBuild {
             bytes,
             expected_source,
-            body_validation: FunctionBodyValidation::ValidatedAtBuild,
         });
         self
     }
@@ -219,13 +223,22 @@ impl<'a> RuntimeArtifactInputs<'a> {
     ) -> Result<Arc<RuntimeArtifact>, EmitError> {
         if let Some(candidate) = self.package {
             let started = std::time::Instant::now();
-            if let Some(runtime) = decode_with_body_validation(
-                candidate.bytes,
-                identity,
-                candidate.expected_source,
-                self.admission_jobs,
-                candidate.body_validation,
-            ) {
+            let admitted = match candidate {
+                Candidate::External {
+                    bytes,
+                    expected_source,
+                } => envelope::decode_with_jobs(
+                    bytes,
+                    identity,
+                    expected_source,
+                    self.admission_jobs,
+                ),
+                Candidate::ImmutableBuild {
+                    bytes,
+                    expected_source,
+                } => decode_immutable_build(bytes, identity, expected_source, self.admission_jobs),
+            };
+            if let Some(runtime) = admitted {
                 if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
                     eprintln!(
                         "scriptw wasm trace: runtime-build-package hit: {} bytes in {:?}",

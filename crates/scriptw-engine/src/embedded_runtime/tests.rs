@@ -255,7 +255,7 @@ fn embedded_runtime_matches_target_emission_and_preserves_native_compatibility_c
                     "the entire host/target raw package is byte-identical"
                 );
                 assert_eq!(
-                    runtime.bytes().as_ref(),
+                    runtime.bytes(),
                     target.wasm(),
                     "host-produced R equals ordinary target R exactly"
                 );

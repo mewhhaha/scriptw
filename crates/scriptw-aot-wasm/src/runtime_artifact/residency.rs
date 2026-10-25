@@ -75,7 +75,7 @@ mod tests {
 
     fn initialize(slot: &RuntimeSlot, id: u8, bytes: usize) -> Arc<RuntimeArtifact> {
         let runtime = Arc::new(RuntimeArtifact::unadmitted_fixture(
-            Arc::from(vec![id; bytes]),
+            vec![id; bytes],
             RuntimeLayout::new(
                 0,
                 vec![],
@@ -101,7 +101,7 @@ mod tests {
             cache.retain_with_limits([id; 32], &slot, 2, 16);
         }
         assert!(first_lease.upgrade().is_none());
-        assert_eq!(artifact.bytes().as_ref(), &[1; 8]);
+        assert_eq!(artifact.bytes(), &[1; 8]);
         assert_eq!(cache.bytes, 16);
         assert_eq!(cache.recent.len(), 2);
         // Acquisition prunes dead profile metadata as well as raw bytes.

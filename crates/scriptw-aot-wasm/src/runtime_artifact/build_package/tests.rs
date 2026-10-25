@@ -1,5 +1,6 @@
 use super::*;
 use scriptw_intl::{CustomIntlProfile, CustomProfileId, IntlCompilationProfile, IntlDataSelection};
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::sync::OnceLock;
 
@@ -45,7 +46,7 @@ fn strict_public_portable_package_codec_never_uses_the_emitter_fallback() {
     let bytes = encode_portable_runtime_package(&produced.runtime, &selection, &SOURCE).unwrap();
     let admitted = admit_portable_runtime_package(&bytes, &selection, &SOURCE).unwrap();
     assert_eq!(admitted.key(), produced.key());
-    assert_eq!(admitted.bytes().as_ref(), produced.wasm());
+    assert_eq!(admitted.bytes(), produced.wasm());
     assert!(admit_portable_runtime_package(&[], &selection, &SOURCE).is_err());
     assert!(admit_portable_runtime_package(&bytes, &selection, &[20; 32]).is_err());
     let mut corrupted = bytes.clone();
@@ -73,7 +74,7 @@ fn build_package_round_trips_real_runtime_and_matches_fresh_target_emission() {
         crate::RuntimeSourceCompilationProfile::Portable
     );
     assert_eq!(admitted.key(), package.key());
-    assert_eq!(admitted.bytes().as_ref(), package.wasm());
+    assert_eq!(admitted.bytes(), package.wasm());
     assert_eq!(admitted.layout(), package.runtime.layout());
     let concurrent = decode_with_jobs(
         package.package_bytes(),
@@ -97,6 +98,13 @@ fn build_package_round_trips_real_runtime_and_matches_fresh_target_emission() {
     assert_eq!(immutable.key(), admitted.key());
     assert_eq!(immutable.bytes(), admitted.bytes());
     assert_eq!(immutable.layout(), admitted.layout());
+    assert!(matches!(&immutable.bytes, Cow::Borrowed(_)));
+    assert!(matches!(&admitted.bytes, Cow::Owned(_)));
+    let start = package.package_bytes().as_ptr().addr();
+    let end = start + package.package_bytes().len();
+    let borrowed = immutable.bytes().as_ptr().addr();
+    assert!(borrowed >= start && borrowed + immutable.bytes().len() <= end);
+    assert_eq!(immutable.wasm_sha256(), admitted.wasm_sha256());
     let target = std::thread::Builder::new()
         .name("runtime-build-package-target-parity".to_owned())
         .stack_size(64 * 1024 * 1024)
@@ -112,7 +120,7 @@ fn build_package_round_trips_real_runtime_and_matches_fresh_target_emission() {
         .unwrap();
     assert_eq!(target.key(), package.key());
     assert_eq!(
-        target.bytes().as_ref(),
+        target.bytes(),
         package.wasm(),
         "normal target emission owns the exact same raw R"
     );
@@ -139,7 +147,7 @@ fn safe_package_replacement_rejects_self_checksummed_invalid_bodies_after_a_trus
     bytes[offset] = 0xff;
     let layout = package.runtime.layout();
     let invalid = RuntimeArtifact::unadmitted_fixture(
-        Arc::from(bytes),
+        bytes,
         super::super::RuntimeLayout::new(
             layout.imported_functions,
             layout.function_types.clone(),
@@ -166,7 +174,7 @@ fn safe_package_replacement_rejects_self_checksummed_invalid_bodies_after_a_trus
         .unwrap();
     assert!(emitted.get());
     assert_eq!(admitted.key(), package.key());
-    assert_eq!(admitted.bytes().as_ref(), package.wasm());
+    assert_eq!(admitted.bytes(), package.wasm());
 }
 
 #[test]
@@ -181,6 +189,22 @@ fn admitted_build_package_resolves_without_emission_or_a_disk_cache() {
         .unwrap();
     assert!(!emitted.get());
     assert_eq!(runtime.key(), fixture().key());
+}
+
+#[test]
+fn safe_package_admission_owns_bytes_after_the_input_is_changed_and_dropped() {
+    let original = fixture();
+    let mut package = original.package_bytes().to_vec();
+    let admitted = RuntimeArtifactInputs::new(None)
+        .with_build_package(&package, &SOURCE)
+        .load_or_emit(&minimal_identity(), || panic!("valid package must admit"))
+        .unwrap();
+    assert!(matches!(&admitted.bytes, Cow::Owned(_)));
+    package.fill(0);
+    drop(package);
+    assert_eq!(admitted.bytes(), original.wasm());
+    assert_eq!(admitted.key(), original.key());
+    assert_eq!(admitted.wasm_sha256(), original.runtime.wasm_sha256());
 }
 
 #[test]
@@ -213,7 +237,7 @@ fn previous_layout_build_package_falls_back_and_current_real_runtime_package_adm
         .expect("the current real R passes raw package admission");
     for admitted in [&replacement, &current] {
         assert_eq!(admitted.key(), package.key());
-        assert_eq!(admitted.bytes().as_ref(), package.wasm());
+        assert_eq!(admitted.bytes(), package.wasm());
         assert_eq!(admitted.layout(), package.runtime.layout());
     }
 }
@@ -249,7 +273,7 @@ fn abi6_build_package_envelope_is_rejected_before_abi7_real_runtime_admission() 
         .expect("the current real R passes raw package admission");
     for admitted in [&replacement, &current] {
         assert_eq!(admitted.key(), package.key());
-        assert_eq!(admitted.bytes().as_ref(), package.wasm());
+        assert_eq!(admitted.bytes(), package.wasm());
         assert_eq!(admitted.layout(), package.runtime.layout());
     }
 }
@@ -390,7 +414,7 @@ fn assert_previous_build_package_replaced(previous_version: u32) {
         .expect("the current real R passes raw package admission");
     for admitted in [&replacement, &current] {
         assert_eq!(admitted.key(), package.key());
-        assert_eq!(admitted.bytes().as_ref(), package.wasm());
+        assert_eq!(admitted.bytes(), package.wasm());
         assert_eq!(admitted.layout(), package.runtime.layout());
     }
 }

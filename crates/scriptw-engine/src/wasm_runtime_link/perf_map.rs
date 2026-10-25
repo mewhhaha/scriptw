@@ -39,7 +39,7 @@ pub(super) fn record(modules: &WasmModules, source: WasmProgramRef<'_>) {
     }
     let mut inputs = Vec::with_capacity(2);
     if let (Some(module), Some(runtime)) = (&modules.runtime, source.runtime) {
-        inputs.push(("R", module, runtime.bytes().as_ref(), runtime.wasm_sha256()));
+        inputs.push(("R", module, runtime.bytes(), runtime.wasm_sha256()));
     }
     inputs.push((
         "P",

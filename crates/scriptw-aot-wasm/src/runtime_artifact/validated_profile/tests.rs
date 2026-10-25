@@ -34,7 +34,7 @@ fn corrupt_runtime(bytes: Vec<u8>, admitted: bool) -> Arc<RuntimeArtifact> {
         key: actual.key,
         source_compilation_profile: actual.source_compilation_profile(),
         compiler_owned_pool: OnceLock::new(),
-        bytes: Arc::from(bytes),
+        bytes: Cow::Owned(bytes),
         wasm_sha256: actual.wasm_sha256,
         layout: RuntimeLayout::new(
             layout.imported_functions,

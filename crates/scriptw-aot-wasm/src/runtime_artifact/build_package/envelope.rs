@@ -37,22 +37,41 @@ pub(super) fn decode_with_jobs(
     expected_source: &[u8; DIGEST_BYTES],
     jobs: std::num::NonZeroUsize,
 ) -> Option<RuntimeArtifact> {
-    decode_with_body_validation(
+    let (payload, expected_runtime) = admit_envelope(
         package,
         identity,
         expected_source,
         jobs,
         FunctionBodyValidation::AtUse,
-    )
+    )?;
+    let runtime = payload.into_owned();
+    (runtime.key().as_bytes() == &expected_runtime).then_some(runtime)
 }
 
-pub(super) fn decode_with_body_validation(
-    package: &[u8],
+pub(super) fn decode_immutable_build(
+    package: &'static [u8],
+    identity: &cache::RuntimeIdentity,
+    expected_source: &[u8; DIGEST_BYTES],
+    jobs: std::num::NonZeroUsize,
+) -> Option<RuntimeArtifact> {
+    let (payload, expected_runtime) = admit_envelope(
+        package,
+        identity,
+        expected_source,
+        jobs,
+        FunctionBodyValidation::ValidatedAtBuild,
+    )?;
+    let runtime = payload.into_immutable_build();
+    (runtime.key().as_bytes() == &expected_runtime).then_some(runtime)
+}
+
+fn admit_envelope<'a>(
+    package: &'a [u8],
     identity: &cache::RuntimeIdentity,
     expected_source: &[u8; DIGEST_BYTES],
     jobs: std::num::NonZeroUsize,
     body_validation: FunctionBodyValidation,
-) -> Option<RuntimeArtifact> {
+) -> Option<(cache::RuntimePayload<'a>, [u8; DIGEST_BYTES])> {
     let digest_offset = package.len().checked_sub(DIGEST_BYTES)?;
     let (framed, digest) = package.split_at(digest_offset);
     let mut payload = framed;
@@ -72,6 +91,6 @@ pub(super) fn decode_with_body_validation(
     if actual_digest.as_slice() != digest {
         return None;
     }
-    let runtime = cache::decode_payload(payload, identity, version, jobs, body_validation)?;
-    (runtime.key().as_bytes() == &expected_runtime).then_some(runtime)
+    let admitted = cache::admit_payload(payload, identity, version, jobs, body_validation)?;
+    Some((admitted, expected_runtime))
 }
