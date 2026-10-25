@@ -11,36 +11,10 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 
 ## Benchmarks vs V8
 
-![Fresh-Realm execution: current Scriptw, baseline and V8 timings, plus Scriptw sampled process RSS for all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
+![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
 
 [Latest measurements and evidence](docs/rust-rewrite/execution-performance-20261025.md)
 · [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
-
-<details>
-<summary>Historical startup and execution comparison, measured 2026-10-24</summary>
-
-<!-- scriptw-performance:start -->
-![Elapsed time and peak process memory: paired V8 and Scriptw bars; lower is better](docs/rust-rewrite/assets/performance-memory.svg)
-<!-- scriptw-performance:end -->
-
-[Methodology, evidence and reproduction](docs/rust-rewrite/v8-baseline.md).
-
-</details>
-
-The [compiler efficiency batch](docs/rust-rewrite/compiler-efficiency-20261024.md)
-tracks subsequent compiler/runtime changes and their verification separately
-from the compiler in the historical startup comparison.
-The [execution hot-path contract](docs/rust-rewrite/contracts/execution-hotpaths.md)
-describes stable Array sorting, private UTF-16 buffers, scalar predicates and
-literal string folding.
-
-The [execution checkpoint, 2026-10-25](docs/rust-rewrite/execution-performance-20261025.md)
-compares 17 workloads with V8 in fresh and reused Realms. Observed fresh-Realm
-medians improve 93–94% for reverse sort/toSorted, 42% for large joins and 35% for
-the 50,000-iteration numeric loop. V8 remains faster. The report retains the
-fresh-integer slowdown, higher numeric process RSS, small-input costs and
-shared-host measurement limits. The main graphic shows the fresh-Realm results;
-the report keeps reused-Realm calls separate.
 
 ## Tests
 

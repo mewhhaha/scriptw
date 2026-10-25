@@ -29,8 +29,8 @@ class PerformanceHistoryTests(unittest.TestCase):
         self.work = Path(self.temporary.name)
         self.root = self.work / 'repo'
         self.root.mkdir()
-        (self.root / 'README.md').write_text('before\n' + PUBLISH.START + '\nold\n' + PUBLISH.END
-                                            + '\n## Tests\nPreserve this status.\n')
+        (self.root / 'README.md').write_text('Latest execution graphic\n'
+                                            '\n## Tests\nPreserve this status.\n')
 
     def report(self, index=-1, name='input'):
         directory = self.work / name
@@ -251,13 +251,13 @@ class PerformanceHistoryTests(unittest.TestCase):
                 PUBLISH.unpack(data.getvalue(), destination)
             self.assertFalse((self.work / 'outside').exists())
 
-    def test_bad_readme_markers_do_not_partially_publish_history(self):
+    def test_historical_publication_preserves_the_current_readme(self):
         path, _ = self.report()
-        (self.root / 'README.md').write_text('no generated markers')
-        before = self.bytes()
-        with self.assertRaisesRegex(ValueError, 'README needs'):
-            PUBLISH.record(self.root, path)
-        self.assertEqual(self.bytes(), before)
+        readme = self.root / 'README.md'
+        before = readme.read_bytes()
+        PUBLISH.record(self.root, path)
+        PUBLISH.render(self.root)
+        self.assertEqual(readme.read_bytes(), before)
 
     def test_invalid_svg_text_cannot_partially_publish_history(self):
         path, report = self.report()

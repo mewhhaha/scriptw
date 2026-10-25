@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish checked V8 comparisons and measured history without running benchmarks."""
+"""Archive checked startup comparisons and render their retained history."""
 import argparse
 from datetime import datetime, timezone
 import gzip
@@ -18,8 +18,6 @@ from performance_charts import render_current
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_HISTORY = 'scriptw-readme-performance-history-v1'
-START = '<!-- scriptw-performance:start -->'
-END = '<!-- scriptw-performance:end -->'
 HISTORY = Path('docs/rust-rewrite/performance-history.json')
 DOCS = Path('docs/rust-rewrite')
 COHORT_FIELDS = ('schema', 'machine', 'configuration', 'policy', 'profile', 'node_versions',
@@ -262,21 +260,9 @@ def load_history(root):
     return manifest, points
 
 
-def readme_block():
-    return '\n'.join([
-        START,
-        '![Elapsed time and peak process memory: paired V8 and Scriptw bars; lower is better](docs/rust-rewrite/assets/performance-memory.svg)',
-        END,
-    ])
-
-
 def outputs(root, points):
-    readme = (root / 'README.md').read_text()
-    require(readme.count(START) == readme.count(END) == 1 and readme.index(START) < readme.index(END),
-            'README needs exactly one ordered generated performance block')
     current = points[-1]
     files = {
-        Path('README.md'): (readme.split(START)[0] + readme_block() + readme.split(END)[1]).encode(),
         DOCS / 'assets/performance-memory.svg': render_current(current).encode(),
     }
     for path, data in files.items():
@@ -342,7 +328,7 @@ def render(root, check=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
-    add = sub.add_parser('record', help='admit a full retained report, append history and refresh README/SVGs')
+    add = sub.add_parser('record', help='admit a full retained report, append history and refresh its SVG')
     add.add_argument('report', type=Path)
     add.add_argument('--root', type=Path, default=ROOT)
     draw = sub.add_parser('render', help='regenerate from committed evidence without running benchmarks')

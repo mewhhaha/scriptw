@@ -1,6 +1,8 @@
 """Read-only admission of the archived execution checkpoint for its README plot.
 
 This is a separate fresh-Realm corpus, not an ordinary startup/history report.
+Current-engine RSS comparisons use process-wide endpoints after execution,
+including runtime/setup and retained warmup effects, not peak or live JS bytes.
 Rendering never runs a compiler, benchmark or native test.
 """
 from datetime import datetime
@@ -183,6 +185,7 @@ def load_chart_data(report_path):
         samples = {product: {runtime: [] for runtime in ('wasmtime', 'v8')}
                    for product in ('baseline', 'candidate')}
         rss = {product: [] for product in samples}
+        endpoint_rss = {runtime: [] for runtime in ('wasmtime', 'v8')}
         for label, raw in raw_rounds.items():
             product = raw['product']
             item = raw['case_results'][case_index]
@@ -220,9 +223,18 @@ def load_chart_data(report_path):
                         _require(memory['status'] == 'sampled'
                                  and memory['scope'] == 'runtime-invocation-process-rss', 'RSS scope differs')
                         rss[product].append(_positive(memory['maximum_rss_bytes']))
+                        if product == 'candidate':
+                            endpoint_rss[runtime].append(_positive(memory['final_rss_bytes']))
                 else:
                     _require([observations['node'], observations['v8']]
                              == analysis['rounds'][label]['node_v8'], 'paired Node/V8 identity differs')
+                    if product == 'candidate':
+                        for value in measured:
+                            memory = value['memory']
+                            _require(memory['scope']
+                                     == 'process-wide-endpoints;natural-gc;not-peak-or-live-workload-bytes',
+                                     'V8 RSS endpoint scope differs')
+                            endpoint_rss[runtime].append(_positive(memory['after']['rss']))
         for product in samples:
             for runtime, values in samples[product].items():
                 pooled = case['pooled'][product][runtime]
@@ -232,6 +244,11 @@ def load_chart_data(report_path):
             memory = case['pooled'][product]['wasmtime']['memory_observations']['maximum_sampled_rss_bytes']
             _require(memory['values'] == rss[product] and memory['median'] == statistics.median(rss[product]),
                      'pooled RSS summary differs')
+        for runtime, field in (('wasmtime', 'final_rss_bytes'), ('v8', 'rss_after_execution_bytes')):
+            memory = case['pooled']['candidate'][runtime]['memory_observations'][field]
+            _require(len(endpoint_rss[runtime]) == 14 and memory['values'] == endpoint_rss[runtime]
+                     and memory['median'] == statistics.median(endpoint_rss[runtime]),
+                     'current RSS endpoint summary differs')
         before, after = [statistics.median(samples[p]['wasmtime']) / 1e6 for p in ('baseline', 'candidate')]
         v8 = statistics.median(samples['candidate']['v8']) / 1e6
         change = 100 * (after / before - 1)
@@ -243,6 +260,8 @@ def load_chart_data(report_path):
         before_rss, after_rss = [statistics.median(rss[p]) / 1024**2 for p in ('baseline', 'candidate')]
         rows.append(dict(file=case['file'], before_ms=before, after_ms=after, v8_ms=v8,
                          before_rss_mib=before_rss, after_rss_mib=after_rss,
+                         scriptw_rss_mib=statistics.median(endpoint_rss['wasmtime']) / 1024**2,
+                         v8_rss_mib=statistics.median(endpoint_rss['v8']) / 1024**2,
                          change_percent=change, rss_change_percent=100 * (after_rss / before_rss - 1)))
     return dict(source_commit=source,
                 baseline_commit=report['products']['baseline']['compiler_identity']['source_revision']['commit'],

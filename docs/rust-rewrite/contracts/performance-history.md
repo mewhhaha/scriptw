@@ -1,57 +1,29 @@
 # README performance graphic and retained measurements
 
-The README shows the latest execution checkpoint first and keeps the startup
-comparison in a historical disclosure. Both graphics read committed evidence.
-Publishing an existing report does not run a benchmark or replace its measured
-compiler identity with the current Git revision. Earlier startup measurements
-remain in their evidence manifest.
-
-## Record and refresh
-
-From the workspace root, publish a complete ordinary baseline:
-
-```sh
-python3 scripts/publish-performance.py record PATH/report.json
-```
-
-This records the measured checkpoint in
-[`performance-history.json`](../performance-history.json), retains its checked
-evidence, and updates the README's generated performance block plus
-[`performance-memory.svg`](../assets/performance-memory.svg).
-
-The generated README block contains only this combined timing and memory image,
-produced by `render_current`. One title and legend apply to both sections. The
-graphic carries the measurement date, compiler commit, sample and warmup counts,
-hardware and runtime identities; detailed methodology and reproduction stay in
-linked docs.
-
-Regenerate or check the committed outputs without timing any code:
-
-```sh
-python3 scripts/publish-performance.py render
-python3 scripts/publish-performance.py render --check
-```
-
-Check mode reports stale generated files without rewriting them. Rendering is
-deterministic and works offline from committed evidence; it does not need the
-original `target` directory. The optional `--root PATH` selects another
-repository root for isolated checks and tests.
+The README shows one graph: the latest verified Scriptw execution measurements
+against V8. Publishing or rendering evidence preserves its measured compiler
+identity and date. Historical startup measurements remain available in their
+own evidence manifest and are not displayed in the README.
 
 ## Execution checkpoint graphic
 
-The primary README image is
+The README image is
 [`execution-performance.svg`](../assets/execution-performance.svg), from the
-separate [2026-10-25 execution checkpoint](../execution-performance-20261025.md).
-It shows all 17 fresh-Store/Realm workloads: the actual frozen baseline,
-current Scriptw and paired current-round V8 timings. Each point is the median
-of 14 measured observations, pooled from two rounds of seven after ten warmups
-in baseline–candidate–candidate–baseline order. The timing axis is logarithmic;
-the numerical columns retain absolute milliseconds. The separate memory panel
-compares Scriptw sampled process RSS on a zero-based linear scale. It includes
-runtime/setup and retained warmup effects, and does not claim live JavaScript
-bytes, whole-child high-water RSS or equivalent V8 heap measurements.
+[2026-10-25 execution checkpoint](../execution-performance-20261025.md).
+It shows all 17 fresh-Store/Realm workloads as paired bars: V8 in orange and
+the latest measured Scriptw in blue. There is no baseline series. Both panels
+use zero-based linear scales shared within each section, with absolute values
+at the bar ends: elapsed milliseconds and process RSS in MiB.
 
-Regenerate or check it offline, without running JavaScript or compiling:
+Each timing bar is the median of 14 measured observations, pooled from the two
+candidate rounds of seven measurements after ten warmups. V8 comes from the
+same candidate rounds. The RSS bars are medians of post-execution process
+snapshots: Wasmtime's final sampler read while the Store remains alive, and
+V8's `memoryUsage().after` while its context remains alive. They include
+host/runtime, setup and retained warmup effects. They are not synchronized
+heap measurements, live JavaScript bytes or whole-child high-water RSS.
+
+Regenerate or check the graph offline, without running JavaScript or compiling:
 
 ```sh
 python3 scripts/render-execution-performance.py
@@ -61,24 +33,47 @@ python3 scripts/render-execution-performance.py --check
 The renderer requires matplotlib and uses its bundled DejaVu Sans font.
 `--preview PATH.png` also writes a local raster preview. The data reader checks
 the committed report, evidence archive and manifest identities, binds the
-archived analysis to the report, and recomputes timing/RSS medians. It rejects
-missing cases, altered summaries and mismatched compiler identities. Measurement
-dates and compiler revisions come from the evidence, not the rendering date.
+archived analysis to the report, and recomputes timing/RSS medians from raw
+observations. It rejects missing cases, altered summaries and mismatched
+compiler identities. Measurement dates and revisions come from the evidence.
 
-The graph preserves the fresh-integer slowdown and numeric-workload RSS cost.
 Shared-host observations remain descriptive, with no significance or V8-parity
-claim. Existing-Realm calls keep their own table in the checkpoint. This corpus
-and measurement boundary do not enter the older four-workload v2 history as
-though they were compatible. Its unchanged startup graphic and generated README
-block remain inside the historical comparison disclosure.
+claim. Earlier Scriptw comparisons and existing-Realm calls retain their own
+tables in the checkpoint. This corpus and boundary do not enter the older
+four-workload v2 history as though they were compatible.
+
+## Retained startup history
+
+Publish a complete ordinary startup report from the workspace root:
+
+```sh
+python3 scripts/publish-performance.py record PATH/report.json
+```
+
+This records its checkpoint in
+[`performance-history.json`](../performance-history.json), retains the checked
+evidence, and updates the separate historical
+[`performance-memory.svg`](../assets/performance-memory.svg). It does not change
+README contents or the current execution graph.
+
+Regenerate or check that historical graphic without timing any code:
+
+```sh
+python3 scripts/publish-performance.py render
+python3 scripts/publish-performance.py render --check
+```
+
+Check mode is read-only and reports stale output. Rendering works offline from
+committed evidence, without the original `target` directory. `--root PATH`
+selects another repository root for isolated checks and tests.
 
 ## Admission and retained evidence
 
-The publisher accepts complete `scriptw-v8-machine-baseline-v2` reports with
+The historical publisher accepts complete `scriptw-v8-machine-baseline-v2` reports with
 startup enabled and exactly the ordinary `startup.js`, `integer.js`,
 `objects.js` and `retained-objects.js` workload inventory. It rejects partial,
 selected-workload, startup-disabled and explicit native-policy reports for
-this README publication. Separate diagnostic scoreboards retain their own scope.
+the retained startup history. Separate diagnostic scoreboards retain their own scope.
 
 Admission uses `benchmark_metrics.load_report`: retained logs, source snapshots
 and emitted P Wasm must match their hashes; child commands must have completed
@@ -101,7 +96,7 @@ publication date and checkout HEAD do not replace those identities. The initial
 2026-10-24 series contains compatible checkpoints `d89fd4068`, `30fc19314`
 and `31c5958d2`; its latest measurement is `31c5958d2`, not the later FFI commit.
 
-## Comparison boundaries
+## Historical startup comparison boundaries
 
 Both sections show V8 in orange and Scriptw in blue, with actual values at each
 bar's end. Lower values are better. There is no ratio column or blended overall
@@ -129,7 +124,7 @@ release profile, Node versions, GNU time version/hash, Wasmtime version, complet
 metadata, harness hashes and sample count. Compiler source and image identities
 may change. Different hardware, runtime versions, harnesses, corpora or policies
 form separate cohorts. All cohorts and their immutable raw evidence remain in
-the manifest; the README renders only the latest checkpoint.
+the manifest; its separate SVG renders the latest admitted startup checkpoint.
 
 These are descriptive observations; retain both absolute scores and raw samples
 when assessing a compiler change. The graphic establishes no confidence

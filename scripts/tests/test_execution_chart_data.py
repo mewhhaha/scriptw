@@ -45,6 +45,9 @@ class ExecutionChartDataTests(unittest.TestCase):
         numeric = mapped['numeric-loop-50000.js']
         self.assertGreater(numeric['rss_change_percent'], 7)
         self.assertGreater(numeric['after_rss_mib'], 354)
+        first = mapped['sort-reverse-128.js']
+        self.assertEqual(first['scriptw_rss_mib'], 335.6875)
+        self.assertEqual(first['v8_rss_mib'], 52.65234375)
         self.assertIn('join-empty-1024.js', mapped)
         self.assertTrue(rows['measurement_end'].startswith('2026-10-25T01:50:53'))
 
@@ -61,6 +64,12 @@ class ExecutionChartDataTests(unittest.TestCase):
     def test_changed_raw_analysis_is_rejected_even_with_matching_local_summary(self):
         case = self.report['performance']['balanced_observations']['cases'][0]
         case['pooled']['candidate']['wasmtime']['execution_ns'][0] = 1
+        with self.assertRaisesRegex(ValueError, 'archived authority'):
+            load_chart_data(self.save())
+
+    def test_changed_current_rss_endpoint_is_rejected(self):
+        case = self.report['performance']['balanced_observations']['cases'][0]
+        case['pooled']['candidate']['v8']['memory_observations']['rss_after_execution_bytes']['median'] = 1
         with self.assertRaisesRegex(ValueError, 'archived authority'):
             load_chart_data(self.save())
 
