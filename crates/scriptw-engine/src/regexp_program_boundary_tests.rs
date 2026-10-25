@@ -19,150 +19,118 @@ fn run_bytes(engine: &Engine, artifact: &Artifact, bytes: &[u8]) -> RunOutcome {
     .expect("descriptor fixture must complete through Wasm AOT")
 }
 
-/// Rewrite the actual GC byte-array initializer, after normal producer
-/// admission. A matching Data segment is not executable program ownership.
-/// Preserve every other operator and rebuild body/section lengths because
-/// signed i32 immediates do not necessarily keep the same encoded width.
+/// Rewrite the descriptor in the passive P metadata copied into its GC owner,
+/// after normal producer admission. Require both the whole-segment GC initializer
+/// and the exact P-relative span used by a byte-copy body; matching unused Data
+/// bytes alone must not turn a corruption fixture into an unmodified control.
 fn replace_gc_program(bytes: &[u8], original: &[u8], replacement: &[u8]) -> Vec<u8> {
+    use wasmparser::{DataKind, Operator};
+
     assert_eq!(original.len(), replacement.len(), "exact array footprint");
-    fn uleb(output: &mut Vec<u8>, mut value: u32) {
-        loop {
-            let byte = (value & 0x7f) as u8;
-            value >>= 7;
-            output.push(byte | if value == 0 { 0 } else { 0x80 });
-            if value == 0 {
-                break;
-            }
-        }
-    }
-    fn read_uleb(bytes: &[u8], cursor: &mut usize) -> u32 {
-        let mut result = 0;
-        for shift in (0..35).step_by(7) {
-            let byte = bytes[*cursor];
-            *cursor += 1;
-            result |= u32::from(byte & 0x7f) << shift;
-            if byte & 0x80 == 0 {
-                return result;
-            }
-        }
-        panic!("test artifact length");
-    }
-    let mut constants = Vec::new();
-    for &byte in replacement {
-        constants.push(0x41); // i32.const
-                              // Byte values are positive i32 values: preserve the signed-LEB sign bit.
-        if byte < 64 {
-            constants.push(byte);
-        } else {
-            constants.extend_from_slice(&[(byte & 0x7f) | 0x80, byte >> 7]);
-        }
-    }
+    assert!(!original.is_empty(), "descriptor has a physical byte span");
     let mut byte_array_types = std::collections::BTreeSet::new();
     let mut type_index = 0;
+    let mut matches = Vec::new();
     for payload in WasmParser::new(0).parse_all(bytes) {
-        if let WasmPayload::TypeSection(groups) = payload.unwrap() {
-            for group in groups {
-                for ty in group.unwrap().into_types() {
-                    if let wasmparser::CompositeInnerType::Array(array) = ty.composite_type.inner {
-                        if array.0.element_type == wasmparser::StorageType::I8 {
-                            byte_array_types.insert(type_index);
+        match payload.unwrap() {
+            WasmPayload::TypeSection(groups) => {
+                for group in groups {
+                    for ty in group.unwrap().into_types() {
+                        if let wasmparser::CompositeInnerType::Array(array) =
+                            ty.composite_type.inner
+                        {
+                            if array.0.element_type == wasmparser::StorageType::I8 {
+                                byte_array_types.insert(type_index);
+                            }
                         }
+                        type_index += 1;
                     }
-                    type_index += 1;
                 }
             }
+            WasmPayload::DataSection(segments) => {
+                for (index, segment) in segments.into_iter().enumerate() {
+                    let segment = segment.unwrap();
+                    if !matches!(segment.kind, DataKind::Passive) {
+                        continue;
+                    }
+                    for (offset, candidate) in segment.data.windows(original.len()).enumerate() {
+                        if candidate == original {
+                            let file_offset = segment.range.end - segment.data.len() + offset;
+                            assert_eq!(&bytes[file_offset..file_offset + original.len()], original);
+                            matches.push((index as u32, segment.data.len(), offset, file_offset));
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
-    let mut bodies = std::collections::BTreeMap::new();
-    let mut replacements = 0;
+    assert_eq!(
+        matches.len(),
+        1,
+        "one exact descriptor in passive P metadata"
+    );
+    let (data_index, segment_length, span_start, file_offset) = matches[0];
+    let mut initialized_types = std::collections::BTreeSet::new();
+    let mut copied_types = std::collections::BTreeSet::new();
     for payload in WasmParser::new(0).parse_all(bytes) {
         let WasmPayload::CodeSectionEntry(body) = payload.unwrap() else {
             continue;
         };
-        let mut reader = body.get_operators_reader().unwrap();
-        let mut run = Vec::new();
-        let mut spans = Vec::new();
-        while !reader.eof() {
-            let start = reader.original_position();
-            match reader.read().unwrap() {
-                wasmparser::Operator::I32Const { value } if (0..=255).contains(&value) => {
-                    run.push((start, value as u8));
+        let operators = body
+            .get_operators_reader()
+            .unwrap()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        for window in operators.windows(3) {
+            if let [Operator::I32Const { value: 0 }, Operator::I32Const { value: length }, Operator::ArrayNewData {
+                array_type_index,
+                array_data_index,
+            }] = window
+            {
+                if *array_data_index == data_index
+                    && *length as u32 as usize == segment_length
+                    && byte_array_types.contains(array_type_index)
+                {
+                    initialized_types.insert(*array_type_index);
                 }
-                wasmparser::Operator::ArrayNewFixed {
-                    array_type_index,
-                    array_size,
-                } => {
-                    if byte_array_types.contains(&array_type_index)
-                        && array_size as usize == original.len()
-                        && run.len() >= original.len()
-                    {
-                        let tail = &run[run.len() - original.len()..];
-                        if tail
-                            .iter()
-                            .map(|(_, byte)| *byte)
-                            .eq(original.iter().copied())
-                        {
-                            spans.push(tail[0].0..start);
-                        }
-                    }
-                    run.clear();
-                }
-                _ => run.clear(),
             }
         }
-        if spans.is_empty() {
-            continue;
+        for (index, window) in operators.windows(4).enumerate() {
+            let [Operator::I32Const { value: start }, Operator::LocalSet { .. }, Operator::I32Const { value: length }, Operator::LocalSet { .. }] =
+                window
+            else {
+                continue;
+            };
+            if *start as u32 as usize != span_start || *length as u32 as usize != original.len() {
+                continue;
+            }
+            let copy = &operators[index + 4..];
+            for operator in copy {
+                if let Operator::ArrayGetU { array_type_index } = operator {
+                    if byte_array_types.contains(array_type_index)
+                        && copy.iter().any(|operator| {
+                            matches!(operator,
+                            Operator::ArraySet { array_type_index: target }
+                                if target == array_type_index)
+                        })
+                    {
+                        copied_types.insert(*array_type_index);
+                    }
+                }
+            }
         }
-        let range = body.range();
-        let mut changed = Vec::new();
-        let mut start = range.start;
-        for span in spans {
-            changed.extend_from_slice(&bytes[start..span.start]);
-            changed.extend_from_slice(&constants);
-            start = span.end;
-            replacements += 1;
-        }
-        changed.extend_from_slice(&bytes[start..range.end]);
-        assert!(bodies.insert(range.start, changed).is_none());
     }
     assert!(
-        replacements > 0,
-        "descriptor must reach a physical GC initializer"
+        !initialized_types.is_disjoint(&copied_types),
+        "descriptor's exact P span must reach a physical GC byte-copy initializer"
     );
-    let mut rewritten = bytes[..8].to_vec();
-    let mut cursor = 8;
-    while cursor < bytes.len() {
-        let section_start = cursor;
-        let id = bytes[cursor];
-        cursor += 1;
-        let length = read_uleb(bytes, &mut cursor) as usize;
-        let end = cursor + length;
-        if id != 10 {
-            rewritten.extend_from_slice(&bytes[section_start..end]);
-            cursor = end;
-            continue;
-        }
-        let count = read_uleb(bytes, &mut cursor);
-        let mut code = Vec::new();
-        uleb(&mut code, count);
-        for _ in 0..count {
-            let length_start = cursor;
-            let length = read_uleb(bytes, &mut cursor) as usize;
-            let body_end = cursor + length;
-            if let Some(body) = bodies.remove(&cursor) {
-                uleb(&mut code, body.len().try_into().unwrap());
-                code.extend_from_slice(&body);
-            } else {
-                code.extend_from_slice(&bytes[length_start..body_end]);
-            }
-            cursor = body_end;
-        }
-        assert_eq!(cursor, end);
-        rewritten.push(id);
-        uleb(&mut rewritten, code.len().try_into().unwrap());
-        rewritten.extend_from_slice(&code);
-    }
-    assert!(bodies.is_empty(), "every matched body was rewritten");
+    let end = file_offset + original.len();
+    let mut rewritten = bytes.to_vec();
+    rewritten[file_offset..end].copy_from_slice(replacement);
+    assert_eq!(&rewritten[..file_offset], &bytes[..file_offset]);
+    assert_eq!(&rewritten[end..], &bytes[end..]);
     rewritten
 }
 
