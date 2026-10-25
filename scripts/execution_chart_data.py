@@ -21,6 +21,8 @@ MAX_REPORT = 16 * 1024**2
 MAX_ARCHIVE = 32 * 1024**2
 MAX_MEMBER = 64 * 1024**2
 MAX_EXPANDED = 256 * 1024**2
+# Complete Intl replay evidence includes more than 6,000 execution receipts.
+MAX_MEMBERS = 32768
 
 
 def _require(condition, message):
@@ -91,7 +93,7 @@ def _archive(report_path, report):
                      'unexpected, duplicate or non-file archive member')
             names.add(member_name)
             expanded += member.size
-            _require(0 <= member.size <= MAX_MEMBER and expanded <= MAX_EXPANDED and len(names) <= 6000,
+            _require(0 <= member.size <= MAX_MEMBER and expanded <= MAX_EXPANDED and len(names) <= MAX_MEMBERS,
                      'archive exceeds reading budget')
             if member_name in selected:
                 _require(member.size <= MAX_REPORT, 'chart evidence exceeds reading budget')

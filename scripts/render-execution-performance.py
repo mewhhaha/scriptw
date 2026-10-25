@@ -14,7 +14,7 @@ import sys
 from execution_chart_data import load_chart_data
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT / 'docs/rust-rewrite/execution-memory-20261025.json'
+REPORT = ROOT / 'docs/rust-rewrite/execution-memory-fixed-costs-20261025.json'
 OUTPUT = ROOT / 'docs/rust-rewrite/assets/execution-performance.svg'
 CURRENT = '#0969da'
 V8 = '#d97706'

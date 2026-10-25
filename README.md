@@ -13,23 +13,26 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 
 ![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
 
-[Latest measurements and evidence](docs/rust-rewrite/execution-memory-20261025.md)
+[Latest measurements and evidence](docs/rust-rewrite/execution-memory-fixed-costs-20261025.md)
 · [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
 
-Borrowing the embedded runtime's existing Wasm bytes removes a redundant
-38.6-MiB allocation. All 17 fresh-Realm workloads measured about 39 MiB less
-post-execution process RSS (integer: **329.94 → 291.08 MiB**; retained objects:
-**355.94 → 317.35 MiB**). Externally loaded bundles retain owned bytes and show
-little memory change. The linked checkpoint retains slower repeated-call
-controls and separates process RSS from JavaScript heap usage.
+All 17 fresh-Realm workloads now use **53–60% less post-execution process RSS**
+than the previous memory checkpoint. Integer execution fell from
+**291.29 → 119.69 MiB** (paired V8: **60.04 MiB**); retained objects fell from
+**317.33 → 149.59 MiB** (V8: **71.42 MiB**). These controls still have roughly
+a 2× gap. RSS includes host/runtime, setup and retained warmup effects;
+it is not live JavaScript heap usage or peak memory.
 
 The runtime now separates build-admitted Intl compilation metadata from
 provider initialization, loads providers on the first Intl operation, and uses
 private disk-backed native mappings where supported. Constant-string bootstrap
 uses a descriptor loop. Large static regexp descriptors copy from checked
 program data, avoiding enormous operand stacks during native compilation.
-The graph remains bound to the measured compiler and
-date shown in it; see the [memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
+Intl remains lazy at whole-provider granularity: actual Intl use still loads
+the complete selected provider. The linked checkpoint retains that first-use
+cost, allocation diagnostics and repeated-call controls. The graph remains
+bound to the measured compiler and date shown in it; see the
+[memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Tests
 
@@ -66,12 +69,14 @@ same four failures and zero crashes, unsupported cases or timeouts. Verification
 used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
 and exact inventories; this checkpoint does not refresh the full Test262 chart.
 
-The [execution-memory checkpoint](docs/rust-rewrite/execution-memory-20261025.md),
-refreshed 2026-10-25 at `9b7746531`, passed **5,718 affected native checks across
-23 targets**. Its selected original Test262 replay passed **980 / 984
+The [fixed-runtime memory checkpoint](docs/rust-rewrite/execution-memory-fixed-costs-20261025.md),
+refreshed 2026-10-25 at `44e17ee4c`, passed **7,077 affected native checks across
+31 targets**, a separate authority-token compile-fail doctest and both embedding
+examples. Its selected original Test262 replay passed **7,742 / 7,746
 executions**, with the same four failures and zero crashes, unsupported cases or
-timeouts. Verification used one CPU and a 4-GiB memory cap. The linked record
-contains refresh commands and exact inventories; the full chart is unchanged.
+timeouts. Verification used one CPU and a 4-GiB memory cap. Existing source-tooling
+failures remain recorded in the linked evidence, alongside refresh commands and
+exact inventories; the full Test262 chart is unchanged.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)
