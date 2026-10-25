@@ -201,7 +201,13 @@ fn runtime_native_compilation_mode(runtime: &RuntimeArtifact) -> WasmNativeCompi
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let mode = match modes.iter().position(|(key, _)| *key == runtime.key()) {
         Some(position) => modes.remove(position).unwrap().1,
-        None => plan_wasm_native_compilation(runtime.bytes()).mode,
+        None => match runtime.immutable_build_largest_body_bytes() {
+            Some(bytes) if bytes >= SIZE_OPTIMIZED_WASM_MIN_CODE_BODY_BYTES => {
+                WasmNativeCompilationMode::SizeOptimized
+            }
+            Some(_) => WasmNativeCompilationMode::Fast,
+            None => plan_wasm_native_compilation(runtime.bytes()).mode,
+        },
     };
     if modes.len() == RETAINED_RUNTIME_PROFILES {
         modes.pop_front();

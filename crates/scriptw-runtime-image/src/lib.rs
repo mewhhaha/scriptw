@@ -4,6 +4,8 @@
 //! independently admits source, target, modes, layout and byte digests before
 //! deserializing native code. This crate accepts no caller bytes or paths.
 
+mod metadata;
+pub use metadata::{metadata, portable_metadata};
 mod native_storage;
 pub use native_storage::NativeRuntimeBytes;
 #[cfg(scriptw_runtime_image)]

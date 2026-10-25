@@ -26,9 +26,9 @@
       "sha256": "3fd864584c7e83496e9f64054cdefd7b8aa09da650a9f7049075d22e32c6268d"
     },
     {
-      "bytes": 17120,
+      "bytes": 21032,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "4fdbcfb69256dd481bd8c498490fd3b5f8427e9775dd5a3363528a3cbb3aeab8"
+      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
     },
     {
       "bytes": 3253,
@@ -426,14 +426,14 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41605,
+      "bytes": 41725,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "b1a75a27d9eeeefe325ca22411283bc008f0605ac245cb933ede3f8e8e8fb730"
+      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
     },
     {
-      "bytes": 6510,
+      "bytes": 8955,
       "path": "crates/scriptw-intl/src/locale_image.rs",
-      "sha256": "c75836ed9dbe7b9fca2d8e408e85048b877227c81fd1c425306a96250182e7a4"
+      "sha256": "2b3b914fa57d4503fdd1a2e1a8e5dbbc8cb5656f0d4ac6a61150738a692022bf"
     },
     {
       "bytes": 2393,
@@ -466,14 +466,14 @@
       "sha256": "928f82efb94091454dc67fd9aa458587415721cdf71edb3b9729d20eca1decac"
     },
     {
-      "bytes": 49964,
+      "bytes": 50172,
       "path": "crates/scriptw-intl/src/protocol.rs",
-      "sha256": "5fca05dbf652b1dd6276f557f78600a6e60086cfd33567b58bc59d9670e1b4a5"
+      "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
     },
     {
-      "bytes": 80477,
+      "bytes": 80488,
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "9f8e71493f749ddd0e8909271c22fff308ce4959c03e78fb14a29d986377fe90"
+      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
     },
     {
       "bytes": 2251,
@@ -618,7 +618,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "c7a6c587f5144bc167b0511dd71c4925d96190ad82839e3be82476028ddf75a2",
+  "provider_data_sha256": "4cf10f8b7150adee2ddc9abcfa05496fee82ad29ee318cf5b9e37a285443a308",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "DisplayNames",

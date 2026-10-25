@@ -1,5 +1,6 @@
 //! Lazy runtime inputs and the explicit immutable Cargo trust boundary.
 use super::*;
+mod admission;
 
 #[derive(Clone, Copy)]
 enum Candidate<'a> {
@@ -10,8 +11,29 @@ enum Candidate<'a> {
     ImmutableBuild {
         bytes: &'static [u8],
         expected_source: &'static [u8; DIGEST_BYTES],
-        intl_metadata: Option<&'static [u8]>,
     },
+    ImmutableMinimal(ImmutableMetadata),
+}
+
+/// No safe constructor can promote static caller/cache bytes to producer facts.
+#[derive(Clone, Copy)]
+pub(super) struct ImmutableMetadata {
+    package: &'static [u8],
+    source: &'static [u8; 32],
+    intl: &'static [u8],
+    receipt: &'static [u8],
+}
+impl ImmutableMetadata {
+    pub(super) fn parts(
+        self,
+    ) -> (
+        &'static [u8],
+        &'static [u8; 32],
+        &'static [u8],
+        &'static [u8],
+    ) {
+        (self.package, self.source, self.intl, self.receipt)
+    }
 }
 
 /// Optional inputs to the one lazy runtime resolver. A package can be supplied
@@ -53,10 +75,6 @@ impl<'a> RuntimeArtifactInputs<'a> {
         self
     }
 
-    pub(in crate::runtime_artifact) const fn admission_jobs(self) -> std::num::NonZeroUsize {
-        self.admission_jobs
-    }
-
     pub const fn with_build_package(
         mut self,
         bytes: &'a [u8],
@@ -91,84 +109,44 @@ impl<'a> RuntimeArtifactInputs<'a> {
         self.package = Some(Candidate::ImmutableBuild {
             bytes,
             expected_source,
-            intl_metadata: None,
         });
         self
     }
 
     /// # Safety
-    /// The package must satisfy `with_immutable_build_package` and metadata
-    /// must be the exact `minimal_build_metadata` output of that same producer.
+    /// The package must satisfy `with_immutable_build_package`. Both metadata
+    /// arrays must be the exact `minimal_build_metadata` and
+    /// `immutable_build_metadata` outputs of that same successful producer.
+    /// This also reuses its complete checksum, layout, frame and pool proofs;
+    /// static caller bytes or re-encoded metadata cannot satisfy this contract.
+    ///
+    /// ```compile_fail
+    /// use scriptw_aot_wasm::RuntimeArtifactInputs;
+    /// let _ = RuntimeArtifactInputs::new(None)
+    ///     .with_immutable_minimal_build(b"package", &[0; 32], b"Intl", b"receipt");
+    /// ```
     pub const unsafe fn with_immutable_minimal_build(
         mut self,
         bytes: &'static [u8],
         expected_source: &'static [u8; DIGEST_BYTES],
         metadata: &'static [u8],
+        runtime_metadata: &'static [u8],
     ) -> Self {
-        self.package = Some(Candidate::ImmutableBuild {
-            bytes,
-            expected_source,
-            intl_metadata: Some(metadata),
-        });
+        self.package = Some(Candidate::ImmutableMinimal(ImmutableMetadata {
+            package: bytes,
+            source: expected_source,
+            intl: metadata,
+            receipt: runtime_metadata,
+        }));
         self
     }
 
-    /// Resolve compilation metadata before constructing any operation providers.
-    pub fn intl_selection(
-        self,
-        profile: &scriptw_intl::IntlCompilationProfile,
-    ) -> Result<scriptw_intl::IntlDataSelection, EmitError> {
-        if *profile == scriptw_intl::IntlCompilationProfile::Minimal {
-            if let Some(Candidate::ImmutableBuild {
-                bytes,
-                expected_source,
-                intl_metadata: Some(metadata),
-            }) = self.package
-            {
-                return Ok(
-                    scriptw_intl::IntlDataSelection::defer_minimal_compilation_data(move || {
-                        let frames = envelope::inert_build_frames(
-                            bytes,
-                            expected_source,
-                            self.source_compilation_profile,
-                        )
-                        .ok_or_else(|| {
-                            scriptw_intl::EmbeddedIntlProviderSetupError::DataImage(
-                                scriptw_intl::IntlDataImageError::consumer(
-                                    "immutable Intl build package failed envelope admission",
-                                ),
-                            )
-                        })?;
-                        // SAFETY: only the immutable Cargo candidate constructor can
-                        // carry this authority. Frame/source/hash checks above and in
-                        // the metadata reader bind the exact admitted producer outputs.
-                        let build = unsafe {
-                            scriptw_intl::ImmutableIntlBuildData::new(
-                                metadata,
-                                expected_source,
-                                frames,
-                            )
-                        };
-                        let selection =
-                            scriptw_intl::IntlDataSelection::from_immutable_minimal_build(build)
-                                .map_err(|error| {
-                                    scriptw_intl::EmbeddedIntlProviderSetupError::DataImage(
-                                        scriptw_intl::IntlDataImageError::consumer(error),
-                                    )
-                                })?;
-                        selection
-                            .compilation_data()
-                            .map(Arc::clone)
-                            .map_err(|error| {
-                                scriptw_intl::EmbeddedIntlProviderSetupError::DataImage(
-                                    scriptw_intl::IntlDataImageError::consumer(error),
-                                )
-                            })
-                    }),
-                );
-            }
+    #[cfg(test)]
+    pub(super) fn immutable_metadata(self) -> Option<ImmutableMetadata> {
+        match self.package? {
+            Candidate::ImmutableMinimal(proof) => Some(proof),
+            Candidate::External { .. } | Candidate::ImmutableBuild { .. } => None,
         }
-        Ok(scriptw_intl::IntlDataSelection::new(profile.clone()))
     }
 
     pub(in crate::runtime_artifact) fn load_or_emit(
@@ -191,8 +169,11 @@ impl<'a> RuntimeArtifactInputs<'a> {
                 Candidate::ImmutableBuild {
                     bytes,
                     expected_source,
-                    ..
                 } => decode_immutable_build(bytes, identity, expected_source, self.admission_jobs),
+                Candidate::ImmutableMinimal(proof) => {
+                    metadata::BuildMetadata::decode(proof, self.source_compilation_profile)
+                        .and_then(|receipt| receipt.into_runtime(identity))
+                }
             };
             if let Some(runtime) = admitted {
                 if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {

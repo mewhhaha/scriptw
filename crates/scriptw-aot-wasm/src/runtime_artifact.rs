@@ -284,6 +284,7 @@ pub struct RuntimeArtifact {
     source_compilation_profile: RuntimeSourceCompilationProfile,
     compilation_data: Option<Arc<scriptw_intl::IntlCompilationData>>,
     compiler_owned_pool: OnceLock<Result<Arc<crate::data::CompilerOwnedPool>, EmitError>>,
+    build_admission: Option<build_package::metadata::BuildAdmission>,
 }
 
 impl RuntimeArtifact {
@@ -303,6 +304,7 @@ impl RuntimeArtifact {
             source_compilation_profile,
             compilation_data: Some(compilation_data),
             compiler_owned_pool: OnceLock::new(),
+            build_admission: None,
         }
     }
 
@@ -318,6 +320,7 @@ impl RuntimeArtifact {
             source_compilation_profile: RuntimeSourceCompilationProfile::Portable,
             compilation_data: None,
             compiler_owned_pool: OnceLock::new(),
+            build_admission: None,
         }
     }
 
@@ -343,6 +346,39 @@ impl RuntimeArtifact {
     /// Computed once when runtime bytes are emitted or fully admitted.
     pub fn wasm_sha256(&self) -> [u8; 32] {
         self.wasm_sha256
+    }
+
+    /// Digest of this exact immutable Cargo package, previously checked by
+    /// its producer. Another slice, even with equal length, grants no proof.
+    pub fn immutable_build_package_digest(&self, package: &[u8]) -> Option<[u8; 32]> {
+        self.build_admission.as_ref()?.package_digest(package)
+    }
+
+    /// Producer-admitted body extent for native planning without paging R in.
+    pub fn immutable_build_largest_body_bytes(&self) -> Option<usize> {
+        Some(self.build_admission.as_ref()?.largest_body)
+    }
+
+    pub(crate) fn admitted_compiler_pool_matches(&self, utf16: &[u8], data: &[u8]) -> Option<bool> {
+        Some(self.build_admission.as_ref()?.matches_pool(utf16, data))
+    }
+
+    fn require_intl_profile(
+        &self,
+        selection: &scriptw_intl::IntlDataSelection,
+    ) -> Result<(), EmitError> {
+        let selected = selection
+            .compilation_data()
+            .map_err(|error| EmitError::unsupported(error.to_string()))?;
+        if self.build_admission.is_some()
+            && self
+                .compilation_data
+                .as_ref()
+                .is_some_and(|data| Arc::ptr_eq(data, selected))
+        {
+            return Ok(());
+        }
+        crate::runtime_function::runtime_profile::require_runtime_profile(self.bytes(), selection)
     }
 
     pub(crate) fn layout(&self) -> &RuntimeLayout {
@@ -392,11 +428,7 @@ pub fn runtime_artifact_with_inputs(
 ) -> Result<Arc<RuntimeArtifact>, EmitError> {
     static RUNTIMES: OnceLock<Mutex<residency::RuntimeResidency>> = OnceLock::new();
     let admission_started = std::time::Instant::now();
-    let identity = cache::RuntimeIdentity::admit_with_jobs(
-        selection,
-        inputs.source_compilation_profile(),
-        inputs.admission_jobs(),
-    )?;
+    let identity = inputs.admit_identity(selection)?;
     if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
         eprintln!(
             "scriptw wasm trace: runtime-data admission: {:?}",

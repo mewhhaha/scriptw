@@ -23,14 +23,15 @@ than the previous memory checkpoint. Integer execution fell from
 a 2× gap. RSS includes host/runtime, setup and retained warmup effects;
 it is not live JavaScript heap usage or peak memory.
 
-The runtime now separates build-admitted Intl compilation metadata from
-provider initialization, loads providers on the first Intl operation, and uses
-private disk-backed native mappings where supported. Constant-string bootstrap
-uses a descriptor loop. Large static regexp descriptors copy from checked
-program data, avoiding enormous operand stacks during native compilation.
-Intl remains lazy at whole-provider granularity: actual Intl use still loads
-the complete selected provider. The linked checkpoint retains that first-use
-cost, allocation diagnostics and repeated-call controls. The graph remains
+The runtime separates build-admitted Intl metadata from operation consumers,
+reuses a compact Cargo runtime receipt and uses private disk-backed native
+mappings where supported. Locale transforms and NumberFormat/PluralRules admit
+only their typed Locale/Number consumers; other Intl operations still initialize
+the complete provider. Constant-string bootstrap uses a descriptor loop and
+shares immutable absent-value snapshots. Large static regexp descriptors copy
+from checked program data, avoiding enormous native-compilation operand stacks.
+The linked checkpoint retains its measured first-use cost, allocation
+diagnostics and repeated-call controls. The graph remains
 bound to the measured compiler and date shown in it; see the
 [memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 

@@ -73,6 +73,37 @@ class MaintenanceSourceGuards(unittest.TestCase):
                     self.assertIn(kind + " keeps checked raw API and exact linked R",
                                   pool.check(ROOT, {path: source.replace(before, "missing_proof(")}))
 
+    def test_pool_receipt_rejects_bad_data_before_freezing_and_keeps_raw_fallback(self):
+        self.assertEqual(pool.check(ROOT), [])
+        path = pool.A + "data/compiler_owned_pool.rs"
+        source = pool.compact((ROOT / path).read_text())
+        invariant = "actual runtime boundary and bytes precede prefix freezing"
+        for before, after in [
+            ("runtime.layout().require_pool(&prefix.0)?;", ""),
+            ("if!matches{returnErr(", "ifmatches{returnErr("),
+            ("else{prefix.require_runtime_data(runtime.bytes())?;}", "else{}"),
+            ("runtime.admitted_compiler_pool_matches(&prefix.0.pooled_code_unit_bytes[..],&prefix.0.bytes[..],)",
+             "Some(true)"),
+        ]:
+            with self.subTest(before=before):
+                self.assertEqual(source.count(before), 1)
+                self.assertIn(invariant, pool.check(ROOT, {path: source.replace(before, after)}))
+        freeze = "prefix.0.bytes.freeze();"
+        boundary = "runtime.layout().require_pool(&prefix.0)?;"
+        changed = source.replace(freeze, "").replace(boundary, freeze + boundary)
+        self.assertIn(invariant, pool.check(ROOT, {path: changed}))
+
+        invariant = "immutable pool proof checks both actual reconstructed image dimensions and hashes"
+        for path, before in [
+            (pool.A + "runtime_artifact.rs", "Some(self.build_admission.as_ref()?.matches_pool(utf16,data))"),
+            (pool.A + "runtime_artifact/build_package/metadata.rs", "bytes.len()==expected.span.len()"),
+            (pool.A + "runtime_artifact/build_package/metadata.rs", "Sha256::digest(bytes).as_slice()==expected.digest"),
+        ]:
+            with self.subTest(before=before):
+                source = pool.compact((ROOT / path).read_text())
+                self.assertEqual(source.count(before), 1)
+                self.assertIn(invariant, pool.check(ROOT, {path: source.replace(before, "true")}))
+
     def test_typed_import_slots_keep_distinct_roles_and_complete_admission(self):
         self.assertEqual(profile.check(ROOT), [])
         path = profile.A + "runtime_artifact/source_compilation.rs"
@@ -132,3 +163,104 @@ class TransientNativeImageGuards(unittest.TestCase):
                 source = (ROOT / path).read_text()
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_owned_byte_proof")}))
+
+
+class ImmutableReceiptGuards(unittest.TestCase):
+    def rejected(self, path, before, after, invariant):
+        source = (ROOT / path).read_text()
+        pattern = r"\s*".join(re.escape(character) for character in before)
+        matches = list(re.finditer(pattern, source))
+        self.assertEqual(len(matches), 1, before)
+        match = matches[0]
+        changed = source[:match.start()] + after + source[match.end():]
+        self.assertIn(invariant, profile.check(ROOT, {path: changed}))
+
+    def test_actual_receipt_owners_are_admitted(self):
+        self.assertEqual(profile.check(ROOT), [])
+
+    def test_safe_external_and_cache_inputs_cannot_reuse_producer_validation(self):
+        invariant = "safe external packages and disk caches still validate every function at use"
+        for path, before in [
+            (profile.A + "runtime_artifact/build_package/envelope.rs",
+             "jobs,FunctionBodyValidation::AtUse,"),
+            (profile.A + "runtime_artifact/cache.rs",
+             "jobs,super::validation::FunctionBodyValidation::AtUse,"),
+        ]:
+            with self.subTest(path=path):
+                self.rejected(path, before, before.replace("AtUse", "ValidatedAtBuild"), invariant)
+
+    def test_immutable_metadata_has_no_safe_constructor_or_raw_decode_entry(self):
+        invariant = "only unsafe immutable Inputs mint receipt authority; the raw parser stays private"
+        path = profile.A + "runtime_artifact/build_package/inputs.rs"
+        for before, after in [
+            ("pubconstunsafefnwith_immutable_minimal_build(",
+             "pubconstfnwith_immutable_minimal_build("),
+            ("package:&'static[u8],source:&'static[u8;32],intl:&'static[u8],receipt:&'static[u8],}",
+             "pubpackage:&'static[u8],source:&'static[u8;32],intl:&'static[u8],receipt:&'static[u8],}"),
+            ("implImmutableMetadata{", "implImmutableMetadata{pubfnforged()->Self{panic!()}"),
+        ]:
+            with self.subTest(before=before):
+                self.rejected(path, before, after, invariant)
+        path = profile.A + "runtime_artifact/build_package/metadata/decode.rs"
+        self.rejected(path, "proof:super::super::inputs::ImmutableMetadata,",
+                      "proof:&'static[u8],", invariant)
+        # A parser exposed from its child could mint BuildMetadata without the
+        # opaque token even if the legitimate decode entry retained its proof.
+        source = (ROOT / path).read_text()
+        self.assertEqual(source.count("    fn parse("), 1)
+        self.assertIn(invariant, profile.check(ROOT, {
+            path: source.replace("    fn parse(", "    pub(super) fn parse(")
+        }))
+        self.rejected(path, "#[cfg(test)]pub(super)fnparser_rejects(",
+                      "pub(super)fnparser_rejects(", invariant)
+        path = profile.A + "runtime_artifact/build_package/inputs/admission.rs"
+        source = (ROOT / path).read_text()
+        forged = '\nfn forged() -> ImmutableMetadata { ImmutableMetadata { package: b"", source: &[0; 32], intl: b"", receipt: b"" } }\n'
+        self.assertIn(invariant, profile.check(ROOT, {path: source + forged}))
+
+    def test_producer_identity_cannot_be_minted_from_a_bare_digest(self):
+        invariant = "receipt identity binds opaque selected data, source profile and producer digest"
+        path = profile.A + "runtime_artifact/cache.rs"
+        self.rejected(path, "proof:super::build_package::metadata::BuildIdentity,",
+                      "proof:[u8;32],", invariant)
+        path = profile.A + "runtime_artifact/build_package/metadata.rs"
+        for before, after in [
+            ("data:Arc<scriptw_intl::IntlCompilationData>,profile:RuntimeSourceCompilationProfile,digest:[u8;32],}",
+             "pubdata:Arc<scriptw_intl::IntlCompilationData>,profile:RuntimeSourceCompilationProfile,digest:[u8;32],}"),
+            ("implBuildIdentity{", "implBuildIdentity{pubfnforged()->Self{panic!()}"),
+            ("data.service_selection().is_some()", "false"),
+            ("data.identity().artifact_identity().as_bytes()!=self.intl_identity.as_bytes()", "false"),
+            ("profile:self.profile,digest:self.selection_digest,", "profile:self.profile,digest:[0;32],"),
+        ]:
+            with self.subTest(before=before):
+                self.rejected(path, before, after, invariant)
+
+    def test_receipt_identity_fallback_retains_actual_profile_and_jobs(self):
+        invariant = "receipt selection delegates exact identity with full external and cache fallback"
+        path = profile.A + "runtime_artifact/build_package/inputs/admission.rs"
+        self.rejected(path, "selection,self.source_compilation_profile,self.admission_jobs,",
+                      "selection,RuntimeSourceCompilationProfile::Portable,self.admission_jobs,", invariant)
+        path = profile.A + "runtime_artifact/build_package/inputs.rs"
+        self.rejected(path, "envelope::decode_with_jobs(bytes,identity,expected_source,self.admission_jobs,)",
+                      "decode_immutable_build(bytes,identity,expected_source,self.admission_jobs)", invariant)
+
+    def test_receipt_still_checks_source_profile_spans_and_exact_package_owner(self):
+        invariant = "compact receipt retains checked framing, exact profile, bounded layout and package ownership"
+        for path, before in [
+            ("metadata/decode.rs", "Sha256::digest(body).as_slice()!=checksum"),
+            ("metadata/decode.rs", "&r.take::<32>()?!=source"),
+            ("metadata/decode.rs", "r.take::<1>()?!=[profile.wire()]"),
+            ("metadata/decode.rs", "spans.windows(2).any(|pair|pair[0].end>pair[1].start)"),
+            ("metadata.rs", "std::ptr::eq(self.package,package).then_some(self.package_digest)"),
+        ]:
+            with self.subTest(before=before):
+                self.rejected(profile.A + "runtime_artifact/build_package/" + path,
+                              before, "false", invariant)
+
+    def test_receipt_accessors_select_two_distinct_immutable_images(self):
+        invariant = "nine immutable image definitions use seven original and two receipt accessors"
+        self.rejected("crates/scriptw-runtime-image/src/metadata.rs",
+                      "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}",
+                      "returnunsafe{&SCRIPTW_RUNTIME_METADATA}", invariant)
+        self.rejected("crates/scriptw-runtime-image/build/objects.rs",
+                      "constPARTS:[(&str,&str);9]", "constPARTS:[(&str,&str);7]", invariant)

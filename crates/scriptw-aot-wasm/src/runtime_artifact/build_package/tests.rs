@@ -4,9 +4,9 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::sync::OnceLock;
 
-const SOURCE: [u8; 32] = [19; 32];
+pub(super) const SOURCE: [u8; 32] = [19; 32];
 
-fn fixture() -> &'static RuntimeBuildArtifact {
+pub(super) fn fixture() -> &'static RuntimeBuildArtifact {
     static FIXTURE: OnceLock<RuntimeBuildArtifact> = OnceLock::new();
     FIXTURE.get_or_init(|| {
         std::thread::Builder::new()

@@ -103,7 +103,9 @@ def check(sources):
             'complete cached witness and exact R/profile: shared linkage owner')
     require('letruntime=validated.runtime();' in artifact and 'emit_runtime_direct_eval_module(program,validated)?' in artifact and
             'runtime:Arc<RuntimeArtifact>,selection:IntlDataSelection,' in proof and
-            len(re.findall(r'require_runtime_profile\(runtime[.]bytes\(\),&selection,?\)\?;', proof)) == 1 and
+            proof.count('runtime.require_intl_profile(&selection)?;') == 1 and
+            'ifself.build_admission.is_some()&&self.compilation_data.as_ref().is_some_and(|data|Arc::ptr_eq(data,selected)){returnOk(());}' in a('runtime_artifact.rs') and
+            'crate::runtime_function::runtime_profile::require_runtime_profile(self.bytes(),selection)' in a('runtime_artifact.rs') and
             'Ok(Self{runtime,selection})' in proof,
             'complete cached witness and exact R/profile: retained opaque profile admission')
     witness = a('runtime_direct_eval/witness.rs')

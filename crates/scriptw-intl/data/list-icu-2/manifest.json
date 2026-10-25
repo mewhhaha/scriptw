@@ -77,9 +77,9 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41605,
+      "bytes": 41725,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "b1a75a27d9eeeefe325ca22411283bc008f0605ac245cb933ede3f8e8e8fb730"
+      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
     },
     {
       "bytes": 5033,
@@ -117,9 +117,9 @@
       "sha256": "e7fb47cfbb23dc0b0a293dc374fc56ea7f96b9b80b1deed99bf73a499f301234"
     },
     {
-      "bytes": 6510,
+      "bytes": 8955,
       "path": "crates/scriptw-intl/src/locale_image.rs",
-      "sha256": "c75836ed9dbe7b9fca2d8e408e85048b877227c81fd1c425306a96250182e7a4"
+      "sha256": "2b3b914fa57d4503fdd1a2e1a8e5dbbc8cb5656f0d4ac6a61150738a692022bf"
     },
     {
       "bytes": 9648,
@@ -132,9 +132,9 @@
       "sha256": "d1b639456ee28338b959c9e176178dfbc1f097deddbb05c0d6b8a203df0dd695"
     },
     {
-      "bytes": 49964,
+      "bytes": 50172,
       "path": "crates/scriptw-intl/src/protocol.rs",
-      "sha256": "5fca05dbf652b1dd6276f557f78600a6e60086cfd33567b58bc59d9670e1b4a5"
+      "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
     },
     {
       "bytes": 2251,
@@ -162,9 +162,9 @@
       "sha256": "555340ca30dabd79560cd293768c0e34208df204af1fb82bec15705bc26dbdfd"
     },
     {
-      "bytes": 80477,
+      "bytes": 80488,
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "9f8e71493f749ddd0e8909271c22fff308ce4959c03e78fb14a29d986377fe90"
+      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
     },
     {
       "bytes": 21454,
@@ -338,7 +338,7 @@
       }
     ]
   },
-  "provider_data_sha256": "9461cb4e83e1838533740f6c92e6fa50d32b7d7b29ee82ac6f6ca57ac344d331",
+  "provider_data_sha256": "a4893dd4227e1c3131ce5be782046037e2a0768bbdfca25febf333ece6b1e984",
   "purpose": "pinned ICU list templates, conditional DFA and exact UTF16/indexed parts kernel",
   "schema_version": 1,
   "source_archive_sha256": "f64d583886e9a8201535b5296be9fb2f299d6e21f84d39488ce51affdd6c8f5e"

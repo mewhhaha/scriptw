@@ -35,6 +35,8 @@ mod locale_image;
 mod locale_information_wire;
 mod locale_text_wire;
 mod locale_week_wire;
+mod minimal_consumer;
+pub use minimal_consumer::{MinimalLocaleProvider, MinimalNumberProvider, NumberProfilesProvider};
 mod named_time_zone_image;
 mod native_locale_information_image;
 pub mod number_format;

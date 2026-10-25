@@ -47,6 +47,7 @@ impl Eq for IntlCompilationBytes {}
 /// requiring formatter/provider ownership during compilation or non-Intl runs.
 #[derive(Debug)]
 pub struct IntlCompilationData {
+    pub(crate) minimal_consumers: crate::minimal_consumer::MinimalConsumers,
     identity: IntlDataIdentity,
     services: Option<CheckedIntlServiceSelection>,
     frames: Vec<(IntlDataComponent, IntlCompilationBytes)>,
@@ -69,6 +70,7 @@ impl IntlCompilationData {
             };
         }
         Ok(Self {
+            minimal_consumers: Default::default(),
             identity: selected.identity().clone(),
             services: selected.service_selection().cloned(),
             frames: selected
@@ -197,17 +199,37 @@ impl IntlDataSelection {
         build: crate::ImmutableIntlBuildData<IntlDataComponent>,
     ) -> Result<Self, IntlBundleExportError> {
         let (metadata, source, frames) = build.into_parts();
-        Self::from_minimal_compilation_data(Arc::new(decode_build_metadata(
-            metadata, source, frames,
+        Self::from_minimal_compilation_data(Arc::new(decode_metadata(
+            metadata,
+            source,
+            frames,
+            FrameValidation::AdmittedAtBuild,
         )?))
         .ok_or(IntlBundleExportError::Identity)
     }
 }
 
+#[derive(Clone, Copy)]
+enum FrameValidation {
+    #[cfg(test)]
+    AtUse,
+    AdmittedAtBuild,
+}
+
+#[cfg(test)]
 fn decode_build_metadata(
     metadata: &[u8],
     source: &[u8; 32],
     frames: Vec<(IntlDataComponent, &'static [u8])>,
+) -> Result<IntlCompilationData, IntlBundleExportError> {
+    decode_metadata(metadata, source, frames, FrameValidation::AtUse)
+}
+
+fn decode_metadata(
+    metadata: &[u8],
+    source: &[u8; 32],
+    frames: Vec<(IntlDataComponent, &'static [u8])>,
+    frame_validation: FrameValidation,
 ) -> Result<IntlCompilationData, IntlBundleExportError> {
     if metadata.len() > MAX_METADATA || metadata.len() < 32 {
         return Err(IntlBundleExportError::TooLarge);
@@ -241,8 +263,16 @@ fn decode_build_metadata(
         if component != expected
             || r.take(2)? != component.code().to_le_bytes()
             || r.u32()? != bytes.len()
-            || r.take(32)? != Sha256::digest(bytes).as_slice()
         {
+            return Err(IntlBundleExportError::Identity);
+        }
+        let expected_digest = r.take(32)?;
+        let verify = match frame_validation {
+            #[cfg(test)]
+            FrameValidation::AtUse => true,
+            FrameValidation::AdmittedAtBuild => false,
+        };
+        if verify && expected_digest != Sha256::digest(bytes).as_slice() {
             return Err(IntlBundleExportError::Identity);
         }
         admitted.push((component, IntlCompilationBytes::Build(bytes)));
@@ -273,6 +303,7 @@ fn decode_build_metadata(
         return Err(IntlBundleExportError::Framing("trailing compiler metadata"));
     }
     Ok(IntlCompilationData {
+        minimal_consumers: Default::default(),
         identity,
         services: None,
         frames: admitted,

@@ -850,6 +850,10 @@ impl<P: IntlProvider> IntlKernel<P> {
         &self.identity
     }
 
+    pub(crate) fn provider(&self) -> &P {
+        &self.provider
+    }
+
     pub fn operation<O>(&self) -> Result<IntlOperationHandle<'_, P, O>, MissingIntlCapabilities>
     where
         O: IntlOperation,
@@ -1247,6 +1251,9 @@ impl IntlKernel<crate::EmbeddedIntlProvider> {
                 .ok_or(crate::UnavailableIntlService(crate::IntlService::Collator))?,
         )
     }
+}
+
+impl<P: crate::NumberProfilesProvider> IntlKernel<P> {
     pub fn decode_number_format_request(
         &self,
         bytes: &[u8],
@@ -1257,7 +1264,7 @@ impl IntlKernel<crate::EmbeddedIntlProvider> {
                 .number_profiles()
                 .filter(|_| {
                     self.provider
-                        .permits_service(crate::IntlService::NumberFormat)
+                        .permits_number_service(crate::IntlService::NumberFormat)
                 })
                 .ok_or(crate::UnavailableIntlService(
                     crate::IntlService::NumberFormat,
@@ -1274,7 +1281,7 @@ impl IntlKernel<crate::EmbeddedIntlProvider> {
                 .number_profiles()
                 .filter(|_| {
                     self.provider
-                        .permits_service(crate::IntlService::NumberFormat)
+                        .permits_number_service(crate::IntlService::NumberFormat)
                 })
                 .ok_or(crate::UnavailableIntlService(
                     crate::IntlService::NumberFormat,
@@ -1291,7 +1298,7 @@ impl IntlKernel<crate::EmbeddedIntlProvider> {
                 .number_profiles()
                 .filter(|_| {
                     self.provider
-                        .permits_service(crate::IntlService::PluralRules)
+                        .permits_number_service(crate::IntlService::PluralRules)
                 })
                 .ok_or(crate::UnavailableIntlService(
                     crate::IntlService::PluralRules,
@@ -1308,13 +1315,16 @@ impl IntlKernel<crate::EmbeddedIntlProvider> {
                 .number_profiles()
                 .filter(|_| {
                     self.provider
-                        .permits_service(crate::IntlService::PluralRules)
+                        .permits_number_service(crate::IntlService::PluralRules)
                 })
                 .ok_or(crate::UnavailableIntlService(
                     crate::IntlService::PluralRules,
                 ))?,
         )
     }
+}
+
+impl IntlKernel<crate::EmbeddedIntlProvider> {
     pub fn decode_relative_time_request(
         &self,
         operation: crate::RelativeHostOp,

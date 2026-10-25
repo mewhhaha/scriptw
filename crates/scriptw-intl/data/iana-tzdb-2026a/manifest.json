@@ -23,7 +23,7 @@
       "ianaCountry": "IS"
     }
   ],
-  "providerDataSha256": "572d6f6bf452d0d0e9d46f065f61503f11cfc0d6bf6001b90e3ac1536e85ab8b",
+  "providerDataSha256": "cd82098c545a7d2a60434b909fc880f8f4192dc0b5fdc73b4cdb87157e54d810",
   "recipe": {
     "domain": "scriptw-intl-named-time-zones-v1",
     "iana": "2026a",
@@ -128,13 +128,13 @@
       },
       {
         "path": "crates/scriptw-intl/src/lib.rs",
-        "bytes": 41605,
-        "sha256": "b1a75a27d9eeeefe325ca22411283bc008f0605ac245cb933ede3f8e8e8fb730"
+        "bytes": 41725,
+        "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
       },
       {
         "path": "crates/scriptw-intl/src/provider.rs",
-        "bytes": 80477,
-        "sha256": "9f8e71493f749ddd0e8909271c22fff308ce4959c03e78fb14a29d986377fe90"
+        "bytes": 80488,
+        "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
       },
       {
         "path": "crates/scriptw-intl/src/selection.rs",
@@ -168,8 +168,8 @@
       },
       {
         "path": "crates/scriptw-intl/src/protocol.rs",
-        "bytes": 49964,
-        "sha256": "5fca05dbf652b1dd6276f557f78600a6e60086cfd33567b58bc59d9670e1b4a5"
+        "bytes": 50172,
+        "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
       },
       {
         "path": "crates/scriptw-intl/src/image.rs",
@@ -178,8 +178,8 @@
       },
       {
         "path": "crates/scriptw-intl/src/locale_image.rs",
-        "bytes": 6510,
-        "sha256": "c75836ed9dbe7b9fca2d8e408e85048b877227c81fd1c425306a96250182e7a4"
+        "bytes": 8955,
+        "sha256": "2b3b914fa57d4503fdd1a2e1a8e5dbbc8cb5656f0d4ac6a61150738a692022bf"
       },
       {
         "path": "crates/scriptw-intl/src/image_build/locale.rs",
@@ -223,8 +223,8 @@
       },
       {
         "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-        "bytes": 17120,
-        "sha256": "4fdbcfb69256dd481bd8c498490fd3b5f8427e9775dd5a3363528a3cbb3aeab8"
+        "bytes": 21032,
+        "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
       },
       {
         "path": "crates/scriptw-aot-wasm/src/emit.rs",
@@ -561,7 +561,7 @@
     {
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
       "bytes": 565,
-      "sha256": "b2c68b4c36e6e692acc664c1882b67ef4eb567e47ad1cd48e636b132e7159ae5"
+      "sha256": "f06651b3599488956e6b92bb6398468fd0f3b356d73a377e42bae300aba15249"
     }
   ]
 }

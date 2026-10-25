@@ -1,6 +1,7 @@
 use super::*;
 #[cfg(test)]
 use scriptw_intl::number_format::embedded_number_profiles_arc;
+use scriptw_intl::NumberProfilesProvider;
 use scriptw_intl::{
     IntlOperation, IntlOperationProvider, PluralCategory, PluralLocaleRequest,
     PluralRulesOperationError, PluralSupportedLocalesRequest, PluralSupportedLocalesResult,
@@ -15,7 +16,7 @@ pub(super) trait PluralHostOperation:
 {
     fn decode_request(
         bytes: &[u8],
-        kernel: &IntlKernel<EmbeddedIntlProvider>,
+        kernel: &IntlKernel<impl NumberProfilesProvider>,
     ) -> Result<Self::Request, PluralWireError>;
     fn encode_response(response: &Self::Response) -> Result<Vec<u8>, PluralWireError>;
 }
@@ -24,7 +25,7 @@ macro_rules! locale_operation {
         impl PluralHostOperation for $operation {
             fn decode_request(
                 bytes: &[u8],
-                _kernel: &IntlKernel<EmbeddedIntlProvider>,
+                _kernel: &IntlKernel<impl NumberProfilesProvider>,
             ) -> Result<Self::Request, PluralWireError> {
                 <$request>::decode(bytes)
             }
@@ -47,7 +48,7 @@ locale_operation!(
 impl PluralHostOperation for SelectPlural {
     fn decode_request(
         bytes: &[u8],
-        kernel: &IntlKernel<EmbeddedIntlProvider>,
+        kernel: &IntlKernel<impl NumberProfilesProvider>,
     ) -> Result<Self::Request, PluralWireError> {
         kernel.decode_plural_select_request(bytes)
     }
@@ -58,7 +59,7 @@ impl PluralHostOperation for SelectPlural {
 impl PluralHostOperation for SelectPluralRange {
     fn decode_request(
         bytes: &[u8],
-        kernel: &IntlKernel<EmbeddedIntlProvider>,
+        kernel: &IntlKernel<impl NumberProfilesProvider>,
     ) -> Result<Self::Request, PluralWireError> {
         kernel.decode_plural_range_request(bytes)
     }
@@ -68,12 +69,11 @@ impl PluralHostOperation for SelectPluralRange {
 }
 
 pub(super) fn call<O>(
-    kernel: &IntlKernel<EmbeddedIntlProvider>,
+    kernel: &IntlKernel<impl NumberProfilesProvider + IntlOperationProvider<O>>,
     payload: &[u8],
 ) -> wasmtime::Result<Option<Vec<u8>>>
 where
     O: PluralHostOperation,
-    EmbeddedIntlProvider: IntlOperationProvider<O>,
 {
     let request = O::decode_request(payload, kernel).map_err(|error| {
         wasmtime::Error::msg(format!(

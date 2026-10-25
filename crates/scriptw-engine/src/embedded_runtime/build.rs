@@ -33,7 +33,7 @@ pub(crate) fn write_bundle(
             RuntimeSourceCompilationProfile::NativeHost,
             RuntimeSourceCompilationProfile::Portable,
         ] {
-            publication::publish(out, profile, &[], &[], &[]);
+            publication::publish(out, profile, &[], &[], &[], &[]);
         }
         publication::publish_intl_metadata(out, &[]);
         return;
@@ -98,6 +98,11 @@ pub(crate) fn write_bundle(
                 let compiler = RuntimeImageCompiler::new(config, module_cache, native_identity)
                     .expect("build engine has the required product configuration and capabilities");
                 println!("build runtime native setup: {:?}", started.elapsed());
+                let metadata = selection
+                    .selected()
+                    .expect("admitted Minimal components")
+                    .minimal_build_metadata(&source)
+                    .expect("consumer-admitted Minimal compiler metadata");
                 for profile in [
                     RuntimeSourceCompilationProfile::NativeHost,
                     RuntimeSourceCompilationProfile::Portable,
@@ -127,7 +132,6 @@ pub(crate) fn write_bundle(
                         let (hits, misses) = cache.counters();
                         println!("build runtime function cache: {hits} hits, {misses} misses");
                     }
-                    let started = std::time::Instant::now();
                     let manifest = manifest::Manifest {
                         source,
                         target: target.to_owned(),
@@ -139,17 +143,18 @@ pub(crate) fn write_bundle(
                     };
                     let encoded = manifest.encode();
                     assert_eq!(manifest::Manifest::decode(&encoded), Some(manifest));
-                    publication::publish(out, profile, runtime.package_bytes(), &native, &encoded);
-                    println!(
-                        "build runtime {profile:?} manifest publication: {:?}",
-                        started.elapsed()
+                    let runtime_metadata = runtime
+                        .immutable_build_metadata(&selection, &source, &metadata)
+                        .expect("fully checked runtime produces bounded metadata");
+                    publication::publish(
+                        out,
+                        profile,
+                        runtime.package_bytes(),
+                        &native,
+                        &encoded,
+                        &runtime_metadata,
                     );
                 }
-                let metadata = selection
-                    .selected()
-                    .expect("admitted Minimal components")
-                    .minimal_build_metadata(&source)
-                    .expect("consumer-admitted Minimal compiler metadata");
                 publication::publish_intl_metadata(out, &metadata);
             })
             .expect("bounded build-runtime compiler thread starts")

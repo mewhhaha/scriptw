@@ -17,6 +17,8 @@ impl<Component> ImmutableIntlBuildData<Component> {
     /// fully admitted Minimal R package. It must have admitted all operation
     /// consumers and derived all six catalogues from those same consumers.
     /// Caller bytes, caches and re-encoded metadata cannot grant this authority.
+    /// The consumer may reuse the producer's complete frame hashes rather than
+    /// faulting every immutable frame into resident memory again.
     ///
     /// ```compile_fail
     /// use scriptw_intl_build_data::ImmutableIntlBuildData;

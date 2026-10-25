@@ -512,9 +512,8 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<GcStackReference<FunctionObject>, EmitError> {
         let schema = self.runtime_schema();
-        let program_operand = inputs
-            .program
-            .capture_operand(meta.entry.executable_kind()?, schema)?;
+        let executable_kind = meta.entry.executable_kind()?;
+        let program_operand = inputs.program.capture_operand(executable_kind, schema)?;
         let object = schema.reserve_gc_local(function).initialize(
             self.emit_alloc_plain_object_with_prototype(Some(inputs.internal_prototype), function)?,
             function,
@@ -530,9 +529,18 @@ impl FunctionBuilder<'_> {
                 function,
             );
         let stored_home = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(inputs.home_object, function),
+            match executable_kind {
+                crate::gc_types::ExecutableCodeKind::JavaScript => schema
+                    .struct_type::<StoredValue>()
+                    .from_value(inputs.home_object, function),
+                // Native entries have no ECMAScript [[HomeObject]]. Their
+                // factories supply undefined, including captured builtins.
+                // Source methods/classes retain their actual defining home.
+                crate::gc_types::ExecutableCodeKind::StandardBuiltin
+                | crate::gc_types::ExecutableCodeKind::HostBuiltin => {
+                    schema.stored_undefined(function)
+                }
+            },
             function,
         );
         let initializer = self.emit_instance_elements_initializer_capture(meta, function)?;
@@ -562,14 +570,11 @@ impl FunctionBuilder<'_> {
                 self.emit_interned_string_reference(&meta.to_string_value, function)?,
                 function,
             );
-        let public_prototype = schema.reserve_value_local(function);
-        public_prototype.set_undefined(function);
-        let stored_public_prototype = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&public_prototype, function),
-            function,
-        );
+        // Publication replaces this field's edge when it creates a prototype;
+        // the immutable undefined snapshot never acquires object identity.
+        let stored_public_prototype = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
         let callable = schema.reserve_gc_local(function).initialize(
             schema.struct_type::<FunctionObject>().construct(
                 (
@@ -612,7 +617,6 @@ impl FunctionBuilder<'_> {
             prototype_materialization,
             function,
         )?;
-        public_prototype.clear(function);
         stored_public_prototype.clear(function);
         source_text.clear(function);
         stored_home.clear(function);

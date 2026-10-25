@@ -3,6 +3,7 @@ use scriptw_intl::number_format::{
     NumberLocaleRequest, NumberSupportedLocalesRequest, RangeNumberPartition, ResolvedNumberLocale,
     ScalarNumberPartition,
 };
+use scriptw_intl::NumberProfilesProvider;
 use scriptw_intl::NumberWireError;
 use scriptw_intl::{
     FormatNumberParts, FormatNumberRangeParts, IntlOperation, IntlOperationProvider,
@@ -19,7 +20,7 @@ pub(super) trait NumberHostOperation:
 {
     fn decode_request(
         bytes: &[u8],
-        kernel: &IntlKernel<EmbeddedIntlProvider>,
+        kernel: &IntlKernel<impl NumberProfilesProvider>,
     ) -> Result<Self::Request, NumberWireError>;
     fn encode_response(response: &Self::Response) -> Result<Vec<u8>, NumberWireError>;
 }
@@ -29,7 +30,7 @@ macro_rules! number_host_operation {
         impl NumberHostOperation for $operation {
             fn decode_request(
                 $bytes: &[u8],
-                $kernel: &IntlKernel<EmbeddedIntlProvider>,
+                $kernel: &IntlKernel<impl NumberProfilesProvider>,
             ) -> Result<Self::Request, NumberWireError> {
                 $decode
             }
@@ -69,12 +70,11 @@ number_host_operation!(
 );
 
 pub(super) fn call<O>(
-    kernel: &IntlKernel<EmbeddedIntlProvider>,
+    kernel: &IntlKernel<impl NumberProfilesProvider + IntlOperationProvider<O>>,
     payload: &[u8],
 ) -> wasmtime::Result<Option<Vec<u8>>>
 where
     O: NumberHostOperation,
-    EmbeddedIntlProvider: IntlOperationProvider<O>,
 {
     let request = O::decode_request(payload, kernel).map_err(|error| {
         wasmtime::Error::msg(format!(

@@ -637,19 +637,13 @@ impl<'a> FunctionBuilder<'a> {
         configurable: I32Local,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let undefined = schema.reserve_value_local(function);
-        undefined.set_undefined(function);
-        let descriptor = self.emit_alloc_property_descriptor_with_word(
+        let descriptor = self.emit_alloc_data_property_descriptor_with_word(
             GcOperand::data_descriptor_flags(writable, enumerable, configurable),
             value,
-            &undefined,
-            &undefined,
             function,
         );
         self.emit_ordinary_append_property_entry(object, key, &descriptor, function)?;
         descriptor.clear(function);
-        undefined.clear(function);
         Ok(())
     }
 
@@ -776,31 +770,11 @@ impl<'a> FunctionBuilder<'a> {
         // values need no per-property immutable snapshots; later redefinition
         // replaces fields on the fresh descriptor, leaving this root unchanged.
         if matches!(&attributes, StoredPropertyAttributes::Data { .. }) {
-            let schema = self.runtime_schema();
-            let stored = schema.reserve_gc_local(function).initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(value, function),
+            return self.emit_alloc_data_property_descriptor_with_word(
+                GcOperand::descriptor_word(attributes.descriptor_word()),
+                value,
                 function,
             );
-            let absent = schema
-                .reserve_gc_local(function)
-                .initialize(schema.stored_undefined(function), function);
-            let descriptor = schema.reserve_gc_local(function).initialize(
-                schema.struct_type::<PropertyDescriptor>().construct(
-                    (
-                        GcOperand::descriptor_word(attributes.descriptor_word()),
-                        GcOperand::reference(&stored, schema),
-                        GcOperand::reference(&absent, schema),
-                        GcOperand::reference(&absent, schema),
-                    ),
-                    function,
-                ),
-                function,
-            );
-            absent.clear(function);
-            stored.clear(function);
-            return descriptor;
         }
         self.emit_alloc_property_descriptor_with_word(
             GcOperand::descriptor_word(attributes.descriptor_word()),
@@ -809,6 +783,41 @@ impl<'a> FunctionBuilder<'a> {
             setter,
             function,
         )
+    }
+
+    /// The caller proves Data even when its attribute bits are runtime operands.
+    /// Only the value needs a snapshot; absent accessors share immutable undefined.
+    fn emit_alloc_data_property_descriptor_with_word(
+        &self,
+        attributes: GcOperand<'_, crate::heap::DescriptorWord, crate::gc_types::NonNullable>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> GcLocal<PropertyDescriptor> {
+        let schema = self.runtime_schema();
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<StoredValue>()
+                .from_value(value, function),
+            function,
+        );
+        let absent = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let descriptor = schema.reserve_gc_local(function).initialize(
+            schema.struct_type::<PropertyDescriptor>().construct(
+                (
+                    attributes,
+                    GcOperand::reference(&stored, schema),
+                    GcOperand::reference(&absent, schema),
+                    GcOperand::reference(&absent, schema),
+                ),
+                function,
+            ),
+            function,
+        );
+        absent.clear(function);
+        stored.clear(function);
+        descriptor
     }
 
     fn emit_alloc_property_descriptor_with_word(

@@ -17,16 +17,18 @@ pub(super) fn publish(
     package: &[u8],
     native: &[u8],
     manifest: &[u8],
+    metadata: &[u8],
 ) {
     let prefix = match profile {
         RuntimeSourceCompilationProfile::NativeHost => "scriptw-runtime",
         RuntimeSourceCompilationProfile::Portable => "scriptw-runtime-portable",
     };
-    // Cargo admits the producer only after both complete triplets are written.
+    // Cargo admits the producer only after both complete package groups are written.
     for (suffix, bytes) in [
         ("package", package),
         ("native", native),
         ("manifest", manifest),
+        ("metadata", metadata),
     ] {
         output::write(&out.join(format!("{prefix}-{suffix}.bin")), bytes)
             .expect("build runtime output writes completely");

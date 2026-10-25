@@ -54,10 +54,15 @@ def check(sources):
             "runtime.intl_compilation_data()" in proof and
             "IntlDataSelection::from_minimal_compilation_data(Arc::clone(data))" in proof and
             "unwrap_or_else(||IntlDataSelection::new(profile))" in proof and
-            len(re.findall(r"require_runtime_profile\(runtime[.]bytes\(\),&selection,?\)\?;", proof)) == 1 and
-            ordered(function(sources[P], "new"), ["runtime.layout_admission", "IntlDataSelection::new(profile)", "require_runtime_profile(", "Ok(Self{runtime,selection})"]),
+            proof.count("runtime.require_intl_profile(&selection)?;") == 1 and
+            ordered(function(sources[P], "new"), ["runtime.layout_admission", "IntlDataSelection::new(profile)", "runtime.require_intl_profile(&selection)?;", "Ok(Self{runtime,selection})"]),
             "single_profile_admission", "only the constructor validates actual layout and physical Intl pair before minting proof")
     runtime = c[A + "runtime_artifact.rs"]
+    intl_gate = function(sources[A + "runtime_artifact.rs"], "require_intl_profile")
+    require("ifself.build_admission.is_some()&&self.compilation_data.as_ref().is_some_and(|data|Arc::ptr_eq(data,selected)){returnOk(());}" in intl_gate and
+            ordered(intl_gate, ["selection.compilation_data()", "self.build_admission.is_some()", "returnOk(());",
+                                "crate::runtime_function::runtime_profile::require_runtime_profile(self.bytes(),selection)"]),
+            "receipt_profile_authority", "only producer-admitted exact data Arc reuses physical admission; other owners compare actual raw frames")
     require((current_layout := re.search(r'constLAYOUT_VERSION:u32=(\d+);', runtime)) is not None and int(current_layout.group(1)) >= 15 and
             "structCurrentRuntimeLayoutVersion(u32);" in runtime and
             "(encoded==LAYOUT_VERSION).then_some(Self(encoded))" in runtime and

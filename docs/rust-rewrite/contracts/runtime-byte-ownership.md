@@ -17,6 +17,22 @@ The producer's complete function-body validation is reused only through this
 existing private build-output boundary. Ordinary external packages retain
 per-use body validation and cannot acquire that authority.
 
+Cargo also publishes a bounded runtime receipt after complete raw admission.
+It records the checked function/global layout, pool and Intl frame spans,
+source/profile identities, raw hashes and largest body extent. An opaque token
+created only by the unsafe immutable-build constructor binds that receipt to
+the exact static package and compilation metadata. Ordinary compilation and
+native loading reuse those facts without hashing or parsing the complete raw R
+payload again. Pool reconstruction still hashes its canonical generated data
+and matches the producer's two admitted data digests. Raw Wasm remains available
+for output, explicit diagnostics and native compilation when required.
+
+The safe package/cache paths continue to validate actual bytes and reconstruct
+their layouts. A parsed receipt or static lifetime cannot mint build authority.
+The native manifest's package digest can be reused only for the exact package
+pointer/length retained by the admitted owner; source, target, configuration,
+runtime key and decoded native-image digest checks still precede deserialization.
+
 This removes a second raw runtime allocation when the identical bytes already
 exist in the executable. It changes Rust byte ownership, without changing the
 R/P Wasm layout, foreign ABI, JavaScript object representation or GC policy.
@@ -37,9 +53,13 @@ metadata reader; Intl retains its workspace `unsafe_code = "forbid"` rule.
 The runtime artifact retains that admitted compilation owner, including across
 native Function/eval/created-Realm compilation. Compilation metadata and UTC or
 fixed-offset compatibility checks do not construct the operation providers.
-The first actual Intl host operation resolves the shared provider once and
-checks its complete identity before publication. This currently defers the
-whole provider; first use still loads the complete selected Minimal data.
+Locale canonicalization/maximize/minimize and NumberFormat/PluralRules use
+separate typed kernels that admit only the Locale and Number consumers they
+need. Their full identities come from the admitted compilation owner; a Number
+kernel cannot request a DateTime operation. These consumers share the canonical
+image owners with later complete-provider initialization. Other operations
+resolve the complete selected provider and check its identity before publication.
+Custom/external admission remains complete rather than acquiring build authority.
 Hostless standalone artifacts without Intl metadata have an explicit absent
 provider. Custom/external component admission retains its checked consumers;
 Portable packages still receive full Wasm-body/layout and exact-frame checks.
@@ -80,6 +100,11 @@ span, in the original allocation order. Rows are appended to the existing
 private static segment before its pool boundary is sealed; no extra data
 segment or program-owned literal can change that runtime table. This replaces
 unrolled initialization code while preserving GC object/string identities.
+
+Absent accessor snapshots and initial native-function home/public-prototype
+snapshots reuse the Realm's canonical immutable stored `undefined` value.
+Descriptors, functions, contexts and mutable edges remain distinct; source
+functions still retain their actual home object for `super` semantics.
 
 ## Static regexp construction
 

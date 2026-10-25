@@ -10,6 +10,7 @@ FILES = tuple(A + path for path in (
     'data/compiler_owned_pool/tests.rs', 'runtime_artifact.rs',
     'runtime_artifact/validated_profile.rs', 'runtime_artifact/validated_profile/tests.rs',
     'runtime_artifact/validated_profile/pool_tests.rs',
+    'runtime_artifact/build_package/metadata.rs',
     'data/intl_supported_values.rs', 'data/regexp_unicode_properties.rs',
     'data/temporal_east_asian_years.rs', 'emit/module_assembly.rs',
     'emit/module_assembly/program_entries.rs', 'emit/module_assembly/native_program.rs',
@@ -47,9 +48,20 @@ def check(root, overrides=None):
             'letprefix=validated.compiler_owned_pool(functions,builtins,temporal)?;' in pool and
             'CompilerOwnedPool::collect_program(prefix,script,functions)' in pool,
             'opaque checked prefix starts every reused program pool')
-    require('runtime.layout().require_pool(&prefix.0)?;prefix.require_runtime_data(runtime.bytes())?;' in pool and
-            'prefix.0.bytes.freeze();prefix.0.pooled_code_unit_bytes.freeze();prefix.0.refs.freeze();' in pool,
+    require(('runtime.layout().require_pool(&prefix.0)?;'
+             'ifletSome(matches)=runtime.admitted_compiler_pool_matches('
+             '&prefix.0.pooled_code_unit_bytes[..],&prefix.0.bytes[..],){'
+             'if!matches{returnErr(EmitError::unsupported('
+             '"canonicalcompilerpooldiffersfromitsimmutableproducerreceipt",));}}'
+             'else{prefix.require_runtime_data(runtime.bytes())?;}'
+             'prefix.0.bytes.freeze();prefix.0.pooled_code_unit_bytes.freeze();prefix.0.refs.freeze();') in pool,
             'actual runtime boundary and bytes precede prefix freezing')
+    receipt = c[A + 'runtime_artifact/build_package/metadata.rs']
+    require('Some(self.build_admission.as_ref()?.matches_pool(utf16,data))' in runtime and
+            'data:[SpanDigest;2]' in receipt and
+            ('[utf16,data].into_iter().zip(&self.data).all(|(bytes,expected)|{'
+             'bytes.len()==expected.span.len()&&Sha256::digest(bytes).as_slice()==expected.digest})') in receipt,
+            'immutable pool proof checks both actual reconstructed image dimensions and hashes')
     require('section.count()!=2' in pool and 'DataKind::Passive' in pool and
             'utf16.data!=&self.0.pooled_code_unit_bytes[..]' in pool and
             'static_data.data!=&self.0.bytes[..]' in pool and

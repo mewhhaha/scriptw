@@ -10,6 +10,13 @@ pub(super) struct Images {
 }
 
 impl Images {
+    pub(super) fn metadata_for_profile(profile: RuntimeSourceCompilationProfile) -> &'static [u8] {
+        match profile {
+            RuntimeSourceCompilationProfile::NativeHost => image::metadata(),
+            RuntimeSourceCompilationProfile::Portable => image::portable_metadata(),
+        }
+    }
+
     pub(super) fn package_for_profile(profile: RuntimeSourceCompilationProfile) -> &'static [u8] {
         match profile {
             RuntimeSourceCompilationProfile::NativeHost => image::package(),

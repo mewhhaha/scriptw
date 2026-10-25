@@ -159,12 +159,81 @@ impl LocaleDataImage {
     }
 }
 
+static MINIMAL_IMAGE: OnceLock<Result<LocaleDataImage, IntlDataImageError>> = OnceLock::new();
+
 pub fn embedded_locale_data_image() -> Result<LocaleDataImage, IntlDataImageError> {
-    static IMAGE: OnceLock<Result<LocaleDataImage, IntlDataImageError>> = OnceLock::new();
-    IMAGE
+    MINIMAL_IMAGE
         .get_or_init(|| LocaleDataImage::for_profile(IntlDataProfile::Minimal))
         .clone()
 }
 
+/// Only an opaque complete Minimal selection may seed the canonical cache.
+pub(crate) fn selected_minimal_locale_data_image(
+    selection: &crate::IntlCompilationData,
+) -> Result<LocaleDataImage, IntlDataImageError> {
+    selected_frame(
+        &MINIMAL_IMAGE,
+        selection.minimal_frame(crate::IntlDataComponent::Locale)?,
+    )
+}
+
+fn selected_frame(
+    cache: &OnceLock<Result<LocaleDataImage, IntlDataImageError>>,
+    bytes: crate::IntlCompilationBytes,
+) -> Result<LocaleDataImage, IntlDataImageError> {
+    let matches = |image: &LocaleDataImage| {
+        if image.profile() != &IntlDataProfile::Minimal || image.bytes().as_ref() != bytes.as_ref()
+        {
+            return Err(IntlDataImageError::consumer(
+                "selected Locale differs from canonical Minimal data",
+            ));
+        }
+        Ok(image.clone())
+    };
+    if let Some(image) = cache.get() {
+        return matches(image.as_ref().map_err(Clone::clone)?);
+    }
+    let owned = match &bytes {
+        crate::IntlCompilationBytes::Shared(bytes) => Arc::clone(bytes),
+        crate::IntlCompilationBytes::Build(bytes) => Arc::from(*bytes),
+    };
+    // Failed caller/frame admission must not poison the canonical cache.
+    let image = LocaleDataImage::from_bytes(owned)?;
+    matches(&image)?;
+    matches(
+        cache
+            .get_or_init(|| Ok(image))
+            .as_ref()
+            .map_err(Clone::clone)?,
+    )
+}
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod selected_tests {
+    use super::*;
+    #[test]
+    fn failed_selected_locale_admission_does_not_poison_canonical_publication() {
+        let cache = OnceLock::new();
+        assert!(selected_frame(&cache, crate::IntlCompilationBytes::Build(b"invalid")).is_err());
+        assert!(cache.get().is_none());
+        let custom = LocaleDataImage::for_profile(IntlDataProfile::Custom(
+            crate::CustomProfileId::parse("locale-cache-negative").unwrap(),
+        ))
+        .unwrap();
+        assert!(
+            selected_frame(&cache, crate::IntlCompilationBytes::Shared(custom.bytes())).is_err()
+        );
+        assert!(cache.get().is_none());
+        let canonical = embedded_locale_data_image().unwrap();
+        let selected = selected_frame(
+            &cache,
+            crate::IntlCompilationBytes::Shared(canonical.bytes()),
+        )
+        .unwrap();
+        assert_eq!(selected.bytes(), canonical.bytes());
+        assert!(cache.get().unwrap().is_ok());
+    }
+}

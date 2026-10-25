@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "9a066b69802493c088a3b8ff3cfe2e8d3761302e39a8a7296044c10237100951",
+  "kernel_sha256": "93e5ee01b0ac32ffeeee142f5b201de2c1651cd1ca3df13f9f54c100674eed47",
   "operations_reserved": [
     33,
     34,
@@ -408,9 +408,9 @@
       "sha256": "ac6f295227ff21b31cdebbd4195eb9ade0cb935c65fc560bf48be95a49f10f56"
     },
     {
-      "bytes": 17120,
+      "bytes": 21032,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "4fdbcfb69256dd481bd8c498490fd3b5f8427e9775dd5a3363528a3cbb3aeab8"
+      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
     },
     {
       "bytes": 3253,
@@ -498,14 +498,14 @@
       "sha256": "7751d28d97851a838bd80faf8577d37a3b90d4052e8126773689c585cdcce36f"
     },
     {
-      "bytes": 41605,
+      "bytes": 41725,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "b1a75a27d9eeeefe325ca22411283bc008f0605ac245cb933ede3f8e8e8fb730"
+      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
     },
     {
-      "bytes": 6510,
+      "bytes": 8955,
       "path": "crates/scriptw-intl/src/locale_image.rs",
-      "sha256": "c75836ed9dbe7b9fca2d8e408e85048b877227c81fd1c425306a96250182e7a4"
+      "sha256": "2b3b914fa57d4503fdd1a2e1a8e5dbbc8cb5656f0d4ac6a61150738a692022bf"
     },
     {
       "bytes": 10689,
@@ -543,9 +543,9 @@
       "sha256": "d1b639456ee28338b959c9e176178dfbc1f097deddbb05c0d6b8a203df0dd695"
     },
     {
-      "bytes": 49964,
+      "bytes": 50172,
       "path": "crates/scriptw-intl/src/protocol.rs",
-      "sha256": "5fca05dbf652b1dd6276f557f78600a6e60086cfd33567b58bc59d9670e1b4a5"
+      "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
     },
     {
       "bytes": 2251,
@@ -573,9 +573,9 @@
       "sha256": "555340ca30dabd79560cd293768c0e34208df204af1fb82bec15705bc26dbdfd"
     },
     {
-      "bytes": 80477,
+      "bytes": 80488,
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "9f8e71493f749ddd0e8909271c22fff308ce4959c03e78fb14a29d986377fe90"
+      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
     },
     {
       "bytes": 6703,

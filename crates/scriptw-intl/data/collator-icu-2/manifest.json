@@ -72,7 +72,7 @@
     },
     {
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "9f8e71493f749ddd0e8909271c22fff308ce4959c03e78fb14a29d986377fe90"
+      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
     },
     {
       "path": "crates/scriptw-intl/src/selection.rs",
@@ -104,7 +104,7 @@
     },
     {
       "path": "crates/scriptw-intl/src/locale_image.rs",
-      "sha256": "c75836ed9dbe7b9fca2d8e408e85048b877227c81fd1c425306a96250182e7a4"
+      "sha256": "2b3b914fa57d4503fdd1a2e1a8e5dbbc8cb5656f0d4ac6a61150738a692022bf"
     },
     {
       "path": "crates/scriptw-intl/src/image_build/locale.rs",
@@ -124,11 +124,11 @@
     },
     {
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "b1a75a27d9eeeefe325ca22411283bc008f0605ac245cb933ede3f8e8e8fb730"
+      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
     },
     {
       "path": "crates/scriptw-intl/src/protocol.rs",
-      "sha256": "5fca05dbf652b1dd6276f557f78600a6e60086cfd33567b58bc59d9670e1b4a5"
+      "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
     },
     {
       "path": "crates/scriptw-engine/src/intl_collator_host.rs",
@@ -253,5 +253,5 @@
   "utf16_policy": "direct pinned compare_utf16; isolated units have ICU replacement weights, valid pairs are scalar; raw units preserved; no lexical tie-breaker",
   "available_locales_count": null,
   "available_sort_collations_count": null,
-  "data_sha256": "c62e696ebda0ad677ab5890b373d5003e9a6acce0cb80e65d5a069496bc7f0d3"
+  "data_sha256": "3db3f54a6dabc25d3d3418023dd46424a6f84ea2fc2d8a42bf6c780f0cba46f9"
 }

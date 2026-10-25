@@ -107,12 +107,7 @@ fn link_intl(
                     wasmtime::Error::msg(format!("invalid Intl GC request: {error}"))
                 })?;
                 let kernel = caller.data().intl_kernel.clone();
-                let response = execute(
-                    kernel
-                        .resolve()
-                        .map_err(|error| wasmtime::Error::msg(error.to_string()))?,
-                    request,
-                )?;
+                let response = execute_deferred(&kernel, request)?;
                 let [output] = outputs else {
                     return Err(wasmtime::Error::msg(
                         "Intl GC callback has invalid output arity",
@@ -135,6 +130,99 @@ fn link_intl(
         )
         .map_err(|error| EngineError::new(format!("Intl GC linker setup failed: {error}")))?;
     Ok(())
+}
+
+pub(super) fn execute_deferred(
+    kernel: &intl_data_images::WasmIntlKernel,
+    request: scriptw_intl::IntlGcHostRequest<'_>,
+) -> wasmtime::Result<Option<Vec<u8>>> {
+    let complete = || {
+        kernel
+            .resolve()
+            .map_err(|error| wasmtime::Error::msg(error.to_string()))
+    };
+    let Some(data) = kernel.minimal_data() else {
+        return execute(complete()?, request);
+    };
+    let locale = || {
+        data.minimal_locale_kernel()
+            .map_err(|error| wasmtime::Error::msg(error.to_string()))
+    };
+    let number = || {
+        data.minimal_number_kernel()
+            .map_err(|error| wasmtime::Error::msg(error.to_string()))
+    };
+    let payload = request.payload();
+    match request.operation() {
+        IntlHostOp::CanonicalizeLocale => intl_locale_host::wasm_intl_locale_call::<
+            CanonicalizeLocale,
+        >(locale()?.as_ref(), payload),
+        IntlHostOp::MaximizeLocale => {
+            intl_locale_host::wasm_intl_locale_call::<MaximizeLocale>(locale()?.as_ref(), payload)
+        }
+        IntlHostOp::MinimizeLocale => {
+            intl_locale_host::wasm_intl_locale_call::<MinimizeLocale>(locale()?.as_ref(), payload)
+        }
+        IntlHostOp::ResolveNumberLocale => {
+            intl_number_host::call::<scriptw_intl::ResolveNumberLocale>(number()?.as_ref(), payload)
+        }
+        IntlHostOp::SupportedNumberLocales => intl_number_host::call::<
+            scriptw_intl::SupportedNumberLocales,
+        >(number()?.as_ref(), payload),
+        IntlHostOp::FormatNumberParts => {
+            intl_number_host::call::<scriptw_intl::FormatNumberParts>(number()?.as_ref(), payload)
+        }
+        IntlHostOp::FormatNumberRangeParts => intl_number_host::call::<
+            scriptw_intl::FormatNumberRangeParts,
+        >(number()?.as_ref(), payload),
+        IntlHostOp::ResolvePluralLocale => {
+            intl_plural_host::call::<scriptw_intl::ResolvePluralLocale>(number()?.as_ref(), payload)
+        }
+        IntlHostOp::SupportedPluralLocales => intl_plural_host::call::<
+            scriptw_intl::SupportedPluralLocales,
+        >(number()?.as_ref(), payload),
+        IntlHostOp::SelectPlural => {
+            intl_plural_host::call::<scriptw_intl::SelectPlural>(number()?.as_ref(), payload)
+        }
+        IntlHostOp::SelectPluralRange => {
+            intl_plural_host::call::<scriptw_intl::SelectPluralRange>(number()?.as_ref(), payload)
+        }
+        IntlHostOp::LocaleCalendarsOperation
+        | IntlHostOp::LocaleCollationsOperation
+        | IntlHostOp::LocaleTimeZonesOperation
+        | IntlHostOp::LocaleNumberingSystemsOperation
+        | IntlHostOp::LocaleHourCyclesOperation
+        | IntlHostOp::LocaleTextInfoOperation
+        | IntlHostOp::LocaleWeekInfoOperation
+        | IntlHostOp::LookupNamedTimeZone
+        | IntlHostOp::NamedTimeZoneOffset
+        | IntlHostOp::PossibleNamedTimeZoneEpochs
+        | IntlHostOp::FindNamedTimeZoneTransition
+        | IntlHostOp::ResolveTimeZone
+        | IntlHostOp::ResolveDateTimeLocale
+        | IntlHostOp::SupportedDateTimeLocales
+        | IntlHostOp::SelectDateTimeFormat
+        | IntlHostOp::FormatDateTimeParts
+        | IntlHostOp::FormatDateTimeRangeParts
+        | IntlHostOp::ResolveCollatorLocale
+        | IntlHostOp::SupportedCollatorLocales
+        | IntlHostOp::CompareCollator
+        | IntlHostOp::ResolveListLocale
+        | IntlHostOp::SupportedListLocales
+        | IntlHostOp::FormatListParts
+        | IntlHostOp::ResolveDisplayNamesLocale
+        | IntlHostOp::SupportedDisplayNamesLocales
+        | IntlHostOp::DisplayName
+        | IntlHostOp::ResolveRelativeTimeLocale
+        | IntlHostOp::SupportedRelativeTimeLocales
+        | IntlHostOp::FormatRelativeTimeParts
+        | IntlHostOp::ResolveSegmenterLocale
+        | IntlHostOp::SupportedSegmenterLocales
+        | IntlHostOp::SegmentUtf16
+        | IntlHostOp::ResolveDurationFormatLocale
+        | IntlHostOp::SupportedDurationFormatLocales
+        | IntlHostOp::PartitionDurationFormat => execute(complete()?, request),
+    }
 }
 
 pub(super) fn execute(

@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 mod envelope;
 mod inputs;
+pub(super) mod metadata;
 #[cfg(test)]
 use envelope::decode_with_jobs;
 use envelope::{decode, decode_immutable_build, encode};

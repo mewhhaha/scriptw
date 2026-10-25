@@ -3,7 +3,6 @@ use super::{RuntimeArtifact, LAYOUT_VERSION};
 use crate::EmitError;
 use scriptw_intl::{IntlCompilationProfile, IntlDataSelection};
 use std::sync::Arc;
-
 /// Private fields bind the selected physical Intl frames to this exact Arc R.
 /// This proof does not replace Wasm validation or canonical GC typed linking.
 #[derive(Debug)]
@@ -48,16 +47,12 @@ impl ValidatedRuntimeArtifact {
             None
         }
         .unwrap_or_else(|| IntlDataSelection::new(profile));
-        crate::runtime_function::runtime_profile::require_runtime_profile(
-            runtime.bytes(),
-            &selection,
-        )?;
+        runtime.require_intl_profile(&selection)?;
         Ok(Self { runtime, selection })
     }
     pub fn source_compilation_profile(&self) -> super::RuntimeSourceCompilationProfile {
         self.runtime.source_compilation_profile()
     }
-
     pub fn runtime(&self) -> &Arc<RuntimeArtifact> {
         &self.runtime
     }

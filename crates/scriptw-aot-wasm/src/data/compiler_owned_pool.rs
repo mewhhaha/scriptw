@@ -12,7 +12,18 @@ impl CompilerOwnedPool {
     ) -> Result<Self, EmitError> {
         let mut prefix = Self::collect(functions, builtins, temporal, selection)?;
         runtime.layout().require_pool(&prefix.0)?;
-        prefix.require_runtime_data(runtime.bytes())?;
+        if let Some(matches) = runtime.admitted_compiler_pool_matches(
+            &prefix.0.pooled_code_unit_bytes[..],
+            &prefix.0.bytes[..],
+        ) {
+            if !matches {
+                return Err(EmitError::unsupported(
+                    "canonical compiler pool differs from its immutable producer receipt",
+                ));
+            }
+        } else {
+            prefix.require_runtime_data(runtime.bytes())?;
+        }
         prefix.0.bytes.freeze();
         prefix.0.pooled_code_unit_bytes.freeze();
         prefix.0.refs.freeze();

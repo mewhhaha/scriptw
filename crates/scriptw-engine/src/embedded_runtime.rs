@@ -1,7 +1,7 @@
 //! Native R authority is limited to this Cargo build's embedded output.
 //!
-//! Raw package bytes retain complete identity, metadata, data and layout
-//! admission. Immutable Cargo output reuses the producer's full body validation.
+//! Safe raw packages retain complete identity, metadata, data and layout
+//! admission. Immutable Cargo output reuses its producer's bounded receipt.
 //! No native constructor accepts a caller slice/path/cache blob, and no Module
 //! is retained here.
 
@@ -55,13 +55,14 @@ pub(super) fn inputs(
         // bytes through complete AOT body/layout validation before native
         // compilation and publication. expected_source() is immutable and
         // build-bound. No external slice, path or cache reaches this boundary.
-        // AOT still checks source/profile/Intl identity, checksums, sections,
-        // data and the reconstructed layout before using the candidate.
+        // AOT checks the bounded source/profile/Intl receipt and reuses the
+        // producer's complete raw checks without paging the entire R back in.
         unsafe {
             inputs.with_immutable_minimal_build(
                 package,
                 expected_source(),
                 scriptw_runtime_image::intl_metadata(),
+                Images::metadata_for_profile(source_compilation_profile),
             )
         }
     }
@@ -74,11 +75,30 @@ struct EmbeddedNativeRuntime {
 }
 
 impl EmbeddedNativeRuntime {
+    #[cfg(test)]
     fn admit(images: Images) -> Option<Self> {
         Self::admit_manifest(images, manifest::Manifest::decode(images.manifest)?)
     }
 
+    #[cfg(test)]
     fn admit_manifest(images: Images, manifest: manifest::Manifest) -> Option<Self> {
+        Self::admit_manifest_with_digest(images, manifest, || digests::digest(images.package))
+    }
+
+    fn admit_runtime(images: Images, runtime: &RuntimeArtifact) -> Option<Self> {
+        let manifest = manifest::Manifest::decode(images.manifest)?;
+        Self::admit_manifest_with_digest(images, manifest, || {
+            runtime
+                .immutable_build_package_digest(images.package)
+                .unwrap_or_else(|| digests::digest(images.package))
+        })
+    }
+
+    fn admit_manifest_with_digest(
+        images: Images,
+        manifest: manifest::Manifest,
+        digest: impl FnOnce() -> [u8; 32],
+    ) -> Option<Self> {
         if &manifest.source != expected_source()
             || manifest.target != env!("SCRIPTW_RUNTIME_BUILD_TARGET")
             || manifest.configuration != CONFIGURATION_SCHEMA
@@ -87,9 +107,9 @@ impl EmbeddedNativeRuntime {
             return None;
         }
         let started = std::env::var_os("SCRIPTW_WASM_TRACE").map(|_| std::time::Instant::now());
+        let package_digest = digest();
         // Both native images are bounded compressed storage. Their exact
         // decoded digest is independently admitted on the first actual load.
-        let package_digest = digests::digest(images.package);
         if let Some(started) = started {
             eprintln!(
                 "scriptw wasm trace: runtime-native-bundle digest admission: {:?}",
@@ -141,7 +161,7 @@ pub(super) fn load_native(
         RuntimeSourceCompilationProfile::Portable => &PORTABLE,
     };
     let admitted = bundle
-        .get_or_init(|| EmbeddedNativeRuntime::admit(images))
+        .get_or_init(|| EmbeddedNativeRuntime::admit_runtime(images, runtime))
         .as_ref()?;
     timings.admission = admission_started.elapsed();
     admitted.load(engine, runtime, mode, timings)

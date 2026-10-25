@@ -93,7 +93,7 @@ mod time_zone_names;
 mod time_zone_snapshot;
 pub(crate) use datetime::{DateTimeProvider, PreparedDateTimeProvider};
 pub(crate) use keyword_aliases::KeywordAliasData;
-use language_domain::LikelySubtags;
+pub(crate) use language_domain::LikelySubtags;
 pub(crate) use language_domain::LocaleCanonicalizationData;
 pub(crate) use named_time_zones::CertifiedNamedGapBoundary;
 pub(crate) use named_time_zones::NamedTimeZones;

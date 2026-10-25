@@ -108,6 +108,17 @@ impl RuntimeIdentity {
         selected: &Arc<scriptw_intl::IntlCompilationData>,
         source_compilation_profile: RuntimeSourceCompilationProfile,
     ) -> Self {
+        Self::from_sections(
+            Self::selected_sections(selected, source_compilation_profile),
+            source_compilation_profile,
+            Arc::clone(selected),
+        )
+    }
+
+    fn selected_sections(
+        selected: &Arc<scriptw_intl::IntlCompilationData>,
+        source_compilation_profile: RuntimeSourceCompilationProfile,
+    ) -> BTreeMap<&'static str, scriptw_intl::IntlCompilationBytes> {
         let mut sections: BTreeMap<_, _> = selected.component_sections().into_iter().collect();
         sections.insert(
             INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
@@ -129,7 +140,27 @@ impl RuntimeIdentity {
                 source_compilation_profile.wire()
             ])),
         );
-        Self::from_sections(sections, source_compilation_profile, Arc::clone(selected))
+        sections
+    }
+
+    pub(super) fn from_admitted_build(
+        proof: super::build_package::metadata::BuildIdentity,
+    ) -> Self {
+        let (selected, source_compilation_profile, digest) = proof.into_parts();
+        Self {
+            sections: Self::selected_sections(&selected, source_compilation_profile),
+            compilation: selected,
+            digest,
+            source_compilation_profile,
+        }
+    }
+
+    pub(super) fn compilation(&self) -> &Arc<scriptw_intl::IntlCompilationData> {
+        &self.compilation
+    }
+
+    pub(super) fn source_compilation_profile(&self) -> RuntimeSourceCompilationProfile {
+        self.source_compilation_profile
     }
 
     fn from_sections(

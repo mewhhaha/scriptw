@@ -10,7 +10,11 @@ FILES = tuple(A + name for name in (
     "runtime_artifact.rs", "runtime_artifact/source_compilation.rs",
     "runtime_artifact/cache.rs", "runtime_artifact/build_package.rs",
     "runtime_artifact/build_package/inputs.rs",
+    "runtime_artifact/build_package/inputs/admission.rs",
     "runtime_artifact/build_package/envelope.rs",
+    "runtime_artifact/build_package/metadata.rs",
+    "runtime_artifact/build_package/metadata/decode.rs",
+    "runtime_artifact/build_package/metadata/encode.rs",
     "runtime_artifact/validated_profile.rs", "emit/module_assembly.rs",
     "emit/module_assembly/metadata.rs",
     "gc_types/host.rs", "prepared_script.rs", "functions/native_direct_eval.rs",
@@ -20,11 +24,31 @@ FILES = tuple(A + name for name in (
     "wasm_runtime_link.rs", "wasm_native_source_compiler.rs", "graph_observation.rs",
     "embedded_runtime/load.rs",
     "embedded_runtime/native_backing.rs",
-)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "native_storage.rs", "native_lease.rs"))
+)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs")) + (
+    "crates/scriptw-runtime-image/build/objects.rs",
+)
 
 
 def compact(source):
     return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source))
+
+
+def item(source, pattern):
+    """Read one actual braced item, excluding neighboring proof spellings."""
+    match = re.search(pattern, source)
+    if not match:
+        return ""
+    start = source.find("{", match.end())
+    depth = 1
+    end = start + 1
+    while start >= 0 and end < len(source) and depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return compact(source[match.start():end]) if start >= 0 and depth == 0 else ""
+
+
+def function(source, name):
+    return item(source, r"\bfn\s+" + re.escape(name) + r"\s*(?:<[^\n]*>)?\s*\(")
 
 
 def check(root, overrides=None):
@@ -64,7 +88,7 @@ def check(root, overrides=None):
     runtime = c[A + "runtime_artifact.rs"]
     require("Self::Program(runtime)=>runtime.source_compilation_profile()" in runtime and
             "Self::Standalone=>RuntimeSourceCompilationProfile::Portable" in runtime and
-            "cache::RuntimeIdentity::admit_with_jobs(selection,inputs.source_compilation_profile(),inputs.admission_jobs(),)?" in runtime and
+            "letidentity=inputs.admit_identity(selection)?;" in runtime and
             "emit_runtime_artifact(selection,inputs.source_compilation_profile())" in runtime,
             "P inherits its actual R and residency resolves the complete selected profile")
     cache = c[A + "runtime_artifact/cache.rs"]
@@ -80,12 +104,67 @@ def check(root, overrides=None):
     package = c[A + "runtime_artifact/build_package.rs"]
     inputs = c[A + "runtime_artifact/build_package/inputs.rs"]
     envelope = c[A + "runtime_artifact/build_package/envelope.rs"]
+    admission = c[A + "runtime_artifact/build_package/inputs/admission.rs"]
+    metadata = c[A + "runtime_artifact/build_package/metadata.rs"]
+    receipt = c[A + "runtime_artifact/build_package/metadata/decode.rs"]
     require("source_compilation_profile:RuntimeSourceCompilationProfile::Portable" in inputs and
             "build_runtime_artifact_with_source_compilation_profile(selection,compiler_source,RuntimeSourceCompilationProfile::Portable,)" in package and
             "RuntimeIdentity::admit(selection,source_compilation_profile)?" in package and
             "identity.digest()" in envelope and
             "cache::admit_payload(payload,identity,version,jobs,body_validation)?" in envelope,
             "ordinary build packages default Portable and retain profile-separated admission")
+    require("admit_envelope(package,identity,expected_source,jobs,FunctionBodyValidation::AtUse,)" in
+            function(source[A + "runtime_artifact/build_package/envelope.rs"], "decode_with_jobs") and
+            "decode_payload(payload,identity,version,jobs,super::validation::FunctionBodyValidation::AtUse,)" in
+            function(source[A + "runtime_artifact/cache.rs"], "decode_with_jobs"),
+            "safe external packages and disk caches still validate every function at use")
+    require("modadmission;" in inputs and
+            "Candidate::ImmutableMinimal(proof)" in admission and
+            "metadata::BuildMetadata::decode(proof,self.source_compilation_profile)" in admission and
+            "cache::RuntimeIdentity::admit_with_jobs(selection,self.source_compilation_profile,self.admission_jobs,)" in admission and
+            "Candidate::External{bytes,expected_source,}=>envelope::decode_with_jobs(bytes,identity,expected_source,self.admission_jobs,)" in inputs and
+            "Candidate::ImmutableBuild{bytes,expected_source,}=>decode_immutable_build(bytes,identity,expected_source,self.admission_jobs)" in inputs,
+            "receipt selection delegates exact identity with full external and cache fallback")
+    require("pub(super)structImmutableMetadata{package:&'static[u8],source:&'static[u8;32],intl:&'static[u8],receipt:&'static[u8],}" in inputs and
+            inputs.count("ImmutableMetadata{") == 3 and
+            "ImmutableMetadata{" not in admission and
+            inputs.count("implImmutableMetadata{") == 1 and
+            item(source[A + "runtime_artifact/build_package/inputs.rs"], r"\bimpl\s+ImmutableMetadata\b").count("fn") == 1 and
+            "pubconstunsafefnwith_immutable_minimal_build(" in inputs and
+            "self.package=Some(Candidate::ImmutableMinimal(ImmutableMetadata{package:bytes,source:expected_source,intl:metadata,receipt:runtime_metadata,}));" in
+            function(source[A + "runtime_artifact/build_package/inputs.rs"], "with_immutable_minimal_build") and
+            "decode(proof:super::super::inputs::ImmutableMetadata,profile:RuntimeSourceCompilationProfile,)" in receipt and
+            re.search(r"(?m)^    fn parse\(", source[A + "runtime_artifact/build_package/metadata/decode.rs"]) is not None and
+            receipt.count("Self::parse(") == 2 and
+            "#[cfg(test)]pub(super)fnparser_rejects(" in receipt,
+            "only unsafe immutable Inputs mint receipt authority; the raw parser stays private")
+    require("pub(incrate::runtime_artifact)structBuildIdentity{data:Arc<scriptw_intl::IntlCompilationData>,profile:RuntimeSourceCompilationProfile,digest:[u8;32],}" in metadata and
+            metadata.count("BuildIdentity{") == 3 and
+            metadata.count("implBuildIdentity{") == 1 and
+            item(source[A + "runtime_artifact/build_package/metadata.rs"], r"\bimpl\s+BuildIdentity\b").count("fn") == 1 and
+            "cache::RuntimeIdentity::from_admitted_build(BuildIdentity{data:Arc::clone(data),profile:self.profile,digest:self.selection_digest,},)" in
+            function(source[A + "runtime_artifact/build_package/metadata.rs"], "identity") and
+            "data.service_selection().is_some()" in metadata and
+            "data.identity().profile().profile()!=&scriptw_intl::IntlDataProfile::Minimal" in metadata and
+            "data.identity().artifact_identity().as_bytes()!=self.intl_identity.as_bytes()" in metadata and
+            "from_admitted_build(proof:super::build_package::metadata::BuildIdentity,)" in cache and
+            "let(selected,source_compilation_profile,digest)=proof.into_parts();" in cache,
+            "receipt identity binds opaque selected data, source profile and producer digest")
+    require("Sha256::digest(body).as_slice()!=checksum" in receipt and
+            "r.u32()?!=LAYOUT_VERSION" in receipt and
+            "&r.take::<32>()?!=source" in receipt and
+            "r.take::<1>()?!=[profile.wire()]" in receipt and
+            "PoolBoundary::from_runtime_cache(static_len,utf16_len,strings)?" in receipt and
+            "spans.windows(2).any(|pair|pair[0].end>pair[1].start)" in receipt and
+            "identity.digest()!=self.selection_digest||identity.source_compilation_profile()!=self.profile" in metadata and
+            "std::ptr::eq(self.package,package).then_some(self.package_digest)" in metadata,
+            "compact receipt retains checked framing, exact profile, bounded layout and package ownership")
+    profile_proof = c[A + "runtime_artifact/validated_profile.rs"]
+    intl_gate = function(source[A + "runtime_artifact.rs"], "require_intl_profile")
+    require("runtime.require_intl_profile(&selection)?;" in profile_proof and
+            "ifself.build_admission.is_some()&&self.compilation_data.as_ref().is_some_and(|data|Arc::ptr_eq(data,selected)){returnOk(());}" in intl_gate and
+            "crate::runtime_function::runtime_profile::require_runtime_profile(self.bytes(),selection)" in intl_gate,
+            "profile reuse requires receipt authority and exact retained data or full raw comparison")
     assembly = c[A + "emit/module_assembly.rs"]
     require("uses_heap,kind.source_compilation_profile()," in assembly and
             "metadata::append_module_declarations(&mutmodule,kind,&script.foreign_modules);" in assembly and
@@ -132,6 +211,17 @@ def check(root, overrides=None):
             "Module::deserialize_open_file(engine,self.0.try_clone()?)" in backing,
             "native file backing remains private, unlinked, synced, non-tmpfs and owned by Wasmtime")
     image = "crates/scriptw-runtime-image/src/"
+    require("modmetadata;pubusemetadata::{metadata,portable_metadata};" in c[image + "lib.rs"] and
+            c[image + "lib.rs"].count("#[inline(never)]") == 7 and
+            c[image + "metadata.rs"].count("#[inline(never)]") == 2 and
+            "pubfnmetadata()->&'static[u8]" in c[image + "metadata.rs"] and
+            "pubfnportable_metadata()->&'static[u8]" in c[image + "metadata.rs"] and
+            "returnunsafe{&SCRIPTW_RUNTIME_METADATA}" in c[image + "metadata.rs"] and
+            "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}" in c[image + "metadata.rs"] and
+            "constPARTS:[(&str,&str);9]" in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"],
+            "nine immutable image definitions use seven original and two receipt accessors")
     lease = c[image + "native_lease.rs"]
     storage = c[image + "native_storage.rs"]
     require("Mutex<Result<Weak<NativeRuntimeBytes>,()>>" in lease and

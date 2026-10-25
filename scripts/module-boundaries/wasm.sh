@@ -520,6 +520,7 @@ engine_embedded_publication="crates/scriptw-engine/src/embedded_runtime/publicat
 engine_native_stencils="crates/scriptw-engine/src/cache/native.rs"
 runtime_image_build="crates/scriptw-runtime-image/build.rs"
 runtime_image_source="crates/scriptw-runtime-image/src/lib.rs"
+runtime_image_metadata="crates/scriptw-runtime-image/src/metadata.rs"
 runtime_image_objects="crates/scriptw-runtime-image/build/objects.rs"
 wasm_build_package="crates/scriptw-aot-wasm/src/runtime_artifact/build_package.rs"
 for native_owner in "$engine_native_config" "$engine_embedded_runtime" "$engine_embedded_build" "$engine_embedded_compile" "$engine_native_stencils" "$runtime_image_build" "$runtime_image_source" "$runtime_image_objects" crates/scriptw-runtime-image/Cargo.toml "$wasm_build_package"; do
@@ -539,18 +540,27 @@ require_fixed_string_count "$engine_embedded_runtime" 'Images::package_for_profi
 require_fixed_string_count "$engine_embedded_runtime" 'self.images.profile == runtime.source_compilation_profile()' 1 'native candidate rejects a foreign source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'include_bytes!' 0 'image bytes do not enter Engine initializers'
 require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 7 'seven non-inline image and Intl metadata accessors'
+require_file "$runtime_image_metadata"
+require_module_decl "$runtime_image_source" metadata
+require_exact_line_count "$runtime_image_source" 'pub use metadata::{metadata, portable_metadata};' 1 'the two immutable receipt accessors'
+require_fixed_string_count "$runtime_image_metadata" '#[inline(never)]' 2 'two non-inline receipt accessors'
+require_fixed_string_count "$runtime_image_metadata" 'return unsafe { &SCRIPTW_RUNTIME_METADATA };' 1 'NativeHost receipt uses its exact linked array'
+require_fixed_string_count "$runtime_image_metadata" 'return unsafe { &SCRIPTW_RUNTIME_PORTABLE_METADATA };' 1 'Portable receipt uses its exact linked array'
+require_fixed_string_count "$runtime_image_metadata" 'include_bytes!' 0 'receipts do not add Rust data initializers'
+check_raw_line_budget "$runtime_image_metadata" 30
 require_fixed_string_count "$runtime_image_source" 'include_bytes!' 0 'no large Rust initializer in leaf metadata'
 require_fixed_string_count "$runtime_image_build" 'objects::embed(&out, &target);' 1 'checked images become immutable linked data'
 require_fixed_string_count "$runtime_image_objects" '"--emit=obj"' 1 'data compilation emits no Rust metadata'
 require_fixed_string_count "$runtime_image_objects" '"-Cembed-bitcode=no"' 1 'data-only object contains no duplicate bitcode image'
 require_fixed_string_count "$runtime_image_objects" '.compile("scriptw_runtime_images")' 1 'target archiver owns the complete linked image'
-for image_part in package native manifest; do
+require_exact_line_count "$runtime_image_objects" 'const PARTS: [(&str, &str); 9] = [' 1 'exact image and receipt definition inventory'
+for image_part in package native manifest metadata; do
   if [ "$image_part" = native ]; then
     require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-native.packed' 1 'one compressed NativeHost native storage definition'
     require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-portable-native.packed' 1 'one compressed Portable native storage definition'
   else
-    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest definition'
-    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest'
+    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest/receipt definition'
+    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest/receipt'
   fi
 done
 require_exact_line_count crates/scriptw-aot-wasm/src/runtime_artifact.rs 'mod build_package;' 1 'private checked build-package owner'
@@ -610,8 +620,9 @@ check_raw_line_budget "$engine_embedded_runtime" 190
 check_raw_line_budget "$engine_embedded_images" 45
 check_raw_line_budget "$engine_embedded_build" 165
 require_file "$engine_embedded_publication"
-require_fixed_string_count "$engine_embedded_build" 'publication::publish(out,' 2 'publish unsupported-target and complete native bundles through one owner'
+require_fixed_string_count "$engine_embedded_build" 'publication::publish(' 2 'publish unsupported-target and complete native bundles through one owner'
 require_fixed_string_count "$engine_embedded_publication" 'output::write(&out.join(format!("{prefix}-{suffix}.bin")), bytes)'  1 'one atomic complete bundle writer'
+require_fixed_string_count "$engine_embedded_publication" '("metadata", metadata),' 1 'each complete bundle includes its checked receipt'
 check_raw_line_budget "$engine_embedded_publication" 40
 check_raw_line_budget "$engine_embedded_compile" 100
 check_raw_line_budget "$engine_native_stencils" 120
@@ -630,9 +641,22 @@ check_raw_line_budget "$wasm_build_package" 230
 require_module_decl "$wasm_build_package" inputs
 require_file crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs.rs
 check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs.rs 230
-require_module_decl "$wasm_build_envelope" intl
-require_file crates/scriptw-aot-wasm/src/runtime_artifact/build_package/envelope/intl.rs
-check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/envelope/intl.rs 80
+wasm_build_inputs="crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs.rs"
+wasm_build_admission="crates/scriptw-aot-wasm/src/runtime_artifact/build_package/inputs/admission.rs"
+wasm_build_metadata="crates/scriptw-aot-wasm/src/runtime_artifact/build_package/metadata.rs"
+require_module_decl "$wasm_build_inputs" admission
+require_file "$wasm_build_admission"
+check_raw_line_budget "$wasm_build_admission" 90
+require_exact_line_count "$wasm_build_package" 'pub(super) mod metadata;' 1 'private immutable receipt owner'
+require_file "$wasm_build_metadata"
+check_raw_line_budget "$wasm_build_metadata" 150
+for receipt_module in encode decode tests; do
+  require_module_decl "$wasm_build_metadata" "$receipt_module"
+  require_file "crates/scriptw-aot-wasm/src/runtime_artifact/build_package/metadata/${receipt_module}.rs"
+done
+check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/metadata/encode.rs 130
+check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/metadata/decode.rs 190
+check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/build_package/metadata/tests.rs 220
 # The cache damage controls deliberately construct foreign Wasm layouts. The
 # file-level gate makes those constructors unavailable to production Rust,
 # even if a future parent accidentally drops its own test-only module gate.

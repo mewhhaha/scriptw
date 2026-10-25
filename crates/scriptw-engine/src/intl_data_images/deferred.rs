@@ -35,6 +35,12 @@ impl WasmIntlKernel {
             Self::Minimal(kernel) => Some(kernel.data.identity()),
         }
     }
+    pub(crate) fn minimal_data(&self) -> Option<&scriptw_intl::IntlCompilationData> {
+        match self {
+            Self::Minimal(kernel) => Some(&kernel.data),
+            Self::Absent | Self::Ready(_) => None,
+        }
+    }
     pub(crate) fn resolve(&self) -> Result<&IntlKernel<EmbeddedIntlProvider>, EngineError> {
         match self {
             Self::Absent => Err(EngineError::new("artifact has no Intl host imports")),
@@ -144,6 +150,58 @@ mod tests {
         assert!(matches!(kernel, WasmIntlKernel::Absent));
         assert!(kernel.identity().is_none());
         assert!(kernel.resolve().is_err());
+    }
+
+    #[test]
+    fn actual_locale_number_and_plural_calls_leave_the_complete_provider_unresolved() {
+        use scriptw_intl::number_format::options::LocaleMatcher;
+        let selection = crate::embedded_runtime::inputs(
+            None,
+            scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable,
+        )
+        .intl_selection(&scriptw_intl::IntlCompilationProfile::Minimal)
+        .unwrap();
+        let data = Arc::clone(selection.compilation_data().unwrap());
+        let kernel = WasmIntlKernel::minimal(Arc::clone(&data)).unwrap();
+        let WasmIntlKernel::Minimal(owner) = &kernel else {
+            unreachable!()
+        };
+        let call = |operation: scriptw_intl::IntlHostOp, payload: &[u8]| {
+            let mut bytes = operation.wire().to_le_bytes().to_vec();
+            bytes.extend_from_slice(payload);
+            super::super::super::wasm_gc_intl_host::execute_deferred(
+                &kernel,
+                scriptw_intl::IntlGcHostRequest::decode(&bytes).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+        };
+        assert_eq!(
+            call(scriptw_intl::IntlHostOp::CanonicalizeLocale, b"EN-us").as_slice(),
+            b"en-US"
+        );
+        assert!(owner.resolved.get().is_none());
+        let locale = scriptw_intl::CanonicalLocaleId::from_data("en-US").unwrap();
+        let number = scriptw_intl::number_format::NumberLocaleRequest {
+            requested: vec![locale.clone()].into_boxed_slice(),
+            matcher: LocaleMatcher::Lookup,
+            numbering_system: None,
+        }
+        .encode()
+        .unwrap();
+        assert!(!call(scriptw_intl::IntlHostOp::ResolveNumberLocale, &number).is_empty());
+        let plural = scriptw_intl::PluralLocaleRequest {
+            requested: vec![locale].into_boxed_slice(),
+            matcher: LocaleMatcher::Lookup,
+        }
+        .encode()
+        .unwrap();
+        assert!(!call(scriptw_intl::IntlHostOp::ResolvePluralLocale, &plural).is_empty());
+        assert_eq!(
+            data.minimal_number_kernel().unwrap().identity(),
+            data.identity()
+        );
+        assert!(owner.resolved.get().is_none(), "first canonicalization/Number/Plural must not load DateTime, Segmenter or other complete consumers");
     }
 
     #[test]

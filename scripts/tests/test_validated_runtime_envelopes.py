@@ -15,6 +15,37 @@ direct_spec.loader.exec_module(direct_controls)
 
 
 class ValidatedEnvelopeControls(unittest.TestCase):
+    def test_receipt_profile_reuse_requires_both_authorities_and_real_raw_fallback(self):
+        sources = {name: (ROOT / name).read_text() for name in controls.FILES}
+        self.assertEqual(controls.check(sources), [])
+        direct_sources = {name: (ROOT / name).read_text() for name in direct_controls.FILES}
+        self.assertEqual(direct_controls.check(direct_sources), [])
+        path = controls.A + 'runtime_artifact.rs'
+        for before, after in [
+            ('self.build_admission.is_some()', 'true'),
+            ('Arc::ptr_eq(data, selected)', 'true'),
+            ('crate::runtime_function::runtime_profile::require_runtime_profile(self.bytes(), selection)',
+             'Ok(())'),
+        ]:
+            with self.subTest(before=before):
+                self.assertEqual(sources[path].count(before), 1)
+                changed = dict(sources)
+                changed[path] = sources[path].replace(before, after)
+                self.assertIn('receipt_profile_authority', {row['invariant'] for row in controls.check(changed)})
+                direct_changed = dict(direct_sources)
+                direct_changed[path] = changed[path]
+                self.assertIn('complete cached witness and exact R/profile: retained opaque profile admission',
+                              direct_controls.check(direct_changed))
+        before = 'runtime.require_intl_profile(&selection)?;'
+        self.assertEqual(sources[controls.P].count(before), 1)
+        changed = dict(sources)
+        changed[controls.P] = sources[controls.P].replace(before, 'let _ = runtime.require_intl_profile(&selection);')
+        self.assertIn('single_profile_admission', {row['invariant'] for row in controls.check(changed)})
+        direct_changed = dict(direct_sources)
+        direct_changed[controls.P] = changed[controls.P]
+        self.assertIn('complete cached witness and exact R/profile: retained opaque profile admission',
+                      direct_controls.check(direct_changed))
+
     def test_actual_version_and_external_body_validation_cannot_be_removed(self):
         sources = {name: (ROOT / name).read_text() for name in controls.FILES}
         self.assertEqual(controls.check(sources), [])

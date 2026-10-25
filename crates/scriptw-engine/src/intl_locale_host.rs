@@ -2,7 +2,7 @@ use super::*;
 use scriptw_intl::{IntlOperation, IntlOperationProvider, LocaleTransformResult};
 
 pub(super) fn wasm_intl_locale_call<O>(
-    kernel: &IntlKernel<EmbeddedIntlProvider>,
+    kernel: &IntlKernel<impl IntlOperationProvider<O>>,
     payload: &[u8],
 ) -> wasmtime::Result<Option<Vec<u8>>>
 where
@@ -11,7 +11,6 @@ where
         Response = LocaleTransformResult,
         Error = LocaleTransformError,
     >,
-    EmbeddedIntlProvider: IntlOperationProvider<O>,
 {
     let request_text = core::str::from_utf8(payload).map_err(|error| {
         wasmtime::Error::msg(format!("Intl locale request is not UTF-8: {error}"))

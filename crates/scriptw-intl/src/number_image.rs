@@ -208,16 +208,33 @@ impl NumberProfilesDataImage {
             ));
         }
         let payload = native_payload()?;
-        let envelope = DataImageEnvelope::decode(
+        Self::from_complete_frame(
             DataImageEnvelope::encode(
                 DataImageComponent::NumberProfiles,
                 &profile,
                 NUMBER_IMAGE_MARKERS,
                 &payload,
             )?,
+            locale,
+        )
+    }
+
+    /// Admit the exact complete pinned schema without a projected List owner.
+    /// Projected Number frames still use from_bytes and its actual dependencies.
+    pub(crate) fn from_complete_frame(
+        bytes: Arc<[u8]>,
+        locale: &LocaleDataImage,
+    ) -> Result<Self, IntlDataImageError> {
+        let envelope = DataImageEnvelope::decode(
+            bytes,
             DataImageComponent::NumberProfiles,
             NUMBER_IMAGE_MARKERS,
         )?;
+        if envelope.profile() != locale.profile() {
+            return Err(IntlDataImageError::consumer(
+                "Number and Locale image profiles differ",
+            ));
+        }
         // The unchanged full branch has no List-specific selected dependency.
         // Its exact pinned native frame and one actual Number owner stay intact.
         let profiles = Arc::new(admit_native_payload(envelope.blob(), locale)?);
@@ -376,7 +393,6 @@ impl NumberProfilesDataImage {
     pub(crate) fn profiles_ref(&self) -> &NumberProfiles {
         &self.0.profiles
     }
-    #[cfg(test)]
     pub(crate) fn profiles_arc_ref(&self) -> &Arc<NumberProfiles> {
         &self.0.profiles
     }
@@ -400,10 +416,12 @@ impl NumberProfilesDataImage {
     }
 }
 
+static MINIMAL_IMAGE: OnceLock<Result<NumberProfilesDataImage, IntlDataImageError>> =
+    OnceLock::new();
+
 pub(crate) fn embedded_number_profiles_data_image_ref(
 ) -> Result<&'static NumberProfilesDataImage, IntlDataImageError> {
-    static IMAGE: OnceLock<Result<NumberProfilesDataImage, IntlDataImageError>> = OnceLock::new();
-    IMAGE
+    MINIMAL_IMAGE
         .get_or_init(|| {
             let locale = crate::embedded_locale_data_image()?;
             NumberProfilesDataImage::for_profile(IntlDataProfile::Minimal, &locale)
@@ -415,6 +433,9 @@ pub fn embedded_number_profiles_data_image() -> Result<NumberProfilesDataImage, 
 {
     embedded_number_profiles_data_image_ref().cloned()
 }
+
+mod selected;
+pub(crate) use selected::selected_minimal_number_data_image;
 
 #[cfg(test)]
 mod tests;
