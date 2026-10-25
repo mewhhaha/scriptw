@@ -24,6 +24,13 @@ The [execution hot-path contract](docs/rust-rewrite/contracts/execution-hotpaths
 describes stable Array sorting, private UTF-16 buffers, scalar predicates and
 literal string folding.
 
+The [execution checkpoint, 2026-10-25](docs/rust-rewrite/execution-performance-20261025.md)
+compares 17 workloads with V8 in fresh and reused Realms. Observed fresh-Realm
+medians improve 93–94% for reverse sort/toSorted, 42% for large joins and 35% for
+the 50,000-iteration numeric loop. V8 remains faster. The report retains the
+fresh-integer slowdown, higher numeric process RSS, small-input costs and
+shared-host measurement limits. The graphic above retains its measured compiler.
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /
@@ -58,6 +65,13 @@ subsets plus known-failure controls passed **980 / 984 executions**, with the
 same four failures and zero crashes, unsupported cases or timeouts. Verification
 used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
 and exact inventories; the full chart and V8 measurements remain historical.
+
+The [execution checkpoint](docs/rust-rewrite/execution-performance-20261025.md),
+refreshed 2026-10-25 at `ab97459e5`, passed **5,717 affected native checks across
+23 targets**. Its selected original Test262 replay passed **2,413 / 2,417
+executions**, with the same four failures and zero crashes, unsupported cases or
+timeouts. Verification used one CPU and a 4-GiB memory cap. The linked record
+contains refresh commands and exact inventories; the full chart is unchanged.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)
