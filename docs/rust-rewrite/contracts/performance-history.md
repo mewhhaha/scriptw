@@ -1,9 +1,10 @@
 # README performance graphic and retained measurements
 
-The README graphic shows the latest admitted measurement, with separate V8 and
-Scriptw bars. Publishing an existing report does not run a benchmark or replace
-its measured compiler identity with the current Git revision. Earlier
-measurements remain in the evidence manifest; the README has no history chart.
+The README shows the latest execution checkpoint first and keeps the startup
+comparison in a historical disclosure. Both graphics read committed evidence.
+Publishing an existing report does not run a benchmark or replace its measured
+compiler identity with the current Git revision. Earlier startup measurements
+remain in their evidence manifest.
 
 ## Record and refresh
 
@@ -35,6 +36,41 @@ Check mode reports stale generated files without rewriting them. Rendering is
 deterministic and works offline from committed evidence; it does not need the
 original `target` directory. The optional `--root PATH` selects another
 repository root for isolated checks and tests.
+
+## Execution checkpoint graphic
+
+The primary README image is
+[`execution-performance.svg`](../assets/execution-performance.svg), from the
+separate [2026-10-25 execution checkpoint](../execution-performance-20261025.md).
+It shows all 17 fresh-Store/Realm workloads: the actual frozen baseline,
+current Scriptw and paired current-round V8 timings. Each point is the median
+of 14 measured observations, pooled from two rounds of seven after ten warmups
+in baseline–candidate–candidate–baseline order. The timing axis is logarithmic;
+the numerical columns retain absolute milliseconds. The separate memory panel
+compares Scriptw sampled process RSS on a zero-based linear scale. It includes
+runtime/setup and retained warmup effects, and does not claim live JavaScript
+bytes, whole-child high-water RSS or equivalent V8 heap measurements.
+
+Regenerate or check it offline, without running JavaScript or compiling:
+
+```sh
+python3 scripts/render-execution-performance.py
+python3 scripts/render-execution-performance.py --check
+```
+
+The renderer requires matplotlib and uses its bundled DejaVu Sans font.
+`--preview PATH.png` also writes a local raster preview. The data reader checks
+the committed report, evidence archive and manifest identities, binds the
+archived analysis to the report, and recomputes timing/RSS medians. It rejects
+missing cases, altered summaries and mismatched compiler identities. Measurement
+dates and compiler revisions come from the evidence, not the rendering date.
+
+The graph preserves the fresh-integer slowdown and numeric-workload RSS cost.
+Shared-host observations remain descriptive, with no significance or V8-parity
+claim. Existing-Realm calls keep their own table in the checkpoint. This corpus
+and measurement boundary do not enter the older four-workload v2 history as
+though they were compatible. Its unchanged startup graphic and generated README
+block remain inside the historical comparison disclosure.
 
 ## Admission and retained evidence
 
