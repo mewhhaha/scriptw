@@ -1023,7 +1023,7 @@ check_raw_line_budget "$wasm_expressions" 1980
 wasm_regexp_expressions="crates/scriptw-aot-wasm/src/expressions/regexp_program.rs"
 require_file "$wasm_regexp_expressions"
 require_exact_line_count "$wasm_expressions" 'mod regexp_program;' 1 'private RegExp expression compiler owner'
-for regexp_expression_entry in emit_validated_regexp_program emit_regexp_program_slots emit_runtime_regexp_program_slots emit_regexp_compiler_failures emit_gc_string_contains_ascii_byte_i32 emit_regexp_program_with_compatible_flags compile_regexp_literal_to_value; do
+for regexp_expression_entry in emit_collected_regexp_program emit_regexp_program_slots emit_runtime_regexp_program_slots emit_regexp_compiler_failures emit_gc_string_contains_ascii_byte_i32 emit_regexp_program_with_compatible_flags compile_regexp_literal_to_value; do
   require_fixed_string_count "$wasm_regexp_expressions" "fn ${regexp_expression_entry}(" 1 'RegExp expression algorithm owner'
   require_fixed_string_count "$wasm_expressions" "fn ${regexp_expression_entry}(" 0 'no parent RegExp expression algorithm copy'
 done
@@ -1034,7 +1034,7 @@ check_raw_line_budget "$wasm_regexp_expressions" 510
 wasm_regexp_candidate="crates/scriptw-aot-wasm/src/expressions/regexp_program/candidate.rs"
 require_file "$wasm_regexp_candidate"
 require_exact_line_count "$wasm_regexp_expressions" 'mod candidate;' 1 'private finite RegExp candidate owner'
-for regexp_candidate_entry in compile_regexp_program_candidate_hook emit_static_regexp_program_payload; do
+for regexp_candidate_entry in compile_regexp_program_candidate_hook emit_static_regexp_program_span emit_static_regexp_program_payload emit_regexp_program_metadata; do
   require_fixed_string_count "$wasm_regexp_candidate" "fn ${regexp_candidate_entry}(" 1 'finite RegExp candidate algorithm owner'
   require_fixed_string_count "$wasm_regexp_expressions" "fn ${regexp_candidate_entry}(" 0 'no parent finite RegExp candidate algorithm copy'
 done

@@ -141,6 +141,12 @@ impl RegExpProgramRef {
     pub(crate) const fn payload(self) -> u64 {
         self.payload
     }
+    pub(crate) fn metadata_span(
+        self,
+        strings: &StringPool,
+    ) -> Result<ProgramMetadataSpan, EmitError> {
+        ProgramMetadataSpan::for_pool(strings, (self.payload >> 32) as u32, self.payload as u32)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -4104,10 +4110,13 @@ impl StringPool {
             );
         }
         let key = RegExpProgramStaticKey::from_program(program);
-        if self.regexp_programs.contains_key(&key)
-            || self
-                .runtime_prefix()
-                .is_some_and(|prefix| prefix.regexp_programs.contains_key(&key))
+        // Literal and static-constructor publication read this P's immutable
+        // metadata, never R's linear prefix. Keep one P descriptor even when
+        // the same validated program already exists in the shared R image.
+        if self
+            .regexp_programs
+            .get(&key)
+            .is_some_and(|reference| reference.metadata_span(self).is_ok())
             || self
                 .pending_regexp_programs
                 .iter()

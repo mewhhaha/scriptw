@@ -195,8 +195,19 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
-    /// The descriptor is a compiler-validated static span, never a guest input.
-    /// Copy its exact P-relative immutable bytes into one unpublished GC construction.
+    /// Literal/constructor collection supplies a checked span in this P image.
+    pub(super) fn emit_static_regexp_program_span(
+        &mut self,
+        span: crate::data::ProgramMetadataSpan,
+        function: &mut Function,
+    ) -> crate::gc_types::GcStackReference<crate::gc_types::RegExpProgram> {
+        let metadata = self
+            .current_program()
+            .metadata_span(self.runtime_schema(), span, function);
+        self.emit_regexp_program_metadata(metadata, function)
+    }
+
+    /// Only the checked Program-domain candidate row supplies a runtime payload.
     fn emit_static_regexp_program_payload(
         &mut self,
         payload: I64Local,
@@ -206,6 +217,17 @@ impl FunctionBuilder<'_> {
         let metadata = self
             .current_program()
             .metadata_payload(schema, payload, function);
+        self.emit_regexp_program_metadata(metadata, function)
+    }
+
+    /// Both paths carry the actual P owner and checked bounds into one bounded
+    /// copy, publishing immutable bytes only after the construction is complete.
+    fn emit_regexp_program_metadata(
+        &mut self,
+        metadata: crate::gc_types::ProgramMetadataView,
+        function: &mut Function,
+    ) -> crate::gc_types::GcStackReference<crate::gc_types::RegExpProgram> {
+        let schema = self.runtime_schema();
         let length = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         let byte = schema.reserve_i32_local(function);

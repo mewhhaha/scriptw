@@ -69,6 +69,48 @@ fn program_appendices_share_the_exact_immutable_prefix_storage() {
 }
 
 #[test]
+fn regexp_literals_and_static_constructors_copy_an_r_descriptor_once_into_p() {
+    let mut prefix = prefix();
+    let program = RegExpProgram::compile("a", "").unwrap();
+    let descriptor = ValidatedRegExpProgram::from_program(&program).unwrap();
+    prefix.0.queue_regexp_program(&program);
+    prefix.0.append_regexp_programs();
+    let runtime_reference = prefix.0.regexp_program(&program);
+    prefix.0.compiler_owned = prefix.0.boundary();
+    let runtime_bytes = prefix.0.bytes.as_slice().to_vec();
+    let prefix = freeze(prefix);
+    for source in [
+        "var literal = /a/; literal;",
+        "new RegExp('a', '');",
+        "var literal = /a/; new RegExp('a', ''); /a/;",
+    ] {
+        let pool =
+            CompilerOwnedPool::collect_program(&prefix, &script(source), &BTreeMap::new()).unwrap();
+        let reference = pool.regexp_program(&program);
+        let span = reference
+            .metadata_span(&pool)
+            .expect("P-owned descriptor span");
+        assert_ne!(reference.payload(), runtime_reference.payload());
+        assert_eq!(
+            &pool.program_metadata_bytes()
+                [span.start() as usize..(span.start() + span.length()) as usize],
+            descriptor.bytes(),
+            "literal/static constructor bytes and ordering must match native validation"
+        );
+        assert_eq!(
+            pool.program_metadata_bytes()
+                .windows(descriptor.bytes().len())
+                .filter(|bytes| *bytes == descriptor.bytes())
+                .count(),
+            1,
+            "literal and constructor must share one P copy: {source}"
+        );
+        assert_eq!(prefix.0.bytes.as_slice(), runtime_bytes.as_slice());
+        assert!(runtime_reference.metadata_span(&pool).is_err());
+    }
+}
+
+#[test]
 fn shared_program_images_and_ordinals_match_fresh_collection_with_exact_utf16() {
     let prefix = freeze(prefix());
     for source in [

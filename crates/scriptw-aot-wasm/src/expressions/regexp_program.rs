@@ -6,31 +6,16 @@ use scriptw_ir::RegExpProgram;
 mod candidate;
 
 impl<'a> FunctionBuilder<'a> {
-    fn emit_validated_regexp_program(
-        &self,
-        program: &scriptw_ir::ValidatedRegExpProgram,
+    fn emit_collected_regexp_program(
+        &mut self,
+        program: &RegExpProgram,
         function: &mut Function,
-    ) -> crate::gc_types::GcStackReference<crate::gc_types::RegExpProgram> {
-        let schema = self.runtime_schema();
-        let bytes = schema
-            .reserve_gc_local::<crate::gc_types::ImmutableByteArray, NonNullable>(function)
-            .initialize(
-                schema
-                    .array_type::<crate::gc_types::ImmutableByteArray>()
-                    .fixed(
-                        program
-                            .bytes()
-                            .iter()
-                            .map(|byte| GcOperand::i32(i32::from(*byte))),
-                        function,
-                    ),
-                function,
-            );
-        let result = schema
-            .struct_type::<crate::gc_types::RegExpProgram>()
-            .construct((GcOperand::reference(&bytes, schema),), function);
-        bytes.clear(function);
-        result
+    ) -> Result<crate::gc_types::GcStackReference<crate::gc_types::RegExpProgram>, EmitError> {
+        let span = self
+            .strings
+            .regexp_program(program)
+            .metadata_span(self.strings)?;
+        Ok(self.emit_static_regexp_program_span(span, function))
     }
 
     pub(crate) fn emit_regexp_program_slots(
@@ -39,15 +24,11 @@ impl<'a> FunctionBuilder<'a> {
         program: &RegExpProgram,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let validated =
-            scriptw_ir::ValidatedRegExpProgram::from_program(program).map_err(|_| {
-                EmitError::unsupported("invalid native RegExp program at GC publication")
-            })?;
         let schema = self.runtime_schema();
         let program = schema
             .reserve_gc_local::<crate::gc_types::RegExpProgram, NonNullable>(function)
             .initialize(
-                self.emit_validated_regexp_program(&validated, function),
+                self.emit_collected_regexp_program(program, function)?,
                 function,
             );
         schema
@@ -327,10 +308,6 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let validated =
-            scriptw_ir::ValidatedRegExpProgram::from_program(program).map_err(|_| {
-                EmitError::unsupported("invalid native RegExp program at GC publication")
-            })?;
         let schema = self.runtime_schema();
         let prototype = schema.reserve_value_local(function);
         self.emit_source_literal_prototype_to_value(
@@ -347,7 +324,7 @@ impl<'a> FunctionBuilder<'a> {
             function,
         );
         let program = schema.reserve_gc_local(function).initialize(
-            self.emit_validated_regexp_program(&validated, function),
+            self.emit_collected_regexp_program(program, function)?,
             function,
         );
         let realm = self.emit_execution_realm(function);

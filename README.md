@@ -26,7 +26,9 @@ controls and separates process RSS from JavaScript heap usage.
 The runtime now separates build-admitted Intl compilation metadata from
 provider initialization, loads providers on the first Intl operation, and uses
 private disk-backed native mappings where supported. Constant-string bootstrap
-uses a descriptor loop. The graph remains bound to the measured compiler and
+uses a descriptor loop. Large static regexp descriptors copy from checked
+program data, avoiding enormous operand stacks during native compilation.
+The graph remains bound to the measured compiler and
 date shown in it; see the [memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Tests

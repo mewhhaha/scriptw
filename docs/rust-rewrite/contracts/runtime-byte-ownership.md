@@ -81,6 +81,15 @@ private static segment before its pool boundary is sealed; no extra data
 segment or program-owned literal can change that runtime table. This replaces
 unrolled initialization code while preserving GC object/string identities.
 
+## Static regexp construction
+
+Static regexp descriptors remain in P metadata. Literal and optimized
+constructor publication uses a checked P-relative span and the same bounded
+copy as dynamic candidates, rather than emitting one Wasm operand per byte.
+Descriptors already present in R receive one deduplicated P copy. Their wire
+bytes and matching semantics stay identical; construction publishes the GC
+program only after the copy is complete.
+
 ## Observe resident memory
 
 On Linux, capture a serial diagnostic using a built `runtime_baseline` example:
