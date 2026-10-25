@@ -59,47 +59,12 @@ impl FunctionBuilder<'_> {
         self.push_scope();
         self.completion().initialize(&mut function);
         let output = self.runtime_schema().reserve_value_local(&mut function);
-        // Both whole operands have already completed evaluation in P. Actual
-        // String tags prove ToPrimitive and ToString are identities; keep this
-        // dispatch and the copy CFG in R rather than at every source `+` site.
-        parameters.left.tag().load(&mut function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
-        function.instruction(&Instruction::I32Eq);
-        parameters.right.tag().load(&mut function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, &mut function);
-        let schema = self.runtime_schema();
-        let left = schema.reserve_gc_local(&mut function).initialize(
-            parameters
-                .left
-                .cast_reference::<StringValue>(schema, &mut function),
-            &mut function,
-        );
-        let right = schema.reserve_gc_local(&mut function).initialize(
-            parameters
-                .right
-                .cast_reference::<StringValue>(schema, &mut function),
-            &mut function,
-        );
-        let string = schema.reserve_gc_local(&mut function).initialize(
-            self.emit_concat_gc_strings(&left, &right, &mut function),
-            &mut function,
-        );
-        output.set_reference(&string, schema, &mut function);
-        string.clear(&mut function);
-        right.clear(&mut function);
-        left.clear(&mut function);
-        function.instruction(&Instruction::Else);
         self.emit_coercive_add_from_values_inner(
             &parameters.left,
             &parameters.right,
             &output,
             &mut function,
         )?;
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
         self.completion().set_normal(&output, &mut function);
         output.clear(&mut function);
         self.pop_scope();
@@ -143,31 +108,31 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::I32Or);
         self.open_frame(ControlFrameKind::If, function);
-        // Both operands are already primitive. The registered conversion helpers
-        // take their primitive fast path while retaining the caller Environment
-        // and complete abrupt result, without repeating their bodies at every +.
-        self.emit_value_to_string_payload(&left, &pending, function)?;
-        self.finish_to_primitive_operation(
-            ToPrimitiveAbruptRoute::ActiveHandler,
-            &pending,
-            function,
-        )?;
+        // ToPrimitive has completed for both operands. ToString is an identity
+        // only for an actual String; retain conversion and abrupt completion
+        // for every other primitive, in left-to-right order. Reuse these rooted
+        // values so the concatenation body and its temporary roots occur once.
+        for value in [&left, &right] {
+            value.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+            function.instruction(&Instruction::I32Ne);
+            self.open_frame(ControlFrameKind::If, function);
+            self.emit_value_to_string_payload(value, &pending, function)?;
+            self.finish_to_primitive_operation(
+                ToPrimitiveAbruptRoute::ActiveHandler,
+                &pending,
+                function,
+            )?;
+            value.copy_from(pending.value(), function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
         let left_string = schema.reserve_gc_local(function).initialize(
-            pending
-                .value()
-                .cast_reference::<StringValue>(schema, function),
+            left.cast_reference::<StringValue>(schema, function),
             function,
         );
-        self.emit_value_to_string_payload(&right, &pending, function)?;
-        self.finish_to_primitive_operation(
-            ToPrimitiveAbruptRoute::ActiveHandler,
-            &pending,
-            function,
-        )?;
         let right_string = schema.reserve_gc_local(function).initialize(
-            pending
-                .value()
-                .cast_reference::<StringValue>(schema, function),
+            right.cast_reference::<StringValue>(schema, function),
             function,
         );
         let string = schema.reserve_gc_local(function).initialize(

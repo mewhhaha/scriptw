@@ -60,11 +60,14 @@ concatenating and re-encoding once. This preserves lone surrogates and pairs
 formed across the operand boundary. A 4-KiB encoded-input budget per fold
 bounds copying; larger and effectful expressions retain runtime evaluation.
 
-The shared runtime `CoerciveAdd` helper checks both actual String tags after
-both operands have been evaluated. That case concatenates directly; other
-values retain ordinary conversion and error behavior. The copy implementation
-stays in the shared runtime rather than being duplicated at source addition
-sites. This does not apply algebraic identities to floating-point expressions.
+The shared runtime `CoerciveAdd` helper retains ordinary `ToPrimitive` for both
+evaluated operands. Within its string-result branch, an actual String tag
+elides that operand's identity `ToString`; other primitives retain conversion
+and error behavior in left-to-right order. The converted values reuse their
+rooted operand locals, then enter one shared concatenation body. The copy
+implementation stays in the shared runtime rather than being duplicated at
+source addition sites. This does not apply algebraic identities to
+floating-point expressions.
 
 ## Verification and measurement
 
