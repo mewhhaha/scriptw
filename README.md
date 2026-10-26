@@ -13,6 +13,15 @@ Trusted Wasmtime native program images also support fresh-process execution
 with the native compiler disabled; the contract records their host-specific
 format and explicit native-code admission boundary.
 
+## Compiler-free comparison
+
+The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
+compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
+and Wasm compilation in separate producer processes. Both measured consumers
+disable compilation and use identical native optimization and runtime settings.
+Loading, setup and execution memory are recorded separately across all 17 workloads.
+This cohort stays separate from the ordinary V8 comparison below.
+
 ## Benchmarks
 
 ![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)

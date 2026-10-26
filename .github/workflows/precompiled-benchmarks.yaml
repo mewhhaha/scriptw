@@ -1,0 +1,80 @@
+name: Precompiled compiler comparison
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precompiled-benchmarks-main
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4; benchmark oracle and external compiler only
+        with:
+          node-version: '24.12.0'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          prefix-key: precompiled-benchmarks-v1
+          cache-on-failure: true
+      - name: Install pinned external benchmark tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lld
+          npm install --prefix "$RUNNER_TEMP/scriptc" --no-audit --no-fund --save-exact scriptc@0.4.5 @scriptc/runtime-wasm32-wasi@0.4.5
+          curl --fail --location --retry 3 https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o "$RUNNER_TEMP/zig.tar.xz"
+          printf '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  %s\n' "$RUNNER_TEMP/zig.tar.xz" | sha256sum --check
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+          printf 'SCRIPTC_RUNTIME_PACK=%s\n' "$RUNNER_TEMP/scriptc/node_modules/@scriptc/runtime-wasm32-wasi" >> "$GITHUB_ENV"
+          python3 -m pip install matplotlib==3.11.2
+      - name: Verify and build the shared host
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary -v
+          bash scripts/check-no-legacy-js.sh
+          python3 -B scripts/intl_source_identities.py
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --example compiler_precompiled_baseline -- --test-threads=1
+          bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --example compiler_precompiled_baseline --message-format=json > "$RUNNER_TEMP/precompiled-cargo.jsonl"
+      - name: Measure both compiler-free consumers
+        env:
+          BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          bash scripts/run-benchmark-scope.sh python3 -B scripts/benchmark-precompiled.py \
+            --host "$PWD/target/release/examples/compiler_precompiled_baseline" \
+            --scriptc "$RUNNER_TEMP/scriptc/node_modules/.bin/scriptc" \
+            --build-log "$RUNNER_TEMP/precompiled-cargo.jsonl" \
+            --package-lock "$RUNNER_TEMP/scriptc/package-lock.json" \
+            --output "$RUNNER_TEMP/precompiled-measurements" \
+            --evidence-output "$RUNNER_TEMP/precompiled-evidence"
+      - name: Retain all raw observations and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: precompiled-measurements
+          path: |
+            ${{ runner.temp }}/precompiled-evidence
+            ${{ runner.temp }}/precompiled-measurements/incomplete-report.json
+            ${{ runner.temp }}/precompiled-measurements/logs
+            ${{ runner.temp }}/precompiled-measurements/sources
+            ${{ runner.temp }}/precompiled-measurements/expected
+            ${{ runner.temp }}/precompiled-measurements/build
+            ${{ runner.temp }}/precompiled-cargo.jsonl
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0

@@ -3,6 +3,17 @@ use scriptw_engine::{CompileOptions, EmbeddedRuntime, Engine, RealmBuilder};
 use std::time::Instant;
 
 pub(super) fn run(fixtures: &Path, output: &Path) -> Result<Value, String> {
+    run_with_config(fixtures, output, |config| {
+        scriptw_engine::configure_wasm_runtime(config);
+        Ok(())
+    })
+}
+
+pub(super) fn run_with_config(
+    fixtures: &Path,
+    output: &Path,
+    configure: fn(&mut wasmtime::Config) -> Result<(), String>,
+) -> Result<Value, String> {
     scriptw_engine::configure_compilation_jobs(1)?;
     let manifest_bytes = fs::read(fixtures.join("manifest.json")).map_err(|e| e.to_string())?;
     let manifest: Value = serde_json::from_slice(&manifest_bytes).map_err(|e| e.to_string())?;
@@ -12,7 +23,7 @@ pub(super) fn run(fixtures: &Path, output: &Path) -> Result<Value, String> {
     fs::create_dir(output).map_err(|e| e.to_string())?;
     let compiler = Engine::new(RealmBuilder::new().build());
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    configure(&mut config)?;
     let native = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
     let mut results = Vec::new();
     let mut seen = std::collections::BTreeSet::new();

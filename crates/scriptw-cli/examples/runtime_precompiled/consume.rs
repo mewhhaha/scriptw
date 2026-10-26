@@ -11,6 +11,19 @@ pub(super) fn run(
     samples: &str,
     warmups: &str,
 ) -> Result<Value, String> {
+    run_with_config(path, expected, samples, warmups, |config| {
+        scriptw_engine::configure_precompiled_wasm_runtime(config);
+        Ok(())
+    })
+}
+
+pub(super) fn run_with_config(
+    path: &Path,
+    expected: &str,
+    samples: &str,
+    warmups: &str,
+    configure: fn(&mut wasmtime::Config) -> Result<(), String>,
+) -> Result<Value, String> {
     let samples: usize = samples.parse().map_err(|_| "invalid sample count")?;
     let warmups: usize = warmups.parse().map_err(|_| "invalid warmup count")?;
     if !(3..=100).contains(&samples) || !(1..=100).contains(&warmups) {
@@ -19,7 +32,7 @@ pub(super) fn run(
     let startup = residency::snapshot()?;
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_precompiled_wasm_runtime(&mut config);
+    configure(&mut config)?;
     let started = Instant::now();
     let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
     let engine_ns = started.elapsed().as_nanos();

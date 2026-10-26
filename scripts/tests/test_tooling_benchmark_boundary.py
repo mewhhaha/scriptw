@@ -32,6 +32,13 @@ class BenchmarkBoundaryTests(unittest.TestCase):
         result = self.audit(SETUP + INSTALL)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_precompiled_comparison_accepts_only_the_same_pinned_setup(self):
+        result = self.audit(SETUP + INSTALL, 'precompiled-benchmarks.yaml')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for extra in ('npm publish\n', 'node compiler/index.js\n'):
+            result = self.audit(SETUP + INSTALL + extra, 'precompiled-benchmarks.yaml')
+            self.assertNotEqual(result.returncode, 0)
+
     def test_other_workflows_cannot_use_the_exception(self):
         self.assertNotEqual(self.audit(SETUP + INSTALL, 'publish.yaml').returncode, 0)
 
