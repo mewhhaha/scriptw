@@ -1,4 +1,4 @@
-# Compiler-free Scriptw and Scriptc comparison
+# Compiler-disabled Scriptw and Scriptc comparison
 
 This cohort measures the complete 17-case execution corpus on one GitHub runner,
 using the same host executable for both compilers. Separate producer processes
@@ -37,8 +37,9 @@ Execution time measures each runtime's public entry API and output capture.
 Scriptw includes its internal worker and outcome handling; WASI calls `_start`.
 Image loading, Store/instance setup and post-timer checksum validation remain
 separate. The total observation time includes memory probes and must not be
-presented as an uninstrumented latency measurement. Runtime startup remains
-inside execution; no cost is subtracted from either result.
+presented as an uninstrumented latency measurement. Initialization performed by
+the entry API remains inside execution; registration and instance setup remain
+outside it. No cost is subtracted from either result.
 
 The native-image transport buffers are dropped before the first Store. Both
 native modules are deserialized from bytes into the same configured engine.
@@ -70,3 +71,8 @@ machine code. The Rust loader retains its explicit trusted-producer contract.
 The ordinary Scriptw/Scriptc/V8 comparison remains a separate cohort. Results
 from different machines or execution boundaries are not combined. These are
 descriptive measurements of this corpus, not a conformance or significance claim.
+Neither a Scriptw–Scriptc RSS difference nor an ordinary-minus-precompiled
+subtraction isolates compiler or JavaScript heap memory. The same executable
+can fault different code and data pages, while native optimization policy,
+runtime bindings, collector/allocator retention and warmup history also affect
+the process footprint.

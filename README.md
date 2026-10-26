@@ -13,14 +13,33 @@ Trusted Wasmtime native program images also support fresh-process execution
 with the native compiler disabled; the contract records their host-specific
 format and explicit native-code admission boundary.
 
-## Compiler-free comparison
+## Precompiled comparison
 
+![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
+
+**Measured 2026-10-26 on one GitHub Actions runner**, compiler `fc714e607`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
 and Wasm compilation in separate producer processes. Both measured consumers
 disable compilation and use identical native optimization and runtime settings.
-Loading, setup and execution memory are recorded separately across all 17 workloads.
-This cohort stays separate from the ordinary V8 comparison below.
+Both passed the original checksums on **17/17 workloads** across two rounds.
+Scriptw's median post-execution process RSS remains **4.1–5.6× Scriptc's**:
+
+| Workload | Scriptw RSS | Scriptc RSS |
+| --- | ---: | ---: |
+| Integer | 57.1 MiB | 13.3 MiB |
+| Objects | 65.1 MiB | 14.0 MiB |
+| Retained objects | 81.2 MiB | 19.8 MiB |
+
+These are medians of 14 samples per runtime and workload, after ten checked
+warmups per round, with each Store still alive. Process memory is sampled at
+loading, setup, execution and Store-drop boundaries; RSS is neither live JS
+heap nor peak memory. The gap remains with compilation disabled, but this does
+not isolate its cause. This cohort stays separate from the ordinary V8 comparison below.
+
+[All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
+[Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40380484042).
 
 ## Benchmarks
 
