@@ -14,6 +14,8 @@ paths and otherwise report a skip. Skips are not passing evidence for those cont
 
 | Module | Linux | macOS |
 | --- | --- | --- |
+| [test_compiler_comparison.py](../../scripts/tests/test_compiler_comparison.py) | All-module discovery | — |
+| [test_tooling_benchmark_boundary.py](../../scripts/tests/test_tooling_benchmark_boundary.py) | All-module discovery | Portable discovery |
 | [test_audit_test262_replay.py](../../scripts/tests/test_audit_test262_replay.py) | All-module discovery | — |
 | [test_ci_targets.py](../../scripts/tests/test_ci_targets.py) | All-module discovery | — |
 | [test_collator_documentation_projection.py](../../scripts/tests/test_collator_documentation_projection.py) | All-module discovery | — |

@@ -32,3 +32,4 @@ path = "src/lib.rs"
 
 [dev-dependencies]
 wasmtime = { version = "=47.0.0", default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "=47.0.0", default-features = false, features = ["p1"] }

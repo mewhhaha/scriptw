@@ -2,6 +2,10 @@
 
 Actual candidate [736f0f120](https://github.com/mewhhaha/scriptw/commit/736f0f1206c581e70048467f7d4423e1efed8bdd) versus published clean baseline [25909ef75](https://github.com/mewhhaha/scriptw/commit/25909ef750d487e8ae257cdce909635d64196995).
 
+![Local Scriptw versus V8 execution time and process RSS](assets/execution-memory-packed-records-20261026.svg)
+
+This local checkpoint is separate from the README's GitHub three-compiler comparison. Its measurements retain source `736f0f120` and are not measurements of the later merged compiler.
+
 GC layout 21 packs StoredValue scalar/tag/reference fields and descriptor flags. Native callable name/length values use compact storage; descriptor snapshots are materialized for reflection or mutation. Observable functions and properties remain initialized and rooted. Bounded idle Cranelift contexts retain useful small scratch and retire oversized owners at function/module boundaries. Structural bounds do not claim exact heap-byte accounting. Native zstd framing/level and decoded-native digest/backing authority remain unchanged.
 
 Each ordinary cohort contains all 17 workloads, ABBA order, two rounds/product and seven measured observations after ten warmups. Fresh Store/Realm execution and existing-Realm calls remain separate. Construction/checksums stay inside execution; V8 is paired with candidate rounds. Shared-host observations are descriptive.

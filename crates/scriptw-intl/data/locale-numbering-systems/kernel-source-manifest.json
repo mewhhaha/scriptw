@@ -24,13 +24,13 @@
   ],
   "decimal_numbering_systems": 78,
   "domain": "scriptw-locale-numbering-systems-native-v1",
-  "kernel_sha256": "784c91dca241d99d5503390bebeef551cd2ac361066198b1b86185947ec82004",
+  "kernel_sha256": "7679ad310967484892d16c44da1d39be32cb639805c0504ff6b38eaff0e6b585",
   "number_locales": 1082,
   "production_sources": [
     {
-      "bytes": 76942,
+      "bytes": 93161,
       "path": "Cargo.lock",
-      "sha256": "27b3d2875d021a89102989e2f7d8659ecaeca8d949ed6a2bae5ae491d4ad9884"
+      "sha256": "924e7c5e0dabe1516b5d30cce54164a5ebfdf82d6e8d0e3293f2ab04eb0354aa"
     },
     {
       "bytes": 6224,

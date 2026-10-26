@@ -8,47 +8,48 @@ Rust embedders can declare numeric, lossless UTF-16 string and byte foreign
 functions, retain and call JavaScript exports, and settle async host operations
 through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
 source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
+
 Trusted Wasmtime native program images also support fresh-process execution
 with the native compiler disabled; the contract records their host-specific
 format and explicit native-code admission boundary.
 
-## Benchmarks vs V8
+## Benchmarks
 
-![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
+![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
 
-[Latest measurements and evidence](docs/rust-rewrite/execution-memory-packed-records-20261026.md)
-· [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
+![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
 
-Ordinary post-execution process RSS is mostly flat against `25909ef75` in a paired rerun:
-it fell in
-**10 of 17 fresh-Realm workloads** and increased in **7**. Integer execution used
-**81.62 → 82.06 MiB** (paired V8: **59.98 MiB**); retained objects used
-**99.57 → 100.08 MiB** (paired V8: **71.55 MiB**). Across this corpus, Scriptw uses
-**1.29–1.81× V8 RSS**. RSS includes host/runtime, setup and
-retained warmup effects; it is not live JavaScript heap usage or peak memory.
-Fresh-Realm timing medians fell in **17 of 17 workloads**. Separate existing-Realm
-calls regressed **30.3% for retained objects** and **26.4% for small joins**. Shared-host
-observations do not establish statistical significance or V8 parity.
+**Measured 2026-10-26 on GitHub Actions**, compiler `8517b2046`.
+All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
+and **Node / V8**. Scriptc passed the original checksums on **17/17 workloads**;
+the remaining cases retain explicit failure labels and diagnostics.
 
-The runtime separates build-admitted Intl metadata from operation consumers,
-reuses a compact Cargo runtime receipt and uses private disk-backed native
-mappings where supported. Three Locale transforms, four NumberFormat and four
-PluralRules operations load their typed Locale/Number consumers; the remaining
-35 Intl operations still initialize the complete provider. Constant-string
-bootstrap uses a descriptor loop and shares immutable absent-value snapshots.
-Stored values and property descriptors use 32-byte GC records under the pinned
-collector. Native function `name`/`length` properties use compact storage and
-materialize descriptors when needed. Idle native compiler scratch is bounded.
-Large static regexp descriptors copy from checked program data, avoiding
-enormous native-compilation operand stacks.
-The separate compiler-disabled precompiled diagnostic measured
+Bars show median execution time and post-execution process RSS, with compilation
+and instance/context setup outside the execution timer. RSS includes the host/runtime,
+compilation and retained warmup effects; it is neither live JavaScript heap nor peak memory.
+Shared-runner observations are descriptive. The existing pinned Test262 status below is separate.
+
+[Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
+[Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
+
+**Separate local memory checkpoint, 2026-10-26:** compiler `736f0f120`,
+compared with `25909ef75` in a paired rerun. Ordinary post-execution process RSS
+was mostly flat: it fell in **10 of 17 workloads** and increased in **7**.
+Integer execution used **81.62 → 82.06 MiB**; retained objects used
+**99.57 → 100.08 MiB**. Fresh-Realm timing medians fell in all 17 workloads,
+while separate existing-Realm calls regressed **30.3% for retained objects**
+and **26.4% for small joins**. These local observations are separate from the
+GitHub Actions comparison above.
+
+The candidate-only compiler-disabled precompiled diagnostic measured
 **49.31 MiB for integer execution** and **66.09 MiB for retained objects**.
-Native loading reached a **111.93 MiB sampled RSS maximum**; shorter transients
-may be missed. These 17 candidate-only cases have no older API baseline and
-retain loading/decode costs; they contribute no samples to the ordinary graph.
-First-use, allocation and repeated-call diagnostics remain in the checkpoint.
-The graph is bound to its measured compiler and date; see the
-[memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
+Native loading reached a **111.93 MiB sampled RSS maximum**, which may miss
+shorter transients. There is no older API baseline; loading/decode costs remain
+recorded and these samples do not enter the comparison above. RSS includes
+host/runtime, code residency, setup and warmup history; it is neither live
+JavaScript heap usage nor whole-child peak memory.
+[Local measurements and evidence](docs/rust-rewrite/execution-memory-packed-records-20261026.md) ·
+[Memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Tests
 
@@ -90,8 +91,8 @@ refreshed 2026-10-26 at `736f0f120`, records **7,118 affected native
 checks across 32 targets**. This combines 31 unchanged targets executed at
 `e36a4f029` with the complete repaired structural target at `736f0f120`;
 the exact test-only source comparison and original execution identities are
-retained. It is not a fresh full native sweep on the final commit. The final
-compiler's selected Test262 replay passed **20,264 / 20,268 executions**,
+retained. It is not a fresh full native sweep on the later merged compiler.
+The measured `736f0f120` compiler's selected Test262 replay passed **20,264 / 20,268 executions**,
 with **4 failures, 0 crashes, 0 unsupported cases and
 0 timeouts**. Verification used one CPU, a 4-GiB memory cap and no swap.
 Existing source-tooling failures remain recorded; refresh commands and exact

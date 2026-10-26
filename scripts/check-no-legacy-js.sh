@@ -71,11 +71,12 @@ done < <(
 )
 
 if [ "${#workflow_files[@]}" -gt 0 ]; then
-  workflow_commands="$({
-    grep -Eni \
+  workflow_matches="$({
+    grep -HEni \
       '(^|[^[:alnum:]_-])(node|deno|npm|npx|bun|jsr)([^[:alnum:]_-]|$)|uses:[^#]*setup-(node|deno|bun)' \
       "${workflow_files[@]}" || true
   })"
+  workflow_commands="$(printf '%s\n' "$workflow_matches" | python3 scripts/check-benchmark-workflow-tools.py)"
   if [ -n "$workflow_commands" ]; then
     fail "first-party workflows invoke retired JavaScript tooling"
     printf '%s\n' "$workflow_commands" >&2
