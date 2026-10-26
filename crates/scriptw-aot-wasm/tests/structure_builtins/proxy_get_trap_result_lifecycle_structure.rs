@@ -104,7 +104,7 @@ fn the_normal_result_has_one_consuming_invariant_and_borrowed_observers() {
         .collect::<String>();
     assert_eq!(normalized.matches("self.emit_tagged_payload_same_value_i32(trap_result.value(),&invariant_value,function)?;").count(), 1);
     assert!(invariant.contains("descriptor.read_getter(&invariant_value, schema, function);"));
-    assert!(invariant.contains("descriptor.read_value(&invariant_value, schema, function);"));
+    assert!(invariant.contains("descriptor.read_value(&invariant_value, self, function);"));
     let trap = bounded(
         OBJECTS_SOURCE,
         "fn emit_proxy_get(",

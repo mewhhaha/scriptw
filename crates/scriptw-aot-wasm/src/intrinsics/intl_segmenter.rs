@@ -1,8 +1,8 @@
 //! Realm-owned auxiliary Segmenter prototypes. Their instances are produced by
 //! compiled builtins; they have no public constructor or entry-Realm fallback.
 use super::super::*;
-use super::intl::{IntlIntrinsicProperty, IntlIntrinsicPropertyKind};
 use super::IntrinsicInstall;
+use super::intl::{IntlIntrinsicProperty, IntlIntrinsicPropertyKind};
 
 pub(crate) const SEGMENTS_PROTOTYPE_PROPERTIES: &[IntlIntrinsicProperty] = &[
     IntlIntrinsicProperty {
@@ -51,15 +51,12 @@ impl<'a> FunctionBuilder<'a> {
                 function,
             );
             for property in properties {
-                let callable =
-                    self.emit_intrinsic_callable(property.builtin, context.realm, function)?;
-                let value = schema.reserve_value_local(function);
-                value.set_reference(&callable, schema, function);
                 self.emit_define_intl_intrinsic_function_property(
-                    &prototype, property, &value, function,
+                    &prototype,
+                    property,
+                    context.realm,
+                    function,
                 )?;
-                value.clear(function);
-                callable.clear(function);
             }
             if let Some(name) = to_string_tag {
                 self.emit_define_intl_intrinsic_to_string_tag(&prototype, name, function)?;

@@ -233,7 +233,12 @@ impl FunctionBuilder<'_> {
                     let string = s
                         .reserve_gc_local::<StringValue, NonNullable>(&mut f)
                         .initialize(
-                            self.current_program().literal_operand(s, payload, &mut f),
+                            self.current_program().literal_operand(
+                                s,
+                                payload,
+                                self.runtime_helper_base()?,
+                                &mut f,
+                            ),
                             &mut f,
                         );
                     value.set_reference(&string, s, &mut f);

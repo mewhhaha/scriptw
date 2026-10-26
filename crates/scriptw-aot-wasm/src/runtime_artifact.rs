@@ -61,7 +61,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 19 indexes per-program cache metadata directly and gives Map/Set
 // cursors stable insertion ordinals across bounded history compaction.
 // Version 20 adds the checked retained embedding call/read/checkpoint kernels.
-const LAYOUT_VERSION: u32 = 21;
+// Version 22 adds the property-value sum and lazy canonical runtime strings.
+const LAYOUT_VERSION: u32 = 22;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

@@ -293,12 +293,7 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 function,
             );
-            schema.struct_type::<StoredValue>().read_into(
-                &stored,
-                result.value(),
-                schema,
-                function,
-            );
+            self.emit_property_value_into(&stored, result.value(), function);
             stored.clear(function);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);

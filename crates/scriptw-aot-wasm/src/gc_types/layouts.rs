@@ -622,7 +622,7 @@ macro_rules! gc_layout_registry {
                     $(Self::$owner => gc_layout_registry!(@definition $kind $owner
                         layouts; $($field: $value, $mutability, $nullability;)*)),+
                 };
-                let is_final = !matches!(self, Self::ObjectPropertyStorage);
+                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::PropertyValue);
                 let supertype_idx = match self {
                     $(Self::$owner => gc_layout_registry!(@parent layouts; $($parent)?)),+
                 };
@@ -679,6 +679,12 @@ macro_rules! gc_layout_registry {
         impl GcStructHeapType for ObjectPropertyStorage { const FIELD_COUNT: u32 = 0; }
         // The non-final base is fieldless and has no allocating constructor.
         pub(crate) type ObjectPropertyStorageSchema = GcStructType<ObjectPropertyStorage>;
+    };
+    (@schema struct PropertyValue PropertyValueSchema;) => {
+        impl sealed::Struct for PropertyValue {}
+        impl GcStructHeapType for PropertyValue { const FIELD_COUNT: u32 = 0; }
+        // The fieldless sum has no allocating constructor.
+        pub(crate) type PropertyValueSchema = GcStructType<PropertyValue>;
     };
     (@schema struct $owner:ident $schema:ident; $($fields:tt)+) => {
         impl sealed::Struct for $owner {}
@@ -800,12 +806,18 @@ macro_rules! gc_layout_registry {
 }
 
 gc_layout_registry! {
-        struct StoredValue => StoredValueSchema {
+        struct PropertyValue => PropertyValueSchema {}
+        struct StoredValue: PropertyValue => StoredValueSchema {
             // Keep the 64-bit payload first: the copying collector can then
             // fit all fields after its header without an extra alignment unit.
             SCALAR: I64Value, Immutable, NonNullable;
             TAG: I32Value, Immutable, NonNullable;
             REFERENCE: AnyGcRef, Immutable, Nullable;
+        }
+        struct DeferredIntrinsicValue: PropertyValue => DeferredIntrinsicValueSchema {
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            BUILTIN: scriptw_ir::StandardBuiltinId, Immutable, NonNullable;
+            CACHED: GcRef<StoredValue>, Mutable, Nullable;
         }
         struct OrdinaryObject => OrdinaryObjectSchema {
             PROTOTYPE: GcRef<StoredValue>, Mutable, NonNullable;
@@ -817,7 +829,7 @@ gc_layout_registry! {
         }
         struct PropertyDescriptor => PropertyDescriptorSchema {
             FLAGS: crate::heap::DescriptorWord, Mutable, NonNullable;
-            VALUE: GcRef<StoredValue>, Mutable, NonNullable;
+            VALUE: GcRef<PropertyValue>, Mutable, NonNullable;
             GETTER: GcRef<StoredValue>, Mutable, NonNullable;
             SETTER: GcRef<StoredValue>, Mutable, NonNullable;
         }

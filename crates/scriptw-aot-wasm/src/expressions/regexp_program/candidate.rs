@@ -61,8 +61,12 @@ impl FunctionBuilder<'_> {
             let source = schema
                 .reserve_gc_local::<StringValue, NonNullable>(&mut function)
                 .initialize(
-                    self.current_program()
-                        .literal_operand(schema, literal, &mut function),
+                    self.current_program().literal_operand(
+                        schema,
+                        literal,
+                        self.runtime_helper_base()?,
+                        &mut function,
+                    ),
                     &mut function,
                 );
             metadata.read_u64(
@@ -75,8 +79,12 @@ impl FunctionBuilder<'_> {
             let flags = schema
                 .reserve_gc_local::<StringValue, NonNullable>(&mut function)
                 .initialize(
-                    self.current_program()
-                        .literal_operand(schema, literal, &mut function),
+                    self.current_program().literal_operand(
+                        schema,
+                        literal,
+                        self.runtime_helper_base()?,
+                        &mut function,
+                    ),
                     &mut function,
                 );
             self.emit_string_payload_equality_i32(&parameters.source, &source, &mut function);

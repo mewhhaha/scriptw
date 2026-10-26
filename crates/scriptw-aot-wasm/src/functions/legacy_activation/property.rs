@@ -4,7 +4,7 @@ use super::*;
 use crate::gc_types::{
     GcOperand, LegacyReflectionPropertyStateSchema, NonNullable, OrdinaryObject,
     PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
-    RuntimeSchema, StoredValue, ValueLocals,
+    PropertyValue, RuntimeSchema, StoredValue, ValueLocals,
 };
 use crate::heap::DescriptorMask;
 use crate::operations::PropertyKeyLocals;
@@ -140,8 +140,10 @@ impl ReflectionProperty {
                     .reference(),
                 function,
             );
+        // Compare the raw owner token: resolving a deferred value must never
+        // revive legacy reflection after a user replacement.
         let actual = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
+            .reserve_gc_local::<PropertyValue, NonNullable>(function)
             .initialize(
                 schema
                     .field(PropertyDescriptorSchema::VALUE)
@@ -187,7 +189,7 @@ impl ReflectionProperty {
         );
         schema.field(PropertyDescriptorSchema::VALUE).write(
             &descriptor,
-            GcOperand::reference(&stored, schema),
+            GcOperand::subtype_reference(&stored, schema),
             schema,
             function,
         );

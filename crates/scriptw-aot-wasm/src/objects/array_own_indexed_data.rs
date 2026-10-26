@@ -1,4 +1,4 @@
-//! Allocation-free own indexed data value probe. `found` is separate from the
+//! Own indexed data value probe; deferred property values resolve on demand. `found` is separate from the
 //! value: a present undefined is never confused with a hole or an accessor.
 use super::*;
 use crate::gc_types::{ArrayIndexedStorageMode, ArrayObject};
@@ -41,8 +41,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        s.struct_type::<StoredValue>()
-            .read_into(&stored, output, s, f);
+        self.emit_property_value_into(&stored, output, f);
         found.set_constant(1, f);
         stored.clear(f);
         self.pop_control(ControlFrameKind::If);

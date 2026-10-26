@@ -260,9 +260,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&key_record, &key_value, schema, function);
+        self.emit_property_value_into(&key_record, &key_value, function);
         native.set_reference(&own_descriptor, schema, function);
         let descriptor_args = self.emit_pre_evaluated_arg_vector(&[&input, &key_value], function);
         self.emit_function_or_proxy_call_with_argv(

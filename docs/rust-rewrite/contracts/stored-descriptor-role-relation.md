@@ -2,6 +2,14 @@
 
 Status: normative for the AOT descriptor-compatibility boundary.
 
+In the current GC backend, descriptor VALUE has the typed PropertyValue sum;
+GETTER and SETTER accept only immutable StoredValue snapshots. Compatibility
+reads and descriptor exposure resolve internal intrinsic recipes before applying
+SameValue. Merging a partial descriptor preserves its current VALUE edge when
+no new value is supplied, and kind conversion restores the canonical undefined
+snapshot. Attribute changes therefore retain lazy values without manufacturing
+new callables. See [lazy runtime values](lazy-runtime-values.md).
+
 ## Closed field roles
 
 `StoredDescriptorLocals::new` accepts the distinct

@@ -197,13 +197,16 @@ impl FunctionBuilder<'_> {
                     own.load(schema, function).require_non_null(function),
                     function,
                 );
+            // These freshly published source-function legacy properties contain
+            // eager StoredValue mutation tokens, never intrinsic recipes.
             let stored = schema
                 .reserve_gc_local::<StoredValue, NonNullable>(function)
                 .initialize(
                     schema
                         .field(PropertyDescriptorSchema::VALUE)
                         .read(&descriptor, schema, function)
-                        .reference(),
+                        .reference()
+                        .cast_subtype::<StoredValue>(schema, function),
                     function,
                 );
             let state = schema

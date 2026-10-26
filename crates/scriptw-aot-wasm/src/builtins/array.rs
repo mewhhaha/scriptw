@@ -860,9 +860,35 @@ impl FunctionBuilder<'_> {
         present: I32Local,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        present.set_constant(0, f);
+        source.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, f);
+        let array = schema
+            .reserve_gc_local(f)
+            .initialize(source.cast_reference::<ArrayObject>(schema, f), f);
+        let value = schema.reserve_value_local(f);
+        // A live own data slot proves HasProperty without boxing packed
+        // numbers or constructing a string key. Holes, accessors and Proxy
+        // receivers retain the full observable HasProperty operation below.
+        self.emit_array_own_indexed_value(&array, index, &value, present, f);
+        value.clear(f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        present.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         let key = self.emit_array_native_index_key(index, f)?;
         self.emit_object_has_property_i32(source, &key, present, f)?;
         key.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         Ok(())
     }
 

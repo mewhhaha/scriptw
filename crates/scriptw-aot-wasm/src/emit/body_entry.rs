@@ -88,6 +88,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::FunctionNameFromKey
             | RuntimeHelperId::RegExpLiteralAllocate
             | RuntimeHelperId::NativeRegExpLiteralFactory
+            | RuntimeHelperId::PropertyValueResolve
             | RuntimeHelperId::FunctionMetadataPublish
             | RuntimeHelperId::RealmInitializeIntrinsics
             | RuntimeHelperId::FunctionCall
@@ -175,6 +176,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::ModuleBodyReaction
             | RuntimeHelperId::RegExpProgramCandidate
             | RuntimeHelperId::RuntimeErrorObject
+            | RuntimeHelperId::PooledStringResolve
             | RuntimeHelperId::PooledStringsInitialize
             | RuntimeHelperId::GlobalLexicalDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationCheck

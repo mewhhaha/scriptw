@@ -439,3 +439,42 @@ gc();result;
         }
     ));
 }
+
+#[test]
+fn snapshot_materializes_unread_intrinsic_method_descriptors_without_js_hooks() {
+    let outcome = observe(
+        r#"
+Object.setPrototypeOf(Math, null);
+Object.setPrototypeOf(Function.prototype, null);
+delete Function.prototype.constructor;
+gc();
+Math;
+"#,
+        SnapshotLimits::default(),
+    );
+    let SnapshotOutcome::Captured { graph } = outcome.completion.outcome else {
+        panic!("graph was rejected: {:?}", outcome.completion.outcome);
+    };
+    let SnapshotDescriptor::Data {
+        value: SnapshotValue::Object { id },
+        writable: true,
+        enumerable: false,
+        configurable: true,
+    } = property(&graph.nodes()[0], "abs")
+    else {
+        panic!("Math.abs descriptor lost its intrinsic value or attributes");
+    };
+    let method = &graph.nodes()[*id as usize];
+    assert!(matches!(
+        method.kind,
+        SnapshotObjectKind::Function {
+            constructable: false,
+            realm: 0,
+        }
+    ));
+    assert!(
+        matches!(property(method, "length"), SnapshotDescriptor::Data {
+        value: SnapshotValue::Number { bits }, ..
+    } if *bits == 1f64.to_bits())
+    );
+}

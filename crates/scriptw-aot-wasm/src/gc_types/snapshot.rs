@@ -16,7 +16,7 @@ macro_rules! snapshot_layouts {
         }
     };
 }
-snapshot_layouts!(Stored => StoredValue, String => StringValue, CodeUnits => CodeUnitArray,
+snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String => StringValue, CodeUnits => CodeUnitArray,
     BigInt => BigIntValue, Limbs => BigIntLimbArray, Symbol => SymbolValue,
     Object => OrdinaryObject, PropertyStorage => OrdinaryPropertyStorage,
     CompactStorage => CompactDataStorage, CompactShape => CompactDataShape,
@@ -32,6 +32,8 @@ snapshot_layouts!(Stored => StoredValue, String => StringValue, CodeUnits => Cod
     Realms => SnapshotRealmInventory, WellKnownSymbols => WellKnownSymbolTable,
     Proxy => ProxyObject, BoundFunction => BoundFunction, Boxed => PrimitiveBox,
     Promise => PromiseObject, Error => NativeErrorObject);
+
+pub const SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT: &str = "scriptw_snapshot_resolve_property_value";
 
 pub const SNAPSHOT_ENTRY_REALM_EXPORT: &str = "scriptw_snapshot_entry_realm";
 pub const SNAPSHOT_REALMS_EXPORT: &str = "scriptw_snapshot_realms";
@@ -197,10 +199,19 @@ impl SnapshotRoots {
     }
 }
 impl RuntimeSchema {
-    pub(crate) fn export_snapshot_roots(&self, exports: &mut wasm_encoder::ExportSection) {
+    pub(crate) fn export_snapshot_roots(
+        &self,
+        exports: &mut wasm_encoder::ExportSection,
+        helpers: crate::runtime_helpers::RuntimeHelperFunctionBase,
+    ) {
         let Some(roots) = &self.snapshot else {
             return;
         };
+        exports.export(
+            SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
+            wasm_encoder::ExportKind::Func,
+            crate::runtime_helpers::RuntimeHelperId::PropertyValueResolve.index(helpers),
+        );
         for (layout, index) in &roots.witnesses {
             exports.export(
                 layout.witness_export(),

@@ -153,8 +153,16 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(function);
         let getter = schema.reserve_value_local(function);
         let setter = schema.reserve_value_local(function);
+        let property_value = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PropertyDescriptorSchema::VALUE)
+                .read(record, schema, function)
+                .reference(),
+            function,
+        );
+        self.emit_property_value_into(&property_value, &value, function);
+        property_value.clear(function);
         for (field, destination) in [
-            (PropertyDescriptorSchema::VALUE, &value),
             (PropertyDescriptorSchema::GETTER, &getter),
             (PropertyDescriptorSchema::SETTER, &setter),
         ] {

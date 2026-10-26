@@ -23,7 +23,7 @@
       "ianaCountry": "IS"
     }
   ],
-  "providerDataSha256": "426b41b00c7e311dc6bfb934bedd873723116dafc11c8ed8793d2e1df1c4f77b",
+  "providerDataSha256": "2eed288391bb0144a7777b9d5f36efa2abb11bef8da23178ee17390a28cf4096",
   "recipe": {
     "domain": "scriptw-intl-named-time-zones-v1",
     "iana": "2026a",
@@ -233,8 +233,8 @@
       },
       {
         "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-        "bytes": 81609,
-        "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
+        "bytes": 81741,
+        "sha256": "fa7582df6f8882c712f6ae6657998c2960dbe187c21ecf2ddd23060d2234687d"
       },
       {
         "path": "crates/scriptw-intl/src/named_time_zone_image.rs",
@@ -561,7 +561,7 @@
     {
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
       "bytes": 565,
-      "sha256": "e05098dfdda13637f6bc80161f011dae0e4c403fc4c2e7495103efcf79c8b365"
+      "sha256": "c83bdb8fbb619f25f6e2ade34ddc1ed08107c1694ebb76b1070aa7d0fcd95cfc"
     }
   ]
 }

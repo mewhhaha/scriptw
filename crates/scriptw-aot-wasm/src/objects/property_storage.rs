@@ -89,7 +89,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
     }
 
-    pub(super) fn emit_ordinary_append_property_entry(
+    pub(crate) fn emit_ordinary_append_property_entry(
         &self,
         object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,

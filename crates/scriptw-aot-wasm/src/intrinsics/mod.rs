@@ -23,6 +23,7 @@ pub(crate) mod array;
 pub(crate) mod binary_data;
 pub(crate) mod collections;
 pub(crate) mod date;
+mod deferred_methods;
 pub(crate) mod errors;
 pub(crate) mod function;
 pub(crate) mod intl;
@@ -278,6 +279,17 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        if let Some(method) = deferred_methods::DeferredIntrinsicMethod::new(builtin) {
+            return self.emit_install_deferred_intrinsic_method_aliases(
+                target,
+                keys,
+                method,
+                realm,
+                writable,
+                configurable,
+                function,
+            );
+        }
         let callable = self.emit_intrinsic_callable(builtin, realm, function)?;
         let value = schema.reserve_value_local(function);
         value.set_reference(&callable, schema, function);

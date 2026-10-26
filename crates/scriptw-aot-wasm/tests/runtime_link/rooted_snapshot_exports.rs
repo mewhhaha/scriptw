@@ -3,11 +3,12 @@ use std::sync::Arc;
 
 use scriptw_aot_wasm::{
     emit, emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy,
-    SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT, SNAPSHOT_SYMBOLS_EXPORT,
+    SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT, SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
+    SNAPSHOT_SYMBOLS_EXPORT,
 };
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
-use wasmparser::{ExternalKind, HeapType, Parser, Payload, ValType};
+use wasmparser::{CompositeInnerType, ExternalKind, HeapType, Parser, Payload, TypeRef, ValType};
 
 fn exports(
     bytes: &[u8],
@@ -34,6 +35,39 @@ fn exports(
     (rows, globals)
 }
 
+fn exported_function_type(bytes: &[u8], function_index: u32) -> wasmparser::FuncType {
+    let mut types = Vec::new();
+    let mut functions = Vec::new();
+    for payload in Parser::new(0).parse_all(bytes) {
+        match payload.unwrap() {
+            Payload::TypeSection(section) => {
+                for group in section {
+                    for subtype in group.unwrap().types().cloned() {
+                        types.push(match subtype.composite_type.inner {
+                            CompositeInnerType::Func(function) => Some(function),
+                            _ => None,
+                        });
+                    }
+                }
+            }
+            Payload::ImportSection(section) => {
+                for import in section.into_imports() {
+                    if let TypeRef::Func(index) | TypeRef::FuncExact(index) = import.unwrap().ty {
+                        functions.push(index);
+                    }
+                }
+            }
+            Payload::FunctionSection(section) => {
+                functions.extend(section.into_iter().map(Result::unwrap));
+            }
+            _ => {}
+        }
+    }
+    types[functions[function_index as usize] as usize]
+        .clone()
+        .expect("resolver export must have an actual function type")
+}
+
 fn snapshot_export_names(rows: &[(String, ExternalKind, u32)]) -> BTreeSet<&str> {
     rows.iter()
         .map(|(name, _, _)| name.as_str())
@@ -41,11 +75,11 @@ fn snapshot_export_names(rows: &[(String, ExternalKind, u32)]) -> BTreeSet<&str>
         .collect()
 }
 
-/// The runtime module declares the snapshot witnesses and roots for every
+/// The runtime module declares snapshot witnesses, roots and its resolver for every
 /// program; a program module never does. Asking for a snapshot only forces
 /// the runtime link of a program that would otherwise be self-contained.
 #[test]
-fn snapshot_witness_exports_are_opt_in_actual_gc_globals() {
+fn snapshot_exports_have_actual_gc_roots_witnesses_and_a_typed_resolver() {
     let heap = lower(&parse("({ value: 7 })", ParseOptions::script()).unwrap());
     let normal = emit(&heap).unwrap();
     let graph = emit_with_rooted_snapshot(
@@ -75,12 +109,13 @@ fn snapshot_witness_exports_are_opt_in_actual_gc_globals() {
             SNAPSHOT_ENTRY_REALM_EXPORT,
             SNAPSHOT_REALMS_EXPORT,
             SNAPSHOT_SYMBOLS_EXPORT,
+            SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
         ])
         .collect::<BTreeSet<_>>();
     assert_eq!(
         snapshot_export_names(&runtime_exports),
         expected,
-        "R exports only the three roots and the declaration-derived witnesses"
+        "R exports three roots, declaration-derived witnesses and the value resolver"
     );
     for name in expected {
         assert_eq!(
@@ -94,6 +129,40 @@ fn snapshot_witness_exports_are_opt_in_actual_gc_globals() {
             .iter()
             .find(|(export, _, _)| export == name)
             .unwrap();
+        if name == SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT {
+            assert_eq!(*kind, ExternalKind::Func, "{name}");
+            let signature = exported_function_type(runtime.bytes(), *index);
+            assert_eq!(signature.params().len(), 1, "one property value input");
+            assert_eq!(
+                signature.results().len(),
+                1,
+                "one immutable snapshot result"
+            );
+            for (actual, layout) in [
+                (signature.params()[0], GcSnapshotLayout::PropertyValue),
+                (signature.results()[0], GcSnapshotLayout::Stored),
+            ] {
+                let (_, kind, index) = runtime_exports
+                    .iter()
+                    .find(|(name, _, _)| name == layout.witness_export())
+                    .unwrap();
+                assert_eq!(*kind, ExternalKind::Global);
+                let ValType::Ref(witness) = runtime_globals[*index as usize].content_type else {
+                    panic!("the published witness must be a GC reference");
+                };
+                let ValType::Ref(actual) = actual else {
+                    panic!("the resolver boundary must use concrete GC references");
+                };
+                assert!(!actual.is_nullable(), "resolver values are non-null");
+                assert!(matches!(actual.heap_type(), HeapType::Concrete(_)));
+                assert_eq!(
+                    actual.heap_type(),
+                    witness.heap_type(),
+                    "resolver signature must use the exact published {layout:?} type"
+                );
+            }
+            continue;
+        }
         assert_eq!(*kind, ExternalKind::Global, "{name}");
         let global = &runtime_globals[*index as usize];
         let ValType::Ref(reference) = global.content_type else {

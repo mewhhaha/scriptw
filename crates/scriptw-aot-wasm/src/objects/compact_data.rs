@@ -467,9 +467,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, output, schema, f);
+        self.emit_property_value_into(&stored, output, f);
         f.instruction(&Instruction::I32Const(1));
         found.store(f);
         stored.clear(f);

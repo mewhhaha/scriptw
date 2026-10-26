@@ -32,8 +32,12 @@ impl FunctionBuilder<'_> {
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(
-                self.current_program()
-                    .literal_operand(schema, operand, function),
+                self.current_program().literal_operand(
+                    schema,
+                    operand,
+                    self.runtime_helper_base()?,
+                    function,
+                ),
                 function,
             );
         body(self, &key, function)?;

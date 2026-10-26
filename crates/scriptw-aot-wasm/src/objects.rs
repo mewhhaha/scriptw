@@ -807,7 +807,7 @@ impl<'a> FunctionBuilder<'a> {
             schema.struct_type::<PropertyDescriptor>().construct(
                 (
                     attributes,
-                    GcOperand::reference(&stored, schema),
+                    GcOperand::subtype_reference(&stored, schema),
                     GcOperand::reference(&absent, schema),
                     GcOperand::reference(&absent, schema),
                 ),
@@ -861,7 +861,7 @@ impl<'a> FunctionBuilder<'a> {
             schema.struct_type::<PropertyDescriptor>().construct(
                 (
                     attributes,
-                    GcOperand::reference(&stored_value, schema),
+                    GcOperand::subtype_reference(&stored_value, schema),
                     GcOperand::reference(&stored_getter, schema),
                     GcOperand::reference(setter_snapshot, schema),
                 ),
@@ -1813,7 +1813,7 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::Else);
-        descriptor.read_value(&value, schema, function);
+        descriptor.read_value(&value, self, function);
         result.set_normal(&value, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -2059,7 +2059,7 @@ impl<'a> FunctionBuilder<'a> {
         descriptor.emit_writable_i32(schema, function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.read_value(&invariant_value, schema, function);
+        descriptor.read_value(&invariant_value, self, function);
         self.emit_tagged_payload_same_value_i32(trap_result.value(), &invariant_value, function)?;
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -3207,7 +3207,7 @@ impl<'a> FunctionBuilder<'a> {
         descriptor.emit_writable_i32(schema, function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.read_value(&field, schema, function);
+        descriptor.read_value(&field, self, function);
         self.emit_tagged_payload_same_value_i32(incoming, &field, function)?;
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -4132,9 +4132,7 @@ impl<'a> FunctionBuilder<'a> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&value, result, schema, function);
+        self.emit_property_value_into(&value, result, function);
         value.clear(function);
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::I32Const(1));

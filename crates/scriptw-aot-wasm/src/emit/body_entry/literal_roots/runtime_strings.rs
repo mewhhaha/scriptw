@@ -1,6 +1,75 @@
 use super::*;
 
 impl FunctionBuilder<'_> {
+    /// Resolve only a checked ordinal in R's sealed canonical prefix. The
+    /// passive UTF-16 segment remains alive for the lifetime of this cache.
+    pub(crate) fn compile_pooled_string_resolve_helper(&mut self) -> Result<Function, EmitError> {
+        self.strings.require_runtime_only()?;
+        let mut function = self.begin_helper_body(RuntimeHelperId::PooledStringResolve);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::PooledStringResolveParameters>(
+                &mut function,
+            );
+        let schema = self.schema;
+        let descriptors = self.strings.runtime_string_descriptors()?;
+        let table = schema.reserve_gc_local(&mut function).initialize(
+            schema.pooled_string_table_reference(&mut function),
+            &mut function,
+        );
+        parameters.ordinal.load(&mut function);
+        function.instruction(&Instruction::I32Const(descriptors.count() as i32));
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::Unreachable);
+        function.instruction(&Instruction::End);
+        let cached = schema
+            .reserve_gc_local::<StringValue, Nullable>(&mut function)
+            .initialize(
+                schema
+                    .array_type::<PooledStringTable>()
+                    .read(&table, parameters.ordinal, schema, &mut function)
+                    .reference(),
+                &mut function,
+            );
+        cached.load(schema, &mut function);
+        function.instruction(&Instruction::RefIsNull);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let row = crate::gc_types::RuntimeStringDescriptorRowLocals::read(
+            descriptors,
+            schema,
+            parameters.ordinal,
+            &mut function,
+        );
+        let construction = StringConstruction::from_runtime_pooled_row(
+            schema,
+            schema.reserve_gc_local(&mut function),
+            &row,
+            &mut function,
+        );
+        let string = schema
+            .reserve_gc_local::<StringValue, NonNullable>(&mut function)
+            .initialize(construction.publish(schema, &mut function), &mut function);
+        schema.array_type::<PooledStringTable>().write(
+            &table,
+            parameters.ordinal,
+            GcOperand::nullable_reference(&string, schema),
+            schema,
+            &mut function,
+        );
+        cached.replace(string.load(schema, &mut function).nullable(), &mut function);
+        string.clear(&mut function);
+        row.release(schema, &mut function);
+        function.instruction(&Instruction::End);
+        cached
+            .load(schema, &mut function)
+            .require_non_null(&mut function);
+        cached.clear(&mut function);
+        table.clear(&mut function);
+        crate::runtime_helpers::HelperParameters::release(parameters, &mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     /// R owns exactly its stable prefix, the well-known symbols and registry.
     /// There is no parameter through which a P can resize the shared table.
     pub(crate) fn compile_pooled_strings_initialize_helper(
@@ -29,51 +98,9 @@ impl FunctionBuilder<'_> {
             ),
             function_body,
         );
-        let descriptors = self.strings.runtime_string_descriptors()?;
-        assert_eq!(
-            descriptors.count(),
-            self.strings.compiler_owned_boundary().strings()
-        );
-        let row_index = schema.reserve_i32_local(function_body);
-        row_index.set_constant(0, function_body);
-        function_body.instruction(&Instruction::Block(BlockType::Empty));
-        function_body.instruction(&Instruction::Loop(BlockType::Empty));
-        row_index.load(function_body);
-        function_body.instruction(&Instruction::I32Const(descriptors.count() as i32));
-        function_body.instruction(&Instruction::I32GeU);
-        function_body.instruction(&Instruction::BrIf(1));
-        let row = crate::gc_types::RuntimeStringDescriptorRowLocals::read(
-            descriptors,
-            schema,
-            row_index,
-            function_body,
-        );
-        let construction = StringConstruction::from_runtime_pooled_row(
-            schema,
-            schema.reserve_gc_local(function_body),
-            &row,
-            function_body,
-        );
-        let string = schema
-            .reserve_gc_local::<StringValue, NonNullable>(function_body)
-            .initialize(construction.publish(schema, function_body), function_body);
-        schema.array_type::<PooledStringTable>().write(
-            &table,
-            row.ordinal(),
-            GcOperand::nullable_reference(&string, schema),
-            schema,
-            function_body,
-        );
-        string.clear(function_body);
-        row.release(schema, function_body);
-        row_index.load(function_body);
-        function_body.instruction(&Instruction::I32Const(1));
-        function_body.instruction(&Instruction::I32Add);
-        row_index.store(function_body);
-        function_body.instruction(&Instruction::Br(0));
-        function_body.instruction(&Instruction::End);
-        function_body.instruction(&Instruction::End);
-        schema.release_i32_local(row_index, function_body);
+        // Publish the fixed R-only nullable cache before resolving symbol
+        // descriptions. Unused canonical strings never allocate GC objects.
+        schema.publish_pooled_strings(&table, function_body);
         let mut symbols = Vec::new();
         for symbol in scriptw_ir::WellKnownSymbol::ALL {
             let description_slot =
@@ -85,11 +112,11 @@ impl FunctionBuilder<'_> {
             ));
             index.store(function_body);
             let description = description_slot.initialize(
-                schema
-                    .array_type::<PooledStringTable>()
-                    .read(&table, index, schema, function_body)
-                    .reference()
-                    .require_non_null(function_body),
+                schema.resolve_pooled_string_reference(
+                    index,
+                    self.runtime_helper_base()?,
+                    function_body,
+                ),
                 function_body,
             );
             let symbol_slot = schema.reserve_gc_local::<SymbolValue, NonNullable>(function_body);
@@ -118,7 +145,6 @@ impl FunctionBuilder<'_> {
             ),
             function_body,
         );
-        schema.publish_pooled_strings(&table, function_body);
         schema.publish_well_known_symbols(&symbol_table, function_body);
         let registry = schema
             .reserve_gc_local::<RegisteredSymbolTable, NonNullable>(function_body)

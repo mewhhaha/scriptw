@@ -1,5 +1,5 @@
 //! Concrete Array own-data reads stay inside the shared ObjectRead kernel.
-//! They need no public descriptor allocation. All reads that can invoke user
+//! They need no public descriptor allocation; deferred values resolve on demand. All reads that can invoke user
 //! code or consult a prototype retain the ordinary completion-aware path.
 use super::*;
 use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcNullability};
@@ -121,9 +121,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, &value, schema, function);
+        self.emit_property_value_into(&stored, &value, function);
         result.set_normal(&value, function);
         function.instruction(&Instruction::I32Const(1));
         handled.store(function);

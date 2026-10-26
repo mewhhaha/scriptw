@@ -6,11 +6,11 @@
 
 use scriptw_ir::ToPrimitiveHint;
 
-use crate::RuntimeErrorMessage;
 use crate::code_sink::Function;
 use crate::gc_types::*;
 use crate::module::StaticSignature;
 use crate::program_hooks::InstalledHook;
+use crate::RuntimeErrorMessage;
 use wasm_encoder::Instruction;
 
 /// Maximum bytes for one RegExp matcher's transient choice-frame arena.
@@ -1074,6 +1074,7 @@ runtime_helper_domain! {
     OrdinaryPropertyStorageEnsure / OrdinaryPropertyStorageEnsureArguments / OrdinaryPropertyStorageEnsureParameters / "ordinary_property_storage_ensure" { object:(Ref OrdinaryObject NonNullable) } => (Ref OrdinaryPropertyStorage NonNullable);
     OrdinaryOwnDescriptor / OrdinaryOwnDescriptorArguments / OrdinaryOwnDescriptorParameters / "ordinary_own_descriptor" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyDescriptor Nullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
+    PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
     CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1155,6 +1156,7 @@ runtime_helper_domain! {
     ModuleBodyReaction / ModuleBodyReactionArguments / ModuleBodyReactionParameters / "module_body_reaction" @ ModuleBodyReactionHook { module:(Ref ModuleRecord NonNullable),rejected:I32,argument:Value } => Void;
     RegExpProgramCandidate / RegExpProgramCandidateArguments / RegExpProgramCandidateParameters / "regexp_program_candidate" @ RegExpProgramCandidateHook { source:(Ref StringValue NonNullable),flags:(Ref StringValue NonNullable) } => RegExpCompile;
     RuntimeErrorObject / RuntimeErrorObjectArguments / RuntimeErrorObjectParameters / "runtime_error_object" { prototype:Value,message:(Ref StringValue NonNullable) } => (Ref NativeErrorObject NonNullable);
+    PooledStringResolve / PooledStringResolveArguments / PooledStringResolveParameters / "pooled_string_resolve" { ordinal:I32 } => (Ref StringValue NonNullable);
     PooledStringsInitialize / PooledStringsInitializeArguments / PooledStringsInitializeParameters / "pooled_strings_initialize" {} => Void;
     ObjectSetPrototypeOf / ObjectSetPrototypeOfArguments / ObjectSetPrototypeOfParameters / "object_set_prototype_of" { target:Value,prototype:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectDelete / ObjectDeleteArguments / ObjectDeleteParameters / "object_delete" { target:Value,key:Key,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1229,6 +1231,7 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => HelperOwner::Runtime,
             Self::OrdinaryOwnDescriptor => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
+            Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
             Self::ArgumentListAppend => HelperOwner::Runtime,
             Self::CachedPropertyRead => HelperOwner::Runtime,
@@ -1314,6 +1317,7 @@ impl RuntimeHelperId {
             Self::ModuleBodyReaction => HelperOwner::Hook(ProgramHook::ModuleBodyReaction),
             Self::RegExpProgramCandidate => HelperOwner::Hook(ProgramHook::RegExpProgramCandidate),
             Self::RuntimeErrorObject => HelperOwner::Runtime,
+            Self::PooledStringResolve => HelperOwner::Runtime,
             Self::PooledStringsInitialize => HelperOwner::Runtime,
             Self::ObjectSetPrototypeOf => HelperOwner::Runtime,
             Self::ObjectDelete => HelperOwner::Runtime,
@@ -1371,6 +1375,7 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => true,
             Self::OrdinaryOwnDescriptor => true,
             Self::CompactLiteralAllocate => true,
+            Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
             Self::ArgumentListAppend => true,
             Self::CachedPropertyRead => true,
@@ -1471,6 +1476,7 @@ impl RuntimeHelperId {
             Self::ModuleBodyReaction => true,
             Self::RegExpProgramCandidate => true,
             Self::RuntimeErrorObject => true,
+            Self::PooledStringResolve => true,
             Self::PooledStringsInitialize => true,
             Self::ObjectSetPrototypeOf => true,
             Self::ObjectDelete => true,
@@ -1599,12 +1605,10 @@ mod tests {
             vec!["generic-error", "current-function-realm-range-error"]
         );
         for failure in RegExpMatcherFailure::ALL {
-            assert!(
-                failure
-                    .message()
-                    .catalog_text()
-                    .is_some_and(|text| !text.is_empty())
-            );
+            assert!(failure
+                .message()
+                .catalog_text()
+                .is_some_and(|text| !text.is_empty()));
         }
     }
 
@@ -1725,11 +1729,9 @@ mod tests {
                 ))
             );
         }
-        assert!(
-            RuntimeHelperId::PooledStringsInitialize
-                .parameter_types()
-                .is_empty()
-        );
+        assert!(RuntimeHelperId::PooledStringsInitialize
+            .parameter_types()
+            .is_empty());
     }
 
     #[test]

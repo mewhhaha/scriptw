@@ -9,7 +9,45 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
     ));
     let (types, _, _) = declarations(&bytes);
     let schema = runtime.globals().schema();
+    let value_index = schema.struct_type::<PropertyValue>().type_index().raw();
     let stored_index = schema.struct_type::<StoredValue>().type_index().raw();
+    let deferred_index = schema
+        .struct_type::<DeferredIntrinsicValue>()
+        .type_index()
+        .raw();
+    let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
+    let reference = |index, nullable| {
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                nullable,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index)),
+            )
+            .unwrap(),
+        ))
+    };
+    let base = &types[value_index as usize];
+    assert!(!base.is_final);
+    assert!(base.supertype_idx.is_none());
+    let CompositeInnerType::Struct(base_fields) = &base.composite_type.inner else {
+        panic!("PropertyValue must be the fieldless sum base");
+    };
+    assert!(base_fields.fields.is_empty());
+    let mut alternatives = types
+        .iter()
+        .enumerate()
+        .filter(|(_, ty)| {
+            ty.supertype_idx.map(|parent| parent.unpack())
+                == Some(wasmparser::UnpackedIndex::Module(value_index))
+        })
+        .map(|(index, ty)| {
+            assert!(ty.is_final, "property value alternatives must be sealed");
+            index as u32
+        })
+        .collect::<Vec<_>>();
+    alternatives.sort_unstable();
+    let mut expected = vec![stored_index, deferred_index];
+    expected.sort_unstable();
+    assert_eq!(alternatives, expected);
     let CompositeInnerType::Struct(stored) = &types[stored_index as usize].composite_type.inner
     else {
         panic!("StoredValue must be the actual registered struct");
@@ -33,6 +71,26 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
     assert_eq!(GcHostField::StoredTag.definition().index(), 1);
     assert_eq!(GcHostField::StoredReference.definition().index(), 2);
 
+    let CompositeInnerType::Struct(deferred) = &types[deferred_index as usize].composite_type.inner
+    else {
+        panic!("DeferredIntrinsicValue must be a registered struct");
+    };
+    assert_eq!(
+        deferred
+            .fields
+            .iter()
+            .map(|field| (field.element_type, field.mutable))
+            .collect::<Vec<_>>(),
+        vec![
+            (reference(realm_index, false), false),
+            (
+                wasmparser::StorageType::Val(wasmparser::ValType::I32),
+                false
+            ),
+            (reference(stored_index, true), true),
+        ]
+    );
+
     let descriptor_index = schema
         .struct_type::<PropertyDescriptor>()
         .type_index()
@@ -48,17 +106,12 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         descriptor.fields[0].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::I32)
     );
-    for field in &descriptor.fields[1..] {
-        assert_eq!(
-            field.element_type,
-            wasmparser::StorageType::Val(wasmparser::ValType::Ref(
-                wasmparser::RefType::new(
-                    false,
-                    wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(stored_index))
-                )
-                .unwrap()
-            ))
-        );
+    assert_eq!(
+        descriptor.fields[1].element_type,
+        reference(value_index, false)
+    );
+    for field in &descriptor.fields[2..] {
+        assert_eq!(field.element_type, reference(stored_index, false));
     }
 }
 

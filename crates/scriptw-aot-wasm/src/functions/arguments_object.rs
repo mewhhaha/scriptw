@@ -142,7 +142,7 @@ impl FunctionBuilder<'_> {
                         }
                         .descriptor_word(),
                     ),
-                    GcOperand::reference(&value, schema),
+                    GcOperand::subtype_reference(&value, schema),
                     GcOperand::reference(&absent, schema),
                     GcOperand::reference(&absent, schema),
                 ),

@@ -50,6 +50,59 @@ for(var j=0;j<258;j++)delete a[j];gc();a[0]=-0;assert(Object.is(a[0],-0) && Obje
 }
 
 #[test]
+fn array_iteration_presence_keeps_live_own_and_inherited_semantics() {
+    check(
+        r#"
+var a=[-0,1,2,,NaN], gets=0, seen=[], proto=Object.create(Array.prototype);
+Object.defineProperty(proto,'2',{value:22,configurable:true});
+Object.setPrototypeOf(a,proto);
+var result=a.map(function(value,index){
+  seen.push(index,value);
+  if(index===0){
+    Object.defineProperty(a,'1',{get:function(){gets++;gc();return undefined;},configurable:true});
+    delete a[2];
+  }
+  return value;
+});
+assert(seen.length===8 && seen[0]===0 && Object.is(seen[1],-0),'first numeric own value');
+assert(seen[2]===1 && seen[3]===undefined && gets===1,'accessor Get runs once after presence');
+assert(seen[4]===2 && seen[5]===22 && seen[6]===4 && Number.isNaN(seen[7]),'later presence sees deletion and prototype');
+assert(Object.is(result[0],-0) && 1 in result && result[1]===undefined && result[2]===22 && !(3 in result) && Number.isNaN(result[4]),'map preserves holes and Number bits');
+var b=[-0,,NaN], bp=Object.create(Array.prototype);
+Object.defineProperty(bp,'1',{value:7,configurable:true});Object.setPrototypeOf(b,bp);
+var copy=b.slice();assert(Object.is(copy[0],-0) && copy[1]===7 && Number.isNaN(copy[2]),'slice copies inherited indices');
+var holes=[1,,3].slice();assert(holes.length===3 && !(1 in holes),'slice retains an absent index');
+var wide={length:4294967296};wide['4294967295']=17;
+assert(Array.prototype.indexOf.call(wide,17,4294967295)===4294967295,'generic indices above Array index range');
+"#,
+    );
+}
+
+#[test]
+fn array_iteration_presence_preserves_proxy_traps_and_own_shadowing() {
+    check(
+        r#"
+var inheritedHas=[],a=[5,,7],proto=new Proxy(Array.prototype,{
+  has:function(target,key){inheritedHas.push(key);return Reflect.has(target,key);}
+});Object.setPrototypeOf(a,proto);
+var calls=0;assert(a.every(function(){calls++;return true;}) && calls===2,'own data and hole iteration');
+assert(inheritedHas.join(',')==='1','own indices never consult prototype has trap');
+var events=[],target=[3,,5],proxy=new Proxy(target,{
+  has:function(t,k){events.push('has:'+k);return Reflect.has(t,k);},
+  get:function(t,k,r){if(k!=='length' && k!=='every')events.push('get:'+k);return Reflect.get(t,k,r);}
+});
+assert(Array.prototype.every.call(proxy,function(){return true;}),'Proxy array iteration result');
+assert(events.join(',')==='has:0,get:0,has:1,has:2,get:2','Proxy has precedes Get and visits holes');
+var error={},visited=0,abrupt=new Proxy([1,2],{
+  has:function(t,k){if(k==='1')throw error;return Reflect.has(t,k);}
+});
+var caught=false;try{Array.prototype.every.call(abrupt,function(){visited++;return true;});}catch(e){caught=e===error;}
+assert(caught && visited===1,'abrupt Proxy has propagates before callback');
+"#,
+    );
+}
+
+#[test]
 fn inherited_setters_distinct_receivers_and_proxy_traps_keep_set_semantics() {
     check(
         r#"

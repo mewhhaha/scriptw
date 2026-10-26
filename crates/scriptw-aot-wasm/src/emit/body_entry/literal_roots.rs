@@ -62,9 +62,11 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<GcStackReference<StringValue>, EmitError> {
         match self.strings.pooled_string_domain(index)? {
-            PooledLiteralDomain::Runtime(index) => {
-                Ok(self.schema.pooled_string_reference(index, function))
-            }
+            PooledLiteralDomain::Runtime(index) => Ok(self.schema.pooled_string_reference(
+                index,
+                self.runtime_helper_base()?,
+                function,
+            )),
             PooledLiteralDomain::Program(index) => {
                 Ok(self.current_program().literal(self.schema, index, function))
             }

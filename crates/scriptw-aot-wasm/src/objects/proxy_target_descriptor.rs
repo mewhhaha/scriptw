@@ -82,10 +82,23 @@ impl CompletedProxyTargetDescriptor {
     pub(crate) fn read_value(
         &self,
         out: &ValueLocals,
-        schema: &RuntimeSchema,
+        builder: &FunctionBuilder<'_>,
         function: &mut Function,
     ) {
-        self.read_field(PropertyDescriptorSchema::VALUE, out, schema, function);
+        let schema = builder.runtime_schema();
+        out.set_undefined(function);
+        self.emit_found_i32(schema, function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let value = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PropertyDescriptorSchema::VALUE)
+                .read(&self.descriptor, schema, function)
+                .reference(),
+            function,
+        );
+        builder.emit_property_value_into(&value, out, function);
+        value.clear(function);
+        function.instruction(&Instruction::End);
     }
     pub(crate) fn read_getter(
         &self,
@@ -141,8 +154,8 @@ impl CompletedProxyTargetDescriptor {
 
 impl FunctionBuilder<'_> {
     /// Ordinary [[GetOwnProperty]] invokes no user code. Copy its mutable
-    /// descriptor record before later consumer effects; only StoredValue edges
-    /// are shared, because all fields of a StoredValue are immutable.
+    /// descriptor record before later consumer effects; only internal value edges
+    /// are shared. StoredValue is immutable; a recipe memoizes one identity.
     fn emit_completed_ordinary_own_descriptor(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
@@ -361,7 +374,7 @@ impl FunctionBuilder<'_> {
                             enumerable_boolean,
                             configurable_boolean,
                         ),
-                        GcOperand::reference(&stored_value, schema),
+                        GcOperand::subtype_reference(&stored_value, schema),
                         GcOperand::reference(&stored_getter, schema),
                         GcOperand::reference(&stored_setter, schema),
                     ),
@@ -381,7 +394,7 @@ impl FunctionBuilder<'_> {
                             enumerable_boolean,
                             configurable_boolean,
                         ),
-                        GcOperand::reference(&stored_value, schema),
+                        GcOperand::subtype_reference(&stored_value, schema),
                         GcOperand::reference(&stored_getter, schema),
                         GcOperand::reference(&stored_setter, schema),
                     ),

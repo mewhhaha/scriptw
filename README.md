@@ -16,6 +16,9 @@ On Linux, Cargo native runtime loading streams through bounded buffers into
 private disk backing. It reads linked image data through the executable file
 when its exact inode and mapped range can be established; see the
 [runtime ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
+Runtime strings and noncanonical intrinsic method functions materialize on first
+use; their real data properties and alias identities remain intact. See the
+[lazy allocation contract](docs/rust-rewrite/contracts/lazy-runtime-values.md).
 
 ## Precompiled comparison
 

@@ -1,5 +1,6 @@
 //! The native graph adapter reads canonical GC records while the execution's
-//! RootScope remains alive. It never calls a Wasm export or a JavaScript hook.
+//! RootScope remains alive. Deferred intrinsic values resolve through an internal
+//! Wasm helper under the existing Store limits; no JavaScript hook is called.
 use super::*;
 use scriptw_aot_wasm::{GcSnapshotField as F, GcSnapshotLayout as L};
 use scriptw_runtime::rooted_snapshot::*;
@@ -53,6 +54,7 @@ pub(super) fn observe(
 struct NativeSnapshot<'a, S: AsContextMut<Data = WasmHostState>> {
     store: &'a mut S,
     witnesses: Vec<(L, HeapType)>,
+    resolve_property_value: wasmtime::Func,
     entry: Rooted<EqRef>,
     realms: Vec<Rooted<EqRef>>,
     symbols: Rooted<EqRef>,
@@ -91,8 +93,15 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
         let symbols = root_global(store, instance, scriptw_aot_wasm::SNAPSHOT_SYMBOLS_EXPORT)?
             .ok_or_else(|| invariant("well-known Symbol table absent"))?;
         let mut current = root_global(store, instance, scriptw_aot_wasm::SNAPSHOT_REALMS_EXPORT)?;
+        let resolve_property_value = instance
+            .get_func(
+                &mut *store,
+                scriptw_aot_wasm::SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
+            )
+            .ok_or_else(|| invariant("snapshot property resolver absent"))?;
         let mut backend = Self {
             store,
+            resolve_property_value,
             witnesses,
             entry,
             realms: Vec::new(),
@@ -225,6 +234,41 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
         let stored = self.required_reference(reference, field)?;
         self.stored(stored)
     }
+    fn property_value(
+        &mut self,
+        reference: Rooted<EqRef>,
+        budget: &mut SnapshotBudget,
+    ) -> Result<NativeValue, SnapshotRejection> {
+        if self.has_layout(reference, L::Stored)? {
+            return self.stored(reference);
+        }
+        let expected = &self
+            .witnesses
+            .iter()
+            .find(|(layout, _)| *layout == L::PropertyValue)
+            .ok_or_else(|| invariant("property value witness absent"))?
+            .1;
+        if !reference
+            .matches_ty(&*self.store, expected)
+            .map_err(invariant)?
+        {
+            return Err(invariant("descriptor value is not a PropertyValue"));
+        }
+        // Charge before materialization, keeping the existing fuel/deadline and
+        // graph limits. The helper allocates intrinsic records without JS calls.
+        budget.work(1)?;
+        let mut results = [WasmtimeVal::AnyRef(None)];
+        self.resolve_property_value
+            .call(
+                &mut *self.store,
+                &[WasmtimeVal::AnyRef(Some(reference.to_anyref()))],
+                &mut results,
+            )
+            .map_err(invariant)?;
+        let resolved = eq_reference(self.store, results[0].clone())?
+            .ok_or_else(|| invariant("property value resolver returned null"))?;
+        self.stored(resolved)
+    }
     fn string(
         &mut self,
         reference: Rooted<EqRef>,
@@ -281,6 +325,7 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
     fn descriptor(
         &mut self,
         descriptor: Rooted<EqRef>,
+        budget: &mut SnapshotBudget,
     ) -> Result<SnapshotRawDescriptor<NativeValue>, SnapshotRejection> {
         let word = u32::try_from(self.integer(descriptor, F::DescriptorFlags)?)
             .map_err(|_| invariant("descriptor flags exceed their unsigned word"))?;
@@ -298,8 +343,9 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
                 configurable,
             })
         } else {
+            let value = self.required_reference(descriptor, F::DescriptorValue)?;
             Ok(SnapshotRawDescriptor::Data {
-                value: self.stored_field(descriptor, F::DescriptorValue)?,
+                value: self.property_value(value, budget)?,
                 writable,
                 enumerable,
                 configurable,
@@ -666,7 +712,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                         )?;
                         let property = SnapshotRawProperty {
                             key: SnapshotRawKey::String(key),
-                            descriptor: self.descriptor(descriptor)?,
+                            descriptor: self.descriptor(descriptor, budget)?,
                         };
                         ordered.push((0, index, ordered.len(), property));
                     }
@@ -703,7 +749,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                             )?;
                             let property = SnapshotRawProperty {
                                 key: SnapshotRawKey::String(key),
-                                descriptor: self.descriptor(descriptor)?,
+                                descriptor: self.descriptor(descriptor, budget)?,
                             };
                             ordered.push((0, index as u32, ordered.len(), property));
                             entry = self.reference(current, F::ArrayNext)?;
@@ -870,7 +916,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 let descriptor = self.required_reference(entry, F::PropertyDescriptor)?;
                 let property = SnapshotRawProperty {
                     key,
-                    descriptor: self.descriptor(descriptor)?,
+                    descriptor: self.descriptor(descriptor, budget)?,
                 };
                 ordered.push((
                     group,

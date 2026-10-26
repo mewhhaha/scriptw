@@ -152,7 +152,9 @@ impl ProgramExports {
         // Diagnostics/snapshot roots remain in the instance owning the globals.
         if self.owns_globals {
             schema.export_throw_diagnostics(exports);
-            schema.export_snapshot_roots(exports);
+            if let Some(base) = helper_base {
+                schema.export_snapshot_roots(exports, base);
+            }
         }
     }
 }

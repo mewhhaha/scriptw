@@ -123,12 +123,21 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
             for artifact in [&short, &long] {
                 let runtime = artifact.runtime().expect("literal program links a runtime");
                 let runtime_initializer = named_function_body(runtime.bytes(), "helper::pooled_strings_initialize");
-                assert_eq!(array_data_initializers(&runtime_initializer), [1, 0, 0, 0],
-                    "R uses one UTF16 construction site for all compiler literals");
+                assert_eq!(array_data_initializers(&runtime_initializer), [0, 0, 0, 0],
+                    "R bootstrap publishes a nullable cache without copying canonical UTF16");
                 assert!(runtime_initializer.len() < 8192, "R bootstrap is bounded independently of its literal count");
-                let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&runtime_initializer, 0));
-                assert!(body.get_operators_reader().unwrap().into_iter().any(|operator| matches!(operator.unwrap(), Operator::Loop { .. })),
-                    "runtime string allocation iterates over the sealed descriptor table");
+                let resolver = named_function_body(runtime.bytes(), "helper::pooled_string_resolve");
+                assert_eq!(array_data_initializers(&resolver), [1, 0, 0, 0],
+                    "only a cache miss constructs canonical UTF16 storage");
+                let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&resolver, 0));
+                let operators = body.get_operators_reader().unwrap().into_iter()
+                    .map(Result::unwrap).collect::<Vec<_>>();
+                assert!(operators.iter().any(|op| matches!(op, Operator::RefIsNull)),
+                    "cached canonical strings bypass allocation");
+                assert!(operators.iter().any(|op| matches!(op, Operator::I32GeU)),
+                    "runtime ordinal is bounded before descriptor access");
+                assert!(!operators.iter().any(|op| matches!(op, Operator::DataDrop { .. })),
+                    "late cache misses must retain the passive canonical UTF16 segment");
                 for bytes in [artifact.bytes.as_slice(), runtime.bytes()] {
                     Validator::new_with_features(WasmFeatures::all())
                         .validate_all(bytes)

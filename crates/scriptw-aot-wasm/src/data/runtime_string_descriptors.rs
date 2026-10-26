@@ -32,7 +32,7 @@ impl StringPool {
             .and_then(|offset| STATIC_DATA_OFFSET.checked_add(offset))
             .ok_or_else(error)?;
         address.checked_add(length).ok_or_else(error)?;
-        let mut rows = Vec::with_capacity(length as usize);
+        let mut rows = vec![0; length as usize];
         let mut seen = vec![false; count as usize];
         for (ordinal, units) in self.pooled_string_initializers() {
             let slot = seen.get_mut(ordinal.ordinal() as usize).ok_or_else(error)?;
@@ -46,8 +46,12 @@ impl StringPool {
             {
                 return Err(error());
             }
-            for word in [ordinal.ordinal(), units.byte_offset, units.length] {
-                rows.extend_from_slice(&word.to_le_bytes());
+            let start = ordinal.ordinal() as usize * RuntimeStringDescriptors::ROW_BYTES as usize;
+            for (slot, word) in rows[start..start + RuntimeStringDescriptors::ROW_BYTES as usize]
+                .chunks_exact_mut(4)
+                .zip([ordinal.ordinal(), units.byte_offset, units.length])
+            {
+                slot.copy_from_slice(&word.to_le_bytes());
             }
         }
         if seen.iter().any(|present| !present) || rows.len() != length as usize {
@@ -72,7 +76,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn descriptor_rows_preserve_ordinals_utf16_spans_and_initialization_order() {
+    fn descriptor_rows_preserve_ordinals_and_utf16_spans_in_ordinal_order() {
         let mut pool = StringPool::default();
         for text in ["z", "", "\0", "a", "\u{1f600}", "\u{10ffff}"] {
             pool.intern_string(text);
@@ -101,7 +105,9 @@ mod tests {
                 })
             })
             .collect::<Vec<_>>();
-        assert_eq!(actual, expected);
+        let mut ordered = expected;
+        ordered.sort_by_key(|row| row[0]);
+        assert_eq!(actual, ordered);
     }
 
     #[test]

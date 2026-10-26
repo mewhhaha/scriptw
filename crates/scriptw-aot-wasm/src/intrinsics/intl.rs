@@ -507,15 +507,12 @@ impl<'a> FunctionBuilder<'a> {
             (context.prototype, properties.prototype),
         ] {
             for property in entries {
-                let callable =
-                    self.emit_intrinsic_callable(property.builtin, context.realm, function)?;
-                let value = self.runtime_schema().reserve_value_local(function);
-                value.set_reference(&callable, self.runtime_schema(), function);
                 self.emit_define_intl_intrinsic_function_property(
-                    receiver, property, &value, function,
+                    receiver,
+                    property,
+                    context.realm,
+                    function,
                 )?;
-                value.clear(function);
-                callable.clear(function);
             }
         }
         self.emit_define_intl_intrinsic_to_string_tag(
@@ -529,32 +526,43 @@ impl<'a> FunctionBuilder<'a> {
         &mut self,
         receiver: &crate::gc_types::ValueLocals,
         property: &IntlIntrinsicProperty,
-        callable: &crate::gc_types::ValueLocals,
+        realm: &crate::functions::RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         match property.kind {
-            IntlIntrinsicPropertyKind::Getter => self.emit_install_intrinsic_accessor_values(
+            IntlIntrinsicPropertyKind::Getter => {
+                // Getter fields remain eager; only method data values use the
+                // existing deferred intrinsic representation.
+                let callable = self.emit_intrinsic_callable(property.builtin, realm, function)?;
+                let schema = self.runtime_schema();
+                let value = schema.reserve_value_local(function);
+                value.set_reference(&callable, schema, function);
+                self.emit_install_intrinsic_accessor_values(
+                    receiver,
+                    IntrinsicKey::Name(property.name),
+                    AccessorDescriptorLocals::Getter(AccessorGetterLocals::new(&value)),
+                    true,
+                    function,
+                )?;
+                value.clear(function);
+                callable.clear(function);
+                Ok(())
+            }
+            IntlIntrinsicPropertyKind::Method => self.emit_install_intrinsic_method(
                 receiver,
                 IntrinsicKey::Name(property.name),
-                AccessorDescriptorLocals::Getter(AccessorGetterLocals::new(callable)),
+                property.builtin,
+                realm,
+                true,
                 true,
                 function,
             ),
-            IntlIntrinsicPropertyKind::Method => self.emit_install_intrinsic_data(
-                receiver,
-                IntrinsicKey::Name(property.name),
-                callable,
-                true,
-                false,
-                true,
-                function,
-            ),
-            IntlIntrinsicPropertyKind::SymbolMethod(symbol) => self.emit_install_intrinsic_data(
+            IntlIntrinsicPropertyKind::SymbolMethod(symbol) => self.emit_install_intrinsic_method(
                 receiver,
                 IntrinsicKey::Symbol(symbol),
-                callable,
+                property.builtin,
+                realm,
                 true,
-                false,
                 true,
                 function,
             ),

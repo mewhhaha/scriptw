@@ -1811,14 +1811,26 @@ impl RuntimeSchema {
     pub(crate) fn pooled_string_reference(
         &self,
         index: crate::data::PooledStringIndex,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
-        emit_root_get(function, self.pooled_strings);
-        function.instruction(&Instruction::RefAsNonNull);
-        function.instruction(&Instruction::I32Const(index.ordinal() as i32));
-        self.array_type::<PooledStringTable>().emit_get(function);
-        function.instruction(&Instruction::RefAsNonNull);
-        GcStackReference::new()
+        let ordinal = self.reserve_i32_local(function);
+        ordinal.set_constant(index.ordinal() as i32, function);
+        let result = self.resolve_pooled_string_reference(ordinal, base, function);
+        self.release_i32_local(ordinal, function);
+        result
+    }
+    pub(crate) fn resolve_pooled_string_reference(
+        &self,
+        ordinal: I32Local,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
+        function: &mut Function,
+    ) -> GcStackReference<StringValue> {
+        self.helper_reference_on_stack(self.call_helper(
+            crate::runtime_helpers::PooledStringResolveArguments::new(ordinal),
+            base,
+            function,
+        ))
     }
     pub(crate) fn well_known_symbol_reference(
         &self,

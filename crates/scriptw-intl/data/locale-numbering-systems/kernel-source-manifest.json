@@ -24,7 +24,7 @@
   ],
   "decimal_numbering_systems": 78,
   "domain": "scriptw-locale-numbering-systems-native-v1",
-  "kernel_sha256": "7679ad310967484892d16c44da1d39be32cb639805c0504ff6b38eaff0e6b585",
+  "kernel_sha256": "a9aaafa71daf79a7585cbe23664833384bf95cb857067a3799d3501730a35a0d",
   "number_locales": 1082,
   "production_sources": [
     {
@@ -43,9 +43,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 81609,
+      "bytes": 81741,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
+      "sha256": "fa7582df6f8882c712f6ae6657998c2960dbe187c21ecf2ddd23060d2234687d"
     },
     {
       "bytes": 33961,

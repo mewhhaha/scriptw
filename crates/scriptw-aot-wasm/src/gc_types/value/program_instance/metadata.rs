@@ -53,6 +53,7 @@ impl ProgramInstanceLocals {
         &self,
         schema: &RuntimeSchema,
         operand: I64Local,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
         let ordinal = schema.reserve_i32_local(function);
@@ -83,17 +84,12 @@ impl ProgramInstanceLocals {
         function.instruction(&Instruction::I32GeU);
         trap_if_true(function);
         schema.release_i32_local(runtime_limit, function);
-        let runtime = schema
-            .reserve_gc_local(function)
-            .initialize(schema.pooled_string_table_reference(function), function);
         string.replace(
             schema
-                .array_type::<PooledStringTable>()
-                .read(&runtime, ordinal, schema, function)
-                .reference(),
+                .resolve_pooled_string_reference(ordinal, base, function)
+                .nullable(),
             function,
         );
-        runtime.clear(function);
         function.instruction(&Instruction::Else);
         domain.load(function);
         function.instruction(&Instruction::I32Const(POOLED_LITERAL_PROGRAM_DOMAIN as i32));

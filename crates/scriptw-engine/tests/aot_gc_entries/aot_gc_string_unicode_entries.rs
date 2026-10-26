@@ -244,3 +244,32 @@ print('program-literal-many:ok');
     );
     assert_unicode_modes(&source, "program-literal-many:ok");
 }
+
+#[test]
+fn late_canonical_strings_preserve_symbols_errors_and_cross_realm_mutation() {
+    assert_unicode_modes(
+        r#"
+function check(value, label) { if (!value) throw label; }
+check(Symbol.iterator.description === 'Symbol.iterator', 'bootstrap symbol description');
+check(Symbol.toStringTag.description === 'Symbol.toStringTag', 'second symbol description');
+for (var i = 0; i < 20; i++) { String(i).repeat(1000); gc(); }
+var foreign = __scriptwCreateRealm().global;
+check(foreign.Symbol.iterator === Symbol.iterator, 'shared well-known identity');
+var original = String.prototype.normalize;
+String.prototype.normalize = function() { return 'replacement'; };
+check(foreign.String.prototype.normalize.call('e\u0301', 'NFC') === '\u00e9', 'late canonical normalization across Realm');
+var first, second;
+try { foreign.String.prototype.normalize.call('x', 'not-a-form'); } catch (error) { first = error; }
+gc();
+try { foreign.String.prototype.normalize.call('x', 'not-a-form'); } catch (error) { second = error; }
+check(first instanceof foreign.RangeError && second instanceof foreign.RangeError, 'late error Realm');
+check(typeof first.message === 'string' && first.message.length > 0 && first.message === second.message, 'cached diagnostic units');
+check(String.prototype.normalize() === 'replacement', 'constant resolution cannot reset mutated intrinsic');
+String.prototype.normalize = original;
+check(original.call('\uD800\0', 'NFC') === '\uD800\0', 'lone surrogate and NUL');
+print('canonical-late:ok');
+262;
+"#,
+        "canonical-late:ok",
+    );
+}

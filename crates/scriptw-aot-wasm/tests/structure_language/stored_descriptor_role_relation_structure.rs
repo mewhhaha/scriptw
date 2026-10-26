@@ -4,6 +4,7 @@ use std::path::Path;
 const DEFINE_PROPERTY_SOURCE: &str = include_str!("../../src/objects/define_property.rs");
 const TARGET_DESCRIPTOR_SOURCE: &str = include_str!("../../src/objects/proxy_target_descriptor.rs");
 const LAYOUT_SOURCE: &str = include_str!("../../src/gc_types/layouts.rs");
+const PROPERTY_VALUE_SOURCE: &str = include_str!("../../src/intrinsics/deferred_methods.rs");
 const CONTRACT: &str =
     include_str!("../../../../docs/rust-rewrite/contracts/stored-descriptor-role-relation.md");
 
@@ -232,7 +233,7 @@ fn stored_descriptor_roles_are_exact_private_wrappers() {
         layout.normalized,
         concat!(
             "FLAGS:crate::heap::DescriptorWord,Mutable,NonNullable;",
-            "VALUE:GcRef<StoredValue>,Mutable,NonNullable;",
+            "VALUE:GcRef<PropertyValue>,Mutable,NonNullable;",
             "GETTER:GcRef<StoredValue>,Mutable,NonNullable;",
             "SETTER:GcRef<StoredValue>,Mutable,NonNullable;"
         )
@@ -245,19 +246,39 @@ fn stored_descriptor_roles_are_exact_private_wrappers() {
     assert!(reader.normalized.contains(
         "current:&GcLocal<PropertyDescriptor>,field:DescriptorField,output:&ValueLocals"
     ));
-    for (role, field) in [("Value", "VALUE"), ("Get", "GETTER"), ("Set", "SETTER")] {
+    assert!(reader.normalized.contains(concat!(
+        "iffield==DescriptorField::Value{",
+        "letvalue=schema.reserve_gc_local(function).initialize(",
+        "schema.field(PropertyDescriptorSchema::VALUE).read(current,schema,function).reference(),function,);",
+        "self.emit_property_value_into(&value,output,function);value.clear(function);return;"
+    )));
+    for (role, field) in [("Get", "GETTER"), ("Set", "SETTER")] {
         assert!(reader.normalized.contains(&format!(
             "DescriptorField::{role}=>PropertyDescriptorSchema::{field}"
         )));
     }
+    assert!(reader.normalized.contains(
+        "schema.struct_type::<StoredValue>().read_into(&stored,output,schema,function);"
+    ));
+    let resolver = rust_code(bounded(
+        PROPERTY_VALUE_SOURCE,
+        "pub(crate) fn emit_property_value_into(",
+        ") {",
+    ));
+    assert!(resolver
+        .normalized
+        .contains("&self,value:&GcLocal<PropertyValue>,out:&ValueLocals,f:&mutFunction,"));
     assert!(!reader.normalized.contains("_=>"));
 }
 
 #[test]
 fn stored_descriptor_read_and_compatibility_owners_have_a_closed_source_census() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    assert_eq!(count_identifier_in_rust_sources(&source_root, "emit_descriptor_value"), 8,
-        "one reader, two compatibility sites, three merge fields, Arguments value and Namespace value");
+    assert_eq!(
+        count_identifier_in_rust_sources(&source_root, "emit_descriptor_value"),
+        7,
+        "one reader, two compatibility sites, two merge accessor fields, Arguments value and Namespace value"
+    );
     assert_eq!(
         count_identifier_in_rust_sources(&source_root, "emit_validate_stored_descriptor"),
         10,
@@ -303,11 +324,83 @@ fn complete_record_readers_bind_every_stored_role_to_its_named_field() {
         "fn emit_merge_property_descriptor(",
         "    pub(crate) fn ",
     ));
-    for (role, local) in [("Value", "value"), ("Get", "getter"), ("Set", "setter")] {
-        assert_eq!(merge.normalized.matches(&format!("self.emit_descriptor_value(&record,DescriptorField::{role},&{local},function);")).count(), 1);
+    assert!(merge.normalized.contains(concat!(
+        "letvalue=schema.reserve_gc_local(function).initialize(",
+        "schema.stored_undefined(function).upcast::<crate::gc_types::PropertyValue>(),function"
+    )));
+    assert_eq!(
+        merge
+            .normalized
+            .matches(concat!(
+                "value.replace(schema.field(PropertyDescriptorSchema::VALUE)",
+                ".read(&record,schema,function).reference(),function"
+            ))
+            .count(),
+        1
+    );
+    assert!(merge
+        .normalized
+        .contains("value.replace(schema.stored_undefined(function).upcast(),function);"));
+    assert!(merge.normalized.contains(concat!(
+        "ifletSome(input)=descriptor.value.value(){",
+        "emit_presence(&descriptor.value,function);",
+        "self.open_frame(ControlFrameKind::If,function);",
+        "value.replace(schema.struct_type::<StoredValue>().from_value(input,function).upcast(),function"
+    )));
+    assert_eq!(
+        merge
+            .normalized
+            .matches("GcOperand::reference(&value,schema)")
+            .count(),
+        2,
+        "both resulting descriptor kinds retain the same typed value edge"
+    );
+    assert!(!merge.normalized.contains("emit_property_value_into"));
+    assert!(!merge.normalized.contains("DescriptorField::Value"));
+    for (role, local) in [("Get", "getter"), ("Set", "setter")] {
+        assert_eq!(
+            merge
+                .normalized
+                .matches(&format!(
+                    "self.emit_descriptor_value(&record,DescriptorField::{role},&{local},function);"
+                ))
+                .count(),
+            1
+        );
     }
+    let value_reader = rust_code(bounded(
+        TARGET_DESCRIPTOR_SOURCE,
+        "fn read_value(",
+        "fn read_getter(",
+    ));
+    assert!(value_reader.normalized.contains(
+        "schema.field(PropertyDescriptorSchema::VALUE).read(&self.descriptor,schema,function).reference()"
+    ));
+    assert_eq!(
+        value_reader
+            .normalized
+            .matches("builder.emit_property_value_into(&value,out,function);")
+            .count(),
+        1
+    );
+    assert!(!value_reader.normalized.contains("self.read_field("));
+    let accessor_reader = rust_code(bounded(
+        TARGET_DESCRIPTOR_SOURCE,
+        "fn read_field(",
+        "fn read_value(",
+    ));
+    assert!(accessor_reader.normalized.contains(concat!(
+        "field:crate::gc_types::GcField<PropertyDescriptor,",
+        "crate::gc_types::GcRef<StoredValue>,crate::gc_types::Mutable,",
+        "crate::gc_types::NonNullable,>"
+    )));
+    assert!(accessor_reader.normalized.contains(
+        "schema.struct_type::<StoredValue>().read_into(&stored,result,schema,function);"
+    ));
+    assert!(!accessor_reader
+        .normalized
+        .contains("emit_property_value_into"));
     for (method, next, field) in [
-        ("read_value", "read_getter", "VALUE"),
         ("read_getter", "read_setter", "GETTER"),
         ("read_setter", "emit_compatibility", "SETTER"),
     ] {

@@ -144,9 +144,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, &value, schema, function);
+        self.emit_property_value_into(&stored, &value, function);
         let key = self.emit_value_to_property_key_locals(&value, function)?;
         construction.write(index, &key, schema, function);
         key.clear(function);

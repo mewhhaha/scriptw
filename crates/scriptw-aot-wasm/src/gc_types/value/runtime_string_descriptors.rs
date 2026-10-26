@@ -41,9 +41,6 @@ impl RuntimeStringDescriptorRowLocals {
         }
         result
     }
-    pub(crate) fn ordinal(&self) -> I32Local {
-        self.ordinal
-    }
     pub(crate) fn release(self, schema: &RuntimeSchema, function: &mut Function) {
         for local in [self.length, self.byte_offset, self.ordinal] {
             schema.release_i32_local(local, function);

@@ -611,8 +611,7 @@ impl FunctionBuilder<'_> {
             f,
         );
         let value = s.reserve_value_local(f);
-        s.struct_type::<StoredValue>()
-            .read_into(&stored, &value, s, f);
+        self.emit_property_value_into(&stored, &value, f);
         let published = self.packed_number_write(storage, index, &value, f);
         published.load(f);
         handled.store(f);

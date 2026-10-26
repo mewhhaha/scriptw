@@ -49,8 +49,20 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
+        if field == DescriptorField::Value {
+            let value = schema.reserve_gc_local(function).initialize(
+                schema
+                    .field(PropertyDescriptorSchema::VALUE)
+                    .read(current, schema, function)
+                    .reference(),
+                function,
+            );
+            self.emit_property_value_into(&value, output, function);
+            value.clear(function);
+            return;
+        }
         let field = match field {
-            DescriptorField::Value => PropertyDescriptorSchema::VALUE,
+            DescriptorField::Value => unreachable!("data value handled above"),
             DescriptorField::Get => PropertyDescriptorSchema::GETTER,
             DescriptorField::Set => PropertyDescriptorSchema::SETTER,
             DescriptorField::Writable
@@ -189,7 +201,12 @@ impl FunctionBuilder<'_> {
     ) -> Result<GcLocal<PropertyDescriptor>, EmitError> {
         let schema = self.runtime_schema();
         let output_slot = schema.reserve_gc_local(function);
-        let value = schema.reserve_value_local(function);
+        let value = schema.reserve_gc_local(function).initialize(
+            schema
+                .stored_undefined(function)
+                .upcast::<crate::gc_types::PropertyValue>(),
+            function,
+        );
         let getter = schema.reserve_value_local(function);
         let setter = schema.reserve_value_local(function);
         let accessor = schema.reserve_i32_local(function);
@@ -199,7 +216,6 @@ impl FunctionBuilder<'_> {
         let requested_data = schema.reserve_i32_local(function);
         let requested_accessor = schema.reserve_i32_local(function);
         let flags = schema.reserve_i32_local(function);
-        value.set_undefined(function);
         getter.set_undefined(function);
         setter.set_undefined(function);
         for flag in [accessor, writable, enumerable, configurable] {
@@ -233,7 +249,15 @@ impl FunctionBuilder<'_> {
             emit_mask(flags, mask, function);
             output.store(function);
         }
-        self.emit_descriptor_value(&record, DescriptorField::Value, &value, function);
+        // An attribute-only definition preserves the internal value edge.
+        // It need not construct an unobserved intrinsic or copy a snapshot.
+        value.replace(
+            schema
+                .field(PropertyDescriptorSchema::VALUE)
+                .read(&record, schema, function)
+                .reference(),
+            function,
+        );
         self.emit_descriptor_value(&record, DescriptorField::Get, &getter, function);
         self.emit_descriptor_value(&record, DescriptorField::Set, &setter, function);
         record.clear(function);
@@ -250,7 +274,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, function);
         requested_accessor.load(function);
         accessor.store(function);
-        value.set_undefined(function);
+        value.replace(schema.stored_undefined(function).upcast(), function);
         getter.set_undefined(function);
         setter.set_undefined(function);
         function.instruction(&Instruction::I32Const(0));
@@ -258,11 +282,20 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         let descriptor = incoming.as_partial();
-        for (presence, output) in [
-            (&descriptor.value, &value),
-            (&descriptor.get, &getter),
-            (&descriptor.set, &setter),
-        ] {
+        if let Some(input) = descriptor.value.value() {
+            emit_presence(&descriptor.value, function);
+            self.open_frame(ControlFrameKind::If, function);
+            value.replace(
+                schema
+                    .struct_type::<StoredValue>()
+                    .from_value(input, function)
+                    .upcast(),
+                function,
+            );
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for (presence, output) in [(&descriptor.get, &getter), (&descriptor.set, &setter)] {
             if let Some(input) = presence.value() {
                 emit_presence(presence, function);
                 self.open_frame(ControlFrameKind::If, function);
@@ -285,12 +318,7 @@ impl FunctionBuilder<'_> {
                 function.instruction(&Instruction::End);
             }
         }
-        let stored_value = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&value, function),
-            function,
-        );
+
         let stored_getter = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<StoredValue>()
@@ -309,7 +337,7 @@ impl FunctionBuilder<'_> {
             schema.struct_type::<PropertyDescriptor>().construct(
                 (
                     GcOperand::accessor_descriptor_flags(enumerable, configurable),
-                    GcOperand::reference(&stored_value, schema),
+                    GcOperand::reference(&value, schema),
                     GcOperand::reference(&stored_getter, schema),
                     GcOperand::reference(&stored_setter, schema),
                 ),
@@ -322,7 +350,7 @@ impl FunctionBuilder<'_> {
             schema.struct_type::<PropertyDescriptor>().construct(
                 (
                     GcOperand::data_descriptor_flags(writable, enumerable, configurable),
-                    GcOperand::reference(&stored_value, schema),
+                    GcOperand::reference(&value, schema),
                     GcOperand::reference(&stored_getter, schema),
                     GcOperand::reference(&stored_setter, schema),
                 ),
@@ -334,7 +362,6 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         stored_setter.clear(function);
         stored_getter.clear(function);
-        stored_value.clear(function);
         schema.release_i32_local(flags, function);
         schema.release_i32_local(requested_accessor, function);
         schema.release_i32_local(requested_data, function);
@@ -644,8 +671,21 @@ impl FunctionBuilder<'_> {
                 function,
             );
         function.instruction(&Instruction::End);
+        let value = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PropertyDescriptorSchema::VALUE)
+                .read(source, schema, function)
+                .reference(),
+            function,
+        );
+        schema.field(PropertyDescriptorSchema::VALUE).write(
+            destination,
+            GcOperand::reference(&value, schema),
+            schema,
+            function,
+        );
+        value.clear(function);
         for field in [
-            PropertyDescriptorSchema::VALUE,
             PropertyDescriptorSchema::GETTER,
             PropertyDescriptorSchema::SETTER,
         ] {
@@ -1614,7 +1654,7 @@ impl FunctionBuilder<'_> {
             .field(PropertyDescriptorSchema::VALUE)
             .write(
                 &completed,
-                GcOperand::reference(&stored, schema),
+                GcOperand::subtype_reference(&stored, schema),
                 schema,
                 function,
             );
