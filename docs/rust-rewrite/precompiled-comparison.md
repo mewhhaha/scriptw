@@ -1,6 +1,6 @@
 # Compiler-free Scriptw / Scriptc comparison
 
-Measured 2026-10-26T19:22:16.460898+00:00 through 2026-10-26T19:23:54.518873+00:00; source `fc714e607c5bce6c017aa06d49dba2e3de7927d2`.
+Measured 2026-10-26T21:27:45.093605+00:00 through 2026-10-26T21:29:03.383924+00:00; source `b1ffc3ffd9f62d990c6f88058c4684018ba3a776`.
 
 Both runtimes use the same executable and shared Wasmtime configuration with its compiler disabled. Both application modules use size-optimized native compilation with backtracking register allocation and the same generic target/backtrace policy. Separate producer processes compile the original JavaScript to Wasm and serialize native images. Scriptc receives only the recorded print adapter; the original checksums and every workload remain unchanged.
 
@@ -10,23 +10,23 @@ RSS, PSS and private-dirty values below are pooled medians of 14 post-execution 
 
 | Workload | Scriptw ms | Scriptc ms | Scriptw RSS / PSS / private dirty MiB | Scriptc RSS / PSS / private dirty MiB |
 | --- | ---: | ---: | ---: | ---: |
-| sort-reverse-128.js | 3.151 | 0.200 | 61.113 / 59.107 / 9.215 | 13.912 / 11.828 / 4.924 |
-| sort-reverse-512.js | 11.619 | 0.423 | 76.961 / 74.954 / 19.221 | 13.941 / 11.880 / 4.979 |
-| sort-sorted-512.js | 10.222 | 0.401 | 73.123 / 71.099 / 15.234 | 13.928 / 11.863 / 4.973 |
-| to-sorted-512.js | 9.636 | 0.451 | 75.092 / 73.065 / 17.238 | 13.975 / 11.898 / 4.984 |
-| join-1024.js | 11.463 | 0.556 | 77.129 / 75.114 / 17.223 | 14.082 / 11.997 / 4.996 |
-| join-4096.js | 41.646 | 1.734 | 81.297 / 79.295 / 21.221 | 14.504 / 12.438 / 5.473 |
-| join-mixed-1024.js | 12.056 | 0.354 | 74.975 / 72.977 / 17.215 | 13.924 / 11.862 / 4.926 |
-| numeric-loop-10000.js | 1.671 | 0.161 | 54.674 / 52.652 / 7.162 | 13.307 / 11.230 / 4.266 |
-| numeric-loop-50000.js | 5.326 | 0.267 | 54.668 / 52.656 / 7.164 | 13.127 / 11.074 / 4.266 |
-| folded-string-4096.js | 2.313 | 0.798 | 54.768 / 52.744 / 7.188 | 13.332 / 11.276 / 4.285 |
-| dynamic-string-4096.js | 2.513 | 0.313 | 55.072 / 53.046 / 7.180 | 13.191 / 11.103 / 4.270 |
-| integer.js | 3.709 | 0.119 | 57.084 / 55.083 / 7.188 | 13.297 / 11.208 / 4.270 |
-| objects.js | 6.042 | 0.774 | 65.051 / 63.022 / 11.219 | 14.006 / 11.939 / 5.045 |
-| retained-objects.js | 199.349 | 38.320 | 81.152 / 79.148 / 21.242 | 19.771 / 17.683 / 10.789 |
-| join-empty-1024.js | 3.708 | 0.330 | 59.043 / 57.032 / 9.176 | 13.867 / 11.787 / 4.842 |
-| join-singleton-1024.js | 3.729 | 0.177 | 58.998 / 56.980 / 9.174 | 13.359 / 11.298 / 4.268 |
-| join-small-1024.js | 5.224 | 0.328 | 58.838 / 56.820 / 9.170 | 13.299 / 11.238 / 4.271 |
+| sort-reverse-128.js | 2.304 | 0.131 | 28.549 / 26.421 / 13.982 | 13.975 / 11.771 / 7.537 |
+| sort-reverse-512.js | 8.089 | 0.250 | 37.375 / 35.234 / 22.031 | 14.084 / 11.872 / 7.637 |
+| sort-sorted-512.js | 7.317 | 0.249 | 35.312 / 33.200 / 19.920 | 14.061 / 11.864 / 7.596 |
+| to-sorted-512.js | 6.711 | 0.280 | 35.418 / 33.299 / 19.996 | 14.047 / 11.843 / 7.592 |
+| join-1024.js | 7.796 | 0.322 | 37.240 / 35.092 / 21.844 | 14.051 / 11.863 / 7.596 |
+| join-4096.js | 27.090 | 0.927 | 41.496 / 39.350 / 25.934 | 14.701 / 12.495 / 8.109 |
+| join-mixed-1024.js | 7.929 | 0.220 | 37.311 / 35.166 / 21.891 | 14.057 / 11.847 / 7.584 |
+| numeric-loop-10000.js | 1.086 | 0.102 | 25.598 / 23.453 / 11.838 | 13.387 / 11.183 / 6.863 |
+| numeric-loop-50000.js | 3.442 | 0.198 | 25.445 / 23.346 / 11.793 | 13.428 / 11.219 / 6.916 |
+| folded-string-4096.js | 1.388 | 0.443 | 25.656 / 23.511 / 7.191 | 13.424 / 11.230 / 6.939 |
+| dynamic-string-4096.js | 1.682 | 0.207 | 25.770 / 23.628 / 7.184 | 13.396 / 11.190 / 4.268 |
+| integer.js | 2.230 | 0.090 | 25.934 / 23.787 / 7.191 | 13.387 / 11.183 / 4.264 |
+| objects.js | 4.202 | 0.437 | 30.492 / 28.346 / 11.225 | 14.236 / 12.025 / 5.053 |
+| retained-objects.js | 116.345 | 21.745 | 41.391 / 39.275 / 21.248 | 19.918 / 17.713 / 10.791 |
+| join-empty-1024.js | 2.482 | 0.197 | 27.980 / 25.836 / 9.178 | 13.969 / 11.809 / 4.846 |
+| join-singleton-1024.js | 2.533 | 0.122 | 27.943 / 25.806 / 9.178 | 13.361 / 11.179 / 4.271 |
+| join-small-1024.js | 3.232 | 0.155 | 27.986 / 25.863 / 9.178 | 13.355 / 11.152 / 4.273 |
 
 A failure in either round removes that runtime’s bars for the case; all original failure streams remain. Checksums, warmup order, shared executable/configuration, raw Wasm and producer/consumer image identities are readmitted before rendering. Checksums do not grant native-code trust: externally supplied native images retain the Rust API’s explicit unsafe provenance requirement.
 
