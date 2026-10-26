@@ -9,39 +9,22 @@ functions, retain and call JavaScript exports, and settle async host operations
 through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
 source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
 
-## Benchmarks vs V8
+## Benchmarks
 
-![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
+![Scriptw, Scriptc WASI and V8: execution time and post-execution process RSS for all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
 
-[Latest measurements and evidence](docs/rust-rewrite/execution-memory-admission-20261025.md)
-· [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
+**Measured 2026-10-26 on GitHub Actions**, compiler `8517b2046`.
+All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
+and **Node / V8**. Scriptc passed the original checksums on **17/17 workloads**;
+the remaining cases retain explicit failure labels and diagnostics.
 
-The manually dispatched [compiler benchmark workflow](.github/workflows/compiler-benchmarks.yaml)
-remeasures Scriptw, Scriptc/WASI through Zig, and V8 together, then publishes the
-checked graph and raw evidence directly to `main`.
-[Method and reproduction](docs/rust-rewrite/contracts/compiler-comparison.md).
+Bars show median execution time and post-execution process RSS, with compilation
+and instance/context setup outside the execution timer. RSS includes the host/runtime,
+compilation and retained warmup effects; it is neither live JavaScript heap nor peak memory.
+Shared-runner observations are descriptive. The existing pinned Test262 status below is separate.
 
-Against the previous compiler in a paired rerun, all 17 fresh-Realm workloads
-use **28–34% less post-execution process RSS**. Integer execution fell from
-**121.61 → 81.69 MiB** (paired V8: **59.99 MiB**); retained objects fell from
-**150.63 → 99.73 MiB** (V8: **73.05 MiB**). Across this corpus, Scriptw still
-uses **1.30–1.85× V8 RSS**. RSS includes host/runtime, setup and retained warmup
-effects; it is not live JavaScript heap usage or peak memory. Timing results
-include regressions; the checkpoint retains every workload and existing-Realm
-controls.
-
-The runtime separates build-admitted Intl metadata from operation consumers,
-reuses a compact Cargo runtime receipt and uses private disk-backed native
-mappings where supported. Three Locale transforms, four NumberFormat and four
-PluralRules operations load their typed Locale/Number consumers; the remaining
-35 Intl operations still initialize the complete provider. Constant-string
-bootstrap uses a descriptor loop and shares immutable absent-value snapshots.
-Large static regexp descriptors copy from checked program data, avoiding
-enormous native-compilation operand stacks.
-The linked checkpoint retains its measured first-use cost, allocation
-diagnostics and repeated-call controls. The graph remains
-bound to the measured compiler and date shown in it; see the
-[memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
+[Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
+[Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
 
 ## Tests
 
