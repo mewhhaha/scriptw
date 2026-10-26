@@ -28,6 +28,7 @@ mod generator_delegate_protocol_error_authority_structure;
 mod generator_for_in_enumeration_structure;
 mod generator_instance_prototype_structure;
 mod generator_with_environment_structure;
+mod host_schema;
 mod plain_async_classic_for_await_using_structure;
 mod plain_async_for_of_await_using_structure;
 mod plain_async_function_await_using_structure;

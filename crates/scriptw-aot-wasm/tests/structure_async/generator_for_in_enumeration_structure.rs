@@ -1,3 +1,4 @@
+use super::host_schema::is_stored_value;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -94,11 +95,7 @@ fn inspect_actual_enumeration_artifact(source: &str) {
             {
                 return None;
             }
-            let value_fields = &structures.get(&value)?.fields;
-            if value_fields.len() != 3
-                || value_fields[0].element_type.unpack() != ValType::I32
-                || value_fields[1].element_type.unpack() != ValType::I64
-            {
+            if !is_stored_value(structures.get(&value)?) {
                 return None;
             }
             Some((cell, cursor))
