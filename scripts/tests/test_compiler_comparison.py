@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -120,7 +121,10 @@ class ComparisonAdmissionTests(unittest.TestCase):
         (destination / 'docs/rust-rewrite/assets').mkdir(parents=True)
         (destination / 'README.md').write_text('# Scriptw\n\n## Benchmarks\nold\n\n## Tests\nkeep me\n')
         self.save()
-        publish(self.path, destination)
+        # This control owns archive admission and README publication. The real
+        # workflow installs matplotlib and separately verifies the actual SVG.
+        with patch('compiler_comparison.render', return_value=b'<svg>fixture</svg>'):
+            publish(self.path, destination)
         path = destination / 'docs/rust-rewrite/compiler-comparison.json'
         _, rows = load_report(path, path.with_suffix('.tar.gz'))
         self.assertEqual(len(rows), 17)

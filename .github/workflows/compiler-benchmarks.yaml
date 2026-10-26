@@ -33,6 +33,7 @@ jobs:
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
         with:
           prefix-key: compiler-benchmarks-v1
+          cache-on-failure: true
       - name: Install pinned external benchmark tools
         shell: bash
         run: |
@@ -52,6 +53,7 @@ jobs:
           set -euo pipefail
           python3 -B -m unittest scripts.tests.test_compiler_comparison scripts.tests.test_tooling_benchmark_boundary -v
           bash scripts/check-no-legacy-js.sh
+          python3 -B scripts/intl_source_identities.py
           rustfmt --edition 2021 --check crates/scriptw-cli/examples/wasi_baseline.rs
           bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --example runtime_baseline --example wasi_baseline --message-format=json > "$RUNNER_TEMP/benchmark-cargo.jsonl"
       - name: Measure all compilers on the same runner

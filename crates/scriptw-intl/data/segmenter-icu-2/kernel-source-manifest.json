@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "93e5ee01b0ac32ffeeee142f5b201de2c1651cd1ca3df13f9f54c100674eed47",
+  "kernel_sha256": "53d35edc6b91a4d43572d04a0caca56f7f90ad7a99215b8f5f0dab15cf489821",
   "operations_reserved": [
     33,
     34,
@@ -378,9 +378,9 @@
   "source_manifest_sha256": "8612f2eb0857fab45863f717f63e95220274747717549f92b2f1af394f067cbe",
   "source_rows": [
     {
-      "bytes": 77072,
+      "bytes": 93304,
       "path": "Cargo.lock",
-      "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+      "sha256": "4b6bd6e9686f24c28427b351a6427edb25ad4238e201cc671620685d7828596b"
     },
     {
       "bytes": 6139,

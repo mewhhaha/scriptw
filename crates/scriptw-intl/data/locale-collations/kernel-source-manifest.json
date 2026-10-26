@@ -413,7 +413,7 @@
   ],
   "formatting_DefaultLocale_selection": false,
   "global_union_selection": false,
-  "kernel_sha256": "4dc011b8f4305441fb925116b8f5482957c2cdd844ba77e3fdc532cd748dbf61",
+  "kernel_sha256": "9663e1cbaf24ede3fd0461595f3a47f154f22ca5ac25a9c74dbb252c2173afa4",
   "locale_independent_profile_admission": {
     "current_native_admission": "Setup loads and retains both profiles through existing checked ICU constructors; source-only recipe does not claim current execution.",
     "historical_admission_receipt_sha256": "3fe60ad649669c2e0a99e4374e3871bfaef222e339ebb3b6f1c808dd710f46e6",
@@ -525,9 +525,9 @@
   "producer_checks": "read-only historical genuine export/constructor ancestry; no new Cargo reexport or runtime admission",
   "production_sources": [
     {
-      "bytes": 77072,
+      "bytes": 93304,
       "path": "Cargo.lock",
-      "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+      "sha256": "4b6bd6e9686f24c28427b351a6427edb25ad4238e201cc671620685d7828596b"
     },
     {
       "bytes": 6139,
