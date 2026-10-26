@@ -210,7 +210,7 @@ def render(report, rows, preview=None):
                 'Title': 'Scriptw, Scriptc WASI and V8 execution and process RSS',
                 'Description': json.dumps(rows, sort_keys=True)})
             if preview: fig.savefig(preview, dpi=90)
-            return output.getvalue()
+            return b'\n'.join(line.rstrip() for line in output.getvalue().splitlines()) + b'\n'
         finally:
             plt.close(fig)
 
