@@ -3,7 +3,9 @@ use super::*;
 use std::time::Instant;
 use wasmtime::{Engine, Module};
 
+#[path = "wasi/envelope.rs"]
 mod envelope;
+#[path = "wasi/execution.rs"]
 mod execution;
 
 pub(super) fn prepare(input: &Path, output: &Path) -> Result<Value, String> {

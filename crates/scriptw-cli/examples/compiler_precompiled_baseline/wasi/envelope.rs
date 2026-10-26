@@ -125,4 +125,5 @@ pub(super) fn reject_implicit_start(bytes: &[u8]) -> Result<(), String> {
 }
 
 #[cfg(test)]
+#[path = "envelope/tests.rs"]
 mod tests;
