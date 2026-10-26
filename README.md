@@ -13,23 +13,26 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 
 ![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
 
-[Latest measurements and evidence](docs/rust-rewrite/execution-memory-fixed-costs-20261025.md)
+[Latest measurements and evidence](docs/rust-rewrite/execution-memory-admission-20261025.md)
 · [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
 
-All 17 fresh-Realm workloads now use **53–60% less post-execution process RSS**
-than the previous memory checkpoint. Integer execution fell from
-**291.29 → 119.69 MiB** (paired V8: **60.04 MiB**); retained objects fell from
-**317.33 → 149.59 MiB** (V8: **71.42 MiB**). These controls still have roughly
-a 2× gap. RSS includes host/runtime, setup and retained warmup effects;
-it is not live JavaScript heap usage or peak memory.
+Against the previous compiler in a paired rerun, all 17 fresh-Realm workloads
+use **28–34% less post-execution process RSS**. Integer execution fell from
+**121.61 → 81.69 MiB** (paired V8: **59.99 MiB**); retained objects fell from
+**150.63 → 99.73 MiB** (V8: **73.05 MiB**). Across this corpus, Scriptw still
+uses **1.30–1.85× V8 RSS**. RSS includes host/runtime, setup and retained warmup
+effects; it is not live JavaScript heap usage or peak memory. Timing results
+include regressions; the checkpoint retains every workload and existing-Realm
+controls.
 
 The runtime separates build-admitted Intl metadata from operation consumers,
 reuses a compact Cargo runtime receipt and uses private disk-backed native
-mappings where supported. Locale transforms and NumberFormat/PluralRules admit
-only their typed Locale/Number consumers; other Intl operations still initialize
-the complete provider. Constant-string bootstrap uses a descriptor loop and
-shares immutable absent-value snapshots. Large static regexp descriptors copy
-from checked program data, avoiding enormous native-compilation operand stacks.
+mappings where supported. Three Locale transforms, four NumberFormat and four
+PluralRules operations load their typed Locale/Number consumers; the remaining
+35 Intl operations still initialize the complete provider. Constant-string
+bootstrap uses a descriptor loop and shares immutable absent-value snapshots.
+Large static regexp descriptors copy from checked program data, avoiding
+enormous native-compilation operand stacks.
 The linked checkpoint retains its measured first-use cost, allocation
 diagnostics and repeated-call controls. The graph remains
 bound to the measured compiler and date shown in it; see the
@@ -70,14 +73,14 @@ same four failures and zero crashes, unsupported cases or timeouts. Verification
 used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
 and exact inventories; this checkpoint does not refresh the full Test262 chart.
 
-The [fixed-runtime memory checkpoint](docs/rust-rewrite/execution-memory-fixed-costs-20261025.md),
-refreshed 2026-10-25 at `44e17ee4c`, passed **7,077 affected native checks across
-31 targets**, a separate authority-token compile-fail doctest and both embedding
-examples. Its selected original Test262 replay passed **7,742 / 7,746
-executions**, with the same four failures and zero crashes, unsupported cases or
-timeouts. Verification used one CPU and a 4-GiB memory cap. Existing source-tooling
-failures remain recorded in the linked evidence, alongside refresh commands and
-exact inventories; the full Test262 chart is unchanged.
+The [runtime-admission memory checkpoint](docs/rust-rewrite/execution-memory-admission-20261025.md),
+refreshed 2026-10-26 at `25909ef75`, passed **7,090 affected native checks across
+31 targets**, three complete rustdoc scopes and both embedding examples. Its
+selected original Test262 replay passed **13,858 / 13,862 executions**, with the
+same four failures and zero crashes, unsupported cases or timeouts. Verification
+used one CPU, a 4-GiB memory cap and no swap. Existing source-tooling failures
+remain recorded in the linked evidence, alongside refresh commands and exact
+inventories; the full Test262 chart is unchanged.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)
