@@ -16,17 +16,19 @@ format and explicit native-code admission boundary.
 
 ![Latest Scriptw vs V8: paired elapsed-time and post-execution process-RSS bars for all 17 workloads; lower is better](docs/rust-rewrite/assets/execution-performance.svg)
 
-[Latest measurements and evidence](docs/rust-rewrite/execution-memory-admission-20261025.md)
+[Latest measurements and evidence](docs/rust-rewrite/execution-memory-packed-records-20261026.md)
 · [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
 
-Against the previous compiler in a paired rerun, all 17 fresh-Realm workloads
-use **28–34% less post-execution process RSS**. Integer execution fell from
-**121.61 → 81.69 MiB** (paired V8: **59.99 MiB**); retained objects fell from
-**150.63 → 99.73 MiB** (V8: **73.05 MiB**). Across this corpus, Scriptw still
-uses **1.30–1.85× V8 RSS**. RSS includes host/runtime, setup and retained warmup
-effects; it is not live JavaScript heap usage or peak memory. Timing results
-include regressions; the checkpoint retains every workload and existing-Realm
-controls.
+Ordinary post-execution process RSS is mostly flat against `25909ef75` in a paired rerun:
+it fell in
+**10 of 17 fresh-Realm workloads** and increased in **7**. Integer execution used
+**81.62 → 82.06 MiB** (paired V8: **59.98 MiB**); retained objects used
+**99.57 → 100.08 MiB** (paired V8: **71.55 MiB**). Across this corpus, Scriptw uses
+**1.29–1.81× V8 RSS**. RSS includes host/runtime, setup and
+retained warmup effects; it is not live JavaScript heap usage or peak memory.
+Fresh-Realm timing medians fell in **17 of 17 workloads**. Separate existing-Realm
+calls regressed **30.3% for retained objects** and **26.4% for small joins**. Shared-host
+observations do not establish statistical significance or V8 parity.
 
 The runtime separates build-admitted Intl metadata from operation consumers,
 reuses a compact Cargo runtime receipt and uses private disk-backed native
@@ -39,9 +41,13 @@ collector. Native function `name`/`length` properties use compact storage and
 materialize descriptors when needed. Idle native compiler scratch is bounded.
 Large static regexp descriptors copy from checked program data, avoiding
 enormous native-compilation operand stacks.
-The linked checkpoint retains its measured first-use cost, allocation
-diagnostics and repeated-call controls. The graph remains
-bound to the measured compiler and date shown in it; see the
+The separate compiler-disabled precompiled diagnostic measured
+**49.31 MiB for integer execution** and **66.09 MiB for retained objects**.
+Native loading reached a **111.93 MiB sampled RSS maximum**; shorter transients
+may be missed. These 17 candidate-only cases have no older API baseline and
+retain loading/decode costs; they contribute no samples to the ordinary graph.
+First-use, allocation and repeated-call diagnostics remain in the checkpoint.
+The graph is bound to its measured compiler and date; see the
 [memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Tests
@@ -79,14 +85,17 @@ same four failures and zero crashes, unsupported cases or timeouts. Verification
 used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
 and exact inventories; this checkpoint does not refresh the full Test262 chart.
 
-The [runtime-admission memory checkpoint](docs/rust-rewrite/execution-memory-admission-20261025.md),
-refreshed 2026-10-26 at `25909ef75`, passed **7,090 affected native checks across
-31 targets**, three complete rustdoc scopes and both embedding examples. Its
-selected original Test262 replay passed **13,858 / 13,862 executions**, with the
-same four failures and zero crashes, unsupported cases or timeouts. Verification
-used one CPU, a 4-GiB memory cap and no swap. Existing source-tooling failures
-remain recorded in the linked evidence, alongside refresh commands and exact
-inventories; the full Test262 chart is unchanged.
+The [packed-record memory checkpoint](docs/rust-rewrite/execution-memory-packed-records-20261026.md),
+refreshed 2026-10-26 at `736f0f120`, records **7,118 affected native
+checks across 32 targets**. This combines 31 unchanged targets executed at
+`e36a4f029` with the complete repaired structural target at `736f0f120`;
+the exact test-only source comparison and original execution identities are
+retained. It is not a fresh full native sweep on the final commit. The final
+compiler's selected Test262 replay passed **20,264 / 20,268 executions**,
+with **4 failures, 0 crashes, 0 unsupported cases and
+0 timeouts**. Verification used one CPU, a 4-GiB memory cap and no swap.
+Existing source-tooling failures remain recorded; refresh commands and exact
+inventories are linked. The full pinned Test262 chart is unchanged.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)

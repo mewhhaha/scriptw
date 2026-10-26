@@ -9,7 +9,7 @@ own evidence manifest and are not displayed in the README.
 
 The README image is
 [`execution-performance.svg`](../assets/execution-performance.svg), from the
-[2026-10-26 runtime-admission memory checkpoint](../execution-memory-admission-20261025.md).
+[2026-10-26 packed-record memory checkpoint](../execution-memory-packed-records-20261026.md).
 It shows all 17 fresh-Store/Realm workloads as paired bars: V8 in orange and
 the latest measured Scriptw in blue. There is no baseline series. Both panels
 use zero-based linear scales shared within each section, with absolute values
