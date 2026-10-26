@@ -1143,11 +1143,49 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Eqz);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
+        // Exact decimal equals ECMAScript shortest decimal throughout the
+        // safe-integer domain. Above it, integer-valued binary64 numbers can
+        // require a different shortest spelling, so retain Ryū there.
+        absolute.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Const(wasm_encoder::Ieee64::from(
+            9_007_199_254_740_991.0,
+        )));
+        function.instruction(&Instruction::F64Le);
+        absolute.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        absolute.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Floor);
+        function.instruction(&Instruction::F64Eq);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let magnitude = schema.reserve_i64_local(function);
+        let negative = schema.reserve_i32_local(function);
+        absolute.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::I64TruncF64U);
+        magnitude.store(function);
+        bits.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Const(wasm_encoder::Ieee64::from(0.0)));
+        function.instruction(&Instruction::F64Lt);
+        negative.store(function);
+        let string = schema.helper_reference_on_stack(schema.call_helper(
+            crate::runtime_helpers::IntegerDecimalStringArguments::new(magnitude, negative),
+            self.runtime_helper_base()?,
+            function,
+        ));
+        output.replace(string, function);
+        schema.release_i32_local(negative, function);
+        schema.release_i64_local(magnitude, function);
+        function.instruction(&Instruction::Else);
         self.emit_ryu_shortest_decimal(absolute, mantissa, exponent, function);
         output.replace(
             self.emit_ecmascript_decimal_string(sign, mantissa, exponent, function),
             function,
         );
+        function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
         schema.release_i64_local(exponent, function);

@@ -177,6 +177,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RegExpProgramCandidate
             | RuntimeHelperId::RuntimeErrorObject
             | RuntimeHelperId::PooledStringResolve
+            | RuntimeHelperId::IntegerDecimalString
             | RuntimeHelperId::PooledStringsInitialize
             | RuntimeHelperId::GlobalLexicalDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationCheck

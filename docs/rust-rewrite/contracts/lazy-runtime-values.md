@@ -1,6 +1,6 @@
 # Lazy runtime values
 
-Scriptw retains one Wasm GC object model. Runtime layout 22 introduces lazy
+Scriptw retains one Wasm GC object model. Runtime layout 22 introduced lazy
 canonical strings and deferred native method values; it rejects earlier R/P
 layouts rather than admitting incompatible fields or helper indices.
 
@@ -47,3 +47,21 @@ key allocation. The representation preserves undefined, NaN and negative zero.
 Memory and execution effects must be measured with the unchanged matched
 [precompiled protocol](precompiled-comparison.md). Lazy allocation does not imply
 that a Wasmtime heap reservation or every process code page becomes smaller.
+
+Runtime layout 23 stores [[Prototype]] as a nullable reference to the actual
+JavaScript object payload. All object layouts belong to a nonallocating typed
+base; strings, BigInts and Symbols do not. This removes per-header StoredValue
+snapshots while retaining Array, Function, BoundFunction, Arguments and Proxy
+identity and behavior. The same schema owns prototype-tag reconstruction.
+Compact ordinary scalar backing starts absent (all scalar words zero) and
+materializes at the first nonzero write. Reference-only records need no scalar
+array; later zero writes clear prior values. Packed numeric arrays start at
+four elements and retain their occupancy-based growth bounds.
+
+On supported Linux anonymous mappings, normal copying collection releases
+whole pages in the dead idle semispace after weak processing and externref
+sweeping. Capacity stays unchanged and reclaimed pages remain readable/writable
+with zero contents on reuse. Custom/shared/CoW backings do not receive this
+operation, and GC zeal retains poison checks. This reduces dead-page retention;
+it adds no collections or benchmark-specific purges. CPU and page-fault costs
+must be measured with the same execution protocol.

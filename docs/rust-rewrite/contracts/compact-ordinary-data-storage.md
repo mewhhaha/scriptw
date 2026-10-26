@@ -24,10 +24,12 @@ literal definition.
 `ObjectPropertyStorage` is a fieldless nonfinal GC base with two sealed final
 subtypes. It has no allocating constructor. An ordinary header's mutable
 storage reference owns either compact storage or an ordinary dictionary.
-Compact storage owns mutable packed-byte tags, i64 scalar bits, and nullable
-eqref arrays. All JavaScript value tags are supported. Each array has exactly
-one slot per source key. Replacing a reference with a scalar clears its old GC
-edge; Number payloads preserve their exact bits. Object and Symbol identity
+Compact storage owns mutable packed-byte tags and nullable eqref elements.
+Its scalar-array edge starts null, representing zero bits in every slot; the
+first nonzero scalar write allocates exact shape-sized i64 storage. Later zero
+writes clear prior bits. All JavaScript value tags are supported. Each present
+array has exactly one slot per source key. Replacing a reference with a scalar
+clears its old GC edge; Number payloads preserve their exact bits. Object and Symbol identity
 remain normal GC references.
 
 The immutable shape belongs to one literal site and physical ProgramInstance.

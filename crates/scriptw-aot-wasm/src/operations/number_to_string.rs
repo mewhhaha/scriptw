@@ -1,6 +1,7 @@
 use super::*;
 
 mod decimal_format;
+mod integer_decimal;
 mod ryu;
 
 pub(super) use decimal_format::{NumberDecimalFormat, NumberExponentialFormat};

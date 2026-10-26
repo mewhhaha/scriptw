@@ -6,7 +6,7 @@ with canonical empty Number-bit and presence arrays. A Number occupies its
 exact `i64` payload and a separate bit in a `u64` presence bitmap. Every Number,
 including `NaN`, either infinity and `-0`, remains distinct from a hole.
 
-Capacity follows occupied indices with geometric growth, an initial eight
+Capacity follows occupied indices with geometric growth, an initial four
 slots and a 1 Mi-slot ceiling. Growth outside existing capacity requires the
 new index to stay near occupancy (`index <= 2*count+8`). Observable Array
 length does not allocate either backing. A distant insertion retires packed

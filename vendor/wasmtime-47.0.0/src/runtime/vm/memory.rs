@@ -171,6 +171,23 @@ pub trait RuntimeLinearMemory: Send + Sync {
     /// of bytes.
     fn grow_to(&mut self, size: usize) -> Result<()>;
 
+    /// Discard whole pages wholly inside an unused byte range, if supported.
+    ///
+    /// A supported implementation releases anonymous backing without changing
+    /// the memory's size or accessibility. Discarded bytes read as zero and can
+    /// immediately be written again; no recommit step is required. Partial
+    /// boundary pages retain their contents. Returns false for unsupported
+    /// backings (including custom and malloc memories by default).
+    ///
+    /// # Safety
+    /// The range must be within byte_size(), contain no live data or references,
+    /// and have no concurrent readers or writers. No aliases into discarded
+    /// pages may be used until the contents have been initialized again.
+    unsafe fn discard_unused_pages(&mut self, range: Range<usize>) -> Result<bool> {
+        let _ = range;
+        Ok(false)
+    }
+
     /// Returns a pointer to the base of this linear memory allocation.
     ///
     /// This is either a raw pointer, or a reference to an mmap along with an
@@ -382,6 +399,24 @@ impl Memory {
         match self {
             Memory::Local(mem) => mem.byte_size(),
             Memory::Shared(mem) => mem.byte_size(),
+        }
+    }
+
+    /// Reclaim unused backing through its owning allocation, never a raw heap
+    /// pointer. Shared and CoW memories do not support this operation.
+    ///
+    /// # Safety
+    /// The range must contain no live data or aliases, as required by
+    /// RuntimeLinearMemory::discard_unused_pages.
+    pub(crate) unsafe fn discard_unused_pages(&mut self, range: Range<usize>) -> Result<bool> {
+        assert!(range.start <= range.end && range.end <= self.byte_size());
+        match self {
+            Memory::Local(memory) if memory.memory_image.is_none() => {
+                // SAFETY: caller proves the byte range is dead and unaliased;
+                // the backing owner alone decides whether/how to reclaim it.
+                unsafe { memory.alloc.discard_unused_pages(range) }
+            }
+            Memory::Local(_) | Memory::Shared(_) => Ok(false),
         }
     }
 

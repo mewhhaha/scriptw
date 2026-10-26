@@ -161,14 +161,23 @@ fn graph_snapshot_reads_packed_numbers_and_empty_sparse_mode_without_mutation() 
     for (source, expected_keys) in [
         (
             "var a=[NaN,-0,,Infinity];gc();a;",
-            vec!["0", "1", "3", "length"].into_iter().map(str::to_owned).collect::<Vec<_>>(),
+            vec!["0", "1", "3", "length"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>(),
         ),
         (
             "var a=[];a[4294967294]=1;delete a[4294967294];gc();a;",
             vec!["length".to_owned()],
         ),
-        ("var a=[];for(var i=0;i<130;i++)a.push(i+0.5);delete a[63];delete a[64];a.length=4294967295;gc();a;",
-            (0..130).filter(|index| *index!=63 && *index!=64).map(|index| index.to_string()).chain(["length".to_owned()]).collect()),
+        (
+            "var a=[];for(var i=0;i<130;i++)a.push(i+0.5);delete a[63];delete a[64];a.length=4294967295;gc();a;",
+            (0..130)
+                .filter(|index| *index != 63 && *index != 64)
+                .map(|index| index.to_string())
+                .chain(["length".to_owned()])
+                .collect(),
+        ),
     ] {
         let result = Engine::new(RealmBuilder::new().build())
             .observe_script_graph(
@@ -211,12 +220,34 @@ fn graph_snapshot_reads_packed_numbers_and_empty_sparse_mode_without_mutation() 
             } if *bits == (-0f64).to_bits())
             );
         } else if node.properties.len() > 1 {
-            assert!(matches!(&node.properties[63].descriptor, SnapshotDescriptor::Data {
+            assert!(
+                matches!(&node.properties[63].descriptor, SnapshotDescriptor::Data {
                 value: SnapshotValue::Number { bits }, writable: true, enumerable: true, configurable: true
-            } if *bits == 65.5f64.to_bits()));
-            assert!(matches!(&node.properties.last().unwrap().descriptor, SnapshotDescriptor::Data {
+            } if *bits == 65.5f64.to_bits())
+            );
+            assert!(
+                matches!(&node.properties.last().unwrap().descriptor, SnapshotDescriptor::Data {
                 value: SnapshotValue::Number { bits }, writable: true, enumerable: false, configurable: false
-            } if *bits == 4294967295f64.to_bits()));
+            } if *bits == 4294967295f64.to_bits())
+            );
         }
     }
+}
+
+#[test]
+fn four_element_capacity_growth_keeps_holes_and_number_bits() {
+    check(
+        r#"
+var a=[0,-0,NaN,3];gc();
+assert(a.length===4 && Object.is(a[1],-0) && Number.isNaN(a[2]),'four-element initial backing');
+delete a[0];a[4]=Infinity;gc();
+assert(!(0 in a) && Object.is(a[1],-0) && Number.isNaN(a[2]) && a[4]===Infinity,'first capacity growth preserves hole bitmap and bits');
+a[7]=-Infinity;a[8]=8.5;delete a[3];gc();
+assert(a.length===9 && !(3 in a) && a[7]===-Infinity && a[8]===8.5,'second growth preserves bitmap');
+a[0]=0;a[1]=0;a[2]=-0;a[4]=NaN;gc();
+assert(Object.is(a[0],0) && Object.is(a[1],0) && Object.is(a[2],-0) && Number.isNaN(a[4]),'replacement after growth');
+a[8]=undefined;gc();
+assert(8 in a && a[8]===undefined && !(3 in a) && Object.is(a[2],-0) && Number.isNaN(a[4]),'descriptor transition preserves small backing state');
+"#,
+    );
 }

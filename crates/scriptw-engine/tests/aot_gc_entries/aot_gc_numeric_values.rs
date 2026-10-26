@@ -245,3 +245,190 @@ Object.defineProperty(original.prototype, "format", getter);
 "#,
     );
 }
+
+#[test]
+fn gc_number_strings_keep_safe_integer_and_shortest_decimal_boundaries() {
+    run_boolean(
+        r#"
+var cases = [
+ [0,'0'],[-0,'0'],[1,'1'],[-1,'-1'],[9,'9'],[10,'10'],[-10,'-10'],
+ [999999999999999,'999999999999999'],[1000000000000000,'1000000000000000'],
+ [4503599627370495.5,'4503599627370495.5'],[-4503599627370495.5,'-4503599627370495.5'],
+ [9007199254740990,'9007199254740990'],[-9007199254740990,'-9007199254740990'],
+ [9007199254740991,'9007199254740991'],[-9007199254740991,'-9007199254740991'],
+ [9007199254740992,'9007199254740992'],[-9007199254740992,'-9007199254740992'],
+ [9007199254740994,'9007199254740994'],[-9007199254740994,'-9007199254740994'],
+ [1000000000000000128,'1000000000000000100'],[-1000000000000000128,'-1000000000000000100'],
+ [0.5,'0.5'],[-0.5,'-0.5'],[1.0000000000000002,'1.0000000000000002'],
+ [0.9999999999999999,'0.9999999999999999'],[5e-324,'5e-324'],[-5e-324,'-5e-324'],
+ [1e-323,'1e-323'],[1e21,'1e+21'],[1.7976931348623157e308,'1.7976931348623157e+308'],
+ [Infinity,'Infinity'],[-Infinity,'-Infinity'],[NaN,'NaN']
+];
+var ok=true;
+for(var i=0;i<cases.length;i++) {
+ var n=cases[i][0], expected=cases[i][1];
+ ok=ok && String(n)===expected && (''+n)===expected && [n].join('')===expected;
+ var object={};object[n]='value';ok=ok && Object.keys(object)[0]===expected;
+}
+ok;
+"#,
+    );
+}
+
+#[test]
+fn gc_runtime_safe_integer_decimal_matches_rust_integer_oracle() {
+    let mut values = vec![
+        0i64,
+        1,
+        -1,
+        9,
+        -9,
+        10,
+        -10,
+        99,
+        -99,
+        100,
+        -100,
+        9_007_199_254_740_991,
+        -9_007_199_254_740_991,
+    ];
+    for power in 1..=15 {
+        let magnitude = 10i64.pow(power);
+        for offset in [-1, 0, 1] {
+            values.push(magnitude + offset);
+            values.push(-magnitude - offset);
+        }
+    }
+    let mut state = 0x1234_5678_9abc_def0u64;
+    for _ in 0..256 {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let value = (state % 9_007_199_254_740_992) as i64;
+        values.push(value);
+        values.push(-value);
+    }
+    let pairs = values
+        .iter()
+        .map(|value| format!("[{value},'{value}']"))
+        .collect::<Vec<_>>()
+        .join(",");
+    run_boolean(&format!(
+        "var pairs=[{pairs}],ok=true;function convert(n){{return String(n);}}for(var i=0;i<pairs.length;i++){{ok=ok&&convert(pairs[i][0])===pairs[i][1];}}ok;"
+    ));
+}
+
+#[test]
+fn gc_shared_decimal_helper_executes_the_full_unsigned_magnitude_domain() {
+    use wasmparser::{ExternalKind, KnownCustom, Name, Parser, Payload};
+    use wasmtime::Val;
+
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let unit = compiler
+        .compile_script("String(0);", CompileOptions::default())
+        .unwrap();
+    let artifact = compiler.emit_wasm(&unit).unwrap();
+    let raw = artifact.runtime.as_ref().unwrap().bytes();
+    let mut helper_index = None;
+    let mut exports = Vec::new();
+    for payload in Parser::new(0).parse_all(raw) {
+        match payload.unwrap() {
+            Payload::CustomSection(section) => {
+                if let KnownCustom::Name(subsections) = section.as_known() {
+                    for subsection in subsections {
+                        if let Name::Function(names) = subsection.unwrap() {
+                            for name in names {
+                                let name = name.unwrap();
+                                if name.name == "helper::integer_decimal_string" {
+                                    assert!(helper_index.replace(name.index).is_none());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Payload::ExportSection(section) => {
+                for export in section {
+                    let export = export.unwrap();
+                    if export.kind == ExternalKind::Func {
+                        exports.push((export.index, export.name.to_owned()));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let helper_index = helper_index.expect("the real compiled helper has a name");
+    let export = exports
+        .iter()
+        .find(|(index, _)| *index == helper_index)
+        .expect("R already exports its real helper to P")
+        .1
+        .clone();
+    let mut config = wasmtime::Config::new();
+    scriptw_engine::configure_wasm_runtime(&mut config);
+    let engine = wasmtime::Engine::new(&config).unwrap();
+    let runtime = scriptw_engine::EmbeddedRuntime::compile(&engine, &artifact).unwrap();
+    let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();
+    let mut store = wasmtime::Store::new(&engine, state);
+    store.limiter(|state| state.limits_mut());
+    store.set_epoch_deadline(u64::MAX / 2);
+    let mut linker = wasmtime::Linker::new(&engine);
+    runtime.register(&mut store, &mut linker).unwrap();
+    let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+    assert!(matches!(
+        instance.initialize(&mut store).unwrap(),
+        scriptw_engine::EmbeddedEvaluation::Settled(scriptw_engine::JsCompletion::Normal(_))
+    ));
+    let formatter = linker
+        .get(
+            &mut store,
+            scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE,
+            &export,
+        )
+        .unwrap()
+        .into_func()
+        .unwrap();
+    for magnitude in [0u64, 1u64 << 63, u64::MAX] {
+        for negative in [0, 1] {
+            let mut result = [Val::AnyRef(None)];
+            formatter
+                .call(
+                    &mut store,
+                    &[Val::I64(magnitude as i64), Val::I32(negative)],
+                    &mut result,
+                )
+                .unwrap();
+            let Val::AnyRef(Some(string)) = result[0] else {
+                panic!("actual StringValue result");
+            };
+            let string = string.as_struct(&store).unwrap().unwrap();
+            let Val::AnyRef(Some(units)) = string
+                .field(
+                    &mut store,
+                    scriptw_aot_wasm::GcSnapshotField::StringUnits.index() as usize,
+                )
+                .unwrap()
+            else {
+                panic!("actual immutable UTF16 backing");
+            };
+            let units = units.as_array(&store).unwrap().unwrap();
+            let length = units.len(&store).unwrap();
+            let actual = (0..length)
+                .map(|index| {
+                    let Val::I32(unit) = units.get(&mut store, index).unwrap() else {
+                        panic!("packed code unit");
+                    };
+                    u16::try_from(unit).unwrap()
+                })
+                .collect::<Vec<_>>();
+            let expected = format!("{}{magnitude}", if negative == 1 { "-" } else { "" });
+            assert_eq!(String::from_utf16(&actual).unwrap(), expected);
+            assert_eq!(
+                length as usize,
+                expected.len(),
+                "exact capacity includes only an optional sign and digits"
+            );
+            store.gc(None).unwrap();
+        }
+    }
+}

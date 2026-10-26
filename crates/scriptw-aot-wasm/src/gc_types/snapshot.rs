@@ -30,7 +30,7 @@ snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String 
     Function => FunctionObject, Code => ExecutableCode,
     Context => FunctionContext, Realm => RealmRecord, Intrinsics => IntrinsicTable,
     Realms => SnapshotRealmInventory, WellKnownSymbols => WellKnownSymbolTable,
-    Proxy => ProxyObject, BoundFunction => BoundFunction, Boxed => PrimitiveBox,
+    Proxy => ProxyObject, BoundFunction => BoundFunction, Arguments => ArgumentsObject, Boxed => PrimitiveBox,
     Promise => PromiseObject, Error => NativeErrorObject);
 
 pub const SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT: &str = "scriptw_snapshot_resolve_property_value";

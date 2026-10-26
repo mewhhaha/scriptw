@@ -330,7 +330,7 @@ impl FunctionBuilder<'_> {
         grown.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        grown.set_constant(8, f);
+        grown.set_constant(4, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         let ready = self.open_frame(ControlFrameKind::Block, f);

@@ -221,6 +221,26 @@ impl RuntimeLinearMemory for MmapMemory {
         Ok(())
     }
 
+    unsafe fn discard_unused_pages(&mut self, range: core::ops::Range<usize>) -> Result<bool> {
+        assert!(range.start <= range.end && range.end <= self.len);
+        // Keep boundary pages intact even when semi-spaces are only aligned
+        // to GC objects rather than host pages.
+        let start = HostAlignedByteCount::new_rounded_up(range.start)?;
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let end = HostAlignedByteCount::new(range.end - range.end % page)?;
+        if start >= end {
+            return Ok(false);
+        }
+        let offset = self
+            .pre_guard_size
+            .checked_add(start)
+            .context("discard range offset overflow")?;
+        let length = end.checked_sub(start)?;
+        // SAFETY: the range is inside the accessible anonymous allocation and
+        // the caller has finished using its contents. Account for pre-guards.
+        unsafe { self.mmap.discard_unused_pages(offset, length) }
+    }
+
     fn set_byte_size(&mut self, len: usize) {
         self.len = len;
     }
@@ -247,5 +267,127 @@ impl RuntimeLinearMemory for MmapMemory {
             base: base.into(),
             current_length: self.len.into(),
         }
+    }
+}
+
+#[cfg(all(test, target_os = "linux", feature = "std", not(miri)))]
+mod discard_tests {
+    use super::*;
+    use wasmtime_environ::{IndexType, Limits, MemoryKind, Tunables};
+
+    fn memory(bytes: usize) -> MmapMemory {
+        let ty = wasmtime_environ::Memory {
+            idx_type: IndexType::I32,
+            limits: Limits { min: 0, max: None },
+            shared: false,
+            page_size_log2: 0,
+        };
+        let tunables = Tunables {
+            memory_reservation: 0,
+            memory_reservation_for_growth: 0,
+            memory_guard_size: HostAlignedByteCount::host_page_size().byte_count() as u64,
+            guard_before_linear_memory: true,
+            memory_init_cow: false,
+            ..Tunables::default_miri()
+        };
+        MmapMemory::new(
+            &ty,
+            &MemoryTunables::new(&tunables, MemoryKind::LinearMemory),
+            bytes,
+            None,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn reclaim_rounds_inward_preserves_boundaries_and_is_rw_zero_on_reuse() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let mut memory = memory(page * 4);
+        let base = memory.base().as_mut_ptr();
+        for _ in 0..4 {
+            // No live typed data or Rust references inhabit this test memory.
+            unsafe {
+                base.write_bytes(0xa5, page * 4);
+            }
+            assert!(unsafe { memory.discard_unused_pages(1..page * 3 + 1) }.unwrap());
+            // This observes actual residency, not RSS or an allocator counter.
+            // Check before reading discarded bytes, which would refault them.
+            let mut resident = [0u8; 4];
+            assert_eq!(
+                unsafe { libc::mincore(base.cast(), page * 4, resident.as_mut_ptr()) },
+                0
+            );
+            assert_eq!(resident[1] & 1, 0);
+            assert_eq!(resident[2] & 1, 0);
+            let bytes = unsafe { core::slice::from_raw_parts(base, page * 4) };
+            assert!(bytes[..page].iter().all(|b| *b == 0xa5));
+            assert!(bytes[page..page * 3].iter().all(|b| *b == 0));
+            assert!(bytes[page * 3..].iter().all(|b| *b == 0xa5));
+            assert_eq!(memory.byte_size(), page * 4);
+        }
+        // Reclamation does not need recommit before writes or later growth.
+        memory.grow_to(page * 7).unwrap();
+        let base = memory.base().as_mut_ptr();
+        unsafe {
+            base.write_bytes(0x5a, page * 7);
+        }
+        assert!(unsafe { memory.discard_unused_pages(0..page * 7) }.unwrap());
+        assert!(
+            unsafe { core::slice::from_raw_parts(base, page * 7) }
+                .iter()
+                .all(|b| *b == 0)
+        );
+        unsafe {
+            base.add(page * 6).write(42);
+        }
+        assert_eq!(unsafe { base.add(page * 6).read() }, 42);
+    }
+
+    #[test]
+    fn partial_empty_ranges_do_not_discard_and_custom_backing_requires_opt_in() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let mut memory = memory(page);
+        let base = memory.base().as_mut_ptr();
+        unsafe {
+            base.write_bytes(0x7b, page);
+        }
+        for range in [0..0, 0..page - 1, 1..page, page..page] {
+            assert!(!unsafe { memory.discard_unused_pages(range) }.unwrap());
+        }
+        // Even a custom implementation returning an mmap base must not be
+        // classified by its pointer. Only its own explicit capability counts.
+        struct Custom(MmapMemory);
+        impl RuntimeLinearMemory for Custom {
+            fn byte_size(&self) -> usize {
+                self.0.byte_size()
+            }
+            fn byte_capacity(&self) -> usize {
+                self.0.byte_capacity()
+            }
+            fn grow_to(&mut self, size: usize) -> Result<()> {
+                self.0.grow_to(size)
+            }
+            fn base(&self) -> MemoryBase {
+                self.0.base()
+            }
+            fn vmmemory(&self) -> crate::vm::VMMemoryDefinition {
+                self.0.vmmemory()
+            }
+        }
+        let mut custom = Custom(memory);
+        assert!(!unsafe { custom.discard_unused_pages(0..page) }.unwrap());
+        assert!(
+            unsafe { core::slice::from_raw_parts(base, page) }
+                .iter()
+                .all(|b| *b == 0x7b)
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn reclaim_rejects_out_of_bounds_before_alignment() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let mut memory = memory(page);
+        let _ = unsafe { memory.discard_unused_pages(0..page + 1) };
     }
 }

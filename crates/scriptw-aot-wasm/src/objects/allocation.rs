@@ -143,12 +143,8 @@ impl FunctionBuilder<'_> {
     ) -> GcStackReference<OrdinaryObject> {
         let schema = self.runtime_schema();
         let prototype_slot = schema.reserve_gc_local(function);
-        let prototype_record = prototype_slot.initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(prototype, function),
-            function,
-        );
+        let prototype_record =
+            prototype_slot.initialize(schema.prototype_reference(prototype, function), function);
         let private_elements = schema
             .reserve_gc_local(function)
             .initialize(schema.empty_private_elements(function), function);

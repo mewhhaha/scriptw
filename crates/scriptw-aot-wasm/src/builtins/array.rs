@@ -1214,63 +1214,19 @@ impl FunctionBuilder<'_> {
         // Exact decimal formatting also serves the private u64 accumulator.
         // No Number rounding may alter its mathematical property key.
         let s = self.runtime_schema();
-        let remaining = s.reserve_i64_local(f);
-        let count = s.reserve_i32_local(f);
-        let cursor = s.reserve_i32_local(f);
-        let unit = s.reserve_i32_local(f);
-        index.load(f);
-        remaining.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        count.store(f);
-        let next = self.open_frame(ControlFrameKind::Loop, f);
-        count.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        count.store(f);
-        remaining.load(f);
-        f.instruction(&Instruction::I64Const(10));
-        f.instruction(&Instruction::I64DivU);
-        remaining.store(f);
-        remaining.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(next, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        let text =
-            crate::gc_types::StringConstruction::allocate(s, s.reserve_gc_local(f), count, f);
-        index.load(f);
-        remaining.store(f);
-        count.load(f);
-        cursor.store(f);
-        let next = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Sub);
-        cursor.store(f);
-        remaining.load(f);
-        f.instruction(&Instruction::I64Const(10));
-        f.instruction(&Instruction::I64RemU);
-        f.instruction(&Instruction::I32WrapI64);
-        f.instruction(&Instruction::I32Const(48));
-        f.instruction(&Instruction::I32Add);
-        unit.store(f);
-        text.write(cursor, unit, s, f);
-        remaining.load(f);
-        f.instruction(&Instruction::I64Const(10));
-        f.instruction(&Instruction::I64DivU);
-        remaining.store(f);
-        cursor.load(f);
-        self.emit_branch_if_to_target(next, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        let text = s.reserve_gc_local(f).initialize(text.publish(s, f), f);
+        let negative = s.reserve_i32_local(f);
+        negative.set_constant(0, f);
+        let slot = s.reserve_gc_local(f);
+        let text = s
+            .call_helper(
+                crate::runtime_helpers::IntegerDecimalStringArguments::new(index, negative),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .bind(s, slot, f);
         let key = crate::operations::PropertyKeyLocals::from_string(s, &text, f);
         text.clear(f);
-        s.release_i32_local(unit, f);
-        s.release_i32_local(cursor, f);
-        s.release_i32_local(count, f);
-        s.release_i64_local(remaining, f);
+        s.release_i32_local(negative, f);
         Ok(key)
     }
 }

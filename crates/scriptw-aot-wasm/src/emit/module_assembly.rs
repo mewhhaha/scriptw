@@ -1387,6 +1387,7 @@ fn emit_script_module_with_factory(
             GlobalIdentifierTypeofStrict, compile_global_identifier_typeof_strict_helper;
         );
         register_runtime_helper!(
+            IntegerDecimalString, compile_integer_decimal_string_helper;
             PooledStringResolve, compile_pooled_string_resolve_helper;
             PooledStringsInitialize, compile_pooled_strings_initialize_helper
         );

@@ -45,5 +45,31 @@ exactParts[0] = 'changed';
 for (let i = 0; i < 25; i++) { ['replacement', 'more units'].join(''); gc(); }
 check(exactText.length === 16 && exactText.charCodeAt(0) === 0xd800 && exactText.slice(1) === '123456789012345', 'published exact backing remains immutable');
 check(trimmedText.length === 4 && trimmedText.charCodeAt(0) === 0xdfff && trimmedText.slice(1) === 'xyz', 'spare backing is trimmed without exposing capacity');
+// Concrete-array own reads must recheck every index after observable coercion.
+const live = ['first', undefined, 'stale', , 'last'];
+const liveProto = Object.create(Array.prototype);
+let inheritedGets = 0, ownGets = 0;
+Object.defineProperty(liveProto, '1', { get() { inheritedGets++; return 'wrong'; }, configurable: true });
+Object.defineProperty(liveProto, '3', { get() { inheritedGets++; gc(); return 'inherited'; }, configurable: true });
+Object.setPrototypeOf(live, liveProto);
+live[0] = { toString() {
+  Object.defineProperty(live, '2', { get() { ownGets++; gc(); return 'updated'; }, configurable: true });
+  check(['nested', 'own'].join(':') === 'nested:own', 'concrete read reentrancy');
+  return 'first';
+} };
+check(live.join('|') === 'first||updated|inherited|last' && inheritedGets === 1 && ownGets === 1,
+  'own undefined shadows inherited getter; later own accessor and hole stay live');
+const separatorMutation = ['old', 'tail'];
+check(separatorMutation.join({ toString() { separatorMutation[0] = 'new'; gc(); return ':'; } }) === 'new:tail',
+  'separator coercion precedes own-data probe');
+const proxyEvents = [];
+const arrayProxy = new Proxy(['a', undefined, , 'd'], {
+  get(target, key, receiver) { proxyEvents.push(String(key)); return Reflect.get(target, key, receiver); },
+  has() { throw 'concrete-array shortcut cannot add HasProperty'; }
+});
+check(Array.prototype.join.call(arrayProxy, ':') === 'a:::d' && proxyEvents.join(',') === 'length,0,1,2,3',
+  'Proxy array cannot bypass ordered Get traps');
+check(Array.prototype.join.call(new Uint8Array([7, 8]), ':') === '7:8', 'borrowed typed-array read fallback');
+check(Array.prototype.join.call({ length: 2, 0: 'generic', 1: undefined }, ':') === 'generic:', 'generic read fallback');
 print('array-private-join:ok');
 262;

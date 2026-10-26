@@ -1200,6 +1200,21 @@ impl CopyingCollection<'_, '_> {
             let idle_start = usize::try_from(self.heap.idle_space_start).unwrap();
             let idle_end = usize::try_from(self.heap.idle_space_end).unwrap();
             self.heap.heap_slice_mut()[idle_start..idle_end].fill(POISON);
+        } else {
+            let range = self.heap.idle_space_start as usize..self.heap.idle_space_end as usize;
+            // Weak/ephemeron processing and the externref sweep have consumed
+            // every old header/forwarding link. Resizing has finalized the
+            // boundaries; only the wholly dead idle semi-space is discarded.
+            // The owning allocation keeps it RW for the next copying flip.
+            if let Some(memory) = self.heap.memory.as_mut() {
+                // SAFETY: no live objects or outstanding collector references
+                // remain in idle space after all collection phases above.
+                if let Err(error) = unsafe { memory.discard_unused_pages(range) } {
+                    // Reclamation is optional; an OS refusal changes neither
+                    // collection semantics nor the allocator's capacity.
+                    log::debug!("idle semi-space backing reclamation failed: {error:#}");
+                }
+            }
         }
 
         log::trace!("End copying collection");
@@ -1379,5 +1394,98 @@ mod tests {
         for len in [1usize << 32, 3usize << 32] {
             check(len);
         }
+    }
+}
+
+#[cfg(all(test, feature = "std", target_os = "linux", not(miri), not(gc_zeal)))]
+mod reclamation_tests {
+    use crate::{
+        AnyRef, Collector, Config, Engine, ExternRef, FieldType, GcEphemeron, Mutability,
+        RootScope, Rooted, StorageType, Store, StructRef, StructRefPre, StructType, Val, ValType,
+        WeakAnyRef,
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    struct Dropped(Arc<AtomicUsize>);
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn repeated_flips_and_growth_preserve_survivors_weak_edges_and_externref_order() {
+        let mut config = Config::new();
+        config
+            .enable_compiler(false)
+            .wasm_gc(true)
+            .wasm_function_references(true)
+            .collector(Collector::Copying)
+            .gc_heap_initial_size(64 * 1024);
+        let engine = Engine::new(&config).unwrap();
+        let ty = StructType::new(
+            &engine,
+            [FieldType::new(
+                Mutability::Const,
+                StorageType::ValType(ValType::I32),
+            )],
+        )
+        .unwrap();
+        let mut store = Store::new(&engine, ());
+        let pre = StructRefPre::new(&mut store, ty);
+        let owner = StructRef::new(&mut store, &pre, &[Val::I32(1)])
+            .unwrap()
+            .to_anyref();
+        let drops = Arc::new(AtomicUsize::new(0));
+        let (key, entry, weak) = {
+            let mut roots = RootScope::new(&mut store);
+            let key = StructRef::new(&mut roots, &pre, &[Val::I32(42)])
+                .unwrap()
+                .to_anyref();
+            let native = ExternRef::new(&mut roots, Dropped(Arc::clone(&drops))).unwrap();
+            let value = AnyRef::convert_extern(&mut roots, native).unwrap();
+            let entry = GcEphemeron::new(&mut roots, &owner, &key, Some(&value)).unwrap();
+            let weak = WeakAnyRef::new(&mut roots, &owner, &value).unwrap();
+            (key.to_owned_rooted(&mut roots).unwrap(), entry, weak)
+        };
+        for _ in 0..8 {
+            {
+                let mut roots = RootScope::new(&mut store);
+                // Root enough objects simultaneously to require real growth,
+                // then release them before the next copying flip.
+                for marker in 0..4096 {
+                    StructRef::new(&mut roots, &pre, &[Val::I32(marker)]).unwrap();
+                }
+            }
+            store.gc(None).unwrap();
+            assert!(store.gc_heap_capacity() > 64 * 1024);
+            let mut roots = RootScope::new(&mut store);
+            assert!(entry.matches_key(&mut roots, &key).unwrap());
+            let value = weak.upgrade(&mut roots).unwrap().unwrap();
+            let native = ExternRef::convert_any(&mut roots, value).unwrap();
+            assert!(native.data(&roots).unwrap().unwrap().is::<Dropped>());
+            assert_eq!(drops.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                key.as_struct(&roots)
+                    .unwrap()
+                    .unwrap()
+                    .field(&mut roots, 0)
+                    .unwrap()
+                    .unwrap_i32(),
+                42
+            );
+            let through_entry = entry.value(&mut roots).unwrap().unwrap();
+            assert!(Rooted::ref_eq(&roots, &value, &through_entry).unwrap());
+        }
+        drop(key);
+        store.gc(None).unwrap();
+        assert!(!entry.is_live(&mut store).unwrap());
+        assert!(weak.upgrade(&mut store).unwrap().is_none());
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        store.gc(None).unwrap();
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
     }
 }

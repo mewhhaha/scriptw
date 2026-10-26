@@ -163,3 +163,48 @@ fn fresh_array_producers_reach_number_storage_without_an_eager_descriptor() {
         );
     }
 }
+
+#[test]
+fn integer_decimal_helper_keeps_private_unsigned_domain_without_float_rounding() {
+    let artifact = emit_script("var a=[]; a.push('x'); String(123);").unwrap();
+    let runtime = artifact.runtime().unwrap();
+    let (formatter, body) = named_body(runtime.bytes(), "helper::integer_decimal_string");
+    assert!(body.iter().any(|op| matches!(op, Operator::I64DivU)));
+    assert!(body.iter().any(|op| matches!(op, Operator::I64RemU)));
+    assert!(
+        !body.iter().any(|op| matches!(
+            op,
+            Operator::F64ConvertI64U
+                | Operator::F64ConvertI64S
+                | Operator::F64ReinterpretI64
+                | Operator::I64TruncF64U
+                | Operator::I64TruncF64S
+                | Operator::Call { .. }
+        )),
+        "the complete u64 magnitude must never pass through binary64 or a coercion callback"
+    );
+    let (_, number) = named_body(runtime.bytes(), "helper::number_to_string");
+    assert!(calls(&number, formatter));
+    let bound = number
+        .iter()
+        .position(|op| {
+            matches!(op, Operator::F64Const { value }
+        if value.bits() == (9_007_199_254_740_991f64).to_bits())
+        })
+        .expect("safe-integer bound");
+    let truncation = number
+        .iter()
+        .position(|op| matches!(op, Operator::I64TruncF64U))
+        .expect("guarded magnitude conversion");
+    assert!(bound < truncation);
+    assert!(
+        number[bound..truncation]
+            .iter()
+            .any(|op| matches!(op, Operator::F64Floor))
+    );
+    let (_, push) = named_body(runtime.bytes(), "builtin::Array.prototype.push");
+    assert!(
+        calls(&push, formatter),
+        "private index publication shares the exact unsigned formatter"
+    );
+}

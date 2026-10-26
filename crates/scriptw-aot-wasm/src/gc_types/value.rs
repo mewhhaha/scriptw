@@ -11,6 +11,7 @@ mod native_global_script_compiler;
 mod object_header_projection;
 mod program_initialize;
 mod program_instance;
+mod prototype_reference;
 pub(crate) use program_instance::{
     FunctionProgramOwner, ProgramInstanceHooks, ProgramInstanceImage, ProgramInstanceLocals,
     ProgramLiteralCount, ProgramLiteralIndex, ProgramLiteralRoots, ProgramMetadataBytes,

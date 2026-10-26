@@ -107,12 +107,6 @@ impl FunctionBuilder<'_> {
             ),
             &mut f,
         );
-        let scalars = schema.reserve_gc_local(&mut f).initialize(
-            schema
-                .array_type::<CompactScalarArray>()
-                .filled(GcOperand::i64(0), length, &mut f),
-            &mut f,
-        );
         let references = schema.reserve_gc_local(&mut f).initialize(
             schema.array_type::<CompactReferenceArray>().filled(
                 GcOperand::eq_reference(undefined.reference()),
@@ -126,7 +120,7 @@ impl FunctionBuilder<'_> {
                 (
                     GcOperand::reference(&p.shape, schema),
                     GcOperand::reference(&tags, schema),
-                    GcOperand::reference(&scalars, schema),
+                    GcOperand::null(schema),
                     GcOperand::reference(&references, schema),
                 ),
                 &mut f,
@@ -144,7 +138,6 @@ impl FunctionBuilder<'_> {
         base.clear(&mut f);
         compact.clear(&mut f);
         references.clear(&mut f);
-        scalars.clear(&mut f);
         tags.clear(&mut f);
         undefined.clear(&mut f);
         keys.clear(&mut f);

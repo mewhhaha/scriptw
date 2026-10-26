@@ -602,6 +602,9 @@ fn object_header_field<T: GcHeapType>(
     field.ordinal()
 }
 
+// Every object projection must have the actual-object supertype at compile time.
+fn require_javascript_object_subtype<T: GcSubtype<JavaScriptObject>>() {}
+
 macro_rules! gc_layout_registry {
     ($($kind:ident $owner:ident $(: $parent:ident)? => $schema:ident {
         $($field:ident: $value:ty, $mutability:ident, $nullability:ty;)*
@@ -622,7 +625,7 @@ macro_rules! gc_layout_registry {
                     $(Self::$owner => gc_layout_registry!(@definition $kind $owner
                         layouts; $($field: $value, $mutability, $nullability;)*)),+
                 };
-                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::PropertyValue);
+                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::PropertyValue | Self::JavaScriptObject);
                 let supertype_idx = match self {
                     $(Self::$owner => gc_layout_registry!(@parent layouts; $($parent)?)),+
                 };
@@ -640,6 +643,7 @@ macro_rules! gc_layout_registry {
             gc_layout_registry!(@schema $kind $owner $schema;
                 $($field: $value, $mutability, $nullability;)*);
             gc_layout_registry!(@javascript_reference $kind $owner; $($field:$value,$mutability,$nullability;)*);
+            gc_layout_registry!(@object_subtype_proof $kind $owner; $($field:$value,$mutability,$nullability;)*);
         )+
     };
     (@parent $layouts:ident;) => { None };
@@ -649,6 +653,13 @@ macro_rules! gc_layout_registry {
         impl sealed::Subtype<$parent> for $owner {}
         impl GcSubtype<$parent> for $owner {}
     };
+    (@object_subtype_proof struct OrdinaryObject; $($fields:tt)+) => {
+        const _: fn() = require_javascript_object_subtype::<OrdinaryObject>;
+    };
+    (@object_subtype_proof struct $owner:ident; OBJECT:$value:ty,$mutable:ident,$null:ty; $($rest:tt)*) => {
+        const _: fn() = require_javascript_object_subtype::<$owner>;
+    };
+    (@object_subtype_proof $kind:ident $owner:ident; $($fields:tt)*) => {};
     (@object_projection struct OrdinaryObject; $($fields:tt)+) => { Some(ObjectHeaderProjection::Own) };
     (@object_projection struct $owner:ident; OBJECT:$value:ty,$mutable:ident,$null:ty; $($rest:tt)*) => {
         Some(ObjectHeaderProjection::Field(object_header_field(GcStructType::<$owner>::OBJECT)))
@@ -679,6 +690,12 @@ macro_rules! gc_layout_registry {
         impl GcStructHeapType for ObjectPropertyStorage { const FIELD_COUNT: u32 = 0; }
         // The non-final base is fieldless and has no allocating constructor.
         pub(crate) type ObjectPropertyStorageSchema = GcStructType<ObjectPropertyStorage>;
+    };
+    (@schema struct JavaScriptObject JavaScriptObjectSchema;) => {
+        impl sealed::Struct for JavaScriptObject {}
+        impl GcStructHeapType for JavaScriptObject { const FIELD_COUNT: u32 = 0; }
+        // The object sum cannot allocate an object without its actual payload.
+        pub(crate) type JavaScriptObjectSchema = GcStructType<JavaScriptObject>;
     };
     (@schema struct PropertyValue PropertyValueSchema;) => {
         impl sealed::Struct for PropertyValue {}
@@ -806,6 +823,7 @@ macro_rules! gc_layout_registry {
 }
 
 gc_layout_registry! {
+        struct JavaScriptObject => JavaScriptObjectSchema {}
         struct PropertyValue => PropertyValueSchema {}
         struct StoredValue: PropertyValue => StoredValueSchema {
             // Keep the 64-bit payload first: the copying collector can then
@@ -819,8 +837,8 @@ gc_layout_registry! {
             BUILTIN: scriptw_ir::StandardBuiltinId, Immutable, NonNullable;
             CACHED: GcRef<StoredValue>, Mutable, Nullable;
         }
-        struct OrdinaryObject => OrdinaryObjectSchema {
-            PROTOTYPE: GcRef<StoredValue>, Mutable, NonNullable;
+        struct OrdinaryObject: JavaScriptObject => OrdinaryObjectSchema {
+            PROTOTYPE: GcRef<JavaScriptObject>, Mutable, Nullable;
             PROPERTIES: GcRef<ObjectPropertyStorage>, Mutable, NonNullable;
             PRIVATE_ELEMENTS: GcRef<PrivateElementTable>, Mutable, NonNullable;
             EXTENSIBLE: bool, Mutable, NonNullable;
@@ -869,7 +887,7 @@ gc_layout_registry! {
         struct CompactDataStorage: ObjectPropertyStorage => CompactDataStorageSchema {
             SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
             TAGS: GcRef<CompactTagArray>, Immutable, NonNullable;
-            SCALARS: GcRef<CompactScalarArray>, Immutable, NonNullable;
+            SCALARS: GcRef<CompactScalarArray>, Mutable, Nullable;
             REFERENCES: GcRef<CompactReferenceArray>, Immutable, NonNullable;
         }
         // Shape graphs retain only immutable primitive string metadata.
@@ -962,7 +980,7 @@ gc_layout_registry! {
             ASYNC_ENTRY: GcFunctionRef<AsyncCallable>, Immutable, Nullable;
             ASYNC_GENERATOR_ENTRY: GcFunctionRef<AsyncGeneratorCallable>, Immutable, Nullable;
         }
-        struct FunctionObject => FunctionObjectSchema {
+        struct FunctionObject: JavaScriptObject => FunctionObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             CODE: GcRef<ExecutableCode>, Immutable, NonNullable;
             CONTEXT: GcRef<FunctionContext>, Immutable, NonNullable;
@@ -1021,37 +1039,37 @@ gc_layout_registry! {
             DEFINING_PROGRAM: GcRef<ProgramInstance>, Immutable, Nullable;
             INSTANCE_ELEMENTS_INITIALIZER: GcFunctionRef<InitializeInstanceElementsHook>, Immutable, Nullable;
         }
-        struct BoundFunction => BoundFunctionSchema {
+        struct BoundFunction: JavaScriptObject => BoundFunctionSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             TARGET: GcRef<StoredValue>, Immutable, NonNullable;
             THIS_VALUE: GcRef<StoredValue>, Immutable, NonNullable;
             ARGUMENTS: GcRef<ValueArray>, Immutable, NonNullable;
             CONSTRUCTABLE: bool, Immutable, NonNullable;
         }
-        struct ProxyObject => ProxyObjectSchema {
+        struct ProxyObject: JavaScriptObject => ProxyObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             TARGET: GcRef<StoredValue>, Mutable, NonNullable;
             HANDLER: GcRef<StoredValue>, Mutable, NonNullable;
             CALL_CAPABILITY: ProxyCallCapability, Immutable, NonNullable;
         }
-        struct PrimitiveBox => PrimitiveBoxSchema {
+        struct PrimitiveBox: JavaScriptObject => PrimitiveBoxSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             PRIMITIVE: GcRef<StoredValue>, Immutable, NonNullable;
         }
-        struct ArgumentsObject => ArgumentsObjectSchema {
+        struct ArgumentsObject: JavaScriptObject => ArgumentsObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             INDEXED: GcRef<IndexedTable>, Mutable, NonNullable;
             PARAMETER_MAP: GcRef<ArgumentsParameterMap>, Immutable, Nullable;
         }
-        struct DateObject => DateObjectSchema {
+        struct DateObject: JavaScriptObject => DateObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             TIME_VALUE: F64Value, Mutable, NonNullable;
         }
-        struct ShadowRealmObject => ShadowRealmObjectSchema {
+        struct ShadowRealmObject: JavaScriptObject => ShadowRealmObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
         }
-        struct RegExpObject => RegExpObjectSchema {
+        struct RegExpObject: JavaScriptObject => RegExpObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             SOURCE: GcRef<StringValue>, Mutable, NonNullable;
             ORIGINAL_FLAGS: GcRef<StringValue>, Mutable, NonNullable;
@@ -1175,13 +1193,13 @@ gc_layout_registry! {
             REGISTRY_KEY: GcRef<StringValue>, Immutable, Nullable;
             KEY_HASH_ID: I64Value, Mutable, NonNullable;
         }
-        struct ArrayObject => ArrayObjectSchema {
+        struct ArrayObject: JavaScriptObject => ArrayObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ELEMENTS: GcRef<ArrayIndexStorage>, Immutable, NonNullable;
             LENGTH: I64Value, Mutable, NonNullable;
             LENGTH_WRITABLE: bool, Mutable, NonNullable;
         }
-        struct ArrayBuffer => ArrayBufferSchema {
+        struct ArrayBuffer: JavaScriptObject => ArrayBufferSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             // Private backing rounds physical extent up to eight bytes; null is detached.
             BYTES: GcRef<ByteArray>, Mutable, Nullable;
@@ -1193,7 +1211,7 @@ gc_layout_registry! {
             BYTE_LENGTH: I64Value, Mutable, NonNullable;
         }
         array ByteArray => ByteArraySchema { ELEMENT: I8Value, Mutable, NonNullable; }
-        struct SharedArrayBuffer => SharedArrayBufferSchema {
+        struct SharedArrayBuffer: JavaScriptObject => SharedArrayBufferSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             BACKING_RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
         }
@@ -1203,11 +1221,11 @@ gc_layout_registry! {
             FIXED_BYTE_LENGTH: I64Value, Immutable, NonNullable;
             LENGTH_TRACKING: bool, Immutable, NonNullable;
         }
-        struct DataViewObject => DataViewObjectSchema {
+        struct DataViewObject: JavaScriptObject => DataViewObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             VIEW: GcRef<BufferView>, Immutable, NonNullable;
         }
-        struct TypedArrayObject => TypedArrayObjectSchema {
+        struct TypedArrayObject: JavaScriptObject => TypedArrayObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             VIEW: GcRef<BufferView>, Immutable, NonNullable;
             ELEMENT_KIND: crate::module::TypedArrayElementKind, Immutable, NonNullable;
@@ -1257,7 +1275,7 @@ gc_layout_registry! {
             RESUME_POINT: I32Value, Mutable, NonNullable;
             STATUS: crate::heap::GeneratorState, Mutable, NonNullable;
         }
-        struct GeneratorObject => GeneratorObjectSchema {
+        struct GeneratorObject: JavaScriptObject => GeneratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ACTIVATION: GcRef<GeneratorActivation>, Immutable, NonNullable;
         }
@@ -1285,7 +1303,7 @@ gc_layout_registry! {
             BODY_RESULT: GcRef<StoredValue>, Mutable, NonNullable;
             RETURN_STAGE: AsyncGeneratorReturnStage, Mutable, NonNullable;
         }
-        struct AsyncGeneratorObject => AsyncGeneratorObjectSchema {
+        struct AsyncGeneratorObject: JavaScriptObject => AsyncGeneratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ACTIVATION: GcRef<AsyncGeneratorActivation>, Immutable, NonNullable;
         }
@@ -1296,7 +1314,7 @@ gc_layout_registry! {
             PROMISE: GcRef<PromiseObject>, Immutable, NonNullable;
             NEXT: GcRef<AsyncGeneratorRequest>, Mutable, Nullable;
         }
-        struct PromiseObject => PromiseObjectSchema {
+        struct PromiseObject: JavaScriptObject => PromiseObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESULT: GcRef<StoredValue>, Mutable, NonNullable;
             FULFILL_REACTIONS: GcRef<PromiseReaction>, Mutable, Nullable;
@@ -1399,7 +1417,7 @@ gc_layout_registry! {
             NEXT: GcRef<TemplateSource>, Mutable, Nullable;
         }
         array TemplateSiteTable => TemplateSiteTableSchema { ELEMENT: GcRef<ArrayObject>, Mutable, Nullable; }
-        struct MapObject => MapObjectSchema {
+        struct MapObject: JavaScriptObject => MapObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ENTRIES: GcRef<MapEntryTable>, Mutable, NonNullable;
             LIVE_COUNT: I64Value, Mutable, NonNullable;
@@ -1410,21 +1428,21 @@ gc_layout_registry! {
             VERSION: I64Value, Mutable, NonNullable;
         }
         // Native resources contain collector slot IDs, never strong JS keys.
-        struct WeakMapObject => WeakMapObjectSchema {
+        struct WeakMapObject: JavaScriptObject => WeakMapObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
         }
-        struct WeakSetObject => WeakSetObjectSchema {
+        struct WeakSetObject: JavaScriptObject => WeakSetObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
         }
         // Prepared unpublished records acquire their weak resource before use.
-        struct WeakRefObject => WeakRefObjectSchema {
+        struct WeakRefObject: JavaScriptObject => WeakRefObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESOURCE: GcRef<HostResource>, Mutable, Nullable;
             TARGET_TAG: I32Value, Immutable, NonNullable;
         }
-        struct FinalizationRegistryObject => FinalizationRegistryObjectSchema {
+        struct FinalizationRegistryObject: JavaScriptObject => FinalizationRegistryObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             CALLBACK: GcRef<StoredValue>, Immutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
@@ -1442,7 +1460,7 @@ gc_layout_registry! {
             HASH_NEXT: I64Value, Mutable, NonNullable;
         }
         array MapEntryTable => MapEntryTableSchema { ELEMENT: GcRef<MapEntry>, Mutable, Nullable; }
-        struct SetObject => SetObjectSchema {
+        struct SetObject: JavaScriptObject => SetObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ENTRIES: GcRef<SetEntryTable>, Mutable, NonNullable;
             LIVE_COUNT: I64Value, Mutable, NonNullable;
@@ -1465,7 +1483,7 @@ gc_layout_registry! {
             METHOD: GcRef<StoredValue>, Immutable, NonNullable;
         }
         array DisposableResourceTable => DisposableResourceTableSchema { ELEMENT: GcRef<DisposableResource>, Mutable, Nullable; }
-        struct DisposableStack => DisposableStackSchema {
+        struct DisposableStack: JavaScriptObject => DisposableStackSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESOURCE_STACK: GcRef<DisposableResourceStack>, Mutable, NonNullable;
             STATE: crate::heap::DisposableStackState, Mutable, NonNullable;
@@ -1477,7 +1495,7 @@ gc_layout_registry! {
         }
         // These immutable configurations come from completed Intl construction
         // and provider-response reads, rather than a generic scalar state array.
-        struct IntlLocaleObject => IntlLocaleObjectSchema {
+        struct IntlLocaleObject: JavaScriptObject => IntlLocaleObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             TAG: GcRef<StringValue>, Immutable, NonNullable;
             LANGUAGE: GcRef<StringValue>, Immutable, NonNullable;
@@ -1485,7 +1503,7 @@ gc_layout_registry! {
             REGION: GcRef<StringValue>, Immutable, Nullable;
             BASE_NAME: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct IntlCollatorObject => IntlCollatorObjectSchema {
+        struct IntlCollatorObject: JavaScriptObject => IntlCollatorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             COLLATION: GcRef<StringValue>, Immutable, NonNullable;
@@ -1497,7 +1515,7 @@ gc_layout_registry! {
             IGNORE_PUNCTUATION: bool, Immutable, NonNullable;
             BOUND_COMPARE: GcRef<FunctionObject>, Mutable, Nullable;
         }
-        struct IntlNumberFormatObject => IntlNumberFormatObjectSchema {
+        struct IntlNumberFormatObject: JavaScriptObject => IntlNumberFormatObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             DATA_LOCALE: GcRef<StringValue>, Immutable, NonNullable;
@@ -1525,7 +1543,7 @@ gc_layout_registry! {
             ROUNDING_MODE: scriptw_intl::number_format::options::RoundingMode, Immutable, NonNullable;
             TRAILING_ZERO: scriptw_intl::number_format::options::TrailingZeroDisplay, Immutable, NonNullable;
         }
-        struct IntlPluralRulesObject => IntlPluralRulesObjectSchema {
+        struct IntlPluralRulesObject: JavaScriptObject => IntlPluralRulesObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             DATA_LOCALE: GcRef<StringValue>, Immutable, NonNullable;
@@ -1535,13 +1553,13 @@ gc_layout_registry! {
             COMPACT_DISPLAY: Option<scriptw_intl::number_format::options::CompactDisplay>, Immutable, NonNullable;
             ROUNDING: GcRef<IntlNumberRounding>, Immutable, NonNullable;
         }
-        struct IntlListFormatObject => IntlListFormatObjectSchema {
+        struct IntlListFormatObject: JavaScriptObject => IntlListFormatObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             TYPE: scriptw_intl::ListType, Immutable, NonNullable;
             STYLE: scriptw_intl::ListStyle, Immutable, NonNullable;
         }
-        struct IntlRelativeTimeFormatObject => IntlRelativeTimeFormatObjectSchema {
+        struct IntlRelativeTimeFormatObject: JavaScriptObject => IntlRelativeTimeFormatObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             FORMATTING_LOCALE: GcRef<StringValue>, Immutable, NonNullable;
@@ -1549,7 +1567,7 @@ gc_layout_registry! {
             STYLE: scriptw_intl::RelativeStyle, Immutable, NonNullable;
             NUMERIC: scriptw_intl::RelativeNumeric, Immutable, NonNullable;
         }
-        struct IntlDisplayNamesObject => IntlDisplayNamesObjectSchema {
+        struct IntlDisplayNamesObject: JavaScriptObject => IntlDisplayNamesObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             TYPE: scriptw_intl::DisplayNamesType, Immutable, NonNullable;
@@ -1557,7 +1575,7 @@ gc_layout_registry! {
             FALLBACK: scriptw_intl::DisplayNamesFallback, Immutable, NonNullable;
             LANGUAGE_DISPLAY: Option<scriptw_intl::DisplayNamesLanguageDisplay>, Immutable, NonNullable;
         }
-        struct IntlDurationFormatObject => IntlDurationFormatObjectSchema {
+        struct IntlDurationFormatObject: JavaScriptObject => IntlDurationFormatObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             NUMBERING_SYSTEM: GcRef<StringValue>, Immutable, NonNullable;
@@ -1578,7 +1596,7 @@ gc_layout_registry! {
             STYLE: scriptw_intl::DurationUnitStyle, Immutable, NonNullable;
             DISPLAY: scriptw_intl::DurationDisplay, Immutable, NonNullable;
         }
-        struct IntlDateTimeFormatObject => IntlDateTimeFormatObjectSchema {
+        struct IntlDateTimeFormatObject: JavaScriptObject => IntlDateTimeFormatObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             CALENDAR: GcRef<StringValue>, Immutable, NonNullable;
@@ -1605,12 +1623,12 @@ gc_layout_registry! {
             PLAN: GcRef<ImmutableByteArray>, Immutable, NonNullable;
             BOUND_FORMAT: GcRef<FunctionObject>, Mutable, Nullable;
         }
-        struct IntlSegmenterObject => IntlSegmenterObjectSchema {
+        struct IntlSegmenterObject: JavaScriptObject => IntlSegmenterObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             LOCALE: GcRef<StringValue>, Immutable, NonNullable;
             GRANULARITY: scriptw_intl::SegmenterGranularity, Immutable, NonNullable;
         }
-        struct IntlSegmentsObject => IntlSegmentsObjectSchema {
+        struct IntlSegmentsObject: JavaScriptObject => IntlSegmentsObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             SEGMENTER: GcRef<IntlSegmenterObject>, Immutable, NonNullable;
             INPUT: GcRef<StringValue>, Immutable, NonNullable;
@@ -1621,7 +1639,7 @@ gc_layout_registry! {
             WORD_LIKE: Option<bool>, Immutable, NonNullable;
         }
         array SegmentBoundaryTable => SegmentBoundaryTableSchema { ELEMENT: GcRef<SegmentBoundary>, Mutable, NonNullable; }
-        struct IntlSegmentIteratorObject => IntlSegmentIteratorObjectSchema {
+        struct IntlSegmentIteratorObject: JavaScriptObject => IntlSegmentIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             SEGMENTS: GcRef<IntlSegmentsObject>, Immutable, NonNullable;
             NEXT_INDEX: I64Value, Mutable, NonNullable;
@@ -1631,7 +1649,7 @@ gc_layout_registry! {
         // Actual Temporal allocators publish immutable numeric fields and
         // validated calendar/zone strings. Duration fields are Number values,
         // including large integral f64 values, rather than signed i64 counters.
-        struct TemporalDurationObject => TemporalDurationObjectSchema {
+        struct TemporalDurationObject: JavaScriptObject => TemporalDurationObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             YEARS: F64Value, Immutable, NonNullable;
             MONTHS: F64Value, Immutable, NonNullable;
@@ -1644,38 +1662,38 @@ gc_layout_registry! {
             MICROSECONDS: F64Value, Immutable, NonNullable;
             NANOSECONDS: F64Value, Immutable, NonNullable;
         }
-        struct TemporalInstantObject => TemporalInstantObjectSchema {
+        struct TemporalInstantObject: JavaScriptObject => TemporalInstantObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             EPOCH_NANOSECONDS: GcRef<BigIntValue>, Immutable, NonNullable;
         }
-        struct TemporalZonedDateTimeObject => TemporalZonedDateTimeObjectSchema {
+        struct TemporalZonedDateTimeObject: JavaScriptObject => TemporalZonedDateTimeObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             EPOCH_NANOSECONDS: GcRef<BigIntValue>, Immutable, NonNullable;
             TIME_ZONE: GcRef<StringValue>, Immutable, NonNullable;
             CALENDAR: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct TemporalPlainDateObject => TemporalPlainDateObjectSchema {
+        struct TemporalPlainDateObject: JavaScriptObject => TemporalPlainDateObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ISO_YEAR: I32Value, Immutable, NonNullable;
             ISO_MONTH: I32Value, Immutable, NonNullable;
             ISO_DAY: I32Value, Immutable, NonNullable;
             CALENDAR: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct TemporalPlainYearMonthObject => TemporalPlainYearMonthObjectSchema {
+        struct TemporalPlainYearMonthObject: JavaScriptObject => TemporalPlainYearMonthObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ISO_YEAR: I32Value, Immutable, NonNullable;
             ISO_MONTH: I32Value, Immutable, NonNullable;
             REFERENCE_ISO_DAY: I32Value, Immutable, NonNullable;
             CALENDAR: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct TemporalPlainMonthDayObject => TemporalPlainMonthDayObjectSchema {
+        struct TemporalPlainMonthDayObject: JavaScriptObject => TemporalPlainMonthDayObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             REFERENCE_ISO_YEAR: I32Value, Immutable, NonNullable;
             ISO_MONTH: I32Value, Immutable, NonNullable;
             ISO_DAY: I32Value, Immutable, NonNullable;
             CALENDAR: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct TemporalPlainTimeObject => TemporalPlainTimeObjectSchema {
+        struct TemporalPlainTimeObject: JavaScriptObject => TemporalPlainTimeObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             HOUR: I32Value, Immutable, NonNullable;
             MINUTE: I32Value, Immutable, NonNullable;
@@ -1684,7 +1702,7 @@ gc_layout_registry! {
             MICROSECOND: I32Value, Immutable, NonNullable;
             NANOSECOND: I32Value, Immutable, NonNullable;
         }
-        struct TemporalPlainDateTimeObject => TemporalPlainDateTimeObjectSchema {
+        struct TemporalPlainDateTimeObject: JavaScriptObject => TemporalPlainDateTimeObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ISO_YEAR: I32Value, Immutable, NonNullable;
             ISO_MONTH: I32Value, Immutable, NonNullable;
@@ -1701,7 +1719,7 @@ gc_layout_registry! {
         struct RegExpProgram => RegExpProgramSchema {
             ENCODED_BYTES: GcRef<ImmutableByteArray>, Immutable, NonNullable;
         }
-        struct RegExpStringIteratorObject => RegExpStringIteratorObjectSchema {
+        struct RegExpStringIteratorObject: JavaScriptObject => RegExpStringIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             REGEXP: GcRef<StoredValue>, Immutable, NonNullable;
             INPUT: GcRef<StringValue>, Immutable, NonNullable;
@@ -1717,7 +1735,7 @@ gc_layout_registry! {
         array PrivateNameTable => PrivateNameTableSchema { ELEMENT: GcRef<PrivateName>, Mutable, NonNullable; }
         // JSON parser/reviver frames and stringify context are compiler-private
         // strong owners. Only RawJsonObject is a JavaScript object.
-        struct RawJsonObject => RawJsonObjectSchema {
+        struct RawJsonObject: JavaScriptObject => RawJsonObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RAW_JSON: GcRef<StringValue>, Immutable, NonNullable;
         }
@@ -1758,11 +1776,11 @@ gc_layout_registry! {
             GAP: GcRef<StringValue>, Immutable, NonNullable;
         }
 
-        struct NativeErrorObject => NativeErrorObjectSchema {
+        struct NativeErrorObject: JavaScriptObject => NativeErrorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             STACK: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct MapIteratorObject => MapIteratorObjectSchema {
+        struct MapIteratorObject: JavaScriptObject => MapIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             MAP: GcRef<MapObject>, Mutable, Nullable;
             NEXT_INDEX: I64Value, Mutable, NonNullable;
@@ -1771,7 +1789,7 @@ gc_layout_registry! {
             NEXT_ORDINAL: I64Value, Mutable, NonNullable;
             VERSION: I64Value, Mutable, NonNullable;
         }
-        struct SetIteratorObject => SetIteratorObjectSchema {
+        struct SetIteratorObject: JavaScriptObject => SetIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             SET: GcRef<SetObject>, Mutable, Nullable;
             NEXT_INDEX: I64Value, Mutable, NonNullable;
@@ -1780,7 +1798,7 @@ gc_layout_registry! {
             NEXT_ORDINAL: I64Value, Mutable, NonNullable;
             VERSION: I64Value, Mutable, NonNullable;
         }
-        struct TypedArrayIteratorObject => TypedArrayIteratorObjectSchema {
+        struct TypedArrayIteratorObject: JavaScriptObject => TypedArrayIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ARRAY: GcRef<TypedArrayObject>, Mutable, Nullable;
             NEXT_INDEX: I64Value, Mutable, NonNullable;
@@ -1793,14 +1811,14 @@ gc_layout_registry! {
             ARRAY_BUFFER: GcRef<ArrayBuffer>, Immutable, Nullable;
             SHARED_ARRAY_BUFFER: GcRef<SharedArrayBuffer>, Immutable, Nullable;
         }
-        struct ArrayIteratorObject => ArrayIteratorObjectSchema {
+        struct ArrayIteratorObject: JavaScriptObject => ArrayIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ARRAY: GcRef<StoredValue>, Mutable, NonNullable;
             NEXT_INDEX: I64Value, Mutable, NonNullable;
             DONE: bool, Mutable, NonNullable;
             KIND: ArrayIterationKind, Immutable, NonNullable;
         }
-        struct StringIteratorObject => StringIteratorObjectSchema {
+        struct StringIteratorObject: JavaScriptObject => StringIteratorObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             INPUT: GcRef<StringValue>, Immutable, NonNullable;
             NEXT_CODE_UNIT_INDEX: I64Value, Mutable, NonNullable;
@@ -1842,7 +1860,7 @@ gc_layout_registry! {
             RETURNED_CHILD: GcRef<ModuleRecord>, Mutable, Nullable;
         }
         array ModuleDfsStack => ModuleDfsStackSchema { ELEMENT: GcRef<ModuleDfsFrame>, Mutable, Nullable; }
-        struct AsyncDisposableStackObject => AsyncDisposableStackObjectSchema {
+        struct AsyncDisposableStackObject: JavaScriptObject => AsyncDisposableStackObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             STATE: crate::heap::AsyncDisposableStackState, Mutable, NonNullable;
             RESOURCES: GcRef<AsyncDisposableResourceStack>, Mutable, NonNullable;
@@ -1879,13 +1897,13 @@ gc_layout_registry! {
             THEN_METHOD: GcRef<StoredValue>, Immutable, NonNullable;
         }
         // The private brand retains the actual host record and its defining Realm.
-        struct ModuleSourceObject => ModuleSourceObjectSchema {
+        struct ModuleSourceObject: JavaScriptObject => ModuleSourceObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             MODULE: GcRef<ModuleRecord>, Immutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             SOURCE_TAG: GcRef<StringValue>, Immutable, NonNullable;
         }
-        struct ModuleNamespaceObject => ModuleNamespaceObjectSchema {
+        struct ModuleNamespaceObject: JavaScriptObject => ModuleNamespaceObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             DEFERRED_EVALUATOR: GcRef<FunctionObject>, Immutable, Nullable;
             EXPORTS: GcRef<ModuleExportTable>, Immutable, NonNullable;
@@ -1932,7 +1950,7 @@ gc_layout_registry! {
         // Cached methods are StoredValues: GetIteratorDirect does not perform
         // the later IsCallable check. A helper's done/executing flags are
         // separate from the underlying Iterator Record's Done state.
-        struct IteratorFromWrapper => IteratorFromWrapperSchema {
+        struct IteratorFromWrapper: JavaScriptObject => IteratorFromWrapperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
         }
@@ -1941,7 +1959,7 @@ gc_layout_registry! {
             TAIL: GcRef<ArgumentListNode>, Mutable, Nullable;
             COUNT: I64Value, Mutable, NonNullable;
         }
-        struct IteratorBufferedHelper => IteratorBufferedHelperSchema {
+        struct IteratorBufferedHelper: JavaScriptObject => IteratorBufferedHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
             BUFFER: GcRef<IteratorBuffer>, Immutable, NonNullable;
@@ -1952,7 +1970,7 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             STARTED: bool, Mutable, NonNullable;
         }
-        struct IteratorMapHelper => IteratorMapHelperSchema {
+        struct IteratorMapHelper: JavaScriptObject => IteratorMapHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
             MAPPER: GcRef<StoredValue>, Immutable, NonNullable;
@@ -1962,7 +1980,7 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             STARTED: bool, Mutable, NonNullable;
         }
-        struct IteratorFilterHelper => IteratorFilterHelperSchema {
+        struct IteratorFilterHelper: JavaScriptObject => IteratorFilterHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
             PREDICATE: GcRef<StoredValue>, Immutable, NonNullable;
@@ -1972,7 +1990,7 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             STARTED: bool, Mutable, NonNullable;
         }
-        struct IteratorFlatMapHelper => IteratorFlatMapHelperSchema {
+        struct IteratorFlatMapHelper: JavaScriptObject => IteratorFlatMapHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             OUTER: GcRef<IteratorRecord>, Immutable, NonNullable;
             MAPPER: GcRef<StoredValue>, Immutable, NonNullable;
@@ -1984,7 +2002,7 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             STARTED: bool, Mutable, NonNullable;
         }
-        struct IteratorTakeHelper => IteratorTakeHelperSchema {
+        struct IteratorTakeHelper: JavaScriptObject => IteratorTakeHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
             // Number arithmetic retains positive infinity.
@@ -1994,7 +2012,7 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             STARTED: bool, Mutable, NonNullable;
         }
-        struct IteratorDropHelper => IteratorDropHelperSchema {
+        struct IteratorDropHelper: JavaScriptObject => IteratorDropHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RECORD: GcRef<IteratorRecord>, Immutable, NonNullable;
             REMAINING: F64Value, Mutable, NonNullable;
@@ -2008,7 +2026,7 @@ gc_layout_registry! {
             METHOD: GcRef<StoredValue>, Immutable, NonNullable;
         }
         array IteratorConcatEntries => IteratorConcatEntriesSchema { ELEMENT: GcRef<IteratorConcatEntry>, Mutable, NonNullable; }
-        struct IteratorConcatHelper => IteratorConcatHelperSchema {
+        struct IteratorConcatHelper: JavaScriptObject => IteratorConcatHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ENTRIES: GcRef<IteratorConcatEntries>, Immutable, NonNullable;
             CURRENT: GcRef<IteratorRecord>, Mutable, Nullable;
@@ -2031,7 +2049,7 @@ gc_layout_registry! {
             PREVIOUS: GcRef<IteratorZipAcquisition>, Immutable, Nullable;
         }
         array PropertyKeyTable => PropertyKeyTableSchema { ELEMENT: GcRef<StoredValue>, Mutable, NonNullable; }
-        struct IteratorZipHelper => IteratorZipHelperSchema {
+        struct IteratorZipHelper: JavaScriptObject => IteratorZipHelperSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             ENTRIES: GcRef<IteratorZipEntries>, Immutable, NonNullable;
             // Null selects array rows; a complete property-key list selects

@@ -114,6 +114,39 @@ impl Mmap<AlignedLength> {
         }
     }
 
+    /// Release anonymous pages while retaining readable/writable zero-on-reuse
+    /// mappings. Unsupported platforms leave the mapping untouched.
+    ///
+    /// # Safety
+    /// The range must be accessible anonymous read/write memory, with no live
+    /// data, outstanding references or concurrent accesses. No CoW/file image
+    /// may overlay this range. Both offset and length are host-page aligned.
+    pub(crate) unsafe fn discard_unused_pages(
+        &self,
+        start: HostAlignedByteCount,
+        length: HostAlignedByteCount,
+    ) -> Result<bool> {
+        let end = start.checked_add(length)?;
+        assert!(end <= self.len_aligned());
+        if length.is_zero() {
+            return Ok(false);
+        }
+        #[cfg(all(target_os = "linux", feature = "std", not(miri)))]
+        {
+            // Only the standard Linux mmap backend implements this operation;
+            // custom allocators and Windows decommit need different contracts.
+            unsafe {
+                self.sys
+                    .discard_unused_pages(start.byte_count()..end.byte_count())?;
+            }
+            Ok(true)
+        }
+        #[cfg(not(all(target_os = "linux", feature = "std", not(miri))))]
+        {
+            Ok(false)
+        }
+    }
+
     /// Converts this `Mmap` into a `Mmap<UnalignedLength>`.
     ///
     /// `UnalignedLength` really means "_possibly_ unaligned length", so it can

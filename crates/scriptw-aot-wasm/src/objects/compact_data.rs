@@ -338,10 +338,19 @@ impl FunctionBuilder<'_> {
             .array_type::<CompactTagArray>()
             .read(&tags, slot, schema, f)
             .store(value.tag(), f);
+        value.scalar().set_constant(0, f);
+        scalars.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(scalars.load(schema, f).require_non_null(f), f);
         schema
             .array_type::<CompactScalarArray>()
-            .read(&scalars, slot, schema, f)
+            .read(&present, slot, schema, f)
             .store_i64(value.scalar(), f);
+        present.clear(f);
+        f.instruction(&Instruction::End);
         schema
             .array_type::<CompactReferenceArray>()
             .read(&references, slot, schema, f)
@@ -387,13 +396,51 @@ impl FunctionBuilder<'_> {
             schema,
             f,
         );
+        // Missing scalar backing encodes zero bits for every present slot.
+        // Allocate only when one slot first needs a nonzero payload; negative
+        // zero and NaN have nonzero bits and therefore take this path too.
+        scalars.load(schema, f).is_null(f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let length = schema.reserve_i32_local(f);
+        schema
+            .array_type::<CompactTagArray>()
+            .length(&tags, schema, f);
+        length.store(f);
+        let allocated = schema.reserve_gc_local(f).initialize(
+            schema
+                .array_type::<CompactScalarArray>()
+                .filled(GcOperand::i64(0), length, f),
+            f,
+        );
+        schema.field(CompactDataStorageSchema::SCALARS).write(
+            storage,
+            GcOperand::nullable_reference(&allocated, schema),
+            schema,
+            f,
+        );
+        scalars.replace(allocated.load(schema, f).nullable(), f);
+        allocated.clear(f);
+        schema.release_i32_local(length, f);
+        f.instruction(&Instruction::End);
+        scalars.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(scalars.load(schema, f).require_non_null(f), f);
         schema.array_type::<CompactScalarArray>().write(
-            &scalars,
+            &present,
             slot,
             GcOperand::i64_local(value.scalar()),
             schema,
             f,
         );
+        present.clear(f);
+        f.instruction(&Instruction::End);
         // Replacing a reference with a scalar clears the old strong edge too.
         schema.array_type::<CompactReferenceArray>().write(
             &references,

@@ -138,13 +138,8 @@ impl<'a> FunctionBuilder<'a> {
             let parent = schema.reserve_value_local(function);
             self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &parent, function);
             let stored = schema
-                .reserve_gc_local::<StoredValue, NonNullable>(function)
-                .initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&parent, function),
-                    function,
-                );
+                .reserve_gc_local(function)
+                .initialize(schema.prototype_reference(&parent, function), function);
             schema
                 .struct_type::<OrdinaryObject>()
                 .field(OrdinaryObjectSchema::PROTOTYPE)
@@ -1161,14 +1156,10 @@ impl<'a> FunctionBuilder<'a> {
                 &function_constructor,
                 function,
             );
-            let parent = schema
-                .reserve_gc_local::<StoredValue, NonNullable>(function)
-                .initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&function_constructor, function),
-                    function,
-                );
+            let parent = schema.reserve_gc_local(function).initialize(
+                schema.prototype_reference(&function_constructor, function),
+                function,
+            );
             schema
                 .struct_type::<OrdinaryObject>()
                 .field(OrdinaryObjectSchema::PROTOTYPE)

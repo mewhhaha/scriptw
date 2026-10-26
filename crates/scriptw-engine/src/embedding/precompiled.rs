@@ -132,11 +132,13 @@ impl EmbeddedRuntime {
                 .verify_engine(engine)
                 .map_err(EngineError::new)?;
             let foreign = admission::program(image.program_wasm(), image.runtime_key.is_some())?;
-            WasmtimeModule::validate(engine, image.program_wasm()).map_err(|error| {
-                EngineError::new(format!(
-                    "precompiled raw program validation failed: {error:#}"
-                ))
-            })?;
+            // This opaque owner carries the exact successful producer output.
+            // Self::compile validated that same raw P before serialization;
+            // external recovery requires that correspondence in its unsafe
+            // contract. Re-running the full Wasm body validator here faults in
+            // compiler-only pages without strengthening native provenance.
+            // Portable/linkage/foreign metadata above still admits its actual
+            // requirements, and deserialize checks destination compatibility.
             let mut loading = WasmRuntimeModuleLoading::default();
             let (runtime, intl) = match &image.runtime_key {
                 Some(key) => {

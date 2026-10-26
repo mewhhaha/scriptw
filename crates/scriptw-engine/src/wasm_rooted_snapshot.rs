@@ -582,7 +582,28 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             }
         }
         let extensible = self.boolean(header, F::ObjectExtensible)?;
-        let prototype = self.stored_field(header, F::ObjectPrototype)?;
+        // The field retains the actual object payload, including exotic wrappers.
+        let prototype_reference = self.reference(header, F::ObjectPrototype)?;
+        let prototype_tag = if let Some(reference) = prototype_reference {
+            if self.has_layout(reference, L::Array)? {
+                WasmRuntimeValueTag::Array
+            } else if self.has_layout(reference, L::Function)?
+                || self.has_layout(reference, L::BoundFunction)?
+            {
+                WasmRuntimeValueTag::Function
+            } else if self.has_layout(reference, L::Arguments)? {
+                WasmRuntimeValueTag::Arguments
+            } else {
+                WasmRuntimeValueTag::Object
+            }
+        } else {
+            WasmRuntimeValueTag::Null
+        };
+        let prototype = NativeValue {
+            tag: prototype_tag as i32,
+            scalar: 0,
+            reference: prototype_reference,
+        };
         let anchors = self.anchors(object, budget)?;
         let mut ordered = Vec::<(
             u8,
@@ -801,16 +822,22 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 return Err(invariant("compact data shape has accessor attributes"));
             }
             let tags = self.required_reference(storage, F::CompactTags)?;
-            let scalars = self.required_reference(storage, F::CompactScalars)?;
+            let scalars = self.reference(storage, F::CompactScalars)?;
             let references = self.required_reference(storage, F::CompactReferences)?;
             let keys = self.array(keys, L::CompactKeys)?;
             let tags = self.array(tags, L::CompactTags)?;
-            let scalars = self.array(scalars, L::CompactScalars)?;
+            let scalars = scalars
+                .map(|value| self.array(value, L::CompactScalars))
+                .transpose()?;
             let references = self.array(references, L::CompactReferences)?;
             let length = keys.len(&*self.store).map_err(invariant)?;
             if length > 16
                 || tags.len(&*self.store).map_err(invariant)? != length
-                || scalars.len(&*self.store).map_err(invariant)? != length
+                || scalars
+                    .as_ref()
+                    .map(|values| values.len(&*self.store).map_err(invariant))
+                    .transpose()?
+                    .is_some_and(|count| count != length)
                 || references.len(&*self.store).map_err(invariant)? != length
             {
                 return Err(invariant("invalid compact property extent"));
@@ -831,10 +858,16 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 else {
                     return Err(invariant("invalid compact value tag"));
                 };
-                let WasmtimeVal::I64(scalar) =
-                    scalars.get(&mut *self.store, ordinal).map_err(invariant)?
-                else {
-                    return Err(invariant("invalid compact value scalar"));
+                let scalar = match &scalars {
+                    Some(scalars) => {
+                        let WasmtimeVal::I64(value) =
+                            scalars.get(&mut *self.store, ordinal).map_err(invariant)?
+                        else {
+                            return Err(invariant("invalid compact value scalar"));
+                        };
+                        value
+                    }
+                    None => 0,
                 };
                 let raw = references
                     .get(&mut *self.store, ordinal)

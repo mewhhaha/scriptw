@@ -254,3 +254,70 @@ assert(mapped(3)===9,'mapped Arguments preserve alias after named-table churn');
 "#,
     );
 }
+
+#[test]
+fn zero_scalar_storage_preserves_present_reference_values_and_late_number_bits() {
+    assert_compact(
+        r#"
+var token={marker:7}, symbol=Symbol('kept');
+function make(){return {zero:0,no:false,missing:undefined,nil:null,text:'kept',object:token,symbol:symbol};}
+var a=make(), b=make();
+gc();
+assert(Object.keys(a).join(',')==='zero,no,missing,nil,text,object,symbol','all zero-payload keys remain present');
+assert(Object.hasOwn(a,'missing') && a.missing===undefined && a.nil===null && a.no===false,'absence of scalar backing is not absence of a property');
+assert(Object.is(a.zero,0) && a.text==='kept' && a.object===token && a.symbol===symbol,'zero and strong reference reads');
+a.zero=-0;gc();
+assert(Object.is(a.zero,-0) && Object.is(b.zero,0) && a.no===false && a.object===token,'first nonzero bits preserve untouched slots and sibling storage');
+a.zero=NaN;a.no=true;gc();
+assert(Number.isNaN(a.zero) && a.no===true && a.symbol===symbol,'NaN and boolean scalar writes');
+a.zero=0;a.no=false;a.object=undefined;gc();
+assert(Object.is(a.zero,0) && a.no===false && Object.hasOwn(a,'object') && a.object===undefined,'zero rewrites clear old bits and references');
+Object.defineProperty(a,'extra',{get:function(){gc();return token;},configurable:true});
+assert(Object.keys(a).join(',')==='zero,no,missing,nil,text,object,symbol' && a.extra===token,'ordinary transition preserves present zero slots');
+Object.defineProperty(b,'extra',{value:1});gc();
+assert(Object.is(b.zero,0) && b.no===false && b.object===token && b.symbol===symbol,'ordinary transition with no scalar backing');
+"#,
+    );
+}
+
+#[test]
+fn rooted_snapshot_projects_missing_and_materialized_compact_scalar_backings() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    for source in [
+        "var value={zero:0,no:false,missing:undefined,nil:null,text:'kept'};gc();value;",
+        "var value={zero:0,no:false,missing:undefined,nil:null,text:'kept'};value.zero=-0;value.zero=0;gc();value;",
+    ] {
+        let observed = Engine::new(RealmBuilder::new().build())
+            .observe_script_graph(
+                source,
+                CompileOptions {
+                    host_surface_policy: HostSurfacePolicy::Test262,
+                    ..CompileOptions::default()
+                },
+                RunOptions {
+                    backend: ExecutionBackend::WasmAot,
+                    timeout_ms: Some(30_000),
+                    ..RunOptions::default()
+                },
+                scriptw_engine::SnapshotLimits::default(),
+            )
+            .unwrap();
+        let scriptw_engine::SnapshotOutcome::Captured { graph } = observed.completion.outcome
+        else {
+            panic!("complete zero-storage snapshot");
+        };
+        let node = &graph.nodes()[0];
+        assert_eq!(node.properties.len(), 5);
+        assert!(matches!(&node.properties[0].descriptor,
+            scriptw_runtime::rooted_snapshot::SnapshotDescriptor::Data {
+                value: scriptw_runtime::rooted_snapshot::SnapshotValue::Number { bits }, ..
+            } if *bits == 0f64.to_bits()));
+        assert!(matches!(
+            &node.properties[2].descriptor,
+            scriptw_runtime::rooted_snapshot::SnapshotDescriptor::Data {
+                value: scriptw_runtime::rooted_snapshot::SnapshotValue::Undefined {},
+                ..
+            }
+        ));
+    }
+}

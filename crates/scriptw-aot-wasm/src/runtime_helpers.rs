@@ -1100,6 +1100,7 @@ runtime_helper_domain! {
     ProxyCall / ProxyCallArguments / ProxyCallParameters / "proxy_call" { callee:Value,this_value:Value,arguments:(Ref ValueArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ProxyConstruct / ProxyConstructArguments / ProxyConstructParameters / "proxy_construct" { callee:Value,new_target:Value,arguments:(Ref ValueArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     StringEquality / StringEqualityArguments / StringEqualityParameters / "string_equality" { left:(Ref StringValue NonNullable),right:(Ref StringValue NonNullable),ascii_fold:I32 } => I32;
+    IntegerDecimalString / IntegerDecimalStringArguments / IntegerDecimalStringParameters / "integer_decimal_string" { magnitude:I64,negative:I32 } => (Ref StringValue NonNullable);
     NumberToString / NumberToStringArguments / NumberToStringParameters / "number_to_string" { bits:I64 } => (Ref StringValue NonNullable);
     StringToNumber / StringToNumberArguments / StringToNumberParameters / "string_to_number" { input:(Ref StringValue NonNullable) } => I64;
     ValueToString / ValueToStringArguments / ValueToStringParameters / "value_to_string" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1257,6 +1258,7 @@ impl RuntimeHelperId {
             Self::ProxyCall => HelperOwner::Runtime,
             Self::ProxyConstruct => HelperOwner::Runtime,
             Self::StringEquality => HelperOwner::Runtime,
+            Self::IntegerDecimalString => HelperOwner::Runtime,
             Self::NumberToString => HelperOwner::Runtime,
             Self::StringToNumber => HelperOwner::Runtime,
             Self::ValueToString => HelperOwner::Runtime,
@@ -1401,6 +1403,7 @@ impl RuntimeHelperId {
             Self::ProxyCall => true,
             Self::ProxyConstruct => true,
             Self::StringEquality => true,
+            Self::IntegerDecimalString => true,
             Self::NumberToString => true,
             Self::StringToNumber => true,
             Self::ValueToString => true,

@@ -81,6 +81,13 @@ detect damage; they do not establish native-code provenance.
 
 Configure a fresh Wasmtime Engine with `configure_precompiled_wasm_runtime`,
 then attach the admitted image using `EmbeddedRuntime::from_precompiled`.
+
+The opaque precompiled owner reuses its actual producer's successful Wasm body
+validation. Recovery from external bytes is unsafe and requires the unchanged
+precompile output with exact raw/native correspondence; checksums alone do not
+establish that provenance. Consumers still admit Portable, linkage and foreign
+ABI metadata and check native compatibility with the destination Engine. Safe
+raw-Wasm compilation retains complete validation.
 The native compiler stays disabled. P requirements, Portable capability, inert
 initialization, runtime key and Wasmtime native compatibility are checked before
 instantiation. R uses this Cargo build's admitted image; missing or incompatible

@@ -136,6 +136,29 @@ impl Mmap {
         self.memory.as_ptr().len()
     }
 
+    /// Discard anonymous Linux pages without removing their RW mapping.
+    ///
+    /// # Safety
+    /// The caller owns this page-aligned, accessible anonymous range and has
+    /// proved that no live data, references or concurrent accesses remain.
+    #[cfg(target_os = "linux")]
+    pub unsafe fn discard_unused_pages(&self, range: Range<usize>) -> Result<()> {
+        assert!(range.start <= range.end && range.end <= self.len());
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        assert_eq!(range.start % page, 0);
+        assert_eq!(range.end % page, 0);
+        if range.is_empty() {
+            return Ok(());
+        }
+        let base = unsafe { self.memory.as_ptr().cast::<u8>().add(range.start) };
+        // MADV_DONTNEED on a private anonymous mapping returns zero-filled
+        // pages on subsequent access while preserving the existing protection.
+        unsafe {
+            rustix::mm::madvise(base.cast(), range.len(), rustix::mm::Advice::LinuxDontNeed)?;
+        }
+        Ok(())
+    }
+
     pub unsafe fn make_executable(
         &self,
         range: Range<usize>,

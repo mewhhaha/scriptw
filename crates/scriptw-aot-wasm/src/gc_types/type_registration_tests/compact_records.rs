@@ -146,3 +146,71 @@ fn compact_descriptor_word_keeps_every_kind_and_attribute_without_unknown_bits()
         assert_eq!(snapshot_descriptor_flags(invalid), None);
     }
 }
+
+#[test]
+fn prototype_edges_accept_only_the_sealed_actual_object_payload_family() {
+    let (runtime, bytes) = encoded(ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ));
+    let (types, _, _) = declarations(&bytes);
+    let schema = runtime.globals().schema();
+    let base = schema.struct_type::<JavaScriptObject>().type_index().raw();
+    let declaration = &types[base as usize];
+    assert!(!declaration.is_final);
+    assert!(declaration.supertype_idx.is_none());
+    let CompositeInnerType::Struct(fields) = &declaration.composite_type.inner else {
+        panic!("the actual object family has a fieldless struct base");
+    };
+    assert!(fields.fields.is_empty());
+    let mut object_count = 0;
+    for layout in GcLayout::ALL {
+        let ty = &types[schema.layouts().layout_index(*layout) as usize];
+        let object = layout.object_projection().is_some();
+        let child = ty.supertype_idx.map(|index| index.unpack())
+            == Some(wasmparser::UnpackedIndex::Module(base));
+        assert_eq!(child, object, "{layout:?} must match its object projection");
+        if object {
+            object_count += 1;
+            assert!(ty.is_final, "actual payload identity must stay sealed");
+        }
+    }
+    assert!(object_count > 0);
+    let index = schema.struct_type::<OrdinaryObject>().type_index().raw();
+    let CompositeInnerType::Struct(object) = &types[index as usize].composite_type.inner else {
+        panic!("ordinary object must retain its own header");
+    };
+    assert_eq!(
+        object.fields[0].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(base)),
+            )
+            .unwrap()
+        ))
+    );
+    assert!(object.fields[0].mutable);
+    let compact_index = schema
+        .struct_type::<CompactDataStorage>()
+        .type_index()
+        .raw();
+    let CompositeInnerType::Struct(compact) = &types[compact_index as usize].composite_type.inner
+    else {
+        panic!("compact data storage remains a single storage subtype");
+    };
+    let scalar_index = schema.array_type::<CompactScalarArray>().type_index().raw();
+    assert_eq!(
+        compact.fields[2].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(scalar_index))
+            )
+            .unwrap()
+        ))
+    );
+    assert!(
+        compact.fields[2].mutable,
+        "first scalar write publishes its backing"
+    );
+}

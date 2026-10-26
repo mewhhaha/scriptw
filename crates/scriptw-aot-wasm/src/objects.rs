@@ -1143,6 +1143,44 @@ impl<'a> FunctionBuilder<'a> {
             );
         let schema = self.runtime_schema();
         let result = schema.reserve_completion(&mut function);
+        // Probe the numeric own-data domain before allocating a decimal key.
+        // A hole or accessor must still run ordinary Get, and Proxy wrappers
+        // never satisfy the concrete Array reference test.
+        let found = schema.reserve_i32_local(&mut function);
+        found.set_constant(0, &mut function);
+        parameters.target.reference().load(&mut function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<crate::gc_types::ArrayObject>(
+                    crate::gc_types::GcNullability::NonNullable,
+                )
+                .heap_type,
+        ));
+        parameters.index.load(&mut function);
+        function.instruction(&Instruction::I64Const(u32::MAX as i64));
+        function.instruction(&Instruction::I64LtU);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, &mut function);
+        let array = schema.reserve_gc_local(&mut function).initialize(
+            parameters
+                .target
+                .cast_reference::<crate::gc_types::ArrayObject>(schema, &mut function),
+            &mut function,
+        );
+        let value = schema.reserve_value_local(&mut function);
+        self.emit_array_own_indexed_value(&array, parameters.index, &value, found, &mut function);
+        found.load(&mut function);
+        self.open_frame(ControlFrameKind::If, &mut function);
+        result.set_normal(&value, &mut function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        value.clear(&mut function);
+        array.clear(&mut function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        found.load(&mut function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut function);
         let number = schema.reserve_i64_local(&mut function);
         parameters.index.load(&mut function);
         function.instruction(&Instruction::F64ConvertI64U);
@@ -1168,6 +1206,9 @@ impl<'a> FunctionBuilder<'a> {
         key.clear(&mut function);
         string.clear(&mut function);
         schema.release_i64_local(number, &mut function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(found, &mut function);
         result.emit(&mut function);
         result.clear(&mut function);
         parameters.release(&mut function);
@@ -3499,9 +3540,7 @@ impl<'a> FunctionBuilder<'a> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&prototype, result, schema, function);
+        schema.prototype_reference_into(&prototype, result, function);
         prototype.clear(function);
         header.clear(function);
     }
@@ -3739,12 +3778,9 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(prototype, function),
-            function,
-        );
+        let stored = schema
+            .reserve_gc_local(function)
+            .initialize(schema.prototype_reference(prototype, function), function);
         schema
             .struct_type::<OrdinaryObject>()
             .field(OrdinaryObjectSchema::PROTOTYPE)
@@ -4102,9 +4138,7 @@ impl<'a> FunctionBuilder<'a> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&prototype, &current, schema, function);
+        schema.prototype_reference_into(&prototype, &current, function);
         prototype.clear(function);
         function.instruction(&Instruction::Else);
         let present_slot = schema.reserve_gc_local(function);

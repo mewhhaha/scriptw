@@ -52,12 +52,9 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::I32Eq);
             function.instruction(&Instruction::I32Or);
             self.open_frame(ControlFrameKind::If, function);
-            let stored = schema.reserve_gc_local(function).initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(value, function),
-                function,
-            );
+            let stored = schema
+                .reserve_gc_local(function)
+                .initialize(schema.prototype_reference(value, function), function);
             schema.field(OrdinaryObjectSchema::PROTOTYPE).write(
                 object,
                 GcOperand::reference(&stored, schema),
