@@ -85,10 +85,22 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
             type_index::<OrdinaryPropertyStorage>(schema),
             type_index::<PropertyDescriptor>(schema),
             type_index::<PropertyEntry>(schema),
-            type_index::<StoredValue>(schema),
         ] {
-            assert!(!operators.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == dictionary_type)), "native metadata allocation must not eagerly create dictionary records or boxed values");
+            assert!(!operators.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == dictionary_type)), "native metadata allocation must not eagerly create dictionary records");
         }
     }
+    let stored_values = |operators: &[Operator<'_>]| {
+        operators.iter().filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<StoredValue>(schema))).count()
+    };
+    assert_eq!(
+        stored_values(&allocator),
+        0,
+        "native name/length values remain unboxed"
+    );
+    assert_eq!(
+        stored_values(&compact_allocator),
+        1,
+        "the ordinary object header owns one prototype snapshot; metadata adds no value boxes"
+    );
     expect_valid_module(&artifact, 0);
 }
