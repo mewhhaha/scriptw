@@ -1,7 +1,8 @@
 # Execution hot paths
 
-This batch reduces work in emitted JavaScript execution while keeping the
-experimental Wasmtime backend, private layout 20 and native policy unchanged.
+The execution optimizations use the experimental Wasmtime backend. The current
+private layout is 21; compact stored values and descriptor words are described
+in the [memory ownership contract](runtime-byte-ownership.md#compact-gc-records).
 
 ## Private Array sorting
 

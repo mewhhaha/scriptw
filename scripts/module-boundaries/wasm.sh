@@ -248,7 +248,7 @@ if [[ "$gc_root_finalizer_code" != *'self,mutglobals:GlobalLedger,snapshot:bool,
   || ! grep -Fq 'section: GlobalLedger,' "$wasm_gc_types"; then
   fail 'both finalization modes must consume the actual global ledger through one typed-root owner and seal its matching schema'
 fi
-require_text_regex_count "$gc_root_finalizer" 'GcRootGlobal::declare[(]&self.layouts, &mut globals[)]' 15 'declared semantic GC roots in the sole finalizer'
+require_text_regex_count "$gc_root_finalizer" 'GcRootGlobal::declare[(]&self.layouts, &mut globals[)]' 17 'declared semantic GC roots in the sole finalizer'
 require_fixed_string_count "$wasm_gc_types" 'active_source_function: GcRootGlobal<FunctionObject>,' 1 'typed active source activation root'
 require_text_regex_count "$gc_root_finalizer" 'CollectionKeyHashCounterGlobal::declare[(]&mut globals[)]' 1 'declared scalar collection identity root'
 require_regex_count "$wasm_gc_types" '^[[:space:]]+fn finalize_globals[(]' 1 'sole concrete GC-root finalizer'
@@ -680,6 +680,11 @@ if [[ "$(head -n 1 "$runtime_validation_fixture_source")" != '#![cfg(test)]' ]];
 fi
 require_fixed_string_count crates/scriptw-aot-wasm/src/runtime_artifact/validation.rs '#[cfg(test)]' 1 'validation fixture parent retains its test-only gate'
 require_module_decl crates/scriptw-aot-wasm/src/runtime_artifact/validation.rs tests
+gc_type_registration_fixture_source="crates/scriptw-aot-wasm/src/gc_types/type_registration_tests.rs"
+require_module_decl "$wasm_gc_types" type_registration_tests
+if [[ "$(head -n 1 "$gc_type_registration_fixture_source")" != '#![cfg(test)]' ]]; then
+  fail 'GC declaration fixtures must be compiled only for tests'
+fi
 for sealed_section in types globals code; do
   source_profile_fixture_exclusions=()
   if [ "$sealed_section" = types ]; then
@@ -690,6 +695,7 @@ for sealed_section in types globals code; do
       ! -path "$compiled_module_package" \
       ! -path "$runtime_cache_fixture_source" \
       ! -path "$runtime_validation_fixture_source" \
+      ! -path "$gc_type_registration_fixture_source" \
       ! -path "$native_template_fixture_source" \
       ! -path "$native_template_literal_fixture_source" \
       ! -path "$native_template_shared_body_fixture_source" \

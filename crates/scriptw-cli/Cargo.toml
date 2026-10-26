@@ -29,3 +29,6 @@ path = "src/bin/scriptw.rs"
 
 [lib]
 path = "src/lib.rs"
+
+[dev-dependencies]
+wasmtime = { version = "=47.0.0", default-features = false, features = ["cranelift", "runtime", "std"] }

@@ -6,6 +6,7 @@ use super::*;
 use crate::gc_types::*;
 
 mod cache;
+mod native_function;
 mod shape;
 
 impl FunctionBuilder<'_> {
@@ -107,6 +108,7 @@ impl FunctionBuilder<'_> {
             &mut f,
         );
         let keys = self.emit_compact_shape_keys(&compact, &mut f);
+        let attributes = self.emit_compact_data_attributes(&compact, &mut f);
         let count = schema.reserve_i32_local(&mut f);
         let index = schema.reserve_i32_local(&mut f);
         schema
@@ -116,8 +118,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         index.store(&mut f);
         let value = schema.reserve_value_local(&mut f);
-        let undefined = schema.reserve_value_local(&mut f);
-        undefined.set_undefined(&mut f);
         let exit = self.open_frame(ControlFrameKind::Block, &mut f);
         let repeat = self.open_frame(ControlFrameKind::Loop, &mut f);
         index.load(&mut f);
@@ -133,15 +133,9 @@ impl FunctionBuilder<'_> {
         );
         let key = PropertyKeyLocals::from_string(schema, &name, &mut f);
         self.emit_compact_value_at(&compact, index, &value, &mut f);
-        let descriptor = self.emit_alloc_property_descriptor(
-            StoredPropertyAttributes::Data {
-                writable: true,
-                enumerable: true,
-                configurable: true,
-            },
+        let descriptor = self.emit_alloc_data_property_descriptor_with_word(
+            attributes.operand(),
             &value,
-            &undefined,
-            &undefined,
             &mut f,
         );
         let hash = schema.reserve_i64_local(&mut f);
@@ -173,7 +167,7 @@ impl FunctionBuilder<'_> {
             &mut f,
         );
         result.replace(dictionary.load(schema, &mut f).nullable(), &mut f);
-        undefined.clear(&mut f);
+        attributes.clear(schema, &mut f);
         value.clear(&mut f);
         keys.clear(&mut f);
         dictionary.clear(&mut f);
@@ -214,6 +208,39 @@ impl FunctionBuilder<'_> {
         );
         shape.clear(f);
         keys
+    }
+
+    /// Immutable uniform data attributes travel with the shape. Reading the
+    /// declared word retains its typed domain through descriptor publication.
+    fn emit_compact_data_attributes(
+        &self,
+        storage: &GcLocal<CompactDataStorage>,
+        f: &mut Function,
+    ) -> GcI32DomainLocal<crate::heap::DescriptorWord> {
+        let schema = self.runtime_schema();
+        let shape = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(CompactDataStorageSchema::SHAPE)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        let attributes = GcI32DomainLocal::new(
+            schema,
+            StoredPropertyAttributes::Data {
+                writable: true,
+                enumerable: true,
+                configurable: true,
+            }
+            .descriptor_word(),
+            f,
+        );
+        schema
+            .field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, schema, f)
+            .store_domain(&attributes, f);
+        shape.clear(f);
+        attributes
     }
 
     /// A canonical string key and the actual immutable shape decide the slot.
@@ -423,15 +450,15 @@ impl FunctionBuilder<'_> {
         descriptor.load(schema, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let flags = schema.reserve_i64_local(f);
+        let flags = schema.reserve_i32_local(f);
         schema
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&descriptor, schema, f)
-            .store_i64(flags, f);
+            .store(flags, f);
         flags.load(f);
-        f.instruction(&Instruction::I64Const(DescriptorMask::ACCESSOR.as_i64()));
-        f.instruction(&Instruction::I64And);
-        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         let stored = schema.reserve_gc_local(f).initialize(
             schema
@@ -448,7 +475,7 @@ impl FunctionBuilder<'_> {
         stored.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        schema.release_i64_local(flags, f);
+        schema.release_i32_local(flags, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         descriptor.clear(f);
@@ -520,12 +547,22 @@ impl FunctionBuilder<'_> {
         );
         let slot = schema.reserve_i32_local(f);
         self.emit_compact_slot_probe(&compact, key, slot, found, f)?;
+        let attributes = self.emit_compact_data_attributes(&compact, f);
+        found.load(f);
+        attributes.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        found.store(f);
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_compact_store_at(&compact, slot, value, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(slot, f);
+        attributes.clear(schema, f);
         compact.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -564,23 +601,16 @@ impl FunctionBuilder<'_> {
         found.load(&mut f);
         self.open_frame(ControlFrameKind::If, &mut f);
         let value = schema.reserve_value_local(&mut f);
-        let undefined = schema.reserve_value_local(&mut f);
-        undefined.set_undefined(&mut f);
         self.emit_compact_value_at(&compact, slot, &value, &mut f);
-        let snapshot = self.emit_alloc_property_descriptor(
-            StoredPropertyAttributes::Data {
-                writable: true,
-                enumerable: true,
-                configurable: true,
-            },
+        let attributes = self.emit_compact_data_attributes(&compact, &mut f);
+        let snapshot = self.emit_alloc_data_property_descriptor_with_word(
+            attributes.operand(),
             &value,
-            &undefined,
-            &undefined,
             &mut f,
         );
         output.replace(snapshot.load(schema, &mut f).nullable(), &mut f);
         snapshot.clear(&mut f);
-        undefined.clear(&mut f);
+        attributes.clear(schema, &mut f);
         value.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

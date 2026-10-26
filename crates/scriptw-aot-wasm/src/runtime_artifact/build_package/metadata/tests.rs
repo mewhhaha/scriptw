@@ -184,10 +184,7 @@ fn receipt_metadata_is_reused_only_through_the_unsafe_exact_producer_candidate()
     let selection = inputs
         .intl_selection(&IntlCompilationProfile::Minimal)
         .unwrap();
-    let identity = inputs.admit_identity(&selection).unwrap();
-    let runtime = inputs
-        .load_or_emit(&identity, || panic!("exact producer receipt must admit"))
-        .unwrap();
+    let runtime = inputs.admit_supplied_package(&selection).unwrap();
     assert!(runtime.build_admission.is_some());
     assert_eq!(runtime.key(), producer().key());
     let validated =

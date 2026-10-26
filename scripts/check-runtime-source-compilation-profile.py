@@ -105,6 +105,7 @@ def check(root, overrides=None):
     inputs = c[A + "runtime_artifact/build_package/inputs.rs"]
     envelope = c[A + "runtime_artifact/build_package/envelope.rs"]
     admission = c[A + "runtime_artifact/build_package/inputs/admission.rs"]
+    package_admission = function(source[A + "runtime_artifact/build_package/inputs.rs"], "admit_package")
     metadata = c[A + "runtime_artifact/build_package/metadata.rs"]
     receipt = c[A + "runtime_artifact/build_package/metadata/decode.rs"]
     require("source_compilation_profile:RuntimeSourceCompilationProfile::Portable" in inputs and
@@ -122,9 +123,14 @@ def check(root, overrides=None):
             "Candidate::ImmutableMinimal(proof)" in admission and
             "metadata::BuildMetadata::decode(proof,self.source_compilation_profile)" in admission and
             "cache::RuntimeIdentity::admit_with_jobs(selection,self.source_compilation_profile,self.admission_jobs,)" in admission and
-            "Candidate::External{bytes,expected_source,}=>envelope::decode_with_jobs(bytes,identity,expected_source,self.admission_jobs,)" in inputs and
-            "Candidate::ImmutableBuild{bytes,expected_source,}=>decode_immutable_build(bytes,identity,expected_source,self.admission_jobs)" in inputs,
+            re.search(r"Candidate::External\{bytes,expected_source,\}=>envelope::decode_with_jobs\(bytes,identity,expected_source,self\.admission_jobs,?\)", package_admission) and
+            re.search(r"Candidate::ImmutableBuild\{bytes,expected_source,\}=>decode_immutable_build\(bytes,identity,expected_source,self\.admission_jobs,?\)", package_admission),
             "receipt selection delegates exact identity with full external and cache fallback")
+    supplied = function(source[A + "runtime_artifact/build_package/inputs.rs"], "admit_supplied_package")
+    require("letidentity=self.admit_identity(selection)?;" in supplied and
+            "self.admit_package(&identity).map(Arc::new).ok_or_else(" in supplied and
+            "cache::" not in supplied and "load_or_emit" not in supplied,
+            "supplied-only admission reuses exact identity and byte checks without emission or cache fallback")
     require("pub(super)structImmutableMetadata{package:&'static[u8],source:&'static[u8;32],intl:&'static[u8],receipt:&'static[u8],}" in inputs and
             inputs.count("ImmutableMetadata{") == 3 and
             "ImmutableMetadata{" not in admission and

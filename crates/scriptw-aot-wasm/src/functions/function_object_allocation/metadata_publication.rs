@@ -127,6 +127,26 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(function);
         let zero = schema.reserve_i32_local(function);
         zero.set_constant(0, function);
+        let code = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CODE)
+                .read(&parameters.callable, schema, function)
+                .reference(),
+            function,
+        );
+        let kind = schema.reserve_i32_local(function);
+        schema
+            .field(crate::gc_types::ExecutableCodeSchema::KIND)
+            .read(&code, schema, function)
+            .store(kind, function);
+        kind.load(function);
+        function.instruction(&Instruction::I32Const(
+            crate::gc_types::GcI32Constant::encode(crate::gc_types::ExecutableCodeKind::JavaScript),
+        ));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        // Native allocation already publishes these two fields in its own
+        // compact arrays. Source metadata retains its ordinary descriptor path.
         value.set_number(parameters.length_bits, function);
         self.emit_define_function_runtime_metadata_property(
             &object,
@@ -145,6 +165,10 @@ impl FunctionBuilder<'_> {
             parameters.configurable,
             function,
         )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(kind, function);
+        code.clear(function);
 
         parameters.has_caller.load(function);
         self.open_frame(ControlFrameKind::If, function);

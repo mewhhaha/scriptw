@@ -293,7 +293,11 @@ impl EmbeddedInstance {
             .try_reserve_exact(arguments.len())
             .map_err(|e| EngineError::new(e.to_string()))?;
         for argument in arguments {
-            let fields = argument.arguments(store)?;
+            let [tag, scalar, reference] = argument.arguments(store)?;
+            let mut fields = [Val::I32(0); 3];
+            fields[GcHostField::StoredTag.definition().index() as usize] = tag;
+            fields[GcHostField::StoredScalar.definition().index() as usize] = scalar;
+            fields[GcHostField::StoredReference.definition().index() as usize] = reference;
             let value =
                 StructRef::new(&mut *store, &struct_allocator, &fields).map_err(embedded_error)?;
             elements.push(Val::AnyRef(Some(value.to_anyref())));

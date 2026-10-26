@@ -39,6 +39,37 @@ R/P Wasm layout, foreign ABI, JavaScript object representation or GC policy.
 Native code admission remains independent and retains its checked Wasmtime
 mapping; borrowing raw Wasm does not borrow executable native memory.
 
+## Compact GC records
+
+The private runtime layout is version 21. Stored values put the 64-bit scalar
+before the 32-bit tag and GC reference. Under the pinned copying collector's
+16-byte object header and alignment, this reduces each record from 48 to 32
+bytes while retaining the complete scalar and reference payload. The separate
+call ABI still passes tag, scalar and reference in its original order. Host
+argument construction uses the schema's field ordinals when storing a value.
+
+Property descriptors retain separate closed types for legal stored attributes
+and query masks. Their four flag bits use 32-bit storage, reducing a complete
+descriptor from 48 to 32 bytes under the same collector layout. Field accesses
+and snapshot projections derive from the common schema. Old runtime packages,
+native caches and Portable bundles must be rebuilt for layout 21.
+
+These are per-record layout sizes, not measured process RSS reductions. GC
+headers, backing arrays, native code, compiler metadata and allocator retention
+remain separate costs.
+
+## Compiler scratch ownership
+
+The pinned Cranelift compiler retains at most two small idle compilation
+contexts. Successful returns clear final IR immediately. Contexts exceeding
+explicit instruction, value, block, local or native-body reuse limits are
+dropped with their translator and codegen scratch storage. Module assembly
+also checks idle owners; active compilation jobs retain exclusive ownership.
+Compiled Modules, native code and GC/type registrations keep their own owners.
+The limits bound retained work sizes rather than claiming an allocator census.
+The [vendored patch](../../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md)
+records the exact limits and upstream provenance.
+
 ## Deferred Intl providers
 
 The Cargo runtime producer admits all twelve Minimal component consumers and
@@ -105,6 +136,16 @@ Absent accessor snapshots and initial native-function home/public-prototype
 snapshots reuse the Realm's canonical immutable stored `undefined` value.
 Descriptors, functions, contexts and mutable edges remain distinct; source
 functions still retain their actual home object for `super` semantics.
+
+Native functions store their own `length` and `name` in the existing compact
+property arrays, with shared immutable shapes carrying primitive keys and the
+correct data attributes. Values and mutable storage belong to each function.
+Ordinary reads use those arrays directly. Reflection creates descriptor
+snapshots when needed; structural or attribute changes promote the object to
+the ordinary dictionary representation. Insertion order, readonly and
+non-enumerable attributes, configurability and deletion remain observable.
+This defers metadata descriptors; constructor and prototype graphs retain their
+normal initialization and per-Realm identities.
 
 ## Static regexp construction
 

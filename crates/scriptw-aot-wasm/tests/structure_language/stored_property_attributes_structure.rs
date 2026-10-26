@@ -64,7 +64,7 @@ fn one_exhaustive_projection_owns_both_descriptor_kinds() {
         "Self::Accessor{enumerable,configurable,}=>",
         "DescriptorWord::of_accessor(enumerable,configurable),"
     )));
-    assert!(compact.contains("pub(crate)constfndescriptor_kind_bits(self)->u64{"));
+    assert!(compact.contains("pub(crate)constfndescriptor_kind_bits(self)->u32{"));
     assert!(compact.contains("self.descriptor_word().bits()"));
 }
 

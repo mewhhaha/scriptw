@@ -23,7 +23,7 @@
       "ianaCountry": "IS"
     }
   ],
-  "providerDataSha256": "cd82098c545a7d2a60434b909fc880f8f4192dc0b5fdc73b4cdb87157e54d810",
+  "providerDataSha256": "c2bb20f897f701293261e939569d946e132758597bddc21910ceba0d94e25826",
   "recipe": {
     "domain": "scriptw-intl-named-time-zones-v1",
     "iana": "2026a",
@@ -108,13 +108,13 @@
       },
       {
         "path": "Cargo.toml",
-        "bytes": 6139,
-        "sha256": "352658e719c69b9c5e3f9034bc95209457b1c4a5154a862668e1f55a2bcf1b98"
+        "bytes": 6224,
+        "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
       },
       {
         "path": "Cargo.lock",
-        "bytes": 77072,
-        "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+        "bytes": 76942,
+        "sha256": "27b3d2875d021a89102989e2f7d8659ecaeca8d949ed6a2bae5ae491d4ad9884"
       },
       {
         "path": "crates/scriptw-intl/Cargo.toml",
@@ -233,8 +233,8 @@
       },
       {
         "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-        "bytes": 81533,
-        "sha256": "3947901de7b973e9ef74734854e594cac2ae5da7b611219e86128525cbf48029"
+        "bytes": 81609,
+        "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
       },
       {
         "path": "crates/scriptw-intl/src/named_time_zone_image.rs",
@@ -561,7 +561,7 @@
     {
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
       "bytes": 565,
-      "sha256": "f06651b3599488956e6b92bb6398468fd0f3b356d73a377e42bae300aba15249"
+      "sha256": "10a92271037798b8507086ffae9cee2dfbeda7b2986bba3db38dc197af5585d1"
     }
   ]
 }

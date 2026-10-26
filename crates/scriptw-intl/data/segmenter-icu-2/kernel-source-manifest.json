@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "93e5ee01b0ac32ffeeee142f5b201de2c1651cd1ca3df13f9f54c100674eed47",
+  "kernel_sha256": "4d0792f90418790b4d9b7f6f0351418cd974254b4e54a27d4b126f7e703b1f59",
   "operations_reserved": [
     33,
     34,
@@ -378,19 +378,19 @@
   "source_manifest_sha256": "8612f2eb0857fab45863f717f63e95220274747717549f92b2f1af394f067cbe",
   "source_rows": [
     {
-      "bytes": 77072,
+      "bytes": 76942,
       "path": "Cargo.lock",
-      "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+      "sha256": "27b3d2875d021a89102989e2f7d8659ecaeca8d949ed6a2bae5ae491d4ad9884"
     },
     {
-      "bytes": 6139,
+      "bytes": 6224,
       "path": "Cargo.toml",
-      "sha256": "352658e719c69b9c5e3f9034bc95209457b1c4a5154a862668e1f55a2bcf1b98"
+      "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
     },
     {
-      "bytes": 81533,
+      "bytes": 81609,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "3947901de7b973e9ef74734854e594cac2ae5da7b611219e86128525cbf48029"
+      "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
     },
     {
       "bytes": 90596,

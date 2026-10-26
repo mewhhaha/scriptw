@@ -84,17 +84,13 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, &mut f);
-        p.target.reference().load(&mut f);
-        f.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
+        let header = self.emit_simple_data_header(&p.target, &mut f);
+        header.load(schema, &mut f).is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, &mut f);
-        let object = schema.reserve_gc_local(&mut f).initialize(
-            p.target.cast_reference::<OrdinaryObject>(schema, &mut f),
-            &mut f,
-        );
+        let object = schema
+            .reserve_gc_local(&mut f)
+            .initialize(header.load(schema, &mut f).require_non_null(&mut f), &mut f);
         let base = schema.reserve_gc_local(&mut f).initialize(
             schema
                 .field(OrdinaryObjectSchema::PROPERTIES)
@@ -109,8 +105,9 @@ impl FunctionBuilder<'_> {
                 .cast_subtype::<CompactDataStorage>(schema, &mut f),
             &mut f,
         );
-        // Generic/exotic receivers never allocate or search cache metadata.
         // Registration starts only after proving a live compact receiver.
+        // Native callable shapes have primitive keys/attributes only; cached
+        // values are always reloaded from this callable's current own storage.
         let cache = self.emit_own_data_cache_site(p.site, p.key.value(), &mut f);
         let shape = schema.reserve_gc_local(&mut f).initialize(
             schema
@@ -188,6 +185,7 @@ impl FunctionBuilder<'_> {
         object.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        header.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         handled.load(&mut f);

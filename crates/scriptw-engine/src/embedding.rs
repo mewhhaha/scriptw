@@ -11,10 +11,12 @@ use wasmtime::{AsContext, AsContextMut, ExnRef, ExnRefPre, ExnType, FuncType, In
 mod async_host;
 mod foreign_host;
 mod operations;
+mod precompiled;
 mod values;
 use async_host::ForeignAsyncState;
 pub use async_host::ForeignCompleter;
 pub use foreign_host::ForeignValue;
+pub use precompiled::{configure_precompiled_wasm_runtime, PrecompiledEmbeddedProgram};
 use values::{embedded_error, retained_completion};
 pub use values::{EmbeddedEvaluation, JsCompletion, JsPromiseState, JsValue, JsValueKind};
 
@@ -167,14 +169,23 @@ impl EmbeddedRuntime {
                 mode,
                 WasmRuntimeImagePolicy::EmbeddedBuild,
             )?;
-            Ok(Self {
-                engine: engine.clone(),
-                modules,
-                foreign,
-                intl,
-                authority: Arc::new(()),
-            })
+            Ok(Self::from_admitted_modules(engine, modules, foreign, intl))
         })
+    }
+
+    fn from_admitted_modules(
+        engine: &WasmtimeEngine,
+        modules: wasm_runtime_link::WasmModules,
+        foreign: ForeignModuleRegistry,
+        intl: intl_data_images::WasmIntlKernel,
+    ) -> Self {
+        Self {
+            engine: engine.clone(),
+            modules,
+            foreign,
+            intl,
+            authority: Arc::new(()),
+        }
     }
 
     /// Construct one fresh host state. The caller creates and retains the Store

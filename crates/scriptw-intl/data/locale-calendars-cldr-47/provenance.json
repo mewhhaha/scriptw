@@ -80,14 +80,14 @@
     "profile_sha256": "fcb074bd730a2c73a58a3c11a040a46efb959b35dc8e4a0457d955a7d9d722fe",
     "sources": [
       {
-        "bytes": 77072,
+        "bytes": 76942,
         "path": "Cargo.lock",
-        "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+        "sha256": "27b3d2875d021a89102989e2f7d8659ecaeca8d949ed6a2bae5ae491d4ad9884"
       },
       {
-        "bytes": 6139,
+        "bytes": 6224,
         "path": "Cargo.toml",
-        "sha256": "352658e719c69b9c5e3f9034bc95209457b1c4a5154a862668e1f55a2bcf1b98"
+        "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
       },
       {
         "bytes": 90596,
@@ -95,9 +95,9 @@
         "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
       },
       {
-        "bytes": 81533,
+        "bytes": 81609,
         "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-        "sha256": "3947901de7b973e9ef74734854e594cac2ae5da7b611219e86128525cbf48029"
+        "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
       },
       {
         "bytes": 33961,
@@ -277,7 +277,7 @@
       {
         "bytes": 31947,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "ebdabcbb626aa29419d8f6d32670308a82d47f76249aa212c2b3d5fdf7ac8bbe"
+        "sha256": "ee0f64b9438a352a53c653d17baeb5ce84f6240deb665e61da3b22972553f465"
       },
       {
         "bytes": 4610,
@@ -297,7 +297,7 @@
       {
         "bytes": 21615,
         "path": "crates/scriptw-intl/data/iana-tzdb-2026a/manifest.json",
-        "sha256": "653c4261409c4fb6bc023e1ccbf95bcc80ca77a6e9cc321733ab18cb72811ab9"
+        "sha256": "08986259b44372d0bca2ac76ff687fb9f3ec4e693fc6e0188d3e6ba5c0c6c642"
       },
       {
         "bytes": 51680,
@@ -507,7 +507,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "d8f2d646d3f083be95e511d9fbe0bb0a7b3cbc49df7a167e34e9441704cff8ad"
+        "sha256": "b8d2e78a414fc068bd87b36ff23ca25045c9edc38749c7db3b7b0f09a5d71691"
       },
       {
         "bytes": 8582,
@@ -717,7 +717,7 @@
       {
         "bytes": 565,
         "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-        "sha256": "f06651b3599488956e6b92bb6398468fd0f3b356d73a377e42bae300aba15249"
+        "sha256": "10a92271037798b8507086ffae9cee2dfbeda7b2986bba3db38dc197af5585d1"
       },
       {
         "bytes": 5089,
@@ -1021,7 +1021,7 @@
       }
     ]
   },
-  "kernel_sha256": "82bf0ffe08fd954ddbab152f75094792aba0d387c2c38d59b3e2f30913dfc663",
+  "kernel_sha256": "06f43ba90a22313db715665a8e6f15291419de8b7af8d4c8846a094c94061e3e",
   "language_region_selector_count": 0,
   "normative_source": "https://tc39.es/ecma402/#sec-calendarsoflocale",
   "ordering": "calendar preference order; canonical BCP47 aliases; stable uniqueness; runtime filter against actual checked DateTime AvailableCalendars",

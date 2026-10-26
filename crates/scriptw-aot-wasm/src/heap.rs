@@ -450,8 +450,8 @@ pub(crate) enum DescriptorBit {
 }
 
 impl DescriptorBit {
-    pub(crate) const fn word(self) -> u64 {
-        1u64 << (self as u32)
+    pub(crate) const fn word(self) -> u32 {
+        1u32 << (self as u32)
     }
 }
 
@@ -463,13 +463,13 @@ impl DescriptorBit {
 /// accessor-to-data conversion reads back as `writable: true`, has **no
 /// constructor**.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DescriptorWord(u64);
+pub(crate) struct DescriptorWord(u32);
 
 impl DescriptorWord {
     /// 6.2.6.6 for a data property: `[[Writable]]`, `[[Enumerable]]`,
     /// `[[Configurable]]`, and the accessor bit clear.
     const fn of_data(writable: bool, enumerable: bool, configurable: bool) -> Self {
-        let mut bits = 0u64;
+        let mut bits = 0u32;
         if writable {
             bits |= DescriptorBit::Writable.word();
         }
@@ -497,12 +497,12 @@ impl DescriptorWord {
         Self(bits)
     }
 
-    pub(crate) const fn bits(self) -> u64 {
+    pub(crate) const fn bits(self) -> u32 {
         self.0
     }
 
-    pub(crate) const fn as_i64(self) -> i64 {
-        self.0 as i64
+    pub(crate) const fn as_i32(self) -> i32 {
+        self.0 as i32
     }
 }
 
@@ -534,7 +534,7 @@ impl StoredPropertyAttributes {
         }
     }
 
-    pub(crate) const fn descriptor_kind_bits(self) -> u64 {
+    pub(crate) const fn descriptor_kind_bits(self) -> u32 {
         self.descriptor_word().bits()
     }
 }
@@ -545,10 +545,10 @@ impl StoredPropertyAttributes {
 /// either direction: composites like `ACCESSOR | WRITABLE` are illegal as
 /// stored values and *legal and needed* as masks — the one at
 /// [`DescriptorMask::ACCESSOR_OR_WRITABLE`] asks "is the existing entry a data
-/// property that is not writable" in a single `I64And`, and banning the bit
+/// property that is not writable" in a single `I32And`, and banning the bit
 /// pattern outright would break correct code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DescriptorMask(u64);
+pub(crate) struct DescriptorMask(u32);
 
 impl DescriptorMask {
     pub(crate) const ACCESSOR: Self = Self(DescriptorBit::Accessor.word());
@@ -556,7 +556,7 @@ impl DescriptorMask {
     pub(crate) const ENUMERABLE: Self = Self(DescriptorBit::Enumerable.word());
     pub(crate) const CONFIGURABLE: Self = Self(DescriptorBit::Configurable.word());
     /// "The existing entry is a data descriptor **and** is not writable", in
-    /// one `I64And`. A legal mask; not a legal word.
+    /// one `I32And`. A legal mask; not a legal word.
     pub(crate) const ACCESSOR_OR_WRITABLE: Self =
         Self(DescriptorBit::Accessor.word() | DescriptorBit::Writable.word());
     /// Bits 0..3: the descriptor kind and the three attributes.
@@ -570,12 +570,12 @@ impl DescriptorMask {
         Self(bit.word())
     }
 
-    pub(crate) const fn bits(self) -> u64 {
+    pub(crate) const fn bits(self) -> u32 {
         self.0
     }
 
-    pub(crate) const fn as_i64(self) -> i64 {
-        self.0 as i64
+    pub(crate) const fn as_i32(self) -> i32 {
+        self.0 as i32
     }
 
     pub(crate) const fn union(self, other: Self) -> Self {

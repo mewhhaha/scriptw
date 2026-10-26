@@ -20,8 +20,8 @@ impl StoredUndefinedGlobal {
                 shared: false,
             },
             &ConstExpr::extended([
-                Instruction::I32Const(crate::WasmRuntimeValueTag::Undefined as i32),
                 Instruction::I64Const(0),
+                Instruction::I32Const(crate::WasmRuntimeValueTag::Undefined as i32),
                 Instruction::RefNull(RefType::EQREF.heap_type),
                 Instruction::StructNew(layouts.struct_type::<StoredValue>().type_index().raw()),
             ]),

@@ -100,7 +100,7 @@ fn native_bootstrap_uses_immutable_undefined_for_home_and_initial_prototype() {
                         .into_iter()
                         .map(Result::unwrap)
                         .collect::<Vec<_>>();
-                    if let [Operator::I32Const { value }, Operator::I64Const { value: 0 }, Operator::RefNull { .. }, Operator::StructNew { struct_type_index }, Operator::End] =
+                    if let [Operator::I64Const { value: 0 }, Operator::I32Const { value }, Operator::RefNull { .. }, Operator::StructNew { struct_type_index }, Operator::End] =
                         &operators[..]
                     {
                         if *value == crate::WasmRuntimeValueTag::Undefined as i32

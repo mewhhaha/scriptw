@@ -255,7 +255,7 @@ impl FunctionBuilder<'_> {
         let list = ArgumentListConstruction::new(self, f);
         let count = s.reserve_i32_local(f);
         let index = s.reserve_i32_local(f);
-        let flags = s.reserve_i64_local(f);
+        let flags = s.reserve_i32_local(f);
         keys.length(count, s, f);
         json_i32(index, 0, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
@@ -280,11 +280,11 @@ impl FunctionBuilder<'_> {
         s.struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&present, s, f)
-            .store_i64(flags, f);
+            .store(flags, f);
         flags.load(f);
-        f.instruction(&Instruction::I64Const(DescriptorMask::ENUMERABLE.as_i64()));
-        f.instruction(&Instruction::I64And);
-        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         list.append(key.value(), s, f);
@@ -306,7 +306,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.release_i64_local(flags, f);
+        s.release_i32_local(flags, f);
         s.release_i32_local(index, f);
         s.release_i32_local(count, f);
         keys.clear(f);

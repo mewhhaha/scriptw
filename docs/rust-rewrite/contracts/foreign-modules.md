@@ -62,7 +62,37 @@ artifact requirements; it is not a permissive JSON configuration loader.
 
 This is a pre-1.0 breaking change: foreign ABI v1 declarations and Portable
 bundles using the previous private runtime ABI must be recompiled. Foreign ABI
-v2 and private runtime ABI 20 are checked at artifact admission.
+v2 and private runtime ABI 21 are checked at artifact admission. The stored-value
+field layout changes; the foreign call argument order remains unchanged.
+
+## Precompiled execution
+
+`EmbeddedRuntime::precompile` prepares an opaque `PrecompiledEmbeddedProgram`
+from actual Portable P compiled by Wasmtime. It retains the small raw P needed
+for requirements admission, its serialized native program and the exact optional
+Cargo Minimal Portable R key. Loading requires no JavaScript source files or
+source compiler. Linked custom profiles and NativeHost programs are rejected.
+
+Persist `PrecompiledEmbeddedProgram::as_bytes()` only with a trusted native-image
+producer. `PrecompiledEmbeddedProgram::from_bytes` is unsafe: the native payload
+must be unchanged Wasmtime serialization of the accompanying P, with matching
+compiler/runtime identity. Bounded framing, source fingerprints and checksums
+detect damage; they do not establish native-code provenance.
+
+Configure a fresh Wasmtime Engine with `configure_precompiled_wasm_runtime`,
+then attach the admitted image using `EmbeddedRuntime::from_precompiled`.
+The native compiler stays disabled. P requirements, Portable capability, inert
+initialization, runtime key and Wasmtime native compatibility are checked before
+instantiation. R uses this Cargo build's admitted image; missing or incompatible
+native images fail without compiling a replacement. The normal embedding
+Store, Linker, foreign calls, retained roots and async settlement remain in use.
+These images are host-specific Wasmtime caches of compiled Wasm; Portable Wasm
+bundles retain their existing format and role.
+
+The opt-in `runtime_precompiled` CLI example separates a producer process from
+one fresh execution process per workload. Its record retains load/decode costs,
+sampled load RSS, fresh-Store execution endpoints and GC capacity. It is a
+separate diagnostic and contributes no cases to the ordinary Scriptw/V8 graph.
 
 ## Modules and first-class functions
 

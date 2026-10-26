@@ -305,10 +305,10 @@ impl FunctionBuilder<'_> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(descriptor, schema, function);
-        function.instruction(&Instruction::I64Const(mask.as_i64()));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Const(0));
-        function.instruction(&Instruction::I64Ne);
+        function.instruction(&Instruction::I32Const(mask.as_i32()));
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32Ne);
     }
 
     fn emit_can_declare_global_inline(

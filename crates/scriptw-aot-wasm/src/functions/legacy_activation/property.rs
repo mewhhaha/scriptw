@@ -152,31 +152,31 @@ impl ReflectionProperty {
         current.load(schema, function);
         owned.load(schema, function);
         function.instruction(&Instruction::RefEq);
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&descriptor, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(DescriptorMask::ACCESSOR.as_i64()));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32And);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(
+        function.instruction(&Instruction::I32Const(
             DescriptorMask::CONFIGURABLE
                 .union(DescriptorMask::WRITABLE)
-                .as_i64(),
+                .as_i32(),
         ));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32And);
         actual.load(schema, function);
         expected.load(schema, function);
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32And);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         actual.clear(function);
         function.instruction(&Instruction::If(BlockType::Empty));
         // A live original owner captured a non-null prior token; publication

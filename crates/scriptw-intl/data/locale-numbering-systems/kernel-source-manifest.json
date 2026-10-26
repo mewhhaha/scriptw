@@ -24,18 +24,18 @@
   ],
   "decimal_numbering_systems": 78,
   "domain": "scriptw-locale-numbering-systems-native-v1",
-  "kernel_sha256": "fd6b041877a104673d7a859f5891cfa9a0a1e5493e2d56d3583e3ff05c9ad315",
+  "kernel_sha256": "784c91dca241d99d5503390bebeef551cd2ac361066198b1b86185947ec82004",
   "number_locales": 1082,
   "production_sources": [
     {
-      "bytes": 77072,
+      "bytes": 76942,
       "path": "Cargo.lock",
-      "sha256": "bae4362554d6f2199e68793454411f26098cd29186261280c0ec471ae64c2233"
+      "sha256": "27b3d2875d021a89102989e2f7d8659ecaeca8d949ed6a2bae5ae491d4ad9884"
     },
     {
-      "bytes": 6139,
+      "bytes": 6224,
       "path": "Cargo.toml",
-      "sha256": "352658e719c69b9c5e3f9034bc95209457b1c4a5154a862668e1f55a2bcf1b98"
+      "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
     },
     {
       "bytes": 90596,
@@ -43,9 +43,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 81533,
+      "bytes": 81609,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "3947901de7b973e9ef74734854e594cac2ae5da7b611219e86128525cbf48029"
+      "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
     },
     {
       "bytes": 33961,

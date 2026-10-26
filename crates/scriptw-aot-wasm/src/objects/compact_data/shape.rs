@@ -37,9 +37,20 @@ impl FunctionBuilder<'_> {
             f,
         );
         let shape = schema.reserve_gc_local(f).initialize(
-            schema
-                .struct_type::<CompactDataShape>()
-                .construct((GcOperand::reference(&key_table, schema),), f),
+            schema.struct_type::<CompactDataShape>().construct(
+                (
+                    GcOperand::reference(&key_table, schema),
+                    GcOperand::descriptor_word(
+                        StoredPropertyAttributes::Data {
+                            writable: true,
+                            enumerable: true,
+                            configurable: true,
+                        }
+                        .descriptor_word(),
+                    ),
+                ),
+                f,
+            ),
             f,
         );
         schema.array_type::<CompactShapeTable>().write(

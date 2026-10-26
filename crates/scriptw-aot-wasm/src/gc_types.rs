@@ -22,6 +22,7 @@ mod empty_arrays;
 use empty_arrays::{EmptyArrayGlobal, EmptyArrays};
 mod stored_undefined;
 use stored_undefined::StoredUndefinedGlobal;
+mod native_metadata_shapes;
 
 mod value;
 pub(crate) use value::*;
@@ -408,6 +409,8 @@ impl RuntimeGcTypes {
         let atomics_async_waiters_tail = GcRootGlobal::declare(&self.layouts, &mut globals);
         let empty_arrays = EmptyArrays::declare(&self.layouts, &mut globals);
         let stored_undefined = StoredUndefinedGlobal::declare(&self.layouts, &mut globals);
+        let configurable_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
+        let fixed_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
         let snapshot =
             snapshot.then(|| snapshot::SnapshotRoots::declare(&self.layouts, &mut globals));
         let module_guards_first = globals.len();
@@ -442,6 +445,8 @@ impl RuntimeGcTypes {
             atomics_async_waiters_tail,
             empty_arrays,
             stored_undefined,
+            configurable_native_metadata,
+            fixed_native_metadata,
             snapshot,
             module_guards: ModuleGuardGlobals {
                 first: module_guards_first,
@@ -765,6 +770,8 @@ pub(crate) struct RuntimeSchema {
     atomics_async_waiters_tail: GcRootGlobal<AtomicsAsyncWaiter>,
     empty_arrays: EmptyArrays,
     stored_undefined: StoredUndefinedGlobal,
+    configurable_native_metadata: GcRootGlobal<CompactDataShape>,
+    fixed_native_metadata: GcRootGlobal<CompactDataShape>,
     snapshot: Option<snapshot::SnapshotRoots>,
     module_guards: ModuleGuardGlobals,
 }

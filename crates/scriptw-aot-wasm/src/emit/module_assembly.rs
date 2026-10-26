@@ -1,8 +1,7 @@
+use super::*;
 use crate::function_layout::ModuleEntryRole;
 use crate::runtime_artifact::{EmittedModule, ModuleKind, RuntimeLayout};
 use crate::runtime_helpers::ProgramHook;
-
-use super::*;
 mod intl;
 use scriptw_intl::IntlDataSelection;
 use wasm_encoder::{
@@ -1335,6 +1334,7 @@ fn emit_script_module_with_factory(
             OrdinaryPropertyStorageEnsure, compile_ordinary_property_storage_ensure_helper;
             OrdinaryOwnDescriptor, compile_ordinary_own_descriptor_helper;
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
+            NativeFunctionAllocate, compile_native_function_allocate_helper;
             ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;
         );

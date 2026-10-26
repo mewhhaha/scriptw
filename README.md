@@ -8,6 +8,9 @@ Rust embedders can declare numeric, lossless UTF-16 string and byte foreign
 functions, retain and call JavaScript exports, and settle async host operations
 through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
 source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
+Trusted Wasmtime native program images also support fresh-process execution
+with the native compiler disabled; the contract records their host-specific
+format and explicit native-code admission boundary.
 
 ## Benchmarks vs V8
 
@@ -31,6 +34,9 @@ mappings where supported. Three Locale transforms, four NumberFormat and four
 PluralRules operations load their typed Locale/Number consumers; the remaining
 35 Intl operations still initialize the complete provider. Constant-string
 bootstrap uses a descriptor loop and shares immutable absent-value snapshots.
+Stored values and property descriptors use 32-byte GC records under the pinned
+collector. Native function `name`/`length` properties use compact storage and
+materialize descriptors when needed. Idle native compiler scratch is bounded.
 Large static regexp descriptors copy from checked program data, avoiding
 enormous native-compilation operand stacks.
 The linked checkpoint retains its measured first-use cost, allocation

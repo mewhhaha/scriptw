@@ -2196,7 +2196,7 @@ impl<V: sealed::Sealed, N: GcFieldNullability> GcOperand<'_, V, N> {
                 configurable,
             } => {
                 use crate::heap::StoredPropertyAttributes;
-                function.instruction(&Instruction::I64Const(0));
+                function.instruction(&Instruction::I32Const(0));
                 for (index, word) in [
                     (
                         writable,
@@ -2240,7 +2240,7 @@ impl<V: sealed::Sealed, N: GcFieldNullability> GcOperand<'_, V, N> {
                     configurable: false,
                 }
                 .descriptor_word();
-                function.instruction(&Instruction::I64Const(base.as_i64()));
+                function.instruction(&Instruction::I32Const(base.as_i32()));
                 for (index, word) in [
                     (
                         enumerable,
@@ -2273,10 +2273,9 @@ fn emit_descriptor_boolean(index: u32, word: crate::heap::DescriptorWord, functi
     function.instruction(&Instruction::LocalGet(index));
     function.instruction(&Instruction::I32Eqz);
     function.instruction(&Instruction::I32Eqz);
-    function.instruction(&Instruction::I64ExtendI32U);
-    function.instruction(&Instruction::I64Const(word.as_i64()));
-    function.instruction(&Instruction::I64Mul);
-    function.instruction(&Instruction::I64Or);
+    function.instruction(&Instruction::I32Const(word.as_i32()));
+    function.instruction(&Instruction::I32Mul);
+    function.instruction(&Instruction::I32Or);
 }
 pub(crate) trait GcI32Field: sealed::Sealed {}
 pub(crate) trait GcNumericI32Field: GcI32Field {}
@@ -2491,7 +2490,7 @@ impl GcOperand<'_, crate::heap::DescriptorWord, NonNullable> {
     }
     pub(crate) fn descriptor_word(value: crate::heap::DescriptorWord) -> Self {
         Self {
-            source: OperandSource::I64(value.as_i64()),
+            source: OperandSource::I32(value.as_i32()),
             shape: PhantomData,
         }
     }
@@ -2629,8 +2628,8 @@ impl GcStructType<StoredValue> {
     ) -> GcStackReference<StoredValue> {
         self.construct(
             (
-                GcOperand::i32_local(value.tag),
                 GcOperand::i64_local(value.scalar),
+                GcOperand::i32_local(value.tag),
                 GcOperand::eq_reference(&value.reference),
             ),
             function,

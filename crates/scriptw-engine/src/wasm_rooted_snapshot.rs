@@ -282,7 +282,8 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
         &mut self,
         descriptor: Rooted<EqRef>,
     ) -> Result<SnapshotRawDescriptor<NativeValue>, SnapshotRejection> {
-        let word = self.integer(descriptor, F::DescriptorFlags)? as u64;
+        let word = u32::try_from(self.integer(descriptor, F::DescriptorFlags)?)
+            .map_err(|_| invariant("descriptor flags exceed their unsigned word"))?;
         let (accessor, writable, enumerable, configurable) =
             scriptw_aot_wasm::snapshot_descriptor_flags(word)
                 .ok_or_else(|| invariant("descriptor has unknown bits"))?;
@@ -397,7 +398,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             WasmRuntimeValueTag::Arguments => {
                 return Err(SnapshotRejection::UnsupportedExotic {
                     exotic: SnapshotExotic::Arguments,
-                })
+                });
             }
             WasmRuntimeValueTag::Array => {
                 let reference = value.reference.unwrap();
@@ -487,13 +488,13 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 scriptw_ir::FunctionExecutionKind::Generator => {
                     return Err(SnapshotRejection::UnsupportedExotic {
                         exotic: SnapshotExotic::GeneratorFunction,
-                    })
+                    });
                 }
                 scriptw_ir::FunctionExecutionKind::Async
                 | scriptw_ir::FunctionExecutionKind::AsyncGenerator => {
                     return Err(SnapshotRejection::UnsupportedExotic {
                         exotic: SnapshotExotic::AsyncFunction,
-                    })
+                    });
                 }
             }
             let context = self.required_reference(object, F::FunctionContext)?;
@@ -745,6 +746,14 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             }
             let shape = self.required_reference(storage, F::CompactShape)?;
             let keys = self.required_reference(shape, F::CompactKeys)?;
+            let attributes = u32::try_from(self.integer(shape, F::CompactAttributes)?)
+                .map_err(|_| invariant("compact attributes exceed their unsigned word"))?;
+            let (accessor, writable, enumerable, configurable) =
+                scriptw_aot_wasm::snapshot_descriptor_flags(attributes)
+                    .ok_or_else(|| invariant("compact attributes have unknown bits"))?;
+            if accessor {
+                return Err(invariant("compact data shape has accessor attributes"));
+            }
             let tags = self.required_reference(storage, F::CompactTags)?;
             let scalars = self.required_reference(storage, F::CompactScalars)?;
             let references = self.required_reference(storage, F::CompactReferences)?;
@@ -799,9 +808,9 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                                 scalar,
                                 reference,
                             },
-                            writable: true,
-                            enumerable: true,
-                            configurable: true,
+                            writable,
+                            enumerable,
+                            configurable,
                         },
                     },
                 ));

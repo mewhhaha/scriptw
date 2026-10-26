@@ -515,7 +515,16 @@ impl FunctionBuilder<'_> {
         let executable_kind = meta.entry.executable_kind()?;
         let program_operand = inputs.program.capture_operand(executable_kind, schema)?;
         let object = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(Some(inputs.internal_prototype), function)?,
+            match executable_kind {
+                crate::gc_types::ExecutableCodeKind::JavaScript => self
+                    .emit_alloc_plain_object_with_prototype(
+                        Some(inputs.internal_prototype),
+                        function,
+                    )?,
+                crate::gc_types::ExecutableCodeKind::StandardBuiltin
+                | crate::gc_types::ExecutableCodeKind::HostBuiltin => self
+                    .emit_alloc_native_function_header(meta, inputs.internal_prototype, function)?,
+            },
             function,
         );
         let code = schema

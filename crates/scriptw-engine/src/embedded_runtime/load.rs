@@ -88,7 +88,7 @@ impl EmbeddedNativeRuntime {
             }
             Err(error) => {
                 if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-                    eprintln!("scriptw wasm trace: runtime-native-bundle incompatible: {error:#}; compiling normally");
+                    eprintln!("scriptw wasm trace: runtime-native-bundle incompatible: {error:#}");
                 }
                 None
             }

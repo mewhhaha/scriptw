@@ -166,7 +166,7 @@ closed_scalar_storage!(
     scriptw_intl::PluralCategorySet,
 );
 impl sealed::Sealed for crate::heap::DescriptorWord {}
-scalar_storage!(crate::heap::DescriptorWord, StorageType::Val(ValType::I64));
+scalar_storage!(crate::heap::DescriptorWord, StorageType::Val(ValType::I32));
 impl sealed::Sealed for scriptw_intl::DateTimeFormatAvailability {}
 scalar_storage!(
     scriptw_intl::DateTimeFormatAvailability,
@@ -801,8 +801,10 @@ macro_rules! gc_layout_registry {
 
 gc_layout_registry! {
         struct StoredValue => StoredValueSchema {
-            TAG: I32Value, Immutable, NonNullable;
+            // Keep the 64-bit payload first: the copying collector can then
+            // fit all fields after its header without an extra alignment unit.
             SCALAR: I64Value, Immutable, NonNullable;
+            TAG: I32Value, Immutable, NonNullable;
             REFERENCE: AnyGcRef, Immutable, Nullable;
         }
         struct OrdinaryObject => OrdinaryObjectSchema {
@@ -861,6 +863,7 @@ gc_layout_registry! {
         // Shape graphs retain only immutable primitive string metadata.
         struct CompactDataShape => CompactDataShapeSchema {
             KEYS: GcRef<CompactShapeKeys>, Immutable, NonNullable;
+            ATTRIBUTES: crate::heap::DescriptorWord, Immutable, NonNullable;
         }
         array CompactShapeTable => CompactShapeTableSchema { ELEMENT: GcRef<CompactDataShape>, Mutable, Nullable; }
         array CompactShapePageTable => CompactShapePageTableSchema { ELEMENT: GcRef<CompactShapeTable>, Mutable, Nullable; }

@@ -59,6 +59,7 @@ snapshot_fields!(StoredTag => Stored, StoredValueSchema::TAG,
     CompactScalars => CompactStorage, CompactDataStorageSchema::SCALARS,
     CompactReferences => CompactStorage, CompactDataStorageSchema::REFERENCES,
     CompactKeys => CompactShape, CompactDataShapeSchema::KEYS,
+    CompactAttributes => CompactShape, CompactDataShapeSchema::ATTRIBUTES,
     PropertiesEntries => PropertyStorage, OrdinaryPropertyStorageSchema::ENTRIES,
     PropertiesLength => PropertyStorage, OrdinaryPropertyStorageSchema::LENGTH,
     PropertyKey => Property, PropertyEntrySchema::KEY, PropertyDescriptor => Property, PropertyEntrySchema::DESCRIPTOR,
@@ -91,7 +92,7 @@ pub fn snapshot_array_storage_mode(code: i32) -> Option<ArrayIndexedStorageMode>
     .find(|mode| mode.encode() == code)
 }
 
-pub fn snapshot_descriptor_flags(word: u64) -> Option<(bool, bool, bool, bool)> {
+pub fn snapshot_descriptor_flags(word: u32) -> Option<(bool, bool, bool, bool)> {
     use crate::heap::DescriptorMask;
     if word & !DescriptorMask::KIND_AND_ATTRIBUTES.bits() != 0 {
         return None;

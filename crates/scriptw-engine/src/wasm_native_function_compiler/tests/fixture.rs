@@ -53,7 +53,7 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeFunctionSignature {
         ],
     )
     .unwrap();
-    let stored_fields = [
+    let mut stored_fields = [
         GcHostField::StoredTag,
         GcHostField::StoredScalar,
         GcHostField::StoredReference,
@@ -62,6 +62,7 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeFunctionSignature {
         GcHostLayout::StoredValue.field_count(),
         Some(stored_fields.len() as u32)
     );
+    stored_fields.sort_by_key(|field| field.definition().index());
     let stored = StructType::new(
         engine,
         stored_fields.into_iter().map(|field| {

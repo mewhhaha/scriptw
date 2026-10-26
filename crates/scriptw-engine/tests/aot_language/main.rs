@@ -15,6 +15,7 @@ mod aot_class_field_named_evaluation;
 mod aot_class_initializer_grammar_context;
 mod aot_class_name_source;
 mod aot_compact_array_literals;
+mod aot_compact_native_metadata;
 mod aot_compound_addition_flow;
 mod aot_compound_assignment_saved_value;
 mod aot_computed_numeric_method_calls;

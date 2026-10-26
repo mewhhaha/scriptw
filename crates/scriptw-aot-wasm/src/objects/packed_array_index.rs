@@ -591,18 +591,18 @@ impl FunctionBuilder<'_> {
         handled.set_constant(0, f);
         s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, f);
         self.open_frame(ControlFrameKind::If, f);
-        let flags = s.reserve_i64_local(f);
+        let flags = s.reserve_i32_local(f);
         s.field(PropertyDescriptorSchema::FLAGS)
             .read(descriptor, s, f)
-            .store_i64(flags, f);
+            .store(flags, f);
         flags.load(f);
-        f.instruction(&Instruction::I64Const(
+        f.instruction(&Instruction::I32Const(
             DescriptorMask::WRITABLE
                 .union(DescriptorMask::ENUMERABLE)
                 .union(DescriptorMask::CONFIGURABLE)
-                .as_i64(),
+                .as_i32(),
         ));
-        f.instruction(&Instruction::I64Eq);
+        f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         let stored = s.reserve_gc_local(f).initialize(
             s.field(PropertyDescriptorSchema::VALUE)
@@ -627,7 +627,7 @@ impl FunctionBuilder<'_> {
         self.emit_materialize_packed_array(storage, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.release_i64_local(flags, f);
+        s.release_i32_local(flags, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         handled

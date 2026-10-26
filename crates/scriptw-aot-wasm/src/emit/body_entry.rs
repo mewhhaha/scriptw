@@ -63,6 +63,7 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeHelperId::OrdinaryPropertyStorageEnsure
             | RuntimeHelperId::OrdinaryOwnDescriptor
             | RuntimeHelperId::CompactLiteralAllocate
+            | RuntimeHelperId::NativeFunctionAllocate
             | RuntimeHelperId::ArgumentListAppend
             | RuntimeHelperId::CachedPropertyRead => {}
             // These bodies call their physical typed kernel directly. Their

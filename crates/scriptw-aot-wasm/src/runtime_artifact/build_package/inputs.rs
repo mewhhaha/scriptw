@@ -149,32 +149,50 @@ impl<'a> RuntimeArtifactInputs<'a> {
         }
     }
 
+    fn admit_package(self, identity: &cache::RuntimeIdentity) -> Option<RuntimeArtifact> {
+        match self.package? {
+            Candidate::External {
+                bytes,
+                expected_source,
+            } => envelope::decode_with_jobs(bytes, identity, expected_source, self.admission_jobs),
+            Candidate::ImmutableBuild {
+                bytes,
+                expected_source,
+            } => decode_immutable_build(bytes, identity, expected_source, self.admission_jobs),
+            Candidate::ImmutableMinimal(proof) => {
+                metadata::BuildMetadata::decode(proof, self.source_compilation_profile)
+                    .and_then(|receipt| receipt.into_runtime(identity))
+            }
+        }
+    }
+
+    /// Admit only the supplied raw package. Missing or rejected input is an
+    /// error: this boundary never reads a cache, parses JavaScript or emits R.
+    /// Safe external candidates retain full Wasm/body/layout admission; only
+    /// the explicit immutable-build authority can reuse producer facts.
+    pub fn admit_supplied_package(
+        self,
+        selection: &scriptw_intl::IntlDataSelection,
+    ) -> Result<Arc<RuntimeArtifact>, EmitError> {
+        if self.package.is_none() {
+            return Err(EmitError::unsupported("no runtime package was supplied"));
+        }
+        let identity = self.admit_identity(selection)?;
+        self.admit_package(&identity).map(Arc::new).ok_or_else(|| {
+            EmitError::unsupported(
+                "supplied runtime package failed identity, Wasm or layout admission",
+            )
+        })
+    }
+
     pub(in crate::runtime_artifact) fn load_or_emit(
         self,
         identity: &cache::RuntimeIdentity,
         emit: impl FnOnce() -> Result<Arc<RuntimeArtifact>, EmitError>,
     ) -> Result<Arc<RuntimeArtifact>, EmitError> {
-        if let Some(candidate) = self.package {
+        if self.package.is_some() {
             let started = std::time::Instant::now();
-            let admitted = match candidate {
-                Candidate::External {
-                    bytes,
-                    expected_source,
-                } => envelope::decode_with_jobs(
-                    bytes,
-                    identity,
-                    expected_source,
-                    self.admission_jobs,
-                ),
-                Candidate::ImmutableBuild {
-                    bytes,
-                    expected_source,
-                } => decode_immutable_build(bytes, identity, expected_source, self.admission_jobs),
-                Candidate::ImmutableMinimal(proof) => {
-                    metadata::BuildMetadata::decode(proof, self.source_compilation_profile)
-                        .and_then(|receipt| receipt.into_runtime(identity))
-                }
-            };
+            let admitted = self.admit_package(identity);
             if let Some(runtime) = admitted {
                 if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
                     eprintln!(

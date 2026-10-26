@@ -47,11 +47,23 @@ fn strict_public_portable_package_codec_never_uses_the_emitter_fallback() {
     let admitted = admit_portable_runtime_package(&bytes, &selection, &SOURCE).unwrap();
     assert_eq!(admitted.key(), produced.key());
     assert_eq!(admitted.bytes(), produced.wasm());
+    let supplied = RuntimeArtifactInputs::new(None).with_build_package(&bytes, &SOURCE);
+    assert_eq!(
+        supplied.admit_supplied_package(&selection).unwrap().key(),
+        produced.key()
+    );
+    assert!(RuntimeArtifactInputs::new(None)
+        .admit_supplied_package(&selection)
+        .is_err());
     assert!(admit_portable_runtime_package(&[], &selection, &SOURCE).is_err());
     assert!(admit_portable_runtime_package(&bytes, &selection, &[20; 32]).is_err());
     let mut corrupted = bytes.clone();
     let end = corrupted.len() - 1;
     corrupted[end] ^= 1;
+    assert!(RuntimeArtifactInputs::new(None)
+        .with_build_package(&corrupted, &SOURCE)
+        .admit_supplied_package(&selection)
+        .is_err());
     assert!(admit_portable_runtime_package(&corrupted, &selection, &SOURCE).is_err());
     let mut forged = bytes;
     forged[12] ^= 1;

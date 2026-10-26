@@ -25,11 +25,11 @@ fn emit_flag(flag: DescriptorFlag, function: &mut Function) {
         DescriptorFlag::BooleanPayload(value) => value.load(function),
     }
 }
-fn emit_mask(flags: I64Local, mask: DescriptorMask, function: &mut Function) {
+fn emit_mask(flags: I32Local, mask: DescriptorMask, function: &mut Function) {
     flags.load(function);
-    function.instruction(&Instruction::I64Const(mask.as_i64()));
-    function.instruction(&Instruction::I64And);
-    function.instruction(&Instruction::I64Eqz);
+    function.instruction(&Instruction::I32Const(mask.as_i32()));
+    function.instruction(&Instruction::I32And);
+    function.instruction(&Instruction::I32Eqz);
     function.instruction(&Instruction::I32Eqz);
 }
 fn emit_terms(terms: KindTerms<WasmLocals<'_>>, function: &mut Function) {
@@ -83,7 +83,7 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         let current_value = schema.reserve_value_local(function);
         let classification = classify(incoming);
         let data_terms = classification.terms(DescriptorSide::Data);
@@ -95,7 +95,7 @@ impl FunctionBuilder<'_> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(current, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         emit_mask(flags, DescriptorMask::CONFIGURABLE, function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -166,7 +166,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         current_value.clear(function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         Ok(())
     }
 
@@ -198,7 +198,7 @@ impl FunctionBuilder<'_> {
         let configurable = schema.reserve_i32_local(function);
         let requested_data = schema.reserve_i32_local(function);
         let requested_accessor = schema.reserve_i32_local(function);
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         value.set_undefined(function);
         getter.set_undefined(function);
         setter.set_undefined(function);
@@ -223,7 +223,7 @@ impl FunctionBuilder<'_> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&record, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         for (output, mask) in [
             (accessor, DescriptorMask::ACCESSOR),
             (writable, DescriptorMask::WRITABLE),
@@ -335,7 +335,7 @@ impl FunctionBuilder<'_> {
         stored_setter.clear(function);
         stored_getter.clear(function);
         stored_value.clear(function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         schema.release_i32_local(requested_accessor, function);
         schema.release_i32_local(requested_data, function);
         schema.release_i32_local(configurable, function);
@@ -605,7 +605,7 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         let writable = schema.reserve_i32_local(function);
         let enumerable = schema.reserve_i32_local(function);
         let configurable = schema.reserve_i32_local(function);
@@ -613,7 +613,7 @@ impl FunctionBuilder<'_> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(source, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         for (out, mask) in [
             (writable, DescriptorMask::WRITABLE),
             (enumerable, DescriptorMask::ENUMERABLE),
@@ -671,7 +671,7 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(configurable, function);
         schema.release_i32_local(enumerable, function);
         schema.release_i32_local(writable, function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
     }
 
     fn emit_proxy_define_own_property(
@@ -795,12 +795,12 @@ impl FunctionBuilder<'_> {
             function,
         );
         self.emit_validate_stored_descriptor(&record, incoming, valid, function)?;
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&record, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         setting_non_configurable.load(function);
         emit_mask(flags, DescriptorMask::CONFIGURABLE, function);
         function.instruction(&Instruction::I32And);
@@ -820,7 +820,7 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32And);
             self.emit_descriptor_reject_if_true(valid, function);
         }
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         record.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -1245,7 +1245,7 @@ impl FunctionBuilder<'_> {
         let keys = self.emit_array_indexed_keys(array, function);
         let remaining = schema.reserve_i32_local(function);
         let slot = schema.reserve_i32_local(function);
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .array_type::<crate::gc_types::ArrayIndexKeyTable>()
             .length(&keys, schema, function);
@@ -1277,7 +1277,7 @@ impl FunctionBuilder<'_> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&descriptor, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         emit_mask(flags, DescriptorMask::CONFIGURABLE, function);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_array_indexed_delete(array, cursor, function)?;
@@ -1305,7 +1305,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         schema.release_i32_local(slot, function);
         schema.release_i32_local(remaining, function);
         keys.clear(function);

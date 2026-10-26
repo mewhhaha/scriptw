@@ -37,6 +37,7 @@ temporal_rs = { path = "vendor/temporal_rs-0.1.0" }
 timezone_provider = { path = "vendor/timezone_provider-0.1.2" }
 wasmtime = { path = "vendor/wasmtime-47.0.0" }
 wasmtime-internal-cache = { path = "vendor/wasmtime-internal-cache-47.0.0" }
+wasmtime-internal-cranelift = { path = "vendor/wasmtime-internal-cranelift-47.0.0" }
 
 # Developer builds keep Scriptw's large IR/backend crates cheap to rebuild,
 # while compiling third-party code (notably Wasmtime/Cranelift) once at a

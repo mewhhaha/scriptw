@@ -3053,18 +3053,18 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         self.emit_object_boolean_result(boolean, result, function);
         function.instruction(&Instruction::Else);
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&descriptor, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(
-            DescriptorMask::CONFIGURABLE.as_i64(),
+        function.instruction(&Instruction::I32Const(
+            DescriptorMask::CONFIGURABLE.as_i32(),
         ));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         function.instruction(&Instruction::I32Const(0));
         boolean.store(function);
@@ -3110,7 +3110,7 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.emit_object_boolean_result(boolean, result, function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         descriptor.clear(function);
@@ -4112,16 +4112,16 @@ impl<'a> FunctionBuilder<'a> {
             descriptor.load(schema, function).require_non_null(function),
             function,
         );
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&present, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(DescriptorMask::ACCESSOR.as_i64()));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         let value_slot = schema.reserve_gc_local(function);
         let value = value_slot.initialize(
@@ -4139,7 +4139,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::I32Const(1));
         done.store(function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         present.clear(function);
         function.instruction(&Instruction::End);
         descriptor.clear(function);

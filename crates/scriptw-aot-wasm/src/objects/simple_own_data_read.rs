@@ -2,9 +2,77 @@
 //! boxing. Keys have already completed ToPropertyKey; no prototype or accessor
 //! lookup can be bypassed by these concrete representation guards.
 use super::*;
-use crate::gc_types::{GcNullability, StringValue};
+use crate::gc_types::{
+    CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability, StringValue,
+};
 
 impl FunctionBuilder<'_> {
+    /// Plain objects have ordinary data semantics. Callable headers join this
+    /// path only while their own storage is compact native metadata; source or
+    /// promoted callable dictionaries retain legacy reflection handling.
+    pub(in crate::objects) fn emit_simple_data_header(
+        &mut self,
+        target: &ValueLocals,
+        function: &mut Function,
+    ) -> GcLocal<OrdinaryObject, Nullable> {
+        let schema = self.runtime_schema();
+        let result = schema
+            .reserve_gc_local::<OrdinaryObject, Nullable>(function)
+            .initialize_null(schema, function);
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        result.replace(
+            target
+                .cast_reference::<OrdinaryObject>(schema, function)
+                .nullable(),
+            function,
+        );
+        function.instruction(&Instruction::Else);
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<FunctionObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let callable = schema.reserve_gc_local(function).initialize(
+            target.cast_reference::<FunctionObject>(schema, function),
+            function,
+        );
+        let header = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::OBJECT)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        let storage = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        storage.is_subtype::<CompactDataStorage>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        result.replace(header.load(schema, function).nullable(), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        storage.clear(function);
+        header.clear(function);
+        callable.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        result
+    }
+
     pub(super) fn emit_primitive_string_length_read(
         &mut self,
         target: &ValueLocals,
@@ -65,17 +133,12 @@ impl FunctionBuilder<'_> {
         let handled = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(0));
         handled.store(function);
-        target.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
+        let header = self.emit_simple_data_header(target, function);
+        header.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
-        // Every exotic stores a separate OrdinaryObject header; its outer GC
-        // reference is a distinct type and cannot enter this concrete arm.
         let object = schema.reserve_gc_local(function).initialize(
-            target.cast_reference::<OrdinaryObject>(schema, function),
+            header.load(schema, function).require_non_null(function),
             function,
         );
         let value = schema.reserve_value_local(function);
@@ -89,6 +152,7 @@ impl FunctionBuilder<'_> {
         object.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        header.clear(function);
         Ok(handled)
     }
 }

@@ -241,8 +241,14 @@ class ImmutableReceiptGuards(unittest.TestCase):
         self.rejected(path, "selection,self.source_compilation_profile,self.admission_jobs,",
                       "selection,RuntimeSourceCompilationProfile::Portable,self.admission_jobs,", invariant)
         path = profile.A + "runtime_artifact/build_package/inputs.rs"
-        self.rejected(path, "envelope::decode_with_jobs(bytes,identity,expected_source,self.admission_jobs,)",
+        self.rejected(path, "envelope::decode_with_jobs(bytes,identity,expected_source,self.admission_jobs)",
                       "decode_immutable_build(bytes,identity,expected_source,self.admission_jobs)", invariant)
+
+    def test_supplied_only_packages_keep_the_checked_no_emission_boundary(self):
+        invariant = "supplied-only admission reuses exact identity and byte checks without emission or cache fallback"
+        path = profile.A + "runtime_artifact/build_package/inputs.rs"
+        self.rejected(path, "self.admit_package(&identity).map(Arc::new).ok_or_else(",
+                      "cache::load_or_emit(&identity,self.cache,emit).ok_or_else(", invariant)
 
     def test_receipt_still_checks_source_profile_spans_and_exact_package_owner(self):
         invariant = "compact receipt retains checked framing, exact profile, bounded layout and package ownership"

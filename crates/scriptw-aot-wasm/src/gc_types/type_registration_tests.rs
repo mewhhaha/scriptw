@@ -1,8 +1,11 @@
+#![cfg(test)]
 use super::*;
 use crate::module::StaticSignature;
 use crate::runtime_artifact::ModuleKind;
 use crate::runtime_helpers::{HelperOwner, HelperTypeRegion, ProgramHook, RuntimeHelperId};
 use wasmparser::{CompositeInnerType, Parser, Payload, SubType, Validator, WasmFeatures};
+
+mod compact_records;
 
 fn encoded(kind: ModuleKind<'_>) -> (FinalizedRuntimeModule, Vec<u8>) {
     let runtime =
@@ -399,11 +402,15 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         ))
     };
     let shape = fields(GcLayout::CompactDataShape);
-    assert_eq!(shape.len(), 1);
+    assert_eq!(shape.len(), 2);
     assert!(shape.iter().all(|field| !field.mutable));
     assert_eq!(
         shape[0].element_type,
         reference(GcLayout::CompactShapeKeys, false)
+    );
+    assert_eq!(
+        shape[1].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I32)
     );
     let CompositeInnerType::Array(keys) = &types[index(GcLayout::CompactShapeKeys) as usize]
         .composite_type

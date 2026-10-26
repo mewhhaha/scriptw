@@ -36,7 +36,7 @@
   "owners": [
     {
       "path": "Cargo.toml",
-      "sha256": "352658e719c69b9c5e3f9034bc95209457b1c4a5154a862668e1f55a2bcf1b98"
+      "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
     },
     {
       "path": "crates/scriptw-intl/Cargo.toml",
@@ -168,7 +168,7 @@
     },
     {
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "3947901de7b973e9ef74734854e594cac2ae5da7b611219e86128525cbf48029"
+      "sha256": "719242e4aa2df1326571b96c32598ca4e65ff7049b8f40c7ac519764aea4c6c8"
     },
     {
       "path": "crates/scriptw-intl/src/collator_image/projection/rows.rs",
@@ -253,5 +253,5 @@
   "utf16_policy": "direct pinned compare_utf16; isolated units have ICU replacement weights, valid pairs are scalar; raw units preserved; no lexical tie-breaker",
   "available_locales_count": null,
   "available_sort_collations_count": null,
-  "data_sha256": "3db3f54a6dabc25d3d3418023dd46424a6f84ea2fc2d8a42bf6c780f0cba46f9"
+  "data_sha256": "8cfe45306a4b08cc13c7dfe2a936e20a95930c2ca582a38b95a8cf44b06655d4"
 }

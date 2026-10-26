@@ -1,8 +1,8 @@
 //! Sole native GetOwnProperty owner, including recursive Proxy targets.
 use super::*;
 use crate::gc_types::{
-    CompletionLocals, GcLocal, I32Local, I64Local, Nullable, PropertyDescriptor,
-    PropertyDescriptorSchema, ProxyObject, StoredValue, ValueLocals,
+    CompletionLocals, GcLocal, I32Local, Nullable, PropertyDescriptor, PropertyDescriptorSchema,
+    ProxyObject, StoredValue, ValueLocals,
 };
 use crate::objects::ProxyRevocationRoute;
 use crate::objects::{
@@ -123,12 +123,12 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(record, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         let accessor = schema.reserve_i32_local(function);
         let data = schema.reserve_i32_local(function);
         let writable = schema.reserve_i32_local(function);
@@ -141,9 +141,9 @@ impl FunctionBuilder<'_> {
             (DescriptorMask::CONFIGURABLE, configurable),
         ] {
             flags.load(function);
-            function.instruction(&Instruction::I64Const(mask.as_i64()));
-            function.instruction(&Instruction::I64And);
-            function.instruction(&Instruction::I64Eqz);
+            function.instruction(&Instruction::I32Const(mask.as_i32()));
+            function.instruction(&Instruction::I32And);
+            function.instruction(&Instruction::I32Eqz);
             function.instruction(&Instruction::I32Eqz);
             destination.store(function);
         }
@@ -201,7 +201,7 @@ impl FunctionBuilder<'_> {
         for local in [configurable, enumerable, writable, data, accessor] {
             schema.release_i32_local(local, function);
         }
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         Ok(())
     }
 }

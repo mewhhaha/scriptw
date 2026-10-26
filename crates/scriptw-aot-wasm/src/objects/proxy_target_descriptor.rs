@@ -19,18 +19,18 @@ impl CompletedProxyTargetDescriptor {
     fn emit_flag_i32(&self, mask: DescriptorMask, schema: &RuntimeSchema, function: &mut Function) {
         self.emit_found_i32(schema, function);
         function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         schema
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&self.descriptor, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(mask.as_i64()));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Const(mask.as_i32()));
+        function.instruction(&Instruction::I32And);
         function.instruction(&Instruction::I32Eqz);
-        schema.release_i64_local(flags, function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(flags, function);
         function.instruction(&Instruction::Else);
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::End);

@@ -8696,7 +8696,7 @@ impl<'a> FunctionBuilder<'a> {
         let define = schema.reserve_completion(function);
         let count = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
-        let flags = schema.reserve_i64_local(function);
+        let flags = schema.reserve_i32_local(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
         self.throw_handler_stack.push(exit);
         self.compile_nullish_tagged_i32(source.tag(), function)?;
@@ -8733,13 +8733,13 @@ impl<'a> FunctionBuilder<'a> {
             .struct_type::<PropertyDescriptor>()
             .field(PropertyDescriptorSchema::FLAGS)
             .read(&descriptor, schema, function)
-            .store_i64(flags, function);
+            .store(flags, function);
         flags.load(function);
-        function.instruction(&Instruction::I64Const(
-            crate::heap::DescriptorBit::Enumerable.word() as i64,
+        function.instruction(&Instruction::I32Const(
+            crate::heap::DescriptorBit::Enumerable.word() as i32,
         ));
-        function.instruction(&Instruction::I64And);
-        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(skip, function);
         // CopyDataProperties performs Get on the ToObject result, rather than
         // GetV's original primitive receiver.
@@ -8795,7 +8795,7 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         keys.clear(function);
-        schema.release_i64_local(flags, function);
+        schema.release_i32_local(flags, function);
         schema.release_i32_local(index, function);
         schema.release_i32_local(count, function);
         define.clear(function);
