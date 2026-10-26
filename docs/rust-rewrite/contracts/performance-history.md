@@ -1,20 +1,19 @@
 # README performance graphic and retained measurements
 
-The [compiler benchmark workflow](compiler-comparison.md) can replace the README
-graphic with fresh, co-measured Scriptw, Scriptc/WASI and V8 evidence. Once
-`compiler-comparison.json` exists, the renderer selects that checked report by
-default. The dated two-runtime checkpoint below remains historical evidence;
-use its explicit `--report` path to render it separately.
+The README shows two images from the [compiler benchmark workflow](compiler-comparison.md):
+[execution time](../assets/execution-performance.svg) and
+[post-execution process memory](../assets/execution-memory.svg), comparing
+Scriptw, Scriptc/WASI and V8. Both use the checked `compiler-comparison.json`
+report and preserve its measured compiler identity and date. The renderer's
+default and `--check` commands process both images.
 
-The README shows one graph: the latest verified Scriptw execution measurements
-against V8. Publishing or rendering evidence preserves its measured compiler
-identity and date. Historical startup measurements remain available in their
-own evidence manifest and are not displayed in the README.
+The dated two-runtime checkpoint below remains historical evidence. Use its
+explicit `--report` and a separate `--output` path to render it without changing
+the README images. Historical startup measurements remain in their own manifest.
 
-## Execution checkpoint graphic
+## Historical execution checkpoint graphic
 
-The README image is
-[`execution-performance.svg`](../assets/execution-performance.svg), from the
+The earlier combined image came from the
 [2026-10-26 runtime-admission memory checkpoint](../execution-memory-admission-20261025.md).
 It shows all 17 fresh-Store/Realm workloads as paired bars: V8 in orange and
 the latest measured Scriptw in blue. There is no baseline series. Both panels
@@ -29,11 +28,12 @@ V8's `memoryUsage().after` while its context remains alive. They include
 host/runtime, setup and retained warmup effects. They are not synchronized
 heap measurements, live JavaScript bytes or whole-child high-water RSS.
 
-Regenerate or check the graph offline, without running JavaScript or compiling:
+Render that historical graph offline, without running JavaScript or compiling:
 
 ```sh
-python3 scripts/render-execution-performance.py
-python3 scripts/render-execution-performance.py --check
+python3 scripts/render-execution-performance.py \
+  --report docs/rust-rewrite/execution-memory-admission-20261025.json \
+  --output /tmp/historical-execution-performance.svg
 ```
 
 The renderer requires matplotlib and uses its bundled DejaVu Sans font.

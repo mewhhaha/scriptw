@@ -2,7 +2,7 @@
 
 [Compiler benchmarks](../../../.github/workflows/compiler-benchmarks.yaml) is a
 manually dispatched GitHub Actions workflow. Run it on `main` with `publish=true`
-to measure and commit the README graph, JSON report, Markdown table and compressed
+to measure and commit the README images, JSON report, Markdown table and compressed
 raw evidence directly to `main`:
 
 ```sh
@@ -47,19 +47,25 @@ includes Wasm native compilation, but excludes its JavaScript frontend process.
 The graph compares complete host-process footprints under these recorded paths.
 
 A smoke program must build and run successfully before per-case failures become
-data. Every original case stays in the graph. A Scriptc compile failure, runtime
+data. Every original case stays in both images. A Scriptc compile failure, runtime
 failure or changed checksum has a visible label and no performance bar. Inputs
 with lone UTF-16 surrogates keep their original contents and expected output.
 Failures and timeouts retain commands, exit statuses, stdout and stderr. A failed
 Scriptw or V8 reference run aborts publication. Incomplete evidence remains an
 Actions artifact and cannot replace the graph.
 
-After successful publication, verify or render offline:
+The README shows separate images for [execution time](../assets/execution-performance.svg)
+and [post-execution process RSS](../assets/execution-memory.svg). Both retain the
+same runtime legend, complete workload inventory, measured source and date.
+
+After successful publication, verify or regenerate both images offline:
 
 ```sh
 python3 -B scripts/benchmark-compilers.py check docs/rust-rewrite/compiler-comparison.json
 python3 -B scripts/render-execution-performance.py --check
-python3 -B scripts/render-execution-performance.py --preview /tmp/compiler-comparison.png
+python3 -B scripts/render-execution-performance.py
+python3 -B scripts/render-execution-performance.py --metric execution --preview /tmp/execution-time.png
+python3 -B scripts/render-execution-performance.py --metric memory --preview /tmp/process-memory.png
 ```
 
 The workflow pins matplotlib 3.11.2 for byte-stable SVG verification. Historical

@@ -30,4 +30,6 @@ Scriptc receives the unchanged JavaScript prefixed only with the recorded `print
 | join-singleton-1024.js | 3.942 | 0.285 | 0.209 |
 | join-small-1024.js | 5.594 | 0.349 | 0.302 |
 
+[Execution time](assets/execution-performance.svg) · [Process memory](assets/execution-memory.svg)
+
 [Checked report](compiler-comparison.json) · [Raw evidence](compiler-comparison.tar.gz) · [Workflow and reproduction](contracts/compiler-comparison.md).

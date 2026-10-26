@@ -11,7 +11,9 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 
 ## Benchmarks
 
-![Scriptw, Scriptc WASI and V8: execution time and post-execution process RSS for all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
+![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
+
+![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
 
 **Measured 2026-10-26 on GitHub Actions**, compiler `8517b2046`.
 All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
