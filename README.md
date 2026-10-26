@@ -16,6 +16,11 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 [Latest measurements and evidence](docs/rust-rewrite/execution-memory-admission-20261025.md)
 · [Regenerate or check this graph](docs/rust-rewrite/contracts/performance-history.md#execution-checkpoint-graphic).
 
+The manually dispatched [compiler benchmark workflow](.github/workflows/compiler-benchmarks.yaml)
+remeasures Scriptw, Scriptc/WASI through Zig, and V8 together, then publishes the
+checked graph and raw evidence directly to `main`.
+[Method and reproduction](docs/rust-rewrite/contracts/compiler-comparison.md).
+
 Against the previous compiler in a paired rerun, all 17 fresh-Realm workloads
 use **28–34% less post-execution process RSS**. Integer execution fell from
 **121.61 → 81.69 MiB** (paired V8: **59.99 MiB**); retained objects fell from

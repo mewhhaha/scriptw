@@ -1,0 +1,117 @@
+name: Compiler benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Commit checked graph and evidence to main
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compiler-benchmarks-main
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4; benchmark oracle and external compiler only
+        with:
+          node-version: '24.12.0'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          prefix-key: compiler-benchmarks-v1
+      - name: Install pinned external benchmark tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lld time
+          npm install --prefix "$RUNNER_TEMP/scriptc" --no-audit --no-fund --save-exact scriptc@0.4.5 @scriptc/runtime-wasm32-wasi@0.4.5
+          curl --fail --location --retry 3 https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o "$RUNNER_TEMP/zig.tar.xz"
+          printf '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  %s\n' "$RUNNER_TEMP/zig.tar.xz" | sha256sum --check
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          printf '%s\n' "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+          printf 'SCRIPTC_RUNTIME_PACK=%s\n' "$RUNNER_TEMP/scriptc/node_modules/@scriptc/runtime-wasm32-wasi" >> "$GITHUB_ENV"
+          python3 -m pip install matplotlib==3.11.2
+      - name: Validate tooling and build benchmark hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest scripts.tests.test_compiler_comparison scripts.tests.test_tooling_benchmark_boundary -v
+          bash scripts/check-no-legacy-js.sh
+          rustfmt --edition 2021 --check crates/scriptw-cli/examples/wasi_baseline.rs
+          bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --example runtime_baseline --example wasi_baseline --message-format=json > "$RUNNER_TEMP/benchmark-cargo.jsonl"
+      - name: Measure all compilers on the same runner
+        env:
+          BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          bash scripts/run-benchmark-scope.sh python3 -B scripts/benchmark-compilers.py run \
+            --scriptw-runner "$PWD/target/release/examples/runtime_baseline" \
+            --wasi-runner "$PWD/target/release/examples/wasi_baseline" \
+            --scriptc "$RUNNER_TEMP/scriptc/node_modules/.bin/scriptc" \
+            --output "$RUNNER_TEMP/compiler-measurements" \
+            --build-log "$RUNNER_TEMP/benchmark-cargo.jsonl" \
+            --package-lock "$RUNNER_TEMP/scriptc/package-lock.json"
+      - name: Retain measurements and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compiler-measurements
+          path: |
+            ${{ runner.temp }}/compiler-measurements
+            ${{ runner.temp }}/benchmark-cargo.jsonl
+          if-no-files-found: warn
+          retention-days: 30
+
+  publish:
+    needs: measure
+    if: inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: compiler-measurements
+          path: ${{ runner.temp }}/measured
+      - name: Validate and publish the complete measurement
+        env:
+          MEASURED_SOURCE: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$MEASURED_SOURCE"
+          python3 -m pip install matplotlib==3.11.2
+          python3 -c 'import json, os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"measured/compiler-measurements/report.json"; assert json.loads(p.read_text())["source_commit"] == os.environ["MEASURED_SOURCE"]'
+          python3 -B scripts/benchmark-compilers.py publish "$RUNNER_TEMP/measured/compiler-measurements/report.json"
+          python3 -B scripts/benchmark-compilers.py check docs/rust-rewrite/compiler-comparison.json
+          python3 -B -m unittest scripts.tests.test_compiler_comparison scripts.tests.test_tooling_benchmark_boundary -v
+          python3 -B scripts/generate-test-graph.py --check
+          bash scripts/check-no-legacy-js.sh
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md docs/rust-rewrite/assets/execution-performance.svg docs/rust-rewrite/compiler-comparison.json docs/rust-rewrite/compiler-comparison.tar.gz docs/rust-rewrite/compiler-comparison.md
+          git commit -m "Publish co-measured Scriptw, Scriptc WASI and V8 benchmarks"
+          git push origin HEAD:main

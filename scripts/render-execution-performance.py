@@ -15,6 +15,9 @@ from execution_chart_data import load_chart_data
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / 'docs/rust-rewrite/execution-memory-admission-20261025.json'
+COMPARISON = ROOT / 'docs/rust-rewrite/compiler-comparison.json'
+if COMPARISON.is_file():
+    REPORT = COMPARISON
 OUTPUT = ROOT / 'docs/rust-rewrite/assets/execution-performance.svg'
 CURRENT = '#0969da'
 V8 = '#d97706'
@@ -134,8 +137,14 @@ def main():
     parser.add_argument('--check', action='store_true', help='validate data and reject a stale SVG')
     args = parser.parse_args()
     try:
-        data = load_chart_data(args.report)
-        svg = render(data, None if args.check else args.preview)
+        from compiler_comparison import SCHEMA, load_report, render as render_comparison
+        if json.loads(args.report.read_text()).get('schema') == SCHEMA:
+            report, rows = load_report(args.report, args.report.with_suffix('.tar.gz'))
+            data = {'source_commit': report['source_commit'], 'rows': rows}
+            svg = render_comparison(report, rows, None if args.check else args.preview)
+        else:
+            data = load_chart_data(args.report)
+            svg = render(data, None if args.check else args.preview)
         if args.check:
             if not args.output.is_file() or args.output.read_bytes() != svg:
                 raise ValueError('execution graph is stale; regenerate it from the verified checkpoint')

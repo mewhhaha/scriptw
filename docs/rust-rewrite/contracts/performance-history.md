@@ -1,5 +1,11 @@
 # README performance graphic and retained measurements
 
+The [compiler benchmark workflow](compiler-comparison.md) can replace the README
+graphic with fresh, co-measured Scriptw, Scriptc/WASI and V8 evidence. Once
+`compiler-comparison.json` exists, the renderer selects that checked report by
+default. The dated two-runtime checkpoint below remains historical evidence;
+use its explicit `--report` path to render it separately.
+
 The README shows one graph: the latest verified Scriptw execution measurements
 against V8. Publishing or rendering evidence preserves its measured compiler
 identity and date. Historical startup measurements remain available in their
