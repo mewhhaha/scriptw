@@ -24,7 +24,7 @@ FILES = tuple(A + name for name in (
     "wasm_runtime_link.rs", "wasm_native_source_compiler.rs", "graph_observation.rs",
     "embedded_runtime/load.rs",
     "embedded_runtime/native_backing.rs",
-)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs")) + (
+)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs", "native_input.rs")) + (
     "crates/scriptw-runtime-image/build/objects.rs",
 )
 
@@ -207,10 +207,18 @@ def check(root, overrides=None):
             "RuntimeSourceCompilationProfile::NativeHost=>scriptw_runtime_image::native()?," in load and
             "if!self.accepts_native(&lease){returnNone;}" in load and
             "image.digest()==&self.manifest.native_digest" in load and
-            load.index("self.accepts_native(&lease)") < load.index("NativeBacking::create(bytes)") and
+            load.index("self.accepts_native(&lease)") < load.index("Module::deserialize(engine,bytes)") and
+            re.search(r"NativeBacking::from_cargo\(self\.images\.profile,&self\.manifest\.native_digest,?\)", load) is not None and
             "Module::deserialize(engine,bytes)" in load and "drop(lease);" in load,
             "both native profiles retain independent digest admission before backing publication and transient byte ownership")
     backing = c[E + "embedded_runtime/native_backing.rs"]
+    from_cargo = function(source[E + "embedded_runtime/native_backing.rs"], "from_cargo")
+    require(re.search(r"RuntimeSourceCompilationProfile::NativeHost=>\{?scriptw_runtime_image::write_native\(&mutfile\)", from_cargo) is not None and
+            re.search(r"RuntimeSourceCompilationProfile::Portable=>\{?scriptw_runtime_image::write_portable_native\(&mutfile\)", from_cargo) is not None and
+            "written.digest()!=expected" in from_cargo and
+            "file.metadata().ok()?.len()!=written.decoded_bytes()asu64" in from_cargo and
+            from_cargo.index("written.digest()!=expected") < from_cargo.index("Self::publish(file)"),
+            "bounded Cargo output matches independent digest and file length before backing publication")
     require("structNativeBacking(File);" in backing and "OFlags::TMPFILE|OFlags::EXCL|OFlags::CLOEXEC" in backing and
             "file.write_all(bytes).ok()?" in backing and "file.sync_data().ok()?" in backing and
             "0x0102_1994|0x8584_58f6" in backing and
@@ -232,15 +240,32 @@ def check(root, overrides=None):
     storage = c[image + "native_storage.rs"]
     require("Mutex<Result<Weak<NativeRuntimeBytes>,()>>" in lease and
             "Arc::downgrade(&image)" in lease and
-            "super::native_storage::decode(encoded)" in lease and
+            "super::native_storage::decode_reader(profile.reader())" in lease and
+            "super::native_storage::write_decoded(profile.reader(),writer)" in lease and
             "&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE[..]" in lease and
             "&super::SCRIPTW_RUNTIME_NATIVE[..]" in lease and
             "pubstructNativeRuntimeBytes{bytes:Box<[u8]>,digest:[u8;32],}" in storage and
             "pubfnbytes(&self)->&[u8]{&self.bytes}" in storage and
             "pubfndigest(&self)->&[u8;32]{&self.digest}" in storage and
-            "letdigest:[u8;32]=Sha256::digest(&bytes).into();" in storage and
-            "ifbytes.len()!=length||digest!=expected" in storage,
+            "hash.update(&buffer[..count]);" in storage and
+            "letdigest:[u8;32]=hash.finalize().into();" in storage and
+            "iflength!=header.length||digest!=header.expected" in storage and
+            "letdigest=write_body(reader,header,&mutbytes)?.digest;" in storage and
+            "letmutbuffer=[0;64*1024];" in storage and
+            "decoder.window_log_max(23).ok()?;" in storage and
+            ".single_frame()" in storage and
+            "decoder.finish().read(&mutbuffer[..1]).ok()?!=0" in storage,
             "only verified immutable Cargo bytes enter weak leases with a derived digest")
+    native_input = c[image + "native_input.rs"]
+    require('File::open("/proc/self/exe")' in native_input and
+            'File::open("/proc/self/maps")' in native_input and
+            'fields.next()?!="r--p"' in native_input and
+            'inode!=self.inode' in native_input and 'major!=expected_major||minor!=expected_minor' in native_input and
+            'address.checked_add(length)?>end' in native_input and
+            'offset.checked_add(u64::try_from(length).ok()?)?<=self.length' in native_input and
+            'Some(file.take(u64::try_from(encoded.len()).ok()?))' in native_input and
+            'Self::Embedded(encoded)' in native_input,
+            "packed input binds immutable symbol range to executable inode with an exact read limit and static fallback")
     link = c[E + "wasm_runtime_link.rs"]
     require(link.count("RuntimeSourceCompilationProfile::from_module(program).ok()?==scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable") == 2 and
             "RuntimeSourceCompilationProfile::from_module(program.bytes)" in link and

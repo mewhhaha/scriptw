@@ -18,12 +18,21 @@ impl EmbeddedNativeRuntime {
         }
         // Reuse only immutable backing storage. Every Engine still creates and
         // admits its own Module; the existing module-cache budget is unchanged.
-        if let Some(Some(backing)) = self.native_backing.get() {
+        let backing_started = std::time::Instant::now();
+        let backing = self.native_backing.get_or_init(|| {
+            native_backing::NativeBacking::from_cargo(
+                self.images.profile,
+                &self.manifest.native_digest,
+            )
+        });
+        timings.native_backing_preparation = backing_started.elapsed();
+        if let Some(backing) = backing {
             let started = std::time::Instant::now();
             // SAFETY: this owner admitted Cargo source/profile/target/digests
             // before construction, and matches() checked this actual R key/mode.
-            if let Ok(module) = unsafe { backing.deserialize(engine) } {
-                timings.deserialize = started.elapsed();
+            let loaded = unsafe { backing.deserialize(engine) };
+            timings.deserialize += started.elapsed();
+            if let Ok(module) = loaded {
                 return Some(module);
             }
         }
@@ -51,21 +60,10 @@ impl EmbeddedNativeRuntime {
         // cannot invalidate the Module's separate Arc<CodeMemory> mapping.
         let started = std::time::Instant::now();
         let native_length = bytes.len();
-        let backing = self
-            .native_backing
-            .get_or_init(|| native_backing::NativeBacking::create(bytes));
-        let loaded = match backing {
-            Some(backing) => {
-                // SAFETY: exact admitted Cargo native bytes are privately
-                // written once. No caller path/cache/native blob enters here.
-                unsafe { backing.deserialize(engine) }
-                    .or_else(|_| unsafe { Module::deserialize(engine, bytes) })
-            }
-            // Read-only or unsupported filesystems keep the same native module
-            // and ordinary loader. No compiler or Wasm representation changes.
-            None => unsafe { Module::deserialize(engine, bytes) },
-        };
-        timings.deserialize = started.elapsed();
+        // A filesystem without private backing keeps the same native image
+        // through the bounded-source reader and existing owned-byte lease.
+        let loaded = unsafe { Module::deserialize(engine, bytes) };
+        timings.deserialize += started.elapsed();
         drop(lease);
         if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
             eprintln!(

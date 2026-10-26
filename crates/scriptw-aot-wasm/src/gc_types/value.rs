@@ -3080,13 +3080,23 @@ impl StringConstruction {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
+        schema
+            .array_type::<CodeUnitArray>()
+            .length(&self.units, schema, function);
+        length.load(function);
+        function.instruction(&Instruction::I32Ne);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        // The owner is consumed below. Exact-capacity storage can be published
+        // directly; only spare capacity requires an observable-length copy.
         let exact = Self::allocate(schema, schema.reserve_gc_local(function), length, function);
         let zero = schema.reserve_i32_local(function);
         zero.set_constant(0, function);
         exact.copy_units_from(zero, &self.units, length, schema, function);
-        self.units.clear(function);
+        self.units
+            .replace(exact.publish_units(schema, function), function);
         schema.release_i32_local(zero, function);
-        exact.publish(schema, function)
+        function.instruction(&Instruction::End);
+        self.publish(schema, function)
     }
     /// Transfer a completed private snapshot without publishing a JS String.
     /// Consuming construction prevents later compiler writes through this owner.

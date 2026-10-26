@@ -820,16 +820,16 @@ impl FunctionBuilder<'_> {
     }
 
     /// Publishes rooted immutable snapshots after argument evaluation finishes.
-    pub(super) fn emit_argument_vector_from_snapshots(
+    pub(crate) fn emit_argument_vector_from_snapshots<'a>(
         &self,
-        stored: &[GcLocal<StoredValue>],
+        stored: impl IntoIterator<Item = &'a GcLocal<StoredValue>>,
         function: &mut Function,
     ) -> GcLocal<ValueArray> {
         let schema = self.runtime_schema();
         schema.reserve_gc_local(function).initialize(
             schema.array_type::<ValueArray>().fixed(
                 stored
-                    .iter()
+                    .into_iter()
                     .map(|value| GcOperand::reference(value, schema)),
                 function,
             ),

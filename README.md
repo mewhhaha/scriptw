@@ -12,6 +12,10 @@ source-free Portable bundles. See the [embedding contract and runnable examples]
 Trusted Wasmtime native program images also support fresh-process execution
 with the native compiler disabled; the contract records their host-specific
 format and explicit native-code admission boundary.
+On Linux, Cargo native runtime loading streams through bounded buffers into
+private disk backing. It reads linked image data through the executable file
+when its exact inode and mapped range can be established; see the
+[runtime ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Precompiled comparison
 
@@ -36,6 +40,8 @@ warmups per round, with each Store still alive. Process memory is sampled at
 loading, setup, execution and Store-drop boundaries; RSS is neither live JS
 heap nor peak memory. The gap remains with compilation disabled, but this does
 not isolate its cause. This cohort stays separate from the ordinary V8 comparison below.
+The matched Scriptc footprint is the execution-memory target; improvements
+must retain the same workloads, checksums and measurement boundaries.
 
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·

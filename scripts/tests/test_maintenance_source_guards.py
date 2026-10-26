@@ -156,13 +156,28 @@ class TransientNativeImageGuards(unittest.TestCase):
         self.assertEqual(profile.check(ROOT), [])
         for path, before in [
             ("crates/scriptw-runtime-image/src/native_lease.rs", "Arc::downgrade(&image)"),
-            ("crates/scriptw-runtime-image/src/native_storage.rs", "Sha256::digest(&bytes).into()"),
-            ("crates/scriptw-runtime-image/src/native_storage.rs", "digest != expected"),
+            ("crates/scriptw-runtime-image/src/native_storage.rs", "hash.finalize().into()"),
+            ("crates/scriptw-runtime-image/src/native_storage.rs", "digest != header.expected"),
         ]:
             with self.subTest(before=before):
                 source = (ROOT / path).read_text()
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_owned_byte_proof")}))
+
+    def test_streamed_backing_requires_independent_admission_and_exact_executable_source(self):
+        self.assertEqual(profile.check(ROOT), [])
+        for path, before in [
+            (profile.E + "embedded_runtime/native_backing.rs", "written.digest() != expected"),
+            (profile.E + "embedded_runtime/native_backing.rs", "file.metadata().ok()?.len() != written.decoded_bytes() as u64"),
+            ("crates/scriptw-runtime-image/src/native_input.rs", "inode != self.inode"),
+            ("crates/scriptw-runtime-image/src/native_input.rs", "major != expected_major || minor != expected_minor"),
+            ("crates/scriptw-runtime-image/src/native_input.rs", "address.checked_add(length)? > end"),
+            ("crates/scriptw-runtime-image/src/native_storage.rs", "decoder.finish().read(&mut buffer[..1]).ok()? != 0"),
+        ]:
+            with self.subTest(before=before):
+                source = (ROOT / path).read_text()
+                self.assertEqual(source.count(before), 1)
+                self.assertTrue(profile.check(ROOT, {path: source.replace(before, "false")}))
 
 
 class ImmutableReceiptGuards(unittest.TestCase):

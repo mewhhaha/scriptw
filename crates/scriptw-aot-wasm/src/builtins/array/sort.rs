@@ -19,8 +19,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64GtU);
         self.open_frame(ControlFrameKind::If, f);
-        let left = s.reserve_value_local(f);
-        let right = s.reserve_value_local(f);
         let greater = s.reserve_i32_local(f);
         let cursor = s.reserve_i32_local(f);
         let width = s.reserve_i64_local(f);
@@ -40,12 +38,13 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        let left = s.reserve_gc_local(f).initialize(stored.load(s, f), f);
+        let right = s.reserve_gc_local(f).initialize(stored.load(s, f), f);
         let sorted = self.open_frame(ControlFrameKind::Block, f);
         // Retain the linear best case without scratch allocation. A failed
         // adjacent ordering check falls through to stable O(n log n) merging.
         // The spec chooses no comparator call sequence; actual source reads
         // and receiver writes stay outside this private sorting phase.
-        self.emit_stored_value_to_locals(&stored, &left, f);
         r.set_constant(1, f);
         let unordered = self.open_frame(ControlFrameKind::Block, f);
         let scan = self.open_frame(ControlFrameKind::Loop, f);
@@ -62,11 +61,11 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        self.emit_stored_value_to_locals(&stored, &right, f);
+        right.replace(stored.load(s, f), f);
         self.emit_array_sort_greater(&left, &right, comparator, greater, pending, f)?;
         greater.load(f);
         self.emit_branch_if_to_target(unordered, f);
-        left.copy_from(&right, f);
+        left.replace(right.load(s, f), f);
         self.emit_increment_local(r, 1, f);
         self.emit_branch_to_target(scan, f);
         self.pop_control(ControlFrameKind::Loop);
@@ -135,7 +134,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        self.emit_stored_value_to_locals(&stored, &left, f);
+        left.replace(stored.load(s, f), f);
         r.load(f);
         f.instruction(&Instruction::I32WrapI64);
         cursor.store(f);
@@ -145,7 +144,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        self.emit_stored_value_to_locals(&stored, &right, f);
+        right.replace(stored.load(s, f), f);
         self.emit_array_sort_greater(&left, &right, comparator, greater, pending, f)?;
         greater.load(f);
         self.open_frame(ControlFrameKind::If, f);

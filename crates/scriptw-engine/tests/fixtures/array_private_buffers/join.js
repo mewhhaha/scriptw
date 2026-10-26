@@ -38,5 +38,12 @@ for (let i = 0; i < 1025; i++) parts.push(i % 2 ? '\ud800\0' : '\ud83d\ude00');
 const text = parts.join('|');
 check(text.length === 3074 && text.charCodeAt(3) === 0xd800 && text.charCodeAt(4) === 0 &&
   text.charCodeAt(text.length - 2) === 0xd83d && text.charCodeAt(text.length - 1) === 0xde00, 'growth boundaries preserve all units');
+const exactParts = ['\ud800', '123456789012345'];
+const exactText = exactParts.join('');
+const trimmedText = ['\udfff', 'xyz'].join('');
+exactParts[0] = 'changed';
+for (let i = 0; i < 25; i++) { ['replacement', 'more units'].join(''); gc(); }
+check(exactText.length === 16 && exactText.charCodeAt(0) === 0xd800 && exactText.slice(1) === '123456789012345', 'published exact backing remains immutable');
+check(trimmedText.length === 4 && trimmedText.charCodeAt(0) === 0xdfff && trimmedText.slice(1) === 'xyz', 'spare backing is trimmed without exposing capacity');
 print('array-private-join:ok');
 262;

@@ -111,13 +111,29 @@ reclaimed. Tmpfs/ramfs are rejected for this optimization: moving bytes to
 unreclaimable memory would merely move them outside process RSS. Unsupported
 or read-only filesystems retain ordinary slice loading of the same admitted
 native image. Files, caller bytes and native disk-cache entries cannot enter
-this Cargo authority. Portable decompression remains transient; first-load
-peaks include its decoded buffer and the new backing file's page cache.
-Both NativeHost and Portable native images use bounded compressed Cargo
-storage and weak decoded leases. Each load independently checks the actual
-decoded native digest against its manifest before constructing backing storage.
-Subsequent mappings can reuse the already admitted private file without
-retaining the decompressed buffer or paging an uncompressed executable array.
+this Cargo authority. Both source profiles stream decompression and SHA-256
+through a 64-KiB output buffer with an 8-MiB zstd history limit. Exact decoded
+length, single-frame EOF and the independent native manifest must agree before
+the private file is published. This path allocates no decoded-image-sized buffer.
+Unsupported backing filesystems retain bounded-source decoding into the existing
+weak byte lease; concurrent fallback loads can share that transient owner.
+Subsequent mappings reuse the admitted private file without retaining decoded
+storage, an Engine, or a Module.
+
+The packed Cargo array remains part of the executable. On Linux, its pointer
+and length select an exact read-only file-backed VMA in bounded
+`/proc/self/maps` data. The loader opens only `/proc/self/exe`, requires matching
+device and inode, checks the complete file range and reads exactly that range
+through a bounded reader. Taking the linked array's address does not read its
+payload through the mapping. Renaming or unlinking the executable cannot
+redirect its kernel handle. Maps pathnames, external files and digest-selected
+cache blobs are never native-code authority. Missing procfs, a shared-library
+image, or an unprovable range uses the original immutable static source.
+
+Reading through the executable file avoids faulting the complete packed array
+into that process's read-only mapping. The input and output still occupy
+reclaimable kernel file cache; a smaller RSS is not a claim that those physical
+cache pages disappeared. No eviction or collection is added to benchmark runs.
 
 RSS, anonymous memory and reclaimable file-cache observations must remain
 separate. Native perf-map text hashing touches every code page, so map captures

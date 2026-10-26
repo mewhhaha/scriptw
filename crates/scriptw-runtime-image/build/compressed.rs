@@ -22,7 +22,7 @@ pub(super) fn write(out: &Path) {
             encoded.extend_from_slice(&(raw.len() as u64).to_le_bytes());
             encoded.extend_from_slice(&Sha256::digest(&raw));
             encoded.extend_from_slice(&compressed);
-            let decoded = native_storage::decode(&encoded)
+            let decoded = native_storage::decode_reader(encoded.as_slice())
                 .expect("Cargo's exact encoded image decodes within its framing bounds");
             assert_eq!(
                 decoded.bytes(),

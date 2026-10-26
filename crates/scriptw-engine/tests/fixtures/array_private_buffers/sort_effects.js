@@ -39,5 +39,34 @@ let gets = 0;
 try { Array.prototype.toSorted.call({ length: 2, get 0() { gets++; throw marker; }, get 1() { throw 'later read'; } }); }
 catch (error) { check(error === marker, 'read abrupt identity'); }
 check(gets === 1, 'read stops at first throw');
+
+// Each call owns its argument array even when immutable snapshots are shared.
+const retainedArguments = [];
+const retainedProxyArguments = [];
+const identityItems = [{ k: 3 }, { k: 1 }, { k: 4 }, { k: 2 }];
+const expectedIdentities = identityItems.slice();
+const retainingComparator = new Proxy(function(a, b) {
+  const originalA = a, originalB = b;
+  retainedArguments.push(arguments);
+  arguments[0] = { k: 99 };
+  gc();
+  return originalA.k - originalB.k;
+}, {
+  apply(target, that, args) {
+    retainedProxyArguments.push(args);
+    const left = args[0], right = args[1];
+    const result = Reflect.apply(target, that, args);
+    check(args[0] === left && args[1] === right, 'callee argument mutation cannot alter caller vector');
+    return result;
+  }
+});
+identityItems.sort(retainingComparator);
+check(identityItems[0] === expectedIdentities[1] && identityItems[1] === expectedIdentities[3] &&
+  identityItems[2] === expectedIdentities[0] && identityItems[3] === expectedIdentities[2], 'retained argument writes preserve sort snapshots');
+for (let i = 0; i < retainedArguments.length; i++) {
+  check(retainedArguments[i][0].k === 99, 'mapped comparator arguments retain their writes');
+  if (i) check(retainedArguments[i] !== retainedArguments[i - 1] &&
+    retainedProxyArguments[i] !== retainedProxyArguments[i - 1], 'fresh comparator argument owners');
+}
 print('array-private-sort-effects:ok');
 262;

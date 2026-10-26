@@ -3,7 +3,7 @@ use super::super::*;
 use crate::control_flow::SyncIteratorConsumer;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, BindingCell, BindingCellSchema, CompletionLocals, GcLocal,
-    GcOperand, I32Local, I64Local, ScalarValue, ValueLocals,
+    GcOperand, I32Local, I64Local, ScalarValue, StoredValue, ValueLocals,
 };
 use scriptw_ir::{ArrayAccumulationElementIr, ArrayAccumulationIr, ArrayAccumulationTargetIr};
 
@@ -3164,14 +3164,18 @@ impl FunctionBuilder<'_> {
     }
     fn emit_array_sort_greater(
         &mut self,
-        left: &ValueLocals,
-        right: &ValueLocals,
+        left_snapshot: &GcLocal<StoredValue>,
+        right_snapshot: &GcLocal<StoredValue>,
         comparator: &ValueLocals,
         greater: I32Local,
         pending: &CompletionLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let left = s.reserve_value_local(f);
+        let right = s.reserve_value_local(f);
+        self.emit_stored_value_to_locals(left_snapshot, &left, f);
+        self.emit_stored_value_to_locals(right_snapshot, &right, f);
         let comparison = s.reserve_completion(f);
         let undefined = s.reserve_value_local(f);
         let numeric = s.reserve_value_local(f);
@@ -3196,7 +3200,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
         f.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[left, right], f);
+        // Snapshots are immutable and already rooted by the private sort.
+        // Keep the argument vector fresh: callbacks can retain or mutate their
+        // arguments and reenter sorting without changing the source snapshots.
+        let argv = self.emit_argument_vector_from_snapshots([left_snapshot, right_snapshot], f);
         self.emit_function_or_proxy_call_with_argv(comparator, &undefined, &argv, &comparison, f)?;
         argv.clear(f);
         self.emit_array_native_propagate(&comparison, f);
@@ -3209,7 +3216,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::F64Gt);
         greater.store(f);
         f.instruction(&Instruction::Else);
-        self.emit_value_to_string_payload(left, &comparison, f)?;
+        self.emit_value_to_string_payload(&left, &comparison, f)?;
         self.emit_array_native_propagate(&comparison, f);
         let l = s.reserve_gc_local(f).initialize(
             comparison
@@ -3217,7 +3224,7 @@ impl FunctionBuilder<'_> {
                 .cast_reference::<crate::gc_types::StringValue>(s, f),
             f,
         );
-        self.emit_value_to_string_payload(right, &comparison, f)?;
+        self.emit_value_to_string_payload(&right, &comparison, f)?;
         self.emit_array_native_propagate(&comparison, f);
         let r = s.reserve_gc_local(f).initialize(
             comparison
@@ -3240,6 +3247,8 @@ impl FunctionBuilder<'_> {
         numeric.clear(f);
         undefined.clear(f);
         comparison.clear(f);
+        right.clear(f);
+        left.clear(f);
         Ok(())
     }
 }
