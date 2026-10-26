@@ -74,6 +74,17 @@ fn shared_configuration() -> Value {
 }
 
 fn decorate(mut report: Value, adapter: &str) -> Value {
+    report
+        .as_object_mut()
+        .expect("benchmark reports are objects")
+        .remove("excluded_from_scored_cohorts");
+    report["comparison_cohort"] = json!("scriptw-precompiled-comparison-v1");
+    report["excluded_from_ordinary_cohorts"] = json!(true);
+    report["scope"] = json!(match report.get("compiler_enabled").and_then(Value::as_bool) {
+        Some(false) => "same-executable-precompiled-execution;fresh-Store;entry-API-interval;loading-and-setup-separate",
+        Some(true) => "separate-native-image-producer;not-a-consumer-observation",
+        None => "same-executable-precompiled-comparison-identity",
+    });
     report["adapter"] = json!(adapter);
     report["shared_configuration"] = shared_configuration();
     report
