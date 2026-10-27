@@ -29,6 +29,7 @@ PHASES = ('after_transport_drop', 'after_instantiate', 'after_execution', 'after
 MAX_SNAPSHOTS = len(PHASES)
 MAX_CONTROL_LINE = 256
 MAX_CONTROL_BYTES = MAX_CONTROL_LINE * len(PHASES)
+MAX_SYMBOL_METADATA_BYTES = 16 * 1024**2
 DEADLINE = 120
 HEADER = re.compile(r'^([0-9a-f]+)-([0-9a-f]+) ([-rwxps]{4}) ([0-9a-f]+) ([0-9a-f]+):([0-9a-f]+) (\d+)(?: +(.*))?$')
 
@@ -441,7 +442,7 @@ def run(args):
                         retained_symbols.add((symbol['name'],symbol['vaddr'],symbol['bytes'],symbol['file_offset']))
                     path=output/('host-symbol-overlap-'+observation['runtime']+'-'+observation['file']+'.json')
                     encoded=(json.dumps(attribution,indent=2)+'\n').encode()
-                    p.require(len(encoded)<=16*1024**2,'host overlap metadata byte bound exceeded')
+                    p.require(len(encoded)<=MAX_SYMBOL_METADATA_BYTES,'host overlap metadata byte bound exceeded')
                     path.write_bytes(encoded)
                     observation['host_symbol_attribution']=dict(path=path.name,bytes=len(encoded),sha256=hashlib.sha256(encoded).hexdigest(),
                         overlapping_functions=len(attribution['symbols']),interpretation=attribution['interpretation'])
@@ -457,7 +458,7 @@ def run(args):
             symbols['interpretation']='Exact inert symbols overlapping at least one captured present executable page; other symbols omitted, counts retained. Overlap is not execution.'
             symbol_path=output/'host-elf-symbols.json'
             encoded=(json.dumps(symbols,indent=2)+'\n').encode()
-            p.require(len(encoded)<=16*1024**2,'host symbol metadata byte bound exceeded')
+            p.require(len(encoded)<=MAX_SYMBOL_METADATA_BYTES,'host symbol metadata byte bound exceeded')
             symbol_path.write_bytes(encoded)
             result['host_symbol_inventory']=dict(path=symbol_path.name,bytes=len(encoded),sha256=hashlib.sha256(encoded).hexdigest())
             result['host_symbol_inventory_status']='validated'
@@ -465,7 +466,7 @@ def run(args):
             result.update(host_symbol_inventory_status='unavailable',host_symbol_inventory_error=str(failure))
         checkpoint()
         p.require(p.digest(campaign/'report.json') == result['scored_report_sha256'], 'scored report changed')
-        result['status'] = 'captured' if all(row['status'] == 'captured' and row.get('module_attribution_validated') is True
+        result['status'] = 'captured' if result.get('host_symbol_inventory_status') == 'validated' and all(row['status'] == 'captured' and row.get('module_attribution_validated') is True
             and row.get('host_symbol_attribution_validated') is True for row in result['cases']) else 'incomplete'
     except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError) as error:
         result['error'] = str(error)

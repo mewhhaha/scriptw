@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -20,6 +21,70 @@ from scripts.tests import test_precompiled_comparison as fixtures
 
 
 class MappingDiagnosticTests(unittest.TestCase):
+    def test_final_inventory_failure_cannot_publish_successful_case_captures(self):
+        # Exercise run's final persistence boundary without launching a consumer
+        # or trusting synthetic bytes as a native image.
+        for failure in (None, 'write', 'bound'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                campaign = root/'campaign'
+                campaign.mkdir()
+                (campaign/'report.json').write_text('{}')
+                host = campaign/'consumer'
+                host.write_bytes(b'inert host; never executed')
+                metadata = dict(sha256=d.p.digest(host), native_sha256='b'*64, runtime_key=None)
+                report = dict(source_fingerprint='a'*64, shared_configuration={}, samples=7, warmups=10,
+                              workloads=[], attempts=[], commands=[])
+                for name in ('integer.js', 'retained-objects.js'):
+                    report['workloads'].append(dict(file=name))
+                    for runtime in ('scriptw', 'scriptc'):
+                        image = campaign/(runtime+'-'+name)
+                        image.write_bytes(host.read_bytes())
+                        identifier = runtime+'-'+name
+                        report['attempts'].append(dict(file=name, runtime=runtime, round=0, status='ok',
+                            image=dict(metadata, file=image.name), consumer_id=identifier))
+                        report['commands'].append(dict(id=identifier, argv=[str(host), 'unused', str(image)]))
+                def captured(_host, _argv, destination, _remaining, _present, index):
+                    destination.mkdir()
+                    (destination/'stdout').write_text('{}')
+                    return dict(status='barriers_complete', nonce='a'*32, observation_index=index, snapshots=[])
+                original_write = Path.write_bytes
+                def write(path, data):
+                    if failure == 'write' and path.name == 'host-elf-symbols.json':
+                        raise OSError('injected host inventory write failure')
+                    return original_write(path, data)
+                inventory = dict(sha256=metadata['sha256'], functions=[],
+                                 sections='x'*1024 if failure == 'bound' else [])
+                output = root/'diagnostic'
+                with patch.object(d, 'kernel_budget', return_value={}), \
+                     patch.object(d.p, 'load_report', return_value=(report, [])), \
+                     patch.object(d.subprocess, 'check_output', return_value='a'*40), \
+                     patch.object(d, 'live_campaign', return_value=host), \
+                     patch.object(d.p, 'image_metadata', return_value=metadata), \
+                     patch.object(d, 'capture', side_effect=captured), \
+                     patch.object(d, 'validate_endpoint', return_value={}), \
+                     patch.object(d.module_images, 'validate_module_images', return_value={}), \
+                     patch.object(d.module_images, 'host_symbol_inventory', return_value=inventory), \
+                     patch.object(d.module_images, 'attribute_host', return_value=dict(symbols=[], interpretation='inert')), \
+                     patch.object(d, 'MAX_SYMBOL_METADATA_BYTES', 1024), \
+                     patch.object(Path, 'write_bytes', write), patch('builtins.print'):
+                    code = d.run(SimpleNamespace(campaign=campaign, output=output, present_bits=True))
+                result = json.loads((output/'report.json').read_text())
+                self.assertEqual(len(result['cases']), 4)
+                self.assertTrue(all(case['status'] == 'captured' and case['module_attribution_validated']
+                                    and case['host_symbol_attribution_validated'] for case in result['cases']))
+                if failure is None:
+                    self.assertEqual((code, result['status'], result['host_symbol_inventory_status']),
+                                     (0, 'captured', 'validated'))
+                    self.assertTrue((output/'host-elf-symbols.json').is_file())
+                else:
+                    self.assertEqual((code, result['status'], result['host_symbol_inventory_status']),
+                                     (1, 'incomplete', 'unavailable'))
+                    self.assertIn('write failure' if failure == 'write' else 'byte bound exceeded',
+                                  result['host_symbol_inventory_error'])
+                    self.assertNotIn('host_symbol_inventory', result)
+                    self.assertFalse((output/'host-elf-symbols.json').exists())
+
     def test_fork_before_exec_and_wrong_inode_cannot_enter_samples(self):
         host = Path('/live/bin/consumer')
         info = type('Info', (), {'st_ino': 12})()
