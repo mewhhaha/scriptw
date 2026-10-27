@@ -27,19 +27,19 @@ while preserving heap capacity for reuse.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-26 on one GitHub Actions runner**, compiler `99a4ff2e9`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `7e02a8707`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
 and Wasm compilation in separate producer processes. Both measured consumers
 disable compilation and use identical native optimization and runtime settings.
 Both passed the original checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.8–2.8× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.6–2.2× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 25.3 MiB | 13.4 MiB |
-| Objects | 30.2 MiB | 14.2 MiB |
-| Retained objects | 40.9 MiB | 20.0 MiB |
+| Integer | 24.5 MiB | 13.5 MiB |
+| Objects | 28.9 MiB | 14.2 MiB |
+| Retained objects | 31.9 MiB | 20.0 MiB |
 
 These are medians of 14 samples per runtime and workload, after ten checked
 warmups per round, with each Store still alive. Process memory is sampled at
@@ -48,16 +48,17 @@ heap nor peak memory. The gap remains with compilation disabled, but this does
 not isolate its cause. This cohort stays separate from the ordinary V8 comparison below.
 The matched Scriptc footprint is the execution-memory target; improvements
 must retain the same workloads, checksums and measurement boundaries.
-The current pass defers canonical runtime strings and noncanonical intrinsic
-method functions, and probes packed Array indices before allocating property
-keys. [Verification](docs/rust-rewrite/memory-lazy-runtime-20261027.md):
-**4,503 native cases and 1,589 original pinned Test262 executions passed**.
-The original long test process reached the 4-GiB cap; its unchanged inventory
-was completed in smaller fresh-process groups under the same limit.
+The current pass stores prototype references directly, defers unused scalar
+storage and reclaims dead GC pages on Linux. Array reads use own-data probes;
+safe integers use a direct decimal formatter.
+[Verification](docs/rust-rewrite/memory-compact-runtime-20261027.md):
+**4,514 native cases, four collector controls and 1,704 original pinned Test262
+executions passed**, under one CPU and a 4-GiB process-tree limit. The measured
+commit and later test-guard corrections have identical production compiler inputs.
 
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40411932915).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40422593194).
 
 ## Benchmarks
 
