@@ -17,7 +17,7 @@
     }
   ],
   "domain": "scriptw-locale-time-zones-native-v1",
-  "kernel_sha256": "f6ff63bbba95c2d1615ca16cb56bae238ada254483b6442e0420a4430740a3de",
+  "kernel_sha256": "f78afef389fe795004437627f492054e3be492240b048548f55d47239ce7d01e",
   "production_sources": [
     {
       "bytes": 93161,
@@ -35,9 +35,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 82448,
+      "bytes": 82531,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "53e0f7f289c2c71e8ecca51fc6c66288cf1a846ad02dbe46a99d247534af0564"
+      "sha256": "bf499a81ea29b9c191e3f1264c7dd752dd266e8078beaf0cf709993b8b277637"
     },
     {
       "bytes": 33961,
@@ -182,7 +182,7 @@
     {
       "bytes": 565,
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-      "sha256": "082a9ff487ffb0176c48837bb2319c636ae664218a2795070c8d353b6f5ee8b0"
+      "sha256": "9a2e90928a0db586df224e9700ef6850fa4d9cca23c62d4dfcc8ac0f9cf08c31"
     },
     {
       "bytes": 3624,

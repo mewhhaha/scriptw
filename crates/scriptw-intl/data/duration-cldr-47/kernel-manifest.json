@@ -16,9 +16,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 82448,
+      "bytes": 82531,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "53e0f7f289c2c71e8ecca51fc6c66288cf1a846ad02dbe46a99d247534af0564"
+      "sha256": "bf499a81ea29b9c191e3f1264c7dd752dd266e8078beaf0cf709993b8b277637"
     },
     {
       "bytes": 33961,
@@ -193,7 +193,7 @@
     {
       "bytes": 13040,
       "path": "crates/scriptw-intl/data/list-icu-2/manifest.json",
-      "sha256": "e63b969ee95dfbbdee71cee94b24d94e266c52715ae684b26a96a08822b46a25"
+      "sha256": "6f72a733843048678bd352ac62dc5a7ebc81131afd0d74307e9deb9bb411c82c"
     },
     {
       "bytes": 3359,
@@ -373,7 +373,7 @@
     {
       "bytes": 327,
       "path": "crates/scriptw-intl/src/list_format/identity.rs",
-      "sha256": "54c3e22eb0a534457d6fdeff6896dabc314eb783b1d94450673e530dbc490d53"
+      "sha256": "8d3e49ddab1161bc717b5fc9a5bd4fdf0bd69c6ac001bf0a4b2555e9e1b65022"
     },
     {
       "bytes": 5033,
@@ -1053,7 +1053,7 @@
       "version": "1.0.21"
     }
   ],
-  "provider_data_sha256": "29c04c43a0889bfb83f2c4cdcf19220222143358ccc384078eceb90a71a034f6",
+  "provider_data_sha256": "a435bafc73da83c2e35278d94600898f1936273259757fc15b01f42e6c33679a",
   "schema_version": 1,
   "scope": "actual immutable native Duration image, retained selected Number/List owners, global/native/host source, complete primitive codecs and primary CLDR47 authority; native and AOT execution pending",
   "service": "DurationFormat"

@@ -41,6 +41,11 @@ helpers while preserving independent descriptors, flags and defining-Realm value
 Deferred method reads share a function-construction tail after selecting their
 metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-property-publication.md).
 
+Eligible eager intrinsic accessors share context/record allocation through a
+typed Wasm helper, with source creation and metadata publication retaining their
+order. Verification and measurements for this pass are pending; see the
+[allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

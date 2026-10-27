@@ -8,6 +8,7 @@ mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
 mod direct_eval_dispatch;
+mod intrinsic_accessor_allocation;
 mod numeric_imul;
 mod numeric_leaf;
 mod plain_data_literals;

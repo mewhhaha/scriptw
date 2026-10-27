@@ -28,6 +28,58 @@ pub(super) struct FunctionAllocationInputs<'a> {
 }
 
 impl FunctionBuilder<'_> {
+    /// The checked eager-accessor domain has no caller/program captures. Its
+    /// source ordinal stays unresolved until the shared tail has made Context.
+    pub(crate) fn emit_validated_intrinsic_accessor_record(
+        &mut self,
+        plan: &crate::intrinsics::eager_accessors::AccessorPlan,
+        realm: &RealmFunctionMaterializationContext,
+        function: &mut Function,
+    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
+        let schema = self.runtime_schema();
+        let meta = plan.metadata();
+        let prototype = schema.reserve_value_local(function);
+        prototype.set_reference(realm.function_prototype(), schema, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            self.emit_alloc_native_function_header(meta, &prototype, function)?,
+            function,
+        );
+        let code = schema.reserve_gc_local(function).initialize(
+            meta.entry
+                .emit_executable_code(meta.class_element_execution_kind, schema, function)?,
+            function,
+        );
+        let source_ordinal = schema.reserve_i32_local(function);
+        source_ordinal.set_constant(plan.source().ordinal() as i32, function);
+        let callable = schema.reserve_gc_local(function).initialize(
+            schema.helper_reference_on_stack(schema.call_helper(
+                crate::runtime_helpers::IntrinsicAccessorAllocateArguments::new(
+                    &header,
+                    &code,
+                    realm.realm(),
+                    source_ordinal,
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )),
+            function,
+        );
+        schema.release_i32_local(source_ordinal, function);
+        self.emit_publish_function_metadata(
+            meta,
+            realm.realm(),
+            &callable,
+            FunctionPrototypeMaterialization::Automatic,
+            function,
+        )?;
+        code.clear(function);
+        header.clear(function);
+        prototype.clear(function);
+        let result = callable.load(schema, function);
+        callable.clear(function);
+        Ok(result)
+    }
+
     pub(super) fn emit_ordinary_function_entry_tail_call(
         &mut self,
         entry: &crate::function_entry::RuntimeOrdinaryBodyEntry,

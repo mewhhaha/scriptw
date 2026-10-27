@@ -19,11 +19,13 @@ use super::*;
 use crate::objects::{AccessorDescriptor, AccessorDescriptorLocals};
 
 mod abstract_module_source;
+mod accessor_allocation;
 pub(crate) mod array;
 pub(crate) mod binary_data;
 pub(crate) mod collections;
 pub(crate) mod date;
 mod deferred_methods;
+pub(crate) mod eager_accessors;
 pub(crate) mod errors;
 pub(crate) mod function;
 pub(crate) mod intl;
@@ -321,7 +323,7 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let materialize = |builtin| -> Result<crate::gc_types::ValueLocals, EmitError> {
-            let callable = self.emit_intrinsic_callable(builtin, realm, function)?;
+            let callable = self.emit_intrinsic_accessor_callable(builtin, realm, function)?;
             let value = schema.reserve_value_local(function);
             value.set_reference(&callable, schema, function);
             callable.clear(function);

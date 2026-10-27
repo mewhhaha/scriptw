@@ -1077,6 +1077,7 @@ runtime_helper_domain! {
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
+    IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
     CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1238,6 +1239,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
+            Self::IntrinsicAccessorAllocate => HelperOwner::Runtime,
             Self::ArgumentListAppend => HelperOwner::Runtime,
             Self::CachedPropertyRead => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
@@ -1385,6 +1387,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorPublish => true,
             Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
+            Self::IntrinsicAccessorAllocate => true,
             Self::ArgumentListAppend => true,
             Self::CachedPropertyRead => true,
             Self::OrdinaryPropertyFind => true,
