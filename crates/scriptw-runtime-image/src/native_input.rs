@@ -2,6 +2,15 @@
 //! No caller path or native cache is an input. Linux binds the linked symbol's
 //! range to the actual executable inode; other cases retain the static source.
 use std::io::{self, Read};
+#[cfg(target_os = "linux")]
+#[path = "native_input/elf_origin.rs"]
+mod elf_origin;
+
+fn trace_source(kind: &str) {
+    if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
+        eprintln!("scriptw wasm trace: runtime-native packed source: {kind}");
+    }
+}
 
 pub(super) enum PackedReader {
     Embedded(&'static [u8]),
@@ -16,6 +25,7 @@ impl PackedReader {
         if let Some(reader) = executable_range(encoded) {
             return Self::Executable(reader);
         }
+        trace_source("embedded");
         Self::Embedded(encoded)
     }
 }
@@ -101,12 +111,20 @@ fn executable_range(encoded: &'static [u8]) -> Option<std::io::Take<std::fs::Fil
     let mut matches = maps
         .lines()
         .filter_map(|line| identity.range_offset(line, encoded.as_ptr() as usize, encoded.len()));
-    let offset = matches.next()?;
-    if matches.next().is_some() {
-        return None;
+    if let Some(offset) = matches.next() {
+        if matches.next().is_some() {
+            return None;
+        }
+        file.seek(SeekFrom::Start(offset)).ok()?;
+        trace_source("executable-inode");
+        return Some(file.take(u64::try_from(encoded.len()).ok()?));
     }
-    file.seek(SeekFrom::Start(offset)).ok()?;
-    Some(file.take(u64::try_from(encoded.len()).ok()?))
+    // Some Linux filesystem views expose different device numbers through
+    // stat and maps. Retain the strict identity path above; the alternative
+    // proves origin independently from the kernel's main executable headers.
+    let reader = elf_origin::KernelMainElf::open()?.read_symbol(encoded, &maps)?;
+    trace_source("kernel-main-elf");
+    Some(reader)
 }
 
 #[cfg(test)]

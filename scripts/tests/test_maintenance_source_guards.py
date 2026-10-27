@@ -182,6 +182,15 @@ class TransientNativeImageGuards(unittest.TestCase):
             ("crates/scriptw-runtime-image/src/native_input.rs", "major != expected_major || minor != expected_minor"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "address.checked_add(length)? > end"),
             ("crates/scriptw-runtime-image/src/native_storage.rs", "decoder.finish().read(&mut buffer[..1]).ok()? != 0"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "table != loaded"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "bias.checked_add(header.entry)? != aux.entry"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "phdr.offset != header.phoff"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "p.address < phdr_end"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "owner.flags != PF_R"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "load.flags != PF_R"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "end > start.checked_add(load.file_size)?"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "actual != inode"),
+            ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "offset(line, address, length, inode) == Some(expected_offset)"),
         ]:
             with self.subTest(before=before):
                 source = (ROOT / path).read_text()

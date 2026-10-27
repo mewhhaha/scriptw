@@ -24,7 +24,7 @@ FILES = tuple(A + name for name in (
     "wasm_runtime_link.rs", "wasm_native_source_compiler.rs", "graph_observation.rs",
     "embedded_runtime/load.rs",
     "embedded_runtime/native_backing.rs",
-)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs", "native_input.rs")) + (
+)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs", "native_input.rs", "native_input/elf_origin.rs")) + (
     "crates/scriptw-runtime-image/build/objects.rs",
 )
 
@@ -272,6 +272,27 @@ def check(root, overrides=None):
             'Some(file.take(u64::try_from(encoded.len()).ok()?))' in native_input and
             'Self::Embedded(encoded)' in native_input,
             "packed input binds immutable symbol range to executable inode with an exact read limit and static fallback")
+    origin = c[image + "native_input/elf_origin.rs"]
+    require('ifletSome(offset)=matches.next()' in native_input and
+            'elf_origin::KernelMainElf::open()?.read_symbol(encoded,&maps)?' in native_input and
+            native_input.index('ifletSome(offset)=matches.next()') < native_input.index('elf_origin::KernelMainElf::open()') and
+            'pub(super)fnopen()->Option<Self>' in origin and
+            all('File::open("' + path + '")' in origin for path in ('/proc/self/exe', '/proc/self/auxv', '/proc/self/mem')) and
+            'take(MAX_AUXV_BYTESasu64+1)' in origin and 'phnum>MAX_PHNUM' in origin and
+            'read_exact_at(&mutloaded,aux.phdr).ok()?' in origin and
+            'table!=loaded' in origin and 'aux.phent!=PHENTasu64||aux.phnum!=header.phnumasu64' in origin and
+            'phdrs.next().is_some()' in origin and 'phdr.offset!=header.phoff' in origin and
+            'p.address<phdr_end&&p.address.checked_add(p.memory_size)' in origin and
+            'owners.next().is_some()||owner.flags!=PF_R' in origin and
+            'owner.offset.checked_add(phdr.address-owner.address)!=Some(header.phoff)' in origin and
+            'letbias=aux.phdr.checked_sub(phdr.address)?;' in origin and
+            'bias.checked_add(header.entry)?!=aux.entry' in origin and
+            'selected.is_some()||load.flags!=PF_R||address<start' in origin and
+            'end>start.checked_add(load.file_size)?' in origin and
+            'ifinode==0||actual!=inode' in origin and
+            'offset(line,address,length,inode)==Some(expected_offset)' in origin and
+            'unsafe{' not in origin,
+            "kernel-main ELF alternative requires bounded kernel headers, loaded-table equality, exact entry/bias and unique readonly file-backed symbol/map agreement")
     link = c[E + "wasm_runtime_link.rs"]
     require(link.count("RuntimeSourceCompilationProfile::from_module(program).ok()?==scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable") == 2 and
             "RuntimeSourceCompilationProfile::from_module(program.bytes)" in link and

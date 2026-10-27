@@ -39,3 +39,35 @@ containing an invalid function opcode and requires the safe setter to reject
 it after an earlier trusted candidate. Original cold deadlines, complete
 affected scopes and fresh broad suites remain mandatory; this contract grants
 no acceptance by itself.
+
+## Packed native-image source
+
+The leaf's private image selector chooses the exact immutable Cargo packed
+array. Reading that array through its mapped address can make the compressed
+payload resident in addition to the decoded native image. Linux first attempts
+the existing executable-file source, requiring the complete symbol range in one
+read-only private mapping with matching device, inode and bounded file offset.
+
+Some local file views report different device IDs for the opened executable and
+its mapping. A private `KernelMainElf` owner supplies an independent origin proof
+for the actual main executable. Only its constructor opens `/proc/self/exe`;
+parsed layouts and digests cannot construct that owner. It reads at most 4 KiB
+of auxiliary-vector facts and 1,024 ELF64 program headers of 56 bytes each.
+The file's program-header table must equal the bounded table read at the
+kernel's `AT_PHDR` address through `/proc/self/mem`. Machine, entry, header count,
+header size, exact unique `PT_PHDR` and checked load bias must agree.
+
+The header table and complete selected symbol must each have one unambiguous
+read-only file-backed load owner. Writable/executable payloads, BSS tails,
+overlapping loads and arithmetic overflows reject. The actual read-only mapping
+must still match the executable inode and the ELF-derived file offset. The
+reader's bound is exactly the immutable array's length. Proc access failures,
+unsupported layouts and ambiguous ranges retain the existing embedded source.
+
+This proof selects byte storage only. The decoded native digest, Cargo manifest,
+source/profile/runtime key and destination Engine compatibility remain separate
+admission requirements. Existing `SCRIPTW_WASM_TRACE` output reports the selected
+source kind without payload bytes or addresses.
+
+The 2026-10-27 source-reader extension and its malformed-header, mapping, range
+and actual-source controls are implemented; whole-batch verification is pending.

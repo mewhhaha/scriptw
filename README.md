@@ -26,6 +26,8 @@ Normalization tables and Intl catalogue metadata initialize on first use.
 Trusted precompiled loading reuses producer-admitted execution facts.
 Internal Array descriptor queries use the private Array kernel and capture a
 fresh descriptor record.
+Linux runtime-image reads can prove the main executable's identity from kernel
+ELF headers when file and mapping device IDs differ.
 
 ## Precompiled comparison
 
