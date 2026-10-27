@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn finalized_globals_bind_the_root_to_the_actual_next_index() {
+    fn finalized_globals_bind_the_root_to_its_actual_encoded_index() {
         let base_global_count =
             RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
                 crate::RuntimeSourceCompilationProfile::Portable,
@@ -1001,10 +1001,27 @@ mod tests {
                 }
 
                 let finalized = runtime.finalize_globals(globals, snapshot, 0);
+                let encoded_types = finalized.globals.runtime_global_types();
+                let (root_index, root_type) = encoded_types
+                    .iter()
+                    .enumerate()
+                    .skip(existing_global_count as usize)
+                    .find(|(_, ty)| matches!(ty.val_type, ValType::Ref(_)))
+                    .expect("the first GC root follows any scalar readiness globals");
                 assert_eq!(
                     finalized.globals.runtime_schema.pooled_strings.raw(),
-                    existing_global_count,
-                    "the typed root must bind the encoded section's actual next index"
+                    root_index as u32,
+                    "the typed root must bind the encoded section's actual reference index"
+                );
+                assert_eq!(
+                    root_type.val_type,
+                    ValType::Ref(
+                        finalized
+                            .globals
+                            .schema()
+                            .reference_type::<PooledStringTable>(GcNullability::Nullable,)
+                    ),
+                    "the encoded root has the exact nullable pooled-string table type"
                 );
                 assert_eq!(
                     finalized.globals.runtime_schema.snapshot.is_some(),
