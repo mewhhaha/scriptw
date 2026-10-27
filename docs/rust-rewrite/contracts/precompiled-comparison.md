@@ -76,3 +76,41 @@ subtraction isolates compiler or JavaScript heap memory. The same executable
 can fault different code and data pages, while native optimization policy,
 runtime bindings, collector/allocator retention and warmup history also affect
 the process footprint.
+
+The workflow subsequently runs a separate, unscored Linux mapping diagnostic for
+`integer.js` and `retained-objects.js`, serially for both adapters. It reuses only
+that job's original frozen consumer and freshly produced native images after
+validating the completed scored report. It never compiles sources or executes
+native images from downloaded evidence. The diagnostic command is for a trusted
+live campaign owned by the caller; checksums alone do not grant native authority.
+It checks original producer/consumer paths, executable/image identities, source
+commit/fingerprint, compiler-disabled configuration, ten warmups, seven samples,
+and every output against the existing comparison reader.
+
+`precompiled-mapping-diagnostic-unscored` retains raw stdout/stderr, bounded
+`smaps` snapshots and a separate diagnostic report; it contains no executable or
+serialized native image. Samples require the exact Rust executable path and
+inode with an executable mapping, excluding the Python fork-before-exec window.
+Optional executable page-presence bitmaps retain only present bits, never PFNs.
+Raw mappings include offsets, permissions, device/inode and RSS counters so code,
+read-only data, private native backing and anonymous mappings can be inspected
+without assigning their cause from pathname or reserved size alone. Consumer
+stdout contains the validated lifecycle endpoints. Parent-polled sampled maxima
+remain asynchronous observations and cannot be labelled Store-drop endpoints.
+These observations never enter scored graphs or replace scored timings/RSS.
+
+The diagnostic inherits the same one-CPU, 4-GiB, no-swap grouped-OOM scope. Each
+consumer has a 120-second deadline, 128-snapshot ceiling, 16-MiB raw-smaps budget
+(64 MiB across all four), and a combined 2-MiB retained stdout/stderr prefix. The parent drains both
+nonblocking pipes through EOF before validating JSON. Overflow or deadline
+terminates only its owned process group and records a capture failure; child
+private-file writes have no diagnostic file-size limit. Snapshots are polled at
+20 ms while the bounds permit; short phases and processes may be unobserved.
+The diagnostic records actual CPU affinity and before/after kernel memory
+budget counters, and checkpoints its initial status and each active/completed
+case before long captures. Missing proc capabilities, incomplete captures, exhausted sampling limits and
+failed commands are explicit in the separate report. The workflow retains this
+artifact even on failure and reports availability separately; unavailable
+diagnostics do not prevent retention or publication of valid scored evidence.
+`SCRIPTW_WASM_TRACE` is enabled only in these unscored consumers so their stderr
+can record the actual packed-input source kind without addresses or native bytes.

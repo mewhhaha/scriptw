@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary -v
+          python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary scripts.tests.test_precompiled_mapping_diagnostic -v
           bash scripts/check-no-legacy-js.sh
           python3 -B scripts/intl_source_identities.py
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --example compiler_precompiled_baseline -- --test-threads=1
@@ -62,6 +62,32 @@ jobs:
             --package-lock "$RUNNER_TEMP/scriptc/package-lock.json" \
             --output "$RUNNER_TEMP/precompiled-measurements" \
             --evidence-output "$RUNNER_TEMP/precompiled-evidence"
+      - name: Observe unscored consumer mappings
+        id: mapping_diagnostic
+        continue-on-error: true
+        timeout-minutes: 12
+        run: |
+          bash scripts/run-benchmark-scope.sh python3 -B scripts/diagnose-precompiled-mappings.py \
+            --campaign "$RUNNER_TEMP/precompiled-measurements" \
+            --output "$RUNNER_TEMP/precompiled-mapping-diagnostic" --present-bits
+      - name: Retain unscored mapping observations and failures
+        id: mapping_artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: precompiled-mapping-diagnostic-unscored
+          path: ${{ runner.temp }}/precompiled-mapping-diagnostic
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+      - name: Report diagnostic availability separately
+        if: always()
+        env:
+          DIAGNOSTIC_OUTCOME: ${{ steps.mapping_diagnostic.outcome }}
+          DIAGNOSTIC_ARTIFACT_OUTCOME: ${{ steps.mapping_artifact.outcome }}
+        run: |
+          printf 'Unscored mapping capture: %s; artifact: %s. Scored observations are unchanged.\n' "$DIAGNOSTIC_OUTCOME" "$DIAGNOSTIC_ARTIFACT_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain all raw observations and failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
