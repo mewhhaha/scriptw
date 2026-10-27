@@ -1,5 +1,5 @@
-//! Completed [[GetOwnProperty]] snapshots. Actual ordinary objects copy their
-//! stored descriptor; exotic objects retain the real recursive builtin owner.
+//! Completed [[GetOwnProperty]] snapshots. Actual ordinary objects and Arrays
+//! copy private descriptors; remaining exotics retain the real recursive builtin owner.
 
 use super::*;
 use crate::gc_types::{I32Local, RuntimeSchema};
@@ -163,10 +163,22 @@ impl FunctionBuilder<'_> {
         descriptor: &GcLocal<PropertyDescriptor, Nullable>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        let source = self.emit_ordinary_own_descriptor_reference(object, key, function)?;
+        self.emit_completed_descriptor_snapshot(source, descriptor, function);
+        Ok(())
+    }
+
+    /// Consume a storage lookup, preserving a fresh mutable descriptor record.
+    /// A later consumer may invoke user code that redefines the source property;
+    /// only immutable value edges may be shared with that property's live record.
+    fn emit_completed_descriptor_snapshot(
+        &mut self,
+        source: GcLocal<PropertyDescriptor, Nullable>,
+        descriptor: &GcLocal<PropertyDescriptor, Nullable>,
+        function: &mut Function,
+    ) {
         let schema = self.runtime_schema();
-        let source = CompletedProxyTargetDescriptor {
-            descriptor: self.emit_ordinary_own_descriptor_reference(object, key, function)?,
-        };
+        let source = CompletedProxyTargetDescriptor { descriptor: source };
         source.emit_found_i32(schema, function);
         self.open_frame(ControlFrameKind::If, function);
         let writable = schema.reserve_i32_local(function);
@@ -246,11 +258,10 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         source.clear(function);
-        Ok(())
     }
 
-    /// Actual OrdinaryObject references can snapshot their stored descriptor
-    /// directly. The real GPD builtin retains all trap/exotic acquisition and
+    /// Actual OrdinaryObject and Array references snapshot private descriptors
+    /// directly. The real GPD builtin retains all other trap/exotic acquisition and
     /// validation; its private fresh complete result has only own data fields.
     pub(crate) fn emit_proxy_target_own_descriptor(
         &mut self,
@@ -275,6 +286,21 @@ impl FunctionBuilder<'_> {
         );
         self.emit_completed_ordinary_own_descriptor(&object, key, &descriptor, function)?;
         object.clear(function);
+        function.instruction(&Instruction::Else);
+        // Concrete Arrays need their exotic indexed/length lookup, but no
+        // public descriptor object or temporary builtin callable. A Proxy that
+        // wraps an Array fails this reference test and retains its trap path.
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<crate::gc_types::ArrayObject>(
+                    crate::gc_types::GcNullability::NonNullable,
+                )
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let source = self.emit_non_proxy_own_descriptor(target, key, function)?;
+        self.emit_completed_descriptor_snapshot(source, &descriptor, function);
         function.instruction(&Instruction::Else);
         let result = schema.reserve_completion(function);
         self.emit_native_object_algorithm_call(
@@ -422,6 +448,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         result.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(CompletedProxyTargetDescriptor { descriptor })

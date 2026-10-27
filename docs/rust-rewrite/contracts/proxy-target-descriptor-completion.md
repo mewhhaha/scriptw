@@ -6,6 +6,9 @@ mutation controls. The original global-loop and exhaustive Float16 deadline
 controls also pass without changing their limits. Complete broad verification
 is pending; this remains a shared invariant correction within T11.
 
+The 2026-10-27 Array extension is implemented with authored regression controls;
+its native and pinned-case verification is pending.
+
 Actual `OrdinaryObject` references now acquire a fresh completed GC descriptor
 directly from their ordinary own-property table. The concrete reference type
 test excludes every exotic object, including objects with ordinary headers;
@@ -25,7 +28,15 @@ table again and observes those changes. Getter/setter invocation, receiver
 identity, target extensibility and Realm-sensitive errors remain owned by the
 existing consumers.
 
-Every other concrete target type, including namespace, Array, arguments,
+Concrete Array references use the existing non-Proxy storage descriptor kernel
+for indexed entries, named and Symbol properties, and virtual length. They then
+use the same fresh-record copier as ordinary targets. A Proxy wrapping an Array
+fails the concrete reference test and retains its trap path. No public builtin
+FunctionObject, argument vector or JavaScript descriptor transport object is
+constructed for these internal Array acquisitions. Absent entries remain absent,
+and later consumers retain ownership of inherited Set behavior and definition.
+
+Every other concrete target type, including namespace, arguments,
 TypedArray, boxed primitive, Function and Proxy, retains the existing native
 acquisition path. The actual Object.getOwnPropertyDescriptor owner handles
 recursive target hooks and descriptor validation. The private
@@ -65,6 +76,14 @@ both String and Symbol keys. The current compatibility check retains the earlier
 descriptor while later Get/Set and descriptor acquisitions see the new frozen
 attributes, values and accessor identities. This control specifically rejects
 an aliased mutable descriptor and a cached descriptor reused on later reads.
+
+The Array controls additionally force both packed-number and full mutable indexed
+storage. A Proxy trap-result value getter freezes and changes the target after
+its internal descriptor was acquired. The current compatibility check observes
+the captured record; a subsequent query sees the frozen property and rejects
+the same report. Adjacent controls cover inherited setters, reentry, accessor
+edges, present Undefined, length failures, nonextensibility, index boundaries,
+revocation, foreign error realms and public-intrinsic/prototype poisoning.
 
 The strict/sloppy Engine controls require actual WasmAot, normal Number262 and
 one final print. They cover all four operation orders, String/Symbol key identity,
