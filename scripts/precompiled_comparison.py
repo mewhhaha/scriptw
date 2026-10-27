@@ -496,9 +496,10 @@ def load_report(path, archive=None):
     require(cargo and cargo[-1] == dict(reason='build-finished', success=True) and producer in cargo
             and sum(row.get('reason') == 'build-finished' for row in cargo) == 1
             and producer.get('reason') == 'compiler-artifact' and producer['target']['kind'] == ['example']
-            and producer['target']['name'] == 'compiler_precompiled_baseline' and producer['features'] == []
+            and producer['target']['name'] == 'compiler_precompiled_baseline'
+            and producer.get('features') in ([], ['benchmark-module-images'])
             and producer['profile']['opt_level'] == '3' and producer['profile']['test'] is False,
-            'actual complete default release Cargo producer differs')
+            'actual complete admitted release Cargo producer differs')
     expected = measurement_plan(report['workloads'])
     attempts = report['attempts']
     require(len(attempts) == len(expected) == 68

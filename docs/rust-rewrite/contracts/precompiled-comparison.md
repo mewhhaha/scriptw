@@ -25,6 +25,12 @@ Sources, expected outputs and all 17 workloads are unchanged. Builds and
 measurements use one CPU, a 4-GiB process-tree cap, no swap and grouped OOM.
 The workflow uploads raw evidence and does not write to the repository.
 
+Cargo producer admission accepts exactly the default feature array `[]` or
+`["benchmark-module-images"]`. The latter enables the shared host's excluded
+phase-diagnostic address hook; ordinary captures do not invoke it. Unknown,
+additional or duplicate features are rejected, and the admitted producer must
+match an actual artifact record in the retained complete release Cargo transcript.
+
 Each of two rounds has ten checked warmups followed by seven measured
 invocations. Every invocation uses a fresh Store/Realm or Store/WASI instance.
 The second round reverses workload order; the first runtime alternates.
