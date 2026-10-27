@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   measure:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/memory-ordered-bootstrap-ci-20261027'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     steps:
@@ -53,6 +53,21 @@ jobs:
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --features benchmark-module-images --lib embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop -- --exact --test-threads=1
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline -- --test-threads=1
           bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline --message-format=json > "$RUNNER_TEMP/precompiled-cargo.jsonl"
+      - name: Verify ordered bootstrap regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/run-benchmark-scope.sh python3 -B scripts/verify-ordered-bootstrap-ci.py \
+            --expected-source "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/ordered-bootstrap-verification"
+      - name: Inspect owned runtime static metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/run-benchmark-scope.sh python3 -B scripts/record-ordered-bootstrap-static.py \
+            --expected-source "$GITHUB_SHA" \
+            --cargo-log "$RUNNER_TEMP/precompiled-cargo.jsonl" \
+            --output "$RUNNER_TEMP/ordered-bootstrap-static"
       - name: Measure both compiler-free consumers
         env:
           BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -90,6 +105,17 @@ jobs:
           DIAGNOSTIC_ARTIFACT_OUTCOME: ${{ steps.mapping_artifact.outcome }}
         run: |
           printf 'Unscored mapping capture: %s; artifact: %s. Scored observations are unchanged.\n' "$DIAGNOSTIC_OUTCOME" "$DIAGNOSTIC_ARTIFACT_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain ordered bootstrap checks and static metadata
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ordered-bootstrap-checks-and-static
+          path: |
+            ${{ runner.temp }}/ordered-bootstrap-verification
+            ${{ runner.temp }}/ordered-bootstrap-static
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
       - name: Retain all raw observations and failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
