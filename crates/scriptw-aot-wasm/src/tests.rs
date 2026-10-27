@@ -2975,7 +2975,7 @@ fn string_script_emits_memory_and_data() {
 
 /// `(passive, active)` segment counts. Active fragments use increasing,
 /// nonoverlapping constant addresses in private memory zero; the first starts
-/// at the shared static base. R's gap is checked by runtime_virtual_static_image.
+/// at the shared static base. R's gaps are checked by runtime_virtual_static_image.
 fn wire_data_segment_counts(bytes: &[u8]) -> (usize, usize) {
     let mut passive_segments = 0;
     let mut active_segments = 0;
@@ -3044,12 +3044,12 @@ fn preseeded_wire_data_stays_in_private_memory() {
     assert!(data_segment_at(&standalone.bytes, 0).starts_with(&expected_prefix));
     assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 1));
 
-    // A heap program's preseed is R's active prefix; its second active
-    // fragment skips normalization's passive payload. P retains passive images.
+    // A heap program's preseed is R's active prefix; later active fragments
+    // skip the passive property and normalization images. P retains passive images.
     let artifact = emit_script("({ value: \",\" });").expect("emit should work");
     expect_valid_module(&artifact, 0);
     let runtime = artifact.runtime().expect("heap program links R");
-    assert!(data_segment_at(runtime.bytes(), 2).starts_with(&expected_prefix));
+    assert!(data_segment_at(runtime.bytes(), 3).starts_with(&expected_prefix));
     assert!(runtime_virtual_static_image(runtime.bytes()).starts_with(&expected_prefix));
     assert_eq!(wire_data_segment_counts(runtime.bytes()), (3, 3));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));

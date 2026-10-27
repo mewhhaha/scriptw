@@ -33,6 +33,9 @@ ready/no-drop emission, computed property aliases and complements, u/v modes,
 string properties, syntax failures, recompile, GC, independent Stores and both
 normalization/property initialization orders.
 
-Whole-batch compilation, semantic verification and matched measurements remain
-pending. Passive storage does not establish reduced native-map residency: native
-admission may still read the bytes. No RSS or execution-time saving is claimed.
+The source-bound batch passed 4,876 native cases across 19 targets, 2,365 exact
+original pinned Test262 executions and 16 separate disjoint Unicode executions.
+The matched 17-workload comparison remains 1.237–1.613× Scriptc process RSS; parity
+is still open. Passive storage and independent CI runner observations do not
+establish causal resident-memory or execution-time savings.
+See [verification and measurements](../memory-regexp-unicode-data-20261027.md).

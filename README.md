@@ -45,31 +45,32 @@ metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-p
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `fa204ae2b`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `e7e512221`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. JavaScript and
 Wasm compilation run in separate producer processes; both measured consumers
 disable compilation and use identical native optimization and runtime settings.
 Both passed the original checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.3–1.7× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.237–1.613× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 19.1 MiB | 13.6 MiB |
-| Objects | 20.1 MiB | 14.3 MiB |
-| Retained objects | 25.6 MiB | 20.0 MiB |
+| Integer | 18.3 MiB | 13.7 MiB |
+| Objects | 18.9 MiB | 14.3 MiB |
+| Retained objects | 24.9 MiB | 20.1 MiB |
 
 These are medians of 14 measured samples per runtime and workload, after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
 Scriptc parity remains open under the same workloads, checksums and boundaries.
-This pass shares intrinsic data/accessor publication and factors deferred
-native-method construction into one validated, defining-Realm tail. Aliases
-keep shared function identity and independent mutable property descriptors.
-[Verification](docs/rust-rewrite/memory-intrinsic-publication-20261027.md):
-**4,874 native cases and 2,365 original pinned Test262 executions passed**.
-One excluded AOT test fixture was repaired for optional compacted imports;
-the original failed attempt and exact repair are retained. Product compiler
+This pass retains the complete RegExp Unicode property catalogue as passive
+data and copies its reserved range on first use in each actual R instance.
+Comparisons across separate CI runners do not establish causal savings.
+[Verification](docs/rust-rewrite/memory-regexp-unicode-data-20261027.md):
+**4,876 native cases, 2,365 original pinned Test262 executions and 16 separate
+Unicode executions passed**. The supplemental IDs are disjoint from the
+original selection. One excluded wire-data inspection fixture was repaired;
+the original failed attempt and exact patch are retained. Product compiler
 inputs match the measured source; verification fixtures are explicitly recorded.
 Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
 retention. Original Test262 executions ran in fresh batches of at most 16.
@@ -79,7 +80,7 @@ Test262 status below unchanged.
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
 [Precompiled process-memory graph](docs/rust-rewrite/assets/precompiled-memory.svg) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40504623872).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40519969552).
 
 ## Benchmarks
 
