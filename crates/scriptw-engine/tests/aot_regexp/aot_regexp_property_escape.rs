@@ -43,7 +43,7 @@ fn options() -> (CompileOptions, RunOptions) {
     )
 }
 
-fn assert_normal(source: &str, expected: &str) {
+pub(super) fn assert_normal(source: &str, expected: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("bounded compilation jobs");
     for directive in ["", "'use strict';\n"] {
         let script = format!("{directive}{UNITS}\n{PROPERTY_HELPERS}\n{source}");

@@ -247,6 +247,10 @@ impl FunctionBuilder<'_> {
         let matched = self.runtime_schema().reserve_i64_local(function);
         let kind = self.runtime_schema().reserve_i64_local(function);
         let image = self.strings.regexp_unicode_property_image();
+        self.runtime_schema().ensure_regexp_unicode_properties(
+            self.strings.regexp_unicode_property_region(),
+            function,
+        );
         self.emit_regexp_scratch_increment(compiler.cursor, 2, function);
         peek(compiler, function, compiler.cursor, 0, unit);
         eq(function, unit, b'{' as u64);

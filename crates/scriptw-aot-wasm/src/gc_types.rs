@@ -23,6 +23,8 @@ use empty_arrays::{EmptyArrayGlobal, EmptyArrays};
 mod stored_undefined;
 use stored_undefined::StoredUndefinedGlobal;
 mod native_metadata_shapes;
+mod regexp_unicode_properties;
+use regexp_unicode_properties::RegExpUnicodePropertiesGlobal;
 mod normalization_tables;
 use normalization_tables::NormalizationTablesGlobal;
 
@@ -392,6 +394,7 @@ impl RuntimeGcTypes {
         snapshot: bool,
         module_guard_count: u32,
     ) -> FinalizedModuleGlobals {
+        let regexp_unicode_properties = RegExpUnicodePropertiesGlobal::declare(&mut globals);
         let normalization_tables = NormalizationTablesGlobal::declare(&mut globals);
         let pooled_strings = GcRootGlobal::declare(&self.layouts, &mut globals);
         let well_known_symbols = GcRootGlobal::declare(&self.layouts, &mut globals);
@@ -430,6 +433,7 @@ impl RuntimeGcTypes {
         let runtime_schema = RuntimeSchema {
             types: self,
             normalization_tables,
+            regexp_unicode_properties,
             pooled_strings,
             well_known_symbols,
             registered_symbols,
@@ -756,6 +760,7 @@ impl CollectionKeyHashCounterGlobal {
 pub(crate) struct RuntimeSchema {
     types: RuntimeGcTypes,
     normalization_tables: NormalizationTablesGlobal,
+    regexp_unicode_properties: RegExpUnicodePropertiesGlobal,
     pooled_strings: GcRootGlobal<PooledStringTable>,
     well_known_symbols: GcRootGlobal<WellKnownSymbolTable>,
     registered_symbols: GcRootGlobal<RegisteredSymbolTable>,

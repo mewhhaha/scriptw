@@ -42,8 +42,32 @@ impl RegExpUnicodePropertyImageStringWord {
 pub(crate) struct RegExpUnicodePropertyImage {
     rows: u32,
     count: u32,
+    region: RegExpUnicodePropertyRegion,
 }
 
+/// Sealed contiguous image with unchanged embedded virtual addresses.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RegExpUnicodePropertyRegion {
+    start: u32,
+    end: u32,
+}
+impl RegExpUnicodePropertyRegion {
+    pub(crate) fn start(self) -> u32 {
+        self.start
+    }
+    pub(crate) fn end(self) -> u32 {
+        self.end
+    }
+    pub(crate) fn length(self) -> u32 {
+        self.end - self.start
+    }
+    pub(crate) const fn segment(self) -> PassiveDataSegment {
+        PassiveDataSegment::RegExpUnicodeProperties
+    }
+    pub(super) fn offsets(self) -> std::ops::Range<usize> {
+        (self.start - STATIC_DATA_OFFSET) as usize..(self.end - STATIC_DATA_OFFSET) as usize
+    }
+}
 impl RegExpUnicodePropertyImage {
     pub(crate) const fn rows(self) -> u32 {
         self.rows
@@ -64,6 +88,7 @@ impl StringPool {
         if self.regexp_unicode_property_image.is_some() {
             return;
         }
+        let start = self.property_image_pointer();
         let mut ranges: BTreeMap<Vec<(u32, u32)>, (u32, u32)> = BTreeMap::new();
         let mut string_keys: BTreeMap<Vec<u32>, (u32, u32)> = BTreeMap::new();
         let mut rows = Vec::new();
@@ -145,13 +170,26 @@ impl StringPool {
             }
         }
         // Check the complete image end before exposing its only pointer owner.
-        self.property_image_pointer();
+        let end = self.property_image_pointer();
         self.regexp_unicode_property_image = Some(RegExpUnicodePropertyImage {
             rows: pointer,
             count,
+            region: RegExpUnicodePropertyRegion { start, end },
         });
     }
 
+    pub(crate) fn regexp_unicode_property_region(&self) -> RegExpUnicodePropertyRegion {
+        self.regexp_unicode_property_image
+            .or_else(|| {
+                self.runtime_prefix()
+                    .and_then(|prefix| prefix.regexp_unicode_property_image)
+            })
+            .map(|image| image.region)
+            .unwrap_or(RegExpUnicodePropertyRegion {
+                start: STATIC_DATA_OFFSET,
+                end: STATIC_DATA_OFFSET,
+            })
+    }
     pub(crate) fn regexp_unicode_property_image(&self) -> RegExpUnicodePropertyImage {
         self.regexp_unicode_property_image
             .or_else(|| {

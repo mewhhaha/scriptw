@@ -43,16 +43,23 @@ impl CompilerOwnedPool {
         let mut found = false;
         for payload in Parser::new(0).parse_all(bytes) {
             if let Payload::DataSection(section) = payload.map_err(|_| error())? {
-                if found || section.count() != 4 {
+                if found || section.count() != 6 {
                     return Err(error());
                 }
                 found = true;
                 let region = self.0.normalization_image_region();
                 let span = region.offsets();
+                let properties = self.0.regexp_unicode_property_region();
+                let property = properties.offsets();
                 let expected = [
                     (&self.0.pooled_code_unit_bytes[..], None),
                     (&self.0.bytes[span.clone()], None),
-                    (&self.0.bytes[..span.start], Some(STATIC_DATA_OFFSET)),
+                    (&self.0.bytes[property.clone()], None),
+                    (&self.0.bytes[..property.start], Some(STATIC_DATA_OFFSET)),
+                    (
+                        &self.0.bytes[property.end..span.start],
+                        Some(properties.end()),
+                    ),
                     (&self.0.bytes[span.end..], Some(region.end())),
                 ];
                 for (row, (bytes, address)) in section.into_iter().zip(expected) {

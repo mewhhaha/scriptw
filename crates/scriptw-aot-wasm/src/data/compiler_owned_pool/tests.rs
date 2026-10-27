@@ -166,6 +166,49 @@ fn shared_program_images_and_ordinals_match_fresh_collection_with_exact_utf16() 
     }
 }
 
+fn exact_bytes_for_corruption(prefix: &CompilerOwnedPool) -> Vec<u8> {
+    let mut data = DataSection::new();
+    prefix.0.append_runtime_data(&mut data);
+    let mut module = Module::new();
+    module.section(&data);
+    module.finish()
+}
+
+fn descriptor_payload_byte(bytes: &[u8], address: u32) -> usize {
+    use wasmparser::{DataKind, Operator, Parser, Payload};
+    let mut found = None;
+    for payload in Parser::new(0).parse_all(bytes) {
+        if let Payload::DataSection(section) = payload.unwrap() {
+            for row in section {
+                let row = row.unwrap();
+                if let DataKind::Active {
+                    memory_index: 0,
+                    offset_expr,
+                } = row.kind
+                {
+                    let mut operators = offset_expr.get_operators_reader();
+                    let Operator::I32Const { value } = operators.read().unwrap() else {
+                        panic!("constant R address");
+                    };
+                    assert!(matches!(operators.read().unwrap(), Operator::End) && operators.eof());
+                    if let Some(displacement) = address
+                        .checked_sub(value as u32)
+                        .map(|n| n as usize)
+                        .filter(|n| *n < row.data.len())
+                    {
+                        let payload_start = row.range.end - row.data.len();
+                        assert!(
+                            found.replace(payload_start + displacement).is_none(),
+                            "descriptor has one actual active owner"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    found.expect("actual encoded R descriptor payload")
+}
+
 #[test]
 fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
     let prefix = prefix();
@@ -174,27 +217,13 @@ fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
     let mut exact = Module::new();
     exact.section(&data);
     prefix.require_runtime_data(&exact.finish()).unwrap();
-    let mut corrupt = prefix.0.bytes[..].to_vec();
+    let mut wrong_bytes = exact_bytes_for_corruption(&prefix);
+    // Retain the exact descriptor-byte corruption control across segment layouts.
+    // Locate its actual encoded payload instead of rebuilding a parallel layout.
     let descriptors = prefix.0.runtime_string_descriptors().unwrap();
-    corrupt[(descriptors.address() - STATIC_DATA_OFFSET) as usize] ^= 1;
-    let region = prefix.0.normalization_image_region();
-    let span = region.offsets();
-    let mut data = DataSection::new();
-    data.passive(prefix.0.pooled_code_unit_bytes[..].iter().copied());
-    data.passive(corrupt[span.clone()].iter().copied());
-    data.active(
-        0,
-        &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32),
-        corrupt[..span.start].iter().copied(),
-    );
-    data.active(
-        0,
-        &ConstExpr::i32_const(region.end() as i32),
-        corrupt[span.end..].iter().copied(),
-    );
-    let mut wrong = Module::new();
-    wrong.section(&data);
-    assert!(prefix.require_runtime_data(&wrong.finish()).is_err());
+    let descriptor_byte = descriptor_payload_byte(&wrong_bytes, descriptors.address());
+    wrong_bytes[descriptor_byte] ^= 1;
+    assert!(prefix.require_runtime_data(&wrong_bytes).is_err());
     assert!(prefix
         .require_runtime_data(&Module::new().finish())
         .is_err());
@@ -224,7 +253,7 @@ fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_a
             rows.extend(section.into_iter().map(Result::unwrap));
         }
     }
-    assert_eq!(rows.len(), 4);
+    assert_eq!(rows.len(), 6);
     assert!(matches!(
         &rows[PooledCodeUnits::DATA_SEGMENT.index() as usize].kind,
         DataKind::Passive
@@ -252,14 +281,29 @@ fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_a
             let offset = value as usize - STATIC_DATA_OFFSET as usize;
             let end = offset + row.data.len();
             assert!(
-                end <= span.start || offset >= span.end,
+                (end <= span.start || offset >= span.end) && {
+                    let property = prefix.0.regexp_unicode_property_region().offsets();
+                    end <= property.start || offset >= property.end
+                },
                 "no active copy may touch the deferred span, including zero placeholders"
             );
             restored[offset..end].copy_from_slice(row.data);
             active_bytes += row.data.len();
         }
     }
-    assert_eq!(active_bytes + span.len(), restored.len());
+    let properties = prefix.0.regexp_unicode_property_region();
+    let property = properties.offsets();
+    assert!(property.len() > 0);
+    assert!(matches!(
+        rows[properties.segment().index() as usize].kind,
+        DataKind::Passive
+    ));
+    assert_eq!(
+        rows[properties.segment().index() as usize].data,
+        &prefix.0.bytes[property.clone()]
+    );
+    assert_eq!(active_bytes + span.len() + property.len(), restored.len());
+    restored[property.clone()].copy_from_slice(rows[properties.segment().index() as usize].data);
     restored[span.clone()].copy_from_slice(rows[region.segment().index() as usize].data);
     assert_eq!(restored, &prefix.0.bytes[..]);
     assert_eq!(

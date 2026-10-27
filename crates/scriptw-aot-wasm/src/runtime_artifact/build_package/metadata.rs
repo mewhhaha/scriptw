@@ -14,7 +14,7 @@ mod encode;
 #[cfg(test)]
 mod tests;
 
-const METADATA_MAGIC: &[u8; 8] = b"SCRWRM01";
+const METADATA_MAGIC: &[u8; 8] = b"SCRWRM02";
 const MAX_METADATA_BYTES: usize = 1024 * 1024;
 
 pub(in crate::runtime_artifact) struct BuildIdentity {
@@ -51,7 +51,7 @@ pub(in crate::runtime_artifact) struct BuildMetadata {
     profile: RuntimeSourceCompilationProfile,
     layout: RuntimeLayout,
     largest_body: usize,
-    data: [SpanDigest; 4],
+    data: [SpanDigest; 6],
     frames: Vec<(IntlDataComponent, SpanDigest)>,
 }
 
@@ -61,7 +61,7 @@ pub(in crate::runtime_artifact) struct BuildAdmission {
     package: &'static [u8],
     package_digest: [u8; 32],
     pub(in crate::runtime_artifact) largest_body: usize,
-    data: [SpanDigest; 4],
+    data: [SpanDigest; 6],
 }
 
 impl BuildAdmission {
@@ -70,24 +70,27 @@ impl BuildAdmission {
     }
 
     pub(in crate::runtime_artifact) fn matches_pool(&self, utf16: &[u8], data: &[u8]) -> bool {
-        let prefix = self.data[2].span.len();
-        let normalization = self.data[1].span.len();
-        let Some(end) = prefix.checked_add(normalization) else {
+        let mut cursor = 0usize;
+        let mut parts = [&[][..]; 6];
+        parts[0] = utf16;
+        // Virtual image order differs from physical segment order.
+        for index in [3, 2, 4, 1, 5] {
+            let Some(end) = cursor.checked_add(self.data[index].span.len()) else {
+                return false;
+            };
+            let Some(bytes) = data.get(cursor..end) else {
+                return false;
+            };
+            parts[index] = bytes;
+            cursor = end;
+        }
+        if cursor != data.len() {
             return false;
-        };
-        let Some((head, tail)) = data.split_at_checked(prefix) else {
-            return false;
-        };
-        let Some((normalization_bytes, suffix)) = tail.split_at_checked(end - prefix) else {
-            return false;
-        };
-        [utf16, normalization_bytes, head, suffix]
-            .into_iter()
-            .zip(&self.data)
-            .all(|(bytes, expected)| {
-                bytes.len() == expected.span.len()
-                    && Sha256::digest(bytes).as_slice() == expected.digest
-            })
+        }
+        parts.into_iter().zip(&self.data).all(|(bytes, expected)| {
+            bytes.len() == expected.span.len()
+                && Sha256::digest(bytes).as_slice() == expected.digest
+        })
     }
 }
 

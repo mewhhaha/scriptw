@@ -112,7 +112,7 @@ fn receipt_largest_body() -> usize {
 fn receipt_metadata_binds_canonical_pool_contents_not_only_dimensions() {
     let receipt = decode(&fixture().metadata).unwrap();
     let utf16 = &receipt.package[receipt.data[0].span.clone()];
-    let data = [2, 1, 3]
+    let data = [3, 2, 4, 1, 5]
         .into_iter()
         .flat_map(|index| {
             receipt.package[receipt.data[index].span.clone()]

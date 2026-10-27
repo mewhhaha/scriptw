@@ -100,7 +100,7 @@ impl RuntimeBuildArtifact {
             }
         }
         word(&mut out, largest_body);
-        assert_eq!(data.len(), 4);
+        assert_eq!(data.len(), 6);
         for bytes in data {
             span(&mut out, &self.package, bytes);
         }

@@ -133,13 +133,13 @@ impl BuildMetadata {
             r.span(&wasm)?,
             r.span(&wasm)?,
             r.span(&wasm)?,
+            r.span(&wasm)?,
+            r.span(&wasm)?,
         ];
         if data[0].span.len() != utf16_len
-            || data[1]
-                .span
-                .len()
-                .checked_add(data[2].span.len())?
-                .checked_add(data[3].span.len())?
+            || data[1..]
+                .iter()
+                .try_fold(0usize, |sum, row| sum.checked_add(row.span.len()))?
                 != static_len
             || data
                 .windows(2)

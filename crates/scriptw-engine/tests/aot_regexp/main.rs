@@ -26,4 +26,5 @@ mod aot_regexp_required_choice_runs;
 mod aot_regexp_required_empty_replay;
 mod aot_regexp_reverse_whitespace;
 mod aot_regexp_runtime_gap;
+mod aot_regexp_unicode_property_data;
 mod aot_regexp_word_boundary;

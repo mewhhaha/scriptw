@@ -41,6 +41,7 @@ mod regexp_unicode_properties;
 pub(crate) use regexp_unicode_properties::{
     RegExpUnicodePropertyImage, RegExpUnicodePropertyImageKind,
     RegExpUnicodePropertyImageStringWord, RegExpUnicodePropertyImageWord,
+    RegExpUnicodePropertyRegion,
 };
 
 mod intl_supported_values;
@@ -70,12 +71,14 @@ pub(crate) use runtime_error_message::{
 pub(crate) enum PassiveDataSegment {
     PooledCodeUnits,
     Normalization,
+    RegExpUnicodeProperties,
 }
 impl PassiveDataSegment {
     pub(crate) const fn index(self) -> u32 {
         match self {
             Self::PooledCodeUnits => 0,
             Self::Normalization => 1,
+            Self::RegExpUnicodeProperties => 2,
         }
     }
 }
@@ -4542,7 +4545,7 @@ impl StringPool {
         })
     }
 
-    /// Publish two passive images and two active fragments around the reserved gap.
+    /// Publish cold images without initializing their reserved linear ranges.
     pub(crate) fn append_runtime_data(&self, section: &mut wasm_encoder::DataSection) {
         assert_eq!(section.len(), PooledCodeUnits::DATA_SEGMENT.index());
         let boundary = self.compiler_owned;
@@ -4551,23 +4554,26 @@ impl StringPool {
                 .iter()
                 .copied(),
         );
-        let region = self.normalization_image_region();
-        let span = region.offsets();
-        assert!(span.end <= boundary.static_bytes);
-        assert_eq!(section.len(), region.segment().index());
-        section.passive(self.bytes[span.clone()].iter().copied());
-        // Preserve virtual addresses without copying a zero-filled placeholder
-        // over the deferred range. Its memory pages remain untouched here.
-        section.active(
-            0,
-            &wasm_encoder::ConstExpr::i32_const(STATIC_DATA_OFFSET as i32),
-            self.bytes[..span.start].iter().copied(),
-        );
-        section.active(
-            0,
-            &wasm_encoder::ConstExpr::i32_const(region.end() as i32),
-            self.bytes[span.end..boundary.static_bytes].iter().copied(),
-        );
+        let normalization = self.normalization_image_region();
+        let norm = normalization.offsets();
+        let properties = self.regexp_unicode_property_region();
+        let property = properties.offsets();
+        assert!(property.end <= norm.start && norm.end <= boundary.static_bytes);
+        assert_eq!(section.len(), normalization.segment().index());
+        section.passive(self.bytes[norm.clone()].iter().copied());
+        assert_eq!(section.len(), properties.segment().index());
+        section.passive(self.bytes[property.clone()].iter().copied());
+        for (span, address) in [
+            (0..property.start, STATIC_DATA_OFFSET),
+            (property.end..norm.start, properties.end()),
+            (norm.end..boundary.static_bytes, normalization.end()),
+        ] {
+            section.active(
+                0,
+                &wasm_encoder::ConstExpr::i32_const(address as i32),
+                self.bytes[span].iter().copied(),
+            );
+        }
     }
 
     /// The program's passive UTF-16, metadata, descriptor and recipe images.

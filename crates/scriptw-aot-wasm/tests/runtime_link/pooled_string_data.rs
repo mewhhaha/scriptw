@@ -135,6 +135,20 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                     "normalization cannot copy pooled literal bytes into its table range");
                 assert!(operators.iter().any(|op| matches!(op, Operator::GlobalSet { .. })),
                     "completed initialization is recorded on the actual R instance");
+                let compiler = named_function_body(runtime.bytes(), "helper::regexp_compiler");
+                let body=wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&compiler,0));
+                let ops=body.get_operators_reader().unwrap().into_iter().map(Result::unwrap).collect::<Vec<_>>();
+                let installs=ops.iter().enumerate().filter_map(|(index,op)|matches!(op,Operator::MemoryInit{data_index:2,mem:0}).then_some(index)).collect::<Vec<_>>();
+                assert!(!installs.is_empty(),"actual Unicode property parser installs its sealed passive image");
+                for index in installs {
+                    assert!(matches!(ops[index-6],Operator::GlobalGet{..}),"instance-local readiness guards each property lookup owner");
+                    let Operator::GlobalGet{global_index}=ops[index-6] else {unreachable!()};
+                    assert!(matches!(ops[index-5],Operator::I32Eqz));
+                    assert!(matches!(ops[index-4],Operator::If{..}));
+                    assert!(matches!(ops[index+1],Operator::I32Const{value:1}));
+                    assert!(matches!(ops[index+2],Operator::GlobalSet{global_index:written} if written==global_index),"publish readiness only after the complete memory.init");
+                }
+                assert!(!ops.iter().any(|op|matches!(op,Operator::DataDrop{data_index:2})),"independent late property lookups retain the passive catalog");
                 let resolver = named_function_body(runtime.bytes(), "helper::pooled_string_resolve");
                 assert_eq!(array_data_initializers(&resolver), [1, 0, 0, 0],
                     "only a cache miss constructs canonical UTF16 storage");

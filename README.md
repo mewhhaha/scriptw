@@ -23,6 +23,8 @@ Object storage avoids boxed prototype links and allocates scalar backing on
 demand. On Linux, the copying collector releases dead pages after collection
 while preserving heap capacity for reuse.
 Normalization tables and Intl catalogue metadata initialize on first use.
+The RegExp Unicode property catalogue also initializes on first lookup; see the
+[data contract](docs/rust-rewrite/contracts/regexp-unicode-property-data.md).
 Trusted precompiled loading reuses producer-admitted execution facts.
 Internal Array descriptor queries use a typed Array kernel and capture a fresh
 record. Set receiver updates use normalized data definitions through the same

@@ -1999,59 +1999,35 @@ fn runtime_virtual_static_image(bytes: &[u8]) -> Vec<u8> {
     }
     assert_eq!(
         rows.len(),
-        4,
-        "R owns two passive images and two active fragments"
+        6,
+        "R owns three passive images and three active fragments"
     );
     assert!(
-        matches!(&rows[0].kind, DataKind::Passive),
-        "pooled UTF16 stays passive"
+        !rows[1].data.is_empty() && !rows[2].data.is_empty(),
+        "full R retains both sealed cold catalogs"
     );
-    assert!(
-        matches!(&rows[1].kind, DataKind::Passive),
-        "normalization stays passive"
-    );
-    assert!(
-        !rows[1].data.is_empty(),
-        "the full R retains normalization data"
-    );
-    let address = |row: &wasmparser::Data<'_>| {
-        let DataKind::Active {
-            memory_index: 0,
-            offset_expr,
-        } = &row.kind
-        else {
-            panic!("static fragments target private memory zero");
-        };
-        let mut operators = offset_expr.get_operators_reader();
-        let Operator::I32Const { value } = operators.read().expect("constant static address")
-        else {
-            panic!("constant static address");
-        };
-        assert!(matches!(operators.read().unwrap(), Operator::End));
-        assert!(operators.eof());
-        u32::try_from(value).expect("positive wasm32 static address") as usize
-    };
-    let prefix_start = address(&rows[2]);
-    assert_eq!(prefix_start, STATIC_DATA_OFFSET as usize);
-    let gap_start = prefix_start.checked_add(rows[2].data.len()).unwrap();
-    let gap_end = gap_start.checked_add(rows[1].data.len()).unwrap();
-    let suffix_start = address(&rows[3]);
-    assert_eq!(
-        suffix_start, gap_end,
-        "active suffix starts after the entire deferred group"
-    );
-    let extent = suffix_start.checked_add(rows[3].data.len()).unwrap() - prefix_start;
-    assert_eq!(
-        rows[2].data.len() + rows[1].data.len() + rows[3].data.len(),
-        extent
-    );
-    let mut image = Vec::with_capacity(extent);
-    image.extend_from_slice(rows[2].data);
-    image.extend_from_slice(rows[1].data);
-    image.extend_from_slice(rows[3].data);
-    assert_eq!(image.len(), extent);
-    // No zero-filled stand-in for the gap is present in active publication.
-    assert!(prefix_start + rows[2].data.len() <= gap_start && suffix_start >= gap_end);
+    for index in 0..3 {
+        assert!(matches!(rows[index].kind, DataKind::Passive));
+    }
+    let mut image = Vec::new();
+    for index in [3, 2, 4, 1, 5] {
+        if [3, 4, 5].contains(&index) {
+            let DataKind::Active {
+                memory_index: 0,
+                offset_expr,
+            } = &rows[index].kind
+            else {
+                panic!("active fragments target private memory zero")
+            };
+            let mut ops = offset_expr.get_operators_reader();
+            assert!(
+                matches!(ops.read().unwrap(),Operator::I32Const{value} if u32::try_from(value).unwrap() as usize==STATIC_DATA_OFFSET as usize+image.len())
+            );
+            assert!(matches!(ops.read().unwrap(), Operator::End));
+            assert!(ops.eof());
+        }
+        image.extend_from_slice(rows[index].data);
+    }
     image
 }
 
@@ -3075,7 +3051,7 @@ fn preseeded_wire_data_stays_in_private_memory() {
     let runtime = artifact.runtime().expect("heap program links R");
     assert!(data_segment_at(runtime.bytes(), 2).starts_with(&expected_prefix));
     assert!(runtime_virtual_static_image(runtime.bytes()).starts_with(&expected_prefix));
-    assert_eq!(wire_data_segment_counts(runtime.bytes()), (2, 2));
+    assert_eq!(wire_data_segment_counts(runtime.bytes()), (3, 3));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));
     assert!(data_segment_at(&artifact.bytes, 3).is_empty());
     assert!(artifact

@@ -58,15 +58,21 @@ def check(root, overrides=None):
             'actual runtime boundary and bytes precede prefix freezing')
     receipt = c[A + 'runtime_artifact/build_package/metadata.rs']
     require('Some(self.build_admission.as_ref()?.matches_pool(utf16,data))' in runtime and
-            'data:[SpanDigest;4]' in receipt and
-            ('[utf16,normalization_bytes,head,suffix].into_iter().zip(&self.data).all(|(bytes,expected)|{'
+            'data:[SpanDigest;6]' in receipt and
+            'forindexin[3,2,4,1,5]' in receipt and
+            'cursor.checked_add(self.data[index].span.len())' in receipt and
+            'data.get(cursor..end)' in receipt and
+            'ifcursor!=data.len(){returnfalse;}' in receipt and
+            ('parts.into_iter().zip(&self.data).all(|(bytes,expected)|{'
              'bytes.len()==expected.span.len()&&Sha256::digest(bytes).as_slice()==expected.digest})') in receipt,
             'immutable pool proof checks both actual reconstructed image dimensions and hashes')
-    require('section.count()!=4' in pool and
+    require('section.count()!=6' in pool and
             'letregion=self.0.normalization_image_region();letspan=region.offsets();' in pool and
             '(&self.0.pooled_code_unit_bytes[..],None)' in pool and
             '(&self.0.bytes[span.clone()],None)' in pool and
-            '(&self.0.bytes[..span.start],Some(STATIC_DATA_OFFSET))' in pool and
+            '(&self.0.bytes[property.clone()],None)' in pool and
+            '(&self.0.bytes[..property.start],Some(STATIC_DATA_OFFSET))' in pool and
+            '(&self.0.bytes[property.end..span.start],Some(properties.end()),)'  in pool and
             '(&self.0.bytes[span.end..],Some(region.end()))' in pool and
             'for(row,(bytes,address))insection.into_iter().zip(expected)' in pool and
             'ifrow.data!=bytes' in pool and
@@ -141,7 +147,12 @@ def check(root, overrides=None):
     require('Arc::ptr_eq(pool.shared_prefix.as_ref().unwrap(),&prefix)' in tests and
             'std::ptr::eq(pool.refs.get("undefined").unwrap(),prefix.0.refs.get("undefined").unwrap())' in tests and
             'assert_eq!(shared_module.finish(),fresh_module.finish())' in tests and
-            'corrupt[(descriptors.address()-STATIC_DATA_OFFSET)asusize]^=1' in tests,
+            'letdescriptors=prefix.0.runtime_string_descriptors().unwrap();' in tests and
+            'descriptor_payload_byte(&wrong_bytes,descriptors.address())' in tests and
+            'letpayload_start=row.range.end-row.data.len();' in tests and
+            'address.checked_sub(valueasu32)' in tests and
+            'wrong_bytes[descriptor_byte]^=1' in tests and
+            'assert!(prefix.require_runtime_data(&wrong_bytes).is_err())' in tests,
             'authored controls cover real sharing, P isolation, exact images and corrupted R data')
     require(c[A + 'runtime_artifact/validated_profile/tests.rs'].count('Arc::ptr_eq(&prefix,runtime.compiler_owned_pool.get().unwrap().as_ref().unwrap())') == 3,
             'two proofs and all three entry kinds retain the one R-owned prefix')
