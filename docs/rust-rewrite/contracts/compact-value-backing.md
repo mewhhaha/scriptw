@@ -42,8 +42,10 @@ descriptor, normalizes its private attribute booleans and invokes the existing
 append algorithm. Recipe creation, property order and Realm ownership stay with
 the existing caller. Focused controls inspect the emitted shared call and cover
 alias identity, independent descriptor mutation, GC and cross-Realm behavior.
-Code-size and residency effects require measurement.
+Per-change code-size and residency effects require separate attribution.
 
-Implementation, focused controls and documentation are being prepared together
-in an isolated worktree. Compilation, semantic verification and matched RSS
-measurements remain pending. No memory saving is claimed by this contract.
+The source-bound batch passed 4,869 native cases and 2,365 original pinned
+Test262 executions. The matched 17-workload comparison remains 1.3–1.7× Scriptc
+process RSS. These runner observations do not isolate a causal saving from any
+individual storage or publication change.
+See [verification and measurements](../memory-value-backings-20261027.md).
