@@ -69,5 +69,7 @@ source/profile/runtime key and destination Engine compatibility remain separate
 admission requirements. Existing `SCRIPTW_WASM_TRACE` output reports the selected
 source kind without payload bytes or addresses.
 
-The 2026-10-27 source-reader extension and its malformed-header, mapping, range
-and actual-source controls are implemented; whole-batch verification is pending.
+The 2026-10-27 source-reader extension passed all 18 runtime-image cases within
+the [4,549-case native checkpoint](../memory-array-native-input-20261027.md), followed by 1,092
+original selected Test262 executions. The record retains exact source identities
+and fresh unscored file-source observations.

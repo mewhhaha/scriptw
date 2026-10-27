@@ -91,6 +91,7 @@ original target and outer-trap throws, early Boolean outcomes and missing
 properties, frozen/accessor and SameValue NaN/signed-zero constraints. Both
 borrowed Reflect Realm directions and source operators retain native error
 prototypes after public foreign intrinsic bindings are replaced. These controls
-are authored and unexecuted. Current scalar layouts, semantic GC migration,
+passed within the [4,549-case native checkpoint](../memory-array-native-input-20261027.md), including
+all 209 GC-entry cases and 1,092 original selected Test262 executions. Current scalar layouts, semantic GC migration,
 full descriptor-lattice obligations and complete T11/Test262 acceptance remain
 separate open work.
