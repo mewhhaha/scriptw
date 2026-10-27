@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from precompiled_comparison import (
-    ADAPTER, FIXTURES, ROUNDS, SAMPLES, SCHEMA, WARMUPS, digest,
+    ADAPTER, FIXTURES, PHASE_BARRIER_ENV, ROUNDS, SAMPLES, SCHEMA, WARMUPS, digest,
     image_metadata, load_report, measurement_plan, require,
 )
 
@@ -54,7 +54,8 @@ def measure(args):
     environment.pop('NODE_COMPILE_CACHE', None)
     instrumentation = ('SCRIPTW_PERF_MAP_DIR','SCRIPTW_WASM_TRACE','SCRIPTW_WASM_TRACE_DUMP',
         'SCRIPTW_EMIT_SIZE_REPORT','SCRIPTW_ROW_PERF_CONTROL','SCRIPTW_ROW_PERF_ACK',
-        'SCRIPTW_ROW_PERF_REGION','SCRIPTW_BOUNDARY_READY_FD','SCRIPTW_BOUNDARY_READY_NONCE')
+        'SCRIPTW_ROW_PERF_REGION','SCRIPTW_BOUNDARY_READY_FD','SCRIPTW_BOUNDARY_READY_NONCE',
+        *PHASE_BARRIER_ENV)
     for key in instrumentation:
         environment.pop(key,None)
     commands = []

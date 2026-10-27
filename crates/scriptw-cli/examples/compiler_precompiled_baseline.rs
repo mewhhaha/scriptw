@@ -2,6 +2,8 @@
 #[path = "runtime_precompiled/consume.rs"]
 #[allow(dead_code)]
 mod consume;
+#[path = "runtime_precompiled/phase_barriers.rs"]
+mod phase_barriers;
 #[path = "runtime_precompiled/produce.rs"]
 #[allow(dead_code)]
 mod produce;
@@ -74,10 +76,12 @@ fn shared_configuration() -> Value {
 }
 
 fn decorate(mut report: Value, adapter: &str) -> Value {
-    report
-        .as_object_mut()
-        .expect("benchmark reports are objects")
-        .remove("excluded_from_scored_cohorts");
+    if report.get("phase_barriers").is_none() {
+        report
+            .as_object_mut()
+            .expect("benchmark reports are objects")
+            .remove("excluded_from_scored_cohorts");
+    }
     report["comparison_cohort"] = json!("scriptw-precompiled-comparison-v1");
     report["excluded_from_ordinary_cohorts"] = json!(true);
     report["scope"] = json!(match report.get("compiler_enabled").and_then(Value::as_bool) {

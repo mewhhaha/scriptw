@@ -1,6 +1,8 @@
 //! Independent fresh-process compiler-disabled execution diagnostic.
 #[path = "runtime_precompiled/consume.rs"]
 mod consume;
+#[path = "runtime_precompiled/phase_barriers.rs"]
+mod phase_barriers;
 #[path = "runtime_precompiled/produce.rs"]
 mod produce;
 #[path = "runtime_precompiled/residency.rs"]

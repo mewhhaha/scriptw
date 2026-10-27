@@ -18,6 +18,9 @@ import tempfile
 
 SCHEMA = 'scriptw-precompiled-comparison-v1'
 RUNTIMES = ('scriptw', 'scriptc')
+PHASE_BARRIER_ENV = ('SCRIPTW_PRECOMPILED_PHASE_FD',
+                     'SCRIPTW_PRECOMPILED_PHASE_NONCE',
+                     'SCRIPTW_PRECOMPILED_PHASE_INDEX')
 SAMPLES, WARMUPS, ROUNDS = 7, 10, 2
 FIXTURES = 'crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths'
 ADAPTER = 'function print(value) { console.log(String(value)); }\n'
@@ -285,6 +288,9 @@ def _memory(value):
 
 
 def _consumer(raw, report, image, case, runtime):
+    require('phase_barriers' not in raw
+            and 'diagnostic_total_timings_include_barrier_waits' not in raw,
+            'phase-barrier diagnostics cannot enter scored comparisons')
     expected_schema = ('scriptw-precompiled-execution-v1' if runtime == 'scriptw'
                        else 'scriptw-precompiled-wasi-execution-v1')
     require(raw.get('schema') == expected_schema and raw.get('compiler_enabled') is False

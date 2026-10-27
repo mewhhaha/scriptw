@@ -250,6 +250,30 @@ class PrecompiledComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'compiler/configuration'):
             comparison.load_report(self.save())
 
+    def test_phase_barrier_reports_cannot_be_relabelled_as_scores(self):
+        for runtime in comparison.RUNTIMES:
+            index = next(i for i, row in enumerate(self.report['attempts'])
+                         if row['runtime'] == runtime and row['status'] == 'ok')
+            _, event, original = self.raw_attempt(index)
+            for marker in (None, False, {'schema': 'scriptw-precompiled-phase-barriers-v1'}):
+                with self.subTest(runtime=runtime, marker=marker):
+                    raw = dict(original, phase_barriers=marker)
+                    # Even deleting the explicit unscored flag cannot make the
+                    # paused timing and memory history a canonical observation.
+                    raw.pop('excluded_from_scored_cohorts', None)
+                    self.write(event['stdout'], self.raw_json(raw))
+                    with self.assertRaisesRegex(ValueError, 'phase-barrier diagnostics'):
+                        comparison.load_report(self.save())
+            self.write(event['stdout'], self.raw_json(original))
+
+            for flag in (None, False, True):
+                with self.subTest(runtime=runtime, timing_label=flag):
+                    raw = dict(original, diagnostic_total_timings_include_barrier_waits=flag)
+                    self.write(event['stdout'], self.raw_json(raw))
+                    with self.assertRaisesRegex(ValueError, 'phase-barrier diagnostics'):
+                        comparison.load_report(self.save())
+            self.write(event['stdout'], self.raw_json(original))
+
     def test_different_consumer_binary_is_rejected(self):
         self.mutate_raw(lambda raw: raw.update(executable_sha256='a' * 64))
         with self.assertRaisesRegex(ValueError, 'shared executable'):

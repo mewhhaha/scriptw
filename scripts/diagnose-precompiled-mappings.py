@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 import re
 import selectors
+import secrets
+import socket
 import signal
 import stat
 import subprocess
@@ -22,7 +24,10 @@ from limited_verification import kernel_group, require_kernel_budget
 ROOT = Path(__file__).resolve().parents[1]
 MAX_READ = 2 * 1024**2
 MAX_TOTAL = 64 * 1024**2
-MAX_SNAPSHOTS = 128
+PHASES = ('after_transport_drop', 'after_instantiate', 'after_execution', 'after_store_drop')
+MAX_SNAPSHOTS = len(PHASES)
+MAX_CONTROL_LINE = 256
+MAX_CONTROL_BYTES = MAX_CONTROL_LINE * len(PHASES)
 DEADLINE = 120
 HEADER = re.compile(r'^([0-9a-f]+)-([0-9a-f]+) ([-rwxps]{4}) ([0-9a-f]+) ([0-9a-f]+):([0-9a-f]+) (\d+)(?: +(.*))?$')
 
@@ -133,46 +138,109 @@ def kill_owned_group(process):
         pass
 
 
-def drain_owned(process, outputs, tick, deadline=DEADLINE):
-    """Drain both pipes through EOF, keeping a bounded raw prefix on failure.
+class PhaseProtocol:
+    """Closed ordered handshake; neither names nor timing imply a phase."""
+    def __init__(self, nonce, observation_index):
+        p.require(re.fullmatch('[0-9a-f]{32}', nonce) is not None, 'invalid phase nonce')
+        p.require(type(observation_index) is int and observation_index >= 0, 'invalid phase index')
+        self.nonce = nonce
+        self.index = observation_index
+        self.completed = []
+        self.buffer = bytearray()
+        self.received = 0
 
-    No child file-write limits: native backing writes must retain normal semantics.
-    The group is created by our Popen and is the only group we may terminate.
-    """
+    def feed(self, data, capture):
+        self.received += len(data)
+        p.require(self.received <= MAX_CONTROL_BYTES, 'phase control byte bound exceeded')
+        self.buffer.extend(data)
+        acknowledgments = bytearray()
+        while b'\n' in self.buffer:
+            line, _, tail = self.buffer.partition(b'\n')
+            self.buffer = bytearray(tail)
+            p.require(not tail, 'pipelined phase events before acknowledgment')
+            p.require(len(line) + 1 <= MAX_CONTROL_LINE, 'phase line byte bound exceeded')
+            seq = len(self.completed) + 1
+            p.require(seq <= len(PHASES), 'duplicate or extra phase event')
+            phase = PHASES[seq - 1]
+            expected = f'SWPHASE1 {self.nonce} {seq} {phase} {self.index}'.encode('ascii')
+            p.require(line == expected, 'phase nonce/order/sequence/index mismatch')
+            capture(phase, seq, self.index)
+            self.completed.append(phase)
+            acknowledgments.extend(f'SWACK1 {self.nonce} {seq} {phase} {self.index}\n'.encode('ascii'))
+        p.require(len(self.buffer) < MAX_CONTROL_LINE, 'phase line byte bound exceeded')
+        return bytes(acknowledgments)
+
+    def eof(self):
+        p.require(not self.buffer and self.completed == list(PHASES), 'incomplete phase control EOF')
+
+
+def drain_owned(process, outputs, control=None, protocol=None, on_phase=None, deadline=DEADLINE):
+    """Select control and both pipes together; kill only our owned group on failure."""
+    p.require((control is None) == (protocol is None), 'incomplete phase drain configuration')
     started = time.monotonic()
     retained = 0
+    control_retained = 0
     error = None
     cleanup_until = None
-    next_tick = started
+    pending = bytearray()
     with selectors.DefaultSelector() as selector:
         for name, pipe in (('stdout', process.stdout), ('stderr', process.stderr)):
             os.set_blocking(pipe.fileno(), False)
             selector.register(pipe, selectors.EVENT_READ, name)
+        if control is not None:
+            control.setblocking(False)
+            selector.register(control, selectors.EVENT_READ, 'control')
         try:
             while selector.get_map() or process.poll() is None:
                 now = time.monotonic()
-                if error is None and now-started >= deadline:
+                if error is None and now - started >= deadline:
                     error = 'diagnostic deadline exceeded'
                 if error is not None and cleanup_until is None:
                     kill_owned_group(process)
                     cleanup_until = now + 2
+                    if control is not None and control in selector.get_map():
+                        selector.unregister(control)
                 if cleanup_until is not None and now >= cleanup_until:
                     error += '; pipe cleanup deadline exceeded'
                     break
-                if error is None and process.poll() is None and now >= next_tick:
-                    tick()
-                    next_tick = now + 0.02
-                for key, _ in selector.select(0.02):
-                    data = os.read(key.fileobj.fileno(), 65536)
-                    if not data:
-                        selector.unregister(key.fileobj)
+                for key, events in selector.select(0.02):
+                    try:
+                        if key.data == 'control':
+                            if events & selectors.EVENT_READ:
+                                data = control.recv(4096)
+                                if not data:
+                                    selector.unregister(control)
+                                    protocol.eof()
+                                    p.require(not pending, 'phase EOF before acknowledgment drained')
+                                    continue
+                                keep = min(len(data), MAX_CONTROL_BYTES - control_retained)
+                                outputs['control'].write(data[:keep])
+                                control_retained += keep
+                                p.require(not pending, 'phase event before acknowledgment drained')
+                                pending.extend(protocol.feed(data, on_phase))
+                            if events & selectors.EVENT_WRITE and pending:
+                                sent = control.send(pending)
+                                p.require(sent > 0, 'phase acknowledgment write failed')
+                                del pending[:sent]
+                            selector.modify(control, selectors.EVENT_READ | (selectors.EVENT_WRITE if pending else 0), 'control')
+                        else:
+                            data = os.read(key.fileobj.fileno(), 65536)
+                            if not data:
+                                selector.unregister(key.fileobj)
+                                continue
+                            keep = min(len(data), MAX_READ - retained)
+                            outputs[key.data].write(data[:keep])
+                            retained += keep
+                            if keep < len(data):
+                                raise ValueError('consumer stream byte bound exceeded; raw prefix retained')
+                    except BlockingIOError:
                         continue
-                    keep = min(len(data), MAX_READ-retained)
-                    outputs[key.data].write(data[:keep])
-                    retained += keep
-                    if keep < len(data) and error is None:
-                        error = 'consumer stream byte bound exceeded; raw prefix retained'
+                    except (OSError, ValueError, KeyError) as failure:
+                        if error is None:
+                            error = str(failure)
             process.wait(timeout=2)
+            if error is None and protocol is not None:
+                protocol.eof()
         finally:
             if process.poll() is None or selector.get_map():
                 kill_owned_group(process)
@@ -183,91 +251,114 @@ def drain_owned(process, outputs, tick, deadline=DEADLINE):
         raise ValueError(error)
 
 
-def validate_endpoint(raw, report, image, case, runtime):
-    _, matched = p._consumer(unique_json(raw), report, image, case, runtime)
+def validate_endpoint(raw, report, image, case, runtime, nonce, observation_index):
+    value = unique_json(raw)
+    p.require(isinstance(value, dict), 'diagnostic endpoint is not an object')
+    expected = dict(schema='scriptw-precompiled-phase-barriers-v1', nonce=nonce,
+                    observation_index=observation_index, completed_phases=list(PHASES))
+    p.require(value.get('phase_barriers') == expected
+              and value.get('excluded_from_scored_cohorts') is True
+              and value.get('diagnostic_total_timings_include_barrier_waits') is True,
+              'missing or mismatched completed phase marker')
+    # Only a transient copy enters ordinary checksum admission. The raw report
+    # remains explicitly unscored and must never be submitted as a scored row.
+    ordinary = dict(value)
+    del ordinary['phase_barriers']
+    del ordinary['excluded_from_scored_cohorts']
+    del ordinary['diagnostic_total_timings_include_barrier_waits']
+    _, matched = p._consumer(ordinary, report, image, case, runtime)
     p.require(matched, 'diagnostic output checksum mismatch')
 
 
-def capture(host, argv, destination, remaining, present_bits):
+def verify_executable(pid, host, info):
+    p.require(os.readlink(f'/proc/{pid}/exe') == str(host), 'live proc executable path differs')
+    actual = Path(f'/proc/{pid}/exe').stat()
+    p.require(actual.st_ino == info.st_ino, 'live proc executable inode differs')
+    return actual
+
+
+def capture(host, argv, destination, remaining, present_bits, observation_index):
     destination.mkdir()
-    record = dict(argv=list(map(str, argv)), status='failed', snapshots=[],
-                  interpretation='unscored asynchronous snapshots; no endpoint phase attribution')
+    nonce = secrets.token_hex(16)
+    protocol = PhaseProtocol(nonce, observation_index)
+    record = dict(argv=list(map(str, argv)), status='failed', snapshots=[], nonce=nonce,
+                  observation_index=observation_index, phase_attribution_validated=False,
+                  interpretation='unscored phase barriers; waits and timings excluded from canonical cohorts')
     process = None
     started = time.monotonic()
     case_budget = MAX_TOTAL // 4
+    parent_socket, child_socket = socket.socketpair()
     try:
         info = owned_file(host)
-        with (destination/'stdout').open('xb') as out, (destination/'stderr').open('xb') as err:
+        with (destination/'stdout').open('xb') as out, (destination/'stderr').open('xb') as err, (destination/'control').open('xb') as control_out:
             environment = dict(os.environ, SCRIPTW_WASM_TRACE='1')
             for key in ('SCRIPTW_WASM_TRACE_DUMP', 'SCRIPTW_PERF_MAP_DIR', 'SCRIPTW_BOUNDARY_READY_FD',
                         'SCRIPTW_BOUNDARY_READY_NONCE', 'SCRIPTW_ROW_PERF_CONTROL', 'SCRIPTW_ROW_PERF_ACK',
                         'SCRIPTW_ROW_PERF_REGION', 'SCRIPTW_EMIT_SIZE_REPORT'):
                 environment.pop(key, None)
-            process = subprocess.Popen(argv, cwd=ROOT, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+            environment.update(SCRIPTW_PRECOMPILED_PHASE_FD=str(child_socket.fileno()),
+                               SCRIPTW_PRECOMPILED_PHASE_NONCE=nonce,
+                               SCRIPTW_PRECOMPILED_PHASE_INDEX=str(observation_index))
+            process = subprocess.Popen(argv, cwd=ROOT, env=environment, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, start_new_session=True, pass_fds=(child_socket.fileno(),))
+            child_socket.close()
             record['owned_child_pid'] = process.pid
-            def sample():
+            def snapshot(phase, seq, index):
                 nonlocal case_budget
-                if len(record['snapshots']) < MAX_SNAPSHOTS and remaining[0] >= MAX_READ and case_budget >= MAX_READ:
+                capture_started = time.monotonic()
+                p.require(remaining[0] >= MAX_READ and case_budget >= MAX_READ, 'phase snapshot budget exhausted')
+                exe_info = verify_executable(process.pid, host, info)
+                raw = bounded_read(f'/proc/{process.pid}/smaps')
+                rows = mappings(raw)
+                p.require(exact_executable(rows, host, info), 'phase smaps executable identity differs')
+                verify_executable(process.pid, host, info)
+                name = f'{seq:03d}-{phase}.smaps'
+                (destination/name).write_bytes(raw)
+                remaining[0] -= len(raw)
+                case_budget -= len(raw)
+                item = dict(phase=phase, sequence=seq, observation_index=index, nonce=nonce,
+                    path=name, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
+                    rss_bytes=sum(row['Rss'] for row in rows), mappings=rows,
+                    proc_exe=dict(inode=exe_info.st_ino, device=[os.major(exe_info.st_dev), os.minor(exe_info.st_dev)]))
+                if present_bits:
                     try:
-                        # /proc/exe first excludes the Python fork-before-exec window.
-                        if os.readlink(f'/proc/{process.pid}/exe') == str(host):
-                            exe_info = Path(f'/proc/{process.pid}/exe').stat()
-                            p.require(exe_info.st_ino == info.st_ino, 'live proc executable inode differs')
-                            raw = bounded_read(f'/proc/{process.pid}/smaps')
-                            rows = mappings(raw)
-                            if exact_executable(rows, host, info):
-                                name = f"{len(record['snapshots']):03d}.smaps"
-                                (destination/name).write_bytes(raw)
-                                remaining[0] -= len(raw)
-                                case_budget -= len(raw)
-                                snapshot = dict(seconds=time.monotonic()-started, path=name, bytes=len(raw),
-                                                sha256=hashlib.sha256(raw).hexdigest(),
-                                                rss_bytes=sum(row['Rss'] for row in rows), mappings=rows,
-                                                proc_exe=dict(inode=exe_info.st_ino,
-                                                    device=[os.major(exe_info.st_dev), os.minor(exe_info.st_dev)]))
-                                if present_bits:
-                                    try:
-                                        snapshot['executable_presence'] = dict(status='present-bits-only-no-PFNs',
-                                            mappings=presence(process.pid, rows, host))
-                                    except (OSError, ValueError) as error:
-                                        snapshot['executable_presence'] = dict(status='unavailable', error=str(error))
-                                record['snapshots'].append(snapshot)
-                    except (FileNotFoundError, ProcessLookupError):
-                        pass
-            drain_owned(process, {'stdout': out, 'stderr': err}, sample)
-            record['returncode'] = process.returncode
-        for stream in ('stdout', 'stderr'):
-            raw = bounded_read(destination/stream)
-            record[stream] = dict(path=stream, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
-        p.require(process.returncode == 0, 'diagnostic consumer failed')
-        record['status'] = 'captured' if record['snapshots'] else 'unobserved'
-        record['sampling_limit_reached'] = len(record['snapshots']) == MAX_SNAPSHOTS or remaining[0] < MAX_READ or case_budget < MAX_READ
-        if record['snapshots']:
-            record['sampled_maximum'] = max(record['snapshots'], key=lambda row: row['rss_bytes'])['path']
+                        item['executable_presence'] = dict(status='present-bits-only-no-PFNs', mappings=presence(process.pid, rows, host))
+                    except (OSError, ValueError) as failure:
+                        item['executable_presence'] = dict(status='unavailable', error=str(failure))
+                item['unscored_capture_seconds'] = time.monotonic() - capture_started
+                record['snapshots'].append(item)
+            drain_owned(process, {'stdout': out, 'stderr': err, 'control': control_out},
+                        parent_socket, protocol, snapshot)
+            p.require(process.returncode == 0, 'diagnostic consumer failed')
+            p.require(len(record['snapshots']) == len(PHASES), 'missing phase captures')
+            record['status'] = 'barriers_complete'
+            record['completed_phases'] = list(protocol.completed)
         return record
-    except (OSError, ValueError, KeyError) as error:
-        record['error'] = str(error)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as failure:
+        record['error'] = str(failure)
         return record
     finally:
+        parent_socket.close()
+        child_socket.close()
         if process is not None and process.poll() is None:
             kill_owned_group(process)
             process.wait(timeout=2)
         if process is not None:
             record['returncode'] = process.returncode
-        for stream in ('stdout', 'stderr'):
+        for stream in ('stdout', 'stderr', 'control'):
             path = destination/stream
             if path.exists():
                 record[stream] = dict(path=stream, bytes=path.stat().st_size, sha256=p.digest(path))
-        record['elapsed_seconds'] = time.monotonic()-started
+        record['unscored_elapsed_seconds'] = time.monotonic() - started
 
 
 def run(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    result = dict(schema='scriptw-precompiled-mapping-diagnostic-v1', scored=False, status='unavailable', cases=[],
+    result = dict(schema='scriptw-precompiled-mapping-diagnostic-v2', scored=False, excluded_from_scored_cohorts=True, status='unavailable', cases=[],
                   limits=dict(deadline_seconds_per_case=DEADLINE, snapshots_per_case=MAX_SNAPSHOTS,
-                              raw_smaps_total_bytes=MAX_TOTAL, stream_bytes_per_case=MAX_READ, poll_seconds=0.02),
-                  interpretation='endpoint stdout and asynchronous sampled maxima are distinct; neither enters scored reports')
+                              raw_smaps_total_bytes=MAX_TOTAL, stream_bytes_per_case=MAX_READ, control_bytes_per_case=MAX_CONTROL_BYTES),
+                  interpretation='four acknowledged phase captures; unscored waits and timings never enter scored reports')
     def checkpoint():
         temporary = output/'report.pending.json'
         temporary.write_text(json.dumps(result, indent=2)+'\n')
@@ -301,19 +392,21 @@ def run(args):
                 directory = output/(runtime+'-'+name)
                 result['active_case'] = dict(runtime=runtime, file=name, status='capture-in-progress')
                 checkpoint()
-                observation = capture(host, command['argv'], directory, remaining, args.present_bits)
+                observation = capture(host, command['argv'], directory, remaining, args.present_bits, report['warmups'] + report['samples'] - 1)
                 observation.update(runtime=runtime, file=name, image_sha256=metadata['sha256'])
                 result['cases'].append(observation)
                 result.pop('active_case', None)
                 checkpoint()
                 if observation['status'] != 'failed':
                     try:
-                        validate_endpoint(bounded_read(directory/'stdout'), report, item['image'], case, runtime)
+                        validate_endpoint(bounded_read(directory/'stdout'), report, item['image'], case, runtime, observation['nonce'], observation['observation_index'])
                         observation['endpoint_stdout_validated'] = True
                     except (ValueError, KeyError) as error:
                         observation.update(status='failed', error=str(error), endpoint_stdout_validated=False)
                 p.require(p.digest(host) == result['executable_sha256'] and p.digest(image) == metadata['sha256'],
                           'live executable/image changed during diagnostic')
+                if observation.get('endpoint_stdout_validated') and observation['status'] == 'barriers_complete':
+                    observation.update(status='captured', phase_attribution_validated=True)
                 checkpoint()
         p.require(p.digest(campaign/'report.json') == result['scored_report_sha256'], 'scored report changed')
         result['status'] = 'captured' if all(row['status'] == 'captured' for row in result['cases']) else 'incomplete'

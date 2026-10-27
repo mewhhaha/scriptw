@@ -89,28 +89,52 @@ and every output against the existing comparison reader.
 
 `precompiled-mapping-diagnostic-unscored` retains raw stdout/stderr, bounded
 `smaps` snapshots and a separate diagnostic report; it contains no executable or
-serialized native image. Samples require the exact Rust executable path and
-inode with an executable mapping, excluding the Python fork-before-exec window.
-Optional executable page-presence bitmaps retain only present bits, never PFNs.
-Raw mappings include offsets, permissions, device/inode and RSS counters so code,
-read-only data, private native backing and anonymous mappings can be inspected
-without assigning their cause from pathname or reserved size alone. Consumer
-stdout contains the validated lifecycle endpoints. Parent-polled sampled maxima
-remain asynchronous observations and cannot be labelled Store-drop endpoints.
-These observations never enter scored graphs or replace scored timings/RSS.
+serialized native image. Its v2 report uses explicit phase acknowledgements,
+rather than assigning phases to asynchronous sampled maxima.
 
-The diagnostic inherits the same one-CPU, 4-GiB, no-swap grouped-OOM scope. Each
-consumer has a 120-second deadline, 128-snapshot ceiling, 16-MiB raw-smaps budget
-(64 MiB across all four), and a combined 2-MiB retained stdout/stderr prefix. The parent drains both
-nonblocking pipes through EOF before validating JSON. Overflow or deadline
-terminates only its owned process group and records a capture failure; child
-private-file writes have no diagnostic file-size limit. Snapshots are polled at
-20 ms while the bounds permit; short phases and processes may be unobserved.
-The diagnostic records actual CPU affinity and before/after kernel memory
-budget counters, and checkpoints its initial status and each active/completed
-case before long captures. Missing proc capabilities, incomplete captures, exhausted sampling limits and
-failed commands are explicit in the separate report. The workflow retains this
-artifact even on failure and reports availability separately; unavailable
-diagnostics do not prevent retention or publication of valid scored evidence.
-`SCRIPTW_WASM_TRACE` is enabled only in these unscored consumers so their stderr
-can record the actual packed-input source kind without addresses or native bytes.
+Both adapters pause after the existing RSS snapshots at `after_transport_drop`,
+`after_instantiate`, `after_execution` and `after_store_drop`. The last three
+checkpoints select observation 16, the final observation after ten warmups and
+seven samples. Scriptw setup precedes Realm initialization and guest execution;
+those remain inside evaluate. Existing RSS snapshots and entry-API intervals stay
+in place. Earlier setup waits still enter diagnostic total wall times, which the
+raw report labels explicitly; no wait cost is subtracted. Pauses alter timing and
+process history: the complete
+invocation is unscored, including its RSS counters. Its phase maps never replace
+canonical timings, RSS values or graphs.
+
+The parent passes one dedicated Unix socket descriptor, a fresh 32-digit hex
+nonce and the selected index through `SCRIPTW_PRECOMPILED_PHASE_FD`,
+`SCRIPTW_PRECOMPILED_PHASE_NONCE` and `SCRIPTW_PRECOMPILED_PHASE_INDEX`. The helper
+requires all three variables or none, admits an inherited Linux socket, and
+transfers that descriptor's ownership only for the diagnostic invocation. A
+bounded `SWPHASE1 nonce sequence phase index` event waits for its exact
+`SWACK1` acknowledgement. Sequences 1–4 and the closed phase order cannot repeat
+or change. Each handshake has a 30-second absolute deadline; missing or malformed
+configuration, acknowledgements and EOF fail clearly.
+
+Before each capture the parent checks the exact child executable path and inode,
+then records its bounded smaps and optional executable page-presence bits. This
+excludes the Python fork-before-exec window. Only present bits survive, never
+PFNs. The parent acknowledges after capture, while independently draining stdout
+and stderr. Phase attribution is admitted only after all four events and the
+final normal completion, source/configuration, native-image and output checksums
+validate. Raw mappings retain offsets, permissions, device/inode and RSS counters;
+phase alignment does not by itself establish which allocation caused a mapping.
+
+The diagnostic inherits the one-CPU, 4-GiB, no-swap grouped-OOM scope. Each
+consumer has a 120-second deadline and four phase captures, with at most 2 MiB
+per smaps read, 64 MiB of raw smaps across the campaign, and a combined 2-MiB
+stdout/stderr prefix. Overflow or deadline terminates only the owned process
+group and retains incomplete evidence; private native-backing writes have no
+diagnostic file-size limit. CPU affinity and kernel memory counters are recorded.
+Missing proc capabilities, invalid phase order, incomplete captures and failed
+commands are explicit in the separate report, which the workflow retains even
+on failure. Diagnostics never prevent retention of valid scored evidence.
+
+Ordinary measurement processes strip all three barrier variables. The canonical
+comparison reader also rejects any `phase_barriers` marker or diagnostic timing
+label, even if its explicit unscored flag was removed. Diagnostic validation keeps original raw stdout and
+uses a separately checked copy solely to validate identities and checksums.
+`SCRIPTW_WASM_TRACE` remains confined to unscored consumers, recording the packed
+input source kind without addresses or native bytes.

@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import socket
 from pathlib import Path
 import sys
 import subprocess
@@ -73,14 +74,39 @@ class MappingDiagnosticTests(unittest.TestCase):
         raw = json.loads((fixture.directory/event['stdout']).read_bytes())
         case = next(row for row in report['workloads'] if row['file'] == item['file'])
         def validate(value):
-            d.validate_endpoint(json.dumps(value).encode(), report, item['image'], case, item['runtime'])
+            d.validate_endpoint(json.dumps(value).encode(), report, item['image'], case, item['runtime'], 'a'*32, 16)
+        raw.update(phase_barriers=dict(schema='scriptw-precompiled-phase-barriers-v1', nonce='a'*32,
+                   observation_index=16, completed_phases=list(d.PHASES)), excluded_from_scored_cohorts=True,
+                   diagnostic_total_timings_include_barrier_waits=True)
         validate(raw)
+        self.assertIn('phase_barriers', raw, 'ordinary admission must receive only a transient copy')
+        for marker in (None, {}, dict(raw['phase_barriers'], nonce='b'*32),
+                       dict(raw['phase_barriers'], observation_index=15),
+                       dict(raw['phase_barriers'], completed_phases=list(d.PHASES[:-1]))):
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                validate(dict(raw, phase_barriers=marker))
+        with self.assertRaises(ValueError):
+            validate(dict(raw, excluded_from_scored_cohorts=False))
+        for timing_flag in (False, None, 1, 'true'):
+            with self.subTest(timing_flag=timing_flag), self.assertRaises(ValueError):
+                validate(dict(raw, diagnostic_total_timings_include_barrier_waits=timing_flag))
+        missing_timing_flag = dict(raw)
+        del missing_timing_flag['diagnostic_total_timings_include_barrier_waits']
+        with self.assertRaises(ValueError):
+            validate(missing_timing_flag)
+        with self.assertRaises(ValueError):
+            d.validate_endpoint(b'[]', report, item['image'], case, item['runtime'], 'a'*32, 16)
         for field, value in [('compiler_enabled', True), ('source_fingerprint', 'f'*64),
                              ('samples', 6), ('shared_configuration', {}), ('image_sha256', '0'*64)]:
             with self.subTest(field=field):
                 changed = dict(raw, **{field:value})
                 with self.assertRaises(ValueError):
                     validate(changed)
+        changed = dict(raw)
+        changed['observations'] = [dict(row) for row in raw['observations']]
+        changed['observations'][-1]['stdout'] = 'wrong checksum\n'
+        with self.assertRaises(ValueError):
+            validate(changed)
         changed = dict(raw)
         del changed['process_snapshots']
         with self.assertRaises(ValueError):
@@ -121,7 +147,7 @@ class TrustedPipeDrainTests(unittest.TestCase):
             process = self.child("import pathlib,sys; pathlib.Path(sys.argv[1]).write_bytes(b'x'*(3*1024**2)); "
                                  "sys.stdout.buffer.write(b'a'*70000); sys.stderr.buffer.write(b'b'*70000)", backing)
             outputs = dict(stdout=io.BytesIO(), stderr=io.BytesIO())
-            d.drain_owned(process, outputs, lambda: None, deadline=10)
+            d.drain_owned(process, outputs, deadline=10)
             self.assertEqual(process.returncode, 0)
             self.assertEqual(backing.stat().st_size, 3*1024**2)
             self.assertEqual(outputs['stdout'].getvalue(), b'a'*70000)
@@ -133,7 +159,7 @@ class TrustedPipeDrainTests(unittest.TestCase):
                              "os.write(1,b'x'*(4*1024**2)); time.sleep(60)")
         outputs = dict(stdout=io.BytesIO(), stderr=io.BytesIO())
         with self.assertRaisesRegex(ValueError, 'stream byte bound exceeded'):
-            d.drain_owned(process, outputs, lambda: None, deadline=10)
+            d.drain_owned(process, outputs, deadline=10)
         self.assertEqual(sum(len(stream.getvalue()) for stream in outputs.values()), d.MAX_READ)
         self.assertIsNotNone(process.returncode)
         self.assertTrue(process.stdout.closed and process.stderr.closed)
@@ -142,6 +168,119 @@ class TrustedPipeDrainTests(unittest.TestCase):
         process = self.child("import time; print('started',flush=True); time.sleep(60)")
         outputs = dict(stdout=io.BytesIO(), stderr=io.BytesIO())
         with self.assertRaisesRegex(ValueError, 'deadline exceeded'):
-            d.drain_owned(process, outputs, lambda: None, deadline=0.2)
+            d.drain_owned(process, outputs, deadline=0.2)
         self.assertIsNotNone(process.returncode)
         self.assertTrue(process.stdout.closed and process.stderr.closed)
+
+
+class PhaseProtocolTests(unittest.TestCase):
+    def event(self, phase, seq, nonce='a'*32, index=16):
+        return f'SWPHASE1 {nonce} {seq} {phase} {index}\n'.encode()
+
+    def test_exact_events_acknowledge_only_after_capture(self):
+        protocol = d.PhaseProtocol('a'*32, 16)
+        seen = []
+        for seq, phase in enumerate(d.PHASES, 1):
+            event = self.event(phase, seq)
+            self.assertEqual(protocol.feed(event[:7], lambda *args: self.fail('partial event captured')), b'')
+            ack = protocol.feed(event[7:], lambda *args: seen.append(args))
+            self.assertEqual(seen[-1], (phase, seq, 16))
+            self.assertEqual(ack, event.replace(b'SWPHASE1', b'SWACK1'))
+        protocol.eof()
+        with self.assertRaisesRegex(ValueError, 'duplicate|extra'):
+            protocol.feed(self.event(d.PHASES[-1], 4), lambda *args: self.fail('extra capture'))
+
+    def test_wrong_nonce_index_sequence_order_and_pipelining_never_capture(self):
+        for event in (self.event(d.PHASES[0], 1, nonce='b'*32),
+                      self.event(d.PHASES[0], 1, index=15),
+                      self.event(d.PHASES[0], 2), self.event(d.PHASES[1], 1),
+                      self.event(d.PHASES[0], 1) + self.event(d.PHASES[1], 2),
+                      b'x'*257):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                d.PhaseProtocol('a'*32, 16).feed(event, lambda *args: self.fail('invalid capture'))
+        protocol = d.PhaseProtocol('a'*32, 16)
+        protocol.feed(self.event(d.PHASES[0], 1), lambda *args: None)
+        with self.assertRaises(ValueError):
+            protocol.feed(self.event(d.PHASES[0], 1), lambda *args: self.fail('duplicate capture'))
+
+    def test_incomplete_eof_and_capture_failure_have_no_acknowledgment(self):
+        for prefix in (b'', b'SWPHASE1'):
+            protocol = d.PhaseProtocol('a'*32, 16)
+            protocol.feed(prefix, lambda *args: None)
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                protocol.eof()
+        protocol = d.PhaseProtocol('a'*32, 16)
+        def failed_capture(*args):
+            raise ValueError('identity failed')
+        with self.assertRaisesRegex(ValueError, 'identity failed'):
+            protocol.feed(self.event(d.PHASES[0], 1), failed_capture)
+        self.assertEqual(protocol.completed, [])
+        partial = d.PhaseProtocol('a'*32, 16)
+        partial.feed(self.event(d.PHASES[0], 1), lambda *args: None)
+        with self.assertRaisesRegex(ValueError, 'incomplete'):
+            partial.eof()
+
+    def test_proc_exe_requires_exact_path_and_inode(self):
+        host = Path('/trusted/consumer')
+        info = type('Info', (), {'st_ino': 12})()
+        for path, inode in (('/usr/bin/python3', 12), (str(host), 13)):
+            with patch.object(os, 'readlink', return_value=path), patch.object(Path, 'stat', return_value=type('Info', (), {'st_ino': inode})()):
+                with self.assertRaisesRegex(ValueError, 'executable'):
+                    d.verify_executable(123, host, info)
+
+
+class PhaseSocketDrainTests(unittest.TestCase):
+    """Trusted Python socket peers; no native images, Wasm or JS execution."""
+    def launch(self, code):
+        parent, child = socket.socketpair()
+        process = subprocess.Popen([sys.executable, '-I', '-c', code, str(child.fileno())],
+            pass_fds=(child.fileno(),), stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        child.close()
+        self.addCleanup(parent.close)
+        def cleanup():
+            if process.poll() is None:
+                d.kill_owned_group(process)
+                process.wait(timeout=2)
+            for pipe in (process.stdout, process.stderr):
+                pipe.close()
+        self.addCleanup(cleanup)
+        return process, parent
+
+    def test_four_barriers_drain_both_streams_before_and_between_acks(self):
+        code = r"""
+import os,socket,sys
+s=socket.socket(fileno=int(sys.argv[1]))
+for seq,phase in enumerate(('after_transport_drop','after_instantiate','after_execution','after_store_drop'),1):
+ os.write(1,b'a'*70000);os.write(2,b'b'*70000)
+ event=f'SWPHASE1 {"a"*32} {seq} {phase} 16\n'.encode()
+ s.sendall(event)
+ ack=bytearray()
+ while not ack.endswith(b'\n'):
+  data=s.recv(256)
+  assert data
+  ack.extend(data)
+ assert ack==event.replace(b'SWPHASE1',b'SWACK1')
+s.close()
+"""
+        process, control = self.launch(code)
+        outputs = {name: io.BytesIO() for name in ('stdout', 'stderr', 'control')}
+        captured = []
+        protocol = d.PhaseProtocol('a'*32, 16)
+        d.drain_owned(process, outputs, control, protocol, lambda *args: captured.append(args), deadline=10)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual([row[0] for row in captured], list(d.PHASES))
+        self.assertEqual(outputs['stdout'].getvalue(), b'a'*(4*70000))
+        self.assertEqual(outputs['stderr'].getvalue(), b'b'*(4*70000))
+        self.assertTrue(process.stdout.closed and process.stderr.closed)
+
+    def test_control_eof_and_missing_event_deadline_preserve_raw_and_reap(self):
+        for code, error in (("import socket,sys; s=socket.socket(fileno=int(sys.argv[1]));print('raw',flush=True);s.close()", 'incomplete'),
+                            ("import time;print('raw',flush=True);time.sleep(60)", 'deadline')):
+            with self.subTest(error=error):
+                process, control = self.launch(code)
+                outputs = {name: io.BytesIO() for name in ('stdout', 'stderr', 'control')}
+                with self.assertRaisesRegex(ValueError, error):
+                    d.drain_owned(process, outputs, control, d.PhaseProtocol('a'*32, 16), lambda *args: self.fail('no event'), deadline=0.3)
+                self.assertIn(b'raw', outputs['stdout'].getvalue())
+                self.assertIsNotNone(process.returncode)
+                self.assertTrue(process.stdout.closed and process.stderr.closed)

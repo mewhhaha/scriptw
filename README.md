@@ -82,6 +82,10 @@ Test262 status below unchanged.
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
 [CI run](https://github.com/mewhhaha/scriptw/actions/runs/40519969552).
 
+The separate [memory diagnostic](docs/rust-rewrite/contracts/precompiled-comparison.md)
+pauses both adapters at four lifecycle boundaries to capture aligned memory maps.
+These diagnostic runs remain unscored.
+
 ## Benchmarks
 
 ![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)

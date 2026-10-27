@@ -63,6 +63,7 @@ pub(super) fn execute(
     if !(3..=100).contains(&samples) || !(1..=100).contains(&warmups) {
         return Err("samples must be 3..100 and warmups 1..100".into());
     }
+    let mut barriers = phase_barriers::Barriers::from_environment(samples, warmups)?;
     let startup = residency::snapshot()?;
     let total = Instant::now();
     let mut config = wasmtime::Config::new();
@@ -104,7 +105,9 @@ pub(super) fn execute(
     drop(bytes);
     let after_transport_drop = residency::snapshot()?;
     let load_total_ns = total.elapsed().as_nanos();
-    let observations = execution::observe(&engine, &module, expected, samples, warmups)?;
+    barriers.after_transport_drop()?;
+    let observations =
+        execution::observe(&engine, &module, expected, samples, warmups, &mut barriers)?;
     let mut report = identity()?;
     report["schema"] = json!("scriptw-precompiled-wasi-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
@@ -125,5 +128,6 @@ pub(super) fn execute(
         "after_transport_drop":after_transport_drop});
     report["observations"] = json!(observations);
     report["scope"] = json!("independent-precompiled-diagnostic;fresh-Store-WASI-per-invocation;process-endpoints;no-compiler-in-consumer;not-an-ordinary-score");
+    barriers.finish(&mut report)?;
     Ok(decorate(report, "wasi"))
 }

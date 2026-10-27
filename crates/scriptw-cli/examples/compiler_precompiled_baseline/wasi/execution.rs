@@ -13,6 +13,7 @@ pub(super) fn observe(
     expected: &str,
     samples: usize,
     warmups: usize,
+    barriers: &mut phase_barriers::Barriers,
 ) -> Result<Vec<Value>, String> {
     let mut observations = Vec::new();
     for index in 0..samples + warmups {
@@ -49,6 +50,7 @@ pub(super) fn observe(
             .map_err(|e| e.to_string())?;
         let instantiate_ns = started.elapsed().as_nanos();
         let after_instantiate = residency::snapshot()?;
+        barriers.after_instantiate(index)?;
         let gc_before = store.gc_heap_capacity();
         let memory_before = instance
             .get_memory(&mut store, "memory")
@@ -64,6 +66,7 @@ pub(super) fn observe(
             .map(|m| m.data_size(&store));
         let after_execution = residency::snapshot()?;
         let total_ns = total.elapsed().as_nanos();
+        barriers.after_execution(index)?;
         // Like the Scriptw adapter, output flattening/completion validation is
         // outside execution_ns and follows the after_execution RSS endpoint.
         match result {
@@ -93,6 +96,7 @@ pub(super) fn observe(
         drop(stdout);
         drop(stderr);
         let after_store_drop = residency::snapshot()?;
+        barriers.after_store_drop(index)?;
         observations.push(json!({"index":index, "warmup":index < warmups,
             "completion":"normal", "stdout":output, "stderr":errors, "matched":true,
             "phases_ns":{"state_linker":state_linker_ns, "register":register_ns,

@@ -29,6 +29,7 @@ pub(super) fn run_with_config(
     if !(3..=100).contains(&samples) || !(1..=100).contains(&warmups) {
         return Err("samples must be 3..100 and warmups 1..100".into());
     }
+    let mut barriers = phase_barriers::Barriers::from_environment(samples, warmups)?;
     let startup = residency::snapshot()?;
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
@@ -70,6 +71,7 @@ pub(super) fn run_with_config(
     drop(bytes);
     let after_transport_drop = residency::snapshot()?;
     let load_total_ns = total_started.elapsed().as_nanos();
+    barriers.after_transport_drop()?;
     let mut observations = Vec::new();
     for index in 0..samples + warmups {
         let before_store = residency::snapshot()?;
@@ -96,6 +98,7 @@ pub(super) fn run_with_config(
             .map_err(|e| e.to_string())?;
         let instantiate_ns = started.elapsed().as_nanos();
         let after_instantiate = residency::snapshot()?;
+        barriers.after_instantiate(index)?;
         let gc_before = store.gc_heap_capacity();
         let started = Instant::now();
         let outcome = instance.evaluate(&mut store).map_err(|e| e.to_string())?;
@@ -103,6 +106,7 @@ pub(super) fn run_with_config(
         let gc_after = store.gc_heap_capacity();
         let after_execution = residency::snapshot()?;
         let total_ns = observation_started.elapsed().as_nanos();
+        barriers.after_execution(index)?;
         let mut stdout = String::new();
         for event in &outcome.output_events {
             match event {
@@ -126,6 +130,7 @@ pub(super) fn run_with_config(
         drop(linker);
         drop(store);
         let after_store_drop = residency::snapshot()?;
+        barriers.after_store_drop(index)?;
         observations.push(json!({"index": index, "warmup": index < warmups,
             "completion": "normal", "stdout": stdout,
             "phases_ns": {"state_linker": state_linker_ns, "register": register_ns,
@@ -154,5 +159,6 @@ pub(super) fn run_with_config(
         "after_transport_drop": after_transport_drop});
     report["observations"] = json!(observations);
     report["scope"] = json!("independent-precompiled-diagnostic;fresh-Store-Realm-per-invocation;process-endpoints;R-decode-in-load-costs;no-compiler-in-consumer;not-an-ordinary-score");
+    barriers.finish(&mut report)?;
     Ok(report)
 }
