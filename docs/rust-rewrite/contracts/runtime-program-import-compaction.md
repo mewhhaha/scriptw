@@ -51,5 +51,10 @@ in advance or instantiating another R.
 
 Focused controls cover structural and name remapping, declaration/segment
 identity, wide-index LEB/body-size changes, opaque ordinal preservation, template
-admission and actual native linking. Whole-batch verification and matched memory
-measurements remain pending; no RSS reduction is claimed by this contract.
+admission and actual native linking. The completed source-bound batch passed
+4,858 native cases and 2,365 original pinned Test262 executions; the test-only
+consumer-census repair and bounded conformance retry are recorded explicitly.
+The matched 17-workload cohort remains 1.3–1.7× Scriptc process RSS. These
+measurements do not isolate the savings caused by import compaction.
+See the [verification and diagnostic evidence](../memory-runtime-imports-20261027.md)
+and [matched comparison](../precompiled-comparison.md).
