@@ -45,39 +45,41 @@ metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-p
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `f3df68beb`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `fa204ae2b`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
-compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
-and Wasm compilation in separate producer processes. Both measured consumers
+compares Scriptw and Scriptc in the same Wasmtime executable. JavaScript and
+Wasm compilation run in separate producer processes; both measured consumers
 disable compilation and use identical native optimization and runtime settings.
 Both passed the original checksums on **17/17 workloads** across two rounds.
 Scriptw's median post-execution process RSS remains **1.3–1.7× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 19.3 MiB | 13.4 MiB |
-| Objects | 20.2 MiB | 14.2 MiB |
-| Retained objects | 25.5 MiB | 19.9 MiB |
+| Integer | 19.1 MiB | 13.6 MiB |
+| Objects | 20.1 MiB | 14.3 MiB |
+| Retained objects | 25.6 MiB | 20.0 MiB |
 
-These are medians of 14 samples per runtime and workload, after ten checked
-warmups per round, with each Store still alive. Process memory is sampled at
-loading, setup, execution and Store-drop boundaries; RSS is neither live JS
-heap nor peak memory. This cohort stays separate from the ordinary V8 comparison
-below. The matched Scriptc footprint remains the execution-memory target, with
-the same workloads, checksums and measurement boundaries.
-The current pass packs default mixed Array values, allocates compact-object
-reference backing on first nonnull payload, and shares intrinsic-method property
-publication while preserving separate mutable descriptors for aliases.
-[Verification](docs/rust-rewrite/memory-value-backings-20261027.md):
-**4,869 native cases and 2,365 original pinned Test262 executions passed**.
-Verification retained one CPU, a 4-GiB process-tree cap, no swap and bounded
-module retention. Original conformance executions ran in fresh batches of at
-most 16. Measured and verified product compiler inputs match. This selected
-verification does not refresh the full pinned-suite status below.
+These are medians of 14 measured samples per runtime and workload, after ten
+checked warmups per round, with each Store still alive. RSS includes code,
+runtime and allocator history; it is neither live JS heap nor peak memory.
+Scriptc parity remains open under the same workloads, checksums and boundaries.
+This pass shares intrinsic data/accessor publication and factors deferred
+native-method construction into one validated, defining-Realm tail. Aliases
+keep shared function identity and independent mutable property descriptors.
+[Verification](docs/rust-rewrite/memory-intrinsic-publication-20261027.md):
+**4,874 native cases and 2,365 original pinned Test262 executions passed**.
+One excluded AOT test fixture was repaired for optional compacted imports;
+the original failed attempt and exact repair are retained. Product compiler
+inputs match the measured source; verification fixtures are explicitly recorded.
+Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
+retention. Original Test262 executions ran in fresh batches of at most 16.
+This selected verification leaves the ordinary V8 comparison and full pinned
+Test262 status below unchanged.
 
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
+[Precompiled process-memory graph](docs/rust-rewrite/assets/precompiled-memory.svg) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40490939304).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40504623872).
 
 ## Benchmarks
 

@@ -46,6 +46,10 @@ Runtime layout 26 records the new private publication helper ABI. Actual runtime
 native images and compiled programs must agree. There is one Wasm GC object
 model and no compatibility representation.
 
-Whole-batch compilation, semantic verification and matched memory measurements
-remain pending. Source review and prepared controls do not establish code-size,
-execution-time or RSS savings.
+The completed source-bound batch passed 4,874 native cases across 19 targets
+and 2,365 exact original pinned Test262 executions. One excluded optional-import
+inspection fixture was repaired; the original failed attempt is retained.
+The matched 17-workload comparison remains 1.3–1.7× Scriptc process RSS, so parity
+is still open. Static owned-image helper sizes confirm smaller code bodies;
+these measurements do not isolate execution or RSS effects of individual changes.
+See [verification and measurements](../memory-intrinsic-publication-20261027.md).
