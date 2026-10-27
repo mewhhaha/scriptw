@@ -65,6 +65,17 @@ def elf():
     return raw
 
 
+def elf_with_function_name(name, terminated=True):
+    raw = elf()
+    offset = len(raw)
+    strings = b'\0' + name + (b'\0' if terminated else b'')
+    raw.extend(strings)
+    # Relocate the linked .strtab without changing code, loads or symbols.
+    struct.pack_into('<Q', raw, 0x300+3*64+24, offset)
+    struct.pack_into('<Q', raw, 0x300+3*64+32, len(strings))
+    return raw
+
+
 class ModuleImageControls(unittest.TestCase):
     def validate(self, value, shots=None, runtime='scriptc', identity=None):
         return m.validate_module_images(value, runtime, NONCE, 16,
@@ -144,6 +155,41 @@ class ModuleImageControls(unittest.TestCase):
 
 
 class ElfControls(unittest.TestCase):
+    def test_long_defined_function_names_admit_measured_host_extent_and_exact_bound(self):
+        # The actual Rust host has a 133,748-byte defined executable symbol.
+        # Synthetic names preserve that extent without retaining host ELF bytes.
+        for length in (133748, m.MAX_SYMBOL_NAME_BYTES):
+            with self.subTest(length=length):
+                name = b'R' * length
+                parsed = m.parse_elf(elf_with_function_name(name))
+                self.assertEqual(parsed['functions'][0]['name'], name.decode())
+
+    def test_symbol_names_keep_size_termination_encoding_and_aggregate_limits(self):
+        cases = [(b'R' * (m.MAX_SYMBOL_NAME_BYTES+1), True, 'oversized ELF symbol name'),
+                 (b'R' * 133748, False, 'unterminated/oversized ELF symbol name'),
+                 (b'R\xff', True, 'utf-8')]
+        for name, terminated, error in cases:
+            with self.subTest(length=len(name), terminated=terminated), self.assertRaisesRegex(ValueError, error):
+                m.parse_elf(elf_with_function_name(name, terminated))
+        with patch.object(m, 'MAX_NAME_BYTES', 64), self.assertRaisesRegex(ValueError, 'name budget exceeded'):
+            m.parse_elf(elf_with_function_name(b'R'*65))
+
+    def test_section_names_retain_their_separate_short_bound(self):
+        for length in (m.MAX_SECTION_NAME_BYTES, m.MAX_SECTION_NAME_BYTES+1):
+            raw = elf()
+            offset = len(raw)
+            raw.extend(b'\0'+b'S'*length+b'\0')
+            struct.pack_into('<Q', raw, 0x300+2*64+24, offset)
+            struct.pack_into('<Q', raw, 0x300+2*64+32, length+2)
+            # All non-null sections can share this synthetic section name.
+            for index in range(1, 5):
+                struct.pack_into('<I', raw, 0x300+index*64, 1)
+            if length == m.MAX_SECTION_NAME_BYTES:
+                self.assertEqual(m.parse_elf(raw)['functions'][0]['section'], 'S'*length)
+            else:
+                with self.assertRaisesRegex(ValueError, 'oversized ELF section name'):
+                    m.parse_elf(raw)
+
     def test_file_backed_function_bounds_and_zero_size_exclusion(self):
         parsed = m.parse_elf(elf())
         self.assertEqual(parsed['functions'], [dict(name='foo', vaddr=0x400100, bytes=16,
