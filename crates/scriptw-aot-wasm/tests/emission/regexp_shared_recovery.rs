@@ -10,7 +10,7 @@ fn snapshot_load(ops: &[Operator<'_>], start: usize) -> Option<(u32, u64, u32)> 
             local_index: address,
         }, Operator::I32WrapI64, Operator::I64Load { memarg }, Operator::LocalSet {
             local_index: destination,
-        }] if memarg.memory == 0 && memarg.align == 3 => {
+        }] if memarg.memory == 0 && memarg.align == 0 => {
             Some((*address, memarg.offset, *destination))
         }
         _ => None,
