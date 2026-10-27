@@ -26,5 +26,4 @@ its bootstrap callers, source/context/function/cycle order, getter metadata,
 nonconstructibility, GC, borrowed foreign-Realm accessors and excluded canonical,
 RegExp alias and captured Intl-function identity paths.
 
-Whole-batch compilation, semantic verification and matched memory measurements
-remain pending. Sharing code does not establish resident-memory or timing savings.
+The [source-bound checkpoint](../memory-eager-accessors-20261027.md) records successful whole-batch compilation, 4,881 native cases, 2,365 original selected Test262 executions and 16 disjoint Unicode executions, plus a matched 17-workload CI cohort. This is not a full pinned-suite refresh. Cross-runner comparisons do not establish causal resident-memory or timing savings.
