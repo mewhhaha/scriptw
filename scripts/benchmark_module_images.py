@@ -17,6 +17,8 @@ MAX_MAPPINGS = 4096
 MAX_ELF = 512 * 1024**2
 MAX_SYMBOLS = 200000
 MAX_NAME_BYTES = 32 * 1024**2
+MAX_SECTION_NAME_BYTES = 2048
+MAX_SYMBOL_NAME_BYTES = 256 * 1024
 
 
 def require(ok, message):
@@ -199,14 +201,14 @@ def parse_elf(raw):
         sections.append(dict(name_offset=name,type=typ,flags=sflags,vaddr=va,offset=off,size=size,link=link,entsize=entsize))
     names=sections[shstr];require(names['type']==3,'ELF section names missing')
     name_bytes=0
-    def string(table,offset):
+    def string(table,offset,limit,kind):
         nonlocal name_bytes
         require(0 <= offset < table['size'],'ELF string offset outside table')
-        start=table['offset']+offset;stop=raw.find(b'\0',start,min(table['offset']+table['size'],start+2049))
-        require(stop>=start,'unterminated/oversized ELF symbol name')
+        start=table['offset']+offset;stop=raw.find(b'\0',start,min(table['offset']+table['size'],start+limit+1))
+        require(stop>=start,'unterminated/oversized ELF '+kind+' name')
         name_bytes+=stop-start;require(name_bytes<=MAX_NAME_BYTES,'ELF symbol-name budget exceeded')
         return raw[start:stop].decode('utf-8',errors='strict')
-    for section in sections:section['name']=string(names,section['name_offset'])
+    for section in sections:section['name']=string(names,section['name_offset'],MAX_SECTION_NAME_BYTES,'section')
     symbols=[];zero=0;symbol_entries=0
     for table in sections:
         if table['type'] != 2:continue
@@ -226,7 +228,7 @@ def parse_elf(raw):
             backing=[load for load in loads if load['flags']&1 and load['offset']<=file_offset
                      and file_offset+size<=load['offset']+load['filesz'] and load['vaddr']+file_offset-load['offset']==va]
             require(len(backing)==1,'function lacks unique executable PT_LOAD translation')
-            symbols.append(dict(name=string(strings,name),vaddr=va,bytes=size,file_offset=file_offset,section=section['name']))
+            symbols.append(dict(name=string(strings,name,MAX_SYMBOL_NAME_BYTES,'symbol'),vaddr=va,bytes=size,file_offset=file_offset,section=section['name']))
     require(symbols,'ELF has no bounded defined function symbols')
     return dict(machine=machine,kind=kind,loads=loads,sections=sections,functions=symbols,zero_size_functions=zero)
 

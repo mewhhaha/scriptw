@@ -25,6 +25,9 @@ function-symbol bounds are separately validated against the actual host file.
 ELF input is capped at 512 MiB, 4,096 sections, 256 program headers and
 200,000 symbol entries. Each retained symbol-metadata/overlap file is capped at
 16 MiB; cold function counts are retained without copying their code.
+ELF names require strict UTF-8 and an in-table NUL terminator. Section names are
+capped at 2,048 bytes and function-symbol names at 256 KiB, with the combined
+decoded-name budget still 32 MiB. Rust generic symbols can exceed 128 KiB.
 Diagnostic success requires the validated host inventory to be retained as well
 as all four cases' validated attribution files.
 Shared pages yield nonexclusive symbol overlaps, never additive function RSS.
