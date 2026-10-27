@@ -6,7 +6,7 @@ use scriptw_engine::{
 fn assert_intrinsic_method_semantics(source: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("one bounded compilation worker");
     let source = format!(
-        "function assert(value, message) {{ if (!value) throw new Error(message); }}\n{source}\nprint('ok');"
+        "function assert(value, message) {{ if (!value) {{ print('assertion failed: '+message); throw new Error(message); }} }}\n{source}\nprint('ok');"
     );
     let outcome = Engine::new(RealmBuilder::new().build())
         .observe_script(
@@ -25,8 +25,9 @@ fn assert_intrinsic_method_semantics(source: &str) {
     assert_eq!(outcome.backend_used, ExecutionBackend::WasmAot);
     assert!(
         matches!(outcome.completion, ObservedCompletion::Normal(_)),
-        "{:?}\n{source}",
+        "{:?}\noutput: {:?}\n{source}",
         outcome.completion,
+        outcome.output_events,
     );
     assert_eq!(
         outcome.output_events,
@@ -155,8 +156,21 @@ var bytes=Object.getOwnPropertyDescriptor(typed,'BYTES_PER_ELEMENT'),prototypeBy
 assert(bytes.value===2 && !bytes.writable && !bytes.enumerable && !bytes.configurable,'typed constructor element-size descriptor');
 assert(prototypeBytes.value===2 && !prototypeBytes.writable && !prototypeBytes.enumerable && !prototypeBytes.configurable,'typed prototype element-size descriptor');
 assert(!Object.getOwnPropertyDescriptor(foreign.Proxy,'prototype'),'Proxy retains its missing public prototype');
-assert(!Object.getOwnPropertyDescriptor(foreign.Iterator.prototype,'constructor'),'Iterator retains its missing constructor backlink');
-foreign.Function=function ReplacementFunction(){};foreign.Array=function ReplacementArray(){};gc();
+var iterator=foreign.Iterator,iteratorPrototype=iterator.prototype;
+var iteratorBacklink=Object.getOwnPropertyDescriptor(iteratorPrototype,'constructor');
+assert(!!iteratorBacklink,'Iterator prototype has its own constructor accessor');
+assert(typeof iteratorBacklink.get==='function' && typeof iteratorBacklink.set==='function' && !('value' in iteratorBacklink) && !('writable' in iteratorBacklink) && !iteratorBacklink.enumerable && iteratorBacklink.configurable,'Iterator constructor backlink remains an accessor with its required attributes');
+assert(Object.getPrototypeOf(iteratorBacklink.get)===fn.prototype && Object.getPrototypeOf(iteratorBacklink.set)===fn.prototype,'Iterator constructor accessors retain the defining Function prototype');
+assert(iteratorPrototype.constructor===iterator && iteratorBacklink.get.call(null)===iterator && iteratorBacklink.get.call(second.Iterator.prototype)===iterator && iterator!==Iterator && iterator!==second.Iterator,'Iterator constructor getter returns its defining Realm intrinsic independently of its receiver');
+var receiver=Object.create(iteratorPrototype);
+assert(iteratorBacklink.set.call(receiver,array)===undefined,'Iterator constructor setter returns undefined');
+var receiverBacklink=Object.getOwnPropertyDescriptor(receiver,'constructor');
+assert(receiverBacklink.value===array && receiverBacklink.writable && receiverBacklink.enumerable && receiverBacklink.configurable && iteratorPrototype.constructor===iterator,'Iterator constructor setter creates a receiver-owned data property without replacing the prototype accessor');
+var prototypeAssignmentRejected=false;
+try{iteratorBacklink.set.call(iteratorPrototype,array);}catch(thrown){prototypeAssignmentRejected=Object.getPrototypeOf(thrown)===foreign.TypeError.prototype;}
+assert(prototypeAssignmentRejected,'Iterator constructor setter rejects its defining prototype with a defining-Realm TypeError');
+foreign.Function=function ReplacementFunction(){};foreign.Array=function ReplacementArray(){};foreign.Iterator=function ReplacementIterator(){};gc();
+assert(iteratorPrototype.constructor===iterator && iteratorBacklink.get.call({})===iterator,'Iterator constructor accessor keeps its canonical intrinsic after public constructor replacement and collection');
 var instance=new array(2),buffer=new typed([257,513]),failure=new error('message');
 assert(Object.getPrototypeOf(instance)===array.prototype && instance.length===2,'Array construction retains canonical prototype cache');
 assert(Object.getPrototypeOf(buffer)===typed.prototype && buffer[0]===257 && buffer[1]===513,'typed constructor retains its exact element kind');
