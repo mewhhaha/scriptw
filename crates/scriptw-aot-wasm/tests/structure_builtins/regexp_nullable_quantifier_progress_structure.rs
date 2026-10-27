@@ -1,6 +1,7 @@
 const IR_SOURCE: &str = include_str!("../../../scriptw-ir/src/regexp.rs");
 const IR_PUBLIC_SOURCE: &str = include_str!("../../../scriptw-ir/src/lib.rs");
 const MATCHER_SOURCE: &str = include_str!("../../src/builtins/regexp.rs");
+const BACKTRACK_SOURCE: &str = include_str!("../../src/builtins/regexp/backtracking.rs");
 const DATA_SOURCE: &str = include_str!("../../src/data.rs");
 const PROGRAM_SOURCE: &str = include_str!("../../../scriptw-ir/src/regexp/program.rs");
 const OPCODE_SOURCE: &str = include_str!("../../../scriptw-ir/src/regexp/opcode.rs");
@@ -432,7 +433,9 @@ fn matcher_frames_preserve_ordered_backtracking_and_exact_progress_identity() {
             "match_utf16.load(function)",
             "I64Eq",
             "progress_no_advance.store(function)",
-            "self.emit_regexp_backtrack_or_fail(",
+            "progress_no_advance.load(&mutfunction)",
+            "Instruction::I32WrapI64",
+            "self.emit_regexp_backtrack_request_if(backtrack.request(),&mutfunction)",
             "operand1.load(&mutfunction)",
             "pc.store(&mutfunction)",
         ],
@@ -536,31 +539,87 @@ fn matcher_frames_preserve_ordered_backtracking_and_exact_progress_identity() {
             "selected.store(f)",
         ],
     );
-    let backtrack = compact(bounded(
-        MATCHER_SOURCE,
-        "fn emit_regexp_backtrack_or_fail(",
-        "    fn emit_regexp_instruction_load(",
+    let request = compact(bounded(
+        BACKTRACK_SOURCE,
+        "fn emit_regexp_backtrack_request_if(",
+        "pub(super) fn emit_regexp_backtrack_recovery(",
     ));
+    assert!(request.contains("request:&BacktrackRequest"));
+    assert!(request.contains("emit_branch_if_to_target(request.target,f)"));
+    assert!(
+        !request.contains("restore_"),
+        "mismatch sites only request recovery"
+    );
+    assert!(compact(COUNTED_MATCHER_SOURCE).contains("backtrack:&BacktrackRequest"));
+    assert!(!BACKTRACK_SOURCE.contains("caller_block_depth"));
+    assert!(!BACKTRACK_SOURCE.contains("Instruction::Br("));
+    assert!(!BACKTRACK_SOURCE.contains("Instruction::BrIf("));
+    let matcher = compact(MATCHER_SOURCE);
+    positions_in_order(
+        &matcher,
+        &[
+            "letbacktrack=BacktrackRequestScope::open(self,&mutfunction)",
+            "letrecovery=backtrack.close(self,&mutfunction)",
+            "self.emit_regexp_backtrack_recovery(",
+            "byte:match_byte",
+            "utf16:match_utf16",
+            "on_low_surrogate:match_on_low_surrogate",
+            "pc,recovery,&mutfunction",
+        ],
+    );
+    assert_eq!(
+        matcher
+            .matches("self.emit_regexp_backtrack_recovery(")
+            .count(),
+        1
+    );
+    let close = compact(bounded(
+        BACKTRACK_SOURCE,
+        "pub(super) fn close(",
+        "impl FunctionBuilder<'_>",
+    ));
+    positions_in_order(
+        &close,
+        &[
+            "self,",
+            "->BacktrackRecoveryScope",
+            "builder.emit_branch_to_target(self.exhausted,f)",
+            "builder.pop_control(ControlFrameKind::Block)",
+            "Instruction::End",
+            "BacktrackRecoveryScope{",
+            "retry:self.retry",
+            "exhausted:self.exhausted",
+        ],
+    );
+    let backtrack = compact(
+        BACKTRACK_SOURCE
+            .split_once("fn emit_regexp_backtrack_recovery(")
+            .unwrap()
+            .1,
+    );
     positions_in_order(
         &backtrack,
         &[
-            "workspace.choices().is_empty(function)",
-            "Instruction::Br(5+caller_block_depth)",
-            "with_top(self,function",
+            "scope:BacktrackRecoveryScope",
+            "letchoose=self.open_frame(ControlFrameKind::Loop,f)",
+            "workspace.choices().is_empty(f)",
+            "self.emit_branch_if_to_target(scope.exhausted,f)",
+            "with_top(self,f",
             "ChoiceEntryKind::RequiredRun",
-            "restore_required_run",
-            "selected.load(function)",
+            "restore_required_run(builder,pc,cursor,selected,f)",
+            "selected.load(f)",
             "Instruction::I32Eqz",
-            "Instruction::Br(2)",
+            "builder.emit_branch_if_to_target(choose,f)",
             "ChoiceEntryKind::LazyProgressAttempt",
-            "entry.discard_through(function)",
-            "Instruction::Br(2)",
+            "entry.discard_through(f)",
+            "builder.emit_branch_to_target(choose,f)",
             "ChoiceEntryKind::LazyProgressChoice",
             "activate_lazy_attempt",
-            "entry.restore_fallback",
-            "entry.restore_cursor",
-            "entry.restore_state",
-            "Instruction::Br(1+caller_block_depth)",
+            "entry.restore_fallback(pc,f)",
+            "entry.restore_cursor(cursor,f)",
+            "entry.restore_state(f)",
+            "builder.emit_branch_to_target(scope.retry,f)",
+            "Instruction::Unreachable",
         ],
     );
 }

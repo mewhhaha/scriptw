@@ -592,12 +592,13 @@ mod native_mode_cohort_tests {
     fn forced_modes_are_reported_exactly_and_reuse_only_their_own_cached_modules() {
         let engine = Engine::new(RealmBuilder::new().build());
         let artifact = engine
-            .profile_script_compilation(
-                "let n=0; for(let i=0;i<8;i++) n+=i; print(n); n;",
-                CompileOptions::default(),
-            )
+            .profile_script_compilation("4 * 7;", CompileOptions::default())
             .unwrap()
             .artifact;
+        assert!(
+            artifact.runtime.is_none(),
+            "mode-key isolation must not compete with R in a one-entry cache"
+        );
         for requested in [
             WasmProfileNativeMode::Fast,
             WasmProfileNativeMode::SizeOptimized,
@@ -615,13 +616,15 @@ mod native_mode_cohort_tests {
                         28.0
                     )))
                 );
+                assert!(profile.outcome.output_events.is_empty());
                 assert_eq!(
-                    profile.outcome.output_events,
-                    [HostOutputEvent::PrintLine("28".into())]
+                    profile.module_cache,
+                    if repeat == 0 {
+                        WasmRuntimeModuleCacheOutcome::Miss
+                    } else {
+                        WasmRuntimeModuleCacheOutcome::Hit
+                    }
                 );
-                if repeat == 1 {
-                    assert_eq!(profile.module_cache, WasmRuntimeModuleCacheOutcome::Hit);
-                }
                 assert_eq!(profile.runtime_policy, wasm_runtime_profile_policy());
             }
         }
