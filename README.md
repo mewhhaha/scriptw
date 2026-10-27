@@ -50,46 +50,42 @@ order. Verification and measurements for this pass are pending; see the
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `e7e512221`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `38c25942b`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
-compares Scriptw and Scriptc in the same Wasmtime executable. JavaScript and
-Wasm compilation run in separate producer processes; both measured consumers
-disable compilation and use identical native optimization and runtime settings.
-Both passed the original checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.237–1.613× Scriptc's**:
+compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
+in separate producer processes; measured consumers disable compilation and use
+identical native optimization and runtime settings. Both passed the original
+checksums on **17/17 workloads** across two rounds.
+Scriptw's median post-execution process RSS remains **1.225–1.591× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.3 MiB | 13.7 MiB |
-| Objects | 18.9 MiB | 14.3 MiB |
-| Retained objects | 24.9 MiB | 20.1 MiB |
+| Integer | 18.2 MiB | 13.6 MiB |
+| Objects | 19.4 MiB | 14.5 MiB |
+| Retained objects | 24.6 MiB | 20.1 MiB |
 
-These are medians of 14 measured samples per runtime and workload, after ten
+These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
-Scriptc parity remains open under the same workloads, checksums and boundaries.
-This pass retains the complete RegExp Unicode property catalogue as passive
-data and copies its reserved range on first use in each actual R instance.
-Comparisons across separate CI runners do not establish causal savings.
-[Verification](docs/rust-rewrite/memory-regexp-unicode-data-20261027.md):
-**4,876 native cases, 2,365 original pinned Test262 executions and 16 separate
-Unicode executions passed**. The supplemental IDs are disjoint from the
-original selection. One excluded wire-data inspection fixture was repaired;
-the original failed attempt and exact patch are retained. Product compiler
-inputs match the measured source; verification fixtures are explicitly recorded.
-Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
-retention. Original Test262 executions ran in fresh batches of at most 16.
-This selected verification leaves the ordinary V8 comparison and full pinned
-Test262 status below unchanged.
+Scriptc parity remains open. This is a measurement-method checkpoint: compiler
+input fingerprints and both locally owned raw runtime packages match e7.
+Cross-runner comparisons do not establish causal savings.
 
-[All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
-[Precompiled process-memory graph](docs/rust-rewrite/assets/precompiled-memory.svg) ·
-[Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40519969552).
+[Verification](docs/rust-rewrite/memory-phase-boundaries-20261027.md): **13 Rust benchmark controls and
+49 Python tooling tests passed**. The prior e7 checkpoint passed **4,876 native
+cases and 2,381 selected original Test262 executions** (2,365 original selections
+plus 16 disjoint Unicode executions); those suites were **not rerun** here.
+Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module retention.
 
-The separate [memory diagnostic](docs/rust-rewrite/contracts/precompiled-comparison.md)
-pauses both adapters at four lifecycle boundaries to capture aligned memory maps.
-These diagnostic runs remain unscored.
+The separate four-boundary map captures are **unscored**. Their warm host RX
+gap is about 2.4–2.5 MiB, with roughly 1.5 MiB in other RX mappings; much of the
+gap remains after Store drop. These permission/path groups do not identify
+heap owners, peak memory or causes. Loading precedes all observations; the
+later captures use observation 16 and include 16 prior invocations of history.
+
+[Method, source bindings and retained evidence](docs/rust-rewrite/memory-phase-boundaries-20261027.md) ·
+[Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40540496469).
 
 ## Benchmarks
 
