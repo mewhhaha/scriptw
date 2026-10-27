@@ -294,3 +294,6 @@ mod emitted_names;
 
 #[path = "tests/shared_emitted_bodies.rs"]
 mod shared_emitted_bodies;
+
+#[path = "tests/import_compaction.rs"]
+mod import_compaction;

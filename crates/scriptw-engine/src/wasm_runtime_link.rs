@@ -14,7 +14,7 @@ use super::*;
 use scriptw_aot_wasm::{
     RuntimeArtifact, RuntimeArtifactCache, RuntimeArtifactCacheKey, RuntimeArtifactKey,
 };
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
 /// Trusted precompiled P names only this Cargo build's Portable Minimal R.
 /// No raw R reconstruction, compiler fallback or caller native blob is admitted.
@@ -31,6 +31,8 @@ pub(super) fn precompiled_minimal_runtime(
     ))
 }
 
+#[cfg(test)]
+mod import_exports_tests;
 mod perf_map;
 #[cfg(test)]
 mod tests;
@@ -415,8 +417,8 @@ pub(super) fn compile_modules(
     Ok(modules)
 }
 
-/// Instantiates the runtime module when present, publishes its exports to the
-/// program under [`scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE`], then instantiates
+/// Instantiates the runtime module when present, publishes only exports imported
+/// by the actual program under [`scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE`], then instantiates
 /// the program. Returns (program, instance that owns diagnostics and roots).
 pub(super) fn instantiate(
     linker: &mut WasmtimeLinker<WasmHostState>,
@@ -430,13 +432,30 @@ pub(super) fn instantiate(
                 .map_err(|err| {
                     EngineError::new(format!("wasmtime runtime instantiate failed: {err:#}"))
                 })?;
-            linker
-                .instance(
-                    &mut *store,
-                    scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE,
-                    runtime,
-                )
-                .map_err(|err| EngineError::new(format!("wasmtime linker setup failed: {err}")))?;
+            let namespace = scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE;
+            let mut published = BTreeSet::new();
+            for import in modules.program.imports() {
+                if import.module() != namespace || !published.insert(import.name().to_owned()) {
+                    continue;
+                }
+                let export = runtime
+                    .get_export(&mut *store, import.name())
+                    .ok_or_else(|| {
+                        EngineError::new(format!(
+                            "wasmtime runtime export missing: {namespace}::{}",
+                            import.name()
+                        ))
+                    })?;
+                // A repeated name needs one definition. P instantiation still
+                // checks every import's actual type, including repeated names
+                // with incompatible requirements. Never skip existing linker
+                // definitions: define must report collisions and ownership errors.
+                linker
+                    .define(&*store, namespace, import.name(), export)
+                    .map_err(|err| {
+                        EngineError::new(format!("wasmtime linker setup failed: {err}"))
+                    })?;
+            }
             Some(runtime)
         }
         None => None,

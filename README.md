@@ -29,6 +29,9 @@ record. Set receiver updates use normalized data definitions through the same
 Array exotic checks; see the [receiver contract](docs/rust-rewrite/contracts/array-set-receiver-data-definition.md).
 Linux runtime-image reads can prove the main executable's identity from kernel
 ELF headers when file and mapping device IDs differ.
+Final program modules retain only referenced runtime imports; instantiation
+registers the exports requested by the actual module. See the
+[import contract](docs/rust-rewrite/contracts/runtime-program-import-compaction.md).
 
 ## Precompiled comparison
 

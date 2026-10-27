@@ -164,9 +164,8 @@ impl FunctionIdentity {
 pub struct FunctionBodySize(u32);
 
 impl FunctionBodySize {
-    /// Measures a finished body. This is the only constructor, and it is called
-    /// from [`EmittedFunction::new`], so a recorded size is always the size of
-    /// the body recorded beside it.
+    /// Measures a finished body at initial emission or final import reencoding,
+    /// so a recorded size always belongs to the exact encoded body beside it.
     fn of(raw_body: &[u8]) -> Self {
         Self(u32::try_from(raw_body.len()).unwrap_or(u32::MAX))
     }
@@ -479,6 +478,46 @@ pub(crate) struct ModuleFunctionTable {
 }
 
 impl ModuleFunctionTable {
+    /// Import compaction preserves every body/local but may shorten structural
+    /// LEB operands. Bind attribution to the actual final body bytes and indices.
+    pub(crate) fn remeasure_reencoded(
+        &mut self,
+        bytes: &[u8],
+        mut remap: impl FnMut(u32) -> Result<u32, EmitError>,
+    ) -> Result<(), EmitError> {
+        let fail = |message: String| {
+            EmitError::unsupported(format!(
+                "compiler function attribution reencoding failed: {message}"
+            ))
+        };
+        let mut records = self.records.iter_mut();
+        for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+            if let wasmparser::Payload::CodeSectionEntry(body) =
+                payload.map_err(|e| fail(e.to_string()))?
+            {
+                let record = records
+                    .next()
+                    .ok_or_else(|| fail("extra final body".into()))?;
+                let mut locals = 0u32;
+                for local in body.get_locals_reader().map_err(|e| fail(e.to_string()))? {
+                    let (count, _) = local.map_err(|e| fail(e.to_string()))?;
+                    locals = locals
+                        .checked_add(count)
+                        .ok_or_else(|| fail("local count overflow".into()))?;
+                }
+                if locals != record.declared_locals.count() {
+                    return Err(fail("final body changed declared local count".into()));
+                }
+                record.wasm_index = remap(record.wasm_index)?;
+                record.body_bytes = FunctionBodySize::of(&bytes[body.range()]);
+            }
+        }
+        if records.next().is_some() {
+            return Err(fail("missing final body".into()));
+        }
+        Ok(())
+    }
+
     pub(crate) fn native_program_context_section(
         &self,
     ) -> Option<wasm_encoder::CustomSection<'static>> {

@@ -29,6 +29,12 @@ pub use source_compilation::{
 };
 mod validated_profile;
 mod validation;
+
+/// Producer P rewriting uses the same required backend feature set as R admission.
+pub(crate) fn program_validation_features() -> wasmparser::WasmFeatures {
+    validation::required_features()
+}
+
 pub use build_package::{
     admit_portable_runtime_package, build_runtime_artifact,
     build_runtime_artifact_with_source_compilation_profile, encode_portable_runtime_package,
@@ -139,8 +145,9 @@ impl RuntimeLayout {
     }
 
     /// Declares every runtime function, then every runtime global, as imports
-    /// in index order. `host_imports` is the count of host functions already
-    /// imported, which the runtime's own index space begins after.
+    /// in index order for canonical body emission. The final P pass compacts
+    /// unused runtime imports after every structural reference exists.
+    /// `host_imports` is the host function prefix shared with R.
     pub(crate) fn emit_runtime_imports(
         &self,
         host_imports: u32,

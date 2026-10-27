@@ -1750,7 +1750,7 @@ fn emit_script_module_with_factory(
 
     let main_emitted_local_count = module_package.main_emitted_local_count();
     let mut module = Module::new();
-    let function_table = module_package.append_to_module(
+    let mut function_table = module_package.append_to_module(
         &mut module,
         ModuleAssemblySections::new(
             imports,
@@ -1825,7 +1825,7 @@ fn emit_script_module_with_factory(
         format!("import func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_AGENT_CAN_SUSPEND}"),
     ];
 
-    let function_sizes = metadata::append_function_attribution(&mut debug_dump, &function_table);
+    let attribution_position = debug_dump.len();
     if uses_host_print {
         debug_dump.push(format!(
             "import func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_PRINT_LINE_UTF8}"
@@ -1921,7 +1921,7 @@ fn emit_script_module_with_factory(
     )?;
 
     metadata::append_module_declarations(&mut module, kind, &script.foreign_modules);
-    metadata::append_function_name_and_check_budget(&mut module, &mut debug_dump, &function_table)?;
+    metadata::append_function_name(&mut module, &mut debug_dump, &function_table)?;
     if let Some(section) = factory.and_then(|_| function_table.native_program_context_section()) {
         module.section(&section);
     }
@@ -1934,8 +1934,19 @@ fn emit_script_module_with_factory(
             string_pool.compiler_owned_boundary(),
         )
     });
+    let bytes = module.finish();
+    let bytes = match kind {
+        ModuleKind::Program(_) => crate::program_imports::compact(bytes, &mut function_table)?,
+        ModuleKind::Standalone | ModuleKind::Runtime(_) => bytes,
+    };
+    let mut attribution = Vec::new();
+    let function_sizes = metadata::append_function_attribution(&mut attribution, &function_table);
+    debug_dump.splice(attribution_position..attribution_position, attribution);
+    if let Some(budget) = FunctionBodyBudget::from_env() {
+        function_table.check_budget(budget)?;
+    }
     let artifact = WasmArtifact {
-        bytes: module.finish(),
+        bytes,
         invariant_note: "direct-js-to-wasm module",
         debug_dump: debug_dump.join("\n"),
         function_sizes,

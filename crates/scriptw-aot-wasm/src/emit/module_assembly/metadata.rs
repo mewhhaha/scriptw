@@ -32,7 +32,7 @@ pub(super) fn append_function_attribution(
     function_sizes
 }
 
-pub(super) fn append_function_name_and_check_budget(
+pub(super) fn append_function_name(
     module: &mut Module,
     debug_dump: &mut Vec<String>,
     function_table: &ModuleFunctionTable,
@@ -46,11 +46,6 @@ pub(super) fn append_function_name_and_check_budget(
         "name section: {} named functions",
         function_table.records().len()
     ));
-
-    // Enforce an emitted-body limit only when explicitly requested.
-    if let Some(budget) = FunctionBodyBudget::from_env() {
-        function_table.check_budget(budget)?;
-    }
 
     Ok(())
 }

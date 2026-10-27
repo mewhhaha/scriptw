@@ -201,6 +201,7 @@ mod tests;
 
 mod native_program_contexts;
 mod native_program_template;
+mod program_imports;
 mod program_literal_operands;
 pub use native_program_template::{
     NativeProgramArrayConstruction, NativeProgramArrayFactory, NativeProgramArrayWidth,
