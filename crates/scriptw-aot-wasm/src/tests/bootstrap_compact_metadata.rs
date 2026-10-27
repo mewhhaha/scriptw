@@ -50,22 +50,40 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
             .expect("actual runtime helper is registered")
     };
     let allocate = index("helper::native_function_allocate");
+    let accessor_allocate = index("helper::intrinsic_accessor_allocate");
     let compact = index("helper::compact_literal_allocate");
     let bootstrap = named_body(
         runtime.bytes(),
         index("helper::realm_initialize_intrinsics"),
     );
-    let callables = bootstrap
+    let inline_callables = bootstrap
         .iter()
         .filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<FunctionObject>(schema)))
         .count();
+    let shared_accessors = bootstrap
+        .iter()
+        .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == accessor_allocate))
+        .count();
+    let accessor_allocator = named_body(runtime.bytes(), accessor_allocate);
+    assert_eq!(
+        accessor_allocator
+            .iter()
+            .filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<FunctionObject>(schema)))
+            .count(),
+        1,
+        "each shared accessor invocation constructs one fresh callable"
+    );
     let native_headers = bootstrap
         .iter()
         .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == allocate))
         .count();
-    assert!(callables > 0, "inspect the real intrinsic bootstrap");
+    assert!(
+        inline_callables > 0 && shared_accessors > 0,
+        "inspect both real bootstrap construction paths"
+    );
     assert_eq!(
-        native_headers, callables,
+        native_headers,
+        inline_callables + shared_accessors,
         "each native callable gets its own compact header"
     );
     let allocator = named_body(runtime.bytes(), allocate);

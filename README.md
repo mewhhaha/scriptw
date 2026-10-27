@@ -43,7 +43,8 @@ metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-p
 
 Eligible eager intrinsic accessors share context/record allocation through a
 typed Wasm helper, with source creation and metadata publication retaining their
-order. Verification and measurements for this pass are pending; see the
+order. The selected verification and matched measurements are recorded in the
+[checkpoint](docs/rust-rewrite/memory-eager-accessors-20261027.md) and the
 [allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
 
 The RegExp matcher shares one in-function backtracking body while preserving
@@ -58,42 +59,40 @@ for this pass are pending; see the
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `38c25942b`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `a960f50ac`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.225–1.591× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.228–1.632× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.2 MiB | 13.6 MiB |
-| Objects | 19.4 MiB | 14.5 MiB |
-| Retained objects | 24.6 MiB | 20.1 MiB |
+| Integer | 18.3 MiB | 13.7 MiB |
+| Objects | 19.0 MiB | 14.4 MiB |
+| Retained objects | 24.7 MiB | 20.1 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
-Scriptc parity remains open. This is a measurement-method checkpoint: compiler
-input fingerprints and both locally owned raw runtime packages match e7.
-Cross-runner comparisons do not establish causal savings.
+Scriptc parity remains open. Eager native accessors now share a typed allocation
+tail while retaining fresh function identity, defining Realm and source-string
+materialization order. Cross-runner comparisons do not establish causal savings.
 
-[Verification](docs/rust-rewrite/memory-phase-boundaries-20261027.md): **13 Rust benchmark controls and
-49 Python tooling tests passed**. The prior e7 checkpoint passed **4,876 native
-cases and 2,381 selected original Test262 executions** (2,365 original selections
-plus 16 disjoint Unicode executions); those suites were **not rerun** here.
-Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module retention.
+[Verification](docs/rust-rewrite/memory-eager-accessors-20261027.md): **4,881 native cases, 2,365 original
+pinned Test262 executions and 16 separate Unicode executions passed**. The
+supplemental IDs are disjoint. The initial test-only compilation error, later inspection-test failure and
+repair are retained; measured and verified compiler-input closures are bound.
+Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
+retention. Original Test262 executions ran in fresh batches of at most 16.
 
-The separate four-boundary map captures are **unscored**. Their warm host RX
-gap is about 2.4–2.5 MiB, with roughly 1.5 MiB in other RX mappings; much of the
-gap remains after Store drop. These permission/path groups do not identify
-heap owners, peak memory or causes. Loading precedes all observations; the
-later captures use observation 16 and include 16 prior invocations of history.
+[Prior phase-aligned method checkpoint](docs/rust-rewrite/memory-phase-boundaries-20261027.md):
+paused maps remain unscored and separate from every canonical graph. They do
+not establish heap ownership, peak memory or causal function attribution.
 
-[Method, source bindings and retained evidence](docs/rust-rewrite/memory-phase-boundaries-20261027.md) ·
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40540496469).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40552965169).
 
 ## Benchmarks
 
