@@ -94,6 +94,52 @@ struct Active {
     socket: std::os::unix::net::UnixStream,
 }
 
+/// Address records are constructed only after capture; roles cannot be supplied
+/// as arbitrary strings by an adapter.
+#[cfg(feature = "benchmark-module-images")]
+enum ModuleRole {
+    Program,
+    Runtime,
+}
+
+#[cfg(feature = "benchmark-module-images")]
+pub(super) struct ModuleImageAddresses {
+    image: std::ops::Range<usize>,
+    text: std::ops::Range<usize>,
+}
+
+#[cfg(feature = "benchmark-module-images")]
+impl ModuleImageAddresses {
+    pub(super) fn new(image: std::ops::Range<usize>, text: std::ops::Range<usize>) -> Self {
+        Self { image, text }
+    }
+
+    fn value(self, role: ModuleRole) -> Value {
+        let role = match role {
+            ModuleRole::Program => "program",
+            ModuleRole::Runtime => "runtime",
+        };
+        json!({"role":role,"image":{"start":self.image.start,"end":self.image.end},
+            "text":{"start":self.text.start,"end":self.text.end}})
+    }
+}
+
+#[cfg(feature = "benchmark-module-images")]
+pub(super) struct ModuleImages {
+    program: ModuleImageAddresses,
+    runtime: Option<ModuleImageAddresses>,
+}
+
+#[cfg(feature = "benchmark-module-images")]
+impl ModuleImages {
+    pub(super) fn new(
+        program: ModuleImageAddresses,
+        runtime: Option<ModuleImageAddresses>,
+    ) -> Self {
+        Self { program, runtime }
+    }
+}
+
 impl Barriers {
     pub(super) fn from_environment(samples: usize, warmups: usize) -> Result<Self, String> {
         let mut values = [None, None, None];
@@ -182,6 +228,34 @@ impl Barriers {
             TIMEOUT,
         )?;
         active.completed += 1;
+        Ok(())
+    }
+
+    /// Never observe module metadata until every capture has been acknowledged.
+    /// No active barrier means no call to the lazy collector and no new fields.
+    #[cfg(feature = "benchmark-module-images")]
+    pub(super) fn finish_with_module_images(
+        self,
+        report: &mut Value,
+        collect: impl FnOnce() -> ModuleImages,
+    ) -> Result<(), String> {
+        let Some(active) = self.active.as_ref() else {
+            return self.finish(report);
+        };
+        if active.completed != PHASES.len() {
+            return Err("incomplete phase barrier sequence".into());
+        }
+        let nonce = active.config.nonce.clone();
+        let observation_index = active.config.index;
+        self.finish(report)?;
+        let images = collect();
+        let mut owners = vec![images.program.value(ModuleRole::Program)];
+        if let Some(runtime) = images.runtime {
+            owners.push(runtime.value(ModuleRole::Runtime));
+        }
+        report["phase_barriers"]["module_images"] = json!({
+            "schema":"scriptw-precompiled-module-images-v1", "nonce":nonce,
+            "observation_index":observation_index, "owners":owners});
         Ok(())
     }
 
@@ -359,6 +433,41 @@ mod tests {
             assert!(configuration(v, 7, 10).is_err());
         }
     }
+    #[cfg(feature = "benchmark-module-images")]
+    #[test]
+    fn module_addresses_are_not_collected_without_barriers() {
+        let mut report = json!({"existing":true});
+        Barriers { active: None }
+            .finish_with_module_images(&mut report, || {
+                panic!("inactive diagnostics must not inspect module metadata")
+            })
+            .unwrap();
+        assert_eq!(report, json!({"existing":true}));
+    }
+
+    #[cfg(all(feature = "benchmark-module-images", target_os = "linux"))]
+    #[test]
+    fn module_addresses_require_the_fourth_acknowledgement() {
+        let (socket, _peer) = std::os::unix::net::UnixStream::pair().unwrap();
+        let config = configuration(values("3", NONCE, "16"), 7, 10)
+            .unwrap()
+            .unwrap();
+        let barriers = Barriers {
+            active: Some(Active {
+                config,
+                completed: 3,
+                socket,
+            }),
+        };
+        let mut report = json!({});
+        assert!(barriers
+            .finish_with_module_images(&mut report, || {
+                panic!("three captures cannot admit address observation")
+            })
+            .is_err());
+        assert_eq!(report, json!({}));
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn acknowledgement_requires_exact_tuple_and_bounded_line() {
@@ -429,6 +538,26 @@ mod tests {
         barriers.after_execution(16).unwrap();
         barriers.after_store_drop(16).unwrap();
         let mut report = json!({});
+        #[cfg(feature = "benchmark-module-images")]
+        {
+            let calls = std::cell::Cell::new(0);
+            barriers
+                .finish_with_module_images(&mut report, || {
+                    calls.set(calls.get() + 1);
+                    // Independent ranges: the hook must not impose containment.
+                    ModuleImages::new(ModuleImageAddresses::new(100..200, 300..400), None)
+                })
+                .unwrap();
+            assert_eq!(calls.get(), 1);
+            assert_eq!(
+                report["phase_barriers"]["module_images"],
+                json!({
+                "schema":"scriptw-precompiled-module-images-v1", "nonce":NONCE,
+                "observation_index":16,"owners":[{"role":"program",
+                "image":{"start":100,"end":200},"text":{"start":300,"end":400}}]})
+            );
+        }
+        #[cfg(not(feature = "benchmark-module-images"))]
         barriers.finish(&mut report).unwrap();
         assert_eq!(report["phase_barriers"]["completed_phases"], json!(PHASES));
         assert_eq!(report["excluded_from_scored_cohorts"], true);

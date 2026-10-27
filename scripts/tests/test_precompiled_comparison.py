@@ -219,6 +219,39 @@ class PrecompiledComparisonTests(unittest.TestCase):
         self.assertEqual(plan[34]['file'], self.report['workloads'][-1]['file'])
         self.assertEqual(plan[34]['runtime'], 'scriptc')
 
+    def test_module_image_diagnostic_feature_host_admits_complete_scored_report(self):
+        producer = self.consumer['cargo_producer']
+        producer['features'] = ['benchmark-module-images']
+        self.write(self.consumer['cargo_log'], ('\n'.join(json.dumps(row) for row in [producer,
+            dict(reason='build-finished', success=True)]) + '\n').encode())
+        admitted, rows = comparison.load_report(self.save())
+        self.assertEqual(admitted['tools']['consumer']['cargo_producer']['features'],
+                         ['benchmark-module-images'])
+        self.assertEqual(len(rows), 17)
+        self.assertTrue(all(row['runtimes'][runtime]['status'] == 'ok'
+                            for row in rows for runtime in comparison.RUNTIMES))
+
+    def test_cargo_host_feature_admission_is_closed_and_bound_to_actual_transcript(self):
+        producer = self.consumer['cargo_producer']
+        for features in (['unknown'], ['differential-oracle'],
+                         ['benchmark-module-images', 'unknown'],
+                         ['unknown', 'benchmark-module-images'],
+                         ['benchmark-module-images', 'benchmark-module-images'],
+                         None, 'benchmark-module-images', {}, False):
+            with self.subTest(features=features):
+                producer['features'] = features
+                self.write(self.consumer['cargo_log'], ('\n'.join(json.dumps(row) for row in [producer,
+                    dict(reason='build-finished', success=True)]) + '\n').encode())
+                with self.assertRaisesRegex(ValueError, 'release Cargo producer'):
+                    comparison.load_report(self.save())
+        # A permitted feature claim cannot replace the actual producer record.
+        producer['features'] = ['benchmark-module-images']
+        other_producer = dict(producer, features=[])
+        self.write(self.consumer['cargo_log'], ('\n'.join(json.dumps(row) for row in [other_producer,
+            dict(reason='build-finished', success=True)]) + '\n').encode())
+        with self.assertRaisesRegex(ValueError, 'release Cargo producer'):
+            comparison.load_report(self.save())
+
     def test_missing_or_reordered_attempt_is_rejected(self):
         self.report['attempts'][0], self.report['attempts'][1] = self.report['attempts'][1], self.report['attempts'][0]
         with self.assertRaisesRegex(ValueError, 'serial inventory'):

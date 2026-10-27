@@ -1,3 +1,5 @@
+#[cfg(feature = "benchmark-module-images")]
+mod benchmark_module_images;
 use super::*;
 mod realm_async;
 mod transfer_retained;

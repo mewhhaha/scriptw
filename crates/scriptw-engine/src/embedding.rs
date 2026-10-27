@@ -8,6 +8,11 @@ use scriptw_ir::foreign::ForeignModuleRegistry;
 use std::any::Any;
 use wasmtime::{AsContext, AsContextMut, ExnRef, ExnRefPre, ExnType, FuncType, Instance, ValType};
 
+#[cfg(feature = "benchmark-module-images")]
+mod benchmark_module_images;
+#[cfg(feature = "benchmark-module-images")]
+pub use benchmark_module_images::{BenchmarkModuleImage, BenchmarkModuleImages};
+
 mod async_host;
 mod foreign_host;
 mod operations;
@@ -101,6 +106,15 @@ pub fn configure_wasm_runtime(config: &mut wasmtime::Config) {
 /// Immutable, admitted program and its matching runtime for one actual Engine.
 /// Different applications may share the same R; their foreign functions remain
 /// P imports and are resolved separately in each caller-owned Linker/Store.
+#[cfg_attr(
+    not(feature = "benchmark-module-images"),
+    doc = "
+The default product API has no benchmark module-address hook:
+```compile_fail,E0432
+use scriptw_engine::BenchmarkModuleImages;
+```
+"
+)]
 pub struct EmbeddedRuntime {
     engine: WasmtimeEngine,
     modules: wasm_runtime_link::WasmModules,
