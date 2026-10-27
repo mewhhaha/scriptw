@@ -153,6 +153,11 @@ fn emitted_direct_eval_factory_retains_full_witness_exact_r_and_valid_typed_hook
         .validate_all(artifact.bytes())
         .unwrap();
     let expected_imports = crate::tests::linked_function_imports(&runtime);
+    let host_count = expected_imports
+        .iter()
+        .take_while(|(module, _, _)| module != crate::RUNTIME_IMPORT_NAMESPACE)
+        .count();
+    let mut runtime_cursor = host_count;
     let mut imported = 0usize;
     let mut types = Vec::new();
     let mut function_types = Vec::new();
@@ -168,13 +173,23 @@ fn emitted_direct_eval_factory_retains_full_witness_exact_r_and_valid_typed_hook
                 for import in reader.into_imports() {
                     let import = import.unwrap();
                     if let TypeRef::Func(index) | TypeRef::FuncExact(index) = import.ty {
-                        let expected = expected_imports
-                            .get(imported as usize)
-                            .expect("P function import must be declared by its actual R");
+                        let expected = if (imported as usize) < host_count {
+                            &expected_imports[imported as usize]
+                        } else {
+                            assert_eq!(import.module, crate::RUNTIME_IMPORT_NAMESPACE,
+                                "P must retain the complete exact host prefix before runtime exports");
+                            let relative = expected_imports[runtime_cursor..].iter().position(|row|
+                                row.0 == import.module && row.1 == import.name)
+                                .expect("P runtime imports must be a unique ordered subset of actual R exports");
+                            runtime_cursor += relative;
+                            let expected = &expected_imports[runtime_cursor];
+                            runtime_cursor += 1;
+                            expected
+                        };
                         assert_eq!(
                             (import.module, import.name, index),
                             (expected.0.as_str(), expected.1.as_str(), expected.2),
-                            "P retains the exact R host prefix and typed runtime export sequence"
+                            "P retains exact host declarations and each selected R export's original type"
                         );
                         function_types.push(index);
                         imported += 1;
@@ -196,7 +211,14 @@ fn emitted_direct_eval_factory_retains_full_witness_exact_r_and_valid_typed_hook
             _ => {}
         }
     }
-    assert_eq!(imported, expected_imports.len());
+    assert!(
+        (imported as usize) > host_count,
+        "factory retains its actual R dependencies"
+    );
+    assert!(
+        (imported as usize) < expected_imports.len(),
+        "small factory must not restore all unused R imports"
+    );
     assert!(!exports.contains_key("main"));
     assert_eq!(
         exports[artifact.program_initialize_export()],

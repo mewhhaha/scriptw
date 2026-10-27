@@ -47,20 +47,31 @@ fn source_body_definition_calls(expression: &str) -> (usize, usize, usize) {
             .filter_map(|(&index, actual)| (actual == name).then_some(index))
             .collect::<Vec<_>>();
         assert_eq!(definitions.len(), 1, "one runtime definition of {name}");
+        let exports = runtime_exports
+            .iter()
+            .filter_map(|(name, &index)| {
+                (index == definitions[0]
+                    && name
+                        .strip_prefix('f')
+                        .is_some_and(|ordinal| ordinal.parse::<u32>().is_ok()))
+                .then_some(name)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(exports.len(), 1, "one R function export for {name}");
         let imported = program_imports
             .iter()
             .filter_map(|(&index, (namespace, export))| {
-                (namespace == crate::RUNTIME_IMPORT_NAMESPACE
-                    && runtime_exports.get(export) == Some(&definitions[0]))
-                .then_some(index)
+                (namespace == crate::RUNTIME_IMPORT_NAMESPACE && export == exports[0])
+                    .then_some(index)
             })
             .collect::<Vec<_>>();
-        assert_eq!(
-            imported.len(),
-            1,
-            "P imports the actual runtime definition of {name}"
+        assert!(
+            imported.len() <= 1,
+            "P imports the actual runtime definition of {name} at most once"
         );
-        imported[0]
+        // Import compaction removes an unused helper. The per-case exact edge
+        // assertions below still require its import whenever calls are expected.
+        imported.first().copied()
     };
     let append = helper_index("helper::ordinary_property_append");
     let define = helper_index("helper::object_define_data");
@@ -78,9 +89,9 @@ fn source_body_definition_calls(expression: &str) -> (usize, usize, usize) {
             let mut edges = (0, 0, 0);
             for operator in body.get_operators_reader().expect("operators parse") {
                 if let Operator::Call { function_index } = operator.expect("operator parses") {
-                    edges.0 += usize::from(function_index == append);
-                    edges.1 += usize::from(function_index == define);
-                    edges.2 += usize::from(function_index == compact);
+                    edges.0 += usize::from(Some(function_index) == append);
+                    edges.1 += usize::from(Some(function_index) == define);
+                    edges.2 += usize::from(Some(function_index) == compact);
                 }
             }
             return edges;

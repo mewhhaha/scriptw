@@ -75,7 +75,38 @@ fn heap_programs_link_against_one_runtime_module() {
             _ => None,
         })
         .sum::<u32>();
-    assert_eq!(imports, host_imports + runtime_functions);
+    let catalog = linked_function_imports(runtime);
+    assert_eq!(catalog.len() as u32, host_imports + runtime_functions);
+    let mut actual = Vec::new();
+    for payload in Parser::new(0).parse_all(&first.bytes) {
+        if let Payload::ImportSection(section) = payload.expect("P parses") {
+            for import in section.into_imports() {
+                let import = import.expect("P import parses");
+                if let wasmparser::TypeRef::Func(ty) | wasmparser::TypeRef::FuncExact(ty) =
+                    import.ty
+                {
+                    actual.push((import.module.to_owned(), import.name.to_owned(), ty));
+                }
+            }
+        }
+    }
+    assert_eq!(
+        &actual[..host_imports as usize],
+        &catalog[..host_imports as usize]
+    );
+    let mut last = host_imports as usize;
+    for entry in &actual[host_imports as usize..] {
+        let position = catalog[last..]
+            .iter()
+            .position(|candidate| candidate == entry)
+            .map(|position| last + position)
+            .expect("P retains ordered R exports with exact types");
+        last = position + 1;
+    }
+    assert!(
+        imports > host_imports && imports < host_imports + runtime_functions,
+        "the actual program imports a proper nonempty typed subset of R"
+    );
 }
 
 #[test]
@@ -3052,9 +3083,8 @@ fn preseeded_wire_data_stays_in_private_memory() {
         .contains(&GcHostImport::CollectGc));
 }
 
-// P repeats its exact R's host imports, then imports R's defined
-// functions by their original index and type. This checks all scalar and
-// GC host roles without accepting an arbitrary second import namespace.
+// Catalog of P's exact R host prefix and canonical typed function exports.
+// Final P retains a referenced ordered subset of the latter.
 pub(crate) fn linked_function_imports(runtime: &RuntimeArtifact) -> Vec<(String, String, u32)> {
     let mut imports = Vec::new();
     let mut defined_types = Vec::new();
@@ -3086,6 +3116,48 @@ pub(crate) fn linked_function_imports(runtime: &RuntimeArtifact) -> Vec<(String,
         )
     }));
     imports
+}
+
+/// Resolve an R function through its actual canonical export into P's compact
+/// function index space. Returning None keeps zero-call controls meaningful.
+fn imported_runtime_function_index(artifact: &WasmArtifact, runtime_index: u32) -> Option<u32> {
+    let runtime = artifact.runtime().expect("P links R");
+    let export_name = format!("f{runtime_index}");
+    let mut exports = 0;
+    for payload in Parser::new(0).parse_all(runtime.bytes()) {
+        if let Payload::ExportSection(section) = payload.expect("R decodes") {
+            for export in section {
+                let export = export.expect("R export decodes");
+                if export.name == export_name {
+                    assert_eq!(export.kind, wasmparser::ExternalKind::Func);
+                    assert_eq!(export.index, runtime_index);
+                    exports += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(exports, 1, "R exports its exact function once");
+    let mut next = 0;
+    let mut found = None;
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        if let Payload::ImportSection(section) = payload.expect("P decodes") {
+            for import in section.into_imports() {
+                let import = import.expect("P import decodes");
+                if matches!(
+                    import.ty,
+                    wasmparser::TypeRef::Func(_) | wasmparser::TypeRef::FuncExact(_)
+                ) {
+                    if import.module == crate::RUNTIME_IMPORT_NAMESPACE
+                        && import.name == export_name
+                    {
+                        assert!(found.replace(next).is_none(), "P imports each helper once");
+                    }
+                    next += 1;
+                }
+            }
+        }
+    }
+    found
 }
 
 fn regexp_descriptor_from_pool(
@@ -3122,6 +3194,23 @@ fn regexp_program_wire_data_is_aligned_and_deduplicated() {
     // metadata image, not an installation in R's linear scratch memory.
     // No P bootstrap, main or outlined body may install this image or move
     // the shared R cursor past it.
+    let mut cursor_import = None;
+    let mut next_global = 0;
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        if let Payload::ImportSection(section) = payload.expect("P imports decode") {
+            for import in section.into_imports() {
+                let import = import.expect("P import decodes");
+                if matches!(import.ty, wasmparser::TypeRef::Global(_)) {
+                    if import.module == crate::RUNTIME_IMPORT_NAMESPACE
+                        && import.name == format!("g{PRIVATE_BYTE_CURSOR_GLOBAL_INDEX}")
+                    {
+                        assert!(cursor_import.replace(next_global).is_none());
+                    }
+                    next_global += 1;
+                }
+            }
+        }
+    }
     let mut bodies = 0;
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         let Payload::CodeSectionEntry(body) = payload.expect("program should parse") else {
@@ -3131,7 +3220,8 @@ fn regexp_program_wire_data_is_aligned_and_deduplicated() {
         for operator in body.get_operators_reader().expect("P operators") {
             match operator.expect("P operator decodes") {
                 Operator::GlobalSet { global_index } => assert_ne!(
-                    global_index, PRIVATE_BYTE_CURSOR_GLOBAL_INDEX,
+                    Some(global_index),
+                    cursor_import,
                     "P metadata must not move R's scratch cursor"
                 ),
                 Operator::MemoryInit { data_index, .. } => assert_ne!(
@@ -3405,6 +3495,10 @@ fn with_has_binding_has_bounded_incremental_function_body_growth() {
                 .find(|(_, actual)| actual.as_str() == name)
                 .expect("the shared lookup body exists")
                 .0
+        })
+        .map(|runtime_index| {
+            imported_runtime_function_index(artifact, runtime_index)
+                .expect("the With read imports its shared lookup helper")
         });
         let program_names = function_names(artifact);
         let mut index = imported_function_count_in_bytes(&artifact.bytes);
@@ -3454,8 +3548,8 @@ fn nested_with_writes_share_dynamic_property_set_dispatch() {
     let repeated = emit_writes(10);
     expect_valid_module(&single, 1);
     expect_valid_module(&repeated, 1);
-    // R and P share declared function indices. Pin actual call edges,
-    // not just the existence of a helper with the right name.
+    // Resolve the actual P import index to R's exact exported function,
+    // then pin both modules' call edges in their own index spaces.
     for artifact in [&single, &repeated] {
         let runtime = artifact.runtime().expect("With writes link R");
         let runtime_names = function_names_in_bytes(runtime.bytes());
@@ -3503,6 +3597,8 @@ fn nested_with_writes_share_dynamic_property_set_dispatch() {
                 "a PutValue helper must never reenter its own facade"
             );
         }
+        let program_set = imported_runtime_function_index(artifact, set)
+            .expect("the With write imports R's OrdinarySet");
         let program_calls = calls_by_index(&artifact.bytes);
         let names = function_names(artifact);
         let probes = names
@@ -3516,7 +3612,7 @@ fn nested_with_writes_share_dynamic_property_set_dispatch() {
         assert!(
             probes
                 .iter()
-                .any(|index| program_calls[index].contains(&set)),
+                .any(|index| program_calls[index].contains(&program_set)),
             "the actual nested With probe calls the shared OrdinarySet"
         );
         let mut imported = 0u32;
@@ -3529,7 +3625,7 @@ fn nested_with_writes_share_dynamic_property_set_dispatch() {
                         import.ty,
                         wasmparser::TypeRef::Func(_) | wasmparser::TypeRef::FuncExact(_)
                     ) {
-                        if imported == set {
+                        if imported == program_set {
                             assert_eq!(
                                 import.module,
                                 crate::runtime_artifact::RUNTIME_IMPORT_NAMESPACE
