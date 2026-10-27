@@ -191,7 +191,7 @@ fn assert_foreign_wrappers() {
                 }
             }
             Payload::FunctionSection(functions) => {
-                runtime_function_types.extend(functions.map(Result::unwrap));
+                runtime_function_types.extend(functions.into_iter().map(Result::unwrap));
             }
             Payload::ExportSection(exports) => {
                 for export in exports {
