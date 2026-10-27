@@ -197,11 +197,9 @@ fn integer_decimal_helper_keeps_private_unsigned_domain_without_float_rounding()
         .position(|op| matches!(op, Operator::I64TruncF64U))
         .expect("guarded magnitude conversion");
     assert!(bound < truncation);
-    assert!(
-        number[bound..truncation]
-            .iter()
-            .any(|op| matches!(op, Operator::F64Floor))
-    );
+    assert!(number[bound..truncation]
+        .iter()
+        .any(|op| matches!(op, Operator::F64Floor)));
     let (_, push) = named_body(runtime.bytes(), "builtin::Array.prototype.push");
     assert!(
         calls(&push, formatter),

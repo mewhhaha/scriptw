@@ -1,0 +1,4366 @@
+{
+  "schema": "scriptw-lazy-runtime-memory-verification-v1",
+  "source_commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec",
+  "recorded_at": "2026-10-27T00:02:21.593568+00:00",
+  "batch": {
+    "initial_attempt": {
+      "source_commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec",
+      "complete": false,
+      "started_at": "2026-10-26T22:19:53.082376+00:00",
+      "cpu_affinity": [
+        0
+      ],
+      "before": {
+        "memory.max": "4294967296",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "40374272",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "commands": [
+        {
+          "label": "identities-sealed",
+          "command": [
+            "/usr/bin/python3",
+            "-B",
+            "scripts/intl_source_identities.py"
+          ],
+          "stdout": "identities-sealed.stdout",
+          "stderr": "identities-sealed.stderr",
+          "started_at": "2026-10-26T22:19:53.082662+00:00",
+          "exit_code": 0,
+          "seconds": 3.9186178980162367,
+          "stdout_sha256": "aea91f342925b6a428fe910d44274be01bdcbcae89f570087bbd7ed926594197",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "source-guards-sealed",
+          "command": [
+            "/usr/bin/python3",
+            "-B",
+            "scripts/check-source-guards.py",
+            "--output",
+            "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/source-guards-sealed"
+          ],
+          "stdout": "source-guards-sealed.stdout",
+          "stderr": "source-guards-sealed.stderr",
+          "started_at": "2026-10-26T22:19:57.001720+00:00",
+          "exit_code": 0,
+          "seconds": 18.159709105966613,
+          "stdout_sha256": "d50a30168e115e927bfa2b22c3efe210a9adeaf03798a349069d762caff45f38",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "runtime-profile-guard",
+          "command": [
+            "/usr/bin/python3",
+            "-B",
+            "scripts/check-runtime-source-compilation-profile.py"
+          ],
+          "stdout": "runtime-profile-guard.stdout",
+          "stderr": "runtime-profile-guard.stderr",
+          "started_at": "2026-10-26T22:20:15.161817+00:00",
+          "exit_code": 0,
+          "seconds": 0.03449748991988599,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "retirement-guard",
+          "command": [
+            "bash",
+            "scripts/check-no-legacy-js.sh"
+          ],
+          "stdout": "retirement-guard.stdout",
+          "stderr": "retirement-guard.stderr",
+          "started_at": "2026-10-26T22:20:15.196775+00:00",
+          "exit_code": 0,
+          "seconds": 0.24077238200698048,
+          "stdout_sha256": "23f652498aae7906b6d934dd7d962b03971cc3dcdb8add58222e0ebde99ae086",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "cargo-check-sealed",
+          "command": [
+            "cargo",
+            "check",
+            "--locked",
+            "--offline",
+            "--workspace",
+            "--all-targets",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "--message-format=json"
+          ],
+          "stdout": "cargo-check-sealed.stdout",
+          "stderr": "cargo-check-sealed.stderr",
+          "started_at": "2026-10-26T22:20:15.438003+00:00",
+          "exit_code": 0,
+          "seconds": 96.41682859393768,
+          "stdout_sha256": "784ff0ea74539054c7bdc444b0069351e2689bab01af1de41e723d2f9e05c848",
+          "stderr_sha256": "8422f202c4e6435cc6cf9de7cb8f81a06ae71aa1626ce960f21ff4d4333ed240"
+        },
+        {
+          "label": "native-driver",
+          "command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/verify-native.py"
+          ],
+          "stdout": "native-driver.stdout",
+          "stderr": "native-driver.stderr",
+          "started_at": "2026-10-26T22:21:51.885697+00:00"
+        }
+      ]
+    },
+    "resumed_attempt": {
+      "source_commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec",
+      "complete": true,
+      "cpu_affinity": [
+        0
+      ],
+      "before": {
+        "memory.max": "4294967296",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "40546304",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "commands": [
+        {
+          "label": "wasm-lib",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--lib",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-lib.stdout",
+          "stderr": "remaining-verification/wasm-lib.stderr",
+          "exit_code": 0,
+          "seconds": 23.116242796066217,
+          "stdout_sha256": "68867e0d354bb6119b2a2e66451e6dae2852a8c4d8cee7a2f80ae4ad2f401487",
+          "stderr_sha256": "8bfe56f01f008293746fcbd1d1981e044a3bd6fddcbaef53739efac62856040c"
+        },
+        {
+          "label": "wasm-structure-builtins",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--test",
+            "structure_builtins",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-structure-builtins.stdout",
+          "stderr": "remaining-verification/wasm-structure-builtins.stderr",
+          "exit_code": 0,
+          "seconds": 23.46636874799151,
+          "stdout_sha256": "1d76d831e1bb2ed6af9923d31017ded46ba503a209e21f1481acb9f44d8340e0",
+          "stderr_sha256": "20e890eae8795a047059c2ce7372987316ee7db75b286d763eb7fdf70e03e01a"
+        },
+        {
+          "label": "wasm-structure-language",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--test",
+            "structure_language",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-structure-language.stdout",
+          "stderr": "remaining-verification/wasm-structure-language.stderr",
+          "exit_code": 0,
+          "seconds": 21.97053685807623,
+          "stdout_sha256": "476ddfb6585f7ce41e79d8296821694abd09b859ffd02ea5a8afe3eb93484c02",
+          "stderr_sha256": "b8e1cd56b93d4c56ad7fdeaa6cc17e00ca444cc1c1ff80181e2772cfe3365df6"
+        },
+        {
+          "label": "cargo-products",
+          "command": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-cli",
+            "--bin",
+            "scriptw",
+            "--example",
+            "compiler_precompiled_baseline",
+            "--message-format=json"
+          ],
+          "stdout": "cargo-products.jsonl",
+          "stderr": "cargo-products.stderr",
+          "exit_code": 0,
+          "seconds": 365.9487579819979,
+          "stdout_sha256": "9b95f78d4f8a3b35afb47039e5a12bf73a626e8a607325268e9e9b0b6cb85a4a",
+          "stderr_sha256": "34547e5189d572c551abdfcd35fc575b597251092a7480ad86e7f9a60d2ba9ba"
+        },
+        {
+          "label": "test262-driver",
+          "command": [
+            "/usr/bin/python3",
+            "-B",
+            "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/test262.py"
+          ],
+          "stdout": "remaining-verification/test262-driver.stdout",
+          "stderr": "remaining-verification/test262-driver.stderr",
+          "exit_code": 0,
+          "seconds": 848.4505052830791,
+          "stdout_sha256": "fe546c9e5eff4fa400e1eaa9b2a11223d0a9a2e6136650bbb73096f0adc577b5",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "scopes": [
+        {
+          "label": "wasm-lib",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--lib",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-lib.stdout",
+          "stderr": "remaining-verification/wasm-lib.stderr",
+          "exit_code": 0,
+          "seconds": 23.116242796066217,
+          "stdout_sha256": "68867e0d354bb6119b2a2e66451e6dae2852a8c4d8cee7a2f80ae4ad2f401487",
+          "stderr_sha256": "8bfe56f01f008293746fcbd1d1981e044a3bd6fddcbaef53739efac62856040c",
+          "test_results": [
+            {
+              "passed": 487,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered": 0
+            }
+          ],
+          "executables": [
+            {
+              "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+              "sha256": "4f16877a65f0456fb2a435f99f599553741a397e8f23cf61978e117d270f02c7",
+              "bytes": 203765616,
+              "cargo_producer": {
+                "reason": "compiler-artifact",
+                "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+                "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+                "target": {
+                  "kind": [
+                    "lib"
+                  ],
+                  "crate_types": [
+                    "lib"
+                  ],
+                  "name": "scriptw_aot_wasm",
+                  "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/src/lib.rs",
+                  "edition": "2021",
+                  "doc": true,
+                  "doctest": true,
+                  "test": true
+                },
+                "profile": {
+                  "opt_level": "3",
+                  "debuginfo": "line-tables-only",
+                  "debug_assertions": false,
+                  "overflow_checks": false,
+                  "test": true
+                },
+                "features": [],
+                "filenames": [
+                  "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783"
+                ],
+                "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+                "fresh": true
+              }
+            }
+          ],
+          "overlaps_full_scope": false
+        },
+        {
+          "label": "wasm-structure-builtins",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--test",
+            "structure_builtins",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-structure-builtins.stdout",
+          "stderr": "remaining-verification/wasm-structure-builtins.stderr",
+          "exit_code": 0,
+          "seconds": 23.46636874799151,
+          "stdout_sha256": "1d76d831e1bb2ed6af9923d31017ded46ba503a209e21f1481acb9f44d8340e0",
+          "stderr_sha256": "20e890eae8795a047059c2ce7372987316ee7db75b286d763eb7fdf70e03e01a",
+          "test_results": [
+            {
+              "passed": 166,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered": 0
+            }
+          ],
+          "executables": [
+            {
+              "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996",
+              "sha256": "75d3dc25705de5d7082018e66d86dbbd4e07b3b7b4b8c458d384d4459d87e216",
+              "bytes": 216674528,
+              "cargo_producer": {
+                "reason": "compiler-artifact",
+                "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+                "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+                "target": {
+                  "kind": [
+                    "test"
+                  ],
+                  "crate_types": [
+                    "bin"
+                  ],
+                  "name": "structure_builtins",
+                  "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/tests/structure_builtins/main.rs",
+                  "edition": "2021",
+                  "doc": false,
+                  "doctest": false,
+                  "test": true
+                },
+                "profile": {
+                  "opt_level": "3",
+                  "debuginfo": "line-tables-only",
+                  "debug_assertions": false,
+                  "overflow_checks": false,
+                  "test": true
+                },
+                "features": [],
+                "filenames": [
+                  "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996"
+                ],
+                "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996",
+                "fresh": false
+              }
+            }
+          ],
+          "overlaps_full_scope": false
+        },
+        {
+          "label": "wasm-structure-language",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "--offline",
+            "--release",
+            "--jobs",
+            "1",
+            "--target-dir",
+            "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+            "-p",
+            "scriptw-aot-wasm",
+            "--test",
+            "structure_language",
+            "--message-format=json",
+            "--",
+            "--test-threads=1"
+          ],
+          "stdout": "remaining-verification/wasm-structure-language.stdout",
+          "stderr": "remaining-verification/wasm-structure-language.stderr",
+          "exit_code": 0,
+          "seconds": 21.97053685807623,
+          "stdout_sha256": "476ddfb6585f7ce41e79d8296821694abd09b859ffd02ea5a8afe3eb93484c02",
+          "stderr_sha256": "b8e1cd56b93d4c56ad7fdeaa6cc17e00ca444cc1c1ff80181e2772cfe3365df6",
+          "test_results": [
+            {
+              "passed": 152,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered": 0
+            }
+          ],
+          "executables": [
+            {
+              "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe",
+              "sha256": "9a94db6a8bd486140a69243b06994f8d5b77072af127d03f7ebaa6f2b86e9541",
+              "bytes": 91989008,
+              "cargo_producer": {
+                "reason": "compiler-artifact",
+                "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+                "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+                "target": {
+                  "kind": [
+                    "test"
+                  ],
+                  "crate_types": [
+                    "bin"
+                  ],
+                  "name": "structure_language",
+                  "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/tests/structure_language/main.rs",
+                  "edition": "2021",
+                  "doc": false,
+                  "doctest": false,
+                  "test": true
+                },
+                "profile": {
+                  "opt_level": "3",
+                  "debuginfo": "line-tables-only",
+                  "debug_assertions": false,
+                  "overflow_checks": false,
+                  "test": true
+                },
+                "features": [],
+                "filenames": [
+                  "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe"
+                ],
+                "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe",
+                "fresh": false
+              }
+            }
+          ],
+          "overlaps_full_scope": false
+        }
+      ],
+      "finished_at": "2026-10-27T00:00:54.857617+00:00",
+      "after": {
+        "memory.max": "4294967296",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "4294967296",
+        "memory.events": "low 0\nhigh 0\nmax 27952\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      }
+    },
+    "original_exit_code": 137,
+    "original_result": "Grouped OOM at the unchanged 4-GiB cap; engine-lib inventory completed with 237 retained passes plus 803 fresh-process cases"
+  },
+  "native": {
+    "source_commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec",
+    "complete": true,
+    "original_attempt_report": "native-verification/report.json",
+    "original_attempt_sha256": "132fc7f30ec885673ae032024e4e97ebbd154bd941c4660b585268e8abf73ed2",
+    "original_scope_result": "engine-lib interrupted by4GiB groupedOOM; original streams retained",
+    "completed_original_scopes": [
+      {
+        "label": "packed-focused",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_gc_entries"
+        ],
+        "filter": "aot_gc_packed_array_storage::",
+        "overlaps_full_scope": true,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_gc_entries",
+          "--message-format=json",
+          "aot_gc_packed_array_storage::",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "packed-focused.stdout",
+        "stderr": "packed-focused.stderr",
+        "started_at": "2026-10-26T22:21:51.934396+00:00",
+        "exit_code": 0,
+        "seconds": 1149.8329410910374,
+        "stdout_sha256": "767fbfb5362c811e1c47068756bdc2fc4ebe7f79c5b99da4363e5b01e21b7400",
+        "stderr_sha256": "bd7c1de1f6a63b83bcc3fe2fa13faf7602d08a8ad69f1b8ebbbec8daa58c2087",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+            "sha256": "7b76ad0c17951a48484c580c4606ba0f51b4cdeeccdc05b2beef7d44244553cb",
+            "bytes": 410311024,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_gc_entries",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_gc_entries/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 7,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 189
+          }
+        ]
+      },
+      {
+        "label": "unicode-focused",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_gc_entries"
+        ],
+        "filter": "aot_gc_string_unicode_entries::",
+        "overlaps_full_scope": true,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_gc_entries",
+          "--message-format=json",
+          "aot_gc_string_unicode_entries::",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "unicode-focused.stdout",
+        "stderr": "unicode-focused.stderr",
+        "started_at": "2026-10-26T22:41:02.294298+00:00",
+        "exit_code": 0,
+        "seconds": 5.577455751015805,
+        "stdout_sha256": "eff4744be4240bc8b235d003aa1f6e497e9710926074bd3b5fa725b1e761f92e",
+        "stderr_sha256": "ae8e4668a9e58ba7b53c84454944dc8635dbbb3f0adb611ac2682b88c8e3db98",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+            "sha256": "7b76ad0c17951a48484c580c4606ba0f51b4cdeeccdc05b2beef7d44244553cb",
+            "bytes": 410311024,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_gc_entries",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_gc_entries/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+              "fresh": true
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 6,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 190
+          }
+        ]
+      },
+      {
+        "label": "realm-focused",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_realm_modules"
+        ],
+        "filter": "aot_created_realm_array_iterator::",
+        "overlaps_full_scope": true,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_realm_modules",
+          "--message-format=json",
+          "aot_created_realm_array_iterator::",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "realm-focused.stdout",
+        "stderr": "realm-focused.stderr",
+        "started_at": "2026-10-26T22:41:08.342636+00:00",
+        "exit_code": 0,
+        "seconds": 12.14834969304502,
+        "stdout_sha256": "a0a3bcfda48a87555885af6fe1d8ca97316bb1b5dab2763eb143c32bb80427d5",
+        "stderr_sha256": "42a072b15d3a3ab49c14dc6243f3a99dbb291a29cab9ad6eab02b29152cd1713",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91",
+            "sha256": "7c4c254e474ec3ee2d09c83443a4f0f28f4d5077dc71fc25cc938deaed96fbf9",
+            "bytes": 414370056,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_realm_modules",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_realm_modules/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 4,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 427
+          }
+        ]
+      },
+      {
+        "label": "snapshot-focused",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "structure"
+        ],
+        "filter": "rooted_completion_graph::",
+        "overlaps_full_scope": true,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "structure",
+          "--message-format=json",
+          "rooted_completion_graph::",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "snapshot-focused.stdout",
+        "stderr": "snapshot-focused.stderr",
+        "started_at": "2026-10-26T22:41:20.953738+00:00",
+        "exit_code": 0,
+        "seconds": 7.533993951976299,
+        "stdout_sha256": "1ee31f356eb30bb4f107a98720fde5a3b235603ac9cdfd21b3031fba86e98aab",
+        "stderr_sha256": "cd0fc5c540d8d571119a7785a0c19c0cd1553586d3cea05c6a7b51822af35311",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053",
+            "sha256": "c330fd2ab265f199fd3a876738f0e376651ea8ab0fb639d075820b000c62adfa",
+            "bytes": 412971568,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "structure",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/structure/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 8,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 29
+          }
+        ]
+      },
+      {
+        "label": "wasm-types-focused",
+        "package": "scriptw-aot-wasm",
+        "target": [
+          "--lib"
+        ],
+        "filter": "gc_types::type_registration_tests::",
+        "overlaps_full_scope": true,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-aot-wasm",
+          "--lib",
+          "--message-format=json",
+          "gc_types::type_registration_tests::",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "wasm-types-focused.stdout",
+        "stderr": "wasm-types-focused.stderr",
+        "started_at": "2026-10-26T22:41:28.965400+00:00",
+        "exit_code": 0,
+        "seconds": 358.58368740498554,
+        "stdout_sha256": "4645ec209455fcb6ddd44f1e1b598a0990b4bfda36cfd0130c952285a6ea2fe4",
+        "stderr_sha256": "e65ed2f8caa535300bcaf93a55586486875261795c91dedd81363044bf6cc4b3",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+            "sha256": "4f16877a65f0456fb2a435f99f599553741a397e8f23cf61978e117d270f02c7",
+            "bytes": 203765616,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+              "target": {
+                "kind": [
+                  "lib"
+                ],
+                "crate_types": [
+                  "lib"
+                ],
+                "name": "scriptw_aot_wasm",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/src/lib.rs",
+                "edition": "2021",
+                "doc": true,
+                "doctest": true,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 7,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 480
+          }
+        ]
+      },
+      {
+        "label": "wasm-runtime-link",
+        "package": "scriptw-aot-wasm",
+        "target": [
+          "--test",
+          "runtime_link"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-aot-wasm",
+          "--test",
+          "runtime_link",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "wasm-runtime-link.stdout",
+        "stderr": "wasm-runtime-link.stderr",
+        "started_at": "2026-10-26T22:47:27.772446+00:00",
+        "exit_code": 0,
+        "seconds": 118.10539163497742,
+        "stdout_sha256": "e1d7adb03566f900d8b9888979d08f2086e1edb7ba0b4c63e6c8a3c1079e86f0",
+        "stderr_sha256": "afe93ccfb686d070c0a2ec2a72c1d0b31cd846fd7f9fb94fba4f5563bdf895dc",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/runtime_link-05a7fe1940e0be36",
+            "sha256": "27ec267cf10d50188b1dda27b10d74472bfcb2376228591bc450d7ed06991624",
+            "bytes": 199175696,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "runtime_link",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/tests/runtime_link/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/runtime_link-05a7fe1940e0be36"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/runtime_link-05a7fe1940e0be36",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 30,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-builtins",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_builtins"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_builtins",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-builtins.stdout",
+        "stderr": "engine-builtins.stderr",
+        "started_at": "2026-10-26T22:49:26.300721+00:00",
+        "exit_code": 0,
+        "seconds": 215.79326969897375,
+        "stdout_sha256": "10ea6f810f2457799d58782fdb4ed2c12712bca070d0b956553aec72d2d931ac",
+        "stderr_sha256": "057a66899a534c39ab7817f63b4ccb1ff8ee6ee6008ffb21b84cfd9dc8b57540",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_builtins-3a404f5e4685c416",
+            "sha256": "0bbb5b9f70c1d9e4cdcf46bb2b8967a3b847e3b91c336c2de82f979a2a4f074a",
+            "bytes": 413478784,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_builtins",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_builtins/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_builtins-3a404f5e4685c416"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_builtins-3a404f5e4685c416",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 545,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-gc-entries",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_gc_entries"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_gc_entries",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-gc-entries.stdout",
+        "stderr": "engine-gc-entries.stderr",
+        "started_at": "2026-10-26T22:53:02.564113+00:00",
+        "exit_code": 0,
+        "seconds": 99.42629976395983,
+        "stdout_sha256": "30a528c6913dc138ac0c63897b86c2e7e1ab3f63f6ef3d36adc89eb36f4320e9",
+        "stderr_sha256": "e1e28a55bd2ebe39e0811f84e79dba2d585d0ea752bafcbdbbe2ef45c8f1b7da",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+            "sha256": "7b76ad0c17951a48484c580c4606ba0f51b4cdeeccdc05b2beef7d44244553cb",
+            "bytes": 410311024,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_gc_entries",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_gc_entries/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_gc_entries-42eaf0c43a7f701d",
+              "fresh": true
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 196,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-realm-modules",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_realm_modules"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_realm_modules",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-realm-modules.stdout",
+        "stderr": "engine-realm-modules.stderr",
+        "started_at": "2026-10-26T22:54:42.457843+00:00",
+        "exit_code": 0,
+        "seconds": 211.46957766602281,
+        "stdout_sha256": "de4871aebe6da1c69b62657445264ecbbb402201c13357ada0279278b6b49e5a",
+        "stderr_sha256": "a58104048912072dc36c386c1c3d2ef73d18e855a3bbca36543c42909ba05401",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91",
+            "sha256": "7c4c254e474ec3ee2d09c83443a4f0f28f4d5077dc71fc25cc938deaed96fbf9",
+            "bytes": 414370056,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_realm_modules",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_realm_modules/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_realm_modules-52afaf4902322f91",
+              "fresh": true
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 431,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-language",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_language"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_language",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-language.stdout",
+        "stderr": "engine-language.stderr",
+        "started_at": "2026-10-26T22:58:14.494786+00:00",
+        "exit_code": 0,
+        "seconds": 122.68478187406436,
+        "stdout_sha256": "86ed1c67d71c25ddafb77fab383c0b0653daf6e672925ed555ee3897b8f33aa4",
+        "stderr_sha256": "b76b1f6c84dd2f251418a6ab3722bad370c7138b2ad51966379ed3beff13c200",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_language-3cac1838140b42d2",
+            "sha256": "8b2acd0f56066c724809e1ec8beee9cfab1abdd24e64d3ea338f228a2fed1552",
+            "bytes": 411692032,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_language",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_language/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_language-3cac1838140b42d2"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_language-3cac1838140b42d2",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 351,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-async",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_async"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_async",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-async.stdout",
+        "stderr": "engine-async.stderr",
+        "started_at": "2026-10-26T23:00:17.655417+00:00",
+        "exit_code": 0,
+        "seconds": 256.8342411890626,
+        "stdout_sha256": "d3a7bf5d1c18e42bd72a68a9a7ba914467d2ed9e0698851f2dc90762cd6e2f64",
+        "stderr_sha256": "1db7d9903812443f2c102b91bc3d6b45984944c83a914bea29a87a67de943ff3",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_async-99bfed11f9b51f5a",
+            "sha256": "8be630587df3afcb99199c9a5ca4e169367536c5e1a381d8c532c16b6739638b",
+            "bytes": 411361680,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_async",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_async/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_async-99bfed11f9b51f5a"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_async-99bfed11f9b51f5a",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 248,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-generators",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_generators"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_generators",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-generators.stdout",
+        "stderr": "engine-generators.stderr",
+        "started_at": "2026-10-26T23:04:34.960849+00:00",
+        "exit_code": 0,
+        "seconds": 162.88171704404522,
+        "stdout_sha256": "1e422581edebe874ffe0eb6909846996797884160a1eddf8906e55dcdf146732",
+        "stderr_sha256": "4f1ecf24ab082ed35808ef610fee7ae9cf037eaf9bd5412b5b9b88890910cf20",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_generators-3b56268afe93a503",
+            "sha256": "69d5dcc5e01264be4b192d705959b94367ca18e6a53aaee6bf9b91922fce587c",
+            "bytes": 410454384,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_generators",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_generators/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_generators-3b56268afe93a503"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_generators-3b56268afe93a503",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 167,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-regexp",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_regexp"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_regexp",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-regexp.stdout",
+        "stderr": "engine-regexp.stderr",
+        "started_at": "2026-10-26T23:07:18.322180+00:00",
+        "exit_code": 0,
+        "seconds": 88.43679484189488,
+        "stdout_sha256": "181ac0e8c13d469403c6adffbc7e1894e52178ab00f4d865db651bee8dd671ba",
+        "stderr_sha256": "f236dbbacfb964eb4d0f909893a93531bacab293c9c8a3c3da80ceb9616f3085",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_regexp-452bff1bd549bfcd",
+            "sha256": "d7d9e894568fc61e11b336a727f2cd2dce8e65ee241b12bb756459399ab4b5a2",
+            "bytes": 410150272,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_regexp",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_regexp/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_regexp-452bff1bd549bfcd"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_regexp-452bff1bd549bfcd",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 152,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-intl",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_intl"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_intl",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-intl.stdout",
+        "stderr": "engine-intl.stderr",
+        "started_at": "2026-10-26T23:08:47.260264+00:00",
+        "exit_code": 0,
+        "seconds": 586.1856061910512,
+        "stdout_sha256": "64e3de60576b1d33ff7f6d6574658ec890e809181e0754b85d49ed91808d22ae",
+        "stderr_sha256": "076f8bf5d5d922396a29971b86b1915e291a8320946db2aaf021a4376ed54ccb",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_intl-4d9c904941407af2",
+            "sha256": "7437472394c92c14f4a6267e6037f6ec9b07ebbe0cb76d692137e65e0f741626",
+            "bytes": 412508192,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_intl",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_intl/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_intl-4d9c904941407af2"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_intl-4d9c904941407af2",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 299,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-temporal",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "aot_temporal"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "aot_temporal",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-temporal.stdout",
+        "stderr": "engine-temporal.stderr",
+        "started_at": "2026-10-26T23:18:34.005706+00:00",
+        "exit_code": 0,
+        "seconds": 145.41547252691817,
+        "stdout_sha256": "6cf57ae381b6c18da13f218101f1254a98b2c276c8992f324e601fc67f9ff4e3",
+        "stderr_sha256": "d7e91eb5d9931885f2d3b325d41dba2779cad3eeaad33666f68ef36666aa602a",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_temporal-d6bf8094cf388ff2",
+            "sha256": "59c52776579093e486152247c2a7298db695ae9b48e4142a454a3949be29038e",
+            "bytes": 410423272,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "aot_temporal",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/aot_temporal/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_temporal-d6bf8094cf388ff2"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/aot_temporal-d6bf8094cf388ff2",
+              "fresh": false
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 202,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      },
+      {
+        "label": "engine-structure",
+        "package": "scriptw-engine",
+        "target": [
+          "--test",
+          "structure"
+        ],
+        "filter": null,
+        "overlaps_full_scope": false,
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-engine",
+          "--test",
+          "structure",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "engine-structure.stdout",
+        "stderr": "engine-structure.stderr",
+        "started_at": "2026-10-26T23:21:00.401100+00:00",
+        "exit_code": 0,
+        "seconds": 2.925029349979013,
+        "stdout_sha256": "43fca492f0f1151a38ff5311d7a8d02a65e5caa185556ac82d09809757dc1f5c",
+        "stderr_sha256": "934017bb60ec252d1b4a1b2780247dce0c2510f36638d515b02a2995b8120ef6",
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053",
+            "sha256": "c330fd2ab265f199fd3a876738f0e376651ea8ab0fb639d075820b000c62adfa",
+            "bytes": 412971568,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-engine#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "structure",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-engine/tests/structure/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure-3a5cd25acfeca053",
+              "fresh": true
+            }
+          }
+        ],
+        "test_results": [
+          {
+            "passed": 37,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ]
+      }
+    ],
+    "engine_lib_coverage_report": "engine-lib-resume/report.json",
+    "engine_lib_coverage_sha256": "29b630a595b7e598b37577ddfa31dff2d2fc2eca4393670e35a97d6505c3093a",
+    "engine_lib_passed": 1040,
+    "remaining_scopes": [
+      {
+        "label": "wasm-lib",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-aot-wasm",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "remaining-verification/wasm-lib.stdout",
+        "stderr": "remaining-verification/wasm-lib.stderr",
+        "exit_code": 0,
+        "seconds": 23.116242796066217,
+        "stdout_sha256": "68867e0d354bb6119b2a2e66451e6dae2852a8c4d8cee7a2f80ae4ad2f401487",
+        "stderr_sha256": "8bfe56f01f008293746fcbd1d1981e044a3bd6fddcbaef53739efac62856040c",
+        "test_results": [
+          {
+            "passed": 487,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ],
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+            "sha256": "4f16877a65f0456fb2a435f99f599553741a397e8f23cf61978e117d270f02c7",
+            "bytes": 203765616,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+              "target": {
+                "kind": [
+                  "lib"
+                ],
+                "crate_types": [
+                  "lib"
+                ],
+                "name": "scriptw_aot_wasm",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/src/lib.rs",
+                "edition": "2021",
+                "doc": true,
+                "doctest": true,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/scriptw_aot_wasm-ded162267c4ee783",
+              "fresh": true
+            }
+          }
+        ],
+        "overlaps_full_scope": false
+      },
+      {
+        "label": "wasm-structure-builtins",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-aot-wasm",
+          "--test",
+          "structure_builtins",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "remaining-verification/wasm-structure-builtins.stdout",
+        "stderr": "remaining-verification/wasm-structure-builtins.stderr",
+        "exit_code": 0,
+        "seconds": 23.46636874799151,
+        "stdout_sha256": "1d76d831e1bb2ed6af9923d31017ded46ba503a209e21f1481acb9f44d8340e0",
+        "stderr_sha256": "20e890eae8795a047059c2ce7372987316ee7db75b286d763eb7fdf70e03e01a",
+        "test_results": [
+          {
+            "passed": 166,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ],
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996",
+            "sha256": "75d3dc25705de5d7082018e66d86dbbd4e07b3b7b4b8c458d384d4459d87e216",
+            "bytes": 216674528,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "structure_builtins",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/tests/structure_builtins/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_builtins-0e41aa64c86f4996",
+              "fresh": false
+            }
+          }
+        ],
+        "overlaps_full_scope": false
+      },
+      {
+        "label": "wasm-structure-language",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "--jobs",
+          "1",
+          "--target-dir",
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build",
+          "-p",
+          "scriptw-aot-wasm",
+          "--test",
+          "structure_language",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        "stdout": "remaining-verification/wasm-structure-language.stdout",
+        "stderr": "remaining-verification/wasm-structure-language.stderr",
+        "exit_code": 0,
+        "seconds": 21.97053685807623,
+        "stdout_sha256": "476ddfb6585f7ce41e79d8296821694abd09b859ffd02ea5a8afe3eb93484c02",
+        "stderr_sha256": "b8e1cd56b93d4c56ad7fdeaa6cc17e00ca444cc1c1ff80181e2772cfe3365df6",
+        "test_results": [
+          {
+            "passed": 152,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ],
+        "executables": [
+          {
+            "path": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe",
+            "sha256": "9a94db6a8bd486140a69243b06994f8d5b77072af127d03f7ebaa6f2b86e9541",
+            "bytes": 91989008,
+            "cargo_producer": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-aot-wasm#0.1.0",
+              "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/Cargo.toml",
+              "target": {
+                "kind": [
+                  "test"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "structure_language",
+                "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-aot-wasm/tests/structure_language/main.rs",
+                "edition": "2021",
+                "doc": false,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "3",
+                "debuginfo": "line-tables-only",
+                "debug_assertions": false,
+                "overflow_checks": false,
+                "test": true
+              },
+              "features": [],
+              "filenames": [
+                "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe"
+              ],
+              "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/deps/structure_language-c329405a612ee1fe",
+              "fresh": false
+            }
+          }
+        ],
+        "overlaps_full_scope": false
+      }
+    ],
+    "passed_disjoint_scopes": 4503
+  },
+  "test262": {
+    "source_commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec",
+    "complete": true,
+    "started_at": "2026-10-26T23:46:46.935573+00:00",
+    "commands": [
+      {
+        "label": "identity",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "compiler-identity"
+        ],
+        "started_at": "2026-10-26T23:46:47.060424+00:00",
+        "stdout": "identity.stdout",
+        "stderr": "identity.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:47.224868+00:00",
+        "seconds": 0.16424323699902743,
+        "stdout_sha256": "dcb7ea95256fc35c16f11d1e404f6a1f970b3a63a8cac118d661672e744e88e4",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-00",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Math/abs/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:47.225270+00:00",
+        "stdout": "inventory-00.stdout",
+        "stderr": "inventory-00.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:47.395209+00:00",
+        "seconds": 0.1698599139926955,
+        "stdout_sha256": "ba2dfba8bb0efb7a9ff3f014434e8621cb2ad7cf2e88f7af30895d03b67d4352",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-01",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Set/prototype/values/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:47.395694+00:00",
+        "stdout": "inventory-01.stdout",
+        "stderr": "inventory-01.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:47.560954+00:00",
+        "seconds": 0.16515003610402346,
+        "stdout_sha256": "8c5da8827d3ba13d6680c046bd266acca3ddbd854b9db2f01d5d126f7a5f2a99",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-02",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Set/prototype/keys/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:47.561373+00:00",
+        "stdout": "inventory-02.stdout",
+        "stderr": "inventory-02.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:47.727962+00:00",
+        "seconds": 0.16647536598611623,
+        "stdout_sha256": "938d0639165f9b76978c78176fcbfe947fb3f938ead8d7310c6366634ce4351d",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-03",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Array/prototype/map/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:47.728363+00:00",
+        "stdout": "inventory-03.stdout",
+        "stderr": "inventory-03.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:47.895095+00:00",
+        "seconds": 0.16656957601662725,
+        "stdout_sha256": "2e9671fc7287f0a5c626f2411f29877694300d2c155c63bbe249926e6bd8df89",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-04",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Array/prototype/slice/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:47.895729+00:00",
+        "stdout": "inventory-04.stdout",
+        "stderr": "inventory-04.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.062371+00:00",
+        "seconds": 0.16651822510175407,
+        "stdout_sha256": "bb58006d7015ddce11960e17eb08b11190b159b0b14df2d7b7f1e24add39fce5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-05",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Object/getOwnPropertyDescriptor/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:48.062910+00:00",
+        "stdout": "inventory-05.stdout",
+        "stderr": "inventory-05.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.231429+00:00",
+        "seconds": 0.16837648407090455,
+        "stdout_sha256": "2bfba909f854dc63a05da5963be9d19321d8ff136bc25d9523b6cd1c2835c239",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-06",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Object/freeze/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:48.232177+00:00",
+        "stdout": "inventory-06.stdout",
+        "stderr": "inventory-06.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.398784+00:00",
+        "seconds": 0.16644313500728458,
+        "stdout_sha256": "b26d3e7e657ded674c2ea883a9811e01277d28e8bec7068b534c40c6a2e321aa",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-07",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Object/seal/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:48.399260+00:00",
+        "stdout": "inventory-07.stdout",
+        "stderr": "inventory-07.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.566603+00:00",
+        "seconds": 0.16720625502057374,
+        "stdout_sha256": "d66ec17f394a97fb52802a8163d14b1cd5c45328b16700ab8f7c1babd03bad7c",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-08",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/Reflect/getOwnPropertyDescriptor/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:48.567131+00:00",
+        "stdout": "inventory-08.stdout",
+        "stderr": "inventory-08.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.735348+00:00",
+        "seconds": 0.16807908297050744,
+        "stdout_sha256": "74ae27b6e72e26dbc6536384f70ad4fd64c616da72492c8874e247a50d1dc3bc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "inventory-09",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "list-all",
+          "built-ins/String/prototype/normalize/",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262"
+        ],
+        "started_at": "2026-10-26T23:46:48.735786+00:00",
+        "stdout": "inventory-09.stdout",
+        "stderr": "inventory-09.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-26T23:46:48.907135+00:00",
+        "seconds": 0.17117980297189206,
+        "stdout_sha256": "cd4b7355d581c894c900e6b5de506a7ef4be1bea8a191306e831d7ee03a183f1",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "execute",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+          "--jobs",
+          "1",
+          "test262",
+          "run-list",
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/executions",
+          "--execution-backend",
+          "wasm-aot",
+          "--suite-root",
+          "/home/mewhhaha/src/porffor/test262/vendor/test262",
+          "--snapshot-dir",
+          "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/snapshots",
+          "--snapshot-name",
+          "lazy-runtime-values",
+          "--threads",
+          "1",
+          "--timeout-ms",
+          "60000",
+          "--reuse-case-workers"
+        ],
+        "started_at": "2026-10-26T23:46:48.908042+00:00",
+        "stdout": "execute.stdout",
+        "stderr": "execute.stderr",
+        "returncode": 0,
+        "finished_at": "2026-10-27T00:00:54.613187+00:00",
+        "seconds": 845.7050183059182,
+        "stdout_sha256": "29d9dfe91eb89591e24a04cf13953d9cfcfa7e8c2bf08c0e43b1b5359768d815",
+        "stderr_sha256": "0b9798f86515f565647016214b65539b5fcdf0049e125e3cbc42e583ac82170f"
+      }
+    ],
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "4294967296",
+      "memory.events": "low 0\nhigh 0\nmax 9736\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "compiler": {
+      "path": "/home/mewhhaha/src/porffor/target/memory-scriptc-lazy-20261026/conformance/compiler",
+      "sha256": "9624e1692e0f18dc1336db1d748f49da5793ba9db47471a747721f34a3d5ecc8",
+      "cargo_producer": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///home/mewhhaha/src/porffor/crates/scriptw-cli#0.1.0",
+        "manifest_path": "/home/mewhhaha/src/porffor/crates/scriptw-cli/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "scriptw",
+          "src_path": "/home/mewhhaha/src/porffor/crates/scriptw-cli/src/bin/scriptw.rs",
+          "edition": "2021",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": "line-tables-only",
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/scriptw"
+        ],
+        "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/scriptw",
+        "fresh": false
+      },
+      "identity": {
+        "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+        "source_fingerprint": "263f4c7135bcc3483b08a2514dbaf2bb3db4e3b6eff593d13d3d1f518b13042e",
+        "source_revision": {
+          "kind": "git-commit",
+          "commit": "99a4ff2e962b6efa8066a48447f3c077981c59ec"
+        },
+        "executable_sha256": "9624e1692e0f18dc1336db1d748f49da5793ba9db47471a747721f34a3d5ecc8"
+      }
+    },
+    "scope": "Exact original pinned Array map/slice, Set aliases, Math abs, Object/Reflect descriptors, freeze/seal, String normalization executions. Not a full-suite status refresh.",
+    "selected_executions": 1589,
+    "execution_list_sha256": "4ec76e55ef87f566858d37f176c709d7e758754ccb4f4d6e8e3b3efa5e920209",
+    "finished_at": "2026-10-27T00:00:54.742088+00:00",
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "4294967296",
+      "memory.events": "low 0\nhigh 0\nmax 27952\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "total": 1589,
+    "passed": 1589,
+    "snapshots": [
+      {
+        "file": "snapshots/lazy-runtime-values-13136616966023562579.json",
+        "sha256": "8b685829e9f356de5c685fb6b11411e691a0a2fdedc82866b0d9fbd7ec182eca",
+        "bytes": 125484
+      }
+    ]
+  },
+  "interpretation": "Selected source-bound verification; not a full pinned Test262 refresh. Matched performance evidence is published separately. Next-step reviews are source calculations, not measured savings.",
+  "archive": {
+    "file": "memory-lazy-runtime-20261027-verification.tar.xz",
+    "sha256": "d401be33b0800633a8083d6ca2309ae90e1e1596c86e97486faef249de939e89",
+    "bytes": 486636,
+    "expanded_bytes": 842718412,
+    "member_count": 390,
+    "max_expanded_bytes": 2147483648,
+    "max_member_bytes": 134217728
+  },
+  "retained_files": [
+    {
+      "path": "batch-report.json",
+      "bytes": 3795,
+      "sha256": "95a38b726eaab085ecf8e95608718405fe1e864df3f77bf7021eab85b56df8db"
+    },
+    {
+      "path": "cargo-check-fixed.stderr",
+      "bytes": 6292,
+      "sha256": "fafcb229c9278769cba9404a9e88a2ba7906450395344612cd644839074ade0f"
+    },
+    {
+      "path": "cargo-check-fixed.stdout",
+      "bytes": 64592245,
+      "sha256": "a9c66fba01d6de5a2195cd7eb9f71c7ffedc66e68d7b8643d01d5ff87d66eec6"
+    },
+    {
+      "path": "cargo-check-sealed.stderr",
+      "bytes": 517,
+      "sha256": "8422f202c4e6435cc6cf9de7cb8f81a06ae71aa1626ce960f21ff4d4333ed240"
+    },
+    {
+      "path": "cargo-check-sealed.stdout",
+      "bytes": 64592031,
+      "sha256": "784ff0ea74539054c7bdc444b0069351e2689bab01af1de41e723d2f9e05c848"
+    },
+    {
+      "path": "cargo-check.stderr",
+      "bytes": 7179,
+      "sha256": "fb7a3762557b1a8197eeb6013f84015d7d0db848578b17342de74bbc5add49c3"
+    },
+    {
+      "path": "cargo-check.stdout",
+      "bytes": 4018280,
+      "sha256": "f8d6118779601a327f5019dfc698a403c3b8a9d02f11ac44c326e9abf2f8b874"
+    },
+    {
+      "path": "cargo-products.jsonl",
+      "bytes": 38469591,
+      "sha256": "9b95f78d4f8a3b35afb47039e5a12bf73a626e8a607325268e9e9b0b6cb85a4a"
+    },
+    {
+      "path": "cargo-products.stderr",
+      "bytes": 2795,
+      "sha256": "34547e5189d572c551abdfcd35fc575b597251092a7480ad86e7f9a60d2ba9ba"
+    },
+    {
+      "path": "check-publication.py",
+      "bytes": 3649,
+      "sha256": "593948ff20f32cf1aac12991c3d4459362eca0538546f6ea2754b1263e9462cf"
+    },
+    {
+      "path": "conformance/execute.stderr",
+      "bytes": 5580,
+      "sha256": "0b9798f86515f565647016214b65539b5fcdf0049e125e3cbc42e583ac82170f"
+    },
+    {
+      "path": "conformance/execute.stdout",
+      "bytes": 211,
+      "sha256": "29d9dfe91eb89591e24a04cf13953d9cfcfa7e8c2bf08c0e43b1b5359768d815"
+    },
+    {
+      "path": "conformance/executions",
+      "bytes": 110434,
+      "sha256": "4ec76e55ef87f566858d37f176c709d7e758754ccb4f4d6e8e3b3efa5e920209"
+    },
+    {
+      "path": "conformance/identity.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/identity.stdout",
+      "bytes": 333,
+      "sha256": "dcb7ea95256fc35c16f11d1e404f6a1f970b3a63a8cac118d661672e744e88e4"
+    },
+    {
+      "path": "conformance/inventory-00.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-00.stdout",
+      "bytes": 774,
+      "sha256": "ba2dfba8bb0efb7a9ff3f014434e8621cb2ad7cf2e88f7af30895d03b67d4352"
+    },
+    {
+      "path": "conformance/inventory-01.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-01.stdout",
+      "bytes": 2732,
+      "sha256": "8c5da8827d3ba13d6680c046bd266acca3ddbd854b9db2f01d5d126f7a5f2a99"
+    },
+    {
+      "path": "conformance/inventory-02.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-02.stdout",
+      "bytes": 111,
+      "sha256": "938d0639165f9b76978c78176fcbfe947fb3f938ead8d7310c6366634ce4351d"
+    },
+    {
+      "path": "conformance/inventory-03.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-03.stdout",
+      "bytes": 27461,
+      "sha256": "2e9671fc7287f0a5c626f2411f29877694300d2c155c63bbe249926e6bd8df89"
+    },
+    {
+      "path": "conformance/inventory-04.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-04.stdout",
+      "bytes": 9911,
+      "sha256": "bb58006d7015ddce11960e17eb08b11190b159b0b14df2d7b7f1e24add39fce5"
+    },
+    {
+      "path": "conformance/inventory-05.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-05.stdout",
+      "bytes": 45481,
+      "sha256": "2bfba909f854dc63a05da5963be9d19321d8ff136bc25d9523b6cd1c2835c239"
+    },
+    {
+      "path": "conformance/inventory-06.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-06.stdout",
+      "bytes": 5985,
+      "sha256": "b26d3e7e657ded674c2ea883a9811e01277d28e8bec7068b534c40c6a2e321aa"
+    },
+    {
+      "path": "conformance/inventory-07.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-07.stdout",
+      "bytes": 13739,
+      "sha256": "d66ec17f394a97fb52802a8163d14b1cd5c45328b16700ab8f7c1babd03bad7c"
+    },
+    {
+      "path": "conformance/inventory-08.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-08.stdout",
+      "bytes": 2136,
+      "sha256": "74ae27b6e72e26dbc6536384f70ad4fd64c616da72492c8874e247a50d1dc3bc"
+    },
+    {
+      "path": "conformance/inventory-09.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "conformance/inventory-09.stdout",
+      "bytes": 2208,
+      "sha256": "cd4b7355d581c894c900e6b5de506a7ef4be1bea8a191306e831d7ee03a183f1"
+    },
+    {
+      "path": "conformance/report.json",
+      "bytes": 12684,
+      "sha256": "4b85e869aa5059eadadc5acd295ccdf87a155a7f3e5ccf6d49b182ec7a806097"
+    },
+    {
+      "path": "conformance/snapshots/lazy-runtime-values-13136616966023562579.json",
+      "bytes": 125484,
+      "sha256": "8b685829e9f356de5c685fb6b11411e691a0a2fdedc82866b0d9fbd7ec182eca"
+    },
+    {
+      "path": "conformance/snapshots/lazy-runtime-values-13136616966023562579.txt",
+      "bytes": 751,
+      "sha256": "70fd5864b31386c82b024d52265ab55aae44e82c207e539a6b173f1302c6af7b"
+    },
+    {
+      "path": "engine-lib-fresh-capacity.stderr",
+      "bytes": 157,
+      "sha256": "302fcf5b045fc977a51bf22e58eddbeddb04d15c3f5de0e45f1115200b642d64"
+    },
+    {
+      "path": "engine-lib-fresh-capacity.stdout",
+      "bytes": 240,
+      "sha256": "66fe094259f6e9018267dc023cd38101cb963031fca1340fef3445bf863fc0af"
+    },
+    {
+      "path": "engine-lib-frozen/provenance.json",
+      "bytes": 26307,
+      "sha256": "6daaab7837d596ecf04dd76b7fd122a631bd068b9f8b13f133f2dd9ceb34a236"
+    },
+    {
+      "path": "engine-lib-resume/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/inventory.stdout",
+      "bytes": 97487,
+      "sha256": "a77bc96def8689c408604f2e1226480eca50e4e5d3257ff3292301e47ea2c74a"
+    },
+    {
+      "path": "engine-lib-resume/report.json",
+      "bytes": 267046,
+      "sha256": "29b630a595b7e598b37577ddfa31dff2d2fc2eca4393670e35a97d6505c3093a"
+    },
+    {
+      "path": "engine-lib-resume/shard-000.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-000.stdout",
+      "bytes": 1097,
+      "sha256": "31a89ee790b9f7a9c4fd93b33366479a4684ce499deee136f953649f43548e81"
+    },
+    {
+      "path": "engine-lib-resume/shard-001.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-001.stdout",
+      "bytes": 1083,
+      "sha256": "ce985746fab3028b70c611ffbfb427c6457475a42d3912a22e4a78de39b9fe00"
+    },
+    {
+      "path": "engine-lib-resume/shard-002.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-002.stdout",
+      "bytes": 1080,
+      "sha256": "83a93a1ee1bf5f7df3f5fba6e5f686139eea722422ad35372f59892a879d1069"
+    },
+    {
+      "path": "engine-lib-resume/shard-003.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-003.stdout",
+      "bytes": 1046,
+      "sha256": "8fc59fef6a9690a37088ac847e9c9a7ab48b9bea287d5fdac26dac743d658bff"
+    },
+    {
+      "path": "engine-lib-resume/shard-004.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-004.stdout",
+      "bytes": 854,
+      "sha256": "ccf9a1435338677edcfcacb9bb2c489f2935430e4642c7e30c3563af23ca282e"
+    },
+    {
+      "path": "engine-lib-resume/shard-005.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-005.stdout",
+      "bytes": 861,
+      "sha256": "d6de3fb03d0e691292f2ff167fcfa6023d1d633257a5440db4e59e00cae67751"
+    },
+    {
+      "path": "engine-lib-resume/shard-006.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-006.stdout",
+      "bytes": 866,
+      "sha256": "486bf3f535658788d75ae32506ad1357dea6655a184d4e6ccbad2df50ef81590"
+    },
+    {
+      "path": "engine-lib-resume/shard-007.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-007.stdout",
+      "bytes": 829,
+      "sha256": "416d11864f6aff46962a40fb6ce81d96d45e82280b678e6b46cca09cbdc0f012"
+    },
+    {
+      "path": "engine-lib-resume/shard-008.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-008.stdout",
+      "bytes": 867,
+      "sha256": "ab4e722a1d5dca7734f14df54ab3a1df49330932577b23f85aa37c0ee3dfb1fb"
+    },
+    {
+      "path": "engine-lib-resume/shard-009.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-009.stdout",
+      "bytes": 874,
+      "sha256": "e657c237cd8b2a9ae8a450145f32cddb15f25ea6da922c720c7ad61ece7434b1"
+    },
+    {
+      "path": "engine-lib-resume/shard-010.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-010.stdout",
+      "bytes": 913,
+      "sha256": "704eaa1195c97db422f10035cecc22dc2238920a8bfe1bcf468da12ddffe47fb"
+    },
+    {
+      "path": "engine-lib-resume/shard-011.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-011.stdout",
+      "bytes": 903,
+      "sha256": "58124c11b7b58c3d199a88acb4ba89c1a8782b02fb89ce1186a92d878d848584"
+    },
+    {
+      "path": "engine-lib-resume/shard-012.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-012.stdout",
+      "bytes": 907,
+      "sha256": "648c3189d585e66057f6551d9b7fa47869025912b6c85662e63e17e68adb353f"
+    },
+    {
+      "path": "engine-lib-resume/shard-013.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-013.stdout",
+      "bytes": 855,
+      "sha256": "3ebaca56122c5ed8521d110aa087e7f92300827e756dc66781f1d6c0336272ef"
+    },
+    {
+      "path": "engine-lib-resume/shard-014.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-014.stdout",
+      "bytes": 858,
+      "sha256": "2e898c206edc09bb9f7883a775230c84d761a9197e9a621c0a32d33d9d53c3d1"
+    },
+    {
+      "path": "engine-lib-resume/shard-015.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-015.stdout",
+      "bytes": 887,
+      "sha256": "b9a67e85df468ddd710fb041f3eb6ff516ea17b32a841c40dac2211b9a479d47"
+    },
+    {
+      "path": "engine-lib-resume/shard-016.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-016.stdout",
+      "bytes": 833,
+      "sha256": "1e30585a4d9e06b440be7585ab705701e19ea5e0736f80c3e7b1af17333d86e1"
+    },
+    {
+      "path": "engine-lib-resume/shard-017.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-017.stdout",
+      "bytes": 871,
+      "sha256": "284942ae6b4f89eda671d6bc193caaa34c6c4c5cfaf23b1439323bc18fe99944"
+    },
+    {
+      "path": "engine-lib-resume/shard-018.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-018.stdout",
+      "bytes": 858,
+      "sha256": "bdb8dbf82d507ff00cb1bd4ccdfa1869c247ff028ad7f226b7a09ac64e8c7eb9"
+    },
+    {
+      "path": "engine-lib-resume/shard-019.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-019.stdout",
+      "bytes": 912,
+      "sha256": "138236f0a7a93b4eec77e4891f38ad5bfbaffe04080091202462b413572d6421"
+    },
+    {
+      "path": "engine-lib-resume/shard-020.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-020.stdout",
+      "bytes": 856,
+      "sha256": "8faa3d78b2a70fc8c56df0ec4d169635ec7ea76518daa52a99a7be409c3fc885"
+    },
+    {
+      "path": "engine-lib-resume/shard-021.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-021.stdout",
+      "bytes": 820,
+      "sha256": "3eb3969cee71b80f26765466aff70f72db3bd963d0a74d299ed83230f4d2533b"
+    },
+    {
+      "path": "engine-lib-resume/shard-022.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-022.stdout",
+      "bytes": 760,
+      "sha256": "01eb337d3188524365391ffdec0cb2b23c129b0a7e9ce37a505cd5ffa2f00b02"
+    },
+    {
+      "path": "engine-lib-resume/shard-023.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-023.stdout",
+      "bytes": 927,
+      "sha256": "ddf778318e555b47c0652c72d52a9846c3e67be3dd7c898b31e45ebb405f8a46"
+    },
+    {
+      "path": "engine-lib-resume/shard-024.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-024.stdout",
+      "bytes": 925,
+      "sha256": "39a6e2916e6b67a97659e482178083c15af9f23735e83d4d128b2dd804b35760"
+    },
+    {
+      "path": "engine-lib-resume/shard-025.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-025.stdout",
+      "bytes": 923,
+      "sha256": "3d41cd736923d41a52e9722770dbc5eb558676591ac0d87d57a3d05c4233bde1"
+    },
+    {
+      "path": "engine-lib-resume/shard-026.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-026.stdout",
+      "bytes": 932,
+      "sha256": "3427f2562a1812a6c6135471103ef4312fc1a4bf6fc2373a5085ccadf1d3b0bb"
+    },
+    {
+      "path": "engine-lib-resume/shard-027.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-027.stdout",
+      "bytes": 970,
+      "sha256": "4e93891c89f3ce2c844441f82d35c4d37c1f62208534ceb52de0a097d10c4c8a"
+    },
+    {
+      "path": "engine-lib-resume/shard-028.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-028.stdout",
+      "bytes": 947,
+      "sha256": "e57d76d454c27b38e67f4405b80a6a555466805cfe3b6c7d9cc99a7e98062e9a"
+    },
+    {
+      "path": "engine-lib-resume/shard-029.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-029.stdout",
+      "bytes": 942,
+      "sha256": "6c9eac549504745f3de2cb7172640d9d914bdd3207c6c8f7b5f210bba42710fc"
+    },
+    {
+      "path": "engine-lib-resume/shard-030.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-030.stdout",
+      "bytes": 950,
+      "sha256": "a137f4f7c54ee05831cbf88292ee86f29ce1fd1683e56375e9429273a438dbdb"
+    },
+    {
+      "path": "engine-lib-resume/shard-031.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-031.stdout",
+      "bytes": 889,
+      "sha256": "41c4bc01abd812adae20d1b3aae76a86575e95bc9777f81569c8882631988e36"
+    },
+    {
+      "path": "engine-lib-resume/shard-032.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-032.stdout",
+      "bytes": 927,
+      "sha256": "bf7e0b5a354e7ef49672c1ee577c855fc927d77e6569b9db5d387c494be3ceac"
+    },
+    {
+      "path": "engine-lib-resume/shard-033.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-033.stdout",
+      "bytes": 914,
+      "sha256": "a800f015d5d51a2dbece0271d5e7cebca061c9f82a3badcc72c79d3c3ec9169f"
+    },
+    {
+      "path": "engine-lib-resume/shard-034.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-034.stdout",
+      "bytes": 885,
+      "sha256": "75db8f11509475fb85b34330d0b274b530fce9149a77af58dc383a5a125ac614"
+    },
+    {
+      "path": "engine-lib-resume/shard-035.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-035.stdout",
+      "bytes": 920,
+      "sha256": "7fa9f02b715800aecad1acff228c3b9a5b0c197c1ee4f4af017a9db93aab8f68"
+    },
+    {
+      "path": "engine-lib-resume/shard-036.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-036.stdout",
+      "bytes": 975,
+      "sha256": "62bced3fc8fe2900c17b25110678bfa4e127012c966082444f83dc1a14077e23"
+    },
+    {
+      "path": "engine-lib-resume/shard-037.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-037.stdout",
+      "bytes": 900,
+      "sha256": "9c8db0f7f11ae62b9130678c58923602436d5c82c124c629d5a350031ffb7033"
+    },
+    {
+      "path": "engine-lib-resume/shard-038.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-038.stdout",
+      "bytes": 885,
+      "sha256": "e5b3d78f360d80fb3b701d9e3c44dade16d04b430430ce4e2f042a982f273040"
+    },
+    {
+      "path": "engine-lib-resume/shard-039.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-039.stdout",
+      "bytes": 907,
+      "sha256": "5f24ea099e76c75ea834e78f886a9cd4ac8e121faca856e33674e0b8e6f53b08"
+    },
+    {
+      "path": "engine-lib-resume/shard-040.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-040.stdout",
+      "bytes": 885,
+      "sha256": "e3eb99bdd7e58fa2a8511338d206207c16e1de0e2a56bc57240a54118fe126e7"
+    },
+    {
+      "path": "engine-lib-resume/shard-041.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-041.stdout",
+      "bytes": 907,
+      "sha256": "b3fb354a1c6505563d8fe37c9e570a5db6afe035316a1b04501edb853a43b2c3"
+    },
+    {
+      "path": "engine-lib-resume/shard-042.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-042.stdout",
+      "bytes": 916,
+      "sha256": "93d5a19f0918985e9afbfd8b78da69006bc5d067c789e9df738aa053ea1c81a7"
+    },
+    {
+      "path": "engine-lib-resume/shard-043.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-043.stdout",
+      "bytes": 752,
+      "sha256": "ff7b7b3783c66a2ad317f25d8dfbb5c42f64ca314c784e35f096d1b0c9fae93b"
+    },
+    {
+      "path": "engine-lib-resume/shard-044.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-044.stdout",
+      "bytes": 799,
+      "sha256": "a9517b959b35cec1e361b943fd4694dd064cc44adfa367aa38694fcd753ae8aa"
+    },
+    {
+      "path": "engine-lib-resume/shard-045.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-045.stdout",
+      "bytes": 775,
+      "sha256": "d9f6270179191c3dfbad7bf757d273b057e97223fd6843d682c9fff6b841dcef"
+    },
+    {
+      "path": "engine-lib-resume/shard-046.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-046.stdout",
+      "bytes": 913,
+      "sha256": "a0eb4bb65e9d9c684e0c792654865d6e655133dfb9f9e5947f89422a8b8397ad"
+    },
+    {
+      "path": "engine-lib-resume/shard-047.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-047.stdout",
+      "bytes": 862,
+      "sha256": "3fd026f9b7789570f4e3b56f4e224724722a216e0564abbb45e04a1b1f19110a"
+    },
+    {
+      "path": "engine-lib-resume/shard-048.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-048.stdout",
+      "bytes": 893,
+      "sha256": "2aca76258bf036bd2381f7ef911f14a4e24d2d526282d8aae8f6ffef785d9d48"
+    },
+    {
+      "path": "engine-lib-resume/shard-049.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-049.stdout",
+      "bytes": 883,
+      "sha256": "3d9b2e0f5a88c7e0309330eaefeefc082dc7a397de765ca1d74c670baea0c13d"
+    },
+    {
+      "path": "engine-lib-resume/shard-050.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-050.stdout",
+      "bytes": 886,
+      "sha256": "7c6851ea9a9bb103c4548e1e16f57f9f0c8cc478fb6845f22d9e5fef566ec523"
+    },
+    {
+      "path": "engine-lib-resume/shard-051.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-051.stdout",
+      "bytes": 868,
+      "sha256": "e4b3f07c7fd5d0cdf6d7ce3c5f157a3c76a95a99629f271efb165668f48241d0"
+    },
+    {
+      "path": "engine-lib-resume/shard-052.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-052.stdout",
+      "bytes": 765,
+      "sha256": "7e8594cf1a8ee6542ba37e58b9d201a53f499de6f3d1cf624aa855cd20da161e"
+    },
+    {
+      "path": "engine-lib-resume/shard-053.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-053.stdout",
+      "bytes": 835,
+      "sha256": "45d5607b97e0a1f142dad5bcc8b97e9415f4a17daa83b9d29ea659f0fb8c768a"
+    },
+    {
+      "path": "engine-lib-resume/shard-054.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-054.stdout",
+      "bytes": 780,
+      "sha256": "cef522ee3d9c85224f1a77994677241970e3c447ad3753d47bc4f9e81fa5f6e2"
+    },
+    {
+      "path": "engine-lib-resume/shard-055.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-055.stdout",
+      "bytes": 735,
+      "sha256": "62ee4853b829b088ff13fe3f96ba71942e426cbe0dae1b1d572915a401a4ca04"
+    },
+    {
+      "path": "engine-lib-resume/shard-056.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-056.stdout",
+      "bytes": 770,
+      "sha256": "c258289e54f2c810a7691829d47baab6829cc1e53a32eb5438cc016bec1242c1"
+    },
+    {
+      "path": "engine-lib-resume/shard-057.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-057.stdout",
+      "bytes": 765,
+      "sha256": "644b8fe75c2c824e2509caaeced35d0a2165e0eed389c17c69cbfd34760b16a3"
+    },
+    {
+      "path": "engine-lib-resume/shard-058.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-058.stdout",
+      "bytes": 935,
+      "sha256": "7d4e7cf6c21b55702d1801ecda38b8f1be8b31a646f98215dfd33761d4c59cdd"
+    },
+    {
+      "path": "engine-lib-resume/shard-059.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-059.stdout",
+      "bytes": 898,
+      "sha256": "ec7719d1823ad683766959bfcc52b55e85a7a05b7fbf7bc0c9db7eee9e821e72"
+    },
+    {
+      "path": "engine-lib-resume/shard-060.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-060.stdout",
+      "bytes": 888,
+      "sha256": "ecb258abcdb1a15d6853aaa2294ef82a093efe9bd454affff6990c15ee661237"
+    },
+    {
+      "path": "engine-lib-resume/shard-061.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-061.stdout",
+      "bytes": 872,
+      "sha256": "d757d0adae0c116969d4c0bd999bbdd8e2980aa58c52451dc3de7cb87179b02b"
+    },
+    {
+      "path": "engine-lib-resume/shard-062.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-062.stdout",
+      "bytes": 801,
+      "sha256": "df1bd73b7721b7201596d22fa5d3e958d544e5bb2146ee8ce03a92caf8652bab"
+    },
+    {
+      "path": "engine-lib-resume/shard-063.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-063.stdout",
+      "bytes": 787,
+      "sha256": "3fea1a929c10cf86ce8f020679ce09f547d00c54d6178f45f7bf19717cd46f44"
+    },
+    {
+      "path": "engine-lib-resume/shard-064.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-064.stdout",
+      "bytes": 791,
+      "sha256": "57bf4ed22fd6837cdc32d36b769560f6bed80fdf7a3bfe824d9984a44866ea25"
+    },
+    {
+      "path": "engine-lib-resume/shard-065.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-065.stdout",
+      "bytes": 870,
+      "sha256": "80350f3a55b9bc8e459ed26c5cd190a9cfeef706b06026d6f014e2ecbbfa58dc"
+    },
+    {
+      "path": "engine-lib-resume/shard-066.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-066.stdout",
+      "bytes": 858,
+      "sha256": "acc104c374804ca8b8b1a517989d4ba68a4f16a8998bf6b19b1bffd0d849eb2e"
+    },
+    {
+      "path": "engine-lib-resume/shard-067.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-067.stdout",
+      "bytes": 751,
+      "sha256": "44a6b9db17e8024f2934e24e91a4692e1b5b5fc6b217388e14d82a021a20fe0c"
+    },
+    {
+      "path": "engine-lib-resume/shard-068.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-068.stdout",
+      "bytes": 832,
+      "sha256": "05973ef4cd92371d3d5062269b1fbc42db17e44b8abae7677723732a04c6f8f2"
+    },
+    {
+      "path": "engine-lib-resume/shard-069.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-069.stdout",
+      "bytes": 886,
+      "sha256": "bca9ce78d494f7e8f50e8aa433631a33cfa26c346a03e5deea0a4235d7c37771"
+    },
+    {
+      "path": "engine-lib-resume/shard-070.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-070.stdout",
+      "bytes": 909,
+      "sha256": "57e0f86db9bf63c299e33d7280762713d21feabb84f5752afb5d7109a62cbc45"
+    },
+    {
+      "path": "engine-lib-resume/shard-071.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-071.stdout",
+      "bytes": 816,
+      "sha256": "e0920c80709649a2b2de757a2465183e43a628ec7807bc47586e1f84e6c6c654"
+    },
+    {
+      "path": "engine-lib-resume/shard-072.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-072.stdout",
+      "bytes": 926,
+      "sha256": "b0566d4bd6862f05e11fcff662819e755d1055458bcb309d33cb7761133bc65a"
+    },
+    {
+      "path": "engine-lib-resume/shard-073.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-073.stdout",
+      "bytes": 929,
+      "sha256": "02107fd4f1636ac342dd990b25f308d364bde408e30a038866469fc3cddf46c2"
+    },
+    {
+      "path": "engine-lib-resume/shard-074.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-074.stdout",
+      "bytes": 892,
+      "sha256": "b3dee9e133a081bdfd82b5593130235867825639900685ee0bd4149f7c30ba6b"
+    },
+    {
+      "path": "engine-lib-resume/shard-075.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-075.stdout",
+      "bytes": 883,
+      "sha256": "0ba49fe96b9dc5694f2ddf6ed953c3aedc0eda69235a1f42d14a1848b5dc103d"
+    },
+    {
+      "path": "engine-lib-resume/shard-076.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-076.stdout",
+      "bytes": 901,
+      "sha256": "3e3197bc38bfc0e6f226930de683438a6666cdf851206ca986a6e8b9f25fd192"
+    },
+    {
+      "path": "engine-lib-resume/shard-077.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-077.stdout",
+      "bytes": 948,
+      "sha256": "c5f388c0451321c8e05de830378938ccadfc6aff5fb4bba9b81db52ee19aa9ea"
+    },
+    {
+      "path": "engine-lib-resume/shard-078.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-078.stdout",
+      "bytes": 906,
+      "sha256": "7e8754668ad66a06cf7b6111609a376dfd812d7dcad580825db4be3a4887fcab"
+    },
+    {
+      "path": "engine-lib-resume/shard-079.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-079.stdout",
+      "bytes": 905,
+      "sha256": "ab5cbe31fb70861842fdb194b4bdde157124dea64864cadd493d8629d63772bf"
+    },
+    {
+      "path": "engine-lib-resume/shard-080.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-080.stdout",
+      "bytes": 885,
+      "sha256": "e9a3eac6d41957cc333ff74a12cd3fc89459f851992c3f85994c9545c6c22e9c"
+    },
+    {
+      "path": "engine-lib-resume/shard-081.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-081.stdout",
+      "bytes": 907,
+      "sha256": "ac6c13cd33e88f336b13dec0afeca91b2c02864f94eac3b34767f70d33870c85"
+    },
+    {
+      "path": "engine-lib-resume/shard-082.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-082.stdout",
+      "bytes": 845,
+      "sha256": "ef2b1564538441c50914afdc0d255bdb9cb4cea0dd622f87aa04a31b21c7107b"
+    },
+    {
+      "path": "engine-lib-resume/shard-083.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-083.stdout",
+      "bytes": 877,
+      "sha256": "754bacc5003e5a62946fbe621062cc9c5549f0b5b89f6e58ee42be825499e8ac"
+    },
+    {
+      "path": "engine-lib-resume/shard-084.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-084.stdout",
+      "bytes": 851,
+      "sha256": "cf8500e3a63856d66063be18010281d1973a1c9275e815aaf5cffdc4a19597cb"
+    },
+    {
+      "path": "engine-lib-resume/shard-085.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-085.stdout",
+      "bytes": 830,
+      "sha256": "fecc5fa67e88679af2ec705133bf0e3e13302fcdf85d1516eebcdf019d037763"
+    },
+    {
+      "path": "engine-lib-resume/shard-086.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-086.stdout",
+      "bytes": 754,
+      "sha256": "fbb440dbad3243547f94dc434e28f194dac3d1a6292cfd72bffcb616ec8a2fcc"
+    },
+    {
+      "path": "engine-lib-resume/shard-087.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-087.stdout",
+      "bytes": 870,
+      "sha256": "09bc695deda0e8851913b7f39e78ef539ecc9d7eb79b74eaa9cc130d7e0278cd"
+    },
+    {
+      "path": "engine-lib-resume/shard-088.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-088.stdout",
+      "bytes": 692,
+      "sha256": "c9d641c7dabd2c7e7960bb5aa96028f0fb8b1aa2bc0e157d312d776b072fd6f4"
+    },
+    {
+      "path": "engine-lib-resume/shard-089.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-089.stdout",
+      "bytes": 898,
+      "sha256": "f38faea7de83d5bcc1f2cf8a7aefcaf155fc94b63dd7ef314cb79ec1acdd44da"
+    },
+    {
+      "path": "engine-lib-resume/shard-090.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-090.stdout",
+      "bytes": 833,
+      "sha256": "f18aff9758c24ace21bfdcdf2f0835f5f25d429bd577e6dca7c0b9a56d10b90a"
+    },
+    {
+      "path": "engine-lib-resume/shard-091.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-091.stdout",
+      "bytes": 910,
+      "sha256": "4c8a6e7399f717685b7ddca70cebb33d759c3c528317b61f000f35ce9f139d26"
+    },
+    {
+      "path": "engine-lib-resume/shard-092.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-092.stdout",
+      "bytes": 754,
+      "sha256": "33e6cb3422b46240d04bf76250edaa615d759a8b40b8430f90cfad600e507aaf"
+    },
+    {
+      "path": "engine-lib-resume/shard-093.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-093.stdout",
+      "bytes": 855,
+      "sha256": "2ed87b802a0693bab1af8f25e70e6a43931efdd092337433a1d9d62c3082a444"
+    },
+    {
+      "path": "engine-lib-resume/shard-094.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-094.stdout",
+      "bytes": 1022,
+      "sha256": "9a36dad7fb523a82500961d4dd8f7e2694d723e3aab9270e460458587c9e9242"
+    },
+    {
+      "path": "engine-lib-resume/shard-095.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-095.stdout",
+      "bytes": 1070,
+      "sha256": "5c0a1688c57b9e00ca6b9f2fe21a224d125508cc4d1eb5e6cfe6a7dbcf2e5b48"
+    },
+    {
+      "path": "engine-lib-resume/shard-096.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-096.stdout",
+      "bytes": 1129,
+      "sha256": "b79b3d2813ab004e43435a3b6cea91029788229ab7946bd3840d037568dfabc6"
+    },
+    {
+      "path": "engine-lib-resume/shard-097.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-097.stdout",
+      "bytes": 1216,
+      "sha256": "15502269a6f9cbb4f407c6b0d7bfec1b2b7d8409d97417dde0dd7f18db6efb08"
+    },
+    {
+      "path": "engine-lib-resume/shard-098.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-098.stdout",
+      "bytes": 1164,
+      "sha256": "4a4f87f28695051cc9a67673463616b10fe7777d18439acb34a0366d5c94b524"
+    },
+    {
+      "path": "engine-lib-resume/shard-099.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-099.stdout",
+      "bytes": 967,
+      "sha256": "f550b6e46357563c835780ab00289d220ca07093e0029c4bf634d92d767ad6fd"
+    },
+    {
+      "path": "engine-lib-resume/shard-100.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "engine-lib-resume/shard-100.stdout",
+      "bytes": 352,
+      "sha256": "948a1db137a99da6b16106720ea685a0118d4215ea523ab1384b74b7201288ed"
+    },
+    {
+      "path": "finish-publication.py",
+      "bytes": 6229,
+      "sha256": "c0644cbd56618ce179286cb9033b448a665d12a2c2fb6892f58a8afac41a05d6"
+    },
+    {
+      "path": "identities-sealed.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "identities-sealed.stdout",
+      "bytes": 651,
+      "sha256": "aea91f342925b6a428fe910d44274be01bdcbcae89f570087bbd7ed926594197"
+    },
+    {
+      "path": "native-driver.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "native-driver.stdout",
+      "bytes": 1832,
+      "sha256": "b8967cdbfb5b5ae22d58cb3ee40ac58eca090f3f3e48fb669e598dcb345d3807"
+    },
+    {
+      "path": "native-final-report.json",
+      "bytes": 53273,
+      "sha256": "9faac9982feb1e59c8c2c65d5bb956ca39d17efb5b9be26a90684aa6df9fad6e"
+    },
+    {
+      "path": "native-verification/engine-async.stderr",
+      "bytes": 278,
+      "sha256": "1db7d9903812443f2c102b91bc3d6b45984944c83a914bea29a87a67de943ff3"
+    },
+    {
+      "path": "native-verification/engine-async.stdout",
+      "bytes": 38298434,
+      "sha256": "d3a7bf5d1c18e42bd72a68a9a7ba914467d2ed9e0698851f2dc90762cd6e2f64"
+    },
+    {
+      "path": "native-verification/engine-builtins.stderr",
+      "bytes": 284,
+      "sha256": "057a66899a534c39ab7817f63b4ccb1ff8ee6ee6008ffb21b84cfd9dc8b57540"
+    },
+    {
+      "path": "native-verification/engine-builtins.stdout",
+      "bytes": 38328333,
+      "sha256": "10ea6f810f2457799d58782fdb4ed2c12712bca070d0b956553aec72d2d931ac"
+    },
+    {
+      "path": "native-verification/engine-gc-entries.stderr",
+      "bytes": 202,
+      "sha256": "e1e28a55bd2ebe39e0811f84e79dba2d585d0ea752bafcbdbbe2ef45c8f1b7da"
+    },
+    {
+      "path": "native-verification/engine-gc-entries.stdout",
+      "bytes": 38292040,
+      "sha256": "30a528c6913dc138ac0c63897b86c2e7e1ab3f63f6ef3d36adc89eb36f4320e9"
+    },
+    {
+      "path": "native-verification/engine-generators.stderr",
+      "bytes": 288,
+      "sha256": "4f1ecf24ab082ed35808ef610fee7ae9cf037eaf9bd5412b5b9b88890910cf20"
+    },
+    {
+      "path": "native-verification/engine-generators.stdout",
+      "bytes": 38289862,
+      "sha256": "1e422581edebe874ffe0eb6909846996797884160a1eddf8906e55dcdf146732"
+    },
+    {
+      "path": "native-verification/engine-intl.stderr",
+      "bytes": 276,
+      "sha256": "076f8bf5d5d922396a29971b86b1915e291a8320946db2aaf021a4376ed54ccb"
+    },
+    {
+      "path": "native-verification/engine-intl.stdout",
+      "bytes": 38298144,
+      "sha256": "64e3de60576b1d33ff7f6d6574658ec890e809181e0754b85d49ed91808d22ae"
+    },
+    {
+      "path": "native-verification/engine-language.stderr",
+      "bytes": 284,
+      "sha256": "b76b1f6c84dd2f251418a6ab3722bad370c7138b2ad51966379ed3beff13c200"
+    },
+    {
+      "path": "native-verification/engine-language.stdout",
+      "bytes": 38312478,
+      "sha256": "86ed1c67d71c25ddafb77fab383c0b0653daf6e672925ed555ee3897b8f33aa4"
+    },
+    {
+      "path": "native-verification/engine-lib.stderr",
+      "bytes": 281,
+      "sha256": "cb8eb8b67813eac0e4a07884aabed8bd28d1e82c4210d99c0c7849cb1fff70db"
+    },
+    {
+      "path": "native-verification/engine-lib.stdout",
+      "bytes": 38292662,
+      "sha256": "fe0d1c12f97a86d5eafb942132ea57ac3c062e5f709aee7b13b41715e2641230"
+    },
+    {
+      "path": "native-verification/engine-realm-modules.stderr",
+      "bytes": 208,
+      "sha256": "a58104048912072dc36c386c1c3d2ef73d18e855a3bbca36543c42909ba05401"
+    },
+    {
+      "path": "native-verification/engine-realm-modules.stdout",
+      "bytes": 38318993,
+      "sha256": "de4871aebe6da1c69b62657445264ecbbb402201c13357ada0279278b6b49e5a"
+    },
+    {
+      "path": "native-verification/engine-regexp.stderr",
+      "bytes": 280,
+      "sha256": "f236dbbacfb964eb4d0f909893a93531bacab293c9c8a3c3da80ceb9616f3085"
+    },
+    {
+      "path": "native-verification/engine-regexp.stdout",
+      "bytes": 38287922,
+      "sha256": "181ac0e8c13d469403c6adffbc7e1894e52178ab00f4d865db651bee8dd671ba"
+    },
+    {
+      "path": "native-verification/engine-structure.stderr",
+      "bytes": 192,
+      "sha256": "934017bb60ec252d1b4a1b2780247dce0c2510f36638d515b02a2995b8120ef6"
+    },
+    {
+      "path": "native-verification/engine-structure.stdout",
+      "bytes": 38275412,
+      "sha256": "43fca492f0f1151a38ff5311d7a8d02a65e5caa185556ac82d09809757dc1f5c"
+    },
+    {
+      "path": "native-verification/engine-temporal.stderr",
+      "bytes": 284,
+      "sha256": "d7e91eb5d9931885f2d3b325d41dba2779cad3eeaad33666f68ef36666aa602a"
+    },
+    {
+      "path": "native-verification/engine-temporal.stdout",
+      "bytes": 38292440,
+      "sha256": "6cf57ae381b6c18da13f218101f1254a98b2c276c8992f324e601fc67f9ff4e3"
+    },
+    {
+      "path": "native-verification/packed-focused.stderr",
+      "bytes": 7548,
+      "sha256": "bd7c1de1f6a63b83bcc3fe2fa13faf7602d08a8ad69f1b8ebbbec8daa58c2087"
+    },
+    {
+      "path": "native-verification/packed-focused.stdout",
+      "bytes": 38272552,
+      "sha256": "767fbfb5362c811e1c47068756bdc2fc4ebe7f79c5b99da4363e5b01e21b7400"
+    },
+    {
+      "path": "native-verification/realm-focused.stderr",
+      "bytes": 295,
+      "sha256": "42a072b15d3a3ab49c14dc6243f3a99dbb291a29cab9ad6eab02b29152cd1713"
+    },
+    {
+      "path": "native-verification/realm-focused.stdout",
+      "bytes": 38271880,
+      "sha256": "a0a3bcfda48a87555885af6fe1d8ca97316bb1b5dab2763eb143c32bb80427d5"
+    },
+    {
+      "path": "native-verification/report.json",
+      "bytes": 45763,
+      "sha256": "132fc7f30ec885673ae032024e4e97ebbd154bd941c4660b585268e8abf73ed2"
+    },
+    {
+      "path": "native-verification/snapshot-focused.stderr",
+      "bytes": 278,
+      "sha256": "cd0fc5c540d8d571119a7785a0c19c0cd1553586d3cea05c6a7b51822af35311"
+    },
+    {
+      "path": "native-verification/snapshot-focused.stdout",
+      "bytes": 38272273,
+      "sha256": "1ee31f356eb30bb4f107a98720fde5a3b235603ac9cdfd21b3031fba86e98aab"
+    },
+    {
+      "path": "native-verification/unicode-focused.stderr",
+      "bytes": 202,
+      "sha256": "ae8e4668a9e58ba7b53c84454944dc8635dbbb3f0adb611ac2682b88c8e3db98"
+    },
+    {
+      "path": "native-verification/unicode-focused.stdout",
+      "bytes": 38272026,
+      "sha256": "eff4744be4240bc8b235d003aa1f6e497e9710926074bd3b5fa725b1e761f92e"
+    },
+    {
+      "path": "native-verification/wasm-runtime-link.stderr",
+      "bytes": 289,
+      "sha256": "afe93ccfb686d070c0a2ec2a72c1d0b31cd846fd7f9fb94fba4f5563bdf895dc"
+    },
+    {
+      "path": "native-verification/wasm-runtime-link.stdout",
+      "bytes": 19140082,
+      "sha256": "e1d7adb03566f900d8b9888979d08f2086e1edb7ba0b4c63e6c8a3c1079e86f0"
+    },
+    {
+      "path": "native-verification/wasm-types-focused.stderr",
+      "bytes": 1937,
+      "sha256": "e65ed2f8caa535300bcaf93a55586486875261795c91dedd81363044bf6cc4b3"
+    },
+    {
+      "path": "native-verification/wasm-types-focused.stdout",
+      "bytes": 18816916,
+      "sha256": "4645ec209455fcb6ddd44f1e1b598a0990b4bfda36cfd0130c952285a6ea2fe4"
+    },
+    {
+      "path": "oom-scope-journal.txt",
+      "bytes": 631,
+      "sha256": "118c4efead0aa1791053ac563e860b3e7b5a770c54b6900f13839ed6cbcc4b44"
+    },
+    {
+      "path": "publish-verification.py",
+      "bytes": 4922,
+      "sha256": "b4d849f44c9d361fd88dfb8f57e1ba039d980d01abc172ab7ec1fffa054a407e"
+    },
+    {
+      "path": "remaining-verification/report.json",
+      "bytes": 12540,
+      "sha256": "ccb619e65fafea36e0c906a0e4a9cc541bf046dc33d94fecac13994a7bb4ba5b"
+    },
+    {
+      "path": "remaining-verification/test262-driver.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "remaining-verification/test262-driver.stdout",
+      "bytes": 66,
+      "sha256": "fe546c9e5eff4fa400e1eaa9b2a11223d0a9a2e6136650bbb73096f0adc577b5"
+    },
+    {
+      "path": "remaining-verification/wasm-lib.stderr",
+      "bytes": 196,
+      "sha256": "8bfe56f01f008293746fcbd1d1981e044a3bd6fddcbaef53739efac62856040c"
+    },
+    {
+      "path": "remaining-verification/wasm-lib.stdout",
+      "bytes": 18861344,
+      "sha256": "68867e0d354bb6119b2a2e66451e6dae2852a8c4d8cee7a2f80ae4ad2f401487"
+    },
+    {
+      "path": "remaining-verification/wasm-structure-builtins.stderr",
+      "bytes": 301,
+      "sha256": "20e890eae8795a047059c2ce7372987316ee7db75b286d763eb7fdf70e03e01a"
+    },
+    {
+      "path": "remaining-verification/wasm-structure-builtins.stdout",
+      "bytes": 19165737,
+      "sha256": "1d76d831e1bb2ed6af9923d31017ded46ba503a209e21f1481acb9f44d8340e0"
+    },
+    {
+      "path": "remaining-verification/wasm-structure-language.stderr",
+      "bytes": 301,
+      "sha256": "b8e1cd56b93d4c56ad7fdeaa6cc17e00ca444cc1c1ff80181e2772cfe3365df6"
+    },
+    {
+      "path": "remaining-verification/wasm-structure-language.stdout",
+      "bytes": 19152857,
+      "sha256": "476ddfb6585f7ce41e79d8296821694abd09b859ffd02ea5a8afe3eb93484c02"
+    },
+    {
+      "path": "resume-batch.py",
+      "bytes": 4780,
+      "sha256": "d69e6dab484a32b25d2afffd2412afdc7dafcf0b6b8f9a775a46924374338bde"
+    },
+    {
+      "path": "resume-batch.stderr",
+      "bytes": 157,
+      "sha256": "302fcf5b045fc977a51bf22e58eddbeddb04d15c3f5de0e45f1115200b642d64"
+    },
+    {
+      "path": "resume-batch.stdout",
+      "bytes": 294,
+      "sha256": "e99295755b0611bf13e451fb672dc386ff44bd5b5bd2372cbae3b2eea5c953e8"
+    },
+    {
+      "path": "resume-engine-lib.py",
+      "bytes": 4047,
+      "sha256": "ed07d085712344267d78f69fc6b7fbc939c625448540946c967b1f6e1023c05c"
+    },
+    {
+      "path": "resume-engine-lib.stderr",
+      "bytes": 157,
+      "sha256": "302fcf5b045fc977a51bf22e58eddbeddb04d15c3f5de0e45f1115200b642d64"
+    },
+    {
+      "path": "resume-engine-lib.stdout",
+      "bytes": 2156,
+      "sha256": "ff1545cbe28221d3642826a55aa19ff34322c19932438958395df5fec450e4a7"
+    },
+    {
+      "path": "retirement-guard.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "retirement-guard.stdout",
+      "bytes": 23,
+      "sha256": "23f652498aae7906b6d934dd7d962b03971cc3dcdb8add58222e0ebde99ae086"
+    },
+    {
+      "path": "review-next-steps.json",
+      "bytes": 2728,
+      "sha256": "f95c4aced66745c22154cc00e3a73da312637f7f1ce54c8d33073b3c86c58359"
+    },
+    {
+      "path": "runtime-profile-guard.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runtime-profile-guard.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/receipt.json",
+      "bytes": 398,
+      "sha256": "4c679ad1b472e419d89fac5ae1fdfae007b2f2f9cc694877a383bb05d710dc0e"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/coverage.json",
+      "bytes": 3035,
+      "sha256": "ff94781bf061a5bd93d8d04c34450b8250e14f7f39e603d1b3f171e6f00ab8fd"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/inventory.stdout",
+      "bytes": 15494,
+      "sha256": "8c3432cedddef97b993c4025a74d15887035f239267251051110aa2fce362237"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/receipt.json",
+      "bytes": 19298,
+      "sha256": "d81407e7bb41910666c0aed2643a7f907a1a7fb1990af44ec492e08759f71bf9"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/source_guards.rs",
+      "bytes": 9678,
+      "sha256": "c518effdb85c8b5bca879c0c89bd4995b5dbf47fb5bb8ecae32cbdfeb08254d6"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_builtins/tests.stdout",
+      "bytes": 16444,
+      "sha256": "2710c734dff0fd330299fc99c599a65d7d94cd0382e5e6bbc60a4fcf33d533ef"
+    },
+    {
+      "path": "source-guards-complete/structure_language/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_language/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_language/coverage.json",
+      "bytes": 2374,
+      "sha256": "358a55f3c98e3112d83df713ce638f3d78e20d55de90c76cb2716686e6efed91"
+    },
+    {
+      "path": "source-guards-complete/structure_language/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_language/inventory.stdout",
+      "bytes": 14988,
+      "sha256": "e0fbc1e4dbee7901712e77d40e6ae8f3b879bc172d7aa47cb20b8153244ab78e"
+    },
+    {
+      "path": "source-guards-complete/structure_language/receipt.json",
+      "bytes": 18123,
+      "sha256": "1655c7aaa2f6ae21e87daa7ca62fe13dddb5ebae3010f1093263e812238997ef"
+    },
+    {
+      "path": "source-guards-complete/structure_language/source_guards.rs",
+      "bytes": 7018,
+      "sha256": "11b948e015577bd411583ee00304aaee92d55bbabf3433a09d159545bc58f7cd"
+    },
+    {
+      "path": "source-guards-complete/structure_language/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-complete/structure_language/tests.stdout",
+      "bytes": 15890,
+      "sha256": "2c21f50206e55f1859b071d235cf23e886983ec66018c5223c15487344a94d69"
+    },
+    {
+      "path": "source-guards-final/receipt.json",
+      "bytes": 403,
+      "sha256": "463f486c2c38cd8c720c14d62532fd02f6b2ae03fc11df0ba83837cefc011421"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/coverage.json",
+      "bytes": 3035,
+      "sha256": "ff94781bf061a5bd93d8d04c34450b8250e14f7f39e603d1b3f171e6f00ab8fd"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/inventory.stdout",
+      "bytes": 15494,
+      "sha256": "8c3432cedddef97b993c4025a74d15887035f239267251051110aa2fce362237"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/receipt.json",
+      "bytes": 19299,
+      "sha256": "5ee28f879d80bc6159a6435a6a6ca4fcd7ebf1c417fadcc48fc3a1f51e9adbeb"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/source_guards.rs",
+      "bytes": 9678,
+      "sha256": "c518effdb85c8b5bca879c0c89bd4995b5dbf47fb5bb8ecae32cbdfeb08254d6"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_builtins/tests.stdout",
+      "bytes": 17170,
+      "sha256": "11ae9ab3db9eab6ca507ec1b9c06e050a08e6e8875b6782db5eb474e2d0abf3c"
+    },
+    {
+      "path": "source-guards-final/structure_language/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_language/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_language/coverage.json",
+      "bytes": 2374,
+      "sha256": "358a55f3c98e3112d83df713ce638f3d78e20d55de90c76cb2716686e6efed91"
+    },
+    {
+      "path": "source-guards-final/structure_language/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_language/inventory.stdout",
+      "bytes": 14988,
+      "sha256": "e0fbc1e4dbee7901712e77d40e6ae8f3b879bc172d7aa47cb20b8153244ab78e"
+    },
+    {
+      "path": "source-guards-final/structure_language/receipt.json",
+      "bytes": 18117,
+      "sha256": "1a5dfaecc6d6ec6cd92cca4e17f4f472e3c63a95677c9948c95bf01a353801cf"
+    },
+    {
+      "path": "source-guards-final/structure_language/source_guards.rs",
+      "bytes": 7018,
+      "sha256": "11b948e015577bd411583ee00304aaee92d55bbabf3433a09d159545bc58f7cd"
+    },
+    {
+      "path": "source-guards-final/structure_language/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-final/structure_language/tests.stdout",
+      "bytes": 15890,
+      "sha256": "7146b3953c749494b5aac91beb105b560846f1d3241a9c728a0c1707b85aae77"
+    },
+    {
+      "path": "source-guards-sealed.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed.stdout",
+      "bytes": 386,
+      "sha256": "d50a30168e115e927bfa2b22c3efe210a9adeaf03798a349069d762caff45f38"
+    },
+    {
+      "path": "source-guards-sealed/receipt.json",
+      "bytes": 398,
+      "sha256": "4c679ad1b472e419d89fac5ae1fdfae007b2f2f9cc694877a383bb05d710dc0e"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/coverage.json",
+      "bytes": 3035,
+      "sha256": "ff94781bf061a5bd93d8d04c34450b8250e14f7f39e603d1b3f171e6f00ab8fd"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/inventory.stdout",
+      "bytes": 15494,
+      "sha256": "8c3432cedddef97b993c4025a74d15887035f239267251051110aa2fce362237"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/receipt.json",
+      "bytes": 19294,
+      "sha256": "cd5d987a25f8b9ae7fa0448a80ebe183c35a6cd7b64d5a22057517666679a3d0"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/source_guards.rs",
+      "bytes": 9678,
+      "sha256": "c518effdb85c8b5bca879c0c89bd4995b5dbf47fb5bb8ecae32cbdfeb08254d6"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_builtins/tests.stdout",
+      "bytes": 16444,
+      "sha256": "f44bcaabe05c4d398f0913b7401d06164d1493b2168ff2fbf152221a12297b20"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/coverage.json",
+      "bytes": 2374,
+      "sha256": "358a55f3c98e3112d83df713ce638f3d78e20d55de90c76cb2716686e6efed91"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/inventory.stdout",
+      "bytes": 14988,
+      "sha256": "e0fbc1e4dbee7901712e77d40e6ae8f3b879bc172d7aa47cb20b8153244ab78e"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/receipt.json",
+      "bytes": 18119,
+      "sha256": "258e8c0f9c26e060e490b9d86399a67d1a1d0eea5f3877d87fd66f05edc4f748"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/source_guards.rs",
+      "bytes": 7018,
+      "sha256": "11b948e015577bd411583ee00304aaee92d55bbabf3433a09d159545bc58f7cd"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards-sealed/structure_language/tests.stdout",
+      "bytes": 15890,
+      "sha256": "5042261ef4769e12b50cdb76904c000c1a37b842318264ae746e5706535efa0f"
+    },
+    {
+      "path": "source-guards/receipt.json",
+      "bytes": 405,
+      "sha256": "16800c28b43b8a7ac15b1f3c7276c9ce0aed3de1fa6835ad1bef55daa04ff53e"
+    },
+    {
+      "path": "source-guards/structure_builtins/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_builtins/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_builtins/coverage.json",
+      "bytes": 3035,
+      "sha256": "ff94781bf061a5bd93d8d04c34450b8250e14f7f39e603d1b3f171e6f00ab8fd"
+    },
+    {
+      "path": "source-guards/structure_builtins/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_builtins/inventory.stdout",
+      "bytes": 15494,
+      "sha256": "8c3432cedddef97b993c4025a74d15887035f239267251051110aa2fce362237"
+    },
+    {
+      "path": "source-guards/structure_builtins/receipt.json",
+      "bytes": 19287,
+      "sha256": "ef480bf54dd91e2207ce90c1e6061ce86db1bfb836e48596d4b682b7a27d1dcd"
+    },
+    {
+      "path": "source-guards/structure_builtins/source_guards.rs",
+      "bytes": 9678,
+      "sha256": "c518effdb85c8b5bca879c0c89bd4995b5dbf47fb5bb8ecae32cbdfeb08254d6"
+    },
+    {
+      "path": "source-guards/structure_builtins/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_builtins/tests.stdout",
+      "bytes": 17170,
+      "sha256": "7cf538f5573a24975a36b2f133685bacb3f33879e449068865658b408be25ef0"
+    },
+    {
+      "path": "source-guards/structure_language/build.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_language/build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_language/coverage.json",
+      "bytes": 2374,
+      "sha256": "358a55f3c98e3112d83df713ce638f3d78e20d55de90c76cb2716686e6efed91"
+    },
+    {
+      "path": "source-guards/structure_language/inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_language/inventory.stdout",
+      "bytes": 14988,
+      "sha256": "e0fbc1e4dbee7901712e77d40e6ae8f3b879bc172d7aa47cb20b8153244ab78e"
+    },
+    {
+      "path": "source-guards/structure_language/receipt.json",
+      "bytes": 18112,
+      "sha256": "132719c7f784dc8b88dcfbea0076479c0162bafcca0975c14821afecadc2ab8c"
+    },
+    {
+      "path": "source-guards/structure_language/source_guards.rs",
+      "bytes": 7018,
+      "sha256": "11b948e015577bd411583ee00304aaee92d55bbabf3433a09d159545bc58f7cd"
+    },
+    {
+      "path": "source-guards/structure_language/tests.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-guards/structure_language/tests.stdout",
+      "bytes": 17468,
+      "sha256": "1c2901f590e27334f7db50b57f134bcd87b78caa28cf9c003e9d55239c22415d"
+    },
+    {
+      "path": "test262.py",
+      "bytes": 5040,
+      "sha256": "1efe97d8f6340e1b5a94223351ee824df60749d639dfd55106878c94c37f5fc3"
+    },
+    {
+      "path": "verify-batch.py",
+      "bytes": 3120,
+      "sha256": "200b7f16d926903895c1c00e0e41766ef32472abb2516d15b4f158d61ee75a98"
+    },
+    {
+      "path": "verify-native.py",
+      "bytes": 6171,
+      "sha256": "7dd96cf14e6ca10b149e0c63ca57470969c5348023210cc29222c616372c931e"
+    }
+  ]
+}

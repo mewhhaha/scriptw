@@ -19,24 +19,27 @@ when its exact inode and mapped range can be established; see the
 Runtime strings and noncanonical intrinsic method functions materialize on first
 use; their real data properties and alias identities remain intact. See the
 [lazy allocation contract](docs/rust-rewrite/contracts/lazy-runtime-values.md).
+Object storage avoids boxed prototype links and allocates scalar backing on
+demand. On Linux, the copying collector releases dead pages after collection
+while preserving heap capacity for reuse.
 
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-26 on one GitHub Actions runner**, compiler `b1ffc3ffd`.
+**Measured 2026-10-26 on one GitHub Actions runner**, compiler `99a4ff2e9`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
 and Wasm compilation in separate producer processes. Both measured consumers
 disable compilation and use identical native optimization and runtime settings.
 Both passed the original checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.9–2.8× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.8–2.8× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 25.9 MiB | 13.4 MiB |
-| Objects | 30.5 MiB | 14.2 MiB |
-| Retained objects | 41.4 MiB | 19.9 MiB |
+| Integer | 25.3 MiB | 13.4 MiB |
+| Objects | 30.2 MiB | 14.2 MiB |
+| Retained objects | 40.9 MiB | 20.0 MiB |
 
 These are medians of 14 samples per runtime and workload, after ten checked
 warmups per round, with each Store still alive. Process memory is sampled at
@@ -45,16 +48,16 @@ heap nor peak memory. The gap remains with compilation disabled, but this does
 not isolate its cause. This cohort stays separate from the ordinary V8 comparison below.
 The matched Scriptc footprint is the execution-memory target; improvements
 must retain the same workloads, checksums and measurement boundaries.
-The current memory pass streams native runtime loading, shares immutable sort
-snapshots and publishes exact-capacity string storage directly. Compressed
-input remains in reclaimable file cache; the RSS change is not all live-heap savings.
-[Verification](docs/rust-rewrite/memory-scriptc-target-20261026.md): **2,631 native
-cases and 463 original pinned Test262 executions passed**. The interrupted local
-before/after run is excluded from performance results.
+The current pass defers canonical runtime strings and noncanonical intrinsic
+method functions, and probes packed Array indices before allocating property
+keys. [Verification](docs/rust-rewrite/memory-lazy-runtime-20261027.md):
+**4,503 native cases and 1,589 original pinned Test262 executions passed**.
+The original long test process reached the 4-GiB cap; its unchanged inventory
+was completed in smaller fresh-process groups under the same limit.
 
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40401356113).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40411932915).
 
 ## Benchmarks
 
