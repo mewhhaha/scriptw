@@ -1,6 +1,6 @@
 # Compact ordinary data backing
 
-Runtime layout 25 keeps ordinary Array values with the same JavaScript object
+The compact value layout introduced in runtime version 25 keeps ordinary Array values with the same JavaScript object
 identity and definition algorithms while specializing their occupied data slots.
 The closed indexed storage modes are packed Numbers, packed general values,
 dense full descriptors and sparse full descriptors. The Number representation
