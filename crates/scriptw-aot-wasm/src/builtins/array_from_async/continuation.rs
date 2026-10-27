@@ -1,5 +1,52 @@
 use super::*;
 
+/// Only the stage dispatch may choose which already-rooted value transition
+/// runs next. The frames are consumed in map-then-commit order.
+enum FulfilledValueRoute {
+    Map,
+    Commit,
+}
+
+struct FulfilledDispatchScope {
+    map: ControlTarget,
+    commit: ControlTarget,
+}
+
+struct FulfilledCommitScope;
+
+impl FulfilledDispatchScope {
+    fn open(builder: &mut FunctionBuilder<'_>, f: &mut Function) -> Self {
+        let commit = builder.open_frame(ControlFrameKind::Block, f);
+        let map = builder.open_frame(ControlFrameKind::Block, f);
+        Self { map, commit }
+    }
+
+    fn route(&self, route: FulfilledValueRoute, builder: &FunctionBuilder<'_>, f: &mut Function) {
+        let target = match route {
+            FulfilledValueRoute::Map => self.map,
+            FulfilledValueRoute::Commit => self.commit,
+        };
+        builder.emit_branch_to_target(target, f);
+    }
+
+    fn into_mapping(
+        self,
+        builder: &mut FunctionBuilder<'_>,
+        f: &mut Function,
+    ) -> FulfilledCommitScope {
+        builder.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        FulfilledCommitScope
+    }
+}
+
+impl FulfilledCommitScope {
+    fn into_commit(self, builder: &mut FunctionBuilder<'_>, f: &mut Function) {
+        builder.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+    }
+}
+
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_array_from_async_fulfilled(
         &mut self,
@@ -16,6 +63,7 @@ impl FunctionBuilder<'_> {
             .read(&state, s, f)
             .store_domain(&stage, f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
+        let dispatch = FulfilledDispatchScope::open(self, f);
         // Exhaustive Rust dispatch defines every encoded continuation outcome.
         for current in [
             ArrayFromAsyncStage::InputValue,
@@ -29,11 +77,14 @@ impl FunctionBuilder<'_> {
             self.open_frame(ControlFrameKind::If, f);
             match current {
                 ArrayFromAsyncStage::InputValue => {
-                    self.emit_af_map_or_commit(&state, &value, exit, f)?
+                    dispatch.route(FulfilledValueRoute::Map, self, f);
                 }
-                ArrayFromAsyncStage::MappedValue => self.emit_af_commit(&state, &value, exit, f)?,
+                ArrayFromAsyncStage::MappedValue => {
+                    dispatch.route(FulfilledValueRoute::Commit, self, f);
+                }
                 ArrayFromAsyncStage::AsyncIteratorResult => {
-                    self.emit_af_iterator_result(&state, &value, exit, f)?
+                    self.emit_af_iterator_value(&state, &value, exit, f)?;
+                    dispatch.route(FulfilledValueRoute::Map, self, f);
                 }
                 ArrayFromAsyncStage::AsyncCloseResult => {
                     self.emit_af_reject_saved(&state, exit, f)?
@@ -44,6 +95,10 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::End);
         }
         f.instruction(&Instruction::Unreachable);
+        let commit = dispatch.into_mapping(self, f);
+        self.emit_af_map_or_await(&state, &value, exit, f)?;
+        commit.into_commit(self, f);
+        self.emit_af_commit(&state, &value, exit, f)?;
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.completion().initialize(f);
@@ -222,7 +277,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_af_iterator_result(
+    fn emit_af_iterator_value(
         &mut self,
         state: &GcLocal<ArrayFromAsyncState>,
         result: &ValueLocals,
@@ -263,16 +318,15 @@ impl FunctionBuilder<'_> {
             f,
         )?;
         self.emit_af_reject_abrupt(&capability, &pending, exit, f)?;
-        let value = s.reserve_value_local(f);
-        value.copy_from(pending.value(), f);
-        // Async iterators retain the value as-is; their result alone is awaited.
-        self.emit_af_map_or_commit(state, &value, exit, f)?;
-        value.clear(f);
+        // No further read of the result object follows the successful value
+        // Get. Replace its rooted value only now; async iterator values are
+        // retained as-is, because their result alone was awaited.
+        result.copy_from(pending.value(), f);
         capability.clear(f);
         pending.clear(f);
         Ok(())
     }
-    fn emit_af_map_or_commit(
+    fn emit_af_map_or_await(
         &mut self,
         state: &GcLocal<ArrayFromAsyncState>,
         value: &ValueLocals,
@@ -308,7 +362,7 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_af_commit(state, value, exit, f)?;
+        // An absent mapper falls through to the shared commit owner.
         mapper.clear(f);
         Ok(())
     }

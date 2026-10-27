@@ -5,6 +5,7 @@
 
 mod aot_gc_agent_harness_contract;
 mod aot_gc_array_from_async_entries;
+mod aot_gc_array_from_async_shared_tail;
 mod aot_gc_array_internal_descriptors;
 mod aot_gc_array_mutation_entries;
 mod aot_gc_array_set_data;

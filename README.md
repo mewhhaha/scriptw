@@ -47,9 +47,12 @@ order. Verification and measurements for this pass are pending; see the
 [allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
 
 The RegExp matcher shares one in-function backtracking body while preserving
-choice restoration, cursor/capture state and candidate retry order. Verification
-and measurements for this pass are pending; see the
-[backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md).
+choice restoration, cursor/capture state and candidate retry order. The
+Array.fromAsync fulfilled continuation shares its mapper and commit/drive paths
+while retaining await and iterator-close ordering. Verification and measurements
+for this pass are pending; see the
+[backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md) and
+[continuation contract](docs/rust-rewrite/contracts/array-from-async-shared-fulfilled.md).
 
 ## Precompiled comparison
 

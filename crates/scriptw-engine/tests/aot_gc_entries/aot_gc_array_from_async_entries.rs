@@ -3,7 +3,7 @@ use scriptw_engine::{
     ObservedCompletion, RealmBuilder, RunOptions,
 };
 
-fn assert_async(source: &str, marker: &str) {
+pub(super) fn assert_async(source: &str, marker: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("one compiler worker");
     for strict in [false, true] {
         let source = format!(

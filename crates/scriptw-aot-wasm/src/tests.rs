@@ -4,6 +4,7 @@ use scriptw_ir::{lower, lower_with_host_surface_policy, BigIntLiteralIr, HostSur
 use wasmparser::{Operator, Parser, Payload, Validator, WasmFeatures};
 
 mod array_data_producers;
+mod array_from_async_shared_tail;
 mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
