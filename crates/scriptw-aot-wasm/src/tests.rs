@@ -12,6 +12,7 @@ mod direct_eval_dispatch;
 mod intrinsic_accessor_allocation;
 mod numeric_imul;
 mod numeric_leaf;
+mod ordered_bootstrap_allocation;
 mod plain_data_literals;
 mod program_cache_pages;
 mod regexp_programs;

@@ -54,6 +54,20 @@ mod tests {
     }
 
     #[test]
+    fn intrinsic_installation_keys_reject_program_literals_and_retain_symbol_identity() {
+        use crate::intrinsics::IntrinsicKey;
+        use crate::operations::IntrinsicInstallationKey;
+        let mut pool = with_runtime_prefix();
+        pool.intern_string("program key");
+        assert!(IntrinsicInstallationKey::new(IntrinsicKey::Name("runtime name"), &pool).is_ok());
+        assert!(IntrinsicInstallationKey::new(IntrinsicKey::Name("program key"), &pool).is_err());
+        assert!(IntrinsicInstallationKey::new(IntrinsicKey::Name("absent key"), &pool).is_err());
+        for symbol in scriptw_ir::WellKnownSymbol::ALL {
+            assert!(IntrinsicInstallationKey::new(IntrinsicKey::Symbol(symbol), &pool).is_ok());
+        }
+    }
+
+    #[test]
     fn literal_domain_retains_runtime_dedup_and_uses_program_local_indexes() {
         let mut pool = with_runtime_prefix();
         pool.intern_string("program z");

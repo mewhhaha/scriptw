@@ -68,7 +68,7 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // cursors stable insertion ordinals across bounded history compaction.
 // Version 20 adds the checked retained embedding call/read/checkpoint kernels.
 // Version 23 stores prototypes as nullable actual object payload references.
-const LAYOUT_VERSION: u32 = 28;
+const LAYOUT_VERSION: u32 = 29;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

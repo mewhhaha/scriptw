@@ -9,6 +9,7 @@ use crate::gc_types::{
 };
 use crate::operations::PropertyKeyLocals;
 
+mod constructor_allocation;
 mod metadata_publication;
 
 /// This is consumed by the actual allocation producer. Captures cannot be

@@ -1858,6 +1858,19 @@ impl RuntimeSchema {
         self.array_type::<WellKnownSymbolTable>().emit_get(function);
         GcStackReference::new()
     }
+    /// Used only after the closed installation key has selected its Symbol arm.
+    /// Its ordinal comes from WellKnownSymbol::ALL, never a JavaScript integer.
+    pub(crate) fn installation_symbol_reference(
+        &self,
+        key: &crate::runtime_helpers::RuntimeHelperIntrinsicKeyParameter,
+        function: &mut Function,
+    ) -> GcStackReference<SymbolValue> {
+        emit_root_get(function, self.well_known_symbols);
+        function.instruction(&Instruction::RefAsNonNull);
+        key.ordinal().load(function);
+        self.array_type::<WellKnownSymbolTable>().emit_get(function);
+        GcStackReference::new()
+    }
     /// Actual caller identity at the current source-call boundary. Opaque
     /// native entries install their own barrier identity; prepared Scripts and
     /// forwarding intrinsics remain transparent. Null denotes no active call.
@@ -2307,6 +2320,17 @@ impl GcNumericI32Field for I8Value {}
 impl GcNumericI32Field for I16Value {}
 pub(crate) trait GcI32Constant: GcI32Field {
     fn encode(self) -> i32;
+}
+impl GcOperand<'_, scriptw_ir::StandardBuiltinId, NonNullable> {
+    /// The helper ABI accepts a closed builtin constant, rather than an I32.
+    pub(crate) fn helper_standard_builtin(
+        parameter: &crate::runtime_helpers::RuntimeHelperStandardBuiltinParameter,
+    ) -> Self {
+        Self {
+            source: OperandSource::Local(parameter.local().index),
+            shape: PhantomData,
+        }
+    }
 }
 impl<V: GcI32Constant> GcOperand<'_, V, NonNullable> {
     pub(crate) fn constant(value: V) -> Self {

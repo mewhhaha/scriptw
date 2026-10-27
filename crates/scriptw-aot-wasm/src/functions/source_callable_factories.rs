@@ -16,30 +16,7 @@ impl FunctionBuilder<'_> {
         context: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        if !meta.protocol().is_constructable()
-            || (meta.standard_builtin.is_none() && meta.host_builtin.is_none())
-        {
-            return Err(EmitError::unsupported(
-                "intrinsic constructor publication requires planned native constructor metadata",
-            ));
-        }
-        let schema = self.runtime_schema();
-        let prototype = schema.reserve_value_local(function);
-        prototype.set_reference(&context.function_prototype, schema, function);
-        let capture = schema
-            .reserve_gc_local::<BuiltinClosureCapture, Nullable>(function)
-            .initialize_null(schema, function);
-        let result = self.emit_native_function_record(
-            meta,
-            &context.realm,
-            &prototype,
-            &capture,
-            FunctionPrototypeMaterialization::BootstrapSupplied,
-            function,
-        )?;
-        capture.clear(function);
-        prototype.clear(function);
-        Ok(result)
+        self.emit_validated_realm_constructor_record(meta, context, function)
     }
 
     pub(crate) fn emit_function_identity_payload(
