@@ -59,6 +59,10 @@ fn shadow_realm_bootstrap_is_shared_and_keeps_every_body_below_native_size_switc
 
     let bodies = linked_bodies(&artifact);
     let initializer = bodies.unique(INITIALIZER);
+    let imports = linked_bodies::runtime_function_imports(
+        &artifact.bytes,
+        artifact.runtime().unwrap().bytes(),
+    );
     assert!(
         bodies
             .runtime
@@ -80,7 +84,13 @@ fn shadow_realm_bootstrap_is_shared_and_keeps_every_body_below_native_size_switc
         );
         eprintln!("{name}: {} bytes", body.bytes());
         assert!(
-            body.calls().contains(&initializer.index),
+            body.calls().iter().any(|index| {
+                if name == "scriptw::main" {
+                    imports.get(index) == Some(&initializer.index)
+                } else {
+                    *index == initializer.index
+                }
+            }),
             "{name} must directly call the shared {INITIALIZER}"
         );
     }

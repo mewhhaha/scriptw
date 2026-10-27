@@ -60,8 +60,7 @@ pub(crate) fn instantiate(
             bindings::data_import(&mut *store, context, template, &import)?
         } else {
             context
-                .linker
-                .get(&mut *store, import.module(), import.name())
+                .resolve_import(&mut *store, import.module(), import.name())
                 .map_err(|error| {
                     wasmtime::Error::msg(format!(
                         "native template lacks actual import {}.{}: {error}",

@@ -14,8 +14,7 @@ pub(super) fn execute(
 ) -> wasmtime::Result<Option<[Val; 6]>> {
     context.check_budget()?;
     let factory = context
-        .linker
-        .get(
+        .resolve_import(
             &mut *store,
             RUNTIME_IMPORT_NAMESPACE,
             NATIVE_REGEXP_LITERAL_FACTORY_EXPORT,

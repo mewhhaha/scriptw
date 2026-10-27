@@ -42,6 +42,13 @@ Store/Engine ownership errors remain errors. R remains the diagnostic and root
 owner, including exports P did not request. No caller manifest replaces actual
 Module imports or Wasmtime’s type checks.
 
+Native source compilation retains that same R instance as its export owner.
+A later Function or eval template resolves its actual runtime imports directly
+from that owner; specialized native factories use the same on-demand lookup.
+Host and foreign imports retain their linker boundary. Later compiled sources
+can use runtime exports absent from the entry P without publishing every export
+in advance or instantiating another R.
+
 Focused controls cover structural and name remapping, declaration/segment
 identity, wide-index LEB/body-size changes, opaque ordinal preservation, template
 admission and actual native linking. Whole-batch verification and matched memory

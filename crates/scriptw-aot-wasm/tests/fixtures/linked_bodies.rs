@@ -2,9 +2,9 @@
 //!
 //! A heap program is a runtime module (R) holding every builtin and runtime
 //! helper, and a small program module (P) holding `main` and the script's own
-//! bodies. P imports R's functions at the indices R defines them, so both
-//! modules name functions in one index space and a `call` in either body
-//! names a callee in either module. `WasmArtifact::function_sizes` describes
+//! bodies. Function indices belong to their individual module. Resolve P's
+//! compact imports through R's actual exports before comparing cross-module
+//! call edges. `WasmArtifact::function_sizes` describes
 //! only P; these readers decode the encoded modules themselves.
 
 // Each test target reads a different subset of this file.
@@ -94,6 +94,38 @@ pub fn module_bodies(bytes: &[u8]) -> Vec<EncodedBody<'_>> {
 pub struct LinkedBodies<'a> {
     pub runtime: Vec<EncodedBody<'a>>,
     pub program: Vec<EncodedBody<'a>>,
+}
+
+/// Actual P function-import index -> actual R exported function index.
+pub fn runtime_function_imports(program: &[u8], runtime: &[u8]) -> BTreeMap<u32, u32> {
+    let mut exports = BTreeMap::new();
+    for payload in Parser::new(0).parse_all(runtime) {
+        if let Payload::ExportSection(reader) = payload.expect("R decodes") {
+            for export in reader {
+                let export = export.expect("R export decodes");
+                if export.kind == wasmparser::ExternalKind::Func {
+                    assert!(exports.insert(export.name, export.index).is_none());
+                }
+            }
+        }
+    }
+    let mut result = BTreeMap::new();
+    let mut index = 0;
+    for payload in Parser::new(0).parse_all(program) {
+        if let Payload::ImportSection(reader) = payload.expect("P decodes") {
+            for import in reader.into_imports() {
+                let import = import.expect("P import decodes");
+                if matches!(import.ty, TypeRef::Func(_) | TypeRef::FuncExact(_)) {
+                    if import.module == scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE {
+                        let target = *exports.get(import.name).expect("P imports a real R export");
+                        assert!(result.insert(index, target).is_none());
+                    }
+                    index += 1;
+                }
+            }
+        }
+    }
+    result
 }
 
 pub fn linked_bodies(artifact: &WasmArtifact) -> LinkedBodies<'_> {

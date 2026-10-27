@@ -4,11 +4,13 @@ use scriptw_aot_wasm::{RuntimeArtifact, ValidatedRuntimeArtifact};
 mod trace;
 use trace::TraceState;
 pub(super) use trace::{CallbackTrace, Family, Phase};
+use wasmtime::{AsContextMut, Extern, Instance};
 
 /// The exact admitted R and already-linked Store execution define this authority.
 /// Neither callback owns a replacement Realm, deadline or source/module cache.
 pub(super) struct NativeSourceCompilerContext {
     pub(super) linker: WasmtimeLinker<WasmHostState>,
+    runtime_instance: Instance,
     validated_runtime: ValidatedRuntimeArtifact,
     pub(super) policy: WasmCompilationPolicy,
     execution: Arc<WasmAgentExecutionControl>,
@@ -35,6 +37,7 @@ pub(super) struct NativeSourceCompilerContext {
 impl NativeSourceCompilerContext {
     pub(super) fn new(
         linker: &WasmtimeLinker<WasmHostState>,
+        runtime_instance: Instance,
         runtime: Arc<RuntimeArtifact>,
         policy: WasmCompilationPolicy,
         execution: Arc<WasmAgentExecutionControl>,
@@ -56,6 +59,7 @@ impl NativeSourceCompilerContext {
         })?;
         Ok(Self {
             linker: linker.clone(),
+            runtime_instance,
             validated_runtime,
             policy,
             execution,
@@ -72,6 +76,36 @@ impl NativeSourceCompilerContext {
             #[cfg(test)]
             direct_eval_test_observer: None,
         })
+    }
+
+    /// Native callbacks may request R exports absent from the original P's
+    /// compact import set. Resolve from the same live R, never a replacement
+    /// instance or a namespace-wide linker publication.
+    pub(super) fn resolve_import(
+        &self,
+        store: &mut impl AsContextMut<Data = WasmHostState>,
+        module: &str,
+        name: &str,
+    ) -> wasmtime::Result<Extern> {
+        self.check_budget()?;
+        if !WasmtimeEngine::same(store.as_context().engine(), self.linker.engine()) {
+            return Err(wasmtime::Error::msg(
+                "native import belongs to a different actual Engine",
+            ));
+        }
+        let export = if module == scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE {
+            self.runtime_instance
+                .get_export(&mut *store, name)
+                .ok_or_else(|| {
+                    wasmtime::Error::msg(format!(
+                        "native source lacks actual R export {module}.{name}"
+                    ))
+                })
+        } else {
+            self.linker.get(&mut *store, module, name)
+        }?;
+        self.check_budget()?;
+        Ok(export)
     }
 
     pub(super) fn validated_runtime(&self) -> &ValidatedRuntimeArtifact {

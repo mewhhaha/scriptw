@@ -86,7 +86,7 @@ all();
 
 struct EncodedBody {
     bytes: usize,
-    calls: Vec<u32>,
+    calls: Vec<(usize, u32)>,
 }
 
 #[test]
@@ -107,11 +107,12 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
         .join()
         .expect("compiler worker completes");
 
-    let mut names = BTreeMap::<u32, String>::new();
-    let mut bodies = BTreeMap::<u32, EncodedBody>::new();
+    let mut names = BTreeMap::<(usize, u32), String>::new();
+    let mut bodies = BTreeMap::<(usize, u32), EncodedBody>::new();
     let runtime = artifact.runtime().expect("async scheduling links R");
     let modules = [runtime.bytes(), artifact.bytes.as_slice()];
-    for bytes in modules {
+    let imports = crate::linked_bodies::runtime_function_imports(&artifact.bytes, runtime.bytes());
+    for (module, bytes) in modules.into_iter().enumerate() {
         wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
             .validate_all(bytes)
             .expect("both scheduling modules validate");
@@ -133,21 +134,31 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
                     for operator in body.get_operators_reader().expect("body reader opens") {
                         match operator.expect("operator decodes") {
                             Operator::Call { function_index }
-                            | Operator::ReturnCall { function_index } => calls.push(function_index),
+                            | Operator::ReturnCall { function_index } => {
+                                let target = if module == 1 {
+                                    imports
+                                        .get(&function_index)
+                                        .map(|index| (0, *index))
+                                        .unwrap_or((module, function_index))
+                                } else {
+                                    (module, function_index)
+                                };
+                                calls.push(target);
+                            }
                             _ => {}
                         }
                     }
                     assert!(
                         bodies
                             .insert(
-                                next_function,
+                                (module, next_function),
                                 EncodedBody {
                                     bytes: body.range().len(),
                                     calls
                                 },
                             )
                             .is_none(),
-                        "R/P own disjoint function bodies"
+                        "each module owns one body per function index"
                     );
                     next_function += 1;
                 }
@@ -161,7 +172,7 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
                                     let naming = naming.expect("function name decodes");
                                     assert!(
                                         names
-                                            .insert(naming.index, naming.name.to_owned())
+                                            .insert((module, naming.index), naming.name.to_owned())
                                             .is_none(),
                                         "a function index must have one emitted name"
                                     );
@@ -188,7 +199,7 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
     });
     for &(index, body) in largest_bodies.iter().take(12) {
         let name = names.get(index).map(String::as_str).unwrap_or("<unnamed>");
-        eprintln!("largest body #{index} {name}: {} bytes", body.bytes);
+        eprintln!("largest body #{index:?} {name}: {} bytes", body.bytes);
     }
     let scheduling_helpers = [
         "helper::async_generator_start_body",
@@ -243,7 +254,7 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
         let name = names.get(&index).map(String::as_str).unwrap_or("<unnamed>");
         assert!(
             body.bytes <= ANY_BODY_LIMIT,
-            "{name} (#{index}) encoded body is {} bytes; limit is {ANY_BODY_LIMIT}",
+            "{name} (#{index:?}) encoded body is {} bytes; limit is {ANY_BODY_LIMIT}",
             body.bytes
         );
     }

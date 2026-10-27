@@ -4190,6 +4190,7 @@ impl Engine {
             {
                 let context = wasm_native_source_compiler::NativeSourceCompilerContext::new(
                     &linker,
+                    observed_instance,
                     Arc::clone(runtime),
                     policy.clone(),
                     Arc::clone(&execution_control),

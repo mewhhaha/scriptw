@@ -1,3 +1,6 @@
+#[path = "../fixtures/linked_bodies.rs"]
+mod linked_bodies;
+
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::{BTreeMap, BTreeSet};
@@ -161,7 +164,7 @@ fn inspect_shared_global_reads(artifact: &scriptw_aot_wasm::WasmArtifact) {
     let runtime = artifact.runtime().expect("With reads link R");
     let modules = [runtime.bytes(), artifact.bytes.as_slice()];
     let mut names = BTreeMap::new();
-    for bytes in modules {
+    for (module, bytes) in modules.into_iter().enumerate() {
         Validator::new_with_features(WasmFeatures::all())
             .validate_all(bytes)
             .expect("both linked With modules validate");
@@ -174,9 +177,9 @@ fn inspect_shared_global_reads(artifact: &scriptw_aot_wasm::WasmArtifact) {
                                 let naming = naming.expect("name decodes");
                                 assert!(
                                     names
-                                        .insert(naming.index, naming.name.to_string())
+                                        .insert((module, naming.index), naming.name.to_string())
                                         .is_none(),
-                                    "R/P own disjoint function names"
+                                    "each module owns unique function names"
                                 );
                             }
                         }
@@ -201,9 +204,10 @@ fn inspect_shared_global_reads(artifact: &scriptw_aot_wasm::WasmArtifact) {
         "helper::global_identifier_typeof_strict",
     ]
     .map(|name| (name, unique_index(name)));
+    let imports = linked_bodies::runtime_function_imports(&artifact.bytes, runtime.bytes());
     let mut body_sizes = BTreeMap::new();
     let mut main_calls = BTreeSet::new();
-    for bytes in modules {
+    for (module, bytes) in modules.into_iter().enumerate() {
         let mut next_function = 0u32;
         for payload in Parser::new(0).parse_all(bytes) {
             match payload.expect("shared global read artifact decodes") {
@@ -219,14 +223,18 @@ fn inspect_shared_global_reads(artifact: &scriptw_aot_wasm::WasmArtifact) {
                 }
                 Payload::CodeSectionEntry(body) => {
                     assert!(body_sizes
-                        .insert(next_function, body.range().len())
+                        .insert((module, next_function), body.range().len())
                         .is_none());
-                    if next_function == main {
+                    if (module, next_function) == main {
                         for operator in body.get_operators_reader().expect("main body opens") {
                             match operator.expect("main instruction decodes") {
                                 Operator::Call { function_index }
                                 | Operator::ReturnCall { function_index } => {
-                                    main_calls.insert(function_index);
+                                    let target = imports
+                                        .get(&function_index)
+                                        .map(|index| (0, *index))
+                                        .unwrap_or((module, function_index));
+                                    main_calls.insert(target);
                                 }
                                 _ => {}
                             }

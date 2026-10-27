@@ -41,7 +41,10 @@ fn created_realm_global_carries_dollar262_detach() {
             let runtime = artifact.runtime().expect("created Realm links R");
             let mut names = BTreeMap::new();
             let mut bodies = BTreeSet::new();
-            for bytes in [runtime.bytes(), artifact.bytes.as_slice()] {
+            for (module, bytes) in [runtime.bytes(), artifact.bytes.as_slice()]
+                .into_iter()
+                .enumerate()
+            {
                 Validator::new_with_features(features)
                     .validate_all(bytes)
                     .expect("created Realm callable entries preserve valid R and P Wasm");
@@ -60,7 +63,10 @@ fn created_realm_global_carries_dollar262_detach() {
                         }
                         Payload::CodeSectionEntry(body) => {
                             assert!(!body.range().is_empty());
-                            assert!(bodies.insert(index), "R/P own disjoint bodies");
+                            assert!(
+                                bodies.insert((module, index)),
+                                "each module owns unique bodies"
+                            );
                             index += 1;
                         }
                         Payload::CustomSection(section) => {
@@ -72,7 +78,10 @@ fn created_realm_global_carries_dollar262_detach() {
                                         for naming in map {
                                             let naming = naming.expect("function name decodes");
                                             assert!(names
-                                                .insert(naming.index, naming.name.to_string())
+                                                .insert(
+                                                    (module, naming.index),
+                                                    naming.name.to_string()
+                                                )
                                                 .is_none());
                                         }
                                     }

@@ -154,11 +154,11 @@ fn duration_and_zoned_difference_share_bounded_calendar_year_helpers() {
         selected.insert(body.index);
     }
 
-    // Decode only the selected bodies. Their actual indices, shared by R and
-    // P, come from the encoded modules, so function names and hard-coded
-    // offsets cannot manufacture the required calls.
+    // Every selected helper/consumer belongs to R. Keep P indices out of
+    // this map: compact P has its own independent function namespace.
     let calls = bodies
-        .all()
+        .runtime
+        .iter()
         .filter(|body| selected.contains(&body.index))
         .map(|body| (body.index, body.calls()))
         .collect::<BTreeMap<u32, BTreeSet<u32>>>();

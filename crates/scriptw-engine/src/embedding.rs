@@ -21,6 +21,8 @@ use values::{embedded_error, retained_completion};
 pub use values::{EmbeddedEvaluation, JsCompletion, JsPromiseState, JsValue, JsValueKind};
 
 #[cfg(test)]
+mod decimal_helper_tests;
+#[cfg(test)]
 mod tests;
 
 /// Opaque Scriptw host state with one independently owned application value.
