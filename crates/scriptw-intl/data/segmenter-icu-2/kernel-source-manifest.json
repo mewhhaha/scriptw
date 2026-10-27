@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "c9126ef733c4416accaa115c8f43aa5f4e636a02e256cd5c0333d483f6baf2b2",
+  "kernel_sha256": "dc301e8793972add6921e88b2d60181bbe57a592047bd39757309632b4a04913",
   "operations_reserved": [
     33,
     34,
@@ -388,9 +388,9 @@
       "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
     },
     {
-      "bytes": 82371,
+      "bytes": 82448,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "d41e34520a7eb9720deb7ee4d12191a2a6912545111dbd0f4dc53ab4a308144e"
+      "sha256": "53e0f7f289c2c71e8ecca51fc6c66288cf1a846ad02dbe46a99d247534af0564"
     },
     {
       "bytes": 90596,

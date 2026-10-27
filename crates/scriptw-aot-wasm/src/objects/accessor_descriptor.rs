@@ -102,3 +102,64 @@ impl AccessorDescriptor<ValueLocals> {
         }
     }
 }
+
+impl FunctionBuilder<'_> {
+    /// Normalize complete accessor slots at their storage owner. A present
+    /// Undefined is valid too; the role witness is not a callability proof.
+    pub(crate) fn emit_intrinsic_accessor_property_publication(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        accessors: AccessorDescriptorLocals<'_>,
+        enumerable: bool,
+        configurable: bool,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let (getter, setter) = accessors.into_fields::<core::convert::Infallible>();
+        let getter_operand = getter.into_static_value();
+        let setter_operand = setter.into_static_value();
+        let getter = s.reserve_gc_local(f).initialize(
+            match getter_operand {
+                Some(value) => s.struct_type::<StoredValue>().from_value(value, f),
+                None => s.stored_undefined(f),
+            },
+            f,
+        );
+        // Retain the compiler alias proof for identical getter/setter operands.
+        let shared = matches!((getter_operand, setter_operand),
+            (Some(getter), Some(setter)) if std::ptr::eq(getter, setter));
+        let setter = (!shared).then(|| {
+            s.reserve_gc_local(f).initialize(
+                match setter_operand {
+                    Some(value) => s.struct_type::<StoredValue>().from_value(value, f),
+                    None => s.stored_undefined(f),
+                },
+                f,
+            )
+        });
+        let enumerable_flag = s.reserve_i32_local(f);
+        enumerable_flag.set_constant(i32::from(enumerable), f);
+        let configurable_flag = s.reserve_i32_local(f);
+        configurable_flag.set_constant(i32::from(configurable), f);
+        s.call_helper(
+            crate::runtime_helpers::IntrinsicAccessorPublishArguments::new(
+                object,
+                key,
+                &getter,
+                setter.as_ref().unwrap_or(&getter),
+                enumerable_flag,
+                configurable_flag,
+            ),
+            self.runtime_helper_base()?,
+            f,
+        );
+        s.release_i32_local(configurable_flag, f);
+        s.release_i32_local(enumerable_flag, f);
+        if let Some(setter) = setter {
+            setter.clear(f);
+        }
+        getter.clear(f);
+        Ok(())
+    }
+}

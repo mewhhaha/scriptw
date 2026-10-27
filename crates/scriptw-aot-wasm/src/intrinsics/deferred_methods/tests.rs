@@ -8,7 +8,7 @@ fn deferred_method_descriptors_are_fresh_in_one_shared_publication_body() {
         .stack_size(64 * 1024 * 1024)
         .spawn(|| {
             let source = scriptw_front::parse(
-                "[Set.prototype.keys, Set.prototype.values, Math.abs];",
+                "[Set.prototype.keys, Set.prototype.values, Math.abs, RegExp.lastMatch];",
                 scriptw_front::ParseOptions::script(),
             ).unwrap();
             let artifact = crate::emit_with_rooted_snapshot(
@@ -36,9 +36,12 @@ fn deferred_method_descriptors_are_fresh_in_one_shared_publication_body() {
                     _=>{},
                 }
             }
-            let publish=names["helper::intrinsic_method_publish"];
+            let publish=names["helper::intrinsic_data_publish"];
+            let accessor=names["helper::intrinsic_accessor_publish"];
+            assert_ne!(publish,accessor,"data/accessor flag domains have distinct typed owners");
             let append=names["helper::ordinary_property_append"];
             let resolve=names["helper::property_value_resolve"];
+            for publish in [publish,accessor] {
             let body=&bodies[&publish];
             let allocations=body.iter().enumerate().filter_map(|(i,op)|matches!(op,Operator::StructNew{..}).then_some(i)).collect::<Vec<_>>();
             assert_eq!(allocations.len(),1,"every helper invocation constructs its own mutable descriptor; recipe remains caller-owned");
@@ -51,5 +54,6 @@ fn deferred_method_descriptors_are_fresh_in_one_shared_publication_body() {
             // The concrete descriptor receives a PropertyValue reference, not a
             // second boxed snapshot or eager FunctionObject allocation.
             assert!(!body.iter().any(|op|matches!(op,Operator::ArrayNew{..}|Operator::ArrayNewDefault{..}|Operator::ArrayNewFixed{..})),"publication does not clone or allocate a value/alias table");
+            }
         }).unwrap().join().unwrap();
 }

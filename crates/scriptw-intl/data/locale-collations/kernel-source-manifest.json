@@ -372,7 +372,7 @@
     {
       "bytes": 10008,
       "path": "crates/scriptw-intl/data/collator-icu-2/manifest.json",
-      "sha256": "95957388b19e2f2f58a67eb9ae74c78a9049139b1350499035d21e89b498f69d"
+      "sha256": "042cb7eed5e2098d7690b018fa28ec76c63732677e1336420dd198f0af0007da"
     },
     {
       "bytes": 8076,
@@ -413,7 +413,7 @@
   ],
   "formatting_DefaultLocale_selection": false,
   "global_union_selection": false,
-  "kernel_sha256": "c08d7e028e7954c24541b7b060bc555afaf3483a91c3da28949a2ce6ae7bd73d",
+  "kernel_sha256": "617f663f0c983f2e66558b560e6369354c748aa9a68215b5478ac942117fdce6",
   "locale_independent_profile_admission": {
     "current_native_admission": "Setup loads and retains both profiles through existing checked ICU constructors; source-only recipe does not claim current execution.",
     "historical_admission_receipt_sha256": "3fe60ad649669c2e0a99e4374e3871bfaef222e339ebb3b6f1c808dd710f46e6",
@@ -540,9 +540,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 82371,
+      "bytes": 82448,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "d41e34520a7eb9720deb7ee4d12191a2a6912545111dbd0f4dc53ab4a308144e"
+      "sha256": "53e0f7f289c2c71e8ecca51fc6c66288cf1a846ad02dbe46a99d247534af0564"
     },
     {
       "bytes": 33961,
@@ -592,7 +592,7 @@
     {
       "bytes": 324,
       "path": "crates/scriptw-intl/src/collator/identity.rs",
-      "sha256": "08d10f2bcd2415ed30cbb02767db56d2ab227d194b749a13883026777bc6ee06"
+      "sha256": "74c4b8903affe56da08297e27d34a505dbe11fccc70caeb04e9591760a52070f"
     },
     {
       "bytes": 37655,

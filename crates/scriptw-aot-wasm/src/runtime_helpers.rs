@@ -1074,7 +1074,8 @@ runtime_helper_domain! {
     OrdinaryPropertyStorageEnsure / OrdinaryPropertyStorageEnsureArguments / OrdinaryPropertyStorageEnsureParameters / "ordinary_property_storage_ensure" { object:(Ref OrdinaryObject NonNullable) } => (Ref OrdinaryPropertyStorage NonNullable);
     OrdinaryOwnDescriptor / OrdinaryOwnDescriptorArguments / OrdinaryOwnDescriptorParameters / "ordinary_own_descriptor" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyDescriptor Nullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
-    IntrinsicMethodPublish / IntrinsicMethodPublishArguments / IntrinsicMethodPublishParameters / "intrinsic_method_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,configurable:I32 } => Void;
+    IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
+    IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
@@ -1233,7 +1234,8 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => HelperOwner::Runtime,
             Self::OrdinaryOwnDescriptor => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
-            Self::IntrinsicMethodPublish => HelperOwner::Runtime,
+            Self::IntrinsicDataPublish => HelperOwner::Runtime,
+            Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
             Self::ArgumentListAppend => HelperOwner::Runtime,
@@ -1379,7 +1381,8 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => true,
             Self::OrdinaryOwnDescriptor => true,
             Self::CompactLiteralAllocate => true,
-            Self::IntrinsicMethodPublish => true,
+            Self::IntrinsicDataPublish => true,
+            Self::IntrinsicAccessorPublish => true,
             Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
             Self::ArgumentListAppend => true,

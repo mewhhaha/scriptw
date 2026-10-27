@@ -113,6 +113,23 @@ fn three_definition_boundaries_consume_the_typed_descriptor() {
     assert!(!projection.contains("_=>"));
     assert!(OBJECTS.contains("accessors.into_fields::<core::convert::Infallible>()"));
     assert!(DEFINE.contains("let (get, set) = accessors.into_fields();"));
+    let storage = normalized(bounded(
+        DOMAIN,
+        "pub(crate) fn emit_intrinsic_accessor_property_publication(",
+        "\n    }\n}",
+    ));
+    assert!(storage.contains("accessors:AccessorDescriptorLocals<'_>,"));
+    assert!(storage.contains("accessors.into_fields::<core::convert::Infallible>()"));
+    assert_eq!(storage.matches("None=>s.stored_undefined(f)").count(), 2);
+    assert!(storage.contains("std::ptr::eq(getter,setter)"));
+    assert!(storage.contains("IntrinsicAccessorPublishArguments::new("));
+    assert!(!storage.contains("cast_subtype::<FunctionObject>"));
+    let installation = normalized(bounded(
+        INTRINSICS,
+        "pub(crate) fn emit_install_intrinsic_accessor_values(",
+        "pub(crate) fn emit_install_intrinsic_string(",
+    ));
+    assert!(installation.contains("self.emit_intrinsic_accessor_property_publication("));
 }
 
 #[test]
@@ -147,6 +164,7 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         "emit_install_intrinsic_accessor_values",
         "emit_object_append_accessor_property_with_flags",
         "emit_object_define_accessor_with_flag_local",
+        "emit_intrinsic_accessor_property_publication",
     ];
     let actual = sources
         .iter()
@@ -159,25 +177,25 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         })
         .collect::<BTreeMap<_, _>>();
     let expected = BTreeMap::from([
-        ("builtins/bootstrap.rs", [3, 1, 0, 0]),
-        ("builtins/string/regexp_legacy.rs", [0, 1, 0, 0]),
-        ("functions/arguments_object.rs", [0, 0, 1, 0]),
-        ("functions/throw_type_error.rs", [0, 0, 1, 0]),
-        ("intrinsics/abstract_module_source.rs", [1, 0, 0, 0]),
-        ("intrinsics/array.rs", [1, 0, 0, 0]),
-        ("intrinsics/binary_data.rs", [5, 0, 0, 0]),
-        ("intrinsics/collections.rs", [5, 0, 0, 0]),
-        ("intrinsics/errors.rs", [1, 0, 0, 0]),
-        ("intrinsics/intl.rs", [0, 1, 0, 0]),
-        ("intrinsics/iterator.rs", [2, 0, 0, 0]),
-        ("intrinsics/mod.rs", [0, 1, 1, 0]),
-        ("intrinsics/object.rs", [1, 0, 0, 0]),
-        ("intrinsics/promise.rs", [1, 0, 0, 0]),
-        ("intrinsics/regexp.rs", [2, 0, 0, 0]),
-        ("intrinsics/resource_management.rs", [1, 0, 0, 0]),
-        ("intrinsics/symbol.rs", [1, 0, 0, 0]),
-        ("intrinsics/temporal/members.rs", [1, 0, 0, 0]),
-        ("objects/object_literal_property.rs", [0, 0, 0, 2]),
+        ("builtins/bootstrap.rs", [3, 1, 0, 0, 0]),
+        ("builtins/string/regexp_legacy.rs", [0, 1, 0, 0, 0]),
+        ("functions/arguments_object.rs", [0, 0, 1, 0, 0]),
+        ("functions/throw_type_error.rs", [0, 0, 1, 0, 0]),
+        ("intrinsics/abstract_module_source.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/array.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/binary_data.rs", [5, 0, 0, 0, 0]),
+        ("intrinsics/collections.rs", [5, 0, 0, 0, 0]),
+        ("intrinsics/errors.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/intl.rs", [0, 1, 0, 0, 0]),
+        ("intrinsics/iterator.rs", [2, 0, 0, 0, 0]),
+        ("intrinsics/mod.rs", [0, 1, 0, 0, 1]),
+        ("intrinsics/object.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/promise.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/regexp.rs", [2, 0, 0, 0, 0]),
+        ("intrinsics/resource_management.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/symbol.rs", [1, 0, 0, 0, 0]),
+        ("intrinsics/temporal/members.rs", [1, 0, 0, 0, 0]),
+        ("objects/object_literal_property.rs", [0, 0, 0, 2, 0]),
     ]);
     assert_eq!(actual, expected);
     let producers = sources

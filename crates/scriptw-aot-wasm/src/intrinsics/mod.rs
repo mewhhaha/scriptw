@@ -32,6 +32,7 @@ pub(crate) mod iterator;
 pub(crate) mod numeric;
 pub(crate) mod object;
 pub(crate) mod promise;
+mod property_publication;
 pub(crate) mod proxy;
 pub(crate) mod regexp;
 pub(crate) mod resource_management;
@@ -104,7 +105,7 @@ impl FunctionBuilder<'_> {
             function,
         );
         let key = self.intrinsic_key(key, function)?;
-        self.emit_object_append_data_property_with_flags(
+        self.emit_intrinsic_data_property_publication(
             &header,
             &key,
             value,
@@ -352,7 +353,7 @@ impl FunctionBuilder<'_> {
             function,
         );
         let key = self.intrinsic_key(key, function)?;
-        self.emit_object_append_accessor_property_with_flags(
+        self.emit_intrinsic_accessor_property_publication(
             &header,
             &key,
             accessors,

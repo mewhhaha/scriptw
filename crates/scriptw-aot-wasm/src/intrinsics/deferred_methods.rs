@@ -7,10 +7,10 @@
 
 use super::*;
 use crate::gc_types::*;
-use crate::runtime_helpers::{
-    HelperParameters, IntrinsicMethodPublishArguments, IntrinsicMethodPublishParameters,
-    RuntimeHelperId,
-};
+use crate::runtime_helpers::{HelperParameters, IntrinsicDataPublishArguments, RuntimeHelperId};
+
+mod materialization;
+use materialization::{MethodPlan, Selection};
 
 #[derive(Clone, Copy)]
 pub(super) struct DeferredIntrinsicMethod(StandardBuiltinId);
@@ -59,6 +59,8 @@ impl FunctionBuilder<'_> {
             .initialize(recipe.load(s, f).upcast(), f);
         let writable_flag = s.reserve_i32_local(f);
         writable_flag.set_constant(i32::from(writable), f);
+        let enumerable_flag = s.reserve_i32_local(f);
+        enumerable_flag.set_constant(0, f);
         let configurable_flag = s.reserve_i32_local(f);
         configurable_flag.set_constant(i32::from(configurable), f);
         let header = s
@@ -69,11 +71,12 @@ impl FunctionBuilder<'_> {
             // Aliases share the immutable recipe, but independently mutable
             // descriptor records, just like eager native data properties.
             s.call_helper(
-                IntrinsicMethodPublishArguments::new(
+                IntrinsicDataPublishArguments::new(
                     &header,
                     &key,
                     &value,
                     writable_flag,
+                    enumerable_flag,
                     configurable_flag,
                 ),
                 self.runtime_helper_base()?,
@@ -83,58 +86,11 @@ impl FunctionBuilder<'_> {
         }
         header.clear(f);
         s.release_i32_local(configurable_flag, f);
+        s.release_i32_local(enumerable_flag, f);
         s.release_i32_local(writable_flag, f);
         value.clear(f);
         recipe.clear(f);
         Ok(())
-    }
-
-    /// Fresh descriptors remain distinct mutable records. Only their immutable
-    /// value and canonical absent accessors are shared by alias publications.
-    pub(crate) fn compile_intrinsic_method_publish_helper(
-        &mut self,
-    ) -> Result<Function, EmitError> {
-        let mut f = self.begin_helper_body(RuntimeHelperId::IntrinsicMethodPublish);
-        let p = self.helper_parameters::<IntrinsicMethodPublishParameters>(&mut f);
-        let s = self.runtime_schema();
-        // No caller can smuggle accessor/unknown bits through a raw flag word.
-        // Normalize the two private boolean operands before building Data flags.
-        let writable = s.reserve_i32_local(&mut f);
-        p.writable.load(&mut f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32Eqz);
-        writable.store(&mut f);
-        let configurable = s.reserve_i32_local(&mut f);
-        p.configurable.load(&mut f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32Eqz);
-        configurable.store(&mut f);
-        let enumerable = s.reserve_i32_local(&mut f);
-        enumerable.set_constant(0, &mut f);
-        let absent = s
-            .reserve_gc_local(&mut f)
-            .initialize(s.stored_undefined(&mut f), &mut f);
-        let descriptor = s.reserve_gc_local(&mut f).initialize(
-            s.struct_type::<PropertyDescriptor>().construct(
-                (
-                    GcOperand::data_descriptor_flags(writable, enumerable, configurable),
-                    GcOperand::reference(&p.value, s),
-                    GcOperand::reference(&absent, s),
-                    GcOperand::reference(&absent, s),
-                ),
-                &mut f,
-            ),
-            &mut f,
-        );
-        self.emit_ordinary_append_property_entry(&p.object, &p.key, &descriptor, &mut f)?;
-        descriptor.clear(&mut f);
-        absent.clear(&mut f);
-        s.release_i32_local(enumerable, &mut f);
-        s.release_i32_local(configurable, &mut f);
-        s.release_i32_local(writable, &mut f);
-        p.release(&mut f);
-        f.instruction(&Instruction::End);
-        Ok(self.finish_function(f))
     }
 
     /// Ordinary stored values keep their direct read. The cold recipe branch
@@ -218,11 +174,18 @@ impl FunctionBuilder<'_> {
             .filter_map(|meta| {
                 meta.standard_builtin
                     .and_then(DeferredIntrinsicMethod::new)
-                    .map(|method| (method, meta.clone()))
+                    .map(|method| MethodPlan::new(method, meta.clone()))
             })
-            .collect();
-        methods.sort_by_key(|(method, _)| method.0);
-        self.emit_deferred_intrinsic_dispatch(&methods, builtin, &context, &value, &mut f)?;
+            .collect::<Result<Vec<_>, _>>()?;
+        methods.sort_by_key(|plan| plan.method.0);
+        let selected = self.emit_deferred_method_selection(&methods, builtin, &mut f)?;
+        let callable = s.reserve_gc_local(&mut f).initialize(
+            self.emit_materialize_selected_method(&selected, &context, &mut f)?,
+            &mut f,
+        );
+        value.set_reference(&callable, s, &mut f);
+        callable.clear(&mut f);
+        selected.release(s, &mut f);
         let stored = s.reserve_gc_local(&mut f).initialize(
             s.struct_type::<StoredValue>().from_value(&value, &mut f),
             &mut f,
@@ -255,41 +218,34 @@ impl FunctionBuilder<'_> {
     // The leaf checks exact identity too; invalid/unplanned IDs always trap.
     fn emit_deferred_intrinsic_dispatch(
         &mut self,
-        methods: &[(DeferredIntrinsicMethod, WasmFunctionMeta)],
+        methods: &[MethodPlan],
         builtin: I32Local,
-        realm: &crate::functions::RealmFunctionMaterializationContext,
-        out: &ValueLocals,
+        selected: &Selection,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         match methods {
             [] => {
                 f.instruction(&Instruction::Unreachable);
             }
-            [(method, meta)] => {
+            [plan] => {
                 builtin.load(f);
-                f.instruction(&Instruction::I32Const(method.0 as i32));
+                f.instruction(&Instruction::I32Const(plan.method.0 as i32));
                 f.instruction(&Instruction::I32Ne);
                 self.open_frame(ControlFrameKind::If, f);
                 f.instruction(&Instruction::Unreachable);
                 self.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
-                let s = self.runtime_schema();
-                let callable = s.reserve_gc_local(f).initialize(
-                    self.emit_function_value_payload_in_realm(meta, realm, f)?,
-                    f,
-                );
-                out.set_reference(&callable, s, f);
-                callable.clear(f);
+                self.emit_select_deferred_method(plan, selected, f)?;
             }
             _ => {
                 let middle = methods.len() / 2;
                 builtin.load(f);
-                f.instruction(&Instruction::I32Const((methods[middle].0).0 as i32));
+                f.instruction(&Instruction::I32Const(methods[middle].method.0 as i32));
                 f.instruction(&Instruction::I32LtU);
                 self.open_frame(ControlFrameKind::If, f);
-                self.emit_deferred_intrinsic_dispatch(&methods[..middle], builtin, realm, out, f)?;
+                self.emit_deferred_intrinsic_dispatch(&methods[..middle], builtin, selected, f)?;
                 f.instruction(&Instruction::Else);
-                self.emit_deferred_intrinsic_dispatch(&methods[middle..], builtin, realm, out, f)?;
+                self.emit_deferred_intrinsic_dispatch(&methods[middle..], builtin, selected, f)?;
                 self.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
             }

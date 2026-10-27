@@ -34,7 +34,10 @@ registers the exports requested by the actual module. See the
 [import contract](docs/rust-rewrite/contracts/runtime-program-import-compaction.md).
 Ordinary Array data and compact literal backing use typed storage states; see
 [the compact backing contract](docs/rust-rewrite/contracts/compact-value-backing.md).
-Intrinsic method installation shares descriptor-publication code across aliases.
+Intrinsic data and accessor installation share typed descriptor-publication
+helpers while preserving independent descriptors, flags and defining-Realm values.
+Deferred method reads share a function-construction tail after selecting their
+metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-property-publication.md).
 
 ## Precompiled comparison
 
