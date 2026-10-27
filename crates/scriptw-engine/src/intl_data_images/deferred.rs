@@ -174,6 +174,7 @@ pub(crate) fn for_standalone(bytes: &[u8]) -> Result<WasmIntlKernel, EngineError
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scriptw_intl::number_format::options::LocaleMatcher;
 
     #[test]
     fn hostless_module_has_no_provider_or_fabricated_identity() {

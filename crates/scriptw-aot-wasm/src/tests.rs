@@ -1,6 +1,6 @@
 use super::*;
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{BigIntLiteralIr, HostSurfacePolicy, lower, lower_with_host_surface_policy};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower, lower_with_host_surface_policy, BigIntLiteralIr, HostSurfacePolicy};
 use wasmparser::{Operator, Parser, Payload, Validator, WasmFeatures};
 
 mod array_data_producers;
@@ -1146,11 +1146,9 @@ fn arbitrary_precision_bigint_literal_emits_a_gc_module() {
     let artifact = emit(&program).expect("arbitrary precision BigInt should emit");
 
     expect_valid_module(&artifact, 0);
-    assert!(
-        artifact
-            .gc_host_imports()
-            .contains(&GcHostImport::CollectGc)
-    );
+    assert!(artifact
+        .gc_host_imports()
+        .contains(&GcHostImport::CollectGc));
 }
 
 #[test]
@@ -2199,11 +2197,9 @@ fn emitted_module_validates() {
     let artifact = emit_script("let x = 40; const y = 2; x + y;").expect("emit should work");
     expect_valid_module(&artifact, 0);
     assert!(artifact.debug_dump.contains("export func: main"));
-    assert!(
-        artifact
-            .debug_dump
-            .contains("main completion ABI: tag/scalar/reference/kind/target")
-    );
+    assert!(artifact
+        .debug_dump
+        .contains("main completion ABI: tag/scalar/reference/kind/target"));
 }
 
 #[test]
@@ -2557,14 +2553,12 @@ fn canonical_locale_list_alone_imports_the_typed_intl_host_call() {
     )
     .expect("unused selected profile should remain inert");
     assert!(components(&without_intl.bytes).is_empty());
-    assert!(
-        Parser::new(0)
-            .parse_all(&without_intl.bytes)
-            .all(|payload| {
-                !matches!(payload.expect("module should parse"), Payload::CustomSection(section)
+    assert!(Parser::new(0)
+        .parse_all(&without_intl.bytes)
+        .all(|payload| {
+            !matches!(payload.expect("module should parse"), Payload::CustomSection(section)
             if section.name() == scriptw_intl::INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION)
-            })
-    );
+        }));
     let artifact = emit_script("262;").expect("constant script should emit");
     assert!(
         !artifact
@@ -3053,11 +3047,9 @@ fn preseeded_wire_data_stays_in_private_memory() {
     assert_eq!(wire_data_segment_counts(runtime.bytes()), (2, 2));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));
     assert!(data_segment_at(&artifact.bytes, 3).is_empty());
-    assert!(
-        artifact
-            .gc_host_imports()
-            .contains(&GcHostImport::CollectGc)
-    );
+    assert!(artifact
+        .gc_host_imports()
+        .contains(&GcHostImport::CollectGc));
 }
 
 // P repeats its exact R's host imports, then imports R's defined
@@ -3600,16 +3592,12 @@ fn object_and_array_scripts_emit_memory_with_agent_capability_import() {
     let artifact =
         emit_script("let o = { x: 1 }; let a = [1]; a[2] = 4; o.x;").expect("emit should work");
     expect_valid_module(&artifact, 0);
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import func: scriptw_host.agent_can_suspend")
-    );
-    assert!(
-        artifact
-            .debug_dump
-            .contains("memory: exported private linear memory")
-    );
+    assert!(artifact
+        .debug_dump
+        .contains("import func: scriptw_host.agent_can_suspend"));
+    assert!(artifact
+        .debug_dump
+        .contains("memory: exported private linear memory"));
     assert!(artifact.debug_dump.contains("data segments: 1"));
 }
 
@@ -3619,21 +3607,15 @@ fn test262_agent_builtins_import_the_agent_call_and_split_memories() {
         emit_script("__scriptwAgentSleep(1);").expect("Test262 agent host call should emit");
     expect_valid_module(&artifact, 0);
 
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import func: scriptw_host.agent_call")
-    );
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import memory: scriptw_host.private_memory")
-    );
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import memory: scriptw_host.shared_memory")
-    );
+    assert!(artifact
+        .debug_dump
+        .contains("import func: scriptw_host.agent_call"));
+    assert!(artifact
+        .debug_dump
+        .contains("import memory: scriptw_host.private_memory"));
+    assert!(artifact
+        .debug_dump
+        .contains("import memory: scriptw_host.shared_memory"));
 }
 
 #[test]
@@ -3643,14 +3625,12 @@ fn product_lowering_cannot_reauthorize_a_test262_name_in_aot() {
     let program = lower(&source);
     // Every heap-backed module compiles every host builtin body; only the
     // script's own host surface decides which names resolve.
-    assert!(
-        program
-            .script
-            .as_ref()
-            .expect("script should lower")
-            .host_builtins
-            .is_empty()
-    );
+    assert!(program
+        .script
+        .as_ref()
+        .expect("script should lower")
+        .host_builtins
+        .is_empty());
     emit(&program).expect("an unresolved global identifier is handled at runtime");
 }
 
@@ -3694,11 +3674,9 @@ fn supports_heap_growth_beyond_initial_capacity() {
     );
     let artifact = emit_script(&source).expect("emit should work");
     expect_valid_module(&artifact, 0);
-    assert!(
-        artifact
-            .debug_dump
-            .contains("memory: exported private linear memory")
-    );
+    assert!(artifact
+        .debug_dump
+        .contains("memory: exported private linear memory"));
 }
 
 #[test]
@@ -4034,16 +4012,12 @@ fn atomics_wait_async_modules_import_monotonic_timeout_host_functions() {
     .expect("Atomics.waitAsync script should emit");
     expect_valid_module(&artifact, 0);
 
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import func: scriptw_host.monotonic_clock_nanos")
-    );
-    assert!(
-        artifact
-            .debug_dump
-            .contains("import func: scriptw_host.sleep_nanos")
-    );
+    assert!(artifact
+        .debug_dump
+        .contains("import func: scriptw_host.monotonic_clock_nanos"));
+    assert!(artifact
+        .debug_dump
+        .contains("import func: scriptw_host.sleep_nanos"));
 }
 
 #[test]
