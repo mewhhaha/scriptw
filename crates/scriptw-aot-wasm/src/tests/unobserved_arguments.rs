@@ -55,7 +55,7 @@ fn activation_traffic(source: &str) -> ActivationTraffic {
             }
         }
     }
-    let append_import = append_import.expect("P imports actual R append");
+    // An unused R import can be absent from the final compacted P.
     let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
         .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
@@ -100,7 +100,8 @@ fn activation_traffic(source: &str) -> ActivationTraffic {
                         traffic.cells += usize::from(struct_type_index == cell);
                     }
                     Operator::Call { function_index } => {
-                        traffic.metadata_appends += usize::from(function_index == append_import)
+                        traffic.metadata_appends +=
+                            usize::from(append_import == Some(function_index))
                     }
                     Operator::I32Const { value: 128 } => source_limit = true,
                     Operator::I32GeU => limit_comparison = true,
