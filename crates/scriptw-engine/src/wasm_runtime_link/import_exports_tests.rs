@@ -104,6 +104,19 @@ fn modules(engine: &WasmtimeEngine, program: &[u8]) -> WasmModules {
     }
 }
 
+fn assert_unpublished(
+    linker: &WasmtimeLinker<WasmHostState>,
+    store: &mut WasmtimeStore<WasmHostState>,
+    namespace: &str,
+    name: &str,
+) {
+    let error = linker.get(store, namespace, name).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        format!("missing definition for `{namespace}::{name}`")
+    );
+}
+
 #[test]
 fn requested_exports_link_once_and_runtime_keeps_unpublished_roots() {
     let engine = engine();
@@ -134,8 +147,8 @@ fn requested_exports_link_once_and_runtime_keeps_unpublished_roots() {
     assert!(program.get_global(&mut store, "g").is_some());
     assert!(program.get_memory(&mut store, "m").is_some());
     assert!(program.get_tag(&mut store, "t").is_some());
-    assert!(linker.get(&mut store, ns, "unused").is_none());
-    assert!(linker.get(&mut store, ns, "unused_global").is_none());
+    assert_unpublished(&linker, &mut store, ns, "unused");
+    assert_unpublished(&linker, &mut store, ns, "unused_global");
     assert!(
         owner.get_func(&mut store, "unused").is_some(),
         "R remains the complete diagnostic/root owner"
@@ -196,7 +209,10 @@ fn foreign_namespace_is_untouched_and_other_store_definitions_still_fail() {
             .unwrap(),
         88
     );
-    assert!(linker
-        .get(&mut first, scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE, "f")
-        .is_none());
+    assert_unpublished(
+        &linker,
+        &mut first,
+        scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE,
+        "f",
+    );
 }
