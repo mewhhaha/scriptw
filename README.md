@@ -46,6 +46,11 @@ typed Wasm helper, with source creation and metadata publication retaining their
 order. Verification and measurements for this pass are pending; see the
 [allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
 
+The RegExp matcher shares one in-function backtracking body while preserving
+choice restoration, cursor/capture state and candidate retry order. Verification
+and measurements for this pass are pending; see the
+[backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md).
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

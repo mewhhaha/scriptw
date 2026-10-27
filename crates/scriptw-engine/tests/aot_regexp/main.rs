@@ -28,3 +28,5 @@ mod aot_regexp_reverse_whitespace;
 mod aot_regexp_runtime_gap;
 mod aot_regexp_unicode_property_data;
 mod aot_regexp_word_boundary;
+
+mod aot_regexp_shared_recovery;

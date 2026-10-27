@@ -25,3 +25,5 @@ mod product_artifact;
 mod proper_tail_call_emission;
 mod property_read_plans;
 mod string_match_call_emission;
+
+mod regexp_shared_recovery;

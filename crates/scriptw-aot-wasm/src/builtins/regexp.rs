@@ -25,6 +25,8 @@ use scriptw_ir::{
 };
 
 mod backreference;
+mod backtracking;
+use backtracking::{BacktrackRequest, BacktrackRequestScope};
 mod compiler;
 mod counted;
 mod matcher_workspace;
@@ -699,6 +701,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
 
+        let backtrack = BacktrackRequestScope::open(self, &mut function);
         function.instruction(&Instruction::Block(BlockType::Empty));
         function.instruction(&Instruction::Loop(BlockType::Empty));
         pc.load(&mut function);
@@ -727,6 +730,7 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_regexp_instruction_load(instruction_address, 16, operand1, &mut function);
         self.emit_regexp_counted_dispatch(
             &workspace,
+            backtrack.request(),
             &counted::CountedMatcherLocals {
                 program: program_ptr,
                 instructions: instruction_count,
@@ -870,15 +874,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Const(63));
         function.instruction(&Instruction::I64ShrU);
         function.instruction(&Instruction::I32WrapI64);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         operand1.load(&mut function);
         function.instruction(&Instruction::I64Const(0x3fff_ffff_ffff_ffff));
         function.instruction(&Instruction::I64And);
@@ -917,15 +913,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Const(1));
         function.instruction(&Instruction::I64And);
         function.instruction(&Instruction::I64Eqz);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         operand0.load(&mut function);
         pc.store(&mut function);
         function.instruction(&Instruction::Br(1));
@@ -1420,15 +1408,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64And);
         function.instruction(&Instruction::I32WrapI64);
         function.instruction(&Instruction::I32Or);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            3,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_read_character(
             checkpoint,
             input_offset,
@@ -1492,15 +1472,7 @@ impl<'a> FunctionBuilder<'a> {
         capture_unit.load(&mut function);
         compare_unit.load(&mut function);
         function.instruction(&Instruction::I64Ne);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            3,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         function.instruction(&Instruction::Br(0));
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
@@ -1537,15 +1509,7 @@ impl<'a> FunctionBuilder<'a> {
             candidate_utf16,
             &mut function,
         );
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         pc.load(&mut function);
         function.instruction(&Instruction::I64Const(1));
         function.instruction(&Instruction::I64Add);
@@ -1731,15 +1695,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         decode_temp.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         pc.load(&mut function);
         function.instruction(&Instruction::I64Const(1));
         function.instruction(&Instruction::I64Add);
@@ -2074,15 +2030,7 @@ impl<'a> FunctionBuilder<'a> {
         )?;
         progress_no_advance.load(&mut function);
         function.instruction(&Instruction::I32WrapI64);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         operand1.load(&mut function);
         pc.store(&mut function);
         function.instruction(&Instruction::Br(1));
@@ -2143,15 +2091,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         match_utf16.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
 
         match_on_low_surrogate.load(&mut function);
         function.instruction(&Instruction::I32WrapI64);
@@ -2273,15 +2213,7 @@ impl<'a> FunctionBuilder<'a> {
         codepoint.load(&mut function);
         operand0.load(&mut function);
         function.instruction(&Instruction::I64Ne);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            2,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         match_utf16.load(&mut function);
         utf16_advance.load(&mut function);
         function.instruction(&Instruction::I64Sub);
@@ -2333,15 +2265,7 @@ impl<'a> FunctionBuilder<'a> {
             range_middle,
             &mut function,
         );
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            2,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         match_utf16.load(&mut function);
         utf16_advance.load(&mut function);
         function.instruction(&Instruction::I64Sub);
@@ -2362,15 +2286,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Or);
         function.instruction(&Instruction::If(BlockType::Empty));
         self.emit_regexp_whitespace_mismatch(opcode, codepoint, &mut function);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            2,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         match_utf16.load(&mut function);
         utf16_advance.load(&mut function);
         function.instruction(&Instruction::I64Sub);
@@ -2397,15 +2313,7 @@ impl<'a> FunctionBuilder<'a> {
         effective_dot_all.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
         function.instruction(&Instruction::I32And);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            2,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         function.instruction(&Instruction::Else);
         self.emit_regexp_ascii_class_contains(codepoint, operand0, operand1, &mut function);
         function.instruction(&Instruction::I64ExtendI32U);
@@ -2423,15 +2331,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Eqz);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::End);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            2,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         function.instruction(&Instruction::End);
         match_utf16.load(&mut function);
         utf16_advance.load(&mut function);
@@ -2609,27 +2509,11 @@ impl<'a> FunctionBuilder<'a> {
         ));
         function.instruction(&Instruction::I64Ne);
         function.instruction(&Instruction::I32And);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            0,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         match_byte.load(&mut function);
         input_len.load(&mut function);
         function.instruction(&Instruction::I64GeU);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            0,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_scratch_byte(input_offset, match_byte, byte, &mut function);
         self.emit_regexp_scratch_decode_scalar(
             input_offset,
@@ -2656,15 +2540,7 @@ impl<'a> FunctionBuilder<'a> {
         effective_dot_all.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
         function.instruction(&Instruction::I32And);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_advance_matched_character(
             match_byte,
             match_utf16,
@@ -2730,15 +2606,7 @@ impl<'a> FunctionBuilder<'a> {
             range_middle,
             &mut function,
         );
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_advance_matched_character(
             match_byte,
             match_utf16,
@@ -2766,15 +2634,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64LeU);
         self.emit_regexp_ascii_class_contains(codepoint, operand0, operand1, &mut function);
         function.instruction(&Instruction::I32And);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_advance_matched_character(
             match_byte,
             match_utf16,
@@ -2850,15 +2710,7 @@ impl<'a> FunctionBuilder<'a> {
         literal_value.load(&mut function);
         operand0.load(&mut function);
         function.instruction(&Instruction::I64Ne);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         literal_advance_byte.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
@@ -2879,15 +2731,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Eq);
         function.instruction(&Instruction::If(BlockType::Empty));
         self.emit_regexp_whitespace_mismatch(opcode, codepoint, &mut function);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_scratch_increment_by_local(match_byte, byte_advance, &mut function);
         function.instruction(&Instruction::I64Const(1));
         utf16_advance.store(&mut function);
@@ -2900,15 +2744,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Eq);
         function.instruction(&Instruction::If(BlockType::Empty));
         self.emit_regexp_whitespace_mismatch(opcode, codepoint, &mut function);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         self.emit_regexp_advance_matched_character(
             match_byte,
             match_utf16,
@@ -2928,15 +2764,7 @@ impl<'a> FunctionBuilder<'a> {
         codepoint.load(&mut function);
         function.instruction(&Instruction::I64Const(0x80));
         function.instruction(&Instruction::I64GeU);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            0,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         opcode.load(&mut function);
         function.instruction(&Instruction::I64Const(REGEXP_OPCODE_LITERAL_ASCII as i64));
         function.instruction(&Instruction::I64Eq);
@@ -2944,27 +2772,11 @@ impl<'a> FunctionBuilder<'a> {
         codepoint.load(&mut function);
         operand0.load(&mut function);
         function.instruction(&Instruction::I64Ne);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         function.instruction(&Instruction::Else);
         self.emit_regexp_ascii_class_contains(codepoint, operand0, operand1, &mut function);
         function.instruction(&Instruction::I32Eqz);
-        self.emit_regexp_backtrack_or_fail(
-            &workspace,
-            1,
-            match_byte,
-            match_utf16,
-            pc,
-            match_on_low_surrogate,
-            &mut function,
-        );
+        self.emit_regexp_backtrack_request_if(backtrack.request(), &mut function);
         function.instruction(&Instruction::End);
         self.emit_regexp_scratch_increment_by_local(match_byte, byte_advance, &mut function);
         function.instruction(&Instruction::I64Const(1));
@@ -2974,6 +2786,18 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Br(0));
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
+        let recovery = backtrack.close(self, &mut function);
+        self.emit_regexp_backtrack_recovery(
+            &workspace,
+            RegExpInputCursor {
+                byte: match_byte,
+                utf16: match_utf16,
+                on_low_surrogate: match_on_low_surrogate,
+            },
+            pc,
+            recovery,
+            &mut function,
+        );
 
         sticky.load(&mut function);
         function.instruction(&Instruction::I64Eqz);
@@ -3151,77 +2975,6 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Raw branches keep the original matcher control-frame shape. The choice
     /// owner restores its own cursor and entire live slab before fallback.
-    fn emit_regexp_backtrack_or_fail(
-        &mut self,
-        workspace: &MatcherWorkspace,
-        caller_block_depth: u32,
-        byte: I64Local,
-        utf16: I64Local,
-        pc: I64Local,
-        on_low_surrogate: I64Local,
-        function: &mut Function,
-    ) {
-        let selected = self.runtime_schema().reserve_i32_local(function);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        workspace.choices().is_empty(function);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::Br(5 + caller_block_depth));
-        function.instruction(&Instruction::End);
-        workspace
-            .choices()
-            .with_top(self, function, |entry, builder, function| {
-                entry.is_kind(ChoiceEntryKind::RequiredRun, function);
-                function.instruction(&Instruction::If(BlockType::Empty));
-                entry.restore_required_run(
-                    builder,
-                    pc,
-                    RegExpInputCursor {
-                        byte,
-                        utf16,
-                        on_low_surrogate,
-                    },
-                    selected,
-                    function,
-                );
-                selected.load(function);
-                function.instruction(&Instruction::I32Eqz);
-                function.instruction(&Instruction::If(BlockType::Empty));
-                function.instruction(&Instruction::Br(2));
-                function.instruction(&Instruction::End);
-                function.instruction(&Instruction::Else);
-                entry.is_kind(ChoiceEntryKind::LazyProgressAttempt, function);
-                function.instruction(&Instruction::If(BlockType::Empty));
-                entry.discard_through(function);
-                function.instruction(&Instruction::Br(2));
-                function.instruction(&Instruction::End);
-                entry.is_kind(ChoiceEntryKind::LazyProgressChoice, function);
-                function.instruction(&Instruction::If(BlockType::Empty));
-                entry.activate_lazy_attempt(function);
-                function.instruction(&Instruction::Else);
-                entry.discard_through(function);
-                function.instruction(&Instruction::End);
-                entry.restore_fallback(pc, function);
-                entry.restore_cursor(
-                    RegExpInputCursor {
-                        byte,
-                        utf16,
-                        on_low_surrogate,
-                    },
-                    function,
-                );
-                entry.restore_state(function);
-                function.instruction(&Instruction::End);
-                function.instruction(&Instruction::Br(1));
-            });
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        self.runtime_schema().release_i32_local(selected, function);
-        function.instruction(&Instruction::Br(1 + caller_block_depth));
-        function.instruction(&Instruction::End);
-    }
-
     fn emit_regexp_instruction_load(
         &self,
         address_local: I64Local,

@@ -353,6 +353,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn emit_regexp_counted_dispatch(
         &mut self,
         workspace: &MatcherWorkspace,
+        backtrack: &BacktrackRequest,
         c: &CountedMatcherLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
@@ -544,17 +545,7 @@ impl FunctionBuilder<'_> {
                     c.cursor.utf16.load(f);
                     f.instruction(&Instruction::I64Eq);
                     f.instruction(&Instruction::I32And);
-                    // Two caller If frames surround this shared raw matcher
-                    // branch: counted-family dispatch and exact End dispatch.
-                    self.emit_regexp_backtrack_or_fail(
-                        workspace,
-                        2,
-                        c.cursor.byte,
-                        c.cursor.utf16,
-                        c.pc,
-                        c.cursor.on_low_surrogate,
-                        f,
-                    );
+                    self.emit_regexp_backtrack_request_if(backtrack, f);
                     let accelerated = self.runtime_schema().reserve_i32_local(f);
                     f.instruction(&Instruction::I32Const(0));
                     accelerated.store(f);
