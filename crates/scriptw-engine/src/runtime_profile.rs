@@ -596,7 +596,7 @@ mod native_mode_cohort_tests {
             .unwrap()
             .artifact;
         assert!(
-            artifact.runtime().is_none(),
+            artifact.runtime.is_none(),
             "mode-key isolation must not compete with R in a one-entry cache"
         );
         for requested in [
