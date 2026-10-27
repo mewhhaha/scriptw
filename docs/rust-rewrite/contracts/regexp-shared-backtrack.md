@@ -33,9 +33,11 @@ tail and checkpoint. Sharing lexical code does not transfer its lease, publish
 scratch addresses, change saved snapshot extents or replace the existing typed
 choice-entry owners. Existing function-local GC roots remain in the matcher.
 
-Prepared controls should verify one emitted restoration owner, all mismatch
+Controls verify one emitted restoration owner, all mismatch
 request paths, unchanged local continuation branches, complete capture rollback,
 required/lazy/empty counted iterations, nested assertions, Unicode cursor state,
-resource failures and scratch retirement. Compilation, semantic verification
-and matched measurements for this batch remain pending. Static code sharing does
+resource failures and scratch retirement. The [source-bound checkpoint](../memory-regexp-backtrack-20261027.md)
+records successful compilation, 4,889 native cases, 6,307 unique selected original
+executions and the matched 17-workload cohort. This is not a full pinned-suite
+refresh. Static code sharing does
 not establish resident-memory, peak-memory or timing savings.

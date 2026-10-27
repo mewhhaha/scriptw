@@ -31,14 +31,16 @@ must not transfer helper-local roots into an outer path after clearing them;
 iterator-result extraction copies the successful value before releasing its
 pending completion. No state is reconstructed from public globals.
 
-Prepared controls should cover all fulfilled-stage entries, mapper/no-mapper
+Controls cover all fulfilled-stage entries, mapper/no-mapper
 paths, await-once behavior, source access and indexed-write ordering, close-error
-precedence, GC/reentry and foreign-Realm use. Whole-batch compilation, semantic
-verification and matched measurements remain pending. Shared emitted code does
+precedence, GC/reentry and foreign-Realm use. The [source-bound checkpoint](../memory-regexp-backtrack-20261027.md)
+records successful compilation, 4,889 native cases, 6,307 unique selected original
+executions and the matched 17-workload cohort. This is not a full pinned-suite
+refresh. Shared emitted code does
 not establish resident-memory, peak-memory or timing savings.
 
-The planned coherent checkpoint covers the complete affected native inventories
-(expected 4,889 cases) and 6,307 unique original pinned Test262 executions:
+The completed checkpoint covers the complete affected native inventories
+(4,889 cases) and 6,307 unique original pinned Test262 executions:
 2,365 earlier selected executions, 3,756 RegExp executions and 186 Array.fromAsync
 executions. The narrower RegExp/Unicode selections overlap that union and are
-not additional cases. These are verification targets, not reported results.
+not additional cases; overlap is not counted twice.

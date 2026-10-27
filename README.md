@@ -50,8 +50,8 @@ order. The selected verification and matched measurements are recorded in the
 The RegExp matcher shares one in-function backtracking body while preserving
 choice restoration, cursor/capture state and candidate retry order. The
 Array.fromAsync fulfilled continuation shares its mapper and commit/drive paths
-while retaining await and iterator-close ordering. Verification and measurements
-for this pass are pending; see the
+while retaining await and iterator-close ordering. See the
+[source-bound checkpoint](docs/rust-rewrite/memory-regexp-backtrack-20261027.md), the
 [backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md) and
 [continuation contract](docs/rust-rewrite/contracts/array-from-async-shared-fulfilled.md).
 
@@ -59,40 +59,41 @@ for this pass are pending; see the
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `a960f50ac`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `80b842693`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.228–1.632× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.229–1.591× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.3 MiB | 13.7 MiB |
-| Objects | 19.0 MiB | 14.4 MiB |
-| Retained objects | 24.7 MiB | 20.1 MiB |
+| Integer | 18.4 MiB | 13.6 MiB |
+| Objects | 19.1 MiB | 14.5 MiB |
+| Retained objects | 24.9 MiB | 20.2 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
-Scriptc parity remains open. Eager native accessors now share a typed allocation
-tail while retaining fresh function identity, defining Realm and source-string
-materialization order. Cross-runner comparisons do not establish causal savings.
+Scriptc parity remains open. RegExp recovery and Array.fromAsync fulfilled
+continuations now share existing in-function paths while retaining state and
+observable ordering. Cross-runner comparisons do not establish causal savings.
 
-[Verification](docs/rust-rewrite/memory-eager-accessors-20261027.md): **4,881 native cases, 2,365 original
-pinned Test262 executions and 16 separate Unicode executions passed**. The
-supplemental IDs are disjoint. The initial test-only compilation error, later inspection-test failure and
-repair are retained; measured and verified compiler-input closures are bound.
-Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
-retention. Original Test262 executions ran in fresh batches of at most 16.
+[Verification](docs/rust-rewrite/memory-regexp-backtrack-20261027.md): **4,889 native cases and 6,307 unique
+original pinned Test262 executions passed**: 2,365 prior selected executions,
+3,756 RegExp executions and 186 Array.fromAsync executions. The narrower 32-case
+RegExp and 16-case Unicode selections overlap RegExp and are not additional
+unique passes. This is not a full pinned-suite refresh. Verification used one
+CPU, a 4-GiB process-tree cap, no swap and bounded module retention; original
+executions ran in fresh batches of at most 16.
 
-[Prior phase-aligned method checkpoint](docs/rust-rewrite/memory-phase-boundaries-20261027.md):
-paused maps remain unscored and separate from every canonical graph. They do
-not establish heap ownership, peak memory or causal function attribution.
+Paused lifecycle maps remain unscored and separate from canonical graphs.
+The [phase method](docs/rust-rewrite/memory-phase-boundaries-20261027.md) does
+not identify heap ownership, peak memory or causal function attribution.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40552965169).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40578330181).
 
 ## Benchmarks
 
