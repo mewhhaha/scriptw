@@ -11,6 +11,10 @@ const NATIVE_DIRECT_EVAL_OWNERSHIP_TEST_SOURCE: &str =
     include_str!("../../src/native_direct_eval_compiler_tests/ownership.rs");
 const NATIVE_GLOBAL_SCRIPT_TEST_SOURCE: &str =
     include_str!("../../src/native_global_script_compiler_tests.rs");
+const NATIVE_SOURCE_COMPILER_SOURCE: &str =
+    include_str!("../../src/wasm_native_source_compiler.rs");
+const NATIVE_SOURCE_COMPILER_TEST_SOURCE: &str =
+    include_str!("../../src/wasm_native_source_compiler/tests.rs");
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -106,6 +110,13 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
         let declaration = format!("\n#[cfg(test)]\nmod {module};");
         assert_eq!(ENGINE_SOURCE.matches(declaration.as_str()).count(), 1);
     }
+    assert_eq!(
+        NATIVE_SOURCE_COMPILER_SOURCE
+            .matches("\n#[cfg(test)]\nmod tests;")
+            .count(),
+        1,
+        "the native source compiler regression consumer is test-only"
+    );
     let native_test_consumers = [
         (
             NATIVE_DIRECT_EVAL_TEST_SOURCE,
@@ -113,12 +124,14 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
             "fn assert_trace(source: &str, expected: &[&str], unmatched: &[Vec<u16>],
                 counts: (usize, usize, usize),) -> NativeDirectEvalCompilationSnapshot",
             "30_000",
+            "engine",
         ),
         (
             NATIVE_DIRECT_EVAL_OWNERSHIP_TEST_SOURCE,
             "direct_eval_native_compilation_and_execution_keep_the_original_parent_timeout",
             "fn direct_eval_native_compilation_and_execution_keep_the_original_parent_timeout()",
             "500",
+            "engine",
         ),
         (
             NATIVE_GLOBAL_SCRIPT_TEST_SOURCE,
@@ -127,10 +140,18 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
                 unmatched: &[(PreparedScriptKind, Vec<u16>)], iterator: bool,
                 counts: NativeGlobalScriptCompilationSnapshot, function_factories: usize,)",
             "30_000",
+            "engine",
+        ),
+        (
+            NATIVE_SOURCE_COMPILER_TEST_SOURCE,
+            "native_function_and_regexp_eval_resolve_new_exports_from_the_original_r",
+            "fn native_function_and_regexp_eval_resolve_new_exports_from_the_original_r()",
+            "30_000",
+            "compiler",
         ),
     ];
     let mut native_test_mode_uses = 0;
-    for (source, name, signature, timeout) in native_test_consumers {
+    for (source, name, signature, timeout, receiver) in native_test_consumers {
         let marker = format!("\nfn {name}(");
         assert_eq!(source.matches(marker.as_str()).count(), 1);
         let function = bounded(source, &marker, "\n}");
@@ -144,7 +165,7 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
         assert_eq!(source.matches("WasmExecutionMode").count(), 1);
         assert_eq!(function.matches("WasmExecutionMode").count(), 1);
         let route = format!(
-            "engine.execute_with_wasm_bytes_inner(artifact.program(),Some({timeout}),false,\
+            "{receiver}.execute_with_wasm_bytes_inner(artifact.program(),Some({timeout}),false,\
                 WasmModuleMemoryCachePolicy::Retain,&WasmExecutionMode::Structured,)"
         );
         assert_eq!(normalized(function).matches(route.as_str()).count(), 1);
@@ -165,7 +186,7 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
         .split_once('{')
         .expect("embedding state constructor body");
     assert!(!embedding_parameters.contains("WasmExecutionMode"));
-    // The three cfg(test) consumers and fixed embedding entry add no mode.
+    // These named cfg(test) consumers and fixed embedding entry add no mode.
     assert_eq!(
         count_in_rust_sources(&source_root, "WasmExecutionMode"),
         25 + native_test_mode_uses + 1
