@@ -87,7 +87,7 @@ fn append_helpers_accept_only_the_ordinary_header_and_share_one_projection() {
     }
     let array = bounded(
         LAYOUTS,
-        "struct ArrayObject => ArrayObjectSchema {",
+        "struct ArrayObject: JavaScriptObject => ArrayObjectSchema {",
         "        }",
     );
     assert!(array.contains("OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;"));
