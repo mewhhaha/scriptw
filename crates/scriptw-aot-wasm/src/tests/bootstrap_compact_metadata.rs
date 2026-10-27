@@ -99,8 +99,8 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     );
     assert_eq!(
         stored_values(&compact_allocator),
-        1,
-        "the ordinary object header owns one prototype snapshot; metadata adds no value boxes"
+        0,
+        "typed prototype references and compact metadata allocate no value boxes"
     );
     expect_valid_module(&artifact, 0);
 }
