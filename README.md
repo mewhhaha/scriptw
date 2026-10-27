@@ -55,6 +55,13 @@ for this pass are pending; see the
 [backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md) and
 [continuation contract](docs/rust-rewrite/contracts/array-from-async-shared-fulfilled.md).
 
+An opt-in `benchmark-module-images` feature adds owner-aware Linux mapping
+metadata to excluded phase diagnostics after all four captures are acknowledged.
+It does not change JavaScript semantics, scored measurements or the default
+embedding API. Verification is pending; see the
+[diagnostic ownership contract](docs/rust-rewrite/contracts/benchmark-module-images.md).
+No RSS improvement is claimed.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

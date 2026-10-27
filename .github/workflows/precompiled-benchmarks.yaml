@@ -46,11 +46,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary scripts.tests.test_precompiled_mapping_diagnostic -v
+          python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary scripts.tests.test_precompiled_mapping_diagnostic scripts.tests.test_benchmark_module_images -v
           bash scripts/check-no-legacy-js.sh
           python3 -B scripts/intl_source_identities.py
-          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --example compiler_precompiled_baseline -- --test-threads=1
-          bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --example compiler_precompiled_baseline --message-format=json > "$RUNNER_TEMP/precompiled-cargo.jsonl"
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --no-default-features --doc
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --features benchmark-module-images --lib embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop -- --exact --test-threads=1
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline -- --test-threads=1
+          bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline --message-format=json > "$RUNNER_TEMP/precompiled-cargo.jsonl"
       - name: Measure both compiler-free consumers
         env:
           BENCHMARK_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -26,6 +26,8 @@ rustix = { version = "=1.1.4", features = ["fs"] }
 sha2 = "0.10.9"
 
 [features]
+# Off by default; address-only hooks for excluded precompiled phase diagnostics.
+benchmark-module-images = []
 # Off by default: keeps the Boa interpreter (scriptw-spec-exec / boa_engine)
 # out of product and release builds. Only enable for developer-only
 # differential-oracle testing (see AGENTS.md and conformance area T25). Never enable this

@@ -19,6 +19,7 @@ import subprocess
 import time
 
 import precompiled_comparison as p
+import benchmark_module_images as module_images
 from limited_verification import kernel_group, require_kernel_budget
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -256,7 +257,9 @@ def validate_endpoint(raw, report, image, case, runtime, nonce, observation_inde
     p.require(isinstance(value, dict), 'diagnostic endpoint is not an object')
     expected = dict(schema='scriptw-precompiled-phase-barriers-v1', nonce=nonce,
                     observation_index=observation_index, completed_phases=list(PHASES))
-    p.require(value.get('phase_barriers') == expected
+    marker=value.get('phase_barriers')
+    core={key:item for key,item in marker.items() if key!='module_images'} if isinstance(marker,dict) else marker
+    p.require(core == expected
               and value.get('excluded_from_scored_cohorts') is True
               and value.get('diagnostic_total_timings_include_barrier_waits') is True,
               'missing or mismatched completed phase marker')
@@ -268,6 +271,7 @@ def validate_endpoint(raw, report, image, case, runtime, nonce, observation_inde
     del ordinary['diagnostic_total_timings_include_barrier_waits']
     _, matched = p._consumer(ordinary, report, image, case, runtime)
     p.require(matched, 'diagnostic output checksum mismatch')
+    return marker.get('module_images')
 
 
 def verify_executable(pid, host, info):
@@ -325,6 +329,11 @@ def capture(host, argv, destination, remaining, present_bits, observation_index)
                         item['executable_presence'] = dict(status='present-bits-only-no-PFNs', mappings=presence(process.pid, rows, host))
                     except (OSError, ValueError) as failure:
                         item['executable_presence'] = dict(status='unavailable', error=str(failure))
+                if present_bits:
+                    try:
+                        item['mapped_presence'] = module_images.readable_presence(process.pid, rows)
+                    except (OSError, ValueError) as failure:
+                        item['mapped_presence'] = dict(status='unavailable',error=str(failure))
                 item['unscored_capture_seconds'] = time.monotonic() - capture_started
                 record['snapshots'].append(item)
             drain_owned(process, {'stdout': out, 'stderr': err, 'control': control_out},
@@ -355,7 +364,7 @@ def capture(host, argv, destination, remaining, present_bits, observation_index)
 def run(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    result = dict(schema='scriptw-precompiled-mapping-diagnostic-v2', scored=False, excluded_from_scored_cohorts=True, status='unavailable', cases=[],
+    result = dict(schema='scriptw-precompiled-mapping-diagnostic-v2', module_function_attribution_status='deferred: no exact owned native ELF symbol binding is collected', scored=False, excluded_from_scored_cohorts=True, status='unavailable', cases=[],
                   limits=dict(deadline_seconds_per_case=DEADLINE, snapshots_per_case=MAX_SNAPSHOTS,
                               raw_smaps_total_bytes=MAX_TOTAL, stream_bytes_per_case=MAX_READ, control_bytes_per_case=MAX_CONTROL_BYTES),
                   interpretation='four acknowledged phase captures; unscored waits and timings never enter scored reports')
@@ -399,8 +408,19 @@ def run(args):
                 checkpoint()
                 if observation['status'] != 'failed':
                     try:
-                        validate_endpoint(bounded_read(directory/'stdout'), report, item['image'], case, runtime, observation['nonce'], observation['observation_index'])
+                        owner_value = validate_endpoint(bounded_read(directory/'stdout'), report, item['image'], case, runtime, observation['nonce'], observation['observation_index'])
                         observation['endpoint_stdout_validated'] = True
+                        identity=dict(source_commit=commit,source_fingerprint=report['source_fingerprint'],
+                            executable_sha256=result['executable_sha256'],image_sha256=metadata['sha256'],
+                            program_native_sha256=metadata['native_sha256'],runtime_key=metadata['runtime_key'],
+                            shared_configuration=report['shared_configuration'])
+                        try:
+                            observation['module_images']=owner_value
+                            observation['module_attribution']=module_images.validate_module_images(owner_value,runtime,
+                                observation['nonce'],observation['observation_index'],observation['snapshots'],identity)
+                            observation['module_attribution_validated']=True
+                        except (OSError,ValueError,KeyError,TypeError) as failure:
+                            observation.update(module_attribution_validated=False,module_attribution_error=str(failure))
                     except (ValueError, KeyError) as error:
                         observation.update(status='failed', error=str(error), endpoint_stdout_validated=False)
                 p.require(p.digest(host) == result['executable_sha256'] and p.digest(image) == metadata['sha256'],
@@ -408,8 +428,45 @@ def run(args):
                 if observation.get('endpoint_stdout_validated') and observation['status'] == 'barriers_complete':
                     observation.update(status='captured', phase_attribution_validated=True)
                 checkpoint()
+        # Inspect only after all four children have exited and all maps were
+        # captured. This retains inert symbol metadata, never the executable.
+        try:
+            symbols=module_images.host_symbol_inventory(host)
+            p.require(symbols['sha256']==result['executable_sha256'],'host symbol executable differs')
+            retained_symbols=set()
+            for observation in result['cases']:
+                try:
+                    attribution=module_images.attribute_host(symbols,observation['snapshots'],host)
+                    for symbol in attribution['symbols']:
+                        retained_symbols.add((symbol['name'],symbol['vaddr'],symbol['bytes'],symbol['file_offset']))
+                    path=output/('host-symbol-overlap-'+observation['runtime']+'-'+observation['file']+'.json')
+                    encoded=(json.dumps(attribution,indent=2)+'\n').encode()
+                    p.require(len(encoded)<=16*1024**2,'host overlap metadata byte bound exceeded')
+                    path.write_bytes(encoded)
+                    observation['host_symbol_attribution']=dict(path=path.name,bytes=len(encoded),sha256=hashlib.sha256(encoded).hexdigest(),
+                        overlapping_functions=len(attribution['symbols']),interpretation=attribution['interpretation'])
+                    observation['host_symbol_attribution_validated']=True
+                except (OSError,ValueError,KeyError,TypeError) as failure:
+                    observation.update(host_symbol_attribution_validated=False,host_symbol_attribution_error=str(failure))
+            # Retain exact symbols overlapping captured present pages; retain
+            # counts for omitted cold symbols, not a second large binary artifact.
+            symbols['total_defined_function_symbols']=len(symbols['functions'])
+            symbols['functions']=[symbol for symbol in symbols['functions'] if
+                (symbol['name'],symbol['vaddr'],symbol['bytes'],symbol['file_offset']) in retained_symbols]
+            symbols['retained_present_overlap_symbols']=len(symbols['functions'])
+            symbols['interpretation']='Exact inert symbols overlapping at least one captured present executable page; other symbols omitted, counts retained. Overlap is not execution.'
+            symbol_path=output/'host-elf-symbols.json'
+            encoded=(json.dumps(symbols,indent=2)+'\n').encode()
+            p.require(len(encoded)<=16*1024**2,'host symbol metadata byte bound exceeded')
+            symbol_path.write_bytes(encoded)
+            result['host_symbol_inventory']=dict(path=symbol_path.name,bytes=len(encoded),sha256=hashlib.sha256(encoded).hexdigest())
+            result['host_symbol_inventory_status']='validated'
+        except (OSError,ValueError,KeyError,TypeError) as failure:
+            result.update(host_symbol_inventory_status='unavailable',host_symbol_inventory_error=str(failure))
+        checkpoint()
         p.require(p.digest(campaign/'report.json') == result['scored_report_sha256'], 'scored report changed')
-        result['status'] = 'captured' if all(row['status'] == 'captured' for row in result['cases']) else 'incomplete'
+        result['status'] = 'captured' if all(row['status'] == 'captured' and row.get('module_attribution_validated') is True
+            and row.get('host_symbol_attribution_validated') is True for row in result['cases']) else 'incomplete'
     except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError) as error:
         result['error'] = str(error)
     finally:
