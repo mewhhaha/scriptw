@@ -1,7 +1,7 @@
 //! Own indexed data value probe; deferred property values resolve on demand. `found` is separate from the
 //! value: a present undefined is never confused with a hole or an accessor.
 use super::*;
-use crate::gc_types::{ArrayIndexedStorageMode, ArrayObject};
+use crate::gc_types::ArrayObject;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_array_own_indexed_value(
@@ -15,7 +15,7 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         found.set_constant(0, f);
         let storage = self.emit_array_index_storage(array, f);
-        s.array_storage_mode_is(&storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        s.array_storage_is_packed(&storage, f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_packed_array_value(&storage, index, output, found, f);
         f.instruction(&Instruction::Else);

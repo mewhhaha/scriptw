@@ -1,5 +1,5 @@
-//! Unboxed Number bits with an independent occupied-slot bitmap. No NaN is a
-//! hole sentinel. Cold descriptor consumers transition the whole live backing
+//! Packed ordinary data uses Number bits/presence or nullable immutable value
+//! slots. No JavaScript value is a hole sentinel. Cold consumers retire the backing
 //! before receiving any mutable descriptor reference.
 use super::*;
 use crate::gc_types::{
@@ -36,7 +36,7 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(target.cast_reference::<ArrayObject>(s, f), f);
         let storage = self.emit_array_index_storage(&array, f);
-        s.array_storage_mode_is(&storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        s.array_storage_is_packed(&storage, f);
         self.open_frame(ControlFrameKind::If, f);
         let index32 = s.reserve_i32_local(f);
         let indexed = s.reserve_i32_local(f);
@@ -65,7 +65,7 @@ impl FunctionBuilder<'_> {
         Ok(handled)
     }
     /// Ordinary Set can bypass descriptor/prototype work only for a present
-    /// own packed Number slot on the exact target/receiver reference.
+    /// own packed data slot on the exact target/receiver reference.
     pub(crate) fn emit_packed_array_existing_data_write(
         &mut self,
         target: &ValueLocals,
@@ -86,16 +86,12 @@ impl FunctionBuilder<'_> {
         receiver.reference().load(f);
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32And);
-        value.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
-        f.instruction(&Instruction::I32Eq);
-        f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
         let array = s
             .reserve_gc_local(f)
             .initialize(target.cast_reference::<ArrayObject>(s, f), f);
         let storage = self.emit_array_index_storage(&array, f);
-        s.array_storage_mode_is(&storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        s.array_storage_is_packed(&storage, f);
         self.open_frame(ControlFrameKind::If, f);
         let index32 = s.reserve_i32_local(f);
         let indexed = s.reserve_i32_local(f);
@@ -111,23 +107,10 @@ impl FunctionBuilder<'_> {
         self.emit_packed_array_present(&storage, index, found, f);
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        // Presence already proves capacity and unchanged full attributes.
-        // No allocation/callback separates that proof from the single write.
-        let numbers = s.reserve_gc_local(f).initialize(
-            s.field(ArrayIndexStorageSchema::NUMBERS)
-                .read(&storage, s, f)
-                .reference(),
-            f,
-        );
-        s.array_type::<NumberBitsI64Array>().write(
-            &numbers,
-            index32,
-            GcOperand::i64_local(value.scalar()),
-            s,
-            f,
-        );
-        handled.set_constant(1, f);
-        numbers.clear(f);
+        let published = self.packed_number_write(&storage, index, value, f);
+        published.load(f);
+        handled.store(f);
+        s.release_i32_local(published, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(found, f);
@@ -212,7 +195,7 @@ impl FunctionBuilder<'_> {
         self.emit_packed_array_probe(storage, index, None, found, f);
     }
 
-    fn emit_packed_array_probe(
+    fn emit_packed_number_probe(
         &mut self,
         storage: &GcLocal<ArrayIndexStorage>,
         index: I64Local,
@@ -276,7 +259,7 @@ impl FunctionBuilder<'_> {
         result
     }
 
-    fn packed_number_write(
+    fn packed_number_only_write(
         &mut self,
         storage: &GcLocal<ArrayIndexStorage>,
         index: I64Local,
@@ -462,7 +445,7 @@ impl FunctionBuilder<'_> {
 
     /// All descriptor consumers must call this before obtaining a reference.
     /// Returned descriptors therefore remain the actual mutable store owners.
-    pub(super) fn emit_materialize_packed_array(
+    fn emit_materialize_packed_numbers(
         &mut self,
         storage: &GcLocal<ArrayIndexStorage>,
         f: &mut Function,
@@ -575,6 +558,8 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
+        s.field(ArrayIndexStorageSchema::VALUES)
+            .write(storage, GcOperand::null(s), s, f);
         presence.clear(f);
         numbers.clear(f);
     }
@@ -589,7 +574,7 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let handled = s.reserve_i32_local(f);
         handled.set_constant(0, f);
-        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        s.array_storage_is_packed(storage, f);
         self.open_frame(ControlFrameKind::If, f);
         let flags = s.reserve_i32_local(f);
         s.field(PropertyDescriptorSchema::FLAGS)
@@ -688,7 +673,7 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(f))
     }
 
-    pub(super) fn emit_packed_array_delete(
+    fn emit_packed_number_delete(
         &mut self,
         storage: &GcLocal<ArrayIndexStorage>,
         index: I64Local,
@@ -765,7 +750,7 @@ impl FunctionBuilder<'_> {
         handled
     }
 
-    pub(super) fn emit_packed_array_keys(
+    fn emit_packed_number_keys(
         &mut self,
         storage: &GcLocal<ArrayIndexStorage>,
         keys: &ArrayIndexKeyConstruction,
@@ -825,3 +810,5 @@ impl FunctionBuilder<'_> {
         numbers.clear(f);
     }
 }
+
+mod values;

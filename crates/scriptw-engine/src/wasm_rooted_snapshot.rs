@@ -635,6 +635,15 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             let presence = self.required_reference(storage, F::ArrayNumberPresent)?;
             let presence = self.array(presence, L::ArrayNumberPresence)?;
             let presence_words = presence.len(&*self.store).map_err(invariant)?;
+            let values = self
+                .reference(storage, F::ArrayValues)?
+                .map(|value| self.array(value, L::ArrayValues))
+                .transpose()?;
+            let value_capacity = values
+                .as_ref()
+                .map(|values| values.len(&*self.store).map_err(invariant))
+                .transpose()?
+                .unwrap_or(0);
             let mode = match self.field(storage, F::ArrayMode)? {
                 WasmtimeVal::I32(code) => scriptw_aot_wasm::snapshot_array_storage_mode(code)
                     .ok_or_else(|| invariant("unknown Array storage mode"))?,
@@ -645,6 +654,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 ArrayIndexedStorageMode::PackedNumbers => {
                     if bucket_count != 0
                         || dense_capacity != 0
+                        || values.is_some()
                         || number_capacity > (1 << 20)
                         || (number_capacity != 0 && !number_capacity.is_power_of_two())
                         || presence_words != number_capacity.div_ceil(64)
@@ -705,8 +715,61 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                         }
                     }
                 }
+                ArrayIndexedStorageMode::PackedValues => {
+                    if bucket_count != 0
+                        || dense_capacity != 0
+                        || number_capacity != 0
+                        || presence_words != 0
+                        || value_capacity > (1 << 20)
+                        || (value_capacity != 0 && !value_capacity.is_power_of_two())
+                        || count as u64 > u64::from(value_capacity)
+                    {
+                        return Err(invariant("invalid packed value Array capacity/count"));
+                    }
+                    budget.work(value_capacity as usize)?;
+                    if let Some(values) = &values {
+                        for index in 0..value_capacity {
+                            let raw = values.get(&mut *self.store, index).map_err(invariant)?;
+                            let Some(stored) = eq_reference(self.store, raw)? else {
+                                continue;
+                            };
+                            if i64::from(index) >= length || ordered.len() >= count as usize {
+                                return Err(invariant(
+                                    "invalid occupied packed value Array index/count",
+                                ));
+                            }
+                            self.require(stored, L::Stored)?;
+                            let value = self.stored(stored)?;
+                            let key = budget.collect_utf16(
+                                index
+                                    .to_string()
+                                    .encode_utf16()
+                                    .collect::<Vec<_>>()
+                                    .into_iter(),
+                            )?;
+                            ordered.push((
+                                0,
+                                index,
+                                ordered.len(),
+                                SnapshotRawProperty {
+                                    key: SnapshotRawKey::String(key),
+                                    descriptor: SnapshotRawDescriptor::Data {
+                                        value,
+                                        writable: true,
+                                        enumerable: true,
+                                        configurable: true,
+                                    },
+                                },
+                            ));
+                        }
+                    }
+                }
                 ArrayIndexedStorageMode::DenseDescriptors => {
-                    if bucket_count != 0 || number_capacity != 0 || presence_words != 0 {
+                    if bucket_count != 0
+                        || number_capacity != 0
+                        || presence_words != 0
+                        || values.is_some()
+                    {
                         return Err(invariant("inactive Array backing is not empty"));
                     }
                     if dense_capacity > (1 << 20)
@@ -742,6 +805,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     if dense_capacity != 0
                         || number_capacity != 0
                         || presence_words != 0
+                        || values.is_some()
                         || (bucket_count == 0 && count != 0)
                         || (bucket_count != 0 && !bucket_count.is_power_of_two())
                     {
@@ -823,13 +887,15 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             }
             let tags = self.required_reference(storage, F::CompactTags)?;
             let scalars = self.reference(storage, F::CompactScalars)?;
-            let references = self.required_reference(storage, F::CompactReferences)?;
+            let references = self.reference(storage, F::CompactReferences)?;
             let keys = self.array(keys, L::CompactKeys)?;
             let tags = self.array(tags, L::CompactTags)?;
             let scalars = scalars
                 .map(|value| self.array(value, L::CompactScalars))
                 .transpose()?;
-            let references = self.array(references, L::CompactReferences)?;
+            let references = references
+                .map(|value| self.array(value, L::CompactReferences))
+                .transpose()?;
             let length = keys.len(&*self.store).map_err(invariant)?;
             if length > 16
                 || tags.len(&*self.store).map_err(invariant)? != length
@@ -838,7 +904,11 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     .map(|values| values.len(&*self.store).map_err(invariant))
                     .transpose()?
                     .is_some_and(|count| count != length)
-                || references.len(&*self.store).map_err(invariant)? != length
+                || references
+                    .as_ref()
+                    .map(|values| values.len(&*self.store).map_err(invariant))
+                    .transpose()?
+                    .is_some_and(|count| count != length)
             {
                 return Err(invariant("invalid compact property extent"));
             }
@@ -869,10 +939,15 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     }
                     None => 0,
                 };
-                let raw = references
-                    .get(&mut *self.store, ordinal)
-                    .map_err(invariant)?;
-                let reference = eq_reference(self.store, raw)?;
+                let reference = match &references {
+                    Some(references) => {
+                        let raw = references
+                            .get(&mut *self.store, ordinal)
+                            .map_err(invariant)?;
+                        eq_reference(self.store, raw)?
+                    }
+                    None => None,
+                };
                 scriptw_aot_wasm::GcHostValue::check(tag, scalar, reference.is_some())
                     .map_err(invariant)?;
                 ordered.push((

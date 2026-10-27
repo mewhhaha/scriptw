@@ -1335,6 +1335,7 @@ fn emit_script_module_with_factory(
             OrdinaryOwnDescriptor, compile_ordinary_own_descriptor_helper;
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
             NativeFunctionAllocate, compile_native_function_allocate_helper;
+            IntrinsicMethodPublish, compile_intrinsic_method_publish_helper;
             PropertyValueResolve, compile_property_value_resolve_helper;
             ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;

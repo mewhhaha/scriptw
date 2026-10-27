@@ -220,6 +220,8 @@ fn compiled_numbers_use_bitmap_arrays_and_keep_real_descriptor_fallback() {
             "P's program-only type suffix must not alter shared recursive groups");
         let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
         let presence = runtime.witness_type(GcSnapshotLayout::ArrayNumberPresence);
+        let values = runtime.witness_type(GcSnapshotLayout::ArrayValues);
+        let stored = runtime.witness_type(GcSnapshotLayout::Stored);
         let descriptor = runtime.witness_type(GcSnapshotLayout::Descriptor);
         let dense = runtime.witness_type(GcSnapshotLayout::ArrayDense);
         assert_ne!(numbers, presence, "Number payload and hole presence are distinct arrays");
@@ -234,8 +236,11 @@ fn compiled_numbers_use_bitmap_arrays_and_keep_real_descriptor_fallback() {
             assert!(default_publish_body.iter().any(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == array)), "shared R publication writes its physical packed backing");
             assert!(!make.iter().any(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == array)), "P never duplicates the shared packed publication CFG");
         }
+        assert!(default_publish_body.iter().any(|op| matches!(op, Operator::ArrayNew { array_type_index } if *array_type_index == values)), "the shared owner grows a nullable immutable-value table for general ordinary data");
+        assert!(default_publish_body.iter().any(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == values)), "general data publication writes the actual typed slot table");
+        assert!(default_publish_body.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == stored)), "numeric promotion and incoming general values publish real immutable StoredValues");
         let (publish, publish_body) = runtime.named("helper::array_indexed_publish");
-        assert!(calls(default_publish_body, publish), "non-Number values keep R's actual descriptor publication fallback");
+        assert!(calls(default_publish_body, publish), "ineligible default-data values retain R's actual descriptor publication fallback");
         assert!(default_publish_body.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == descriptor)), "the shared default-data owner boxes the incoming descriptor before its raw publication fallback");
         let descriptor_count = |body: &[Operator<'_>]| body.iter().filter(|op|
             matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == descriptor)).count();
@@ -247,10 +252,11 @@ fn compiled_numbers_use_bitmap_arrays_and_keep_real_descriptor_fallback() {
         let (object_read, read) = runtime.named("helper::object_read");
         assert!(calls(source_read, program.imported_runtime(&runtime, object_read)),
             "the canonical nonliteral GetV source body calls the actual linked R ObjectRead definition");
-        for array in [numbers, presence] {
+        for array in [numbers, presence, values] {
             assert!(read.iter().any(|op| matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == array)), "ordinary read reaches encoded packed value/presence loads");
         }
         let (_, delete) = runtime.named("helper::array_indexed_delete");
+        assert!(delete.iter().any(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == values)), "general deletion clears the actual nullable value edge");
         assert!(delete.iter().any(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == presence)), "deletion clears explicit presence rather than inventing a Number sentinel");
     }).unwrap().join().unwrap();
 }

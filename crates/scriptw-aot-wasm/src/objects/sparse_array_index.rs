@@ -1,5 +1,5 @@
 //! The shared indexed store dispatches between bounded dense descriptors and
-//! sparse nodes and packed Number bits. An explicit closed mode selects the
+//! sparse nodes and packed ordinary data. An explicit closed mode selects the
 //! active backing. Logical Array length never sizes any backing.
 use super::*;
 use crate::gc_types::{
@@ -40,7 +40,7 @@ impl FunctionBuilder<'_> {
         let storage = self.emit_array_index_storage(array, f);
         // A query for a missing index must not retire packed storage (Array
         // push and ordinary definition probe a missing index before publishing).
-        schema.array_storage_mode_is(&storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        schema.array_storage_is_packed(&storage, f);
         self.open_frame(ControlFrameKind::If, f);
         let found = schema.reserve_i32_local(f);
         found.set_constant(0, f);
@@ -758,7 +758,7 @@ impl FunctionBuilder<'_> {
         let cursor = schema
             .reserve_gc_local::<ArrayIndexEntry, Nullable>(f)
             .initialize_null(schema, f);
-        schema.array_storage_mode_is(&storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        schema.array_storage_is_packed(&storage, f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_packed_array_keys(&storage, &keys, output, f);
         f.instruction(&Instruction::Else);

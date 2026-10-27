@@ -26,6 +26,7 @@ snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String 
     Descriptor => PropertyDescriptor, PrivateElements => PrivateElementTable,
     Array => ArrayObject, ArrayStorage => ArrayIndexStorage, ArrayBuckets => ArrayIndexBucketTable,
     ArrayEntry => ArrayIndexEntry, ArrayDense => IndexedTable,
+    ArrayValues => PackedValueTable,
     ArrayNumbers => NumberBitsI64Array, ArrayNumberPresence => NumberPresenceU64Array,
     Function => FunctionObject, Code => ExecutableCode,
     Context => FunctionContext, Realm => RealmRecord, Intrinsics => IntrinsicTable,
@@ -72,6 +73,7 @@ snapshot_fields!(StoredTag => Stored, StoredValueSchema::TAG,
     ArrayBuckets => ArrayStorage, ArrayIndexStorageSchema::BUCKETS, ArrayCount => ArrayStorage, ArrayIndexStorageSchema::COUNT,
     ArrayDense => ArrayStorage, ArrayIndexStorageSchema::DENSE,
     ArrayMode => ArrayStorage, ArrayIndexStorageSchema::MODE,
+    ArrayValues => ArrayStorage, ArrayIndexStorageSchema::VALUES,
     ArrayNumbers => ArrayStorage, ArrayIndexStorageSchema::NUMBERS,
     ArrayNumberPresent => ArrayStorage, ArrayIndexStorageSchema::NUMBER_PRESENT,
     ArrayIndex => ArrayEntry, ArrayIndexEntrySchema::INDEX, ArrayDescriptor => ArrayEntry, ArrayIndexEntrySchema::DESCRIPTOR,
@@ -89,6 +91,7 @@ pub fn snapshot_array_storage_mode(code: i32) -> Option<ArrayIndexedStorageMode>
         ArrayIndexedStorageMode::DenseDescriptors,
         ArrayIndexedStorageMode::SparseDescriptors,
         ArrayIndexedStorageMode::PackedNumbers,
+        ArrayIndexedStorageMode::PackedValues,
     ]
     .into_iter()
     .find(|mode| mode.encode() == code)

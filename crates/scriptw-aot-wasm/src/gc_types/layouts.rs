@@ -60,6 +60,7 @@ pub enum ArrayIndexedStorageMode {
     DenseDescriptors,
     SparseDescriptors,
     PackedNumbers,
+    PackedValues,
 }
 
 // Reuse the closed domains already validated by the actual builtin/provider
@@ -888,7 +889,8 @@ gc_layout_registry! {
             SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
             TAGS: GcRef<CompactTagArray>, Immutable, NonNullable;
             SCALARS: GcRef<CompactScalarArray>, Mutable, Nullable;
-            REFERENCES: GcRef<CompactReferenceArray>, Immutable, NonNullable;
+            // Null backing means every slot has a null reference payload.
+            REFERENCES: GcRef<CompactReferenceArray>, Mutable, Nullable;
         }
         // Shape graphs retain only immutable primitive string metadata.
         struct CompactDataShape => CompactDataShapeSchema {
@@ -920,7 +922,8 @@ gc_layout_registry! {
         // Only the storage constructor and registered mutation bodies own the
         // closed mode and occupied-entry count. Packed Number values use raw
         // bits plus a hole-presence bitmap; full descriptors remain available
-        // after one-way transitions. Inactive backings are always empty.
+        // after one-way transitions. General ordinary data uses nullable immutable
+        // StoredValue slots; inactive VALUES is null and other backings empty.
         struct ArrayIndexStorage => ArrayIndexStorageSchema {
             BUCKETS: GcRef<ArrayIndexBucketTable>, Mutable, NonNullable;
             COUNT: I64Value, Mutable, NonNullable;
@@ -928,7 +931,9 @@ gc_layout_registry! {
             MODE: ArrayIndexedStorageMode, Mutable, NonNullable;
             NUMBERS: GcRef<NumberBitsI64Array>, Mutable, NonNullable;
             NUMBER_PRESENT: GcRef<NumberPresenceU64Array>, Mutable, NonNullable;
+            VALUES: GcRef<PackedValueTable>, Mutable, Nullable;
         }
+        array PackedValueTable => PackedValueTableSchema { ELEMENT: GcRef<StoredValue>, Mutable, Nullable; }
         array NumberBitsI64Array => NumberBitsI64ArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         array NumberPresenceU64Array => NumberPresenceU64ArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         struct ArrayIndexEntry => ArrayIndexEntrySchema {

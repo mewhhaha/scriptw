@@ -35,3 +35,4 @@ mod aot_gc_typed_array_immutable_properties;
 mod aot_gc_typed_array_method_entries;
 mod aot_gc_uint8array_codec_entries;
 mod aot_gc_uri_entries;
+mod aot_gc_value_backing_transitions;

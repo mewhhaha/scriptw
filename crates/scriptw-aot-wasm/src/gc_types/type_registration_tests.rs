@@ -484,7 +484,41 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     assert_eq!(ArrayIndexStorageSchema::MODE.ordinal().raw(), 3);
     assert_eq!(ArrayIndexStorageSchema::NUMBERS.ordinal().raw(), 4);
     assert_eq!(ArrayIndexStorageSchema::NUMBER_PRESENT.ordinal().raw(), 5);
-    assert_eq!(storage.fields.len(), 6);
+    assert_eq!(storage.fields.len(), 7);
+    assert_eq!(ArrayIndexStorageSchema::VALUES.ordinal().raw(), 6);
+    let values = &storage.fields[6];
+    assert!(values.mutable);
+    assert_eq!(
+        values.element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index(
+                    GcLayout::PackedValueTable
+                )))
+            )
+            .unwrap()
+        ))
+    );
+    let CompositeInnerType::Array(value_slots) = &types[index(GcLayout::PackedValueTable) as usize]
+        .composite_type
+        .inner
+    else {
+        panic!("general packed slots are a real GC array")
+    };
+    assert!(value_slots.0.mutable);
+    assert_eq!(
+        value_slots.0.element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index(
+                    GcLayout::StoredValue
+                )))
+            )
+            .unwrap()
+        ))
+    );
     let mode = ArrayIndexStorageSchema::MODE.ordinal().raw() as usize;
     assert!(storage.fields[mode].mutable);
     assert_eq!(
@@ -549,7 +583,7 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     module.section(&code);
     Validator::new_with_features(WasmFeatures::all())
         .validate_all(&module.finish())
-        .expect("the complete six-field constructor has valid Wasm stack types");
+        .expect("the complete seven-field constructor has valid Wasm stack types");
     let mut body = Vec::new();
     wasm_encoder::Encode::encode(&constructor, &mut body);
     let mut reader = wasmparser::BinaryReader::new(&body, 0);
@@ -641,8 +675,9 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
             Operand::I32(ArrayIndexedStorageMode::PackedNumbers.encode()),
             empty(schema.empty_arrays.number_bits.index()),
             empty(schema.empty_arrays.number_presence.index()),
+            Operand::Reference {global:None,non_null:false},
         ],
-        "StructNew consumes exactly the declared BUCKETS/COUNT/DENSE/MODE/NUMBERS/NUMBER_PRESENT values"
+        "StructNew consumes exactly the declared BUCKETS/COUNT/DENSE/MODE/NUMBERS/NUMBER_PRESENT/VALUES values"
     );
 }
 

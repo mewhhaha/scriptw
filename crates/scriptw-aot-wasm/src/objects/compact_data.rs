@@ -351,10 +351,19 @@ impl FunctionBuilder<'_> {
             .store_i64(value.scalar(), f);
         present.clear(f);
         f.instruction(&Instruction::End);
+        value.reference().clear(f);
+        references.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(references.load(schema, f).require_non_null(f), f);
         schema
             .array_type::<CompactReferenceArray>()
-            .read(&references, slot, schema, f)
+            .read(&present, slot, schema, f)
             .store_eq(value.reference(), f);
+        present.clear(f);
+        f.instruction(&Instruction::End);
         references.clear(f);
         scalars.clear(f);
         tags.clear(f);
@@ -441,14 +450,57 @@ impl FunctionBuilder<'_> {
         );
         present.clear(f);
         f.instruction(&Instruction::End);
-        // Replacing a reference with a scalar clears the old strong edge too.
+        // Missing reference backing encodes null for every present slot. The
+        // tag still distinguishes undefined/null/scalars from missing properties.
+        references.load(schema, f).is_null(f);
+        value.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let length = schema.reserve_i32_local(f);
+        schema
+            .array_type::<CompactTagArray>()
+            .length(&tags, schema, f);
+        length.store(f);
+        let undefined = schema.reserve_value_local(f);
+        undefined.set_undefined(f);
+        let allocated = schema.reserve_gc_local(f).initialize(
+            schema.array_type::<CompactReferenceArray>().filled(
+                GcOperand::eq_reference(undefined.reference()),
+                length,
+                f,
+            ),
+            f,
+        );
+        schema.field(CompactDataStorageSchema::REFERENCES).write(
+            storage,
+            GcOperand::nullable_reference(&allocated, schema),
+            schema,
+            f,
+        );
+        references.replace(allocated.load(schema, f).nullable(), f);
+        allocated.clear(f);
+        undefined.clear(f);
+        schema.release_i32_local(length, f);
+        f.instruction(&Instruction::End);
+        // Once allocated, every write updates the backing, including null
+        // overwrites that must retire the old strong edge.
+        references.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(references.load(schema, f).require_non_null(f), f);
         schema.array_type::<CompactReferenceArray>().write(
-            &references,
+            &present,
             slot,
             GcOperand::eq_reference(value.reference()),
             schema,
             f,
         );
+        present.clear(f);
+        f.instruction(&Instruction::End);
         references.clear(f);
         scalars.clear(f);
         tags.clear(f);

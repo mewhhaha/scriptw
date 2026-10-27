@@ -32,6 +32,9 @@ ELF headers when file and mapping device IDs differ.
 Final program modules retain only referenced runtime imports; instantiation
 registers the exports requested by the actual module. See the
 [import contract](docs/rust-rewrite/contracts/runtime-program-import-compaction.md).
+Ordinary Array data and compact literal backing use typed storage states; see
+[the compact backing contract](docs/rust-rewrite/contracts/compact-value-backing.md).
+Intrinsic method installation shares descriptor-publication code across aliases.
 
 ## Precompiled comparison
 

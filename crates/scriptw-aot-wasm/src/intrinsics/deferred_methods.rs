@@ -7,7 +7,10 @@
 
 use super::*;
 use crate::gc_types::*;
-use crate::runtime_helpers::{HelperParameters, RuntimeHelperId};
+use crate::runtime_helpers::{
+    HelperParameters, IntrinsicMethodPublishArguments, IntrinsicMethodPublishParameters,
+    RuntimeHelperId,
+};
 
 #[derive(Clone, Copy)]
 pub(super) struct DeferredIntrinsicMethod(StandardBuiltinId);
@@ -51,7 +54,13 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        let absent = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
+        let value = s
+            .reserve_gc_local(f)
+            .initialize(recipe.load(s, f).upcast(), f);
+        let writable_flag = s.reserve_i32_local(f);
+        writable_flag.set_constant(i32::from(writable), f);
+        let configurable_flag = s.reserve_i32_local(f);
+        configurable_flag.set_constant(i32::from(configurable), f);
         let header = s
             .reserve_gc_local(f)
             .initialize(self.emit_object_header_projection(target, f), f);
@@ -59,33 +68,73 @@ impl FunctionBuilder<'_> {
             let key = self.intrinsic_key(key, f)?;
             // Aliases share the immutable recipe, but independently mutable
             // descriptor records, just like eager native data properties.
-            let copy = s.reserve_gc_local(f).initialize(
-                s.struct_type::<PropertyDescriptor>().construct(
-                    (
-                        GcOperand::descriptor_word(
-                            StoredPropertyAttributes::Data {
-                                writable,
-                                enumerable: false,
-                                configurable,
-                            }
-                            .descriptor_word(),
-                        ),
-                        GcOperand::subtype_reference(&recipe, s),
-                        GcOperand::reference(&absent, s),
-                        GcOperand::reference(&absent, s),
-                    ),
-                    f,
+            s.call_helper(
+                IntrinsicMethodPublishArguments::new(
+                    &header,
+                    &key,
+                    &value,
+                    writable_flag,
+                    configurable_flag,
                 ),
+                self.runtime_helper_base()?,
                 f,
             );
-            self.emit_ordinary_append_property_entry(&header, &key, &copy, f)?;
-            copy.clear(f);
             key.clear(f);
         }
         header.clear(f);
-        absent.clear(f);
+        s.release_i32_local(configurable_flag, f);
+        s.release_i32_local(writable_flag, f);
+        value.clear(f);
         recipe.clear(f);
         Ok(())
+    }
+
+    /// Fresh descriptors remain distinct mutable records. Only their immutable
+    /// value and canonical absent accessors are shared by alias publications.
+    pub(crate) fn compile_intrinsic_method_publish_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::IntrinsicMethodPublish);
+        let p = self.helper_parameters::<IntrinsicMethodPublishParameters>(&mut f);
+        let s = self.runtime_schema();
+        // No caller can smuggle accessor/unknown bits through a raw flag word.
+        // Normalize the two private boolean operands before building Data flags.
+        let writable = s.reserve_i32_local(&mut f);
+        p.writable.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        writable.store(&mut f);
+        let configurable = s.reserve_i32_local(&mut f);
+        p.configurable.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        configurable.store(&mut f);
+        let enumerable = s.reserve_i32_local(&mut f);
+        enumerable.set_constant(0, &mut f);
+        let absent = s
+            .reserve_gc_local(&mut f)
+            .initialize(s.stored_undefined(&mut f), &mut f);
+        let descriptor = s.reserve_gc_local(&mut f).initialize(
+            s.struct_type::<PropertyDescriptor>().construct(
+                (
+                    GcOperand::data_descriptor_flags(writable, enumerable, configurable),
+                    GcOperand::reference(&p.value, s),
+                    GcOperand::reference(&absent, s),
+                    GcOperand::reference(&absent, s),
+                ),
+                &mut f,
+            ),
+            &mut f,
+        );
+        self.emit_ordinary_append_property_entry(&p.object, &p.key, &descriptor, &mut f)?;
+        descriptor.clear(&mut f);
+        absent.clear(&mut f);
+        s.release_i32_local(enumerable, &mut f);
+        s.release_i32_local(configurable, &mut f);
+        s.release_i32_local(writable, &mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
 
     /// Ordinary stored values keep their direct read. The cold recipe branch
@@ -248,3 +297,6 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

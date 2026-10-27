@@ -97,19 +97,9 @@ impl FunctionBuilder<'_> {
             .array_type::<CompactShapeKeys>()
             .length(&keys, schema, &mut f);
         length.store(&mut f);
-        let undefined = schema.reserve_value_local(&mut f);
-        undefined.set_undefined(&mut f);
         let tags = schema.reserve_gc_local(&mut f).initialize(
             schema.array_type::<CompactTagArray>().filled(
                 GcOperand::i32(WasmRuntimeValueTag::Undefined as i32),
-                length,
-                &mut f,
-            ),
-            &mut f,
-        );
-        let references = schema.reserve_gc_local(&mut f).initialize(
-            schema.array_type::<CompactReferenceArray>().filled(
-                GcOperand::eq_reference(undefined.reference()),
                 length,
                 &mut f,
             ),
@@ -121,7 +111,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&p.shape, schema),
                     GcOperand::reference(&tags, schema),
                     GcOperand::null(schema),
-                    GcOperand::reference(&references, schema),
+                    GcOperand::null(schema),
                 ),
                 &mut f,
             ),
@@ -137,9 +127,7 @@ impl FunctionBuilder<'_> {
             self.emit_alloc_object_header_with_storage(&p.prototype, mutable, &base, &mut f);
         base.clear(&mut f);
         compact.clear(&mut f);
-        references.clear(&mut f);
         tags.clear(&mut f);
-        undefined.clear(&mut f);
         keys.clear(&mut f);
         schema.release_i32_local(mutable, &mut f);
         schema.release_i32_local(length, &mut f);

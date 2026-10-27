@@ -485,7 +485,7 @@ word_i32_codec!(
 );
 enum_i32_codec!(ProxyCallCapability; ObjectOnly => 0, CallOnly => 1, CallAndConstruct => 2);
 enum_i32_codec!(MapIterationKind; Key => 0, Value => 1, KeyAndValue => 2);
-enum_i32_codec!(ArrayIndexedStorageMode; DenseDescriptors => 0, SparseDescriptors => 1, PackedNumbers => 2);
+enum_i32_codec!(ArrayIndexedStorageMode; DenseDescriptors => 0, SparseDescriptors => 1, PackedNumbers => 2, PackedValues => 3);
 enum_i32_codec!(SetIterationKind; Value => 0, KeyAndValue => 1);
 enum_i32_codec!(ArrayIterationKind; Key => 0, Value => 1, KeyAndValue => 2);
 enum_i32_codec!(PrivateElementKind; Brand => 0, Field => 1, Method => 2, Accessor => 3);
@@ -1533,6 +1533,16 @@ impl RuntimeSchema {
         self.field(ArrayIndexStorageSchema::MODE).emit_get(function);
         function.instruction(&Instruction::I32Const(mode.encode()));
         function.instruction(&Instruction::I32Eq);
+    }
+
+    pub(crate) fn array_storage_is_packed(
+        &self,
+        storage: &GcLocal<ArrayIndexStorage>,
+        function: &mut Function,
+    ) {
+        self.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, function);
+        self.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedValues, function);
+        function.instruction(&Instruction::I32Or);
     }
 
     pub(crate) fn set_array_storage_mode(
@@ -3317,6 +3327,7 @@ impl GcStructType<ArrayIndexStorage> {
                 GcOperand::constant(ArrayIndexedStorageMode::PackedNumbers),
                 GcOperand::reference(&numbers, schema),
                 GcOperand::reference(&presence, schema),
+                GcOperand::null(schema),
             ),
             function,
         );

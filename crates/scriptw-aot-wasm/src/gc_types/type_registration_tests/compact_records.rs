@@ -213,4 +213,35 @@ fn prototype_edges_accept_only_the_sealed_actual_object_payload_family() {
         compact.fields[2].mutable,
         "first scalar write publishes its backing"
     );
+    let references_index = schema
+        .array_type::<CompactReferenceArray>()
+        .type_index()
+        .raw();
+    assert_eq!(
+        compact.fields[3].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(references_index))
+            )
+            .unwrap()
+        ))
+    );
+    assert!(
+        compact.fields[3].mutable,
+        "first nonnull reference write publishes its backing"
+    );
+    let CompositeInnerType::Array(references) =
+        &types[references_index as usize].composite_type.inner
+    else {
+        panic!("compact references must retain their exact registered array type");
+    };
+    assert_eq!(
+        references.0.element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(wasmparser::RefType::EQREF))
+    );
+    assert!(
+        references.0.mutable,
+        "null overwrites must retire strong edges"
+    );
 }
