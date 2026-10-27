@@ -34,19 +34,19 @@ ELF headers when file and mapping device IDs differ.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `a9ad49c8e`.
+**Measured 2026-10-27 on one GitHub Actions runner**, compiler `eb9ff7b05`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable, with JavaScript
 and Wasm compilation in separate producer processes. Both measured consumers
 disable compilation and use identical native optimization and runtime settings.
 Both passed the original checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.4–1.8× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.4–1.7× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 19.9 MiB | 13.5 MiB |
-| Objects | 22.3 MiB | 14.3 MiB |
-| Retained objects | 27.9 MiB | 20.0 MiB |
+| Integer | 20.1 MiB | 13.5 MiB |
+| Objects | 21.0 MiB | 14.2 MiB |
+| Retained objects | 27.4 MiB | 20.0 MiB |
 
 These are medians of 14 samples per runtime and workload, after ten checked
 warmups per round, with each Store still alive. Process memory is sampled at
@@ -55,16 +55,16 @@ heap nor peak memory. The gap remains with compilation disabled, but this does
 not isolate its cause. This cohort stays separate from the ordinary V8 comparison below.
 The matched Scriptc footprint is the execution-memory target; improvements
 must retain the same workloads, checksums and measurement boundaries.
-The current pass removes public descriptor-call allocations from internal Array
-queries and adds a kernel-proven executable-file source for packed native data.
-[Verification](docs/rust-rewrite/memory-array-native-input-20261027.md):
-**4,549 native cases and 1,092 original pinned Test262 executions
+The current pass shares typed Array lookup code and applies validated Set data
+fields directly through the existing Array definition kernel.
+[Verification](docs/rust-rewrite/memory-array-set-kernel-20261027.md):
+**4,535 native cases and 1,200 original pinned Test262 executions
 passed**, under one CPU and a 4-GiB process-tree limit.
 The matched measurements and verification use the same source revision.
 
 [All measurements and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
 [Precompiled execution-time graph](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40449574274).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40456976322).
 
 ## Benchmarks
 

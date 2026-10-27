@@ -37,5 +37,7 @@ writability, mismatched conversions, original throws and foreign errors,
 distinct receivers, nonextensible existing/new properties, Symbol and named
 attributes, shrink rollback, outer strict errors and the non-index uint32
 boundary. Existing Array snapshot, inherited-setter and Proxy controls remain
-part of the adjacent verification scope. The batch’s verification and matched
-memory effects remain pending; no RSS reduction is claimed by this contract.
+part of the [4,535-case native checkpoint](../memory-array-set-kernel-20261027.md). All 1,200
+original selected Test262 executions passed. The separately linked matched
+measurements retain the compiler-disabled protocol and both timing/RSS graphs;
+Scriptc memory parity remains open.
