@@ -160,7 +160,7 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
                 }
             }
             Payload::FunctionSection(functions) => {
-                declarations.extend(functions.map(Result::unwrap))
+                declarations.extend(functions.into_iter().map(Result::unwrap))
             }
             Payload::ExportSection(exports) => {
                 for export in exports {
