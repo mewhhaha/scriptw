@@ -159,6 +159,16 @@ pub(super) fn run_with_config(
         "after_transport_drop": after_transport_drop});
     report["observations"] = json!(observations);
     report["scope"] = json!("independent-precompiled-diagnostic;fresh-Store-Realm-per-invocation;process-endpoints;R-decode-in-load-costs;no-compiler-in-consumer;not-an-ordinary-score");
+    #[cfg(feature = "benchmark-module-images")]
+    barriers.finish_with_module_images(&mut report, || {
+        // The admitted P/R owner remains alive across all Stores and captures.
+        let images = runtime.benchmark_module_images();
+        let address = |image: &scriptw_engine::BenchmarkModuleImage| {
+            phase_barriers::ModuleImageAddresses::new(image.image_range(), image.text_range())
+        };
+        phase_barriers::ModuleImages::new(address(images.program()), images.runtime().map(address))
+    })?;
+    #[cfg(not(feature = "benchmark-module-images"))]
     barriers.finish(&mut report)?;
     Ok(report)
 }

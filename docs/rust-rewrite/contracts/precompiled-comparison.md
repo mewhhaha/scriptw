@@ -25,6 +25,12 @@ Sources, expected outputs and all 17 workloads are unchanged. Builds and
 measurements use one CPU, a 4-GiB process-tree cap, no swap and grouped OOM.
 The workflow uploads raw evidence and does not write to the repository.
 
+Cargo producer admission accepts exactly the default feature array `[]` or
+`["benchmark-module-images"]`. The latter enables the shared host's excluded
+phase-diagnostic address hook; ordinary captures do not invoke it. Unknown,
+additional or duplicate features are rejected, and the admitted producer must
+match an actual artifact record in the retained complete release Cargo transcript.
+
 Each of two rounds has ten checked warmups followed by seven measured
 invocations. Every invocation uses a fresh Store/Realm or Store/WASI instance.
 The second round reverses workload order; the first runtime alternates.
@@ -138,3 +144,11 @@ label, even if its explicit unscored flag was removed. Diagnostic validation kee
 uses a separately checked copy solely to validate identities and checksums.
 `SCRIPTW_WASM_TRACE` remains confined to unscored consumers, recording the packed
 input source kind without addresses or native bytes.
+
+With the nondefault `benchmark-module-images` feature, excluded phase diagnostics
+also join the actual retained P/R Module image/text ranges with bounded
+present-bit-only evidence for readable VMAs. The lazy observation occurs only
+after ACK4; host ELF symbol metadata is inspected after child exit. See the
+[ownership contract](benchmark-module-images.md). This feature does not alter
+scored values or grant native-image admission authority, and shared symbol pages
+are nonexclusive overlaps rather than function RSS or execution evidence.

@@ -13,6 +13,8 @@ serde_json = "1.0"
 sha2 = "0.10.9"
 
 [features]
+# Benchmark examples only; absent from default product builds.
+benchmark-module-images = ["scriptw-engine/benchmark-module-images"]
 # Off by default: product/release builds of `scriptw` must link no JavaScript
 # interpreter/VM engine (AGENTS.md). Enable only for developer-only
 # differential-oracle testing (`differential replay --oracle spec-exec` or an
