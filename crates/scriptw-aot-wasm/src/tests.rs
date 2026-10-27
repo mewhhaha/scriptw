@@ -1956,6 +1956,76 @@ fn data_segment_at(bytes: &[u8], index: usize) -> Vec<u8> {
     panic!("module has no data section");
 }
 
+/// Reconstruct R's virtual static arena while checking its physical sparse
+/// publication. The deferred payload belongs in the gap, not either active
+/// fragment; callers that reason about virtual addresses must include it.
+fn runtime_virtual_static_image(bytes: &[u8]) -> Vec<u8> {
+    use wasmparser::DataKind;
+    let mut rows = Vec::new();
+    for payload in Parser::new(0).parse_all(bytes) {
+        if let Payload::DataSection(section) = payload.expect("R parses") {
+            assert!(rows.is_empty(), "one R data section");
+            rows.extend(section.into_iter().map(|row| row.expect("R data row")));
+        }
+    }
+    assert_eq!(
+        rows.len(),
+        4,
+        "R owns two passive images and two active fragments"
+    );
+    assert!(
+        matches!(&rows[0].kind, DataKind::Passive),
+        "pooled UTF16 stays passive"
+    );
+    assert!(
+        matches!(&rows[1].kind, DataKind::Passive),
+        "normalization stays passive"
+    );
+    assert!(
+        !rows[1].data.is_empty(),
+        "the full R retains normalization data"
+    );
+    let address = |row: &wasmparser::Data<'_>| {
+        let DataKind::Active {
+            memory_index: 0,
+            offset_expr,
+        } = &row.kind
+        else {
+            panic!("static fragments target private memory zero");
+        };
+        let mut operators = offset_expr.get_operators_reader();
+        let Operator::I32Const { value } = operators.read().expect("constant static address")
+        else {
+            panic!("constant static address");
+        };
+        assert!(matches!(operators.read().unwrap(), Operator::End));
+        assert!(operators.eof());
+        u32::try_from(value).expect("positive wasm32 static address") as usize
+    };
+    let prefix_start = address(&rows[2]);
+    assert_eq!(prefix_start, STATIC_DATA_OFFSET as usize);
+    let gap_start = prefix_start.checked_add(rows[2].data.len()).unwrap();
+    let gap_end = gap_start.checked_add(rows[1].data.len()).unwrap();
+    let suffix_start = address(&rows[3]);
+    assert_eq!(
+        suffix_start, gap_end,
+        "active suffix starts after the entire deferred group"
+    );
+    let extent = suffix_start.checked_add(rows[3].data.len()).unwrap() - prefix_start;
+    assert_eq!(
+        rows[2].data.len() + rows[1].data.len() + rows[3].data.len(),
+        extent
+    );
+    let mut image = Vec::with_capacity(extent);
+    image.extend_from_slice(rows[2].data);
+    image.extend_from_slice(rows[1].data);
+    image.extend_from_slice(rows[3].data);
+    assert_eq!(image.len(), extent);
+    // No zero-filled stand-in for the gap is present in active publication.
+    assert!(prefix_start + rows[2].data.len() <= gap_start && suffix_start >= gap_end);
+    image
+}
+
 fn data_segment_bytes(bytes: &[u8]) -> Vec<u8> {
     let mut collected = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
@@ -2902,11 +2972,13 @@ fn string_script_emits_memory_and_data() {
     );
 }
 
-/// `(passive, active)` data segment counts. Every active segment must be
-/// the preseeded wire data, written at `STATIC_DATA_OFFSET` of memory 0.
+/// `(passive, active)` segment counts. Active fragments use increasing,
+/// nonoverlapping constant addresses in private memory zero; the first starts
+/// at the shared static base. R's gap is checked by runtime_virtual_static_image.
 fn wire_data_segment_counts(bytes: &[u8]) -> (usize, usize) {
     let mut passive_segments = 0;
     let mut active_segments = 0;
+    let mut previous_end = None;
     for payload in Parser::new(0).parse_all(bytes) {
         let Payload::DataSection(reader) = payload.expect("module should parse") else {
             continue;
@@ -2922,9 +2994,16 @@ fn wire_data_segment_counts(bytes: &[u8]) -> (usize, usize) {
                     active_segments += 1;
                     assert_eq!(memory_index, 0);
                     let mut offset = offset_expr.get_operators_reader();
-                    assert!(
-                        matches!(offset.read().expect("wire offset"), Operator::I32Const { value } if value == STATIC_DATA_OFFSET as i32)
-                    );
+                    let Operator::I32Const { value } = offset.read().expect("wire offset") else {
+                        panic!("constant wire offset");
+                    };
+                    let start = u32::try_from(value).expect("positive wire address") as usize;
+                    if let Some(end) = previous_end {
+                        assert!(start >= end, "active fragments cannot overlap");
+                    } else {
+                        assert_eq!(start, STATIC_DATA_OFFSET as usize);
+                    }
+                    previous_end = Some(start.checked_add(segment.data.len()).unwrap());
                     assert!(matches!(
                         offset.read().expect("wire offset end"),
                         Operator::End
@@ -2964,13 +3043,14 @@ fn preseeded_wire_data_stays_in_private_memory() {
     assert!(data_segment_at(&standalone.bytes, 0).starts_with(&expected_prefix));
     assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 1));
 
-    // A heap program's preseed is R's one active segment; P only appends
-    // passive suffixes to it.
+    // A heap program's preseed is R's active prefix; its second active
+    // fragment skips normalization's passive payload. P retains passive images.
     let artifact = emit_script("({ value: \",\" });").expect("emit should work");
     expect_valid_module(&artifact, 0);
     let runtime = artifact.runtime().expect("heap program links R");
-    assert!(data_segment_at(runtime.bytes(), 1).starts_with(&expected_prefix));
-    assert_eq!(wire_data_segment_counts(runtime.bytes()), (1, 1));
+    assert!(data_segment_at(runtime.bytes(), 2).starts_with(&expected_prefix));
+    assert!(runtime_virtual_static_image(runtime.bytes()).starts_with(&expected_prefix));
+    assert_eq!(wire_data_segment_counts(runtime.bytes()), (2, 2));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));
     assert!(data_segment_at(&artifact.bytes, 3).is_empty());
     assert!(
@@ -3032,7 +3112,7 @@ fn regexp_program_wire_data_is_aligned_and_deduplicated() {
     let program = scriptw_ir::RegExpProgram::compile("[a-c]", "").unwrap();
     let encoded = scriptw_ir::ValidatedRegExpProgram::from_program(&program).unwrap();
     let runtime = artifact.runtime().expect("RegExp program links R");
-    let runtime_data = data_segment_at(runtime.bytes(), 1);
+    let runtime_data = runtime_virtual_static_image(runtime.bytes());
     let data = data_segment_at(&artifact.bytes, 1);
     let offsets = data
         .windows(encoded.bytes().len())
