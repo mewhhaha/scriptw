@@ -299,8 +299,13 @@ impl FunctionBuilder<'_> {
                 .heap_type,
         ));
         self.open_frame(ControlFrameKind::If, function);
-        let source = self.emit_non_proxy_own_descriptor(target, key, function)?;
+        let array = schema.reserve_gc_local(function).initialize(
+            target.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
+            function,
+        );
+        let source = self.emit_array_own_descriptor_reference(&array, key, function)?;
         self.emit_completed_descriptor_snapshot(source, &descriptor, function);
+        array.clear(function);
         function.instruction(&Instruction::Else);
         let result = schema.reserve_completion(function);
         self.emit_native_object_algorithm_call(

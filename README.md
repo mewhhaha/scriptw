@@ -24,8 +24,9 @@ demand. On Linux, the copying collector releases dead pages after collection
 while preserving heap capacity for reuse.
 Normalization tables and Intl catalogue metadata initialize on first use.
 Trusted precompiled loading reuses producer-admitted execution facts.
-Internal Array descriptor queries use the private Array kernel and capture a
-fresh descriptor record.
+Internal Array descriptor queries use a typed Array kernel and capture a fresh
+record. Set receiver updates use normalized data definitions through the same
+Array exotic checks; see the [receiver contract](docs/rust-rewrite/contracts/array-set-receiver-data-definition.md).
 Linux runtime-image reads can prove the main executable's identity from kernel
 ELF headers when file and mapping device IDs differ.
 

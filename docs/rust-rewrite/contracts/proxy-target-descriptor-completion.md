@@ -28,8 +28,10 @@ table again and observes those changes. Getter/setter invocation, receiver
 identity, target extensibility and Realm-sensitive errors remain owned by the
 existing consumers.
 
-Concrete Array references use the existing non-Proxy storage descriptor kernel
-for indexed entries, named and Symbol properties, and virtual length. They then
+Concrete Array references use a typed Array-only storage descriptor lookup
+for indexed entries, named and Symbol properties, and virtual length. The Array
+indexed/length tail is shared with the public non-Proxy kernel; unrelated exotic
+branches are not emitted beneath this concrete type proof. They then
 use the same fresh-record copier as ordinary targets. A Proxy wrapping an Array
 fails the concrete reference test and retains its trap path. No public builtin
 FunctionObject, argument vector or JavaScript descriptor transport object is

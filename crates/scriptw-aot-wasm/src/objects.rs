@@ -152,6 +152,34 @@ pub(crate) type WasmLocals<'v> = descriptor_object::DescriptorObjectLocals<'v>;
 pub(crate) type WasmPartialDescriptor<'v> = PartialDescriptor<WasmLocals<'v>>;
 pub(crate) type WasmDescriptor<'v> = ValidatedDescriptor<WasmLocals<'v>>;
 
+/// OrdinarySet can only update a value or create a complete data property.
+/// Callers cannot put accessor fields behind the direct Array definition path.
+enum SetReceiverDataDefinition<'v> {
+    Update(&'v ValueLocals),
+    Create(&'v ValueLocals),
+}
+
+impl<'v> SetReceiverDataDefinition<'v> {
+    fn descriptor(self) -> WasmDescriptor<'v> {
+        let fields = match self {
+            Self::Update(value) => WasmPartialDescriptor {
+                value: Presence::Present(value),
+                ..WasmPartialDescriptor::empty()
+            },
+            Self::Create(value) => WasmPartialDescriptor {
+                value: Presence::Present(value),
+                writable: Presence::Present(DescriptorFlag::Known(true)),
+                enumerable: Presence::Present(DescriptorFlag::Known(true)),
+                configurable: Presence::Present(DescriptorFlag::Known(true)),
+                ..WasmPartialDescriptor::empty()
+            },
+        };
+        fields
+            .validate()
+            .expect("Set receiver definitions contain only normalized data fields")
+    }
+}
+
 struct DescriptorFieldLocals {
     present: I32Local,
     value: ValueLocals,
@@ -2545,26 +2573,67 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        let fields = DescriptorObjectFields {
-            value: Presence::Present(value),
-            ..DescriptorObjectFields::empty()
-        };
-        self.emit_define_own_property_from_fields(receiver, key, &fields, result, function)?;
+        self.emit_set_receiver_data_definition(
+            receiver,
+            key,
+            SetReceiverDataDefinition::Update(value),
+            result,
+            function,
+        )?;
         function.instruction(&Instruction::Else);
-        let fields = DescriptorObjectFields {
-            value: Presence::Present(value),
-            writable: Presence::Present(DescriptorFlag::Known(true)),
-            enumerable: Presence::Present(DescriptorFlag::Known(true)),
-            configurable: Presence::Present(DescriptorFlag::Known(true)),
-            ..DescriptorObjectFields::empty()
-        };
-        self.emit_define_own_property_from_fields(receiver, key, &fields, result, function)?;
+        self.emit_set_receiver_data_definition(
+            receiver,
+            key,
+            SetReceiverDataDefinition::Create(value),
+            result,
+            function,
+        )?;
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         descriptor.clear(function);
         schema.release_i32_local(boolean, function);
+        Ok(())
+    }
+
+    /// A concrete Array consumes normalized data fields directly. Other receiver
+    /// kinds retain their existing ToPropertyDescriptor/native dispatch boundary.
+    fn emit_set_receiver_data_definition(
+        &mut self,
+        receiver: &ValueLocals,
+        key: &PropertyKeyLocals,
+        definition: SetReceiverDataDefinition<'_>,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let incoming = definition.descriptor();
+        let schema = self.runtime_schema();
+        receiver.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<crate::gc_types::ArrayObject>(
+                    crate::gc_types::GcNullability::NonNullable,
+                )
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let array = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
+            function,
+        );
+        self.emit_array_define_own_property(&array, key, &incoming, result, function)?;
+        array.clear(function);
+        function.instruction(&Instruction::Else);
+        self.emit_define_own_property_from_fields(
+            receiver,
+            key,
+            incoming.as_partial(),
+            result,
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 

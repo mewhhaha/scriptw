@@ -1030,7 +1030,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_array_define_own_property(
+    pub(super) fn emit_array_define_own_property(
         &mut self,
         array: &GcLocal<crate::gc_types::ArrayObject>,
         key: &PropertyKeyLocals,
@@ -1532,6 +1532,81 @@ impl FunctionBuilder<'_> {
         Ok(result)
     }
 
+    /// The Array-only tail after ordinary header lookup. Key classification is
+    /// shared with the surrounding non-Proxy dispatch when it already exists.
+    fn emit_array_exotic_own_descriptor(
+        &mut self,
+        array: &GcLocal<crate::gc_types::ArrayObject>,
+        key: &PropertyKeyLocals,
+        index: I32Local,
+        indexed: I32Local,
+        result: &GcLocal<PropertyDescriptor, Nullable>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        indexed.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        let index64 = schema.reserve_i64_local(function);
+        index.load(function);
+        function.instruction(&Instruction::I64ExtendI32U);
+        index64.store(function);
+        let descriptor = self.emit_array_indexed_descriptor(array, index64, function);
+        result.replace(descriptor.load(schema, function), function);
+        descriptor.clear(function);
+        schema.release_i64_local(index64, function);
+        function.instruction(&Instruction::Else);
+        let name = schema.reserve_gc_local(function).initialize(
+            self.emit_interned_string_reference("length", function)?,
+            function,
+        );
+        let length_key = PropertyKeyLocals::from_string(schema, &name, function);
+        self.emit_tagged_payload_same_value_i32(key.value(), length_key.value(), function)?;
+        self.open_frame(ControlFrameKind::If, function);
+        let descriptor = self.emit_array_length_descriptor(array, function);
+        result.replace(descriptor.load(schema, function).nullable(), function);
+        descriptor.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        length_key.clear(function);
+        name.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// An actual Array uses only its ordinary header and Array exotic storage.
+    /// Do not emit unrelated exotic-object branches beneath an Array type proof.
+    pub(super) fn emit_array_own_descriptor_reference(
+        &mut self,
+        array: &GcLocal<crate::gc_types::ArrayObject>,
+        key: &PropertyKeyLocals,
+        function: &mut Function,
+    ) -> Result<GcLocal<PropertyDescriptor, Nullable>, EmitError> {
+        let schema = self.runtime_schema();
+        let header = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<crate::gc_types::ArrayObject>()
+                .field(crate::gc_types::ArrayObjectSchema::OBJECT)
+                .read(array, schema, function)
+                .reference(),
+            function,
+        );
+        let result = self.emit_ordinary_own_descriptor_reference(&header, key, function)?;
+        result.load(schema, function);
+        function.instruction(&Instruction::RefIsNull);
+        self.open_frame(ControlFrameKind::If, function);
+        let index = schema.reserve_i32_local(function);
+        let indexed = schema.reserve_i32_local(function);
+        self.emit_property_key_array_index(key, index, indexed, function)?;
+        self.emit_array_exotic_own_descriptor(array, key, index, indexed, &result, function)?;
+        schema.release_i32_local(indexed, function);
+        schema.release_i32_local(index, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        header.clear(function);
+        Ok(result)
+    }
+
     /// Actual non-Proxy storage descriptor dispatcher. Public recursive queries
     /// remain with the real GPD algorithm; this kernel owns only concrete
     /// ordinary/exotic storage and never reinterprets a reference as an address.
@@ -1581,33 +1656,7 @@ impl FunctionBuilder<'_> {
             target.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
             function,
         );
-        indexed.load(function);
-        self.open_frame(ControlFrameKind::If, function);
-        let index64 = schema.reserve_i64_local(function);
-        index.load(function);
-        function.instruction(&Instruction::I64ExtendI32U);
-        index64.store(function);
-        let descriptor = self.emit_array_indexed_descriptor(&array, index64, function);
-        result.replace(descriptor.load(schema, function), function);
-        descriptor.clear(function);
-        schema.release_i64_local(index64, function);
-        function.instruction(&Instruction::Else);
-        let name = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference("length", function)?,
-            function,
-        );
-        let length_key = PropertyKeyLocals::from_string(schema, &name, function);
-        self.emit_tagged_payload_same_value_i32(key.value(), length_key.value(), function)?;
-        self.open_frame(ControlFrameKind::If, function);
-        let descriptor = self.emit_array_length_descriptor(&array, function);
-        result.replace(descriptor.load(schema, function).nullable(), function);
-        descriptor.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        length_key.clear(function);
-        name.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        self.emit_array_exotic_own_descriptor(&array, key, index, indexed, &result, function)?;
         array.clear(function);
         function.instruction(&Instruction::Else);
         target.tag().load(function);
