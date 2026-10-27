@@ -407,8 +407,8 @@ fn decode_layout(
     let mut sections = identity.sections.clone();
     let mut data_count = 0;
     let mut deferred_len = 0usize;
-    let mut prefix_len = 0usize;
-    let mut suffix_len = 0usize;
+    let mut property_len = 0usize;
+    let mut next_active_address = STATIC_DATA_OFFSET;
     let mut source_admission = SourceCompilationProfileAdmission::default();
     for payload in parser.parse_all(bytes) {
         let payload = payload.ok()?;
@@ -472,29 +472,33 @@ fn decode_layout(
                     match (data_count, data.kind) {
                         (0, DataKind::Passive) if data.data.len() == pool.code_unit_len() => {}
                         (1, DataKind::Passive) => deferred_len = data.data.len(),
+                        (2, DataKind::Passive) => property_len = data.data.len(),
                         (
-                            position @ (2 | 3),
+                            position @ (3..=5),
                             DataKind::Active {
                                 memory_index: 0,
                                 offset_expr,
                             },
                         ) => {
-                            let address = if position == 2 {
-                                prefix_len = data.data.len();
-                                STATIC_DATA_OFFSET
-                            } else {
-                                suffix_len = data.data.len();
-                                STATIC_DATA_OFFSET.checked_add(
-                                    u32::try_from(prefix_len.checked_add(deferred_len)?).ok()?,
-                                )?
-                            };
                             let mut ops = offset_expr.get_operators_reader();
-                            if !matches!(ops.read().ok()?, Operator::I32Const { value } if value == address as i32)
+                            if !matches!(ops.read().ok()?, Operator::I32Const { value } if value == next_active_address as i32)
                                 || !matches!(ops.read().ok()?, Operator::End)
                                 || !ops.eof()
                             {
                                 return None;
                             }
+                            // Physical passive order is normalization, properties;
+                            // the virtual image places properties before normalization.
+                            let gap = if position == 3 {
+                                property_len
+                            } else if position == 4 {
+                                deferred_len
+                            } else {
+                                0
+                            };
+                            next_active_address = next_active_address.checked_add(
+                                u32::try_from(data.data.len().checked_add(gap)?).ok()?,
+                            )?;
                         }
                         _ => return None,
                     }
@@ -520,11 +524,9 @@ fn decode_layout(
         return None;
     }
     if !validated_end
-        || data_count != 4
-        || prefix_len
-            .checked_add(deferred_len)?
-            .checked_add(suffix_len)?
-            != pool.static_len()
+        || data_count != 6
+        || next_active_address
+            != STATIC_DATA_OFFSET.checked_add(u32::try_from(pool.static_len()).ok()?)?
         || !sections.is_empty()
         || function_types.is_empty()
         || globals.is_empty()

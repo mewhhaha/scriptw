@@ -17,6 +17,9 @@ followed by three active fragments covering the complement of both cold ranges.
 No active zero-filled placeholders overwrite the deferred ranges. Memory extent
 and all virtual offsets stay intact. P's four passive data roles are unchanged.
 DataCount derives from the actual emitted segments.
+Raw runtime-package and cache admission require the same six-segment layout.
+A checked virtual cursor validates all three active offsets across both passive
+gaps and the exact final static extent; a valid checksum cannot bypass this check.
 
 The immutable Cargo receipt binds all six physical payload spans with checked
 lengths and individual hashes. Reconstructing the canonical linear image uses

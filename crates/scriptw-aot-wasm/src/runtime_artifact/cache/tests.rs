@@ -120,6 +120,8 @@ enum Defect {
     ExportKind,
     ForeignImport,
     DataOffset,
+    MiddleDataOffset,
+    SuffixDataOffset,
     IntlIdentity,
 }
 
@@ -215,7 +217,8 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
     module.section(&code);
     let mut data = DataSection::new();
     data.passive([0, 0, 65, 0]);
-    data.passive([]);
+    data.passive([11, 12]); // normalization image
+    data.passive([21, 22, 23]); // Unicode property image
     data.active(
         0,
         &ConstExpr::i32_const(
@@ -223,7 +226,20 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         ),
         [0, 65],
     );
-    data.active(0, &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32 + 2), []);
+    data.active(
+        0,
+        &ConstExpr::i32_const(
+            STATIC_DATA_OFFSET as i32 + 5 + i32::from(matches!(defect, Defect::MiddleDataOffset)),
+        ),
+        [66],
+    );
+    data.active(
+        0,
+        &ConstExpr::i32_const(
+            STATIC_DATA_OFFSET as i32 + 8 + i32::from(matches!(defect, Defect::SuffixDataOffset)),
+        ),
+        [67],
+    );
     module.section(&data);
     module.section(&CustomSection {
         name: INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION.into(),
@@ -244,7 +260,7 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
             1,
             vec![0],
             vec![global_type],
-            PoolBoundary::from_runtime_cache(2, 4, 2).unwrap(),
+            PoolBoundary::from_runtime_cache(9, 4, 2).unwrap(),
         ),
     ))
 }
@@ -394,6 +410,8 @@ fn runtime_cache_rejects_validly_checksummed_wrong_abi_or_unvalidated_wasm() {
         Defect::ExportKind,
         Defect::ForeignImport,
         Defect::DataOffset,
+        Defect::MiddleDataOffset,
+        Defect::SuffixDataOffset,
         Defect::IntlIdentity,
     ] {
         assert!(decode(&encode(&fixture(defect), key), key, &identity).is_none());
