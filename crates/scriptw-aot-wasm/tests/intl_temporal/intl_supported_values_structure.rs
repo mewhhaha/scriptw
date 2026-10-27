@@ -3,6 +3,7 @@ const BODY: &str = include_str!("../../src/builtins/intl_supported_values.rs");
 const POOL: &str = include_str!("../../src/data/intl_supported_values.rs");
 const DATA: &str = include_str!("../../src/data.rs");
 const EMIT: &str = include_str!("../../src/emit/module_assembly.rs");
+const INTL_EMIT: &str = include_str!("../../src/emit/module_assembly/intl.rs");
 const EMISSION: &str = include_str!("../../src/emit.rs");
 const NAMES: &str = include_str!("../../../scriptw-ir/src/names.rs");
 const SHAPE: &str = include_str!("../../../scriptw-ir/src/lowering/builtin_shapes.rs");
@@ -50,7 +51,7 @@ fn primitive_tables_check_producer_identity_before_host_image_emission() {
         POOL,
         &[
             "selection",
-            ".selected()",
+            ".compilation_data()",
             "selected.identity().artifact_identity()",
             ".supported_values(key)",
             "source.provider_identity().artifact_identity().as_bytes() != identity",
@@ -70,7 +71,7 @@ fn primitive_tables_check_producer_identity_before_host_image_emission() {
     ordered(
         &emission,
         &[
-            "letintl_selection=scriptw_intl::IntlDataSelection::new(intl_profile.clone())",
+            "letintl_selection=inputs.intl_selection(intl_profile)?",
             "emit_script(script,promise_rejection_policy,&intl_selection,snapshot,inputs,)",
             "fnemit_script(",
             "runtime_artifact_with_inputs(intl_selection,inputs)",
@@ -79,19 +80,32 @@ fn primitive_tables_check_producer_identity_before_host_image_emission() {
         ],
     );
     ordered(
-        EMIT,
+        INTL_EMIT,
         &[
             "string_pool.check_intl_supported_values()?",
             "if kind.owns_globals() && (uses_intl_host || uses_system_time_zone || uses_intl_catalogue) {",
-            "intl_selection.selected()",
+            "intl_selection.compilation_data()",
             "selected.identity().artifact_identity()",
             "INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION",
             "for (name, data) in selected.component_sections()",
         ],
     );
-    assert!(!EMIT.contains("embedded_intl_data_identity"));
+    // The assembly caller passes the same checked pool and selection into the
+    // frame owner, which checks catalogue admission before publishing identity
+    // or component sections. Lazy data selection does not bypass that boundary.
+    ordered(
+        EMIT,
+        &[
+            "intl::append_sections(",
+            "&mut module,",
+            "kind,",
+            "&string_pool,",
+            "intl_selection,",
+        ],
+    );
+    assert!(!INTL_EMIT.contains("embedded_intl_data_identity"));
     assert!(!POOL.contains("embedded_supported_values"));
-    assert!(!EMIT.contains(
+    assert!(!INTL_EMIT.contains(
         "uses_intl_host || uses_system_time_zone || supported_values_identity.is_some()"
     ));
     assert!(!POOL.contains("pub(crate) fn new"));

@@ -326,6 +326,62 @@ fn emitter_consumes_the_package_through_the_reviewed_lifecycle() {
         .unwrap();
     assert!(initialize < initialize_body && initialize_body < main);
     assert!(!EMIT_SOURCE.contains("let main_function ="));
+    // Package-owned sections and original-index metadata precede the only
+    // byte finalization. Only P is then rewritten; attribution and budgets
+    // must observe its actual final indices/body bytes, not the initial code.
+    let lifecycle = [
+        "let mut function_table = module_package.append_to_module(",
+        "metadata::append_module_declarations(&mut module, kind, &script.foreign_modules);",
+        "metadata::append_function_name(&mut module, &mut debug_dump, &function_table)?;",
+        "function_table.native_program_context_section()",
+        "let bytes = module.finish();",
+        "crate::program_imports::compact(bytes, &mut function_table)?",
+        "metadata::append_function_attribution(&mut attribution, &function_table)",
+        "debug_dump.splice(attribution_position..attribution_position, attribution);",
+        "function_table.check_budget(budget)?;",
+        "let artifact = WasmArtifact {",
+    ];
+    let mut cursor = 0;
+    for step in lifecycle {
+        assert_eq!(
+            EMIT_SOURCE.matches(step).count(),
+            1,
+            "unique lifecycle step: {step}"
+        );
+        cursor += EMIT_SOURCE[cursor..]
+            .find(step)
+            .unwrap_or_else(|| panic!("package finalization order violated at {step}"))
+            + step.len();
+    }
+    let finalization = bounded(
+        EMIT_SOURCE,
+        "let bytes = module.finish();",
+        "let artifact = WasmArtifact {",
+    );
+    assert!(compact(finalization).contains(concat!(
+        "letbytes=matchkind{",
+        "ModuleKind::Program(_)=>crate::program_imports::compact(bytes,&mutfunction_table)?,",
+        "ModuleKind::Standalone|ModuleKind::Runtime(_)=>bytes,",
+        "};"
+    )), "only linked P may rewrite its completed package; R and standalone bytes retain their owners");
+    assert!(
+        compact(finalization).contains(concat!(
+            "ifletSome(budget)=FunctionBodyBudget::from_env(){",
+            "function_table.check_budget(budget)?;}"
+        )),
+        "explicit body budgets must inspect the final remeasured function table"
+    );
+    let name_metadata = include_str!("../../src/emit/module_assembly/metadata.rs");
+    let append_names = bounded(
+        name_metadata,
+        "pub(super) fn append_function_name(",
+        "pub(super) fn append_memory_attribution(",
+    );
+    assert!(append_names.contains("module.section(&function_table.name_section());"));
+    assert!(append_names.contains("function_table.literal_operand_section()"));
+    assert!(!append_names.contains("check_budget"));
+    assert!(!append_names.contains("append_function_attribution"));
+
     assert!(EMIT_SOURCE.contains("program_functions.extend(program_helpers);"));
     assert_eq!(
         EMIT_SOURCE
@@ -357,14 +413,14 @@ fn emitter_consumes_the_package_through_the_reviewed_lifecycle() {
         .1;
     assert_eq!(
         append_exports
-            .matches("schema.export_snapshot_roots(exports);")
+            .matches("schema.export_snapshot_roots(exports, base);")
             .count(),
         1
     );
     assert!(
         compact(append_exports).contains(concat!(
             "ifself.owns_globals{schema.export_throw_diagnostics(exports);",
-            "schema.export_snapshot_roots(exports);}"
+            "ifletSome(base)=helper_base{schema.export_snapshot_roots(exports,base);}}"
         )),
         "only the instance owning the supplied package schema exports its roots"
     );

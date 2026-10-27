@@ -171,6 +171,41 @@ fn assert_foreign_wrappers() {
         .validate_all(runtime.bytes())
         .expect("actual R validates");
     let runtime_types = types(runtime.bytes());
+    let mut host_prefix = Vec::new();
+    let mut runtime_function_types = Vec::new();
+    let mut runtime_exports = std::collections::BTreeMap::new();
+    for payload in Parser::new(0).parse_all(runtime.bytes()) {
+        match payload.unwrap() {
+            Payload::ImportSection(imports) => {
+                for import in imports.into_imports() {
+                    let import = import.unwrap();
+                    if let TypeRef::Func(index) | TypeRef::FuncExact(index) = import.ty {
+                        host_prefix.push((
+                            import.module.to_owned(),
+                            import.name.to_owned(),
+                            index,
+                            matches!(import.ty, TypeRef::FuncExact(_)),
+                        ));
+                        runtime_function_types.push(index);
+                    }
+                }
+            }
+            Payload::FunctionSection(functions) => {
+                runtime_function_types.extend(functions.map(Result::unwrap));
+            }
+            Payload::ExportSection(exports) => {
+                for export in exports {
+                    let export = export.unwrap();
+                    if export.kind == wasmparser::ExternalKind::Func {
+                        assert!(runtime_exports
+                            .insert(export.name.to_owned(), export.index)
+                            .is_none());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
     for (artifact, name, native, fallible) in [
         (&first, "add", "add", false),
         (&second, "sum", "sum_other", true),
@@ -193,7 +228,12 @@ fn assert_foreign_wrappers() {
                 for import in imports.into_imports() {
                     let import = import.unwrap();
                     if let TypeRef::Func(index) | TypeRef::FuncExact(index) = import.ty {
-                        functions.push((import.module.to_owned(), import.name.to_owned(), index));
+                        functions.push((
+                            import.module.to_owned(),
+                            import.name.to_owned(),
+                            index,
+                            matches!(import.ty, TypeRef::FuncExact(_)),
+                        ));
                     }
                 }
             }
@@ -206,14 +246,37 @@ fn assert_foreign_wrappers() {
             ),
             ("dd", native)
         );
-        let runtime_imports = functions
-            .iter()
-            .enumerate()
-            .filter(|(_, (module, _, _))| module == RUNTIME_IMPORT_NAMESPACE)
-            .collect::<Vec<_>>();
+        assert_eq!(
+            &functions[..host_prefix.len()],
+            host_prefix.as_slice(),
+            "P retains the exact ordered typed host-function prefix of R"
+        );
+        let runtime_imports = &functions[host_prefix.len()..foreign_index as usize];
         assert!(!runtime_imports.is_empty());
-        for (index, (_, exported, _)) in runtime_imports {
-            assert_eq!(exported, &format!("f{index}"));
+        let mut previous = None;
+        for (module, exported, signature, _) in runtime_imports {
+            assert_eq!(
+                module, RUNTIME_IMPORT_NAMESPACE,
+                "only the compact R subset separates host and foreign imports"
+            );
+            assert!(
+                exported
+                    .strip_prefix('f')
+                    .is_some_and(|index| index.parse::<u32>().is_ok()),
+                "P imports a producer-owned fN export"
+            );
+            let definition = *runtime_exports
+                .get(exported)
+                .expect("actual R exports the imported function");
+            assert!(
+                previous.is_none_or(|index| index < definition),
+                "retained R imports preserve original definition order"
+            );
+            previous = Some(definition);
+            assert_eq!(
+                *signature, runtime_function_types[definition as usize],
+                "compact R import retains its actual exported function type"
+            );
         }
         let declared_types = types(&artifact.bytes);
         let CompositeInnerType::Func(signature) = &declared_types
