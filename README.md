@@ -22,6 +22,8 @@ use; their real data properties and alias identities remain intact. See the
 Object storage avoids boxed prototype links and allocates scalar backing on
 demand. On Linux, the copying collector releases dead pages after collection
 while preserving heap capacity for reuse.
+Normalization tables and Intl catalogue metadata initialize on first use.
+Trusted precompiled loading reuses producer-admitted execution facts.
 
 ## Precompiled comparison
 

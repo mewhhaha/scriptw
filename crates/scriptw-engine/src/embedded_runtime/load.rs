@@ -16,6 +16,15 @@ impl EmbeddedNativeRuntime {
         if !self.matches(runtime, mode) {
             return None;
         }
+        self.load_admitted(engine, mode, timings)
+    }
+
+    pub(super) fn load_admitted(
+        &self,
+        engine: &Engine,
+        mode: WasmNativeCompilationMode,
+        timings: &mut crate::WasmRuntimeEmbeddedImageTimings,
+    ) -> Option<Module> {
         // Reuse only immutable backing storage. Every Engine still creates and
         // admits its own Module; the existing module-cache budget is unchanged.
         let backing_started = std::time::Instant::now();

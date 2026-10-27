@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "a55c42483e6be43117710ce2933a0979313fb6eae939cbbecd62698d97969d93",
+  "kernel_sha256": "dfc0b2aee5954c15245591f60b99216cc0183b63c26ee76f27da79c6ea8d6c9a",
   "operations_reserved": [
     33,
     34,
@@ -408,9 +408,9 @@
       "sha256": "ac6f295227ff21b31cdebbd4195eb9ade0cb935c65fc560bf48be95a49f10f56"
     },
     {
-      "bytes": 21032,
+      "bytes": 21112,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
+      "sha256": "1a49f7e4acab0c7365901f0ac9622772a3a826814315c67e374e068d3390ccfa"
     },
     {
       "bytes": 3253,

@@ -187,6 +187,15 @@ impl Mmap<AlignedLength> {
         MmapOffset::new(self.clone(), HostAlignedByteCount::ZERO)
     }
 
+    /// Prefer native base pages for this anonymous reservation, without
+    /// changing contents, accessibility or virtual capacity. Unsupported hosts
+    /// keep their normal page policy. No backing pages are discarded.
+    pub fn prefer_base_pages(&self) -> Result<()> {
+        #[cfg(all(target_os = "linux", feature = "std", not(miri)))]
+        self.sys.prefer_base_pages()?;
+        Ok(())
+    }
+
     /// Make the memory starting at `start` and extending for `len` bytes
     /// accessible. `start` and `len` must be native page-size multiples and
     /// describe a range within `self`'s reserved memory.

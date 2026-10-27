@@ -48,7 +48,7 @@ Memory and execution effects must be measured with the unchanged matched
 [precompiled protocol](precompiled-comparison.md). Lazy allocation does not imply
 that a Wasmtime heap reservation or every process code page becomes smaller.
 
-Runtime layout 23 stores [[Prototype]] as a nullable reference to the actual
+Runtime layout 24 stores [[Prototype]] as a nullable reference to the actual
 JavaScript object payload. All object layouts belong to a nonallocating typed
 base; strings, BigInts and Symbols do not. This removes per-header StoredValue
 snapshots while retaining Array, Function, BoundFunction, Arguments and Proxy
@@ -65,3 +65,18 @@ with zero contents on reuse. Custom/shared/CoW backings do not receive this
 operation, and GC zeal retains poison checks. This reduces dead-page retention;
 it adds no collections or benchmark-specific purges. CPU and page-fault costs
 must be measured with the same execution protocol.
+
+Normalization tables keep their complete canonical bytes and fixed addresses,
+but use a passive R data segment. Two active fragments omit the deferred span.
+A typed per-Store readiness guard installs the complete region before valid
+normalization and locale-casing operations that read its combining classes.
+Coercion can reenter before initialization; the flag publishes only after the
+copy completes. UTF-16 and normalization segment roles have distinct types.
+Raw admission reconstructs and checks the complete virtual static image.
+
+Linear scratch memory starts with one spare Wasm page. Its existing allocator
+checks alignment, overflow, limits and growth before publishing a new cursor.
+Linux mmap-backed GC heaps prefer base pages before initialization, and retain
+that preference through in-place growth and relocation. Advice refusal keeps
+valid memory usable; custom/malloc backing retains its own allocation policy.
+These policies do not request extra collections or purge benchmark state.

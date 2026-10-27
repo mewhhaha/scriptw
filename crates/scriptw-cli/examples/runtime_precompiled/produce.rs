@@ -59,6 +59,8 @@ pub(super) fn run_with_config(
             "image": image_name, "image_sha256": hash(image.as_bytes()),
             "image_bytes": image.as_bytes().len(),
             "native_serialized_bytes": image.serialized_program_len(),
+            "execution_facts_bytes": image.serialized_execution_facts().len(),
+            "execution_facts_sha256": hash(image.serialized_execution_facts()),
             "runtime_key": image.runtime_key().map(|key| hash_key(key)),
             "source_compilation_profile": "portable", "intl_profile": "Minimal",
             "phases_ns": {"source_compilation": source_compilation_ns, "native_preparation": native_preparation_ns}}));

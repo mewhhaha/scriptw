@@ -64,6 +64,48 @@ pub(crate) use runtime_error_message::{
     IntlErrorOption, RuntimeErrorMessage, SourceRuntimeErrorMessage,
 };
 
+/// Passive segment roles are distinct even though P and R both own UTF-16
+/// segment zero. Normalization exists only in R's sealed static image.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PassiveDataSegment {
+    PooledCodeUnits,
+    Normalization,
+}
+impl PassiveDataSegment {
+    pub(crate) const fn index(self) -> u32 {
+        match self {
+            Self::PooledCodeUnits => 0,
+            Self::Normalization => 1,
+        }
+    }
+}
+
+/// The exact virtual address range reserved by the sealed normalization group.
+/// Bytes remain in the canonical arena for address/identity admission but R
+/// installs them only on the first valid normalization operation.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NormalizationRegion {
+    start: u32,
+    end: u32,
+}
+impl NormalizationRegion {
+    pub(crate) fn start(self) -> u32 {
+        self.start
+    }
+    pub(crate) fn end(self) -> u32 {
+        self.end
+    }
+    pub(crate) fn length(self) -> u32 {
+        self.end - self.start
+    }
+    pub(crate) const fn segment(self) -> PassiveDataSegment {
+        PassiveDataSegment::Normalization
+    }
+    fn offsets(self) -> std::ops::Range<usize> {
+        (self.start - STATIC_DATA_OFFSET) as usize..(self.end - STATIC_DATA_OFFSET) as usize
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct PooledStringIndex(u32);
 impl PooledStringIndex {
@@ -118,7 +160,7 @@ impl PooledModuleBytes {
 }
 
 impl PooledCodeUnits {
-    pub(crate) const DATA_SEGMENT: u32 = 0;
+    pub(crate) const DATA_SEGMENT: PassiveDataSegment = PassiveDataSegment::PooledCodeUnits;
 }
 
 /// Compile-time storage locator for a validated descriptor. Executable P rows
@@ -432,6 +474,7 @@ pub(crate) struct StringPool {
     pub(crate) cased_range_count: u32,
     pub(crate) case_ignorable_range_table_ptr: u32,
     pub(crate) case_ignorable_range_count: u32,
+    pub(crate) normalization_region: Option<NormalizationRegion>,
     pub(crate) canonical_decomposition_table_ptr: u32,
     pub(crate) canonical_decomposition_count: u32,
     pub(crate) compatibility_decomposition_table_ptr: u32,
@@ -2267,7 +2310,8 @@ impl CompilerOwnedPool {
 impl StringPool {
     fn append_normalization_tables(&mut self) {
         let tables = normalization::tables();
-
+        self.align_bytes(8);
+        let start = STATIC_DATA_OFFSET + self.bytes.len() as u32;
         let canonical_sequences_ptr = self.append_codepoints(&tables.canonical_sequences);
         self.canonical_decomposition_table_ptr =
             self.append_normalization_mappings(&tables.canonical_mappings, canonical_sequences_ptr);
@@ -2297,6 +2341,11 @@ impl StringPool {
             self.bytes.extend_from_slice(&0_u32.to_le_bytes());
         }
         self.composition_count = tables.compositions.len() as u32;
+        self.align_bytes(8);
+        self.normalization_region = Some(NormalizationRegion {
+            start,
+            end: STATIC_DATA_OFFSET + self.bytes.len() as u32,
+        });
     }
 
     fn append_codepoints(&mut self, codepoints: &[u32]) -> u32 {
@@ -4479,20 +4528,45 @@ impl StringPool {
         }
     }
 
-    /// The runtime module's data: the passive UTF-16 image, then the compiler
-    /// tables as the active static segment.
+    /// Partial compiler-only test pools keep the same physical segment roles
+    /// with an empty deferred region at the end of their static arena.
+    pub(super) fn normalization_image_region(&self) -> NormalizationRegion {
+        self.normalization_region.unwrap_or_else(|| {
+            let end = STATIC_DATA_OFFSET
+                .checked_add(
+                    u32::try_from(self.compiler_owned.static_bytes)
+                        .expect("sealed static image fits wasm32"),
+                )
+                .expect("sealed image address fits wasm32");
+            NormalizationRegion { start: end, end }
+        })
+    }
+
+    /// Publish two passive images and two active fragments around the reserved gap.
     pub(crate) fn append_runtime_data(&self, section: &mut wasm_encoder::DataSection) {
-        assert_eq!(section.len(), PooledCodeUnits::DATA_SEGMENT);
+        assert_eq!(section.len(), PooledCodeUnits::DATA_SEGMENT.index());
         let boundary = self.compiler_owned;
         section.passive(
             self.pooled_code_unit_bytes[..boundary.code_unit_bytes]
                 .iter()
                 .copied(),
         );
+        let region = self.normalization_image_region();
+        let span = region.offsets();
+        assert!(span.end <= boundary.static_bytes);
+        assert_eq!(section.len(), region.segment().index());
+        section.passive(self.bytes[span.clone()].iter().copied());
+        // Preserve virtual addresses without copying a zero-filled placeholder
+        // over the deferred range. Its memory pages remain untouched here.
         section.active(
             0,
             &wasm_encoder::ConstExpr::i32_const(STATIC_DATA_OFFSET as i32),
-            self.bytes[..boundary.static_bytes].iter().copied(),
+            self.bytes[..span.start].iter().copied(),
+        );
+        section.active(
+            0,
+            &wasm_encoder::ConstExpr::i32_const(region.end() as i32),
+            self.bytes[span.end..boundary.static_bytes].iter().copied(),
         );
     }
 
@@ -4501,7 +4575,7 @@ impl StringPool {
     /// use the immutable ProgramInstance image; the segment is not installed in
     /// shared linear memory. Compact recipes use their P module's passive image.
     pub(crate) fn append_program_data(&self, section: &mut wasm_encoder::DataSection) {
-        assert_eq!(section.len(), PooledCodeUnits::DATA_SEGMENT);
+        assert_eq!(section.len(), PooledCodeUnits::DATA_SEGMENT.index());
         section.passive(self.program_utf16_bytes().iter().copied());
         section.passive(self.program_metadata_bytes().iter().copied());
         self.program_string_descriptor_image()
@@ -5230,7 +5304,9 @@ pub(crate) fn align_heap_start(bytes: usize) -> u64 {
 
 pub(crate) fn initial_memory_pages(static_data_bytes: usize, uses_heap: bool) -> u64 {
     let required = if uses_heap {
-        align_heap_start(static_data_bytes) + (WASM_PAGE_SIZE * 16)
+        // PrivateByteAlloc checks aligned end against memory.size and grows
+        // before cursor publication; the spare page is not an allocation cap.
+        align_heap_start(static_data_bytes) + WASM_PAGE_SIZE
     } else {
         STATIC_DATA_OFFSET as u64 + static_data_bytes as u64
     };

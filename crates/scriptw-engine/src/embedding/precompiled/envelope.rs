@@ -2,13 +2,16 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
-const MAGIC: &[u8; 8] = b"SCRWEP01";
+const MAGIC: &[u8; 8] = b"SCRWEP02";
+const MAX_FACTS_BYTES: usize = 1024 * 1024;
+const FRAME_BYTES: usize = 126;
 const MAX_BYTES: usize = 256 * 1024 * 1024;
 
 pub(super) struct Frame {
     pub(super) program: Range<usize>,
     pub(super) native: Range<usize>,
-    pub(super) runtime_key: Option<[u8; 32]>,
+    pub(super) execution_facts: Range<usize>,
+    pub(super) facts: ProgramExecutionFacts,
     pub(super) mode: WasmNativeCompilationMode,
 }
 
@@ -25,13 +28,19 @@ fn take<'a>(bytes: &mut &'a [u8], count: usize) -> Result<&'a [u8], EngineError>
 pub(super) fn encode(
     program: &[u8],
     native: &[u8],
-    runtime_key: Option<[u8; 32]>,
+    facts: &ProgramExecutionFacts,
     mode: WasmNativeCompilationMode,
 ) -> Result<Vec<u8>, EngineError> {
+    let registry = facts.foreign.to_normalized_json();
+    if registry.len() > MAX_FACTS_BYTES {
+        return Err(invalid());
+    }
+    let runtime_key = facts.runtime_key().map(|key| *key.as_bytes());
     let length = program
         .len()
         .checked_add(native.len())
-        .and_then(|n| n.checked_add(122))
+        .and_then(|n| n.checked_add(registry.len()))
+        .and_then(|n| n.checked_add(FRAME_BYTES))
         .ok_or_else(invalid)?;
     if length > MAX_BYTES {
         return Err(invalid());
@@ -52,6 +61,8 @@ pub(super) fn encode(
     });
     bytes.extend_from_slice(&(program.len() as u64).to_le_bytes());
     bytes.extend_from_slice(&(native.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(&(registry.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&registry);
     bytes.extend_from_slice(program);
     bytes.extend_from_slice(native);
     bytes.extend_from_slice(&Sha256::digest(&bytes));
@@ -59,7 +70,7 @@ pub(super) fn encode(
 }
 
 pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
-    if bytes.len() > MAX_BYTES || bytes.len() < 122 {
+    if bytes.len() > MAX_BYTES || bytes.len() < FRAME_BYTES {
         return Err(invalid());
     }
     let body_end = bytes.len().checked_sub(32).ok_or_else(invalid)?;
@@ -95,6 +106,29 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
     };
     let program_length = length()?;
     let native_length = length()?;
+    let registry_length: [u8; 4] = take(&mut rest, 4)?.try_into().map_err(|_| invalid())?;
+    let registry_length = u32::from_le_bytes(registry_length) as usize;
+    if registry_length > MAX_FACTS_BYTES {
+        return Err(invalid());
+    }
+    let registry_start = body.len() - rest.len();
+    let execution_facts = registry_start..registry_start + registry_length;
+    let registry = take(&mut rest, registry_length)?;
+    let foreign = ForeignModuleRegistry::from_normalized_json(registry).map_err(|_| invalid())?;
+    // Reject duplicate JSON keys, noncanonical ordering/whitespace, unsupported
+    // fields and invalid declarations before constructing any opaque owner.
+    if foreign.to_normalized_json() != registry {
+        return Err(invalid());
+    }
+    let facts = ProgramExecutionFacts {
+        foreign,
+        runtime: match runtime_key {
+            None => ProgramRuntimeRequirement::Standalone,
+            Some(key) => ProgramRuntimeRequirement::CargoMinimalPortable {
+                key: RuntimeArtifactKey::from_bytes(key),
+            },
+        },
+    };
     let start = body.len() - rest.len();
     take(&mut rest, program_length)?;
     take(&mut rest, native_length)?;
@@ -104,7 +138,8 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
     Ok(Frame {
         program: start..start + program_length,
         native: start + program_length..body_end,
-        runtime_key,
+        execution_facts,
+        facts,
         mode,
     })
 }

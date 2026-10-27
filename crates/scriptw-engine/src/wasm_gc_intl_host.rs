@@ -141,7 +141,10 @@ pub(super) fn execute_deferred(
             .resolve()
             .map_err(|error| wasmtime::Error::msg(error.to_string()))
     };
-    let Some(data) = kernel.minimal_data() else {
+    let Some(data) = kernel
+        .minimal_data()
+        .map_err(|error| wasmtime::Error::msg(error.to_string()))?
+    else {
         return execute(complete()?, request);
     };
     let locale = || {

@@ -215,6 +215,7 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
     module.section(&code);
     let mut data = DataSection::new();
     data.passive([0, 0, 65, 0]);
+    data.passive([]);
     data.active(
         0,
         &ConstExpr::i32_const(
@@ -222,6 +223,7 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         ),
         [0, 65],
     );
+    data.active(0, &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32 + 2), []);
     module.section(&data);
     module.section(&CustomSection {
         name: INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION.into(),

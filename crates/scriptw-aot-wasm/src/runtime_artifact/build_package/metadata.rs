@@ -51,7 +51,7 @@ pub(in crate::runtime_artifact) struct BuildMetadata {
     profile: RuntimeSourceCompilationProfile,
     layout: RuntimeLayout,
     largest_body: usize,
-    data: [SpanDigest; 2],
+    data: [SpanDigest; 4],
     frames: Vec<(IntlDataComponent, SpanDigest)>,
 }
 
@@ -61,7 +61,7 @@ pub(in crate::runtime_artifact) struct BuildAdmission {
     package: &'static [u8],
     package_digest: [u8; 32],
     pub(in crate::runtime_artifact) largest_body: usize,
-    data: [SpanDigest; 2],
+    data: [SpanDigest; 4],
 }
 
 impl BuildAdmission {
@@ -70,7 +70,18 @@ impl BuildAdmission {
     }
 
     pub(in crate::runtime_artifact) fn matches_pool(&self, utf16: &[u8], data: &[u8]) -> bool {
-        [utf16, data]
+        let prefix = self.data[2].span.len();
+        let normalization = self.data[1].span.len();
+        let Some(end) = prefix.checked_add(normalization) else {
+            return false;
+        };
+        let Some((head, tail)) = data.split_at_checked(prefix) else {
+            return false;
+        };
+        let Some((normalization_bytes, suffix)) = tail.split_at_checked(end - prefix) else {
+            return false;
+        };
+        [utf16, normalization_bytes, head, suffix]
             .into_iter()
             .zip(&self.data)
             .all(|(bytes, expected)| {

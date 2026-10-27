@@ -43,32 +43,42 @@ impl CompilerOwnedPool {
         let mut found = false;
         for payload in Parser::new(0).parse_all(bytes) {
             if let Payload::DataSection(section) = payload.map_err(|_| error())? {
-                if found || section.count() != 2 {
+                if found || section.count() != 4 {
                     return Err(error());
                 }
                 found = true;
-                let mut rows = section.into_iter();
-                let utf16 = rows.next().ok_or_else(error)?.map_err(|_| error())?;
-                let static_data = rows.next().ok_or_else(error)?.map_err(|_| error())?;
-                if !matches!(utf16.kind, DataKind::Passive)
-                    || utf16.data != &self.0.pooled_code_unit_bytes[..]
-                    || static_data.data != &self.0.bytes[..]
-                {
-                    return Err(error());
-                }
-                let DataKind::Active {
-                    memory_index: 0,
-                    offset_expr,
-                } = static_data.kind
-                else {
-                    return Err(error());
-                };
-                let mut operators = offset_expr.get_operators_reader();
-                if !matches!(operators.read().map_err(|_| error())?, Operator::I32Const { value } if value == STATIC_DATA_OFFSET as i32)
-                    || !matches!(operators.read().map_err(|_| error())?, Operator::End)
-                    || !operators.eof()
-                {
-                    return Err(error());
+                let region = self.0.normalization_image_region();
+                let span = region.offsets();
+                let expected = [
+                    (&self.0.pooled_code_unit_bytes[..], None),
+                    (&self.0.bytes[span.clone()], None),
+                    (&self.0.bytes[..span.start], Some(STATIC_DATA_OFFSET)),
+                    (&self.0.bytes[span.end..], Some(region.end())),
+                ];
+                for (row, (bytes, address)) in section.into_iter().zip(expected) {
+                    let row = row.map_err(|_| error())?;
+                    if row.data != bytes {
+                        return Err(error());
+                    }
+                    match (row.kind, address) {
+                        (DataKind::Passive, None) => {}
+                        (
+                            DataKind::Active {
+                                memory_index: 0,
+                                offset_expr,
+                            },
+                            Some(address),
+                        ) => {
+                            let mut ops = offset_expr.get_operators_reader();
+                            if !matches!(ops.read().map_err(|_| error())?, Operator::I32Const { value } if value == address as i32)
+                                || !matches!(ops.read().map_err(|_| error())?, Operator::End)
+                                || !ops.eof()
+                            {
+                                return Err(error());
+                            }
+                        }
+                        _ => return Err(error()),
+                    }
                 }
             }
         }
@@ -106,6 +116,7 @@ impl StringPool {
             cased_range_count: base.cased_range_count,
             case_ignorable_range_table_ptr: base.case_ignorable_range_table_ptr,
             case_ignorable_range_count: base.case_ignorable_range_count,
+            normalization_region: base.normalization_region,
             canonical_decomposition_table_ptr: base.canonical_decomposition_table_ptr,
             canonical_decomposition_count: base.canonical_decomposition_count,
             compatibility_decomposition_table_ptr: base.compatibility_decomposition_table_ptr,

@@ -11,6 +11,8 @@ use crate::{
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
+mod execution;
+
 const MAGIC: &[u8; 8] = b"SCRWIC01";
 const MAX_METADATA: usize = 256 * 1024;
 
@@ -231,31 +233,8 @@ fn decode_metadata(
     frames: Vec<(IntlDataComponent, &'static [u8])>,
     frame_validation: FrameValidation,
 ) -> Result<IntlCompilationData, IntlBundleExportError> {
-    if metadata.len() > MAX_METADATA || metadata.len() < 32 {
-        return Err(IntlBundleExportError::TooLarge);
-    }
-    let (body, checksum) = metadata.split_at(metadata.len() - 32);
-    if Sha256::digest(body).as_slice() != checksum {
-        return Err(IntlBundleExportError::Identity);
-    }
-    let mut r = Reader(body);
-    if r.take(8)? != MAGIC || r.take(32)? != source {
-        return Err(IntlBundleExportError::Identity);
-    }
-    let digest = IntlDataDigest::from_sha256(r.take(32)?.try_into().unwrap());
-    let locale =
-        CanonicalLocaleId::from_data(r.text()?).map_err(|_| IntlBundleExportError::Identity)?;
-    let plan = IntlProfilePlan::minimal(IntlServiceSet::ALL)
-        .map_err(|_| IntlBundleExportError::Identity)?
-        .with_operation::<crate::LookupNamedTimeZone>()
-        .with_operation::<crate::ResolveTimeZone>()
-        .with_operation::<crate::NamedTimeZoneOffset>()
-        .with_operation::<crate::PossibleNamedTimeZoneEpochs>()
-        .with_operation::<crate::FindNamedTimeZoneTransition>();
-    let identity = IntlDataIdentity::new(plan, locale, IntlDataPlacement::Embedded, digest);
-    if r.field()? != identity.artifact_identity().as_bytes()
-        || frames.len() != IntlDataComponent::ALL.len()
-    {
+    let (identity, mut r) = execution::identity_prefix(metadata, source)?;
+    if frames.len() != IntlDataComponent::ALL.len() {
         return Err(IntlBundleExportError::Identity);
     }
     let mut admitted = Vec::with_capacity(IntlDataComponent::ALL.len());

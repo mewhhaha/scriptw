@@ -117,6 +117,20 @@ fn precompiled_linked_images_keep_foreign_metadata_retained_calls_throws_and_gc_
         .unwrap()
         .to_string()
         .contains("missing declared foreign import"));
+    let mut wrong_store = state(&runtime);
+    let mut wrong_linker = WasmtimeLinker::new(&engine);
+    wrong_linker
+        .func_wrap("fixture", "add", |a: i32, b: i32| a + b)
+        .unwrap();
+    runtime
+        .register(&mut wrong_store, &mut wrong_linker)
+        .unwrap();
+    assert!(runtime
+        .instantiate(&mut wrong_store, &mut wrong_linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("foreign import type mismatch"));
     let mut store = state(&runtime);
     let mut linker = WasmtimeLinker::new(&engine);
     linker
@@ -166,18 +180,27 @@ fn precompiled_rejects_wrong_runtime_missing_link_and_incompatible_native_engine
 {
     let engine = compiler_disabled();
     let mut wrong = linked_image().clone();
-    wrong.runtime_key.as_mut().unwrap()[0] ^= 1;
+    let mut wrong_key = *wrong.runtime_key().unwrap();
+    wrong_key[0] ^= 1;
+    wrong.facts.runtime = ProgramRuntimeRequirement::CargoMinimalPortable {
+        key: RuntimeArtifactKey::from_bytes(wrong_key),
+    };
     assert!(EmbeddedRuntime::from_precompiled(&engine, &wrong)
         .err()
         .unwrap()
         .to_string()
         .contains("runtime key"));
-    wrong.runtime_key = None;
-    assert!(EmbeddedRuntime::from_precompiled(&engine, &wrong)
-        .err()
-        .unwrap()
-        .to_string()
-        .contains("linkage differs"));
+    // Inert linkage is a producer-established fact. A public raw artifact
+    // cannot mint Standalone facts for a P that imports Cargo R.
+    let mut missing_link = script("var answer = 42; answer;");
+    assert!(missing_link.runtime.take().is_some());
+    assert!(
+        EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &missing_link)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("linkage differs")
+    );
     assert!(
         EmbeddedRuntime::from_precompiled(&shared_wasm_engine().unwrap(), linked_image())
             .err()
@@ -273,7 +296,10 @@ fn precompiled_framing_rejects_corruption_truncation_overflow_and_trailing_data_
     let bytes = envelope::encode(
         b"raw-program",
         b"native-image",
-        None,
+        &ProgramExecutionFacts {
+            foreign: ForeignModuleRegistry::default(),
+            runtime: ProgramRuntimeRequirement::Standalone,
+        },
         WasmNativeCompilationMode::Fast,
     )
     .unwrap();
@@ -300,4 +326,99 @@ fn precompiled_framing_rejects_corruption_truncation_overflow_and_trailing_data_
     extra.insert(extra.len() - 32, 0);
     resign(&mut extra);
     assert!(envelope::decode(&extra).is_err());
+}
+
+#[test]
+fn precompiled_execution_facts_are_canonical_bounded_and_product_versioned() {
+    let facts = ProgramExecutionFacts {
+        foreign: ForeignModuleRegistry::default(),
+        runtime: ProgramRuntimeRequirement::Standalone,
+    };
+    // Inert frame parsing grants no native-origin authority.
+    let bytes =
+        envelope::encode(b"raw", b"native", &facts, WasmNativeCompilationMode::Fast).unwrap();
+    assert_eq!(&bytes[..8], b"SCRWEP02");
+    let frame = envelope::decode(&bytes).unwrap();
+    assert!(frame.facts.foreign.is_empty());
+    assert!(matches!(
+        frame.facts.runtime,
+        ProgramRuntimeRequirement::Standalone
+    ));
+    assert_eq!(&bytes[frame.program], b"raw");
+    assert_eq!(&bytes[frame.native], b"native");
+    let resign = |bytes: &mut Vec<u8>| {
+        let end = bytes.len() - 32;
+        let digest = sha2::Sha256::digest(&bytes[..end]);
+        bytes[end..].copy_from_slice(&digest);
+    };
+    let mut historical = bytes.clone();
+    historical[..8].copy_from_slice(b"SCRWEP01");
+    resign(&mut historical);
+    assert!(envelope::decode(&historical).is_err());
+    let mut excessive = bytes.clone();
+    excessive[90..94].copy_from_slice(&u32::MAX.to_le_bytes());
+    resign(&mut excessive);
+    assert!(envelope::decode(&excessive).is_err());
+    let original_length = u32::from_le_bytes(bytes[90..94].try_into().unwrap()) as usize;
+    let canonical = facts.foreign.to_normalized_json();
+    for registry in [
+        [canonical.as_slice(), b" "].concat(),
+        b"{\"abi_version\":3,\"error_tag\":null,\"modules\":[]}".to_vec(),
+        b"{\"abi_version\":2,\"abi_version\":2,\"error_tag\":null,\"modules\":[]}".to_vec(),
+    ] {
+        let mut changed = bytes[..90].to_vec();
+        changed.extend_from_slice(&(registry.len() as u32).to_le_bytes());
+        changed.extend_from_slice(&registry);
+        changed.extend_from_slice(&bytes[94 + original_length..]);
+        resign(&mut changed);
+        assert!(envelope::decode(&changed).is_err());
+    }
+}
+
+#[test]
+fn precompile_cannot_mint_facts_for_invalid_wasm_bodies() {
+    let mut artifact = script("42;");
+    // Valid inert section framing, but an invalid opcode in the function body.
+    artifact.bytes =
+        b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x0a\x04\x01\x02\0\xff".to_vec();
+    let name = scriptw_aot_wasm::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION.as_bytes();
+    artifact
+        .bytes
+        .extend_from_slice(&[0, (name.len() + 2) as u8, name.len() as u8]);
+    artifact.bytes.extend_from_slice(name);
+    artifact.bytes.push(0);
+    assert!(EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &artifact).is_err());
+}
+
+#[test]
+fn precompiled_facts_roundtrip_async_foreign_declarations_and_explicit_error_tag() {
+    use scriptw_ir::foreign::{
+        ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
+        ForeignValueType,
+    };
+    let registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "fixture:async",
+        vec![ForeignFunctionDeclaration::new_async(
+            "read",
+            "fixture",
+            "read",
+            vec![ForeignValueType::Bytes],
+            ForeignResultType::StringUtf16,
+        )
+        .unwrap()],
+    )
+    .unwrap()])
+    .unwrap()
+    .with_error_tag(ForeignErrorTag::code_v1());
+    let facts = ProgramExecutionFacts {
+        foreign: registry.clone(),
+        runtime: ProgramRuntimeRequirement::CargoMinimalPortable {
+            key: RuntimeArtifactKey::from_bytes([7; 32]),
+        },
+    };
+    let bytes =
+        envelope::encode(b"raw", b"native", &facts, WasmNativeCompilationMode::Fast).unwrap();
+    let recovered = envelope::decode(&bytes).unwrap();
+    assert_eq!(recovered.facts.foreign, registry);
+    assert_eq!(recovered.facts.runtime_key().unwrap().as_bytes(), &[7; 32]);
 }

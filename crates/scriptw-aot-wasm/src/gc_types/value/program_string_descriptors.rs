@@ -143,7 +143,7 @@ impl StringConstruction {
         row.literal.length.load(function);
         function.instruction(&Instruction::ArrayNewData {
             array_type_index: schema.array_type::<CodeUnitArray>().type_index().raw(),
-            array_data_index: crate::data::PooledCodeUnits::DATA_SEGMENT,
+            array_data_index: crate::data::PooledCodeUnits::DATA_SEGMENT.index(),
         });
         Self {
             units: slot.initialize(GcStackReference::new(), function),

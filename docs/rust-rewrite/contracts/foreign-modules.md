@@ -328,3 +328,18 @@ under the limiter. Preserve the nonzero known-failure exit and verify the exact
 ID set and native snapshot, including timeouts. Full affected native commands
 and all selected IDs are retained in the JSON rather than a permissive filter
 or expected-failure suppression.
+
+Precompiled native program frames use `SCRWEP02`. Their private execution facts
+are minted after successful Portable compilation, including inert initialization,
+foreign declarations and the exact Cargo Minimal Portable runtime requirement.
+Consumers decode canonical bounded facts without parsing raw P again or
+reconstructing compiler planning data for R. Actual deserialized foreign function
+types, exception Tag identity, Engine/Store ownership and lifecycle checks remain.
+The unsafe recovery contract requires the whole unchanged producer envelope,
+including execution facts and raw/native correspondence. Checksums and decoded
+facts grant no authority to deserialize caller-supplied native code. Rebuild
+older native frames; the read-only benchmark evidence reader retains historical
+SW01 support independently of the product loader.
+
+Canonical foreign execution facts are bounded at 1 MiB, and the complete native
+program envelope at 256 MiB. Oversized or noncanonical facts are rejected.

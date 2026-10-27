@@ -136,6 +136,22 @@ impl Mmap {
         self.memory.as_ptr().len()
     }
 
+    /// This advisory policy preserves contents and protections, including for
+    /// currently inaccessible pages of the reservation that may grow later.
+    #[cfg(target_os = "linux")]
+    pub fn prefer_base_pages(&self) -> Result<()> {
+        if self.len() != 0 {
+            unsafe {
+                rustix::mm::madvise(
+                    self.memory.as_ptr().cast::<u8>().cast(),
+                    self.len(),
+                    rustix::mm::Advice::LinuxNoHugepage,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
     /// Discard anonymous Linux pages without removing their RW mapping.
     ///
     /// # Safety

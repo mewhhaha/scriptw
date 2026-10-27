@@ -1,5 +1,6 @@
 //! Explicit native-image ownership for source-free, compiler-disabled embedding.
 use super::*;
+use scriptw_aot_wasm::RuntimeArtifactKey;
 use std::ops::Range;
 use std::time::Instant;
 
@@ -25,8 +26,43 @@ pub struct PrecompiledEmbeddedProgram {
     bytes: Arc<[u8]>,
     program: Range<usize>,
     native: Range<usize>,
-    runtime_key: Option<[u8; 32]>,
+    execution_facts: Range<usize>,
+    facts: ProgramExecutionFacts,
     mode: WasmNativeCompilationMode,
+}
+
+/// Execution facts are minted after real compilation, or recovered structurally
+/// inside the unsafe unchanged-producer-envelope boundary. They are never a
+/// native-code authority independently of PrecompiledEmbeddedProgram.
+#[derive(Clone)]
+struct ProgramExecutionFacts {
+    foreign: ForeignModuleRegistry,
+    runtime: ProgramRuntimeRequirement,
+}
+
+#[derive(Clone, Copy)]
+enum ProgramRuntimeRequirement {
+    Standalone,
+    CargoMinimalPortable { key: RuntimeArtifactKey },
+}
+
+impl ProgramExecutionFacts {
+    fn from_compiled(runtime: &EmbeddedRuntime, key: Option<RuntimeArtifactKey>) -> Self {
+        Self {
+            foreign: runtime.foreign.clone(),
+            runtime: match key {
+                None => ProgramRuntimeRequirement::Standalone,
+                Some(key) => ProgramRuntimeRequirement::CargoMinimalPortable { key },
+            },
+        }
+    }
+
+    fn runtime_key(&self) -> Option<&RuntimeArtifactKey> {
+        match &self.runtime {
+            ProgramRuntimeRequirement::Standalone => None,
+            ProgramRuntimeRequirement::CargoMinimalPortable { key } => Some(key),
+        }
+    }
 }
 
 impl PrecompiledEmbeddedProgram {
@@ -41,8 +77,14 @@ impl PrecompiledEmbeddedProgram {
     pub fn serialized_program_len(&self) -> usize {
         self.native.len()
     }
+    /// Canonical foreign-registry part of the producer-bound execution facts.
+    /// Runtime linkage and mode are in the fixed envelope header. These bytes
+    /// describe requirements and grant no native-code authority.
+    pub fn serialized_execution_facts(&self) -> &[u8] {
+        &self.bytes[self.execution_facts.clone()]
+    }
     pub fn runtime_key(&self) -> Option<&[u8; 32]> {
-        self.runtime_key.as_ref()
+        self.facts.runtime_key().map(RuntimeArtifactKey::as_bytes)
     }
 
     /// Recover a persisted image without parsing or compiling JavaScript/Wasm.
@@ -50,20 +92,22 @@ impl PrecompiledEmbeddedProgram {
     ///
     /// # Safety
     ///
-    /// The accepted native payload must be the unchanged output of Wasmtime's
-    /// `Module::serialize` for the exact accompanying raw program. It must have
-    /// been produced through `EmbeddedRuntime::precompile`, with its matching
-    /// compiler/runtime identity. Never deserialize attacker-controlled native
-    /// bytes. A matching checksum or static lifetime does not establish this
-    /// provenance. This has Wasmtime `Module::deserialize`'s native-code trust
-    /// requirement, plus the exact raw/native P correspondence requirement.
+    /// The complete envelope must be the unchanged output of
+    /// EmbeddedRuntime::precompile from this compiler/runtime identity,
+    /// including its execution facts, foreign declarations, raw P and native P.
+    /// The native payload must be the exact Module::serialize output for that
+    /// accompanying validated raw program. Never recover attacker-controlled
+    /// native bytes or rewritten execution facts. Checksums and static lifetime
+    /// detect neither forged provenance nor incorrect raw/native correspondence.
+    /// This includes Module::deserialize's native-code trust requirement.
     pub unsafe fn from_bytes(bytes: &[u8]) -> Result<Self, EngineError> {
         let frame = envelope::decode(bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes),
             program: frame.program,
             native: frame.native,
-            runtime_key: frame.runtime_key,
+            execution_facts: frame.execution_facts,
+            facts: frame.facts,
             mode: frame.mode,
         })
     }
@@ -97,10 +141,10 @@ impl EmbeddedRuntime {
                     ))
                 }
             };
-            let key = artifact.runtime.as_ref().map(|r| *r.key().as_bytes());
+            let key = artifact.runtime.as_ref().map(|r| r.key());
             admission::program(&artifact.bytes, key.is_some())?;
             if let Some(key) = &key {
-                admission::cargo_runtime(key)?;
+                admission::cargo_runtime(key.as_bytes())?;
             }
             let runtime = Self::compile(engine, artifact)?;
             let native = runtime.modules.program.serialize().map_err(|error| {
@@ -108,7 +152,11 @@ impl EmbeddedRuntime {
                     "precompiled program serialization failed: {error:#}"
                 ))
             })?;
-            let bytes = envelope::encode(&artifact.bytes, &native, key, mode)?;
+            // Only the successfully compiled exact P can mint these facts.
+            // Producer admission above established Portable/inert/linkage/Intl
+            // requirements; compile admitted the exact foreign signatures.
+            let facts = ProgramExecutionFacts::from_compiled(&runtime, key);
+            let bytes = envelope::encode(&artifact.bytes, &native, &facts, mode)?;
             // SAFETY: Self::compile compiled this exact P and the matching R.
             // Its actual immutable Wasmtime serialization is copied unchanged.
             unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }
@@ -131,32 +179,23 @@ impl EmbeddedRuntime {
             PRODUCT_WASMTIME_POLICY
                 .verify_engine(engine)
                 .map_err(EngineError::new)?;
-            let foreign = admission::program(image.program_wasm(), image.runtime_key.is_some())?;
-            // This opaque owner carries the exact successful producer output.
-            // Self::compile validated that same raw P before serialization;
-            // external recovery requires that correspondence in its unsafe
-            // contract. Re-running the full Wasm body validator here faults in
-            // compiler-only pages without strengthening native provenance.
-            // Portable/linkage/foreign metadata above still admits its actual
-            // requirements, and deserialize checks destination compatibility.
+            // The opaque owner binds these producer-validated execution facts
+            // to the exact raw/native P. Runtime consumers inspect actual native
+            // Module imports/types; no raw-P parser is entered here.
+            let foreign = image.facts.foreign.clone();
             let mut loading = WasmRuntimeModuleLoading::default();
-            let (runtime, intl) = match &image.runtime_key {
-                Some(key) => {
+            let (runtime, intl) = match image.facts.runtime {
+                ProgramRuntimeRequirement::CargoMinimalPortable { key } => {
                     let started = Instant::now();
-                    let raw = admission::cargo_runtime(key)?;
-                    let intl = wasm_runtime_link::intl_kernel_for(WasmProgramRef::new(
-                        image.program_wasm(),
-                        Some(&raw),
-                    ))?;
-                    let timings = loading.embedded_image.get_or_insert_with(Default::default);
-                    let module = embedded_runtime::load_native(engine, &raw, image.mode, timings)
-                        .ok_or_else(|| EngineError::new("matching Cargo Portable native runtime is unavailable or incompatible; no compiler fallback"))?;
+                    let (module, intl) =
+                        wasm_runtime_link::precompiled_minimal_runtime(engine, key, image.mode)?;
                     loading.runtime = started.elapsed();
                     loading.runtime_cache = Some(WasmRuntimeModuleCacheOutcome::Bypassed);
                     (Some(module), intl)
                 }
-                // admission::program proved there are no Intl imports/metadata.
-                None => (None, intl_data_images::WasmIntlKernel::Absent),
+                ProgramRuntimeRequirement::Standalone => {
+                    (None, intl_data_images::WasmIntlKernel::Absent)
+                }
             };
             let started = Instant::now();
             // SAFETY: only actual serialization or the explicitly unsafe

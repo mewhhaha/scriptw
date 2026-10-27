@@ -226,16 +226,22 @@ def check(root, overrides=None):
             "native file backing remains private, unlinked, synced, non-tmpfs and owned by Wasmtime")
     image = "crates/scriptw-runtime-image/src/"
     require("modmetadata;pubusemetadata::{metadata,portable_metadata};" in c[image + "lib.rs"] and
-            c[image + "lib.rs"].count("#[inline(never)]") == 7 and
+            c[image + "lib.rs"].count("#[inline(never)]") == 9 and
             c[image + "metadata.rs"].count("#[inline(never)]") == 2 and
             "pubfnmetadata()->&'static[u8]" in c[image + "metadata.rs"] and
             "pubfnportable_metadata()->&'static[u8]" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_METADATA}" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}" in c[image + "metadata.rs"] and
-            "constPARTS:[(&str,&str);9]" in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            "constPARTS:[(&str,&str);11]" in c["crates/scriptw-runtime-image/build/objects.rs"] and
             '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"],
-            "nine immutable image definitions use seven original and two receipt accessors")
+            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            "pubfnexecution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
+            "pubfnportable_execution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
+            "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}" in function(source[image + "lib.rs"], "execution_metadata") and
+            "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}" in function(source[image + "lib.rs"], "portable_execution_metadata") and
+            '"SCRIPTW_RUNTIME_EXECUTION","scriptw-runtime-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            '"SCRIPTW_RUNTIME_PORTABLE_EXECUTION","scriptw-runtime-portable-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"],
+            "eleven immutable image definitions use seven original and four receipt accessors")
     lease = c[image + "native_lease.rs"]
     storage = c[image + "native_storage.rs"]
     require("Mutex<Result<Weak<NativeRuntimeBytes>,()>>" in lease and

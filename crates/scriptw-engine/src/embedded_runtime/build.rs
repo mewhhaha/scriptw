@@ -33,7 +33,7 @@ pub(crate) fn write_bundle(
             RuntimeSourceCompilationProfile::NativeHost,
             RuntimeSourceCompilationProfile::Portable,
         ] {
-            publication::publish(out, profile, &[], &[], &[], &[]);
+            publication::publish(out, profile, &[], &[], &[], &[], &[]);
         }
         publication::publish_intl_metadata(out, &[]);
         return;
@@ -146,6 +146,9 @@ pub(crate) fn write_bundle(
                     let runtime_metadata = runtime
                         .immutable_build_metadata(&selection, &source, &metadata)
                         .expect("fully checked runtime produces bounded metadata");
+                    let execution_metadata = runtime
+                        .immutable_execution_metadata(&selection, &source, &metadata, &encoded)
+                        .expect("checked producer emits compact execution receipt");
                     publication::publish(
                         out,
                         profile,
@@ -153,6 +156,7 @@ pub(crate) fn write_bundle(
                         &native,
                         &encoded,
                         &runtime_metadata,
+                        &execution_metadata,
                     );
                 }
                 publication::publish_intl_metadata(out, &metadata);

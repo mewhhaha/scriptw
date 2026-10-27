@@ -406,6 +406,9 @@ fn decode_layout(
     let mut exports = BTreeMap::new();
     let mut sections = identity.sections.clone();
     let mut data_count = 0;
+    let mut deferred_len = 0usize;
+    let mut prefix_len = 0usize;
+    let mut suffix_len = 0usize;
     let mut source_admission = SourceCompilationProfileAdmission::default();
     for payload in parser.parse_all(bytes) {
         let payload = payload.ok()?;
@@ -468,16 +471,25 @@ fn decode_layout(
                     let data = data.ok()?;
                     match (data_count, data.kind) {
                         (0, DataKind::Passive) if data.data.len() == pool.code_unit_len() => {}
+                        (1, DataKind::Passive) => deferred_len = data.data.len(),
                         (
-                            1,
+                            position @ (2 | 3),
                             DataKind::Active {
                                 memory_index: 0,
                                 offset_expr,
                             },
-                        ) if data.data.len() == pool.static_len() => {
+                        ) => {
+                            let address = if position == 2 {
+                                prefix_len = data.data.len();
+                                STATIC_DATA_OFFSET
+                            } else {
+                                suffix_len = data.data.len();
+                                STATIC_DATA_OFFSET.checked_add(
+                                    u32::try_from(prefix_len.checked_add(deferred_len)?).ok()?,
+                                )?
+                            };
                             let mut ops = offset_expr.get_operators_reader();
-                            if !matches!(ops.read().ok()?, Operator::I32Const { value }
-                                if value == STATIC_DATA_OFFSET as i32)
+                            if !matches!(ops.read().ok()?, Operator::I32Const { value } if value == address as i32)
                                 || !matches!(ops.read().ok()?, Operator::End)
                                 || !ops.eof()
                             {
@@ -508,7 +520,11 @@ fn decode_layout(
         return None;
     }
     if !validated_end
-        || data_count != 2
+        || data_count != 4
+        || prefix_len
+            .checked_add(deferred_len)?
+            .checked_add(suffix_len)?
+            != pool.static_len()
         || !sections.is_empty()
         || function_types.is_empty()
         || globals.is_empty()
@@ -540,7 +556,9 @@ fn decode_layout(
             // identity, data and layout checks above still run at use.
             debug_assert!(functions.is_empty());
             if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-                eprintln!("scriptw wasm trace: runtime-function bodies: reused immutable Cargo producer validation");
+                eprintln!(
+                    "scriptw wasm trace: runtime-function bodies: reused immutable Cargo producer validation"
+                );
             }
         }
     }

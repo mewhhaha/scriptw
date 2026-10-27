@@ -2,7 +2,7 @@
 //! platform mmap primitive.
 
 use crate::prelude::*;
-use crate::runtime::vm::memory::RuntimeLinearMemory;
+use crate::runtime::vm::memory::{MemoryPagePolicy, RuntimeLinearMemory};
 use crate::runtime::vm::{HostAlignedByteCount, Mmap, mmap::AlignedLength};
 use alloc::sync::Arc;
 use wasmtime_environ::MemoryTunables;
@@ -14,6 +14,8 @@ use super::MemoryBase;
 pub struct MmapMemory {
     // The underlying allocation.
     mmap: Arc<Mmap<AlignedLength>>,
+    // Applied to the complete reservation, including future in-place growth.
+    page_policy: MemoryPagePolicy,
 
     // The current length of this Wasm memory, in bytes.
     //
@@ -104,7 +106,8 @@ impl MmapMemory {
             .and_then(|i| i.checked_add(offset_guard_bytes))
             .with_context(|| format!("cannot allocate {minimum} with guard regions"))?;
 
-        let mmap = Mmap::accessible_reserved(HostAlignedByteCount::ZERO, request_bytes)?;
+        let page_policy = MemoryPagePolicy::SystemDefault;
+        let mmap = Self::reserve_mapping(request_bytes, page_policy)?;
 
         if minimum > 0 {
             let accessible = HostAlignedByteCount::new_rounded_up(minimum)?;
@@ -116,12 +119,37 @@ impl MmapMemory {
 
         Ok(Self {
             mmap: try_new::<Arc<_>>(mmap)?,
+            page_policy,
             len: minimum,
             maximum,
             pre_guard_size: pre_guard_bytes,
             offset_guard_size: offset_guard_bytes,
             extra_to_reserve_on_growth,
         })
+    }
+
+    /// Every replacement reservation receives its policy before any bytes are
+    /// copied into it. Applying to inaccessible growth space is intentional.
+    fn reserve_mapping(
+        bytes: HostAlignedByteCount,
+        policy: MemoryPagePolicy,
+    ) -> Result<Mmap<AlignedLength>> {
+        let mmap = Mmap::accessible_reserved(HostAlignedByteCount::ZERO, bytes)?;
+        Self::apply_page_policy(&mmap, policy);
+        Ok(mmap)
+    }
+
+    fn apply_page_policy(mmap: &Mmap<AlignedLength>, policy: MemoryPagePolicy) {
+        match policy {
+            MemoryPagePolicy::SystemDefault => {}
+            MemoryPagePolicy::PreferBasePages => {
+                // This is only an OS hint. Refusal cannot invalidate a valid
+                // backing; keep the preference so later mappings retry it.
+                if let Err(error) = mmap.prefer_base_pages() {
+                    log::debug!("GC base-page preference could not be applied: {error:#}");
+                }
+            }
+        }
     }
 
     /// Get the length of the accessible portion of the underlying `mmap`. This
@@ -153,6 +181,16 @@ impl RuntimeLinearMemory for MmapMemory {
         self.current_capacity().byte_count()
     }
 
+    fn configure_page_policy(&mut self, policy: MemoryPagePolicy) -> Result<()> {
+        ensure!(
+            self.page_policy == MemoryPagePolicy::SystemDefault || self.page_policy == policy,
+            "a configured mmap page policy cannot be reverted"
+        );
+        Self::apply_page_policy(&self.mmap, policy);
+        self.page_policy = policy;
+        Ok(())
+    }
+
     fn grow_to(&mut self, new_size: usize) -> Result<()> {
         let new_accessible = HostAlignedByteCount::new_rounded_up(new_size)?;
         let current_capacity = self.current_capacity();
@@ -168,8 +206,7 @@ impl RuntimeLinearMemory for MmapMemory {
                 .and_then(|s| s.checked_add(self.offset_guard_size))
                 .context("overflow calculating size of memory allocation")?;
 
-            let mut new_mmap =
-                Mmap::accessible_reserved(HostAlignedByteCount::ZERO, request_bytes)?;
+            let mut new_mmap = Self::reserve_mapping(request_bytes, self.page_policy)?;
             // SAFETY: new_mmap is not in use right now so it's safe to make it
             // accessible.
             unsafe {
@@ -276,6 +313,10 @@ mod discard_tests {
     use wasmtime_environ::{IndexType, Limits, MemoryKind, Tunables};
 
     fn memory(bytes: usize) -> MmapMemory {
+        memory_with_reservation(bytes, 0)
+    }
+
+    fn memory_with_reservation(bytes: usize, reservation: usize) -> MmapMemory {
         let ty = wasmtime_environ::Memory {
             idx_type: IndexType::I32,
             limits: Limits { min: 0, max: None },
@@ -283,7 +324,7 @@ mod discard_tests {
             page_size_log2: 0,
         };
         let tunables = Tunables {
-            memory_reservation: 0,
+            memory_reservation: reservation as u64,
             memory_reservation_for_growth: 0,
             memory_guard_size: HostAlignedByteCount::host_page_size().byte_count() as u64,
             guard_before_linear_memory: true,
@@ -297,6 +338,142 @@ mod discard_tests {
             None,
         )
         .unwrap()
+    }
+
+    /// Check the kernel's VMA preference, independently of THP availability,
+    /// physical residency, RSS and the requested policy stored in Rust.
+    fn has_no_huge_page_preference(address: *mut u8) -> bool {
+        let address = address as usize;
+        let smaps = std::fs::read_to_string("/proc/self/smaps").unwrap();
+        let mut contains_address = false;
+        for line in smaps.lines() {
+            if let Some((start, end)) = line
+                .split_whitespace()
+                .next()
+                .and_then(|word| word.split_once('-'))
+            {
+                if let (Ok(start), Ok(end)) = (
+                    usize::from_str_radix(start, 16),
+                    usize::from_str_radix(end, 16),
+                ) {
+                    contains_address = start <= address && address < end;
+                }
+            }
+            if contains_address {
+                if let Some(flags) = line.strip_prefix("VmFlags:") {
+                    return flags.split_whitespace().any(|flag| flag == "nh");
+                }
+            }
+        }
+        panic!("the owned mapping must have a kernel VMA");
+    }
+
+    #[test]
+    fn gc_page_preference_survives_growth_and_relocation_without_changing_bytes() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let mut memory = memory_with_reservation(page, page * 4);
+        memory
+            .configure_page_policy(MemoryPagePolicy::for_kind(MemoryKind::GcHeap))
+            .unwrap();
+        assert_eq!(memory.page_policy, MemoryPagePolicy::PreferBasePages);
+        let base = memory.base().as_mut_ptr();
+        assert!(has_no_huge_page_preference(base));
+        // No advice operation writes contents, and future reserved pages carry
+        // the same preference before becoming accessible.
+        assert!(
+            unsafe { core::slice::from_raw_parts(base, page) }
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        unsafe {
+            base.write_bytes(0x35, page);
+        }
+        memory.grow_to(page * 3).unwrap();
+        assert_eq!(
+            memory.base().as_mut_ptr(),
+            base,
+            "growth fits the reservation"
+        );
+        assert!(has_no_huge_page_preference(unsafe { base.add(page * 2) }));
+        assert!(
+            unsafe { core::slice::from_raw_parts(base, page) }
+                .iter()
+                .all(|byte| *byte == 0x35)
+        );
+        assert!(
+            unsafe { core::slice::from_raw_parts(base.add(page), page * 2) }
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        unsafe {
+            base.add(page).write_bytes(0x72, page * 2);
+        }
+        // Exceeding the old reservation must allocate a different mapping.
+        // The policy is applied before grow_to copies the existing bytes.
+        memory.grow_to(page * 7).unwrap();
+        let relocated = memory.base().as_mut_ptr();
+        assert_ne!(relocated, base);
+        assert_eq!(memory.page_policy, MemoryPagePolicy::PreferBasePages);
+        assert!(has_no_huge_page_preference(relocated));
+        assert!(has_no_huge_page_preference(unsafe {
+            relocated.add(page * 6)
+        }));
+        assert!(
+            unsafe { core::slice::from_raw_parts(relocated, page) }
+                .iter()
+                .all(|byte| *byte == 0x35)
+        );
+        assert!(
+            unsafe { core::slice::from_raw_parts(relocated.add(page), page * 2) }
+                .iter()
+                .all(|byte| *byte == 0x72)
+        );
+        assert!(
+            unsafe { core::slice::from_raw_parts(relocated.add(page * 3), page * 4) }
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        unsafe {
+            relocated.add(page * 6).write(19);
+        }
+        assert_eq!(unsafe { relocated.add(page * 6).read() }, 19);
+    }
+
+    #[test]
+    fn base_page_advice_preserves_existing_contents_and_rw_access() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let memory = memory(page * 2);
+        let base = memory.base().as_mut_ptr();
+        unsafe {
+            base.write_bytes(0xa3, page * 2);
+        }
+        // Advice is separate from dead-page discard: even already written
+        // bytes retain their values and remain accessible.
+        memory.mmap.prefer_base_pages().unwrap();
+        assert!(has_no_huge_page_preference(base));
+        assert!(
+            unsafe { core::slice::from_raw_parts(base, page * 2) }
+                .iter()
+                .all(|byte| *byte == 0xa3)
+        );
+        unsafe {
+            base.add(page).write(41);
+        }
+        assert_eq!(unsafe { base.add(page).read() }, 41);
+    }
+
+    #[test]
+    fn ordinary_linear_memory_keeps_system_page_preference() {
+        let page = HostAlignedByteCount::host_page_size().byte_count();
+        let mut memory = memory(page);
+        memory
+            .configure_page_policy(MemoryPagePolicy::for_kind(MemoryKind::LinearMemory))
+            .unwrap();
+        assert_eq!(memory.page_policy, MemoryPagePolicy::SystemDefault);
+        assert!(!has_no_huge_page_preference(memory.base().as_mut_ptr()));
+        memory.grow_to(page * 3).unwrap();
+        assert_eq!(memory.page_policy, MemoryPagePolicy::SystemDefault);
+        assert!(!has_no_huge_page_preference(memory.base().as_mut_ptr()));
     }
 
     #[test]
@@ -375,6 +552,11 @@ mod discard_tests {
             }
         }
         let mut custom = Custom(memory);
+        custom
+            .configure_page_policy(MemoryPagePolicy::for_kind(MemoryKind::GcHeap))
+            .unwrap();
+        assert_eq!(custom.0.page_policy, MemoryPagePolicy::SystemDefault);
+        assert!(!has_no_huge_page_preference(base));
         assert!(!unsafe { custom.discard_unused_pages(0..page) }.unwrap());
         assert!(
             unsafe { core::slice::from_raw_parts(base, page) }

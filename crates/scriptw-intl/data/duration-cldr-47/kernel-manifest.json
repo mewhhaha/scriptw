@@ -31,9 +31,9 @@
       "sha256": "8d404b67c0f8dc3e077c161a6cc6b08971bbbc095a708705398eb8e532d8fdaf"
     },
     {
-      "bytes": 21032,
+      "bytes": 21112,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
+      "sha256": "1a49f7e4acab0c7365901f0ac9622772a3a826814315c67e374e068d3390ccfa"
     },
     {
       "bytes": 3253,
@@ -1053,7 +1053,7 @@
       "version": "1.0.21"
     }
   ],
-  "provider_data_sha256": "8e9cc8b4ee6786de685c0e52fcda039179ab0778076847eb0439fbb83d800079",
+  "provider_data_sha256": "64dabc9ecc3c770b83b472ec5c37304280d3bf12bd899343f9ccacb3a33e5926",
   "schema_version": 1,
   "scope": "actual immutable native Duration image, retained selected Number/List owners, global/native/host source, complete primitive codecs and primary CLDR47 authority; native and AOT execution pending",
   "service": "DurationFormat"

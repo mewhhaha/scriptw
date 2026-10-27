@@ -104,6 +104,15 @@ class MaintenanceSourceGuards(unittest.TestCase):
                 self.assertEqual(source.count(before), 1)
                 self.assertIn(invariant, pool.check(ROOT, {path: source.replace(before, "true")}))
 
+        invariant = "same-sized foreign data or offset cannot certify the canonical R prefix"
+        path = pool.A + "data/compiler_owned_pool.rs"
+        source = pool.compact((ROOT / path).read_text())
+        for before in ("section.count()!=4", "ifrow.data!=bytes",
+                       "Some(region.end())", "value==addressasi32", "!ops.eof()"):
+            with self.subTest(sparse_admission=before):
+                self.assertEqual(source.count(before), 1)
+                self.assertIn(invariant, pool.check(ROOT, {path: source.replace(before, "true")}))
+
     def test_typed_import_slots_keep_distinct_roles_and_complete_admission(self):
         self.assertEqual(profile.check(ROOT), [])
         path = profile.A + "runtime_artifact/source_compilation.rs"
@@ -279,9 +288,15 @@ class ImmutableReceiptGuards(unittest.TestCase):
                               before, "false", invariant)
 
     def test_receipt_accessors_select_two_distinct_immutable_images(self):
-        invariant = "nine immutable image definitions use seven original and two receipt accessors"
+        invariant = "eleven immutable image definitions use seven original and four receipt accessors"
         self.rejected("crates/scriptw-runtime-image/src/metadata.rs",
                       "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}",
                       "returnunsafe{&SCRIPTW_RUNTIME_METADATA}", invariant)
         self.rejected("crates/scriptw-runtime-image/build/objects.rs",
-                      "constPARTS:[(&str,&str);9]", "constPARTS:[(&str,&str);7]", invariant)
+                      "constPARTS:[(&str,&str);11]", "constPARTS:[(&str,&str);9]", invariant)
+        self.rejected("crates/scriptw-runtime-image/src/lib.rs",
+                      "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}",
+                      "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}", invariant)
+        self.rejected("crates/scriptw-runtime-image/src/lib.rs",
+                      "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}",
+                      "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}", invariant)

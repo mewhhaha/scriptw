@@ -62,6 +62,8 @@ pub(super) fn run_with_config(
     let image_bytes = bytes.len();
     let program_wasm_sha256 = hash(image.program_wasm());
     let runtime_key = image.runtime_key().map(produce::hash_key);
+    let execution_facts_bytes = image.serialized_execution_facts().len();
+    let execution_facts_sha256 = hash(image.serialized_execution_facts());
     // Both native Modules own their mappings. The execution floor therefore
     // retains neither transport copy; load endpoints above include both.
     drop(image);
@@ -141,6 +143,8 @@ pub(super) fn run_with_config(
     report["image_bytes"] = json!(image_bytes);
     report["program_wasm_sha256"] = json!(program_wasm_sha256);
     report["runtime_key"] = json!(runtime_key);
+    report["execution_facts_bytes"] = json!(execution_facts_bytes);
+    report["execution_facts_sha256"] = json!(execution_facts_sha256);
     report["samples"] = json!(samples);
     report["warmups"] = json!(warmups);
     report["load_phases_ns"] = json!({"engine": engine_ns, "image_read_and_envelope_admission": image_read_ns,

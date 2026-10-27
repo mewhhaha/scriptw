@@ -128,10 +128,22 @@ impl BuildMetadata {
         if largest_body == 0 || largest_body > wasm.len() {
             return None;
         }
-        let data = [r.span(&wasm)?, r.span(&wasm)?];
+        let data = [
+            r.span(&wasm)?,
+            r.span(&wasm)?,
+            r.span(&wasm)?,
+            r.span(&wasm)?,
+        ];
         if data[0].span.len() != utf16_len
-            || data[1].span.len() != static_len
-            || data[0].span.end > data[1].span.start
+            || data[1]
+                .span
+                .len()
+                .checked_add(data[2].span.len())?
+                .checked_add(data[3].span.len())?
+                != static_len
+            || data
+                .windows(2)
+                .any(|rows| rows[0].span.end > rows[1].span.start)
         {
             return None;
         }

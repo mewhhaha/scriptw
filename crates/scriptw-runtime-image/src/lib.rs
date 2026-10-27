@@ -4,6 +4,7 @@
 //! independently admits source, target, modes, layout and byte digests before
 //! deserializing native code. This crate accepts no caller bytes or paths.
 
+pub mod execution;
 mod metadata;
 pub use metadata::{metadata, portable_metadata};
 mod native_storage;
@@ -15,6 +16,22 @@ mod native_lease;
 
 #[cfg(scriptw_runtime_image)]
 include!(concat!(env!("OUT_DIR"), "/image_bindings.rs"));
+
+/// Exact compact receipt of the checked Cargo producer, not caller authority.
+#[inline(never)]
+pub fn execution_metadata() -> &'static [u8] {
+    #[cfg(scriptw_runtime_image)]
+    return unsafe { &SCRIPTW_RUNTIME_EXECUTION };
+    #[cfg(not(scriptw_runtime_image))]
+    &[]
+}
+#[inline(never)]
+pub fn portable_execution_metadata() -> &'static [u8] {
+    #[cfg(scriptw_runtime_image)]
+    return unsafe { &SCRIPTW_RUNTIME_PORTABLE_EXECUTION };
+    #[cfg(not(scriptw_runtime_image))]
+    &[]
+}
 
 // The target Rust compiler defines each immutable data array with the same
 // symbol and exact type as its generated declaration. The linked archive owns

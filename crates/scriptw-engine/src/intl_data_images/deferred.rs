@@ -11,8 +11,29 @@ pub(crate) enum WasmIntlKernel {
 }
 
 pub(crate) struct DeferredMinimal {
-    data: Arc<scriptw_intl::IntlCompilationData>,
+    data: MinimalData,
     resolved: OnceLock<Result<Arc<IntlKernel<EmbeddedIntlProvider>>, String>>,
+}
+
+enum MinimalData {
+    Ready(Arc<scriptw_intl::IntlCompilationData>),
+    Cargo {
+        owner: Arc<crate::embedded_runtime::CargoExecutionRuntime>,
+    },
+}
+impl MinimalData {
+    fn identity(&self) -> &scriptw_intl::IntlDataIdentity {
+        match self {
+            Self::Ready(data) => data.identity(),
+            Self::Cargo { owner, .. } => owner.identity(),
+        }
+    }
+    fn get(&self) -> Result<&scriptw_intl::IntlCompilationData, EngineError> {
+        match self {
+            Self::Ready(data) => Ok(data),
+            Self::Cargo { owner } => owner.compilation_data(),
+        }
+    }
 }
 
 impl From<Arc<IntlKernel<EmbeddedIntlProvider>>> for WasmIntlKernel {
@@ -24,9 +45,17 @@ impl WasmIntlKernel {
     pub(crate) fn minimal(data: Arc<scriptw_intl::IntlCompilationData>) -> Option<Self> {
         scriptw_intl::IntlDataSelection::from_minimal_compilation_data(Arc::clone(&data))?;
         Some(Self::Minimal(Arc::new(DeferredMinimal {
-            data,
+            data: MinimalData::Ready(data),
             resolved: OnceLock::new(),
         })))
+    }
+    pub(crate) fn cargo_minimal(
+        owner: Arc<crate::embedded_runtime::CargoExecutionRuntime>,
+    ) -> Self {
+        Self::Minimal(Arc::new(DeferredMinimal {
+            data: MinimalData::Cargo { owner },
+            resolved: OnceLock::new(),
+        }))
     }
     pub(crate) fn identity(&self) -> Option<&scriptw_intl::IntlDataIdentity> {
         match self {
@@ -35,10 +64,12 @@ impl WasmIntlKernel {
             Self::Minimal(kernel) => Some(kernel.data.identity()),
         }
     }
-    pub(crate) fn minimal_data(&self) -> Option<&scriptw_intl::IntlCompilationData> {
+    pub(crate) fn minimal_data(
+        &self,
+    ) -> Result<Option<&scriptw_intl::IntlCompilationData>, EngineError> {
         match self {
-            Self::Minimal(kernel) => Some(&kernel.data),
-            Self::Absent | Self::Ready(_) => None,
+            Self::Minimal(kernel) => kernel.data.get().map(Some),
+            Self::Absent | Self::Ready(_) => Ok(None),
         }
     }
     pub(crate) fn resolve(&self) -> Result<&IntlKernel<EmbeddedIntlProvider>, EngineError> {
@@ -243,5 +274,51 @@ mod tests {
             assert!(pointers.windows(2).all(|pair| pair[0] == pair[1]));
         });
         assert!(owner.resolved.get().unwrap().is_ok());
+    }
+    #[test]
+    fn cargo_minimal_keeps_locale_number_and_plural_on_specialized_consumers() {
+        let cargo = crate::embedded_runtime::CargoExecutionRuntime::portable().unwrap();
+        let kernel = WasmIntlKernel::cargo_minimal(cargo);
+        let WasmIntlKernel::Minimal(owner) = &kernel else {
+            unreachable!()
+        };
+        let call = |operation: scriptw_intl::IntlHostOp, payload: &[u8]| {
+            let mut bytes = operation.wire().to_le_bytes().to_vec();
+            bytes.extend_from_slice(payload);
+            crate::wasm_gc_intl_host::execute_deferred(
+                &kernel,
+                scriptw_intl::IntlGcHostRequest::decode(&bytes).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+        };
+        assert_eq!(
+            call(scriptw_intl::IntlHostOp::CanonicalizeLocale, b"EN-us"),
+            b"en-US"
+        );
+        let locale = scriptw_intl::CanonicalLocaleId::from_data("en-US").unwrap();
+        let number = scriptw_intl::number_format::NumberLocaleRequest {
+            requested: vec![locale.clone()].into_boxed_slice(),
+            matcher: LocaleMatcher::Lookup,
+            numbering_system: None,
+        }
+        .encode()
+        .unwrap();
+        assert!(!call(scriptw_intl::IntlHostOp::ResolveNumberLocale, &number).is_empty());
+        let plural = scriptw_intl::PluralLocaleRequest {
+            requested: vec![locale].into_boxed_slice(),
+            matcher: LocaleMatcher::Lookup,
+        }
+        .encode()
+        .unwrap();
+        assert!(!call(scriptw_intl::IntlHostOp::ResolvePluralLocale, &plural).is_empty());
+        assert!(
+            owner.resolved.get().is_none(),
+            "specialized calls must not construct the full provider"
+        );
+        assert_eq!(
+            kernel.minimal_data().unwrap().unwrap().identity(),
+            kernel.identity().unwrap()
+        );
     }
 }

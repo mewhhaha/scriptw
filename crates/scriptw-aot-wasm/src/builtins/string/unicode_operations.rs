@@ -1112,6 +1112,16 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
+        // Locale-sensitive casing shares canonical combining classes with
+        // normalization. These scanners may be the first consumer in a Store.
+        if !matches!(kind, UnicodeCaseContext::FollowingCased) {
+            s.ensure_normalization_tables(
+                self.strings
+                    .normalization_region
+                    .expect("locale combining classes require the sealed normalization group"),
+                f,
+            );
+        }
         let scan = s.reserve_i64_local(f);
         let cp = s.reserve_i64_local(f);
         let step = s.reserve_i64_local(f);
@@ -1848,6 +1858,12 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<GcLocal<StringValue>, EmitError> {
         let s = self.runtime_schema();
+        s.ensure_normalization_tables(
+            self.strings
+                .normalization_region
+                .expect("normalization requires its sealed R group"),
+            function,
+        );
         let units = self.emit_unicode_units(input, function);
         let src_len_local = s.reserve_i64_local(function);
         let src_index_local = s.reserve_i64_local(function);

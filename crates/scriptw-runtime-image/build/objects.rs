@@ -9,7 +9,12 @@ use std::fmt::Write;
 use std::path::Path;
 use std::process::Command;
 
-const PARTS: [(&str, &str); 9] = [
+const PARTS: [(&str, &str); 11] = [
+    ("SCRIPTW_RUNTIME_EXECUTION", "scriptw-runtime-execution.bin"),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_EXECUTION",
+        "scriptw-runtime-portable-execution.bin",
+    ),
     ("SCRIPTW_RUNTIME_METADATA", "scriptw-runtime-metadata.bin"),
     (
         "SCRIPTW_RUNTIME_PORTABLE_METADATA",

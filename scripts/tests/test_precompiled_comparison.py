@@ -75,10 +75,14 @@ class PrecompiledComparisonTests(unittest.TestCase):
                 native = b'INERT UNIT TEST BYTES; NEVER DESERIALIZE'
                 fingerprint = bytes.fromhex(self.report['source_fingerprint'])
                 if runtime == 'scriptw':
-                    body = b'SCRWEP01' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
+                    body = b'SCRWEP02' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
                 else:
                     body = b'SCRWWA01' + fingerprint
-                body += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little') + wasm + native
+                body += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
+                if runtime == 'scriptw':
+                    registry = b'{"abi_version":2,"error_tag":null,"modules":[]}'
+                    body += len(registry).to_bytes(4, 'little') + registry
+                body += wasm + native
                 image = comparison.image_metadata(body + hashlib.sha256(body).digest(), runtime,
                                                   self.report['source_fingerprint'])
                 image['file'] = 'images/' + runtime + '/' + case['file'] + '.cwasm'
@@ -92,6 +96,8 @@ class PrecompiledComparisonTests(unittest.TestCase):
                     source_compilation_profile='portable', intl_profile='Minimal', wasm=case['file'] + '.wasm',
                     phases_ns=dict(source_compilation=1, native_preparation=2))
                 if runtime == 'scriptw':
+                    produced.update({key: image[key] for key in
+                                     ('execution_facts_bytes', 'execution_facts_sha256')})
                     batch_cases.append(produced)
                     producer_ids = [batch['id']]
                 else:
@@ -170,6 +176,8 @@ class PrecompiledComparisonTests(unittest.TestCase):
             compiler_enabled=False, shared_configuration=self.config, adapter='scriptw' if runtime == 'scriptw' else 'wasi',
             samples=7, warmups=10, image_sha256=image['sha256'], image_bytes=image['bytes'],
             program_wasm_sha256=image['program_wasm_sha256'], wasm_sha256=image['program_wasm_sha256'],
+            **({key: image[key] for key in ('execution_facts_bytes', 'execution_facts_sha256')}
+               if image.get('magic') == 'SCRWEP02' else {}),
             runtime_key=image['runtime_key'], load_phases_ns=dict(engine=100, image_read_and_envelope_admission=200,
                 native_admission_and_deserialization=300, process_total=1000),
             native_serialized_bytes=image['native_serialized_bytes'],
@@ -292,6 +300,16 @@ class PrecompiledComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'producer/image'):
             comparison.load_report(self.save())
 
+    def test_sw02_facts_cannot_be_relabelled_independently_of_the_producer(self):
+        self.report['attempts'][0]['image']['execution_facts_sha256'] = 'f' * 64
+        with self.assertRaisesRegex(ValueError, 'producer execution facts'):
+            comparison.load_report(self.save())
+
+    def test_sw02_consumer_must_echo_exact_execution_facts(self):
+        self.mutate_raw(lambda raw: raw.update(execution_facts_sha256='f' * 64))
+        with self.assertRaisesRegex(ValueError, 'consumer execution facts'):
+            comparison.load_report(self.save())
+
     def test_shared_host_identity_cannot_claim_another_policy(self):
         command = next(row for row in self.report['commands'] if row['id'] == 'shared-identity')
         raw = json.loads((self.directory / command['stdout']).read_bytes())
@@ -365,6 +383,57 @@ class PrecompiledComparisonTests(unittest.TestCase):
         wrong_mode[73] = 0
         with self.assertRaisesRegex(ValueError, 'common native policy'):
             comparison.image_metadata(bytes(wrong_mode) + hashlib.sha256(wrong_mode).digest(), runtime, '02' * 32)
+
+    def test_sw02_execution_facts_are_bounded_canonical_and_keep_historical_sw01_readable(self):
+        wasm, native = b'\0asm\x01\0\0\0', b'INERT; NEVER DESERIALIZE'
+        prefix = b'SCRWEP02' + b'\x02' * 32 + b'\x00' + bytes(32) + b'\x01'
+        prefix += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
+        def frame(registry):
+            body = prefix + len(registry).to_bytes(4, 'little') + registry + wasm + native
+            return body + hashlib.sha256(body).digest()
+        canonical = b'{"abi_version":2,"error_tag":null,"modules":[]}'
+        metadata = comparison.image_metadata(frame(canonical), 'scriptw', '02' * 32)
+        self.assertEqual(metadata['magic'], 'SCRWEP02')
+        self.assertEqual(metadata['program_wasm_sha256'], hashlib.sha256(wasm).hexdigest())
+        self.assertEqual(metadata['native_sha256'], hashlib.sha256(native).hexdigest())
+        for registry in [canonical + b' ', canonical.replace(b':2', b':3'),
+                         b'{"abi_version":2,"abi_version":2,"error_tag":null,"modules":[]}',
+                         canonical.replace(b'null', b'false')]:
+            with self.assertRaises(ValueError):
+                comparison.image_metadata(frame(registry), 'scriptw', '02' * 32)
+        excessive = bytearray(frame(canonical)[:-32])
+        excessive[90:94] = (2**32 - 1).to_bytes(4, 'little')
+        with self.assertRaises(ValueError):
+            comparison.image_metadata(bytes(excessive) + hashlib.sha256(excessive).digest(),
+                                      'scriptw', '02' * 32)
+        old_body = b'SCRWEP01' + prefix[8:] + wasm + native
+        historical = comparison.image_metadata(old_body + hashlib.sha256(old_body).digest(),
+                                               'scriptw', '02' * 32)
+        self.assertEqual(historical['magic'], 'SCRWEP01')
+        self.assertEqual(historical['native_sha256'], metadata['native_sha256'])
+
+    def test_sw02_foreign_declarations_reject_conflicts_and_reserved_namespaces(self):
+        def encoded(registry):
+            return json.dumps(registry, sort_keys=True, separators=(',', ':')).encode()
+        function = dict(export='call', module='fixture', name='call', mode='async',
+                        parameters=['number', 'bytes'], result='utf16')
+        registry = dict(abi_version=2, error_tag=dict(module='scriptw_foreign',
+                        name='error_v1', payload=['i32']), modules=[dict(specifier='fixture:host',
+                        functions=[function])])
+        comparison._execution_registry(encoded(registry))
+        import copy
+        invalid = copy.deepcopy(registry)
+        invalid['modules'][0]['functions'][0]['module'] = 'scriptw_host'
+        with self.assertRaises(ValueError):
+            comparison._execution_registry(encoded(invalid))
+        invalid = copy.deepcopy(registry)
+        invalid['modules'][0]['functions'].append(dict(function, export='other'))
+        with self.assertRaises(ValueError):
+            comparison._execution_registry(encoded(invalid))
+        invalid = copy.deepcopy(registry)
+        invalid['modules'][0]['functions'][0]['mode'] = 'unsupported'
+        with self.assertRaises(ValueError):
+            comparison._execution_registry(encoded(invalid))
 
 
 if __name__ == '__main__':

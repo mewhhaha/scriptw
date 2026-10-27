@@ -9,6 +9,8 @@
 #[path = "embedded_runtime/compile.rs"]
 mod build_compile;
 mod digests;
+mod execution;
+pub(super) use execution::CargoExecutionRuntime;
 mod images;
 mod load;
 mod manifest;
@@ -154,17 +156,25 @@ pub(super) fn load_native(
     {
         return None;
     }
-    static NATIVE_HOST: OnceLock<Option<EmbeddedNativeRuntime>> = OnceLock::new();
-    static PORTABLE: OnceLock<Option<EmbeddedNativeRuntime>> = OnceLock::new();
-    let bundle = match images.profile {
-        RuntimeSourceCompilationProfile::NativeHost => &NATIVE_HOST,
-        RuntimeSourceCompilationProfile::Portable => &PORTABLE,
-    };
-    let admitted = bundle
-        .get_or_init(|| EmbeddedNativeRuntime::admit_runtime(images, runtime))
-        .as_ref()?;
+    let admitted = native_bundle(images.profile, || {
+        EmbeddedNativeRuntime::admit_runtime(images, runtime)
+    })?;
     timings.admission = admission_started.elapsed();
     admitted.load(engine, runtime, mode, timings)
+}
+
+fn native_bundle(
+    profile: RuntimeSourceCompilationProfile,
+    initialize: impl FnOnce() -> Option<EmbeddedNativeRuntime>,
+) -> Option<&'static EmbeddedNativeRuntime> {
+    static NATIVE_HOST: OnceLock<Option<EmbeddedNativeRuntime>> = OnceLock::new();
+    static PORTABLE: OnceLock<Option<EmbeddedNativeRuntime>> = OnceLock::new();
+    match profile {
+        RuntimeSourceCompilationProfile::NativeHost => &NATIVE_HOST,
+        RuntimeSourceCompilationProfile::Portable => &PORTABLE,
+    }
+    .get_or_init(initialize)
+    .as_ref()
 }
 
 #[cfg(test)]

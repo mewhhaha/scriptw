@@ -58,16 +58,22 @@ def check(root, overrides=None):
             'actual runtime boundary and bytes precede prefix freezing')
     receipt = c[A + 'runtime_artifact/build_package/metadata.rs']
     require('Some(self.build_admission.as_ref()?.matches_pool(utf16,data))' in runtime and
-            'data:[SpanDigest;2]' in receipt and
-            ('[utf16,data].into_iter().zip(&self.data).all(|(bytes,expected)|{'
+            'data:[SpanDigest;4]' in receipt and
+            ('[utf16,normalization_bytes,head,suffix].into_iter().zip(&self.data).all(|(bytes,expected)|{'
              'bytes.len()==expected.span.len()&&Sha256::digest(bytes).as_slice()==expected.digest})') in receipt,
             'immutable pool proof checks both actual reconstructed image dimensions and hashes')
-    require('section.count()!=2' in pool and 'DataKind::Passive' in pool and
-            'utf16.data!=&self.0.pooled_code_unit_bytes[..]' in pool and
-            'static_data.data!=&self.0.bytes[..]' in pool and
+    require('section.count()!=4' in pool and
+            'letregion=self.0.normalization_image_region();letspan=region.offsets();' in pool and
+            '(&self.0.pooled_code_unit_bytes[..],None)' in pool and
+            '(&self.0.bytes[span.clone()],None)' in pool and
+            '(&self.0.bytes[..span.start],Some(STATIC_DATA_OFFSET))' in pool and
+            '(&self.0.bytes[span.end..],Some(region.end()))' in pool and
+            'for(row,(bytes,address))insection.into_iter().zip(expected)' in pool and
+            'ifrow.data!=bytes' in pool and
+            '(DataKind::Passive,None)=>{}' in pool and
             re.search(r'DataKind::Active\{memory_index:0,offset_expr,?\}', pool) and
-            'Operator::I32Const{value}ifvalue==STATIC_DATA_OFFSETasi32' in pool and
-            'Operator::End' in pool and '!operators.eof()' in pool,
+            'Operator::I32Const{value}ifvalue==addressasi32' in pool and
+            'Operator::End' in pool and '!ops.eof()' in pool,
             'same-sized foreign data or offset cannot certify the canonical R prefix')
     require('prefix:Arc<[u8]>,appended:Vec<u8>' in storage and
             'prefix:Arc<BTreeMap<String,StringRef>>,appended:BTreeMap<String,StringRef>' in storage and

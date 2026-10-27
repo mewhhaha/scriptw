@@ -177,13 +177,93 @@ fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
     let mut corrupt = prefix.0.bytes[..].to_vec();
     let descriptors = prefix.0.runtime_string_descriptors().unwrap();
     corrupt[(descriptors.address() - STATIC_DATA_OFFSET) as usize] ^= 1;
+    let region = prefix.0.normalization_image_region();
+    let span = region.offsets();
     let mut data = DataSection::new();
     data.passive(prefix.0.pooled_code_unit_bytes[..].iter().copied());
-    data.active(0, &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32), corrupt);
+    data.passive(corrupt[span.clone()].iter().copied());
+    data.active(
+        0,
+        &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32),
+        corrupt[..span.start].iter().copied(),
+    );
+    data.active(
+        0,
+        &ConstExpr::i32_const(region.end() as i32),
+        corrupt[span.end..].iter().copied(),
+    );
     let mut wrong = Module::new();
     wrong.section(&data);
     assert!(prefix.require_runtime_data(&wrong.finish()).is_err());
     assert!(prefix
         .require_runtime_data(&Module::new().finish())
         .is_err());
+}
+
+#[test]
+fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_addresses() {
+    use wasmparser::{DataKind, Operator, Parser, Payload};
+    let prefix = CompilerOwnedPool::collect(
+        &BTreeMap::new(),
+        &[StandardBuiltinId::StringPrototypeNormalize],
+        false,
+        &IntlDataSelection::new(IntlCompilationProfile::Minimal),
+    )
+    .unwrap();
+    let region = prefix.0.normalization_region.unwrap();
+    let span = region.offsets();
+    assert!(region.length() > 0);
+    let mut data = DataSection::new();
+    prefix.0.append_runtime_data(&mut data);
+    let mut module = Module::new();
+    module.section(&data);
+    let bytes = module.finish();
+    let mut rows = Vec::new();
+    for payload in Parser::new(0).parse_all(&bytes) {
+        if let Payload::DataSection(section) = payload.unwrap() {
+            rows.extend(section.into_iter().map(Result::unwrap));
+        }
+    }
+    assert_eq!(rows.len(), 4);
+    assert!(matches!(
+        &rows[PooledCodeUnits::DATA_SEGMENT.index() as usize].kind,
+        DataKind::Passive
+    ));
+    assert!(matches!(
+        &rows[region.segment().index() as usize].kind,
+        DataKind::Passive
+    ));
+    assert_eq!(
+        rows[region.segment().index() as usize].data,
+        &prefix.0.bytes[span.clone()]
+    );
+    let mut restored = vec![0u8; prefix.0.bytes.len()];
+    let mut active_bytes = 0;
+    for row in &rows {
+        if let DataKind::Active {
+            memory_index: 0,
+            offset_expr,
+        } = &row.kind
+        {
+            let Operator::I32Const { value } = offset_expr.get_operators_reader().read().unwrap()
+            else {
+                panic!("constant address");
+            };
+            let offset = value as usize - STATIC_DATA_OFFSET as usize;
+            let end = offset + row.data.len();
+            assert!(
+                end <= span.start || offset >= span.end,
+                "no active copy may touch the deferred span, including zero placeholders"
+            );
+            restored[offset..end].copy_from_slice(row.data);
+            active_bytes += row.data.len();
+        }
+    }
+    assert_eq!(active_bytes + span.len(), restored.len());
+    restored[span.clone()].copy_from_slice(rows[region.segment().index() as usize].data);
+    assert_eq!(restored, &prefix.0.bytes[..]);
+    assert_eq!(
+        initial_memory_pages(prefix.0.bytes.len(), true),
+        (align_heap_start(prefix.0.bytes.len()) + WASM_PAGE_SIZE).div_ceil(WASM_PAGE_SIZE)
+    );
 }

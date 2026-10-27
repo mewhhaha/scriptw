@@ -273,3 +273,39 @@ print('canonical-late:ok');
         "canonical-late:ok",
     );
 }
+
+#[test]
+fn deferred_normalization_tables_survive_first_use_coercion_reentrancy_and_fresh_stores() {
+    let source = r#"
+function check(v,m){if(!v)throw m;}
+var events=[],caught=false;
+try{String.prototype.normalize.call({toString(){events.push('receiver-invalid');return 'x';}},
+ {toString(){events.push('form-invalid');return 'invalid';}});}catch(e){caught=e instanceof RangeError;}
+check(caught && events.join(',')==='receiver-invalid,form-invalid','invalid form before any normalization');
+var input={toString(){events.push('receiver');gc();return '\u1e9b\u0323';}};
+var form={toString(){events.push('form');check('A\u030a'.normalize('NFC')==='\u00c5','first nested initialization');gc();return 'NFKD';}};
+check(String.prototype.normalize.call(input,form)==='s\u0323\u0307','outer first use after recursive coercion');
+check(events.join(',')==='receiver-invalid,form-invalid,receiver,form','coercion order');
+var foreign=__scriptwCreateRealm().global;
+for(var i=0;i<3;i++){
+ gc();
+ check('A\u030a'.normalize('NFC')==='\u00c5','NFC');
+ check('\u00c5'.normalize('NFD')==='A\u030a','NFD');
+ check('\ufb03'.normalize('NFKC')==='ffi','NFKC');
+ check(foreign.String.prototype.normalize.call('\u1e9b\u0323','NFKD')==='s\u0323\u0307','NFKD same R after Realm creation');
+ check('\ud800\0\udc00'.normalize('NFC')==='\ud800\0\udc00','exact units');
+}
+print('normalization-deferred:ok');
+262;
+"#;
+    // assert_unicode_modes creates a new Store for each invocation. Repeat the
+    // same retained runtime profile so readiness cannot leak across Stores.
+    assert_unicode_modes(source, "normalization-deferred:ok");
+    let casing_first = format!(
+        r#"
+if('I\u0307'.toLocaleLowerCase('tr')!=='i')throw 'Turkic first table consumer';
+if('I\u0301'.toLocaleLowerCase('lt')!=='i\u0307\u0301')throw 'Lithuanian combining classes';
+{source}"#
+    );
+    assert_unicode_modes(&casing_first, "normalization-deferred:ok");
+}

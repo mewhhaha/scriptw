@@ -26,9 +26,9 @@
       "sha256": "3fd864584c7e83496e9f64054cdefd7b8aa09da650a9f7049075d22e32c6268d"
     },
     {
-      "bytes": 21032,
+      "bytes": 21112,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
+      "sha256": "1a49f7e4acab0c7365901f0ac9622772a3a826814315c67e374e068d3390ccfa"
     },
     {
       "bytes": 3253,
@@ -618,7 +618,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "865ac5225ed8f934f24e9b3e2f609a94ba2cbfe49712f6e604f31e424877566a",
+  "provider_data_sha256": "f7c56c778b2fbd1fa5bbcc08efbf460979da5ad86e97419ac375d9abc7183d36",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "DisplayNames",

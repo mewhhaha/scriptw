@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 mod envelope;
+mod execution;
 mod inputs;
 pub(super) mod metadata;
 #[cfg(test)]

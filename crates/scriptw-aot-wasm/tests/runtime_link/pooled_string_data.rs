@@ -126,6 +126,15 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 assert_eq!(array_data_initializers(&runtime_initializer), [0, 0, 0, 0],
                     "R bootstrap publishes a nullable cache without copying canonical UTF16");
                 assert!(runtime_initializer.len() < 8192, "R bootstrap is bounded independently of its literal count");
+                let normalize = named_function_body(runtime.bytes(), "builtin::String.prototype.normalize");
+                let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&normalize, 0));
+                let operators = body.get_operators_reader().unwrap().into_iter().map(Result::unwrap).collect::<Vec<_>>();
+                assert!(operators.iter().any(|op| matches!(op, Operator::MemoryInit { data_index: 1, mem: 0 })),
+                    "valid normalization resolves its own passive data role rather than UTF16 segment zero");
+                assert!(!operators.iter().any(|op| matches!(op, Operator::MemoryInit { data_index: 0, .. })),
+                    "normalization cannot copy pooled literal bytes into its table range");
+                assert!(operators.iter().any(|op| matches!(op, Operator::GlobalSet { .. })),
+                    "completed initialization is recorded on the actual R instance");
                 let resolver = named_function_body(runtime.bytes(), "helper::pooled_string_resolve");
                 assert_eq!(array_data_initializers(&resolver), [1, 0, 0, 0],
                     "only a cache miss constructs canonical UTF16 storage");

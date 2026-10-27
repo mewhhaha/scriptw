@@ -16,6 +16,21 @@ use scriptw_aot_wasm::{
 };
 use std::collections::VecDeque;
 
+/// Trusted precompiled P names only this Cargo build's Portable Minimal R.
+/// No raw R reconstruction, compiler fallback or caller native blob is admitted.
+pub(super) fn precompiled_minimal_runtime(
+    engine: &WasmtimeEngine,
+    key: RuntimeArtifactKey,
+    mode: WasmNativeCompilationMode,
+) -> Result<(WasmtimeModule, intl_data_images::WasmIntlKernel), EngineError> {
+    let owner = embedded_runtime::CargoExecutionRuntime::portable()?;
+    let module = owner.load(engine, key, mode)?;
+    Ok((
+        module,
+        intl_data_images::WasmIntlKernel::cargo_minimal(owner),
+    ))
+}
+
 mod perf_map;
 #[cfg(test)]
 mod tests;

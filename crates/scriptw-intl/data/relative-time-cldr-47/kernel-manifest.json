@@ -26,9 +26,9 @@
       "sha256": "8d126f0b78fc262fbd6972ae1a9835c10ceef2cf0ac275c9976ef0222f6e8bc3"
     },
     {
-      "bytes": 21032,
+      "bytes": 21112,
       "path": "crates/scriptw-engine/src/wasm_gc_intl_host.rs",
-      "sha256": "e07adbe9e5bb4a86fa89bf16c0b5fb7ae3a313988fee4a06c2c14ba88287464f"
+      "sha256": "1a49f7e4acab0c7365901f0ac9622772a3a826814315c67e374e068d3390ccfa"
     },
     {
       "bytes": 3253,
@@ -764,7 +764,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "0b4e3cd88ddedcc5853a3b1aa22f516ccc556b213b41f15a3452966a240e212a",
+  "provider_data_sha256": "d68d394dd33e08507c1b1dd8611850c5be9075daa12b51cef662d60fdee851dc",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "RelativeTimeFormat",

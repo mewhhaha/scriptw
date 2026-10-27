@@ -18,6 +18,7 @@ pub(super) fn publish(
     native: &[u8],
     manifest: &[u8],
     metadata: &[u8],
+    execution: &[u8],
 ) {
     let prefix = match profile {
         RuntimeSourceCompilationProfile::NativeHost => "scriptw-runtime",
@@ -29,6 +30,7 @@ pub(super) fn publish(
         ("native", native),
         ("manifest", manifest),
         ("metadata", metadata),
+        ("execution", execution),
     ] {
         output::write(&out.join(format!("{prefix}-{suffix}.bin")), bytes)
             .expect("build runtime output writes completely");

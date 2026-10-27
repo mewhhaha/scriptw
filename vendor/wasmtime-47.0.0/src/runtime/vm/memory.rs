@@ -155,6 +155,22 @@ impl RuntimeMemoryCreator for DefaultMemoryCreator {
     }
 }
 
+/// Page-size preference chosen before a memory backing is initialized.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemoryPagePolicy {
+    SystemDefault,
+    PreferBasePages,
+}
+
+impl MemoryPagePolicy {
+    fn for_kind(kind: MemoryKind) -> Self {
+        match kind {
+            MemoryKind::LinearMemory => Self::SystemDefault,
+            MemoryKind::GcHeap => Self::PreferBasePages,
+        }
+    }
+}
+
 /// A linear memory and its backing storage.
 pub trait RuntimeLinearMemory: Send + Sync {
     /// Returns the number bytes that this linear memory can access.
@@ -170,6 +186,14 @@ pub trait RuntimeLinearMemory: Send + Sync {
     /// Returns an error if memory can't be grown by the specified amount
     /// of bytes.
     fn grow_to(&mut self, size: usize) -> Result<()>;
+
+    /// Configure page-size preference before publishing or initializing this
+    /// backing. Custom and malloc memories retain their own allocation policy.
+    /// Mmap-backed implementations must preserve their selection on relocation.
+    fn configure_page_policy(&mut self, policy: MemoryPagePolicy) -> Result<()> {
+        let _ = policy;
+        Ok(())
+    }
 
     /// Discard whole pages wholly inside an unused byte range, if supported.
     ///
@@ -266,7 +290,10 @@ impl Memory {
         let (minimum, maximum) = Self::limit_new(ty, limiter).await?;
         let tunables = engine.tunables();
         let memory_tunables = MemoryTunables::new(tunables, kind);
-        let allocation = creator.new_memory(ty, &memory_tunables, minimum, maximum)?;
+        let mut allocation = creator.new_memory(ty, &memory_tunables, minimum, maximum)?;
+        // The allocator owns the backing kind; a raw pointer alone is never
+        // authority to apply mmap advice. Configure before image/data writes.
+        allocation.configure_page_policy(MemoryPagePolicy::for_kind(kind))?;
 
         let memory = LocalMemory::new(ty, &memory_tunables, allocation, memory_image)?;
         Ok(if ty.shared {
