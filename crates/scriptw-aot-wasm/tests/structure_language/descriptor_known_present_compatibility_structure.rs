@@ -160,7 +160,7 @@ fn fresh_runtime_errors_append_message_without_recursive_validation() {
     let helper = compact(between(
         ERROR,
         "pub(crate) fn compile_runtime_error_object_helper(",
-        "fn emit_set_thrown_error_text(",
+        "pub(crate) fn compile_runtime_error_for_throw_helper(",
     ));
     assert!(helper.contains("self.begin_helper_body(RuntimeHelperId::RuntimeErrorObject)"));
     assert_eq!(
@@ -180,11 +180,12 @@ fn fresh_runtime_errors_append_message_without_recursive_validation() {
         "pub(crate) fn compile_runtime_error_object_helper(",
     ));
     assert!(call.contains("RuntimeErrorObjectArguments::new(prototype,&message)"));
-    assert_eq!(
-        ERROR
-            .matches("self.emit_fresh_native_error_object(")
-            .count(),
-        2
-    );
+    let throwing = compact(between(
+        ERROR,
+        "pub(crate) fn emit_throw_runtime_error_with_prototype(",
+        "pub(crate) fn emit_throw_current_function_realm_type_error(",
+    ));
+    assert!(throwing.contains("RuntimeErrorForThrowArguments::new(kind,prototype,&message)"));
+    assert!(!throwing.contains("self.emit_fresh_native_error_object("));
     assert!(!call.contains("emit_object_append_data_property_with_flags("));
 }

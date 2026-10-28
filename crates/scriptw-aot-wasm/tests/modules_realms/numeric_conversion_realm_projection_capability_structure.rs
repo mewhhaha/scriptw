@@ -168,8 +168,22 @@ fn numeric_errors_preserve_kind_and_use_the_execution_realm_error_factory() {
         "pub(crate)fnemit_throw_runtime_error(",
         "pub(crate)fnemit_throw_current_function_realm_error(",
     );
-    assert!(thrown.contains("self.emit_runtime_error_object(kind,message,&value,function)?;"));
-    assert!(thrown.contains("result.set_throw(&value,function);"));
+    assert!(thrown.contains("letrealm=self.emit_execution_realm(function);"));
+    assert!(thrown.contains(
+        "self.emit_load_non_array_realm_intrinsic(&realm,prototype_slot(kind),&prototype,function,"
+    ));
+    assert!(thrown.contains(
+        "self.emit_throw_runtime_error_with_prototype(kind,message,&prototype,result,function)?;"
+    ));
+    let resolved = bounded(
+        &errors,
+        "pub(crate)fnemit_throw_runtime_error_with_prototype(",
+        "pub(crate)fnemit_throw_current_function_realm_type_error(",
+    );
+    assert!(resolved.contains("RuntimeErrorForThrowArguments::new(kind,prototype,&message)"));
+    assert!(resolved.contains("result.set_throw(&value,function);"));
+    assert!(!resolved.contains("load_current_realm"));
+    assert!(!resolved.contains("emit_execution_realm"));
     let operations = normalized(OPERATIONS_SOURCE);
     for marker in [
         "self.emit_throw_runtime_error(NativeErrorKind::TypeError,RuntimeErrorMessage::CANNOT_CONVERT_SYMBOL_TO_NUMBER,result,function,)",

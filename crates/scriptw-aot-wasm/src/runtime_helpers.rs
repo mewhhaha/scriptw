@@ -705,6 +705,19 @@ impl RuntimeHelperStandardBuiltinParameter {
     }
 }
 
+/// Only the closed error-kind domain can populate this parameter. A program
+/// string ordinal cannot accidentally be interpreted as a runtime error name.
+pub(crate) struct RuntimeHelperNativeErrorKindParameter {
+    local: I32Local,
+}
+impl RuntimeHelperNativeErrorKindParameter {
+    pub(crate) fn emit_is(&self, kind: scriptw_ir::NativeErrorKind, function: &mut Function) {
+        self.local.load(function);
+        function.instruction(&Instruction::I32Const(kind as i32));
+        function.instruction(&Instruction::I32Eq);
+    }
+}
+
 /// Wire projections of one compile-time validated runtime String/Symbol key.
 /// No raw numeric argument constructor is exposed to installation callers.
 pub(crate) struct RuntimeHelperIntrinsicKeyParameter {
@@ -760,6 +773,7 @@ macro_rules! helper_field {
     (@argument Completion) => { &'a CompletionLocals };
     (@argument Key) => { &'a crate::operations::PropertyKeyLocals };
     (@argument StandardBuiltin) => { scriptw_ir::StandardBuiltinId };
+    (@argument NativeErrorKind) => { scriptw_ir::NativeErrorKind };
     (@argument InstallationKey) => { &'a crate::operations::IntrinsicInstallationKey };
     (@argument I32) => { I32Local };
     (@argument I64) => { I64Local };
@@ -770,6 +784,7 @@ macro_rules! helper_field {
     (@parameter Completion) => { CompletionLocals };
     (@parameter Key) => { crate::operations::PropertyKeyLocals };
     (@parameter StandardBuiltin) => { RuntimeHelperStandardBuiltinParameter };
+    (@parameter NativeErrorKind) => { RuntimeHelperNativeErrorKindParameter };
     (@parameter InstallationKey) => { RuntimeHelperIntrinsicKeyParameter };
     (@parameter I32) => { I32Local };
     (@parameter I64) => { I64Local };
@@ -780,6 +795,7 @@ macro_rules! helper_field {
     (@abi Completion) => { &crate::module::COMPLETION_TYPES };
     (@abi Key) => { helper_field!(@abi Value) };
     (@abi StandardBuiltin) => { &[AbiType::I32] };
+    (@abi NativeErrorKind) => { &[AbiType::I32] };
     (@abi InstallationKey) => { &[AbiType::I32, AbiType::I32] };
     (@abi I32) => { &[AbiType::I32] };
     (@abi I64) => { &[AbiType::I64] };
@@ -790,6 +806,7 @@ macro_rules! helper_field {
     (@emit $value:expr, $schema:ident, $function:ident, Completion) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, Key) => { $value.value().emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, StandardBuiltin) => { $function.instruction(&Instruction::I32Const($value as i32)) };
+    (@emit $value:expr, $schema:ident, $function:ident, NativeErrorKind) => { $function.instruction(&Instruction::I32Const($value as i32)) };
     (@emit $value:expr, $schema:ident, $function:ident, InstallationKey) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I32) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I64) => { $value.load($function) };
@@ -809,6 +826,7 @@ macro_rules! helper_field {
         })
     };
     (@acquire $schema:ident, $index:ident, $function:ident, StandardBuiltin) => { RuntimeHelperStandardBuiltinParameter { local: $schema.parameter_i32($index, $function) } };
+    (@acquire $schema:ident, $index:ident, $function:ident, NativeErrorKind) => { RuntimeHelperNativeErrorKindParameter { local: $schema.parameter_i32($index, $function) } };
     (@acquire $schema:ident, $index:ident, $function:ident, InstallationKey) => { RuntimeHelperIntrinsicKeyParameter { is_symbol: $schema.parameter_i32($index, $function), ordinal: $schema.parameter_i32($index + 1, $function) } };
     (@acquire $schema:ident, $index:ident, $function:ident, I32) => { $schema.parameter_i32($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, I64) => { $schema.parameter_i64($index, $function) };
@@ -819,6 +837,7 @@ macro_rules! helper_field {
     (@release $value:expr, $function:ident, Completion) => { $value.clear($function) };
     (@release $value:expr, $function:ident, Key) => { $value.clear($function) };
     (@release $value:expr, $function:ident, StandardBuiltin) => { { let _ = $value; } };
+    (@release $value:expr, $function:ident, NativeErrorKind) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, InstallationKey) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I32) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I64) => { { let _ = $value; } };
@@ -1201,6 +1220,7 @@ runtime_helper_domain! {
     ModuleBodyReaction / ModuleBodyReactionArguments / ModuleBodyReactionParameters / "module_body_reaction" @ ModuleBodyReactionHook { module:(Ref ModuleRecord NonNullable),rejected:I32,argument:Value } => Void;
     RegExpProgramCandidate / RegExpProgramCandidateArguments / RegExpProgramCandidateParameters / "regexp_program_candidate" @ RegExpProgramCandidateHook { source:(Ref StringValue NonNullable),flags:(Ref StringValue NonNullable) } => RegExpCompile;
     RuntimeErrorObject / RuntimeErrorObjectArguments / RuntimeErrorObjectParameters / "runtime_error_object" { prototype:Value,message:(Ref StringValue NonNullable) } => (Ref NativeErrorObject NonNullable);
+    RuntimeErrorForThrow / RuntimeErrorForThrowArguments / RuntimeErrorForThrowParameters / "runtime_error_for_throw" { kind:NativeErrorKind,prototype:Value,message:(Ref StringValue NonNullable) } => (Ref NativeErrorObject NonNullable);
     PooledStringResolve / PooledStringResolveArguments / PooledStringResolveParameters / "pooled_string_resolve" { ordinal:I32 } => (Ref StringValue NonNullable);
     PooledStringsInitialize / PooledStringsInitializeArguments / PooledStringsInitializeParameters / "pooled_strings_initialize" {} => Void;
     ObjectSetPrototypeOf / ObjectSetPrototypeOfArguments / ObjectSetPrototypeOfParameters / "object_set_prototype_of" { target:Value,prototype:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1369,6 +1389,7 @@ impl RuntimeHelperId {
             Self::ModuleBodyReaction => HelperOwner::Hook(ProgramHook::ModuleBodyReaction),
             Self::RegExpProgramCandidate => HelperOwner::Hook(ProgramHook::RegExpProgramCandidate),
             Self::RuntimeErrorObject => HelperOwner::Runtime,
+            Self::RuntimeErrorForThrow => HelperOwner::Runtime,
             Self::PooledStringResolve => HelperOwner::Runtime,
             Self::PooledStringsInitialize => HelperOwner::Runtime,
             Self::ObjectSetPrototypeOf => HelperOwner::Runtime,
@@ -1535,6 +1556,7 @@ impl RuntimeHelperId {
             Self::ModuleBodyReaction => true,
             Self::RegExpProgramCandidate => true,
             Self::RuntimeErrorObject => true,
+            Self::RuntimeErrorForThrow => true,
             Self::PooledStringResolve => true,
             Self::PooledStringsInitialize => true,
             Self::ObjectSetPrototypeOf => true,

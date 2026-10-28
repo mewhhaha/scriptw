@@ -462,11 +462,21 @@ fn lexical_read_tdz_branches_share_one_runtime_error_without_erasing_reads() {
                 );
             }
             assert!(!body.calls.contains(&index));
+            let (throwing, tail) = runtime_helper(&runtime, "helper::runtime_error_for_throw");
             let (error, _) = runtime_helper(&runtime, "helper::runtime_error_object");
             assert_eq!(
-                body.calls.iter().filter(|&&target| target == error).count(),
+                body.calls
+                    .iter()
+                    .filter(|&&target| target == throwing)
+                    .count(),
                 1,
-                "the shared error body constructs the actual fresh native error"
+                "the TDZ body reaches the shared throwing tail once"
+            );
+            assert!(!body.calls.contains(&error));
+            assert_eq!(
+                tail.calls.iter().filter(|&&target| target == error).count(),
+                1,
+                "the throwing tail constructs the actual fresh native error"
             );
             let growth = repeated
                 .bytes

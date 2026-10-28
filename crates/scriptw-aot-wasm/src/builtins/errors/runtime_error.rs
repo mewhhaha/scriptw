@@ -8,7 +8,8 @@ use crate::gc_types::{
 use crate::module::ThrowDiagnosticRole;
 use crate::operations::PropertyKeyLocals;
 use crate::runtime_helpers::{
-    HelperParameters, RuntimeErrorObjectArguments, RuntimeErrorObjectParameters,
+    HelperParameters, RuntimeErrorForThrowArguments, RuntimeErrorForThrowParameters,
+    RuntimeErrorObjectArguments, RuntimeErrorObjectParameters,
 };
 use scriptw_ir::NativeErrorKind;
 
@@ -208,6 +209,55 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
+    /// The caller has already selected its prototype and resolved its own
+    /// message. Only R's closed error names are selected after allocation.
+    pub(crate) fn compile_runtime_error_for_throw_helper(&mut self) -> Result<Function, EmitError> {
+        self.strings.require_runtime_only()?;
+        let mut function = self.begin_helper_body(RuntimeHelperId::RuntimeErrorForThrow);
+        let schema = self.runtime_schema();
+        let parameters = self.helper_parameters::<RuntimeErrorForThrowParameters>(&mut function);
+        let error = schema
+            .call_helper(
+                RuntimeErrorObjectArguments::new(&parameters.prototype, &parameters.message),
+                self.runtime_helper_base()?,
+                &mut function,
+            )
+            .bind(
+                schema,
+                schema.reserve_gc_local::<NativeErrorObject, _>(&mut function),
+                &mut function,
+            );
+        self.emit_clear_throw_diagnostic(ThrowDiagnosticRole::Name, &mut function);
+        self.emit_clear_throw_diagnostic(ThrowDiagnosticRole::Message, &mut function);
+        for kind in NativeErrorKind::ALL {
+            parameters.kind.emit_is(kind, &mut function);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            let name = schema.reserve_gc_local(&mut function).initialize(
+                self.emit_interned_string_reference(kind.as_str(), &mut function)?,
+                &mut function,
+            );
+            self.emit_store_throw_diagnostic(ThrowDiagnosticRole::Name, &name, &mut function);
+            name.clear(&mut function);
+            function.instruction(&Instruction::Else);
+        }
+        // No raw string index is accepted, and an invalid kind cannot silently
+        // select another error name or complete the throwing wrapper.
+        function.instruction(&Instruction::Unreachable);
+        for _ in NativeErrorKind::ALL {
+            function.instruction(&Instruction::End);
+        }
+        self.emit_store_throw_diagnostic(
+            ThrowDiagnosticRole::Message,
+            &parameters.message,
+            &mut function,
+        );
+        error.load(schema, &mut function);
+        error.clear(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     fn emit_set_thrown_error_text(
         &mut self,
         kind: NativeErrorKind,
@@ -242,11 +292,17 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let value = schema.reserve_value_local(function);
-        self.emit_runtime_error_object(kind, message, &value, function)?;
-        self.emit_set_thrown_error_text(kind, Some(message), function)?;
-        result.set_throw(&value, function);
-        value.clear(function);
+        let realm = self.emit_execution_realm(function);
+        let prototype = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            prototype_slot(kind),
+            &prototype,
+            function,
+        );
+        self.emit_throw_runtime_error_with_prototype(kind, message, &prototype, result, function)?;
+        prototype.clear(function);
+        realm.clear(function);
         Ok(())
     }
 
@@ -283,11 +339,27 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        let message = schema.reserve_gc_local(function).initialize(
+            self.emit_runtime_error_message_reference(message, function)?,
+            function,
+        );
+        let error = schema
+            .call_helper(
+                RuntimeErrorForThrowArguments::new(kind, prototype, &message),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .bind(
+                schema,
+                schema.reserve_gc_local::<NativeErrorObject, _>(function),
+                function,
+            );
         let value = schema.reserve_value_local(function);
-        self.emit_fresh_native_error_object(prototype, message, &value, function)?;
-        self.emit_set_thrown_error_text(kind, Some(message), function)?;
+        value.set_reference(&error, schema, function);
         result.set_throw(&value, function);
         value.clear(function);
+        error.clear(function);
+        message.clear(function);
         Ok(())
     }
 

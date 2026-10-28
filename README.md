@@ -102,42 +102,48 @@ a memory or speed gain: the [controlled capacity probe](docs/rust-rewrite/memory
 grew back to 16 MiB on retained objects and roughly doubled their execution time.
 Its diagnostic RSS is separate from the comparison below.
 
+The [error-preparation change](docs/rust-rewrite/contracts/runtime-error-for-throw.md)
+shares repeated allocation and diagnostic code while preserving caller Realm,
+message ownership and throw completion. Its [verified checkpoint](docs/rust-rewrite/memory-runtime-error-tail-20261028.md)
+records native correctness and matched observations; these do not establish a
+causal resident-memory or execution-time saving.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-28 on one GitHub Actions runner**, compiler `a19ba7395`.
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `68dae6ed8`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS is **1.135–1.565× Scriptc's**:
+Scriptw's median post-execution process RSS is **1.350–1.953× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 17.8 MiB | 13.6 MiB |
-| Objects | 18.7 MiB | 14.3 MiB |
-| Retained objects | 22.8 MiB | 20.1 MiB |
+| Integer | 20.0 MiB | 12.1 MiB |
+| Objects | 20.7 MiB | 12.9 MiB |
+| Retained objects | 25.0 MiB | 18.5 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
 Cross-runner observations do not establish causal savings or Scriptc parity.
 
-[The memory checkpoint](docs/rust-rewrite/memory-inline-compact-storage-20261028.md) records **4,912 fresh native
-test executions across 19 complete affected targets**, including all 517 AOT
-library tests, all 1,056 engine library tests and 234 GC tests. Six focused
-emission, mutation, Realm/GC and snapshot controls count once within those
-targets. No original Test262 execution is counted in this checkpoint.
+[The memory checkpoint](docs/rust-rewrite/memory-runtime-error-tail-20261028.md) records **4,917 fresh native
+test executions across 19 complete affected targets**, including all 520 AOT
+library tests, all 1,056 engine library tests, 353 language tests and 234 GC
+tests. Seven focused error-tail and cancellation controls count once within
+those targets. No original Test262 execution is counted in this checkpoint.
 
-One- and two-key compact storage uses inline GC fields. For 8,192 retained
-records, its layout calculation removes 384 KiB of allocation and 16,384 GC
-objects. This is not measured RSS savings; extra dispatch and native code can
-offset it. Four unscored ownership captures record residency separately.
+Messageful compiler throws share a typed runtime allocation and diagnostic
+tail while preserving caller Realm, message ownership and completion order.
+This does not establish a causal RSS or execution-time saving. Four unscored
+ownership captures record residency separately.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40640282249).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40655566391).
 
 ## Benchmarks
 

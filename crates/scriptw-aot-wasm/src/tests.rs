@@ -16,6 +16,7 @@ mod ordered_bootstrap_allocation;
 mod plain_data_literals;
 mod program_cache_pages;
 mod regexp_programs;
+mod runtime_error_for_throw;
 mod scalar_predicates;
 mod scalar_regions;
 mod unobserved_arguments;
