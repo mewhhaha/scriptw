@@ -24,6 +24,11 @@ The GC object model, descriptors, prototype identity and source ownership remain
 unchanged. The additional helper ABI requires runtime layout 32; incompatible
 runtime artifacts are rejected.
 
-Native verification and a fresh compiler-disabled Scriptc comparison are
-pending. Removing repeated emitted code does not itself establish resident-memory
+The [verified checkpoint](../memory-runtime-error-tail-20261028.md) records 4,917 fresh native passes
+across 19 full targets, including all 520 AOT, 1,056 engine-library, 353 language
+and 234 GC tests. Seven focused error-tail and cancellation controls count once.
+The fresh compiler-disabled Scriptc comparison passed 68/68 attempts and all
+17 workload checksums; six observer controls and four unscored ownership
+captures were separately validated. No original Test262 execution is counted.
+Removing repeated emitted code does not itself establish resident-memory
 or execution-time savings.
