@@ -1,0 +1,1518 @@
+{
+  "schema": "scriptw-gc-capacity-diagnostic-v1",
+  "source_commit": "623f722a1d1be62bdf603f8d1f791f522f68efc4",
+  "native_verification": {
+    "report_sha256": "6db1c40854066e3b19525a94f9ed4544b596c7c561b7c99e9f88b1819f29460e",
+    "native_tests": 25,
+    "engine_tests": 18,
+    "example_tests": 7,
+    "scope": "18 full runtime_profile native IDs and the complete diagnostic example tests; no broad/Test262 claim",
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "12730368",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "4294967296",
+      "memory.events": "low 0\nhigh 0\nmax 6711\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "python_measurement_controls": 20,
+  "experiment": {
+    "complete": true,
+    "source_commit": "623f722a1d1be62bdf603f8d1f791f522f68efc4",
+    "scope": "Selected same-host matched diagnostic; compiler/serialized-image history is included. Not compiler-disabled Scriptw/Scriptc or live-heap RSS.",
+    "capacities": [
+      16,
+      8,
+      8,
+      16
+    ],
+    "samples": 7,
+    "warmups": 10,
+    "cpu_affinity": [
+      0
+    ],
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "10752000",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "runner_sha256": "4186e8bf1510f721d3f64dccbba3ebcb401c22fa460f8d7df6e83bba424971e0",
+    "native_receipt_sha256": "6db1c40854066e3b19525a94f9ed4544b596c7c561b7c99e9f88b1819f29460e",
+    "source_sha256": {
+      "integer.js": "bbf3e6bb123b44f3f39acaa46140af1bd3f4801cce1d19e8b390f21a33637f3c",
+      "retained-objects.js": "9648fbc87f9361de8b2b0bb418929af1c79331a58ebf38817cc511dc512c5911",
+      "to-sorted-512.js": "0e40c47ddc2f946f5d27c63996ff16361eb0f176d07d32a051ae3a17ebc551b0"
+    },
+    "rows": [
+      {
+        "round": 0,
+        "capacity_mib": 16,
+        "file": "integer.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "integer.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/0-16-integer.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.29 0.56 0.70 1/3279 3011108",
+        "exit_code": 0,
+        "stdout_sha256": "f3d275410b8ee68044845c41b1cd0792aa2aafeaf7f6bc47d854b9c464cd18a6",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.40 0.58 0.71 1/3279 3011148",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            2530540,
+            2512810,
+            2506899,
+            2500010,
+            2510099,
+            2504810,
+            2508150
+          ],
+          "median": 2508150,
+          "minimum": 2500010,
+          "maximum": 2530540
+        },
+        "final_rss_bytes": {
+          "samples": [
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400
+          ],
+          "median": 552550400,
+          "minimum": 552550400,
+          "maximum": 552550400
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400,
+            552550400
+          ],
+          "median": 552550400,
+          "minimum": 552550400,
+          "maximum": 552550400
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 0,
+        "capacity_mib": 16,
+        "file": "retained-objects.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "retained-objects.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/0-16-retained-objects.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.40 0.58 0.71 1/3279 3011170",
+        "exit_code": 0,
+        "stdout_sha256": "8237656ed39be14f46d141a56b6a44c5e1434473518ac17c992f5f8d7787ea83",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.40 0.58 0.71 2/3277 3011215",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            37960814,
+            38914193,
+            40435443,
+            37552864,
+            37661964,
+            39166883,
+            38295484
+          ],
+          "median": 38295484,
+          "minimum": 37552864,
+          "maximum": 40435443
+        },
+        "final_rss_bytes": {
+          "samples": [
+            247431168,
+            247439360,
+            247443456,
+            247451648,
+            247455744,
+            247463936,
+            247468032
+          ],
+          "median": 247451648,
+          "minimum": 247431168,
+          "maximum": 247468032
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            252731392,
+            250957824,
+            250433536,
+            251981824,
+            252575744,
+            250974208,
+            252203008
+          ],
+          "median": 251981824,
+          "minimum": 250433536,
+          "maximum": 252731392
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 0,
+        "capacity_mib": 16,
+        "file": "to-sorted-512.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "to-sorted-512.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/0-16-to-sorted-512.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.40 0.58 0.71 2/3276 3011237",
+        "exit_code": 0,
+        "stdout_sha256": "5d36e911dc4ee32b684c220885028a99f34967f41c2cef1737d90d2315c7c07f",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.40 0.58 0.71 1/3275 3011275",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            4473799,
+            4477359,
+            4471559,
+            4476999,
+            4490509,
+            4484679,
+            4470089
+          ],
+          "median": 4476999,
+          "minimum": 4470089,
+          "maximum": 4490509
+        },
+        "final_rss_bytes": {
+          "samples": [
+            247091200,
+            247099392,
+            247103488,
+            247111680,
+            247115776,
+            247123968,
+            247128064
+          ],
+          "median": 247111680,
+          "minimum": 247091200,
+          "maximum": 247128064
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            247091200,
+            247099392,
+            247103488,
+            247111680,
+            247115776,
+            247123968,
+            247128064
+          ],
+          "median": 247111680,
+          "minimum": 247091200,
+          "maximum": 247128064
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 1,
+        "capacity_mib": 8,
+        "file": "to-sorted-512.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "to-sorted-512.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/1-8-to-sorted-512.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.40 0.58 0.71 1/3272 3011297",
+        "exit_code": 0,
+        "stdout_sha256": "401e1ec379f6a437edfcceab38f0f0f106e19cb09fa44a8600cba0b02cc09786",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.49 0.59 0.71 1/3243 3011345",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            5030718,
+            5135829,
+            5106919,
+            5022589,
+            5115649,
+            5097549,
+            5133429
+          ],
+          "median": 5106919,
+          "minimum": 5022589,
+          "maximum": 5135829
+        },
+        "final_rss_bytes": {
+          "samples": [
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360
+          ],
+          "median": 535695360,
+          "minimum": 535695360,
+          "maximum": 535695360
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360,
+            535695360
+          ],
+          "median": 535695360,
+          "minimum": 535695360,
+          "maximum": 535695360
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 1,
+        "capacity_mib": 8,
+        "file": "retained-objects.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "retained-objects.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/1-8-retained-objects.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.49 0.59 0.71 1/3242 3011367",
+        "exit_code": 0,
+        "stdout_sha256": "aaf8b80c4bb51670e88a0c6da47ce57756c11d8a75f500b3c4209b88e3689e00",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.49 0.59 0.71 1/3242 3011405",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            79586859,
+            79742259,
+            80032508,
+            79549808,
+            79508429,
+            79294588,
+            79672048
+          ],
+          "median": 79586859,
+          "minimum": 79294588,
+          "maximum": 80032508
+        },
+        "final_rss_bytes": {
+          "samples": [
+            231436288,
+            231444480,
+            231448576,
+            231456768,
+            231460864,
+            231469056,
+            231473152
+          ],
+          "median": 231456768,
+          "minimum": 231436288,
+          "maximum": 231473152
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            234987520,
+            234897408,
+            234999808,
+            234934272,
+            234897408,
+            235044864,
+            234958848
+          ],
+          "median": 234958848,
+          "minimum": 234897408,
+          "maximum": 235044864
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 1,
+        "capacity_mib": 8,
+        "file": "integer.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "integer.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/1-8-integer.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.53 0.60 0.71 1/3242 3011427",
+        "exit_code": 0,
+        "stdout_sha256": "4c6642f40b03be175657eb4d47728a402692a8183dffc42011307ae4b44a6671",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.53 0.60 0.71 1/3242 3011465",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            2598559,
+            2547900,
+            2560019,
+            2533250,
+            2547269,
+            2590310,
+            2570709
+          ],
+          "median": 2560019,
+          "minimum": 2533250,
+          "maximum": 2598559
+        },
+        "final_rss_bytes": {
+          "samples": [
+            227155968,
+            227164160,
+            227168256,
+            227176448,
+            227180544,
+            227188736,
+            227192832
+          ],
+          "median": 227176448,
+          "minimum": 227155968,
+          "maximum": 227192832
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            227155968,
+            227164160,
+            227168256,
+            227176448,
+            227180544,
+            227188736,
+            227192832
+          ],
+          "median": 227176448,
+          "minimum": 227155968,
+          "maximum": 227192832
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 2,
+        "capacity_mib": 8,
+        "file": "to-sorted-512.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "to-sorted-512.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/2-8-to-sorted-512.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.53 0.60 0.71 1/3242 3011487",
+        "exit_code": 0,
+        "stdout_sha256": "844b30db6a17a3301d901a3005ea757f1f06609abf4b103bc87db7a78a7054fe",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.53 0.60 0.71 1/3243 3011526",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            4969699,
+            4960818,
+            5038999,
+            5012778,
+            4967578,
+            5011139,
+            4978309
+          ],
+          "median": 4978309,
+          "minimum": 4960818,
+          "maximum": 5038999
+        },
+        "final_rss_bytes": {
+          "samples": [
+            224116736,
+            224124928,
+            224129024,
+            224137216,
+            224141312,
+            224149504,
+            224153600
+          ],
+          "median": 224137216,
+          "minimum": 224116736,
+          "maximum": 224153600
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            224116736,
+            224124928,
+            224129024,
+            224137216,
+            224141312,
+            224149504,
+            224153600
+          ],
+          "median": 224137216,
+          "minimum": 224116736,
+          "maximum": 224153600
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 2,
+        "capacity_mib": 8,
+        "file": "retained-objects.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "retained-objects.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/2-8-retained-objects.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.53 0.60 0.71 1/3243 3011548",
+        "exit_code": 0,
+        "stdout_sha256": "4f90199c3626220325e613aed3d936ae2003c740591d9e0dfce5d9bf3573cc60",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.53 0.60 0.71 1/3240 3011586",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            79624456,
+            79449076,
+            79429235,
+            79488666,
+            79529296,
+            79540296,
+            79593225
+          ],
+          "median": 79529296,
+          "minimum": 79429235,
+          "maximum": 79624456
+        },
+        "final_rss_bytes": {
+          "samples": [
+            226914304,
+            226922496,
+            226926592,
+            226934784,
+            226938880,
+            226947072,
+            226951168
+          ],
+          "median": 226934784,
+          "minimum": 226914304,
+          "maximum": 226951168
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            230395904,
+            230432768,
+            230387712,
+            230465536,
+            230486016,
+            230400000,
+            230371328
+          ],
+          "median": 230400000,
+          "minimum": 230371328,
+          "maximum": 230486016
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 2,
+        "capacity_mib": 8,
+        "file": "integer.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "integer.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/2-8-integer.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "8"
+        ],
+        "load_before": "0.53 0.60 0.71 1/3240 3011608",
+        "exit_code": 0,
+        "stdout_sha256": "3d933e68fc3db58838daaf73c6080d1d1cb2ccaae3a028d227378619133e87d2",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.53 0.60 0.71 1/3240 3011646",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            2513749,
+            2541210,
+            2529869,
+            2523219,
+            2521959,
+            2505509,
+            2505020
+          ],
+          "median": 2521959,
+          "minimum": 2505020,
+          "maximum": 2541210
+        },
+        "final_rss_bytes": {
+          "samples": [
+            222625792,
+            222633984,
+            222638080,
+            222646272,
+            222650368,
+            222658560,
+            222662656
+          ],
+          "median": 222646272,
+          "minimum": 222625792,
+          "maximum": 222662656
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            222625792,
+            222633984,
+            222638080,
+            222646272,
+            222650368,
+            222658560,
+            222662656
+          ],
+          "median": 222646272,
+          "minimum": 222625792,
+          "maximum": 222662656
+        },
+        "gc_before_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "gc_after_bytes": [
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608,
+          8388608
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 3,
+        "capacity_mib": 16,
+        "file": "integer.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "integer.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/3-16-integer.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.65 0.62 0.72 1/3240 3011668",
+        "exit_code": 0,
+        "stdout_sha256": "0d344d418d3351944a222a3be55f183cd48616bd8827d332223c5739df405bb6",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.65 0.62 0.72 1/3241 3011707",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            2512509,
+            2549579,
+            2528759,
+            2518259,
+            2536920,
+            2521819,
+            2520859
+          ],
+          "median": 2521819,
+          "minimum": 2512509,
+          "maximum": 2549579
+        },
+        "final_rss_bytes": {
+          "samples": [
+            222552064,
+            222560256,
+            222564352,
+            222572544,
+            222576640,
+            222584832,
+            222588928
+          ],
+          "median": 222572544,
+          "minimum": 222552064,
+          "maximum": 222588928
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            222552064,
+            222560256,
+            222564352,
+            222572544,
+            222576640,
+            222584832,
+            222588928
+          ],
+          "median": 222572544,
+          "minimum": 222552064,
+          "maximum": 222588928
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 3,
+        "capacity_mib": 16,
+        "file": "retained-objects.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "retained-objects.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/3-16-retained-objects.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.65 0.62 0.72 1/3241 3011729",
+        "exit_code": 0,
+        "stdout_sha256": "2b529dde09c40c802e63289ef6dd3a1666c10cb7b72bbf78ea12a7d8b62abead",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.65 0.62 0.72 3/3240 3011767",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            38449557,
+            38471768,
+            38192208,
+            38198218,
+            38438267,
+            38191427,
+            38174817
+          ],
+          "median": 38198218,
+          "minimum": 38174817,
+          "maximum": 38471768
+        },
+        "final_rss_bytes": {
+          "samples": [
+            227037184,
+            227045376,
+            227049472,
+            227057664,
+            227061760,
+            227069952,
+            227074048
+          ],
+          "median": 227057664,
+          "minimum": 227037184,
+          "maximum": 227074048
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            231051264,
+            230780928,
+            231600128,
+            232030208,
+            231460864,
+            231702528,
+            231706624
+          ],
+          "median": 231600128,
+          "minimum": 230780928,
+          "maximum": 232030208
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      },
+      {
+        "round": 3,
+        "capacity_mib": 16,
+        "file": "to-sorted-512.js",
+        "command": [
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/native-623f722a1/runtime_baseline",
+          "/home/mewhhaha/src/porffor/target/memory-calendar-rows-20261028/crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths",
+          "7",
+          "10",
+          "to-sorted-512.js",
+          "/home/mewhhaha/src/porffor/target/gc-capacity-8m-20261028-evidence/abba-16-8-8-16/3-16-to-sorted-512.js/artifacts",
+          "--native-mode",
+          "size-optimized",
+          "--regalloc",
+          "backtracking",
+          "--gc-initial-mib",
+          "16"
+        ],
+        "load_before": "0.65 0.62 0.72 4/3240 3011789",
+        "exit_code": 0,
+        "stdout_sha256": "b545f72007cb8cf20382e9db13746bca6da1b0737ce1f55c8a0f46bced9223bb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "load_after": "0.65 0.62 0.72 1/3238 3011827",
+        "admitted": true,
+        "source_fingerprint": "956f6458e66b5fb9690a1e9ba4f5dcc5f3c362dfe6d59385a3246c828fe4af53",
+        "program_wasm_sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1",
+        "linked_runtime": {
+          "key": "99ad17640195678fbcd8582a0f76b6c7b5c82435121117cb64ba8b03fcb37b66",
+          "wasm_bytes": 39565705,
+          "wasm_sha256": "e6cea16be9b5addf8a919037ce0f6a9ee6886d7c93adc7e3b87d2ea607495220"
+        },
+        "execution_ns": {
+          "samples": [
+            4489489,
+            4546508,
+            4499808,
+            4491379,
+            4474429,
+            4556539,
+            4473498
+          ],
+          "median": 4491379,
+          "minimum": 4473498,
+          "maximum": 4556539
+        },
+        "final_rss_bytes": {
+          "samples": [
+            227373056,
+            227381248,
+            227385344,
+            227393536,
+            227397632,
+            227405824,
+            227409920
+          ],
+          "median": 227393536,
+          "minimum": 227373056,
+          "maximum": 227409920
+        },
+        "maximum_sampled_rss_bytes": {
+          "samples": [
+            227373056,
+            227381248,
+            227385344,
+            227393536,
+            227397632,
+            227405824,
+            227409920
+          ],
+          "median": 227393536,
+          "minimum": 227373056,
+          "maximum": 227409920
+        },
+        "gc_before_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "gc_after_bytes": [
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216,
+          16777216
+        ],
+        "matched_image_cache": [
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit",
+          "Hit"
+        ]
+      }
+    ],
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "810455040",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "interpretation": "Keep 16 MiB default. Retained 8 MiB grows to 16 MiB and is roughly 2x slower. RSS includes producer/cache history and is not canonical compiler-disabled RSS. No original Test262 or full native claim.",
+  "archive": {
+    "file": "memory-gc-capacity-20261028-inert.tar.xz",
+    "sha256": "43db8e2a0ab00acc75b643b56d00474cfa5dbd79940c79026f97929d58eb0dc5",
+    "bytes": 483404,
+    "expanded_bytes": 120452230,
+    "members": {
+      "probe/report.json": {
+        "bytes": 34906,
+        "sha256": "c97ec397d3236b61ca38ef72f09b1263a77af02c4887120434b827648e860ac1"
+      },
+      "probe/0-16-integer.js/stdout": {
+        "bytes": 55084,
+        "sha256": "f3d275410b8ee68044845c41b1cd0792aa2aafeaf7f6bc47d854b9c464cd18a6"
+      },
+      "probe/0-16-integer.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/0-16-retained-objects.js/stdout": {
+        "bytes": 55168,
+        "sha256": "8237656ed39be14f46d141a56b6a44c5e1434473518ac17c992f5f8d7787ea83"
+      },
+      "probe/0-16-retained-objects.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/0-16-to-sorted-512.js/stdout": {
+        "bytes": 55126,
+        "sha256": "5d36e911dc4ee32b684c220885028a99f34967f41c2cef1737d90d2315c7c07f"
+      },
+      "probe/0-16-to-sorted-512.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/1-8-to-sorted-512.js/stdout": {
+        "bytes": 55077,
+        "sha256": "401e1ec379f6a437edfcceab38f0f0f106e19cb09fa44a8600cba0b02cc09786"
+      },
+      "probe/1-8-to-sorted-512.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/1-8-retained-objects.js/stdout": {
+        "bytes": 55150,
+        "sha256": "aaf8b80c4bb51670e88a0c6da47ce57756c11d8a75f500b3c4209b88e3689e00"
+      },
+      "probe/1-8-retained-objects.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/1-8-integer.js/stdout": {
+        "bytes": 55027,
+        "sha256": "4c6642f40b03be175657eb4d47728a402692a8183dffc42011307ae4b44a6671"
+      },
+      "probe/1-8-integer.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/2-8-to-sorted-512.js/stdout": {
+        "bytes": 55074,
+        "sha256": "844b30db6a17a3301d901a3005ea757f1f06609abf4b103bc87db7a78a7054fe"
+      },
+      "probe/2-8-to-sorted-512.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/2-8-retained-objects.js/stdout": {
+        "bytes": 55146,
+        "sha256": "4f90199c3626220325e613aed3d936ae2003c740591d9e0dfce5d9bf3573cc60"
+      },
+      "probe/2-8-retained-objects.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/2-8-integer.js/stdout": {
+        "bytes": 55027,
+        "sha256": "3d933e68fc3db58838daaf73c6080d1d1cb2ccaae3a028d227378619133e87d2"
+      },
+      "probe/2-8-integer.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/3-16-integer.js/stdout": {
+        "bytes": 55078,
+        "sha256": "0d344d418d3351944a222a3be55f183cd48616bd8827d332223c5739df405bb6"
+      },
+      "probe/3-16-integer.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/3-16-retained-objects.js/stdout": {
+        "bytes": 55169,
+        "sha256": "2b529dde09c40c802e63289ef6dd3a1666c10cb7b72bbf78ea12a7d8b62abead"
+      },
+      "probe/3-16-retained-objects.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/3-16-to-sorted-512.js/stdout": {
+        "bytes": 55127,
+        "sha256": "b545f72007cb8cf20382e9db13746bca6da1b0737ce1f55c8a0f46bced9223bb"
+      },
+      "probe/3-16-to-sorted-512.js/stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "probe/3-16-to-sorted-512.js/artifacts/to-sorted-512.js.wasm": {
+        "bytes": 75390,
+        "sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1"
+      },
+      "probe/3-16-retained-objects.js/artifacts/retained-objects.js.wasm": {
+        "bytes": 73080,
+        "sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1"
+      },
+      "probe/3-16-integer.js/artifacts/integer.js.wasm": {
+        "bytes": 64281,
+        "sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8"
+      },
+      "probe/2-8-integer.js/artifacts/integer.js.wasm": {
+        "bytes": 64281,
+        "sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8"
+      },
+      "probe/2-8-retained-objects.js/artifacts/retained-objects.js.wasm": {
+        "bytes": 73080,
+        "sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1"
+      },
+      "probe/2-8-to-sorted-512.js/artifacts/to-sorted-512.js.wasm": {
+        "bytes": 75390,
+        "sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1"
+      },
+      "probe/1-8-integer.js/artifacts/integer.js.wasm": {
+        "bytes": 64281,
+        "sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8"
+      },
+      "probe/1-8-retained-objects.js/artifacts/retained-objects.js.wasm": {
+        "bytes": 73080,
+        "sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1"
+      },
+      "probe/1-8-to-sorted-512.js/artifacts/to-sorted-512.js.wasm": {
+        "bytes": 75390,
+        "sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1"
+      },
+      "probe/0-16-to-sorted-512.js/artifacts/to-sorted-512.js.wasm": {
+        "bytes": 75390,
+        "sha256": "0489cac36288b6b5205fd9e70c3d96e7da19771f76c56656d8be312d98375ec1"
+      },
+      "probe/0-16-retained-objects.js/artifacts/retained-objects.js.wasm": {
+        "bytes": 73080,
+        "sha256": "66f6478b0bc4f3e6c7cded98eff7ff02470ba749a9c19f5fde37e47e906496d1"
+      },
+      "probe/0-16-integer.js/artifacts/integer.js.wasm": {
+        "bytes": 64281,
+        "sha256": "833a91be8b6f008caf51e06327e4a25b237dba747fb7680faf333b20b439e4c8"
+      },
+      "native/report.json": {
+        "bytes": 13805,
+        "sha256": "6db1c40854066e3b19525a94f9ed4544b596c7c561b7c99e9f88b1819f29460e"
+      },
+      "native/cargo-engine.stdout": {
+        "bytes": 39448267,
+        "sha256": "4ea45216e606a6fddaa967e5a7285cab3c2af89a1a79cfba56d648edadfdd915"
+      },
+      "native/cargo-engine.stderr": {
+        "bytes": 335,
+        "sha256": "77e7e9611f9daba8bc57208de66149f74fd4660f39c0ffe9eba525e4e6b47732"
+      },
+      "native/cargo-example-tests.stdout": {
+        "bytes": 39659576,
+        "sha256": "4b489aa9bfbe736d1dd63b35ab6d54c67087f9df93e3a8a57f2e97d07ab2c2d5"
+      },
+      "native/cargo-example-tests.stderr": {
+        "bytes": 3054,
+        "sha256": "34141ded2ad1cfcb9fb0343eacf6f0aeaa15c2fa0d77e131f612c8e332252ac3"
+      },
+      "native/cargo-example.stdout": {
+        "bytes": 39659454,
+        "sha256": "df719178b5dd6ae826c6a95ffb6583c1a4a7d494016280c6ea5332ae01ffa1d7"
+      },
+      "native/cargo-example.stderr": {
+        "bytes": 191,
+        "sha256": "c0096475124bd0fa67a1c467e3122cc5409d983bae42dc7d8b7d6ee79faccd21"
+      },
+      "native/engine-inventory.stdout": {
+        "bytes": 99203,
+        "sha256": "f63dddff406775f228c162c01e2a691236445b9ca24340a4ccda6d5141d5dc05"
+      },
+      "native/engine-inventory.stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native/engine-profile-tests.stdout": {
+        "bytes": 2358,
+        "sha256": "178daf38b414aa100d950c4fd0c6c29052850b62d30d543db4c72802caa17664"
+      },
+      "native/engine-profile-tests.stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native/example-inventory.stdout": {
+        "bytes": 594,
+        "sha256": "3340067738271fdaa70c57e527694fff77b2b8c4ac0deede4347310653db399e"
+      },
+      "native/example-inventory.stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native/example-tests.stdout": {
+        "bytes": 726,
+        "sha256": "95c6792ba6fb07f82126b71c09952db91ed5aa8fa559bcc5af6540130c538f37"
+      },
+      "native/example-tests.stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "reproduce/verify-gc8.py": {
+        "bytes": 4939,
+        "sha256": "6045f0b815f9b23f403127507021dcb7f09ca4fd3428113c122d942c00c46c01"
+      },
+      "reproduce/probe-abba.py": {
+        "bytes": 5888,
+        "sha256": "cfcf71b13135c276f76f8551a44ec3f2d8a475d5f4011d99521592b4f1d8f6fd"
+      },
+      "reproduce/probe-abba-r1.py": {
+        "bytes": 6241,
+        "sha256": "8aa38e93e207ad1dce6f511fcd6f96e403a7b1b5578b585b7796e007ac73969b"
+      },
+      "reproduce/python-metrics.stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "reproduce/python-metrics.stderr": {
+        "bytes": 276,
+        "sha256": "5ac94f573552b1af8366bbd6229c9bdd5bec809e0e1b7211a2202c7d6cc83d2a"
+      },
+      "reproduce/tools/source.json": {
+        "bytes": 160,
+        "sha256": "4b5afaa3edfd1085b7488aa2f414e5db73d6fa63fc33ace39ec7a9709543fb37"
+      }
+    }
+  }
+}

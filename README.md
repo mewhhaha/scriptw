@@ -98,7 +98,9 @@ prevent causal conclusions from comparisons across hosts.
 The [runtime diagnostic](docs/rust-rewrite/contracts/runtime-performance-profile.md)
 also admits an explicit 8 MiB initial GC heap for controlled capacity experiments.
 Ordinary execution still starts at 16 MiB. The smaller setting has not established
-a memory or speed gain; its diagnostic RSS is separate from the comparison below.
+a memory or speed gain: the [controlled capacity probe](docs/rust-rewrite/memory-gc-capacity-20261028.md)
+grew back to 16 MiB on retained objects and roughly doubled their execution time.
+Its diagnostic RSS is separate from the comparison below.
 
 ## Precompiled comparison
 
