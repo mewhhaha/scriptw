@@ -33,7 +33,9 @@ as all four cases' validated attribution files.
 Shared pages yield nonexclusive symbol overlaps, never additive function RSS.
 Names and permissions alone establish neither allocation ownership nor causality.
 
-Verification is pending. Planned controls cover default feature exclusion,
-actual P/R ranges and Store-drop lifetime, lazy-hook ordering, malformed ownership
-metadata, present-bit bounds and adversarial ELF ranges. No native execution,
-RSS reduction or memory-saving claim follows from source checks or static extents.
+The [verified checkpoint](../memory-module-ownership-20261027.md) records 31 native
+diagnostic test executions, 63 Python tests and the default-feature compile-fail check.
+They cover actual P/R owners and Store-drop lifetime, lazy-hook ordering,
+malformed ownership metadata, present-bit bounds and adversarial ELF ranges.
+The current matched cohort passes all 17 workload checksums; its four additional
+ownership captures remain unscored. No RSS improvement follows from this feature.
