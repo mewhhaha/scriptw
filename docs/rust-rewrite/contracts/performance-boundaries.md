@@ -102,7 +102,7 @@ workload, machine, native policy or measurement configuration.
 ## Explicit native-policy experiments
 
 The runner accepts `--native-mode fast|size-optimized|speed`,
-`--gc-initial-mib 16|32|64|128`, and
+`--gc-initial-mib 8|16|32|64|128`, and
 `--regalloc single-pass|backtracking`. Any explicit option selects a separately
 labelled policy cohort; omitted fields become Fast/16 MiB/SinglePass. These
 options require `--skip-startup`, because the source-startup CLI still uses its
@@ -122,6 +122,13 @@ and image storage, so the difference cannot establish an isolated P compiler,
 register-allocation or GC-capacity speedup. Policy RSS additionally includes
 serialized-image storage and producer/allocator effects; it is not ordinary
 product RSS or live JavaScript heap usage.
+
+The 8 MiB option permits a smaller-capacity control without changing the ordinary
+16 MiB default. Both explicit capacities produce compatible R and P images for
+their executing Engine. Initial capacity is demand-paged and may grow; it is
+neither committed RSS nor a live-byte limit. A 16/8/8/16 sequence on one host can
+test capacity and timing effects within this diagnostic boundary. Its absolute
+RSS does not replace the compiler-disabled Scriptw/Scriptc comparison.
 
 Explicit reports use `scriptw-v8-machine-policy-baseline-v1` and require the
 runner's `scriptw-wasmtime-policy-baseline-v1` wire schema. Every observation's

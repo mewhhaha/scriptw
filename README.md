@@ -95,6 +95,11 @@ allocation calculation is not measured RSS savings; see the
 Subsequent matched benchmark runs pin Rust to 1.99.1; runner differences still
 prevent causal conclusions from comparisons across hosts.
 
+The [runtime diagnostic](docs/rust-rewrite/contracts/runtime-performance-profile.md)
+also admits an explicit 8 MiB initial GC heap for controlled capacity experiments.
+Ordinary execution still starts at 16 MiB. The smaller setting has not established
+a memory or speed gain; its diagnostic RSS is separate from the comparison below.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

@@ -153,7 +153,7 @@ def main():
     parser.add_argument('--baseline', type=Path, help='compatible complete v2 report to compare')
     parser.add_argument('--native-mode', choices=('fast', 'size-optimized', 'speed'),
                         help='explicit runner policy cohort; requires --skip-startup')
-    parser.add_argument('--gc-initial-mib', type=int, choices=(16, 32, 64, 128),
+    parser.add_argument('--gc-initial-mib', type=int, choices=(8, 16, 32, 64, 128),
                         help='explicit initial GC capacity cohort; requires --skip-startup')
     parser.add_argument('--regalloc', choices=('single-pass', 'backtracking'),
                         help='explicit native register allocation cohort; requires --skip-startup')

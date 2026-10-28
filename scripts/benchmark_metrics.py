@@ -21,7 +21,7 @@ def validate_native_policy(policy):
     if (not isinstance(policy, dict)
             or set(policy) != {'native_mode', 'gc_initial_mib', 'register_allocation'}
             or policy['native_mode'] not in ('fast', 'size-optimized', 'speed')
-            or type(policy['gc_initial_mib']) is not int or policy['gc_initial_mib'] not in (16, 32, 64, 128)
+            or type(policy['gc_initial_mib']) is not int or policy['gc_initial_mib'] not in (8, 16, 32, 64, 128)
             or policy['register_allocation'] not in ('single-pass', 'backtracking')):
         raise ValueError('invalid explicit native-policy cohort')
 

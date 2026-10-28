@@ -150,6 +150,7 @@ impl WasmProfileNativeMode {
 /// capacities, not live-byte limits; the ordinary Store limit remains in force.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WasmProfileGcInitialCapacity {
+    MiB8,
     MiB16,
     MiB32,
     MiB64,
@@ -159,6 +160,7 @@ pub enum WasmProfileGcInitialCapacity {
 impl WasmProfileGcInitialCapacity {
     pub const fn mebibytes(self) -> usize {
         match self {
+            Self::MiB8 => 8,
             Self::MiB16 => 16,
             Self::MiB32 => 32,
             Self::MiB64 => 64,
@@ -276,11 +278,13 @@ impl WasmRuntimeProfileOptions {
                 ));
             }
         };
+        const MIB8: u64 = WasmProfileGcInitialCapacity::MiB8.bytes() as u64;
         const MIB16: u64 = WasmProfileGcInitialCapacity::MiB16.bytes() as u64;
         const MIB32: u64 = WasmProfileGcInitialCapacity::MiB32.bytes() as u64;
         const MIB64: u64 = WasmProfileGcInitialCapacity::MiB64.bytes() as u64;
         const MIB128: u64 = WasmProfileGcInitialCapacity::MiB128.bytes() as u64;
         let initial_gc_capacity = match engine.get_gc_heap_initial_size() {
+            MIB8 => WasmProfileGcInitialCapacity::MiB8,
             MIB16 => WasmProfileGcInitialCapacity::MiB16,
             MIB32 => WasmProfileGcInitialCapacity::MiB32,
             MIB64 => WasmProfileGcInitialCapacity::MiB64,
@@ -764,6 +768,7 @@ mod native_mode_cohort_tests {
             "control must link the real shared runtime"
         );
         for capacity in [
+            WasmProfileGcInitialCapacity::MiB8,
             WasmProfileGcInitialCapacity::MiB16,
             WasmProfileGcInitialCapacity::MiB32,
         ] {
@@ -840,6 +845,16 @@ mod engine_observation_tests {
     #[test]
     fn policy_observation_maps_each_supported_native_level_from_an_independent_engine() {
         for (level, capacity, allocator, expected) in [
+            (
+                wasmtime::OptLevel::SpeedAndSize,
+                8,
+                wasmtime::RegallocAlgorithm::Backtracking,
+                WasmRuntimeProfileOptions::new(
+                    WasmProfileNativeMode::SizeOptimized,
+                    WasmProfileGcInitialCapacity::MiB8,
+                    WasmProfileRegisterAllocation::Backtracking,
+                ),
+            ),
             (
                 wasmtime::OptLevel::None,
                 16,

@@ -62,11 +62,16 @@ class AccountingTests(unittest.TestCase):
 class EvidenceTests(unittest.TestCase):
     def test_explicit_native_policy_defaults_and_bounds(self):
         self.assertIsNone(BENCH.native_policy_plan())
+        self.assertEqual(BENCH.native_policy_plan(native_mode='fast'),
+            dict(native_mode='fast', gc_initial_mib=16, register_allocation='single-pass'))
+        self.assertEqual(BENCH.native_policy_plan(gc_initial_mib=8),
+            dict(native_mode='fast', gc_initial_mib=8, register_allocation='single-pass'))
         self.assertEqual(BENCH.native_policy_plan(gc_initial_mib=32),
             dict(native_mode='fast', gc_initial_mib=32, register_allocation='single-pass'))
         self.assertEqual(BENCH.native_policy_plan('speed', 64, 'backtracking'),
             dict(native_mode='speed', gc_initial_mib=64, register_allocation='backtracking'))
-        for mode, capacity, allocation in [('jit', 16, 'single-pass'), ('fast', 17, 'single-pass'),
+        for mode, capacity, allocation in [('jit', 16, 'single-pass'), ('fast', 4, 'single-pass'),
+                                           ('fast', 17, 'single-pass'), ('fast', 8.0, 'single-pass'),
                                            ('fast', True, 'single-pass'), ('fast', 16, 'automatic')]:
             with self.subTest(mode=mode, capacity=capacity, allocation=allocation), self.assertRaises(ValueError):
                 BENCH.native_policy_plan(mode, capacity, allocation)
@@ -76,7 +81,7 @@ class EvidenceTests(unittest.TestCase):
             root = Path(directory)
             path, ordinary = self.make_report(root)
             report = copy.deepcopy(ordinary)
-            policy = BENCH.native_policy_plan('speed', 32, 'backtracking')
+            policy = BENCH.native_policy_plan('speed', 8, 'backtracking')
             report['schema'] = metrics.POLICY_SCHEMA
             report['configuration']['native_policy'] = policy
             case = report['execution']['wasmtime']['cases'][0]
@@ -96,7 +101,7 @@ class EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'incompatible'):
                 metrics.compare(ordinary, report)
             changed = copy.deepcopy(report)
-            changed['configuration']['native_policy']['gc_initial_mib'] = 64
+            changed['configuration']['native_policy']['gc_initial_mib'] = 16
             with self.assertRaisesRegex(ValueError, 'incompatible'):
                 metrics.compare(report, changed)
             changed['summaries'] = metrics.summarize(changed)
@@ -104,7 +109,7 @@ class EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'requested native policy'):
                 metrics.load_report(path)
             changed = copy.deepcopy(report)
-            changed['execution']['wasmtime']['cases'][0]['observations'][2]['actual_native_policy']['gc_initial_mib'] = 64
+            changed['execution']['wasmtime']['cases'][0]['observations'][2]['actual_native_policy']['gc_initial_mib'] = 16
             path.write_text(json.dumps(changed))
             with self.assertRaisesRegex(ValueError, 'actual native policy'):
                 metrics.load_report(path)

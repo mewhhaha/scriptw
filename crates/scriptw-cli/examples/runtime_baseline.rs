@@ -16,7 +16,7 @@ fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() < 5 {
         return Err(
-            "usage: runtime-baseline FIXTURES SAMPLES WARMUPS CASE ARTIFACT_DIR [--row-phases] [--native-mode fast|size-optimized|speed] [--gc-initial-mib 16|32|64|128] [--regalloc single-pass|backtracking]"
+            "usage: runtime-baseline FIXTURES SAMPLES WARMUPS CASE ARTIFACT_DIR [--row-phases] [--native-mode fast|size-optimized|speed] [--gc-initial-mib 8|16|32|64|128] [--regalloc single-pass|backtracking]"
                 .into(),
         );
     }

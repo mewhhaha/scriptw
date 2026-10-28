@@ -39,11 +39,12 @@ pub(super) fn parse(args: &[String]) -> Result<InvocationOptions, String> {
             }
             "--gc-initial-mib" if capacity.is_none() => {
                 capacity = Some(match value.as_str() {
+                    "8" => WasmProfileGcInitialCapacity::MiB8,
                     "16" => WasmProfileGcInitialCapacity::MiB16,
                     "32" => WasmProfileGcInitialCapacity::MiB32,
                     "64" => WasmProfileGcInitialCapacity::MiB64,
                     "128" => WasmProfileGcInitialCapacity::MiB128,
-                    _ => return Err("GC initial capacity must be 16, 32, 64 or 128 MiB".into()),
+                    _ => return Err("GC initial capacity must be 8, 16, 32, 64 or 128 MiB".into()),
                 });
             }
             "--regalloc" if allocation.is_none() => {
@@ -99,21 +100,23 @@ mod tests {
 
     #[test]
     fn combined_options_retain_each_independent_experiment() {
-        let parsed = parse(&strings(&[
-            "--native-mode",
-            "speed",
-            "--row-phases",
-            "--gc-initial-mib",
-            "64",
-            "--regalloc",
-            "backtracking",
-        ]))
-        .unwrap();
-        assert!(parsed.row_phases);
-        assert_eq!(
-            policy_json(parsed.policy.unwrap()),
-            json!({"native_mode":"speed", "gc_initial_mib":64, "register_allocation":"backtracking"})
-        );
+        for (capacity, expected_mib) in [("8", 8), ("64", 64)] {
+            let parsed = parse(&strings(&[
+                "--native-mode",
+                "speed",
+                "--row-phases",
+                "--gc-initial-mib",
+                capacity,
+                "--regalloc",
+                "backtracking",
+            ]))
+            .unwrap();
+            assert!(parsed.row_phases);
+            assert_eq!(
+                policy_json(parsed.policy.unwrap()),
+                json!({"native_mode":"speed", "gc_initial_mib":expected_mib, "register_allocation":"backtracking"})
+            );
+        }
     }
 
     #[test]

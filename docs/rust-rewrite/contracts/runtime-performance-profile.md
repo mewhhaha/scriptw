@@ -4,14 +4,14 @@
 
 `Engine::profile_wasm_execution_with_options` accepts closed, immutable
 `WasmRuntimeProfileOptions`: Fast/SizeOptimized/Speed program compilation,
-16/32/64/128 MiB initial GC capacity, and SinglePass/Backtracking program
+8/16/32/64/128 MiB initial GC capacity, and SinglePass/Backtracking program
 register allocation. These are diagnostic configurations. Ordinary execution
 retains automatic native-mode selection, a 16 MiB initial heap and SinglePass.
 All cohorts retain the required copying collector, GC/reference/exception
 features, Store limits, deadlines and a fresh Store/Realm for every invocation.
 
 The runtime-baseline example accepts trailing `--native-mode
-fast|size-optimized|speed`, `--gc-initial-mib 16|32|64|128` and `--regalloc
+fast|size-optimized|speed`, `--gc-initial-mib 8|16|32|64|128` and `--regalloc
 single-pass|backtracking` options (each flag and value are separate arguments).
 Any explicit policy flag activates a separate diagnostic cohort; omitted fields
 then use fast/16/single-pass. Ordinary invocations keep their v2 schema.
