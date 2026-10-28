@@ -533,7 +533,8 @@ impl<'a> FunctionBuilder<'a> {
             IntlIntrinsicPropertyKind::Getter => {
                 // Getter fields remain eager; only method data values use the
                 // existing deferred intrinsic representation.
-                let callable = self.emit_intrinsic_callable(property.builtin, realm, function)?;
+                let callable =
+                    self.emit_intrinsic_accessor_callable(property.builtin, realm, function)?;
                 let schema = self.runtime_schema();
                 let value = schema.reserve_value_local(function);
                 value.set_reference(&callable, schema, function);

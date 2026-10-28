@@ -207,3 +207,91 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
         [reference(type_index::<FunctionObject>(schema))]
     );
 }
+
+#[test]
+fn every_intl_getter_uses_the_checked_shared_accessor_allocation_tail() {
+    use crate::intrinsics::intl::{intl_constructor_properties, IntlIntrinsicPropertyKind};
+    use std::collections::BTreeSet;
+
+    let mut getters = Vec::new();
+    for &constructor in StandardBuiltinId::ALL {
+        if let Some(properties) = intl_constructor_properties(constructor) {
+            for property in properties.constructor.iter().chain(properties.prototype) {
+                match property.kind {
+                    IntlIntrinsicPropertyKind::Getter => getters.push(property.builtin),
+                    IntlIntrinsicPropertyKind::Method
+                    | IntlIntrinsicPropertyKind::SymbolMethod(_) => {}
+                }
+            }
+        }
+    }
+    assert_eq!(
+        getters.len(),
+        15,
+        "the full represented Intl getter inventory"
+    );
+    assert_eq!(getters.iter().copied().collect::<BTreeSet<_>>().len(), 15);
+    let artifact = emit_script("Intl.Locale.prototype;").unwrap();
+    expect_valid_module(&artifact, 1);
+    let runtime = artifact.runtime().unwrap();
+    let names = function_names_in_bytes(runtime.bytes());
+    let named = |wanted: &str| {
+        let indices = names
+            .iter()
+            .filter_map(|(&index, name)| (name == wanted).then_some(index))
+            .collect::<Vec<_>>();
+        assert_eq!(indices.len(), 1, "one physical body for {wanted}");
+        indices[0]
+    };
+    let allocate = named("helper::intrinsic_accessor_allocate");
+    let bootstrap = body(
+        runtime.bytes(),
+        named("helper::realm_initialize_intrinsics"),
+    );
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let schema = registered.globals().schema();
+    for builtin in getters {
+        assert!(!builtin.constructable() && builtin.global_name().is_none());
+        assert!(crate::module::standard_builtin_function_realm_slot(builtin).is_none());
+        let entry = named(&format!("builtin::{}", builtin.debug_name()));
+        assert_eq!(
+            crate::function_entry::PlannedFunctionEntry::standard(builtin, entry).protocol(),
+            scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly
+        );
+        let sites = bootstrap
+            .iter()
+            .enumerate()
+            .filter_map(|(index, op)| {
+                matches!(op, Operator::RefFunc { function_index } if *function_index == entry)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            sites.len(),
+            1,
+            "one eager bootstrap installation for {}",
+            builtin.debug_name()
+        );
+        let start = sites[0];
+        let end = bootstrap[start + 1..]
+            .iter()
+            .position(|op| matches!(op, Operator::RefFunc { .. }))
+            .map_or(bootstrap.len(), |offset| start + 1 + offset);
+        let installation = &bootstrap[start..end];
+        assert_eq!(installation.iter().filter(|op|
+            matches!(op, Operator::Call { function_index } if *function_index == allocate)).count(), 1,
+            "{} must pass actual planned metadata and runtime-owned source admission", builtin.debug_name());
+        assert!(
+            !installation
+                .iter()
+                .any(|op| matches!(op, Operator::StructNew { struct_type_index }
+                if *struct_type_index == type_index::<FunctionContext>(schema)
+                    || *struct_type_index == type_index::<FunctionObject>(schema))),
+            "{} cannot retain an inline copy of the shared allocation tail",
+            builtin.debug_name()
+        );
+    }
+}
