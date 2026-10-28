@@ -110,7 +110,7 @@ impl RuntimeHelperInstallationSpanParameter {
         // This is the sole dynamic constructor of the builtin/key parameter
         // proofs. The checked cursor addresses compiler-validated immutable
         // rows; neither a Program ordinal nor an arbitrary i32 can enter it.
-        let read = |word, f: &mut Function| {
+        let read = |word: u64, f: &mut Function| {
             let local = s.reserve_i32_local(f);
             cursor.load(f);
             f.instruction(&Instruction::I32Load(wasm_encoder::MemArg {
