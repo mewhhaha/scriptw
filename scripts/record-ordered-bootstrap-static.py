@@ -203,7 +203,7 @@ def main():
     report = dict(schema='scriptw-ordered-bootstrap-static-ci-v1', source_commit=args.expected_source,
                   complete=False, scored=False, started_at=v.stamp(), commands=[], variants={},
                   limits=dict(package_bytes=64*MIB, native_bytes=128*MIB, nm_stdout_bytes=32*MIB, nm_stderr_bytes=MIB,
-                              nm_timeout_seconds=60, cargo_log_bytes=32*MIB),
+                              nm_timeout_seconds=60, cargo_log_bytes=64*MIB),
                   reported_reference=dict(source_commit='9001324dc52ce583e7b95a1292f317796d415c01', layout=28,
                                           realm_initializer_native_bytes=765194, accessor_allocate_native_bytes=783,
                                           remeasured_by_this_invocation=False),
@@ -215,7 +215,7 @@ def main():
         v.source(args.expected_source)
         report['compiler_inputs'] = source_fingerprint()
         log_path = args.cargo_log.resolve(strict=True)
-        raw = read(log_path, 32 * MIB)
+        raw = read(log_path, 64 * MIB)
         cargo = [json.loads(line) for line in raw.splitlines()]
         v.require(cargo and cargo[-1] == dict(reason='build-finished', success=True)
                   and sum(row.get('reason') == 'build-finished' for row in cargo) == 1, 'Cargo build did not finish successfully exactly once')

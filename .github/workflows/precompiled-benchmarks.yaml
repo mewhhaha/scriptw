@@ -61,6 +61,8 @@ jobs:
             --expected-source "$GITHUB_SHA" \
             --output "$RUNNER_TEMP/ordered-bootstrap-verification"
       - name: Inspect owned runtime static metadata
+        id: bootstrap_static
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -103,8 +105,10 @@ jobs:
         env:
           DIAGNOSTIC_OUTCOME: ${{ steps.mapping_diagnostic.outcome }}
           DIAGNOSTIC_ARTIFACT_OUTCOME: ${{ steps.mapping_artifact.outcome }}
+          BOOTSTRAP_STATIC_OUTCOME: ${{ steps.bootstrap_static.outcome }}
         run: |
           printf 'Unscored mapping capture: %s; artifact: %s. Scored observations are unchanged.\n' "$DIAGNOSTIC_OUTCOME" "$DIAGNOSTIC_ARTIFACT_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Owned runtime static inspection: %s. Failed inspection supplies no static-size result; scored measurements have independent admission.\n' "$BOOTSTRAP_STATIC_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain ordered bootstrap checks and static metadata
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
