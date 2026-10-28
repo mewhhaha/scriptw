@@ -156,3 +156,26 @@ after ACK4; host ELF symbol metadata is inspected after child exit. See the
 [ownership contract](benchmark-module-images.md). This feature does not alter
 scored values or grant native-image admission authority, and shared symbol pages
 are nonexclusive overlaps rather than function RSS or execution evidence.
+
+## Consumer capability experiment
+
+Build `scriptw-precompiled-consumer` as a separate selected package, with
+`--no-default-features`. Its default engine dependency excludes the
+`native-source-compiler` capability. Native compiler callbacks, their Store
+context/cache and source-compiling agent starts are absent; the Portable
+embedding SDK retains its existing host, foreign-value and async implementations.
+Unsupported source imports fail clearly. Static compiler/Cranelift dependencies
+remain, so this is an intermediate runtime separation experiment.
+
+The consumer has only identity and trusted-image execution commands. Its actual
+engine capability must match the requested consumer feature, or startup rejects
+Cargo workspace feature unification. Build the same package separately with
+`--features native-source-compiler` for a capability-enabled control. Both builds
+use identical producer images, target and runtime settings. Compile-time
+source exclusion is distinct from the Wasmtime compiler-disabled runtime policy.
+
+`scripts/benchmark-consumer-capability.py --help` describes the two-host diagnostic.
+It retains balanced fresh-process observations, exact image/source identities and
+all failures, and compares RSS, PSS, private-dirty memory and execution time.
+Its reports are excluded from canonical scores. Fewer linked entrypoints or
+allocations alone do not establish an RSS reduction.

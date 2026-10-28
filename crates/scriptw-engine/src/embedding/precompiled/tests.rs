@@ -46,6 +46,7 @@ fn precompiled_standalone_executes_on_an_engine_that_cannot_compile_wasm() {
         .contains("compiler"));
     let runtime = EmbeddedRuntime::from_precompiled(&engine, &image).unwrap();
     let mut store = state(&runtime);
+    #[cfg(feature = "native-source-compiler")]
     assert!(store.data().native_source_compiler.is_none());
     let mut linker = WasmtimeLinker::new(&engine);
     runtime.register(&mut store, &mut linker).unwrap();
@@ -172,6 +173,7 @@ fn precompiled_linked_images_keep_foreign_metadata_retained_calls_throws_and_gc_
         normal(instance.call(&mut store, &host, None, &[n]).unwrap()).as_number(),
         Some(42.0)
     );
+    #[cfg(feature = "native-source-compiler")]
     assert!(store.data().native_source_compiler.is_none());
 }
 
@@ -421,4 +423,35 @@ fn precompiled_facts_roundtrip_async_foreign_declarations_and_explicit_error_tag
     let recovered = envelope::decode(&bytes).unwrap();
     assert_eq!(recovered.facts.foreign, registry);
     assert_eq!(recovered.facts.runtime_key().unwrap().as_bytes(), &[7; 32]);
+}
+
+#[cfg(not(feature = "native-source-compiler"))]
+#[test]
+fn feature_off_precompiled_agent_start_has_no_source_compilation_authority() {
+    configure_compilation_jobs(1).unwrap();
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let unit = compiler
+        .compile_script(
+            "__scriptwAgentStart('throw new Error(\"must not execute\");');",
+            CompileOptions {
+                host_surface_policy: HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+        )
+        .unwrap();
+    let artifact = compiler.emit_wasm(&unit).unwrap();
+    let image = EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &artifact).unwrap();
+    let engine = compiler_disabled();
+    let runtime = EmbeddedRuntime::from_precompiled(&engine, &image).unwrap();
+    let mut store = state(&runtime);
+    let mut linker = WasmtimeLinker::new(&engine);
+    runtime.register(&mut store, &mut linker).unwrap();
+    let instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+    let error = instance.evaluate(&mut store).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("agent.start source compilation is unavailable"),
+        "{error}"
+    );
 }

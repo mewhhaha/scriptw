@@ -62,7 +62,7 @@ pub(super) fn run_with_config(
     let image_sha256 = hash(&bytes);
     let image_bytes = bytes.len();
     let program_wasm_sha256 = hash(image.program_wasm());
-    let runtime_key = image.runtime_key().map(produce::hash_key);
+    let runtime_key = image.runtime_key().map(hash_key);
     let execution_facts_bytes = image.serialized_execution_facts().len();
     let execution_facts_sha256 = hash(image.serialized_execution_facts());
     // Both native Modules own their mappings. The execution floor therefore

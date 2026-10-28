@@ -15,6 +15,7 @@ const NATIVE_SOURCE_COMPILER_SOURCE: &str =
     include_str!("../../src/wasm_native_source_compiler.rs");
 const NATIVE_SOURCE_COMPILER_TEST_SOURCE: &str =
     include_str!("../../src/wasm_native_source_compiler/tests.rs");
+const NATIVE_COMPILER_TEST_GATE: &str = "#[cfg(all(test, feature = \"native-source-compiler\"))]";
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -59,12 +60,12 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
         "pub struct Engine {",
         "\n}\n\nenum WasmExecutionMode {",
     );
-    // Test observers disappear from the product struct. Preserve the original
-    // production-state restriction without coupling it to observer field names.
+    // Test observers require both test isolation and native-source capability.
+    // Only this exact conjunction may leave the production-state inventory.
     let mut production_fields = String::new();
     let mut test_field = false;
     for line in fields.lines() {
-        if line.trim() == "#[cfg(test)]" {
+        if line.trim() == NATIVE_COMPILER_TEST_GATE {
             assert!(
                 !test_field,
                 "a test field must end before the next attribute"
@@ -107,7 +108,7 @@ fn wasm_execution_mode_is_the_exact_private_no_capability_domain() {
         "native_direct_eval_compiler_tests",
         "native_global_script_compiler_tests",
     ] {
-        let declaration = format!("\n#[cfg(test)]\nmod {module};");
+        let declaration = format!("\n{NATIVE_COMPILER_TEST_GATE}\nmod {module};");
         assert_eq!(ENGINE_SOURCE.matches(declaration.as_str()).count(), 1);
     }
     assert_eq!(

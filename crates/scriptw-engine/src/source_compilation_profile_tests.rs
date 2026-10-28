@@ -35,6 +35,7 @@ fn run_portable(engine: &Engine, artifact: &Artifact) -> Result<RunOutcome, Engi
 }
 
 #[test]
+#[cfg(feature = "native-source-compiler")]
 fn public_exports_remain_portable_after_native_source_execution_warms_the_runtime() {
     let engine = Engine::new(RealmBuilder::new().build());
     let native = engine

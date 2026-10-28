@@ -53,6 +53,12 @@ pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
     module: &WasmtimeModule,
 ) -> Result<(), EngineError> {
+    #[cfg(not(feature = "native-source-compiler"))]
+    if imports_native_source_compiler(module) {
+        return Err(EngineError::new(
+            "native source compilation is unavailable in this build; enable native-source-compiler",
+        ));
+    }
     let bind_error =
         |error| EngineError::new(format!("wasmtime GC host linker setup failed: {error}"));
     let import = GcHostImport::CollectGc;
@@ -244,6 +250,7 @@ pub(super) fn link(
     // larger binding routines for an immutable module that needs none of them.
     // A present name still enters every original validator, regardless of its
     // type or the Store's compiler context (which may be armed after linking).
+    #[cfg(feature = "native-source-compiler")]
     if imports_native_source_compiler(module) {
         wasm_native_function_compiler::link(linker, module)?;
         wasm_native_global_script_compiler::link(linker, module)?;

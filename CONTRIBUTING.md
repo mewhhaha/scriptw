@@ -40,11 +40,16 @@ workers, deadlines or cache policy. Missing resource controls must fail clearly.
    batch. Give shared files one owner; implement independent chunks concurrently
    when that helps. Prefer existing domain boundaries over speculative abstractions.
 2. Finish the code, appropriate regressions, types and documentation before costly
-   verification. Use inspection and cheap checks while editing; compile early only
-   to resolve a blocking uncertainty or validate a risky foundation.
+   verification. Run cheap source and structural checks before a broad native
+   build; compile early only to resolve a blocking uncertainty or risky foundation.
 3. Compile once, run focused and adjacent checks, then the required broader
-   checkpoint in sequence so Cargo reuses artifacts. Investigate failures and rerun
-   affected checks. Report commands, actual inventories, results and unverified work.
+   checkpoint in sequence so Cargo reuses artifacts. After failures or test-only
+   edits, retain passing unaffected scopes with their recorded source and artifact
+   identities, rerun affected checks, then continue unfinished scopes. Report
+   commands, actual inventories, results and unverified work. Batch source changes
+   and commits around verification and measurement checkpoints: changing HEAD
+   invalidates compiler identity. A test-only correction is not a reason to
+   rebuild unchanged production code or repeat its passing scopes.
 
 Prefer compiler-enforced invariants and focused consumer contracts. Keep tests
 that protect behavior; discard exploratory harnesses and duplicate prose checks.

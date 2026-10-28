@@ -27,7 +27,8 @@ class SourceGuardRunnerTests(unittest.TestCase):
         (self.root / ".cargo/config.toml").write_text("[build]\njobs = 1\n")
         (self.root / "Cargo.toml").write_text('[workspace.package]\nedition = "2024"\n')
         for target, cargo_modules in RUNNER.TARGETS.items():
-            entry = self.root / "crates/scriptw-aot-wasm/tests" / target
+            package = "scriptw-engine" if target == "structure" else "scriptw-aot-wasm"
+            entry = self.root / "crates" / package / "tests" / target
             entry.mkdir(parents=True)
             (entry / "main.rs").write_text("\n".join(
                 f"mod {name};" for name in sorted(cargo_modules | {"guard_a", "guard_b"})
@@ -37,6 +38,8 @@ class SourceGuardRunnerTests(unittest.TestCase):
 
     def invoke(self, inventory, summary, status=0, target="structure_builtins"):
         def native(command, **kwargs):
+            package = "scriptw-engine" if target == "structure" else "scriptw-aot-wasm"
+            self.assertEqual(kwargs["env"]["CARGO_MANIFEST_DIR"], str(self.root / "crates" / package))
             if "--test" in command:
                 return subprocess.CompletedProcess(command, 0)
             if "--list" in command:
@@ -100,13 +103,25 @@ class SourceGuardRunnerTests(unittest.TestCase):
         self.assertEqual(receipt["full_cargo_only_modules"], sorted(RUNNER.TARGETS["structure_language"]))
         self.assertIn("/structure_language/guard_a.rs", (self.output / "source_guards.rs").read_text())
 
+    def test_engine_target_uses_its_own_source_root_and_manifest_directory(self):
+        self.assertEqual(self.invoke(
+            "guard_a::check: test\nguard_b::check: test\n\n2 tests, 0 benchmarks\n",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n",
+            target="structure",
+        ), 0)
+        receipt = json.loads((self.output / "receipt.json").read_text())
+        self.assertEqual(receipt["package"], "scriptw-engine")
+        self.assertEqual(receipt["full_cargo_only_modules"], sorted(RUNNER.TARGETS["structure"]))
+        self.assertIn("/scriptw-engine/tests/structure/guard_a.rs", (self.output / "source_guards.rs").read_text())
+
     def test_target_set_retains_first_failure_and_runs_remaining_target(self):
-        with patch.object(RUNNER, "run", side_effect=[101, 0]) as run:
+        results = [101] + [0] * (len(RUNNER.TARGETS) - 1)
+        with patch.object(RUNNER, "run", side_effect=results) as run:
             self.assertEqual(RUNNER.run_targets(self.root, self.output, list(RUNNER.TARGETS)), 101)
         self.assertEqual([call.args[2] for call in run.call_args_list], list(RUNNER.TARGETS))
         receipt = json.loads((self.output / "receipt.json").read_text())
         self.assertFalse(receipt["passed"])
-        self.assertEqual([row["exit_code"] for row in receipt["targets"]], [101, 0])
+        self.assertEqual([row["exit_code"] for row in receipt["targets"]], results)
 
     def test_duplicate_target_selection_is_rejected_before_execution(self):
         with patch.object(RUNNER, "run") as run:

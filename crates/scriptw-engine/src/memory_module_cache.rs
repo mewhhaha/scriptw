@@ -1,5 +1,6 @@
 use super::{WasmModuleMemoryCacheKey, WasmtimeModule};
 mod native_templates;
+#[cfg(feature = "native-source-compiler")]
 pub(super) use native_templates::MemoryNativeInstanceCache;
 use std::collections::VecDeque;
 use std::num::NonZeroUsize;

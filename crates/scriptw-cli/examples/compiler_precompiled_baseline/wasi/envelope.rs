@@ -12,7 +12,7 @@ pub(super) struct Frame {
     pub(super) native: Range<usize>,
 }
 
-pub(super) fn current_fingerprint() -> Result<[u8; 32], String> {
+pub(crate) fn current_fingerprint() -> Result<[u8; 32], String> {
     let value = CompilerIdentity::current()?
         .source_fingerprint()
         .to_string();
@@ -27,7 +27,7 @@ pub(super) fn current_fingerprint() -> Result<[u8; 32], String> {
     Ok(fingerprint)
 }
 
-pub(super) fn encode(
+pub(crate) fn encode(
     program: &[u8],
     native: &[u8],
     fingerprint: &[u8; 32],
@@ -101,7 +101,7 @@ fn section_length(bytes: &[u8], cursor: &mut usize) -> Result<usize, String> {
 
 /// A bounded section scan rejects implicit instantiation execution. Full Wasm
 /// validation still belongs to Module::new/validate, before deserialization.
-pub(super) fn reject_implicit_start(bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn reject_implicit_start(bytes: &[u8]) -> Result<(), String> {
     if bytes.get(..8) != Some(b"\0asm\x01\0\0\0".as_slice()) {
         return Err("expected a core Wasm module".into());
     }

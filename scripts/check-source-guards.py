@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run source-only backend guards before building the compiler dependency graph.
 
-This is an additive diagnostic. The full Cargo structure_builtins and
-structure_language targets still own typed IR/Wasm checks and remain required
-for native acceptance.
+This is an additive diagnostic. The full Cargo structure_builtins,
+structure_language and engine structure targets remain required for native
+acceptance.
 """
 import argparse
 import json
@@ -32,6 +32,18 @@ TARGETS = {
         "with_environment_compound_assignment_structure",
         "with_environment_numeric_update_structure",
     }),
+    # Admit the std-only execution-mode guard before an expensive Engine build.
+    # The remaining engine structure modules retain their full Cargo owner.
+    "structure": frozenset({
+        "compiler_fingerprint",
+        "compiler_inspection",
+        "engine_error_wasmtime_policy_authority_structure",
+        "execution_backend_routing_structure",
+        "module_entry_source_authority_structure",
+        "oracle_entry_syntax",
+        "rooted_completion_graph",
+        "wasm_top_level_completion_kind_structure",
+    }),
 }
 
 
@@ -43,7 +55,8 @@ def run(root, output, target="structure_builtins"):
             "missing tracked .cargo/config.toml; restore it before Cargo builds "
             "so a sparse checkout does not fork dependency fingerprints"
         )
-    crate = root / "crates/scriptw-aot-wasm"
+    package = "scriptw-engine" if target == "structure" else "scriptw-aot-wasm"
+    crate = root / "crates" / package
     entry = crate / "tests" / target / "main.rs"
     modules = []
     for line in entry.read_text().splitlines():
@@ -60,6 +73,7 @@ def run(root, output, target="structure_builtins"):
         raise ValueError("source-only guard selection is empty")
     manifest = dict(
         kind="source-only diagnostic; not full native or Wasm/IR acceptance",
+        package=package,
         target=target,
         source_modules=selected,
         full_cargo_only_modules=sorted(cargo_modules),
@@ -148,7 +162,7 @@ def main():
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path, help="fresh evidence directory; default: temporary")
     parser.add_argument("--target", action="append", choices=TARGETS,
-                        help="repeatable target selection; default: both structural targets")
+                        help="repeatable target selection; default: all registered structural targets")
     args = parser.parse_args()
     targets = args.target or list(TARGETS)
     if args.output:

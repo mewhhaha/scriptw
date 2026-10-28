@@ -2356,6 +2356,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "scriptw-precompiled-consumer"
+version = "0.1.0"
+dependencies = [
+ "scriptw-engine",
+ "serde_json",
+ "sha2",
+ "wasmtime",
+ "wasmtime-wasi",
+]
+
+[[package]]
 name = "scriptw-runtime"
 version = "0.1.0"
 dependencies = [

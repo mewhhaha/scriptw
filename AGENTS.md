@@ -25,8 +25,8 @@
 ## Development and verification
 
 - Identify the whole coherent batch and its independent chunks before implementation. Implement independent chunks concurrently with subagents; coordinate ownership of shared files. Create only the smallest necessary seam when work is coupled.
-- Finish code, tests, types and docs before expensive builds or broad suites. Use inspection and cheap source checks during implementation; compile early only to resolve an uncertainty or risky dependency.
-- After the batch, compile once, run focused regressions, then affected broader suites sequentially to reuse artifacts. Fix failures, rerun affected checks and finish with a broad verification checkpoint appropriate to the change. Report exactly what ran and what remains unverified.
+- Finish code, tests, types and docs before expensive builds or broad suites. Run cheap source and structural checks first; compile early only to resolve an uncertainty or risky dependency. Batch commits so Git identity changes do not repeatedly invalidate builds.
+- Compile the batch once, then run focused regressions and affected broader suites sequentially. Preserve passing scopes after a failure or test-only correction; rerun affected checks and continue unfinished scopes instead of restarting the batch. Reuse requires unchanged relevant inputs, with original source and binary identities retained. Report actual coverage and unverified work; prefer existing tooling over custom evidence frameworks.
 - Do not add tests that only mirror reversible, low-impact edits. Prefer checks that enforce meaningful compiler or tooling behavior.
 - Local verification uses `python3 scripts/limited_verification.py -- <command>`: at most 4 GiB, no swap, grouped OOM termination, serial CPU/workers and bounded retained-module caches. Do not run uncapped expensive verification.
 - On managed cloud machines, use `--cloud` with the inherited finite cgroup budget. The opt-in `--cloud-cpus auto` mode respects affinity and CPU quotas; Cargo and libtest remain serial. Preserve explicit worker counts, cache bounds and deadlines.

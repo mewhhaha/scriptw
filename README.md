@@ -16,6 +16,10 @@ code and execution history; it is not a measurement of the live JavaScript heap.
 See [runtime memory ownership](docs/rust-rewrite/contracts/runtime-byte-ownership.md)
 and [compact object storage](docs/rust-rewrite/contracts/compact-ordinary-data-storage.md).
 
+An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-comparison.md#consumer-capability-experiment)
+can exclude dynamic-source compilation callbacks from its host. The existing
+Portable embedding API remains available; static compiler dependencies remain.
+
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 build, debug and verification loop.

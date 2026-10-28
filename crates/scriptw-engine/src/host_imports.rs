@@ -249,7 +249,9 @@ mod tests {
             user_data: None,
             embedding: None,
             weak: wasm_gc_weak_host::WeakGcState::default(),
+            #[cfg(feature = "native-source-compiler")]
             native_source_compiler: None,
+            #[cfg(feature = "native-source-compiler")]
             native_template_instances: Default::default(),
             monotonic_clock_origin: realm.host_clock().monotonic_instant(),
             realm,

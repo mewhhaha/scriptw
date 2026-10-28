@@ -343,3 +343,22 @@ SW01 support independently of the product loader.
 
 Canonical foreign execution facts are bounded at 1 MiB, and the complete native
 program envelope at 256 MiB. Oversized or noncanonical facts are rejected.
+
+## Portable consumer build capability
+
+`scriptw-engine` enables `native-source-compiler` by default. A Portable embedder
+can use `default-features = false` to exclude native Function/eval/Script callback
+modules, their per-Store compiler context and native-template cache, and the
+source-compiling agent-start operation. Native-source imports and agent starts
+fail explicitly in that build. The existing precompiled owner, foreign calls,
+UTF-16/byte transfer, retained exports and asynchronous settlement API remain.
+
+This feature controls runtime source-compilation authority. Static compiler APIs,
+frontend/IR/AOT dependencies and Wasmtime Cranelift remain available for producers;
+it is not a promise of a compiler-free dependency graph. Build a dedicated
+consumer package separately: Cargo feature unification can re-enable the default
+capability when a producer/CLI package is selected in the same build.
+`NATIVE_SOURCE_COMPILER_ENABLED` reports the actual engine capability after that
+unification. Full native
+source-driven verification must explicitly enable the default capability when
+using `--no-default-features`.
