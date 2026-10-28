@@ -1,7 +1,8 @@
 //! Inspect the actual native bootstrap path, including its shared allocator.
 use super::*;
 use crate::gc_types::{
-    CompactDataStorage, FunctionObject, GcHeapType, GcNullability, GlobalLedger,
+    ArrayCompactDataStorage, CompactDataStorage, FunctionObject, GcHeapType, GcNullability,
+    GlobalLedger, InlineCompactDataStorage, InlineCompactDataStorageSchema,
     OrdinaryPropertyStorage, PropertyDescriptor, PropertyEntry, RuntimeModuleTypes, StoredValue,
 };
 
@@ -102,7 +103,13 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
         1
     );
     let compact_allocator = named_body(runtime.bytes(), compact);
-    assert_eq!(compact_allocator.iter().filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<CompactDataStorage>(schema))).count(), 1);
+    for concrete in [
+        type_index::<ArrayCompactDataStorage>(schema),
+        type_index::<InlineCompactDataStorage>(schema),
+    ] {
+        assert_eq!(compact_allocator.iter().filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == concrete)).count(), 1, "each physical variant has one allocation site");
+    }
+    assert!(!compact_allocator.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<CompactDataStorage>(schema))), "the SHAPE-only sum base is never allocated");
     for operators in [&allocator, &compact_allocator] {
         for dictionary_type in [
             type_index::<OrdinaryPropertyStorage>(schema),
@@ -212,5 +219,187 @@ fn native_bootstrap_omits_empty_metadata_but_retains_thrower_and_source_publicat
         2,
         "both the source constructor and strict nonconstructor arrow retain metadata publication"
     );
+    expect_valid_module(&artifact, 0);
+}
+
+#[test]
+fn inline_compact_reads_and_stores_reject_indices_outside_shape_before_field_access() {
+    let artifact = emit_script("var record={left:1,right:2}; record.left=3; Object.getOwnPropertyDescriptor(record,'right');").unwrap();
+    let runtime = artifact.runtime().unwrap();
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let schema = registered.globals().schema();
+    let inline = type_index::<InlineCompactDataStorage>(schema);
+    let names = function_names_in_bytes(runtime.bytes());
+    let mut store = None;
+    for name in [
+        "helper::compact_data_store",
+        "helper::ordinary_own_descriptor",
+    ] {
+        let index = names
+            .iter()
+            .find_map(|(index, actual)| (actual == name).then_some(*index))
+            .expect("actual registered inline path");
+        let body = named_body(runtime.bytes(), index);
+        let first_access = body.iter().position(|op| matches!(op, Operator::StructGet { struct_type_index, field_index } | Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index != InlineCompactDataStorageSchema::SHAPE.ordinal().raw())).expect("inline slot fields are used");
+        // Null refinement is unrelated to the integer bounds proof. Keep the
+        // actual slot local and both unsigned comparisons in the checked span.
+        let prefix = body[..first_access]
+            .iter()
+            .filter(|op| !matches!(op, Operator::RefAsNonNull))
+            .collect::<Vec<_>>();
+        assert!(prefix.windows(11).any(|ops| matches!(ops,
+            [Operator::LocalGet { local_index: slot }, Operator::LocalGet { .. }, Operator::ArrayLen,
+             Operator::I32GeU, Operator::LocalGet { local_index: same_slot }, Operator::I32Const { value: 2 },
+             Operator::I32GeU, Operator::I32Or, Operator::If { .. }, Operator::Unreachable, Operator::End]
+             if slot == same_slot)), "{name} must reject slot >= shape length or slot >= two before accessing fields");
+        if name == "helper::compact_data_store" {
+            store = Some(body);
+        }
+    }
+    let store = store.unwrap();
+    for (field, incoming_parameter) in [
+        (InlineCompactDataStorageSchema::SCALAR0.ordinal().raw(), 3),
+        (InlineCompactDataStorageSchema::SCALAR1.ordinal().raw(), 3),
+        (
+            InlineCompactDataStorageSchema::REFERENCE0.ordinal().raw(),
+            4,
+        ),
+        (
+            InlineCompactDataStorageSchema::REFERENCE1.ordinal().raw(),
+            4,
+        ),
+    ] {
+        let writes = store.iter().enumerate().filter_map(|(position, op)| matches!(op, Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index == field).then_some(position)).collect::<Vec<_>>();
+        assert_eq!(
+            writes.len(),
+            1,
+            "each selected slot has one complete tuple write"
+        );
+        // ABI: storage, slot, then Value's i32 tag/i64 scalar/nullable eqref.
+        // The typed parameter acquisition roots the incoming tuple in locals.
+        let copied = store[..writes[0]]
+            .windows(2)
+            .find_map(|ops| match ops {
+                [Operator::LocalGet {
+                    local_index: source,
+                }, Operator::LocalSet {
+                    local_index: target,
+                }] if *source == incoming_parameter => Some(*target),
+                _ => None,
+            })
+            .expect("typed helper acquisition copies the incoming payload");
+        assert_eq!(
+            store[..writes[0]]
+                .iter()
+                .filter(
+                    |op| matches!(op, Operator::LocalSet { local_index } if *local_index == copied)
+                )
+                .count(),
+            1,
+            "incoming payload remains intact until its field write"
+        );
+        // A nullable reference is written even for scalar tags, so an object
+        // overwrite cannot retain its previous strong edge in either slot.
+        assert!(
+            matches!(store[writes[0] - 1], Operator::LocalGet { local_index } if local_index == copied),
+            "field {field} is overwritten from its complete incoming payload"
+        );
+    }
+    expect_valid_module(&artifact, 0);
+}
+
+#[test]
+fn compact_allocator_selects_inline_only_for_one_or_two_keys_without_backing_arrays() {
+    let artifact = emit_script("({left:1,right:2});").unwrap();
+    let runtime = artifact.runtime().unwrap();
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let schema = registered.globals().schema();
+    let allocate = function_names_in_bytes(runtime.bytes())
+        .iter()
+        .find_map(|(index, name)| (name == "helper::compact_literal_allocate").then_some(*index))
+        .unwrap();
+    let body = named_body(runtime.bytes(), allocate);
+    let (start, length_local, lower, width) = body.windows(6).enumerate().find_map(|(start, ops)| match ops {
+        [Operator::LocalGet { local_index }, Operator::I32Const { value: lower }, Operator::I32Sub,
+         Operator::I32Const { value: width }, Operator::I32LtU, Operator::If { .. }] => Some((start, *local_index, *lower as u32, *width as u32)),
+        _ => None,
+    }).expect("actual allocator has an unsigned contiguous inline range predicate");
+    let length_assignment = body[..start]
+        .iter()
+        .rposition(
+            |op| matches!(op, Operator::LocalSet { local_index } if *local_index == length_local),
+        )
+        .unwrap();
+    assert!(
+        matches!(body[length_assignment - 1], Operator::ArrayLen),
+        "selector uses the actual shape's key extent"
+    );
+    for length in (0u32..=16).chain([u32::MAX]) {
+        assert_eq!(
+            length.wrapping_sub(lower) < width,
+            length == 1 || length == 2,
+            "emitted predicate for length {length}"
+        );
+    }
+    // Follow structured control rather than comparing instruction offsets or
+    // physical local numbers. Inspect both actual allocation branches.
+    let mut depth = 0;
+    let mut otherwise = None;
+    let mut end = None;
+    for (position, op) in body.iter().enumerate().skip(start + 6) {
+        match op {
+            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => depth += 1,
+            Operator::Else if depth == 0 => otherwise = Some(position),
+            Operator::End if depth == 0 => {
+                end = Some(position);
+                break;
+            }
+            Operator::End => depth -= 1,
+            _ => {}
+        }
+    }
+    let otherwise = otherwise.unwrap();
+    let inline = &body[start + 6..otherwise];
+    let array = &body[otherwise + 1..end.unwrap()];
+    let allocations = |ops: &[Operator<'_>]| {
+        ops.iter()
+            .filter_map(|op| match op {
+                Operator::StructNew { struct_type_index } => Some(*struct_type_index),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        allocations(inline),
+        [type_index::<InlineCompactDataStorage>(schema)]
+    );
+    assert_eq!(
+        allocations(array),
+        [type_index::<ArrayCompactDataStorage>(schema)]
+    );
+    assert!(
+        !inline.iter().any(|op| matches!(
+            op,
+            Operator::ArrayNew { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::ArrayNewFixed { .. }
+        )),
+        "inline objects allocate no tag, scalar or reference arrays"
+    );
+    assert_eq!(
+        array
+            .iter()
+            .filter(|op| matches!(op, Operator::ArrayNew { .. }))
+            .count(),
+        1,
+        "other extents retain one tag backing and lazy scalar/reference backings"
+    );
+    assert!(!body.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<CompactDataStorage>(schema))), "no path can allocate the common base");
     expect_valid_module(&artifact, 0);
 }

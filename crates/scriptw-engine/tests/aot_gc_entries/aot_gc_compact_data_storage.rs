@@ -6,7 +6,7 @@ use scriptw_engine::{
 fn assert_compact(source: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("one compiler worker");
     let source =
-        format!("function assert(value,message){{if(!value)throw new Error(message);}}\n{source}");
+        format!("function assert(value,message){{if(!value){{print(message);throw new Error(message);}}}}\n{source}");
     let observed = Engine::new(RealmBuilder::new().build())
         .observe_script(
             &source,
@@ -24,8 +24,9 @@ fn assert_compact(source: &str) {
     assert_eq!(observed.backend_used, ExecutionBackend::WasmAot);
     assert!(
         matches!(observed.completion, ObservedCompletion::Normal(_)),
-        "{:?}\n{source}",
-        observed.completion
+        "{:?}\noutput: {:?}\n{source}",
+        observed.completion,
+        observed.output_events
     );
 }
 
@@ -320,4 +321,170 @@ fn rooted_snapshot_projects_missing_and_materialized_compact_scalar_backings() {
             }
         ));
     }
+}
+
+#[test]
+fn inline_one_and_two_slot_values_preserve_sibling_tags_and_gc_roots() {
+    assert_compact(
+        r#"
+var token={},symbol=Symbol('inline'),call=function(){return token;};
+var values=[undefined,null,false,true,0,-0,NaN,1.5,11n,'text',symbol,token,[token],call];
+function one(value){return {left:value};}
+function pair(left,right){return {left:left,right:right};}
+function left(record){return record.left;}
+function right(record){return record.right;}
+for(var i=0;i<values.length;i++){
+  var a=values[i],b=values[(i+1)%values.length],c=values[(i+2)%values.length];
+  var single=one(a),first=pair(a,b),second=pair(b,a),saved=Object.getOwnPropertyDescriptor(first,'left');
+  gc();
+  assert(Object.is(left(single),a) && Object.is(left(first),a) && Object.is(right(first),b),'initial inline slots '+i);
+  first.left=c;single.left=c;gc();
+  assert(Object.is(left(first),c) && Object.is(right(first),b) && Object.is(left(single),c),'slot zero preserves slot one '+i);
+  first.right=a;gc();
+  assert(Object.is(left(first),c) && Object.is(right(first),a),'slot one preserves slot zero '+i);
+  assert(Object.is(left(second),b) && Object.is(right(second),a) && Object.is(saved.value,a),'shared shape has independent values and descriptor snapshot '+i);
+  first.left=undefined;first.right=null;single.left=null;gc();
+  assert(Object.hasOwn(first,'left') && left(first)===undefined && right(first)===null && left(single)===null,'reference and scalar overwrites '+i);
+  assert(Object.keys(first).join(',')==='left,right' && Object.keys(single).join(',')==='left' && !Object.hasOwn(single,'right'),'shape extent excludes hidden second slot '+i);
+  var descriptor=Object.getOwnPropertyDescriptor(first,'right');
+  assert(descriptor.value===null && descriptor.writable && descriptor.enumerable && descriptor.configurable,'default inline data attributes '+i);
+}
+var cyclic=pair(null,symbol);cyclic.left=cyclic;gc();
+assert(left(cyclic)===cyclic && right(cyclic)===symbol,'inline self cycle and Symbol sibling');
+cyclic.left=-0;cyclic.right=NaN;gc();
+assert(Object.is(left(cyclic),-0) && Number.isNaN(right(cyclic)),'full number bits after retiring object and Symbol payloads');
+"#,
+    );
+}
+
+#[test]
+fn inline_storage_promotions_and_foreign_function_metadata_keep_identity_and_flags() {
+    assert_compact(
+        r#"
+var token={},symbol=Symbol('inline');
+function pair(left,right){return {left:left,right:right};}
+function left(record){return record.left;}
+var added=pair(token,symbol);left(added);added.extra=17n;gc();
+assert(left(added)===token && added.right===symbol && added.extra===17n && Object.keys(added).join(',')==='left,right,extra','Add promotes both inline slots');
+var removed=pair(token,symbol);left(removed);delete removed.left;removed.left=-0;gc();
+assert(Object.is(left(removed),-0) && removed.right===symbol && Object.keys(removed).join(',')==='right,left','Delete and reinsert retire cached inline slot');
+var accessor=pair(token,symbol),calls=0;left(accessor);
+Object.defineProperty(accessor,'left',{get:function(){calls++;gc();return this.right;},configurable:true});
+assert(left(accessor)===symbol && calls===1 && accessor.right===symbol,'DefineAccessor preserves receiver and sibling root');
+var frozen=pair(token,symbol);left(frozen);Object.freeze(frozen);gc();
+assert(Object.isFrozen(frozen) && left(frozen)===token && frozen.right===symbol && !Reflect.set(frozen,'right',0),'Freeze preserves inline roots and flags');
+var single={left:token},proto={get right(){gc();return this.left;}};
+Object.setPrototypeOf(single,proto);gc();
+assert(single.right===token && !Object.hasOwn(single,'right') && Object.getPrototypeOf(single)===proto,'one-slot miss respects prototype receiver');
+var first=__scriptwCreateRealm().global,second=__scriptwCreateRealm().global;
+var foreign=first.Array.prototype.values,other=second.Array.prototype.values,home=Array.prototype.values;
+gc();
+assert(foreign!==other && foreign!==home && Object.getPrototypeOf(foreign)===first.Function.prototype,'foreign callable metadata keeps defining Realm');
+assert(foreign.name==='values' && foreign.length===0 && other.name==='values' && other.length===0,'independent two-slot native metadata');
+var name=Object.getOwnPropertyDescriptor(foreign,'name'),length=Object.getOwnPropertyDescriptor(foreign,'length');
+assert(!name.writable && !name.enumerable && name.configurable && !length.writable && !length.enumerable && length.configurable,'foreign metadata flags');
+Object.defineProperty(foreign,'name',{value:token});Object.defineProperty(foreign,'length',{value:11n});gc();
+assert(foreign.name===token && foreign.length===11n && other.name==='values' && other.length===0 && home.name==='values','metadata updates keep sibling values and Realm independence');
+assert(foreign.call([23]).next().value===23 && Object.getPrototypeOf(foreign)===first.Function.prototype,'metadata transition preserves callable behavior');
+"#,
+    );
+}
+
+#[test]
+fn rooted_snapshot_projects_inline_slots_without_losing_bits_or_reference_identity() {
+    use scriptw_runtime::rooted_snapshot::{SnapshotDescriptor, SnapshotKey, SnapshotValue};
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let observed = Engine::new(RealmBuilder::new().build())
+        .observe_script_graph(
+            r#"
+var token={},symbol=Symbol('inline');
+var result={negative:{left:-0,right:token},nan:{left:token,right:NaN},references:{left:11n,right:symbol},single:{left:NaN},cleared:{left:token,right:symbol}};
+result.cleared.left=undefined;result.cleared.right=null;gc();result;
+"#,
+            CompileOptions {
+                host_surface_policy: HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                timeout_ms: Some(30_000),
+                ..RunOptions::default()
+            },
+            scriptw_engine::SnapshotLimits::default(),
+        )
+        .unwrap();
+    let scriptw_engine::SnapshotOutcome::Captured { graph } = observed.completion.outcome else {
+        panic!(
+            "complete inline-storage snapshot: {:?}",
+            observed.completion.outcome
+        );
+    };
+    let data = |node: &scriptw_runtime::rooted_snapshot::SnapshotNode, name: &str| {
+        let expected = name.encode_utf16().collect::<Vec<_>>();
+        let property = node.properties.iter().find(|property| {
+            matches!(&property.key, SnapshotKey::String { units } if units.units() == expected)
+        }).expect("present compact own property");
+        let SnapshotDescriptor::Data {
+            value,
+            writable,
+            enumerable,
+            configurable,
+        } = &property.descriptor
+        else {
+            panic!("compact slot remains a data descriptor");
+        };
+        assert!(*writable && *enumerable && *configurable);
+        value.clone()
+    };
+    assert_eq!(graph.root(), &SnapshotValue::Object { id: 0 });
+    let root = &graph.nodes()[0];
+    assert_eq!(root.properties.len(), 5);
+    let child = |name| {
+        let SnapshotValue::Object { id } = data(root, name) else {
+            panic!("nested compact record");
+        };
+        &graph.nodes()[id as usize]
+    };
+    let negative = child("negative");
+    let nan = child("nan");
+    let references = child("references");
+    let single = child("single");
+    let cleared = child("cleared");
+    for node in [negative, nan, references, cleared] {
+        assert_eq!(node.properties.len(), 2);
+    }
+    assert_eq!(
+        single.properties.len(),
+        1,
+        "one-slot extent has no hidden second property"
+    );
+    assert_eq!(
+        data(negative, "left"),
+        SnapshotValue::Number {
+            bits: (-0f64).to_bits()
+        }
+    );
+    assert!(
+        matches!(data(nan, "right"), SnapshotValue::Number { bits } if f64::from_bits(bits).is_nan())
+    );
+    assert!(
+        matches!(data(single, "left"), SnapshotValue::Number { bits } if f64::from_bits(bits).is_nan())
+    );
+    let token = data(negative, "right");
+    assert!(matches!(&token, SnapshotValue::Object { .. }));
+    assert_eq!(
+        data(nan, "left"),
+        token,
+        "both physical reference fields retain the same object"
+    );
+    assert!(
+        matches!(data(references, "left"), SnapshotValue::BigInt { decimal } if decimal.decimal() == "11")
+    );
+    assert!(matches!(
+        data(references, "right"),
+        SnapshotValue::Symbol { .. }
+    ));
+    assert_eq!(data(cleared, "left"), SnapshotValue::Undefined {});
+    assert_eq!(data(cleared, "right"), SnapshotValue::Null {});
+    assert_eq!(graph.symbols().len(), 1);
 }

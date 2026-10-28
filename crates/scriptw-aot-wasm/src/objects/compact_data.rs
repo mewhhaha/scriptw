@@ -1,5 +1,5 @@
 //! Bounded fresh data literals share immutable string-only shapes. Mutable
-//! values remain strongly rooted in tag/scalar/reference arrays. Structural
+//! values remain strongly rooted in inline slots or tag/scalar/reference arrays. Structural
 //! mutation replaces the complete storage once; no PropertyEntry is fabricated.
 use super::property_storage::PreparedOrdinaryPropertyKey;
 use super::*;
@@ -313,23 +313,136 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let schema = self.runtime_schema();
+        storage.is_subtype::<InlineCompactDataStorage>(schema, f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let inline = schema.reserve_gc_local(f).initialize(
+            storage
+                .load(schema, f)
+                .cast_subtype::<InlineCompactDataStorage>(schema, f),
+            f,
+        );
+        self.emit_inline_compact_value_at(&inline, slot, value, f);
+        inline.clear(f);
+        f.instruction(&Instruction::Else);
+        let array = schema.reserve_gc_local(f).initialize(
+            storage
+                .load(schema, f)
+                .cast_subtype::<ArrayCompactDataStorage>(schema, f),
+            f,
+        );
+        self.emit_array_compact_value_at(&array, slot, value, f);
+        array.clear(f);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Inline storage cannot silently alias slot one for an invalid index.
+    /// The immutable shape is also the logical extent for a one-slot record.
+    fn emit_check_inline_compact_slot(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let shape = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(InlineCompactDataStorageSchema::SHAPE)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        let keys = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(CompactDataShapeSchema::KEYS)
+                .read(&shape, schema, f)
+                .reference(),
+            f,
+        );
+        slot.load(f);
+        schema
+            .array_type::<CompactShapeKeys>()
+            .length(&keys, schema, f);
+        f.instruction(&Instruction::I32GeU);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::I32Or);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        keys.clear(f);
+        shape.clear(f);
+    }
+
+    fn emit_inline_compact_value_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.emit_check_inline_compact_slot(storage, slot, f);
+        let schema = self.runtime_schema();
+        schema
+            .field(InlineCompactDataStorageSchema::PACKED_TAGS)
+            .read(storage, schema, f)
+            .store(value.tag(), f);
+        value.tag().load(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(8));
+        f.instruction(&Instruction::I32Mul);
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Const(255));
+        f.instruction(&Instruction::I32And);
+        value.tag().store(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        schema
+            .field(InlineCompactDataStorageSchema::SCALAR0)
+            .read(storage, schema, f)
+            .store_i64(value.scalar(), f);
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE0)
+            .read(storage, schema, f)
+            .store_eq(value.reference(), f);
+        f.instruction(&Instruction::Else);
+        schema
+            .field(InlineCompactDataStorageSchema::SCALAR1)
+            .read(storage, schema, f)
+            .store_i64(value.scalar(), f);
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE1)
+            .read(storage, schema, f)
+            .store_eq(value.reference(), f);
+        f.instruction(&Instruction::End);
+    }
+
+    fn emit_array_compact_value_at(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         let tags = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::TAGS)
+                .field(ArrayCompactDataStorageSchema::TAGS)
                 .read(storage, schema, f)
                 .reference(),
             f,
         );
         let scalars = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::SCALARS)
+                .field(ArrayCompactDataStorageSchema::SCALARS)
                 .read(storage, schema, f)
                 .reference(),
             f,
         );
         let references = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::REFERENCES)
+                .field(ArrayCompactDataStorageSchema::REFERENCES)
                 .read(storage, schema, f)
                 .reference(),
             f,
@@ -369,6 +482,8 @@ impl FunctionBuilder<'_> {
         tags.clear(f);
     }
 
+    /// Repeated literal/native metadata stores marshal only the original value
+    /// tuple. The complete storage dispatch and lazy array writes live once in R.
     pub(super) fn emit_compact_store_at(
         &self,
         storage: &GcLocal<CompactDataStorage>,
@@ -377,23 +492,145 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let schema = self.runtime_schema();
+        schema.call_helper(
+            crate::runtime_helpers::CompactDataStoreArguments::new(storage, slot, value),
+            self.runtime_helper_base()
+                .expect("compact storage requires its registered store helper"),
+            f,
+        );
+    }
+
+    pub(crate) fn compile_compact_data_store_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CompactDataStore);
+        let p =
+            self.helper_parameters::<crate::runtime_helpers::CompactDataStoreParameters>(&mut f);
+        let schema = self.runtime_schema();
+        p.storage
+            .is_subtype::<InlineCompactDataStorage>(schema, &mut f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let inline = schema.reserve_gc_local(&mut f).initialize(
+            p.storage
+                .load(schema, &mut f)
+                .cast_subtype::<InlineCompactDataStorage>(schema, &mut f),
+            &mut f,
+        );
+        self.emit_inline_compact_store_at(&inline, p.slot, &p.value, &mut f);
+        inline.clear(&mut f);
+        f.instruction(&Instruction::Else);
+        let array = schema.reserve_gc_local(&mut f).initialize(
+            p.storage
+                .load(schema, &mut f)
+                .cast_subtype::<ArrayCompactDataStorage>(schema, &mut f),
+            &mut f,
+        );
+        self.emit_array_compact_store_at(&array, p.slot, &p.value, &mut f);
+        array.clear(&mut f);
+        f.instruction(&Instruction::End);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
+
+    fn emit_inline_compact_store_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.emit_check_inline_compact_slot(storage, slot, f);
+        let schema = self.runtime_schema();
+        let shift = schema.reserve_i32_local(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(8));
+        f.instruction(&Instruction::I32Mul);
+        shift.store(f);
+        let tags = schema.reserve_i32_local(f);
+        schema
+            .field(InlineCompactDataStorageSchema::PACKED_TAGS)
+            .read(storage, schema, f)
+            .store(tags, f);
+        tags.load(f);
+        f.instruction(&Instruction::I32Const(255));
+        shift.load(f);
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32Const(-1));
+        f.instruction(&Instruction::I32Xor);
+        f.instruction(&Instruction::I32And);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(255));
+        f.instruction(&Instruction::I32And);
+        shift.load(f);
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32Or);
+        tags.store(f);
+        schema
+            .field(InlineCompactDataStorageSchema::PACKED_TAGS)
+            .write(storage, GcOperand::i32_local(tags), schema, f);
+        // Every assignment replaces the complete tuple. Null writes must
+        // retire a previous strong edge even when the new tag is a scalar.
+        slot.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        schema.field(InlineCompactDataStorageSchema::SCALAR0).write(
+            storage,
+            GcOperand::i64_local(value.scalar()),
+            schema,
+            f,
+        );
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE0)
+            .write(
+                storage,
+                GcOperand::eq_reference(value.reference()),
+                schema,
+                f,
+            );
+        f.instruction(&Instruction::Else);
+        schema.field(InlineCompactDataStorageSchema::SCALAR1).write(
+            storage,
+            GcOperand::i64_local(value.scalar()),
+            schema,
+            f,
+        );
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE1)
+            .write(
+                storage,
+                GcOperand::eq_reference(value.reference()),
+                schema,
+                f,
+            );
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(tags, f);
+        schema.release_i32_local(shift, f);
+    }
+
+    fn emit_array_compact_store_at(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         let tags = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::TAGS)
+                .field(ArrayCompactDataStorageSchema::TAGS)
                 .read(storage, schema, f)
                 .reference(),
             f,
         );
         let scalars = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::SCALARS)
+                .field(ArrayCompactDataStorageSchema::SCALARS)
                 .read(storage, schema, f)
                 .reference(),
             f,
         );
         let references = schema.reserve_gc_local(f).initialize(
             schema
-                .field(CompactDataStorageSchema::REFERENCES)
+                .field(ArrayCompactDataStorageSchema::REFERENCES)
                 .read(storage, schema, f)
                 .reference(),
             f,
@@ -425,7 +662,7 @@ impl FunctionBuilder<'_> {
                 .filled(GcOperand::i64(0), length, f),
             f,
         );
-        schema.field(CompactDataStorageSchema::SCALARS).write(
+        schema.field(ArrayCompactDataStorageSchema::SCALARS).write(
             storage,
             GcOperand::nullable_reference(&allocated, schema),
             schema,
@@ -473,12 +710,14 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        schema.field(CompactDataStorageSchema::REFERENCES).write(
-            storage,
-            GcOperand::nullable_reference(&allocated, schema),
-            schema,
-            f,
-        );
+        schema
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .write(
+                storage,
+                GcOperand::nullable_reference(&allocated, schema),
+                schema,
+                f,
+            );
         references.replace(allocated.load(schema, f).nullable(), f);
         allocated.clear(f);
         undefined.clear(f);

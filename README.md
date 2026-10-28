@@ -86,6 +86,11 @@ omits proven-empty native metadata publication and routes fifteen Intl getters
 through the checked shared accessor allocator. Verification and matched
 measurements are pending.
 
+The following [compact-storage experiment](docs/rust-rewrite/contracts/inline-compact-storage.md)
+stores one- and two-key records in one GC allocation and shares their store kernel.
+Its layout calculation removes 384 KiB and 16,384 allocations from the retained
+record workload. Native correctness and process RSS effects remain unverified.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

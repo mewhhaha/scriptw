@@ -1112,6 +1112,7 @@ runtime_helper_domain! {
     OrdinaryPropertyStorageEnsure / OrdinaryPropertyStorageEnsureArguments / OrdinaryPropertyStorageEnsureParameters / "ordinary_property_storage_ensure" { object:(Ref OrdinaryObject NonNullable) } => (Ref OrdinaryPropertyStorage NonNullable);
     OrdinaryOwnDescriptor / OrdinaryOwnDescriptorArguments / OrdinaryOwnDescriptorParameters / "ordinary_own_descriptor" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyDescriptor Nullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
+    CompactDataStore / CompactDataStoreArguments / CompactDataStoreParameters / "compact_data_store" { storage:(Ref CompactDataStorage NonNullable),slot:I32,value:Value } => Void;
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
@@ -1275,6 +1276,7 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => HelperOwner::Runtime,
             Self::OrdinaryOwnDescriptor => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
+            Self::CompactDataStore => HelperOwner::Runtime,
             Self::IntrinsicDataPublish => HelperOwner::Runtime,
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
@@ -1425,6 +1427,7 @@ impl RuntimeHelperId {
             Self::OrdinaryPropertyStorageEnsure => true,
             Self::OrdinaryOwnDescriptor => true,
             Self::CompactLiteralAllocate => true,
+            Self::CompactDataStore => true,
             Self::IntrinsicDataPublish => true,
             Self::IntrinsicAccessorPublish => true,
             Self::PropertyValueResolve => true,

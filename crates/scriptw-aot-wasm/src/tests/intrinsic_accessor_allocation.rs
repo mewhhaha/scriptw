@@ -214,7 +214,7 @@ fn every_intl_getter_uses_the_checked_shared_accessor_allocation_tail() {
     use std::collections::BTreeSet;
 
     let mut getters = Vec::new();
-    for &constructor in StandardBuiltinId::ALL {
+    for &constructor in StandardBuiltinId::all_functions() {
         if let Some(properties) = intl_constructor_properties(constructor) {
             for property in properties.constructor.iter().chain(properties.prototype) {
                 match property.kind {
