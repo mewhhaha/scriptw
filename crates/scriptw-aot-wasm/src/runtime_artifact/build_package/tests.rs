@@ -398,6 +398,11 @@ fn abi10_package_is_replaced_before_shared_naming_and_regexp_helpers_are_admitte
     assert_previous_build_package_replaced(10);
 }
 
+#[test]
+fn abi29_package_is_replaced_before_lazy_calendar_rows_are_admitted() {
+    assert_previous_build_package_replaced(29);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

@@ -20,7 +20,7 @@ use super::{
     CurrentRuntimeLayoutVersion, RuntimeArtifact, RuntimeLayout, RuntimeSourceCompilationProfile,
     LAYOUT_VERSION, RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
 };
-use crate::data::PoolBoundary;
+use crate::data::{PoolBoundary, RUNTIME_DATA_SEGMENT_COUNT, RUNTIME_STATIC_SEGMENT_ORDER};
 use crate::heap::STATIC_DATA_OFFSET;
 use crate::module::HOST_IMPORT_MODULE;
 use crate::EmitError;
@@ -406,9 +406,8 @@ fn decode_layout(
     let mut exports = BTreeMap::new();
     let mut sections = identity.sections.clone();
     let mut data_count = 0;
-    let mut deferred_len = 0usize;
-    let mut property_len = 0usize;
-    let mut next_active_address = STATIC_DATA_OFFSET;
+    let mut data_layout: [(Option<u32>, usize); RUNTIME_DATA_SEGMENT_COUNT] =
+        [(None, 0); RUNTIME_DATA_SEGMENT_COUNT];
     let mut source_admission = SourceCompilationProfileAdmission::default();
     for payload in parser.parse_all(bytes) {
         let payload = payload.ok()?;
@@ -469,39 +468,28 @@ fn decode_layout(
             Payload::DataSection(reader) => {
                 for data in reader {
                     let data = data.ok()?;
-                    match (data_count, data.kind) {
-                        (0, DataKind::Passive) if data.data.len() == pool.code_unit_len() => {}
-                        (1, DataKind::Passive) => deferred_len = data.data.len(),
-                        (2, DataKind::Passive) => property_len = data.data.len(),
+                    let address = match (data_count, data.kind) {
+                        (0, DataKind::Passive) if data.data.len() == pool.code_unit_len() => None,
+                        (1..=3, DataKind::Passive) => None,
                         (
-                            position @ (3..=5),
+                            4..=7,
                             DataKind::Active {
                                 memory_index: 0,
                                 offset_expr,
                             },
                         ) => {
                             let mut ops = offset_expr.get_operators_reader();
-                            if !matches!(ops.read().ok()?, Operator::I32Const { value } if value == next_active_address as i32)
-                                || !matches!(ops.read().ok()?, Operator::End)
-                                || !ops.eof()
-                            {
+                            let Operator::I32Const { value } = ops.read().ok()? else {
+                                return None;
+                            };
+                            if !matches!(ops.read().ok()?, Operator::End) || !ops.eof() {
                                 return None;
                             }
-                            // Physical passive order is normalization, properties;
-                            // the virtual image places properties before normalization.
-                            let gap = if position == 3 {
-                                property_len
-                            } else if position == 4 {
-                                deferred_len
-                            } else {
-                                0
-                            };
-                            next_active_address = next_active_address.checked_add(
-                                u32::try_from(data.data.len().checked_add(gap)?).ok()?,
-                            )?;
+                            Some(value as u32)
                         }
                         _ => return None,
-                    }
+                    };
+                    *data_layout.get_mut(data_count)? = (address, data.data.len());
                     data_count += 1;
                 }
             }
@@ -523,10 +511,19 @@ fn decode_layout(
     if source_admission.finish().ok()? != identity.source_compilation_profile {
         return None;
     }
+    // Physical passive order differs from the virtual image. Reconstruct the
+    // complete sealed image, checking every active fragment around its holes.
+    let mut next_address = STATIC_DATA_OFFSET;
+    for index in RUNTIME_STATIC_SEGMENT_ORDER {
+        let (address, bytes) = *data_layout.get(index)?;
+        if address.is_some_and(|address| address != next_address) {
+            return None;
+        }
+        next_address = next_address.checked_add(u32::try_from(bytes).ok()?)?;
+    }
     if !validated_end
-        || data_count != 6
-        || next_active_address
-            != STATIC_DATA_OFFSET.checked_add(u32::try_from(pool.static_len()).ok()?)?
+        || data_count != RUNTIME_DATA_SEGMENT_COUNT
+        || next_address != STATIC_DATA_OFFSET.checked_add(u32::try_from(pool.static_len()).ok()?)?
         || !sections.is_empty()
         || function_types.is_empty()
         || globals.is_empty()

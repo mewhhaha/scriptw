@@ -5,7 +5,7 @@
 //! caller bytes and caches always take the complete raw admission path.
 use super::super::RuntimeLayout;
 use super::*;
-use crate::data::PoolBoundary;
+use crate::data::{PoolBoundary, RUNTIME_DATA_SEGMENT_COUNT, RUNTIME_STATIC_SEGMENT_ORDER};
 use scriptw_intl::IntlDataComponent;
 use std::ops::Range;
 
@@ -51,7 +51,7 @@ pub(in crate::runtime_artifact) struct BuildMetadata {
     profile: RuntimeSourceCompilationProfile,
     layout: RuntimeLayout,
     largest_body: usize,
-    data: [SpanDigest; 6],
+    data: [SpanDigest; RUNTIME_DATA_SEGMENT_COUNT],
     frames: Vec<(IntlDataComponent, SpanDigest)>,
 }
 
@@ -61,7 +61,7 @@ pub(in crate::runtime_artifact) struct BuildAdmission {
     package: &'static [u8],
     package_digest: [u8; 32],
     pub(in crate::runtime_artifact) largest_body: usize,
-    data: [SpanDigest; 6],
+    data: [SpanDigest; RUNTIME_DATA_SEGMENT_COUNT],
 }
 
 impl BuildAdmission {
@@ -71,10 +71,10 @@ impl BuildAdmission {
 
     pub(in crate::runtime_artifact) fn matches_pool(&self, utf16: &[u8], data: &[u8]) -> bool {
         let mut cursor = 0usize;
-        let mut parts = [&[][..]; 6];
+        let mut parts = [&[][..]; RUNTIME_DATA_SEGMENT_COUNT];
         parts[0] = utf16;
         // Virtual image order differs from physical segment order.
-        for index in [3, 2, 4, 1, 5] {
+        for index in RUNTIME_STATIC_SEGMENT_ORDER {
             let Some(end) = cursor.checked_add(self.data[index].span.len()) else {
                 return false;
             };

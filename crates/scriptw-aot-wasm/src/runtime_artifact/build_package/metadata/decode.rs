@@ -128,7 +128,9 @@ impl BuildMetadata {
         if largest_body == 0 || largest_body > wasm.len() {
             return None;
         }
-        let data = [
+        let data: [SpanDigest; RUNTIME_DATA_SEGMENT_COUNT] = [
+            r.span(&wasm)?,
+            r.span(&wasm)?,
             r.span(&wasm)?,
             r.span(&wasm)?,
             r.span(&wasm)?,

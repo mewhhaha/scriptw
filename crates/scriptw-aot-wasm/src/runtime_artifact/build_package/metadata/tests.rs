@@ -112,7 +112,7 @@ fn receipt_largest_body() -> usize {
 fn receipt_metadata_binds_canonical_pool_contents_not_only_dimensions() {
     let receipt = decode(&fixture().metadata).unwrap();
     let utf16 = &receipt.package[receipt.data[0].span.clone()];
-    let data = [3, 2, 4, 1, 5]
+    let data = RUNTIME_STATIC_SEGMENT_ORDER
         .into_iter()
         .flat_map(|index| {
             receipt.package[receipt.data[index].span.clone()]
@@ -121,6 +121,12 @@ fn receipt_metadata_binds_canonical_pool_contents_not_only_dimensions() {
         })
         .collect::<Vec<_>>();
     let data = data.as_slice();
+    let calendar_offset = RUNTIME_STATIC_SEGMENT_ORDER
+        .into_iter()
+        .take_while(|index| *index != 3)
+        .map(|index| receipt.data[index].span.len())
+        .sum::<usize>();
+    assert!(!receipt.data[3].span.is_empty());
     let selection = IntlDataSelection::new(IntlCompilationProfile::Minimal);
     let identity = receipt.identity(&selection).unwrap().unwrap();
     let runtime = receipt.into_runtime(&identity).unwrap();
@@ -132,6 +138,12 @@ fn receipt_metadata_binds_canonical_pool_contents_not_only_dimensions() {
     wrong[0] ^= 1;
     assert_eq!(
         runtime.admitted_compiler_pool_matches(utf16, &wrong),
+        Some(false)
+    );
+    let mut wrong_calendar = data.to_vec();
+    wrong_calendar[calendar_offset] ^= 1;
+    assert_eq!(
+        runtime.admitted_compiler_pool_matches(utf16, &wrong_calendar),
         Some(false)
     );
     assert_eq!(
@@ -150,6 +162,9 @@ fn receipt_metadata_rejects_truncation_tampering_source_profile_and_overlapping_
     wrong[12] ^= 1;
     assert!(rejects(&wrong));
     assert!(rejects(&resign(wrong)));
+    let mut previous_layout = f.metadata.clone();
+    previous_layout[8..12].copy_from_slice(&29u32.to_le_bytes());
+    assert!(rejects(&resign(previous_layout)));
     assert!(BuildMetadata::parser_rejects(
         &f.metadata,
         producer().package_bytes(),
@@ -173,6 +188,37 @@ fn receipt_metadata_rejects_truncation_tampering_source_profile_and_overlapping_
     let first = wrong[first_frame_start..first_frame_start + 8].to_vec();
     wrong[last_frame_start..last_frame_start + 8].copy_from_slice(&first);
     assert!(rejects(&resign(wrong)));
+}
+
+#[test]
+fn receipt_metadata_rejects_missing_overlapping_and_unbounded_calendar_spans() {
+    let metadata = &fixture().metadata;
+    let span_bytes = 8 + 8 + 32;
+    let frame_bytes = IntlDataComponent::ALL.len() * (2 + span_bytes);
+    let data_start = metadata.len() - 32 - frame_bytes - RUNTIME_DATA_SEGMENT_COUNT * span_bytes;
+    let calendar = data_start + 3 * span_bytes;
+
+    let mut missing = metadata.to_vec();
+    missing.drain(calendar..calendar + span_bytes);
+    assert!(rejects(&resign(missing)));
+
+    let mut outside = metadata.to_vec();
+    outside[calendar..calendar + 8].copy_from_slice(&u64::MAX.to_le_bytes());
+    assert!(rejects(&resign(outside)));
+
+    let mut overlap = metadata.to_vec();
+    let normalization = overlap[data_start + span_bytes..data_start + span_bytes + 16].to_vec();
+    overlap[calendar..calendar + 16].copy_from_slice(&normalization);
+    assert!(rejects(&resign(overlap)));
+
+    let mut wrong_extent = metadata.to_vec();
+    let bytes = u64::from_le_bytes(
+        wrong_extent[calendar + 8..calendar + 16]
+            .try_into()
+            .unwrap(),
+    );
+    wrong_extent[calendar + 8..calendar + 16].copy_from_slice(&(bytes - 1).to_le_bytes());
+    assert!(rejects(&resign(wrong_extent)));
 }
 
 #[test]

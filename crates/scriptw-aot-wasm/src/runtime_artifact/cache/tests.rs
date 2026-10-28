@@ -122,6 +122,11 @@ enum Defect {
     DataOffset,
     MiddleDataOffset,
     SuffixDataOffset,
+    PostCalendarDataOffset,
+    ActiveCalendarImage,
+    CalendarImageLength,
+    MissingCalendarImage,
+    ExtraDataSegment,
     IntlIdentity,
 }
 
@@ -219,6 +224,15 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
     data.passive([0, 0, 65, 0]);
     data.passive([11, 12]); // normalization image
     data.passive([21, 22, 23]); // Unicode property image
+    if !matches!(defect, Defect::MissingCalendarImage) {
+        if matches!(defect, Defect::ActiveCalendarImage) {
+            data.active(0, &ConstExpr::i32_const(0), [31, 32, 33, 34]);
+        } else if matches!(defect, Defect::CalendarImageLength) {
+            data.passive([31, 32, 33]);
+        } else {
+            data.passive([31, 32, 33, 34]); // Chinese/Dangi retained rows
+        }
+    }
     data.active(
         0,
         &ConstExpr::i32_const(
@@ -240,6 +254,18 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         ),
         [67],
     );
+    data.active(
+        0,
+        &ConstExpr::i32_const(
+            STATIC_DATA_OFFSET as i32
+                + 13
+                + i32::from(matches!(defect, Defect::PostCalendarDataOffset)),
+        ),
+        [68],
+    );
+    if matches!(defect, Defect::ExtraDataSegment) {
+        data.passive([]);
+    }
     module.section(&data);
     module.section(&CustomSection {
         name: INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION.into(),
@@ -260,9 +286,38 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
             1,
             vec![0],
             vec![global_type],
-            PoolBoundary::from_runtime_cache(9, 4, 2).unwrap(),
+            PoolBoundary::from_runtime_cache(14, 4, 2).unwrap(),
         ),
     ))
+}
+
+#[test]
+fn runtime_cache_reconstructs_calendar_rows_between_exact_active_fragments() {
+    let runtime = fixture(Defect::None);
+    let data = Parser::new(0)
+        .parse_all(runtime.bytes())
+        .find_map(|payload| match payload.unwrap() {
+            Payload::DataSection(reader) => Some(
+                reader
+                    .map(|row| row.unwrap().data.to_vec())
+                    .collect::<Vec<_>>(),
+            ),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(data.len(), 8);
+    let image = RUNTIME_STATIC_SEGMENT_ORDER
+        .into_iter()
+        .flat_map(|index| data[index].iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        image,
+        [0, 65, 21, 22, 23, 66, 11, 12, 67, 31, 32, 33, 34, 68]
+    );
+    let identity = identity();
+    let key = identity.cache_key(&[17; 32]);
+    let admitted = decode(&encode(&runtime, key), key, &identity).unwrap();
+    assert_eq!(admitted.layout.pool.static_len(), image.len());
 }
 
 #[test]
@@ -412,6 +467,11 @@ fn runtime_cache_rejects_validly_checksummed_wrong_abi_or_unvalidated_wasm() {
         Defect::DataOffset,
         Defect::MiddleDataOffset,
         Defect::SuffixDataOffset,
+        Defect::PostCalendarDataOffset,
+        Defect::ActiveCalendarImage,
+        Defect::CalendarImageLength,
+        Defect::MissingCalendarImage,
+        Defect::ExtraDataSegment,
         Defect::IntlIdentity,
     ] {
         assert!(decode(&encode(&fixture(defect), key), key, &identity).is_none());
@@ -533,6 +593,11 @@ fn abi9_artifact_is_replaced_before_program_payload_layout_is_admitted() {
 #[test]
 fn abi10_runtime_is_replaced_before_shared_naming_and_regexp_helpers_are_admitted() {
     assert_previous_runtime_cache_entry_replaced(10);
+}
+
+#[test]
+fn abi29_runtime_cache_is_replaced_before_lazy_calendar_rows_are_admitted() {
+    assert_previous_runtime_cache_entry_replaced(29);
 }
 
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
