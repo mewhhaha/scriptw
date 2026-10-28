@@ -146,6 +146,18 @@ fn assert_numeric_probe_before_conversion(body: &[Operator<'_>], conversion: u32
         .expect("the admitted numeric key becomes an integer before conversion");
     let guard = &prefix[..cast];
     assert!(
+        guard.windows(4).any(|ops| matches!(
+            ops,
+            [
+                Operator::I32Eq,
+                Operator::If { .. },
+                Operator::LocalGet { .. },
+                Operator::RefTestNonNull { .. }
+            ]
+        )),
+        "nonnumeric keys skip the GC subtype test, not just the numeric backing load"
+    );
+    assert!(
         guard
             .iter()
             .any(|op| matches!(op, Operator::RefTestNonNull { .. }))

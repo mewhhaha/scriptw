@@ -18,12 +18,14 @@ impl FunctionBuilder<'_> {
         raw_key.tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
         f.instruction(&Instruction::I32Eq);
+        // Most named reads (notably TypedArray length) cannot use this probe.
+        // Avoid their otherwise redundant GC subtype test entirely.
+        self.open_frame(ControlFrameKind::If, f);
         lookup.reference().load(f);
         f.instruction(&Instruction::RefTestNonNull(
             s.reference_type::<ArrayObject>(GcNullability::NonNullable)
                 .heap_type,
         ));
-        f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
         // Ordered bounds reject NaN and infinities before the integer cast.
         // Numeric -0 is index 0; the distinct String "-0" never enters this arm.
@@ -70,6 +72,8 @@ impl FunctionBuilder<'_> {
         storage.clear(f);
         array.clear(f);
         s.release_i64_local(index, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
