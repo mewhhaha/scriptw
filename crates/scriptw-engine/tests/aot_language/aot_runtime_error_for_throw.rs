@@ -39,6 +39,7 @@ fn assert_normal_true(source: &str) {
 // Catalog text comes from data/runtime_error_message.rs; the TDZ text is also
 // emitted by the program-owned RuntimeThrow/IdentifierWriteErrorIr path. The
 // duplicate-declaration message is a prepared-source diagnostic, not R text.
+// ScriptParser reports the declaration condition, without the identifier spelling.
 const REPEATED_THROWS: &str = r#"
 function check(value, label) { if (!value) throw label; }
 function nativeType() { Array.from([], 0); }
@@ -72,7 +73,7 @@ for (var turn = 0; turn < 4; turn++) {
   capture(programReference, ReferenceError, 'ReferenceError',
     'lexical binding accessed before initialization');
   var syntax = capture(programSyntax, SyntaxError, 'SyntaxError', syntaxText);
-  check(syntax.message.includes('duplicate'), 'program-owned syntax diagnostic content');
+  check(syntax.message === 'parse error: lexical name declared multiple times at line 1, col 1', 'program-owned syntax diagnostic content: ' + syntax.message);
   syntaxText = syntax.message;
 }
 gc();
@@ -100,7 +101,11 @@ fn repeated_throw_tails_replace_diagnostics_and_keep_program_messages_across_gc(
             "ReferenceError",
             "lexical binding accessed before initialization",
         ),
-        ("programSyntax();", "SyntaxError", "duplicate"),
+        (
+            "programSyntax();",
+            "SyntaxError",
+            "parse error: lexical name declared multiple times at line 1, col 1",
+        ),
     ] {
         let source = format!("{REPEATED_THROWS}\n{tail}");
         let failure = engine()
@@ -155,8 +160,8 @@ function capture(thunk, Type, OtherType, name, content) {
     'called or explicit Realm instanceof: ' + name);
   check(Object.getPrototypeOf(error) === Type.prototype && error.constructor === Type &&
     error.name === name, 'canonical prototype after global tampering: ' + name);
-  check(typeof error.message === 'string' && error.message.includes(content),
-    'selected caller resolves its message before shared error tail: ' + name);
+  check(typeof error.message === 'string' && error.message === content,
+    'selected caller resolves its message before shared error tail: ' + name + ': ' + error.message);
   for (var i = 0; i < saved.length; i++) {
     check(error !== saved[i][0], 'foreign and local throws allocate independently');
   }
@@ -178,7 +183,8 @@ for (var turn = 0; turn < 3; turn++) {
   capture(function () { realm.evalScript('(function () { let value = later; let later = 1; return value; })();'); },
     ForeignReference, LocalReference, 'ReferenceError', 'lexical binding accessed before initialization');
   capture(function () { realm.evalScript('let duplicate; let duplicate;'); },
-    ForeignSyntax, LocalSyntax, 'SyntaxError', 'duplicate');
+    ForeignSyntax, LocalSyntax, 'SyntaxError',
+    'parse error: lexical name declared multiple times at line 1, col 1');
 }
 gc();
 for (var i = 0; i < saved.length; i++) {
