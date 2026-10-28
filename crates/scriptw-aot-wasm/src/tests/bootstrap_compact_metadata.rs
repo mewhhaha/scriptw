@@ -2,8 +2,8 @@
 use super::*;
 use crate::gc_types::{
     ArrayCompactDataStorage, CompactDataStorage, FunctionObject, GcHeapType, GcNullability,
-    GlobalLedger, InlineCompactDataStorage, InlineCompactDataStorageSchema,
-    OrdinaryPropertyStorage, PropertyDescriptor, PropertyEntry, RuntimeModuleTypes, StoredValue,
+    GcSnapshotField, GlobalLedger, InlineCompactDataStorage, OrdinaryPropertyStorage,
+    PropertyDescriptor, PropertyEntry, RuntimeModuleTypes, StoredValue,
 };
 
 fn type_index<T: GcHeapType>(schema: &crate::gc_types::RuntimeSchema) -> u32 {
@@ -243,7 +243,7 @@ fn inline_compact_reads_and_stores_reject_indices_outside_shape_before_field_acc
             .find_map(|(index, actual)| (actual == name).then_some(*index))
             .expect("actual registered inline path");
         let body = named_body(runtime.bytes(), index);
-        let first_access = body.iter().position(|op| matches!(op, Operator::StructGet { struct_type_index, field_index } | Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index != InlineCompactDataStorageSchema::SHAPE.ordinal().raw())).expect("inline slot fields are used");
+        let first_access = body.iter().position(|op| matches!(op, Operator::StructGet { struct_type_index, field_index } | Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index != GcSnapshotField::InlineCompactShape.index())).expect("inline slot fields are used");
         // Null refinement is unrelated to the integer bounds proof. Keep the
         // actual slot local and both unsigned comparisons in the checked span.
         let prefix = body[..first_access]
@@ -261,16 +261,10 @@ fn inline_compact_reads_and_stores_reject_indices_outside_shape_before_field_acc
     }
     let store = store.unwrap();
     for (field, incoming_parameter) in [
-        (InlineCompactDataStorageSchema::SCALAR0.ordinal().raw(), 3),
-        (InlineCompactDataStorageSchema::SCALAR1.ordinal().raw(), 3),
-        (
-            InlineCompactDataStorageSchema::REFERENCE0.ordinal().raw(),
-            4,
-        ),
-        (
-            InlineCompactDataStorageSchema::REFERENCE1.ordinal().raw(),
-            4,
-        ),
+        (GcSnapshotField::InlineScalar0.index(), 3),
+        (GcSnapshotField::InlineScalar1.index(), 3),
+        (GcSnapshotField::InlineReference0.index(), 4),
+        (GcSnapshotField::InlineReference1.index(), 4),
     ] {
         let writes = store.iter().enumerate().filter_map(|(position, op)| matches!(op, Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index == field).then_some(position)).collect::<Vec<_>>();
         assert_eq!(
