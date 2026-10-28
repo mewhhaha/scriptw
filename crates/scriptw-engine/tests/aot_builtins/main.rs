@@ -76,6 +76,7 @@ mod aot_tagged_template_source_owners;
 mod aot_typed_array_byte_copy;
 mod aot_typed_array_constructor_storage;
 mod aot_typed_array_fill;
+mod aot_typed_array_numeric_callback;
 mod aot_typed_array_reference_get;
 mod aot_typed_array_same_type;
 mod aot_typed_array_species;

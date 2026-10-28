@@ -90,6 +90,8 @@ pub(crate) enum FunctionIdentity {
     ProgramInitialize,
     /// A function declared by the user program.
     Script { id: FunctionId, name: String },
+    /// An auxiliary primitive-only attempt, retaining its real source callable.
+    BinaryNumericSource { id: FunctionId, name: String },
     /// An independently prepared Script body with its distinct typed entry.
     PreparedScript { id: FunctionId, name: String },
     /// A standard builtin compiled with its real body.
@@ -110,6 +112,7 @@ impl FunctionIdentity {
         match self {
             Self::Main => "scriptw::main".to_string(),
             Self::ProgramInitialize => "scriptw::program_init".to_string(),
+            Self::BinaryNumericSource { id, name } => format!("js-numeric::{name}#{id}"),
             Self::Script { id, name } | Self::PreparedScript { id, name } if name.is_empty() => {
                 format!("js::{id}")
             }
@@ -129,6 +132,7 @@ impl FunctionIdentity {
             Self::Main => "main",
             Self::ProgramInitialize => "program-initialize",
             Self::Script { .. } | Self::PreparedScript { .. } => "script",
+            Self::BinaryNumericSource { .. } => "numeric-callback",
             Self::StandardBuiltin(_) => "builtin",
             Self::HostBuiltin(_) => "host-builtin",
             Self::RuntimeHelper(_) => "runtime-helper",
@@ -150,6 +154,7 @@ impl FunctionIdentity {
                 StaticSignature::JavaScriptFunction.type_index()
             }
             Self::PreparedScript { .. } => StaticSignature::PreparedScript.type_index(),
+            Self::BinaryNumericSource { .. } => StaticSignature::BinaryNumericCallback.type_index(),
             Self::RuntimeHelper(helper) => helper.type_index(),
         }
     }
@@ -315,6 +320,7 @@ enum FunctionDeclaration {
     NonCallable,
     ProgramInitialize(crate::function_layout::ProgramInitializeIndex),
     Planned(crate::function_entry::PlannedFunctionEntry),
+    BinaryNumeric(crate::function_entry::PlannedBinaryNumericEntry),
 }
 
 #[derive(Debug, Clone)]
@@ -335,6 +341,15 @@ pub(crate) struct EmittedFunction {
 }
 
 impl EmittedFunction {
+    pub(crate) fn binary_numeric(
+        entry: crate::function_entry::PlannedBinaryNumericEntry,
+        schema: &crate::gc_types::RuntimeSchema,
+    ) -> Self {
+        let body = entry.compile_body(schema);
+        let mut function = Self::new(entry.identity(), body);
+        function.declaration = FunctionDeclaration::BinaryNumeric(entry);
+        function
+    }
     pub(crate) fn main(body: Function) -> Self {
         Self::new(FunctionIdentity::Main, body)
     }
@@ -430,6 +445,10 @@ impl ModuleCode {
             FunctionDeclaration::Planned(entry) => {
                 entry.assert_body_index(wasm_index);
                 entry.signature().type_index()
+            }
+            FunctionDeclaration::BinaryNumeric(entry) => {
+                entry.assert_body_index(wasm_index);
+                StaticSignature::BinaryNumericCallback.type_index()
             }
         };
         self.functions.function(type_index);
@@ -866,6 +885,10 @@ mod tests {
                 id: "prepared0".to_string(),
                 name: "prepared".to_string(),
             },
+            FunctionIdentity::BinaryNumericSource {
+                id: "fn0".to_string(),
+                name: "outer".to_string(),
+            },
             FunctionIdentity::StandardBuiltin(StandardBuiltinId::MathMax),
             FunctionIdentity::HostBuiltin(HostBuiltinId::Print),
             FunctionIdentity::RuntimeHelper(RuntimeHelperId::TransientByteAlloc),
@@ -873,7 +896,7 @@ mod tests {
         .iter()
         .map(FunctionIdentity::wasm_name)
         .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(names.len(), 6);
+        assert_eq!(names.len(), 7);
     }
 
     #[test]

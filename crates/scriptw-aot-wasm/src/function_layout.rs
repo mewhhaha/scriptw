@@ -1,21 +1,23 @@
 //! The one Wasm function index space.
 //!
 //! ```text
-//! [common host imports][runtime callables/helpers][P foreign imports][main?][P initializer?][program callables/helpers]
+//! [common host imports][runtime callables/helpers][P foreign imports][main?][P initializer?][program callables/scalar entries/helpers]
 //!           ^-- runtime half: identical for every program --^
 //!                                                 ^-- program half starts with its actual entry prefix
 //! ```
 //!
 //! Runtime callables are the compiler-owned source bodies, every standard
 //! builtin and every host builtin. Program callables are the script's own
-//! functions followed by its prepared script units. Program helpers are the
+//! functions followed by its prepared script units. Validated scalar callback
+//! entries follow those callables and precede all program helpers, which are the
 //! helper bodies generated from the script (module operations and the runtime
 //! hooks, see `HelperOwner`). Every index is derived
 //! Native factory modules have an initializer prefix; ordinary programs also
 //! have main. Every index is derived here, so the runtime/program boundary is [`Self::first_program_index`]
 //! and no other module does position arithmetic.
 
-use scriptw_ir::{FunctionIr, ScriptIr};
+use scriptw_ir::{FunctionId, FunctionIr, ScriptIr};
+use std::collections::BTreeMap;
 
 use crate::runtime_artifact::ModuleKind;
 use crate::runtime_helpers::RuntimeHelperFunctionBase;
@@ -67,18 +69,86 @@ impl ProgramInitializeIndex {
 pub(crate) struct SourceFunctions<'a> {
     pub(crate) runtime_owned: Vec<&'a FunctionIr>,
     pub(crate) program: Vec<&'a FunctionIr>,
+    numeric_leaves: BTreeMap<FunctionId, crate::functions::NumericLeafPlan>,
+    binary_numeric: Vec<BinaryNumericSource<'a>>,
+}
+
+struct BinaryNumericSource<'a> {
+    function: &'a FunctionIr,
+    proof: crate::functions::BinaryNumericLeafPlan,
 }
 
 impl<'a> SourceFunctions<'a> {
     pub(crate) fn partition(script: &'a ScriptIr) -> Self {
-        let (runtime_owned, program) = script
+        let (runtime_owned, program): (Vec<_>, Vec<_>) = script
             .functions
             .iter()
             .partition(|function| crate::builtins::is_empty_dynamic_function_body(function));
+        let numeric_leaves: BTreeMap<_, _> = script
+            .functions
+            .iter()
+            .filter_map(|function| {
+                crate::functions::NumericLeafPlan::for_function(function)
+                    .map(|proof| (function.id.clone(), proof))
+            })
+            .collect();
+        let binary_numeric = program
+            .iter()
+            .filter_map(|function| {
+                numeric_leaves
+                    .get(&function.id)?
+                    .binary_callback()
+                    .map(|proof| BinaryNumericSource { function, proof })
+            })
+            .collect();
         Self {
             runtime_owned,
             program,
+            numeric_leaves,
+            binary_numeric,
         }
+    }
+
+    pub(crate) fn numeric_leaf(
+        &self,
+        function: &FunctionIr,
+    ) -> Option<&crate::functions::NumericLeafPlan> {
+        self.numeric_leaves.get(&function.id)
+    }
+
+    pub(crate) fn binary_numeric_count(&self) -> usize {
+        self.binary_numeric.len()
+    }
+
+    pub(crate) fn binary_numeric_entry(
+        &self,
+        function: &FunctionIr,
+        layout: &FunctionIndexLayout,
+    ) -> Option<crate::function_entry::PlannedBinaryNumericEntry> {
+        self.binary_numeric
+            .iter()
+            .enumerate()
+            .find_map(|(position, source)| {
+                (source.function.id == function.id).then(|| {
+                    crate::function_entry::PlannedBinaryNumericEntry::new(
+                        source.function,
+                        source.proof.clone(),
+                        layout.binary_numeric_index(position),
+                    )
+                })
+            })
+    }
+}
+
+/// Only the complete P index plan can name an auxiliary scalar body.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BinaryNumericFunctionIndex(u32);
+impl BinaryNumericFunctionIndex {
+    pub(crate) fn emit_ref_func(self, function: &mut crate::code_sink::Function) {
+        function.instruction(&wasm_encoder::Instruction::RefFunc(self.0));
+    }
+    pub(crate) fn assert_body_index(self, actual: u32) {
+        assert_eq!(self.0, actual, "binary numeric body uses its planned index");
     }
 }
 
@@ -93,6 +163,7 @@ pub(crate) struct FunctionIndexLayout {
     entry_role: ModuleEntryRole,
     program_initialize: bool,
     program_callables: u32,
+    program_binary_numeric: u32,
     program_helpers: u32,
 }
 
@@ -108,6 +179,7 @@ impl FunctionIndexLayout {
         host: usize,
         runtime_helpers: usize,
         program_callables: usize,
+        program_binary_numeric: usize,
         program_helpers: usize,
         kind: ModuleKind<'_>,
         entry_role: ModuleEntryRole,
@@ -134,6 +206,7 @@ impl FunctionIndexLayout {
             entry_role,
             program_initialize: matches!(kind, ModuleKind::Program(_)),
             program_callables: count(program_callables),
+            program_binary_numeric: count(program_binary_numeric),
             program_helpers: count(program_helpers),
         };
         // Fails here, once, if the whole space does not fit.
@@ -202,7 +275,10 @@ impl FunctionIndexLayout {
     }
 
     pub(crate) fn helper_base(&self) -> RuntimeHelperFunctionBase {
-        RuntimeHelperFunctionBase::at(self.runtime_helper_first(), self.program_callable_end())
+        RuntimeHelperFunctionBase::at(
+            self.runtime_helper_first(),
+            self.program_binary_numeric_end(),
+        )
     }
 
     /// End of the common H/R prefix, identical regardless of P capabilities.
@@ -273,8 +349,17 @@ impl FunctionIndexLayout {
         Self::add(self.program_callable_first(), self.program_callables)
     }
 
+    pub(crate) fn binary_numeric_index(&self, position: usize) -> BinaryNumericFunctionIndex {
+        assert!(position < self.program_binary_numeric as usize);
+        BinaryNumericFunctionIndex(Self::add(self.program_callable_end(), count(position)))
+    }
+
+    fn program_binary_numeric_end(&self) -> u32 {
+        Self::add(self.program_callable_end(), self.program_binary_numeric)
+    }
+
     fn program_helper_end(&self) -> u32 {
-        Self::add(self.program_callable_end(), self.program_helpers)
+        Self::add(self.program_binary_numeric_end(), self.program_helpers)
     }
 
     /// Every defined function: what `ref.func` may name, for the declarative

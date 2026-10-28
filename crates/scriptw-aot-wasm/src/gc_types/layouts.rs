@@ -517,13 +517,14 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GcFunctionSignature {
     Entry(crate::module::StaticSignature),
+    Scalar(crate::module::StaticSignature),
     ProgramHook(crate::runtime_helpers::ProgramHook),
     ContextHook(crate::runtime_helpers::RuntimeHelperId),
 }
 impl GcFunctionSignature {
     pub(crate) const fn type_index(self) -> u32 {
         match self {
-            Self::Entry(signature) => signature.type_index(),
+            Self::Entry(signature) | Self::Scalar(signature) => signature.type_index(),
             Self::ProgramHook(hook) => hook.helper().type_index(),
             Self::ContextHook(helper) => helper.type_index(),
         }
@@ -545,6 +546,14 @@ macro_rules! callable_roles {
 }
 callable_roles!(OrdinaryCallable => JavaScriptFunction, GeneratorCallable => GeneratorFunction,
     AsyncCallable => AsyncFunction, AsyncGeneratorCallable => AsyncGeneratorFunction);
+
+/// A scalar attempt has no Completion ABI and cannot pass through call_entry.
+pub(crate) enum BinaryNumericCallback {}
+impl sealed::Sealed for BinaryNumericCallback {}
+impl GcFunctionRole for BinaryNumericCallback {
+    const SIGNATURE: GcFunctionSignature =
+        GcFunctionSignature::Scalar(crate::module::StaticSignature::BinaryNumericCallback);
+}
 
 /// Only the five closed hook roles can select one ProgramInstance hook field.
 pub(crate) trait GcProgramHookRole: GcFunctionRole + Sized {
@@ -1007,6 +1016,7 @@ gc_layout_registry! {
             GENERATOR_ENTRY: GcFunctionRef<GeneratorCallable>, Immutable, Nullable;
             ASYNC_ENTRY: GcFunctionRef<AsyncCallable>, Immutable, Nullable;
             ASYNC_GENERATOR_ENTRY: GcFunctionRef<AsyncGeneratorCallable>, Immutable, Nullable;
+            BINARY_NUMERIC_ENTRY: GcFunctionRef<BinaryNumericCallback>, Immutable, Nullable;
         }
         struct FunctionObject: JavaScriptObject => FunctionObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;

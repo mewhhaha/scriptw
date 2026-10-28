@@ -312,6 +312,7 @@ fn emit_script_module_with_factory(
         compiled_host_builtins.len(),
         runtime_helper_count,
         source.program.len() + script.prepared_script_units().count(),
+        source.binary_numeric_count(),
         program_helper_count,
         kind,
         if factory.is_some() {
@@ -480,6 +481,18 @@ fn emit_script_module_with_factory(
             runtime_helper_base,
         );
         program_functions.push(builder.compile_callable()?);
+    }
+    for function in source.program.iter().filter(|_| compile_program) {
+        if let Some(entry) = function_metas
+            .get(&function.id)
+            .and_then(|meta| meta.entry.binary_numeric())
+            .cloned()
+        {
+            program_functions.push(EmittedFunction::binary_numeric(
+                entry,
+                module_package.schema(),
+            ));
+        }
     }
     for builtin in compiled_standard_builtins
         .iter()

@@ -78,7 +78,9 @@ fn immutable_leaf_plans_validate_the_entire_ordinary_zero_arity_body() {
             "function leaf(){return 'a\\ud800'+'\\udc00b'+'\\u0000c';}",
             true,
         ),
-        ("function leaf(){'use strict';return 17;}", true),
+        ("'use strict';function leaf(){return 17;}", true),
+        // A body directive remains an Expression in this closed IR proof.
+        ("function leaf(){'use strict';return 17;}", false),
         ("function leaf(){return true;}", true),
         ("function leaf(){return null;}", true),
         ("function leaf(){return;}", true),

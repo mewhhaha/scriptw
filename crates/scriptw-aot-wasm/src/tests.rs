@@ -5,6 +5,7 @@ use wasmparser::{Operator, Parser, Payload, Validator, WasmFeatures};
 
 mod array_data_producers;
 mod array_from_async_shared_tail;
+mod binary_numeric_callback;
 mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
@@ -21,6 +22,7 @@ mod regexp_programs;
 mod runtime_error_for_throw;
 mod scalar_predicates;
 mod scalar_regions;
+mod typed_array_numeric_callback;
 mod unobserved_arguments;
 
 fn emit_script(source: &str) -> Result<WasmArtifact, EmitError> {

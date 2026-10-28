@@ -29,15 +29,19 @@ enum NumericLeafExpression {
 /// guarded Number path, allocation, or activation/Realm observers.
 #[derive(Clone, Debug)]
 pub(crate) struct NumericLeafPlan {
+    source: FunctionId,
     arity: usize,
     expression: NumericLeafExpression,
 }
 
 impl NumericLeafPlan {
     pub(crate) fn for_function(function: &FunctionIr) -> Option<Self> {
-        if function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
-            || function.class_element_execution_kind != ClassElementExecutionKind::None
+        if !matches!(
+            function.protocol,
+            FunctionProtocolIr::OrdinaryCallAndConstruct | FunctionProtocolIr::Arrow
+        ) || function.class_element_execution_kind != ClassElementExecutionKind::None
             || function.class_instance_element_plan.is_some()
+            || function.body.lexical_environment.is_some()
             || !function.captured_bindings.is_empty()
             || function.captures_private_environment
             || function.params.is_empty()
@@ -58,6 +62,7 @@ impl NumericLeafPlan {
         };
         let mut remaining = MAX_LEAF_NODES;
         Some(Self {
+            source: function.id.clone(),
             arity: function.params.len(),
             expression: Self::expression(value, function, &mut remaining)?,
         })
@@ -110,22 +115,29 @@ impl NumericLeafExpression {
     /// The whole expression is allocation-free and cannot throw. Its bounded
     /// tree may keep primitive payloads on the Wasm operand stack unchanged.
     fn emit(&self, arguments: &[ValueLocals], function: &mut Function) {
-        match self {
-            Self::Parameter(index) => {
-                arguments[*index].scalar().load(function);
+        self.emit_parameters(
+            &|index, function| {
+                arguments[index].scalar().load(function);
                 function.instruction(&Instruction::F64ReinterpretI64);
-            }
+            },
+            function,
+        );
+    }
+
+    fn emit_parameters(&self, parameter: &impl Fn(usize, &mut Function), function: &mut Function) {
+        match self {
+            Self::Parameter(index) => parameter(*index, function),
             Self::Constant(bits) => {
                 function.instruction(&Instruction::I64Const(*bits as i64));
                 function.instruction(&Instruction::F64ReinterpretI64);
             }
             Self::Negate(value) => {
-                value.emit(arguments, function);
+                value.emit_parameters(parameter, function);
                 function.instruction(&Instruction::F64Neg);
             }
             Self::Binary(op, lhs, rhs) => {
-                lhs.emit(arguments, function);
-                rhs.emit(arguments, function);
+                lhs.emit_parameters(parameter, function);
+                rhs.emit_parameters(parameter, function);
                 function.instruction(&match op {
                     NumericLeafBinaryOp::Add => Instruction::F64Add,
                     NumericLeafBinaryOp::Sub => Instruction::F64Sub,
@@ -134,6 +146,45 @@ impl NumericLeafExpression {
                 });
             }
         }
+    }
+}
+
+/// Only the already validated complete Number leaf can mint a binary thunk.
+/// Its proof is shared by direct specialization, layout and code publication.
+#[derive(Clone, Debug)]
+pub(crate) struct BinaryNumericLeafPlan(NumericLeafPlan);
+
+impl NumericLeafPlan {
+    pub(crate) fn binary_callback(&self) -> Option<BinaryNumericLeafPlan> {
+        (self.arity == 2).then(|| BinaryNumericLeafPlan(self.clone()))
+    }
+}
+
+impl BinaryNumericLeafPlan {
+    pub(crate) fn source(&self) -> &FunctionId {
+        &self.0.source
+    }
+    pub(crate) fn compile_body(&self, schema: &crate::gc_types::RuntimeSchema) -> Function {
+        let signature = schema.signature(crate::module::StaticSignature::BinaryNumericCallback);
+        let mut function = Function::with_parameters(
+            crate::code_sink::LocalDeclarations::from_types([]),
+            signature.parameters().to_vec(),
+        );
+        schema.emit_source_activation_admission_test(&mut function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Const(1));
+        self.0.expression.emit_parameters(
+            &|index, function| {
+                schema.parameter_f64(index as u32, function).load(function);
+            },
+            &mut function,
+        );
+        function.instruction(&Instruction::Return);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
+        function.instruction(&Instruction::End);
+        function
     }
 }
 

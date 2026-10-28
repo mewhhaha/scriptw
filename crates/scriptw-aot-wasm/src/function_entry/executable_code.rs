@@ -2,8 +2,9 @@
 
 use super::*;
 use crate::gc_types::{
-    AsyncCallable, AsyncGeneratorCallable, ExecutableCode, ExecutableCodeEntry, ExecutableCodeKind,
-    ExecutableCodeMetadata, GcStackReference, GeneratorCallable, OrdinaryCallable, RuntimeSchema,
+    AsyncCallable, AsyncGeneratorCallable, BinaryNumericCallback, ExecutableCode,
+    ExecutableCodeEntry, ExecutableCodeKind, ExecutableCodeMetadata, GcStackReference,
+    GeneratorCallable, OrdinaryCallable, RuntimeSchema,
 };
 
 impl PlannedFunctionEntry {
@@ -47,6 +48,14 @@ impl PlannedFunctionEntry {
             protocol: self.protocol(),
             class_element_execution,
         };
+        let binary_numeric = self.binary_numeric().map(|entry| {
+            schema
+                .reserve_function_local::<BinaryNumericCallback, _>(function)
+                .initialize(
+                    schema.reference_binary_numeric_entry(entry, function),
+                    function,
+                )
+        });
         macro_rules! publish {
             ($role:ident, $variant:ident) => {{
                 let entry = schema
@@ -54,14 +63,15 @@ impl PlannedFunctionEntry {
                     .initialize(schema.reference_entry::<$role>(self, function)?, function);
                 let published = schema.struct_type::<ExecutableCode>().publish(
                     ExecutableCodeEntry::$variant(&entry),
+                    binary_numeric.as_ref(),
                     metadata,
                     function,
                 )?;
                 entry.clear(function);
-                Ok(published)
+                published
             }};
         }
-        match self.body() {
+        let published = match self.body() {
             PlannedBodyEntry::Ordinary(_) => publish!(OrdinaryCallable, Ordinary),
             PlannedBodyEntry::Generator(_) => publish!(GeneratorCallable, Generator),
             PlannedBodyEntry::Async(_) => publish!(AsyncCallable, Async),
@@ -69,7 +79,11 @@ impl PlannedFunctionEntry {
             PlannedBodyEntry::PreparedScript(_) => {
                 unreachable!("Script rejected before publication")
             }
+        };
+        if let Some(entry) = binary_numeric {
+            entry.clear(function);
         }
+        Ok(published)
     }
 }
 
@@ -85,6 +99,7 @@ mod program_ownership_tests {
                 id: "source-owner".into(),
                 name: "sourceOwner".into(),
                 protocol: FunctionProtocolIr::OrdinaryCallOnly,
+                binary_numeric: None,
             },
             wasm_index: 19,
         };

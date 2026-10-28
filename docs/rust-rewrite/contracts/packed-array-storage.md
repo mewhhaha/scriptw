@@ -89,6 +89,16 @@ receiver and arguments evaluate once before admission. A nullable result marks
 an unsupported packed snapshot; fallback invokes the saved ordinary callable
 and operands. The helper creates the real String and performs no source callback.
 
+Sort can copy a dense packed prefix into a private exact-length ValueArray
+before comparisons. It shares immutable stored values or snapshots Number bits,
+then releases the storage borrow before any callback. The stable sort algorithm
+is unchanged. In-place writeback reacquires and validates the current receiver,
+length, mode and dense count before its first canonical publication. A miss uses
+the original sequential Set/delete path, preserving partial writes and throws.
+Replacing existing default data slots does not require extensibility or a
+writable length. `toSorted` publishes into its unexposed fresh Array through the
+same default-data owner; callback mutations cannot change the collected values.
+
 The opt-in host graph snapshot reads raw bits and bitmap words directly, with
 a typed mode decoder and declaration-derived field/layout witnesses. It checks
 inactive backings are empty, capacity/bitmap bounds, unused high presence bits,

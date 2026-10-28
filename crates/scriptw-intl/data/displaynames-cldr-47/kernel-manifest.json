@@ -11,9 +11,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 83431,
+      "bytes": 83871,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "595a63f4190013090114316c4a559729a14a17f898479a076fac53a14f77be8b"
+      "sha256": "19ecd23593635ab009c76c091e5a14d53b41163675942c6a7433a6d891a9bcbb"
     },
     {
       "bytes": 33961,
@@ -618,7 +618,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "88b8b19c5b7c407001b59eb053700a6e8c173f651b2e8f9349ba88b16bfaaa1f",
+  "provider_data_sha256": "5c00cfc4c698825cfffe3a2ed614fd59df10c291e1984a006a42956484ffabe3",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "DisplayNames",

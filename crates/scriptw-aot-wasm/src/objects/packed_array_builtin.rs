@@ -2,8 +2,8 @@
 //! receiver/length work. No JavaScript runs inside the validated borrow.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexStorage, ArrayIndexStorageSchema, ArrayObject, ArrayObjectSchema, JavaScriptObject,
-    ValueArray,
+    ArrayIndexStorage, ArrayIndexStorageSchema, ArrayIndexedStorageMode, ArrayObject,
+    ArrayObjectSchema, JavaScriptObject, NumberBitsI64Array, PackedValueTable, ValueArray,
 };
 
 /// Available only inside the concrete-Array, captured-length and packed-mode
@@ -28,6 +28,196 @@ impl PackedArraySnapshot {
 }
 
 impl FunctionBuilder<'_> {
+    /// Copy a contiguous packed prefix into an independent, exact private
+    /// List. No storage borrow or mutable slot reaches comparator execution.
+    pub(crate) fn emit_try_packed_array_sort_snapshot(
+        &mut self,
+        receiver: &ValueLocals,
+        length: I64Local,
+        f: &mut Function,
+    ) -> Result<GcLocal<ValueArray, Nullable>, EmitError> {
+        let s = self.runtime_schema();
+        let result = s
+            .reserve_gc_local::<ValueArray, Nullable>(f)
+            .initialize_null(s, f);
+        self.emit_with_packed_array_snapshot(
+            receiver,
+            length,
+            f,
+            |builder, packed, decline, f| {
+                // Canonical Array indices are below length. Occupancy equal to
+                // length therefore proves every own index, including undefined.
+                s.field(ArrayIndexStorageSchema::COUNT)
+                    .read(&packed.storage, s, f);
+                length.load(f);
+                f.instruction(&Instruction::I64Ne);
+                builder.emit_branch_if_to_target(decline, f);
+                let extent = s.reserve_i32_local(f);
+                length.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                extent.store(f);
+                let seed = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
+                let list = s.reserve_gc_local(f).initialize(
+                    s.array_type::<ValueArray>()
+                        .filled(GcOperand::reference(&seed, s), extent, f),
+                    f,
+                );
+                seed.clear(f);
+                let slot = s.reserve_i32_local(f);
+                slot.set_constant(0, f);
+                s.array_storage_mode_is(&packed.storage, ArrayIndexedStorageMode::PackedValues, f);
+                builder.open_frame(ControlFrameKind::If, f);
+                let values = s.reserve_gc_local(f).initialize(
+                    s.field(ArrayIndexStorageSchema::VALUES)
+                        .read(&packed.storage, s, f)
+                        .reference()
+                        .require_non_null(f),
+                    f,
+                );
+                let finished = builder.open_frame(ControlFrameKind::Block, f);
+                let next = builder.open_frame(ControlFrameKind::Loop, f);
+                slot.load(f);
+                extent.load(f);
+                f.instruction(&Instruction::I32GeU);
+                builder.emit_branch_if_to_target(finished, f);
+                let stored = s.reserve_gc_local(f).initialize(
+                    s.array_type::<PackedValueTable>()
+                        .read(&values, slot, s, f)
+                        .reference()
+                        .require_non_null(f),
+                    f,
+                );
+                s.array_type::<ValueArray>().write(
+                    &list,
+                    slot,
+                    GcOperand::reference(&stored, s),
+                    s,
+                    f,
+                );
+                stored.clear(f);
+                slot.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                slot.store(f);
+                builder.emit_branch_to_target(next, f);
+                builder.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                values.clear(f);
+                f.instruction(&Instruction::Else);
+                let numbers = s.reserve_gc_local(f).initialize(
+                    s.field(ArrayIndexStorageSchema::NUMBERS)
+                        .read(&packed.storage, s, f)
+                        .reference(),
+                    f,
+                );
+                let value = s.reserve_value_local(f);
+                let finished = builder.open_frame(ControlFrameKind::Block, f);
+                let next = builder.open_frame(ControlFrameKind::Loop, f);
+                slot.load(f);
+                extent.load(f);
+                f.instruction(&Instruction::I32GeU);
+                builder.emit_branch_if_to_target(finished, f);
+                s.array_type::<NumberBitsI64Array>()
+                    .read(&numbers, slot, s, f)
+                    .store_i64(value.scalar(), f);
+                value.set_number(value.scalar(), f);
+                let stored = s
+                    .reserve_gc_local(f)
+                    .initialize(s.struct_type::<StoredValue>().from_value(&value, f), f);
+                s.array_type::<ValueArray>().write(
+                    &list,
+                    slot,
+                    GcOperand::reference(&stored, s),
+                    s,
+                    f,
+                );
+                stored.clear(f);
+                slot.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                slot.store(f);
+                builder.emit_branch_to_target(next, f);
+                builder.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                value.clear(f);
+                numbers.clear(f);
+                builder.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                result.replace(list.load(s, f).nullable(), f);
+                list.clear(f);
+                s.release_i32_local(slot, f);
+                s.release_i32_local(extent, f);
+                Ok(())
+            },
+        )?;
+        Ok(result)
+    }
+
+    /// Reacquire the entire own WEC prefix after every comparator has finished.
+    /// A miss leaves all receiver indices untouched for ordered generic Set.
+    /// Existing own writable data needs neither extensibility nor writable
+    /// length, and shadows every prototype indexed property.
+    pub(crate) fn emit_try_packed_array_sort_writeback(
+        &mut self,
+        receiver: &ValueLocals,
+        length: I64Local,
+        count: I64Local,
+        list: &GcLocal<ValueArray>,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let s = self.runtime_schema();
+        let handled = s.reserve_i32_local(f);
+        handled.set_constant(0, f);
+        self.emit_with_packed_array_snapshot(
+            receiver,
+            length,
+            f,
+            |builder, packed, decline, f| {
+                count.load(f);
+                length.load(f);
+                f.instruction(&Instruction::I64Ne);
+                builder.emit_branch_if_to_target(decline, f);
+                s.field(ArrayIndexStorageSchema::COUNT)
+                    .read(&packed.storage, s, f);
+                length.load(f);
+                f.instruction(&Instruction::I64Ne);
+                builder.emit_branch_if_to_target(decline, f);
+                // No user code or remaining admission check occurs after this point.
+                let index = s.reserve_i64_local(f);
+                index.set_constant(0, f);
+                let slot = s.reserve_i32_local(f);
+                let value = s.reserve_value_local(f);
+                let finished = builder.open_frame(ControlFrameKind::Block, f);
+                let next = builder.open_frame(ControlFrameKind::Loop, f);
+                index.load(f);
+                count.load(f);
+                f.instruction(&Instruction::I64GeU);
+                builder.emit_branch_if_to_target(finished, f);
+                index.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                slot.store(f);
+                builder.emit_argument_vector_entry_to_value(list, slot, &value, f);
+                builder.emit_array_indexed_publish_default_data(&packed.array, index, &value, f)?;
+                builder.emit_increment_local(index, 1, f);
+                builder.emit_branch_to_target(next, f);
+                builder.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                value.clear(f);
+                s.release_i32_local(slot, f);
+                s.release_i64_local(index, f);
+                handled.set_constant(1, f);
+                Ok(())
+            },
+        )?;
+        Ok(handled)
+    }
+
     pub(crate) fn emit_with_packed_array_snapshot(
         &mut self,
         receiver: &ValueLocals,

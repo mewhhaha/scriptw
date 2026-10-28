@@ -308,6 +308,193 @@ fn source_join_calls_reach_shared_kernel_only_after_actual_code_realm_and_array_
 }
 
 #[test]
+fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let lowered = lower(
+                &parse(
+                    "function compare(a,b){return a-b;} var arrow=(a,b)=>a-b; \
+                 [Array.prototype.sort,Array.prototype.toSorted,compare,arrow];",
+                    ParseOptions::script(),
+                )
+                .unwrap(),
+            );
+            let artifact = emit_with_rooted_snapshot(
+                &lowered,
+                PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal,
+            )
+            .unwrap();
+            let runtime_bytes = artifact.runtime().unwrap().bytes();
+            for bytes in [&artifact.bytes[..], runtime_bytes] {
+                Validator::new_with_features(WasmFeatures::all())
+                    .validate_all(bytes)
+                    .unwrap();
+            }
+            let runtime = Module::read(runtime_bytes);
+            let signatures = runtime
+                .types
+                .iter()
+                .enumerate()
+                .filter_map(|(index, ty)| {
+                    let wasmparser::CompositeInnerType::Func(signature) = &ty.composite_type.inner
+                    else {
+                        return None;
+                    };
+                    (signature.params() == [ValType::F64, ValType::F64]
+                        && signature.results() == [ValType::I32, ValType::F64])
+                    .then_some(index as u32)
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                signatures.len(),
+                1,
+                "one non-Completion binary numeric callback signature"
+            );
+            let binary = signatures[0];
+            let code = runtime.witness_type(GcSnapshotLayout::Code);
+            let wasmparser::CompositeInnerType::Struct(fields) =
+                &runtime.types[code as usize].composite_type.inner
+            else {
+                panic!("actual ExecutableCode is a struct");
+            };
+            let callback_fields = fields
+                .fields
+                .iter()
+                .enumerate()
+                .filter_map(|(index, field)| {
+                    let wasmparser::StorageType::Val(ValType::Ref(reference)) = field.element_type
+                    else {
+                        return None;
+                    };
+                    (reference.heap_type() == HeapType::Concrete(UnpackedIndex::Module(binary)))
+                        .then_some((index as u32, reference.is_nullable(), field.mutable))
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                callback_fields.len(),
+                1,
+                "ExecutableCode owns one optional binary entry"
+            );
+            let (callback_field, nullable, mutable) = callback_fields[0];
+            assert!(
+                nullable && !mutable,
+                "the typed entry is optional and immutable"
+            );
+            let array = runtime.witness_type(GcSnapshotLayout::Array);
+            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let object = runtime.witness_type(GcSnapshotLayout::Object);
+            let values = runtime.witness_type(GcSnapshotLayout::ArrayValues);
+            let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
+            let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
+            let (ordinary_set, _) = runtime.named("helper::ordinary_set");
+            let (delete, _) = runtime.named("helper::object_delete");
+            let callback_helpers = [
+                "helper::proxy_call",
+                "helper::value_to_number",
+                "helper::value_to_string",
+            ]
+            .map(|name| runtime.named(name).0);
+            for name in [
+                "builtin::Array.prototype.sort",
+                "builtin::Array.prototype.toSorted",
+            ] {
+                let (_, body) = runtime.named(name);
+                let typed_call = |op: &Operator<'_>| {
+                    matches!(op,
+                    Operator::CallRef { type_index } if *type_index == binary)
+                };
+                let first_comparison = body
+                    .iter()
+                    .position(typed_call)
+                    .expect("real Array builtin invokes the optional typed callback");
+                assert!(
+                    body[..first_comparison].iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == code && *field_index == callback_field)),
+                    "the typed call uses the actual callable's immutable optional entry"
+                );
+                for backing in [values, numbers] {
+                    assert!(
+                        body[..first_comparison].iter().any(|op| matches!(op,
+                        Operator::ArrayGet { array_type_index } if *array_type_index == backing)),
+                        "packed data enters a private snapshot before comparisons"
+                    );
+                }
+                let last_comparison = body
+                    .iter()
+                    .rposition(|op| {
+                        typed_call(op)
+                            || matches!(op,
+                    Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                        if callback_helpers.contains(function_index))
+                    })
+                    .unwrap();
+                let publication = body
+                    .iter()
+                    .position(|op| {
+                        matches!(op,
+                    Operator::Call { function_index } if *function_index == publish)
+                    })
+                    .expect("sorted output uses the sole canonical indexed publisher");
+                assert!(
+                    last_comparison < publication,
+                    "all callback/coercion branches precede output writes"
+                );
+                if name.ends_with(".sort") {
+                    let proof = &body[last_comparison + 1..publication];
+                    for (owner, field) in [
+                        (array, scriptw_aot_wasm::GcSnapshotField::ArrayLength),
+                        (storage, scriptw_aot_wasm::GcSnapshotField::ArrayCount),
+                    ] {
+                        assert!(
+                            proof.iter().any(|op| matches!(op,
+                            Operator::StructGet { struct_type_index, field_index }
+                                if *struct_type_index == owner && *field_index == field.index())),
+                            "writeback reacquires {field:?} after every comparison"
+                        );
+                    }
+                    for (owner, field) in [
+                        (
+                            array,
+                            scriptw_aot_wasm::GcSnapshotField::ArrayLengthWritable,
+                        ),
+                        (object, scriptw_aot_wasm::GcSnapshotField::ObjectExtensible),
+                    ] {
+                        assert!(
+                            !proof.iter().any(|op| matches!(op,
+                            Operator::StructGet { struct_type_index, field_index }
+                                if *struct_type_index == owner && *field_index == field.index())),
+                            "replacing own writable data does not require {field:?}"
+                        );
+                    }
+                    assert!(
+                        calls(&body[publication..], ordinary_set),
+                        "declined proof retains ordered Set from index zero"
+                    );
+                    assert!(
+                        calls(&body[publication..], delete),
+                        "sparse sort retains trailing deletion"
+                    );
+                } else {
+                    assert!(
+                        !calls(&body[publication..], ordinary_set),
+                        "fresh toSorted output needs no ordinary Set"
+                    );
+                }
+                assert!(
+                    calls(body, callback_helpers[0]),
+                    "unsupported callback/operands retain fresh ordinary invocation"
+                );
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
 fn compiled_numbers_use_bitmap_arrays_and_keep_real_descriptor_fallback() {
     std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(|| {
         // Publish callable values without directly calling them. This retains

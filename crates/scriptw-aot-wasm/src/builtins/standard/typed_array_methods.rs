@@ -338,6 +338,16 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
         f.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, f);
+        let number = s.reserve_f64_local(f);
+        let handled = self.emit_try_binary_numeric_callback(comparator, left, right, number, f)?;
+        handled.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        number.load(f);
+        f.instruction(&Instruction::I64ReinterpretF64);
+        bits.store(f);
+        undefined.set_number(bits, f);
+        result.set_normal(&undefined, f);
+        f.instruction(&Instruction::Else);
         let argv = self.emit_pre_evaluated_arg_vector(&[left, right], f);
         self.emit_function_or_proxy_call_with_argv(comparator, &undefined, &argv, &pending, f)?;
         argv.clear(f);
@@ -347,6 +357,14 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_value_to_number_payload(pending.value(), result, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(handled, f);
+        s.release_f64_local(number, f);
+        // Both callback routes feed the existing stable merge contract. A NaN
+        // comparison is +0 before the caller's F64Le chooses the left element.
         result.kind().load(f);
         f.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
         f.instruction(&Instruction::I32Eq);
@@ -359,8 +377,6 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         undefined.set_scalar(ScalarValue::NumberBits(0), f);
         result.set_normal(&undefined, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);

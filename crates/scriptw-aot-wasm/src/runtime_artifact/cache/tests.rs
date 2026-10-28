@@ -611,6 +611,11 @@ fn abi33_runtime_cache_is_replaced_before_shared_packed_join_is_admitted() {
     assert_previous_runtime_cache_entry_replaced(33);
 }
 
+#[test]
+fn abi34_runtime_cache_is_replaced_before_typed_numeric_callbacks_are_admitted() {
+    assert_previous_runtime_cache_entry_replaced(34);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

@@ -749,6 +749,7 @@ impl GcStructType<ExecutableCode> {
     pub(crate) fn publish(
         self,
         entry: ExecutableCodeEntry<'_>,
+        binary_numeric: Option<&FunctionLocal<BinaryNumericCallback>>,
         metadata: ExecutableCodeMetadata,
         function: &mut Function,
     ) -> Result<GcStackReference<ExecutableCode>, crate::EmitError> {
@@ -771,7 +772,12 @@ impl GcStructType<ExecutableCode> {
                 metadata.standard_builtin.is_none() && metadata.host_builtin.is_some()
             }
         };
-        if metadata.protocol.execution_kind() != entry_execution || !origin_valid {
+        if metadata.protocol.execution_kind() != entry_execution
+            || !origin_valid
+            || (binary_numeric.is_some()
+                && (metadata.kind != ExecutableCodeKind::JavaScript
+                    || entry_execution != scriptw_ir::FunctionExecutionKind::Ordinary))
+        {
             return Err(crate::EmitError::unsupported(
                 "executable metadata disagrees with its registered entry",
             ));
@@ -814,6 +820,10 @@ impl GcStructType<ExecutableCode> {
                 generator,
                 asynchronous,
                 async_generator,
+                match binary_numeric {
+                    Some(entry) => GcOperand::function_reference(entry),
+                    None => GcOperand::null_function(),
+                },
             ),
             function,
         ))
@@ -1967,6 +1977,36 @@ impl RuntimeSchema {
         }
         entry.emit_ref_func(function);
         Ok(FunctionStackReference { shape: PhantomData })
+    }
+    pub(crate) fn reference_binary_numeric_entry(
+        &self,
+        entry: &crate::function_entry::PlannedBinaryNumericEntry,
+        function: &mut Function,
+    ) -> FunctionStackReference<BinaryNumericCallback> {
+        entry.emit_ref_func(function);
+        FunctionStackReference { shape: PhantomData }
+    }
+
+    /// This scalar role owns its two-result order; it has no Completion route.
+    pub(crate) fn call_binary_numeric_reference(
+        &self,
+        entry: &FunctionLocal<BinaryNumericCallback>,
+        left: &ValueLocals,
+        right: &ValueLocals,
+        handled: I32Local,
+        output: F64Local,
+        function: &mut Function,
+    ) {
+        for value in [left, right] {
+            value.scalar().load(function);
+            function.instruction(&Instruction::F64ReinterpretI64);
+        }
+        entry.load(function);
+        function.instruction(&Instruction::CallRef(
+            BinaryNumericCallback::SIGNATURE.type_index(),
+        ));
+        output.store(function);
+        handled.store(function);
     }
     pub(crate) fn call_entry(
         &self,

@@ -138,6 +138,9 @@ static_signature_domain! {
     HostFinalizationCellRemove => ([ExternRef(NonNullable)], []),
     HostReportCleanupException => ([I32, I64, EqRef, EqRef, EqRef], []),
 
+    // Pure source callbacks retain their own scalar result and decline bit.
+    BinaryNumericCallback => ([F64, F64], [I32, F64]),
+
     // Only signatures with concrete runtime references share its recursion group.
     // Independent host signatures above must canonicalize as singleton types.
     JavaScriptFunction => ([Gc(GcLayout::FunctionObject, NonNullable), I32, I64, EqRef,

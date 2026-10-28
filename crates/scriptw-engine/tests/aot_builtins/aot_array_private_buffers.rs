@@ -52,6 +52,14 @@ fn sort_snapshots_gets_and_preserves_comparator_abrupt_and_writeback_semantics()
 }
 
 #[test]
+fn packed_sort_revalidates_comparator_effects_and_preserves_exact_partial_writeback() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/packed_sort_effects.js"),
+        "array-packed-sort-effects:ok",
+    );
+}
+
+#[test]
 fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/packed_push.js"),

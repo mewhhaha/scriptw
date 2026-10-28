@@ -5749,7 +5749,7 @@ pub(crate) fn build_function_metas<'a>(
             function.id.clone(),
             WasmFunctionMeta {
                 constant_leaf: crate::functions::ConstantLeafPlan::for_function(function),
-                numeric_leaf: crate::functions::NumericLeafPlan::for_function(function),
+                numeric_leaf: source.numeric_leaf(function).cloned(),
                 async_generator_resume_environment_plan: function
                     .resumable_plan
                     .as_ref()
@@ -5761,7 +5761,11 @@ pub(crate) fn build_function_metas<'a>(
                 host_builtin: None,
                 length: function_length(&function.params),
                 length_name_configurable: true,
-                entry: crate::function_entry::PlannedFunctionEntry::user(function, wasm_index),
+                entry: crate::function_entry::PlannedFunctionEntry::user(
+                    function,
+                    wasm_index,
+                    source.binary_numeric_entry(function, layout),
+                ),
                 strict: function.strict,
                 is_named_expression: function.is_named_expression,
                 class_element_execution_kind: function.class_element_execution_kind,

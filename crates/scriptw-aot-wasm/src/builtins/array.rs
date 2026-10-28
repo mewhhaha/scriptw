@@ -3050,6 +3050,9 @@ impl FunctionBuilder<'_> {
             ArraySortOutput::Receiver => target.copy_from(&receiver, f),
             ArraySortOutput::Copy => self.emit_array_native_create(length, &target, f)?,
         }
+        let snapshot = self.emit_try_packed_array_sort_snapshot(&receiver, length, f)?;
+        snapshot.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
         let collected = crate::functions::ArgumentListConstruction::new(self, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
@@ -3085,8 +3088,39 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let list = collected.finish(self, f);
+        let generic_list = collected.finish(self, f);
+        snapshot.replace(generic_list.load(s, f).nullable(), f);
+        generic_list.clear(f);
+        f.instruction(&Instruction::Else);
+        length.load(f);
+        count.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let list = s
+            .reserve_gc_local(f)
+            .initialize(snapshot.load(s, f).require_non_null(f), f);
+        snapshot.clear(f);
+        // The canonical storage borrow ended before sorting can invoke any
+        // comparator, coercion or reentrant source code.
         let list = self.emit_array_private_values_sort(list, count, &comparator, &pending, f)?;
+        let writeback_complete = self.open_frame(ControlFrameKind::Block, f);
+        if matches!(output, ArraySortOutput::Receiver) {
+            let handled =
+                self.emit_try_packed_array_sort_writeback(&target, length, count, &list, f)?;
+            handled.load(f);
+            s.release_i32_local(handled, f);
+            self.emit_branch_if_to_target(writeback_complete, f);
+        }
+        // Copy's target was created above and has never been exposed to any
+        // source code. CreateDataProperty may publish default data directly,
+        // irrespective of indexed setters added to its prototype by callbacks.
+        let fresh_copy = match output {
+            ArraySortOutput::Receiver => None,
+            ArraySortOutput::Copy => Some(
+                s.reserve_gc_local(f)
+                    .initialize(target.cast_reference::<ArrayObject>(s, f), f),
+            ),
+        };
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let written = self.open_frame(ControlFrameKind::Block, f);
@@ -3104,10 +3138,14 @@ impl FunctionBuilder<'_> {
                 self.emit_array_native_set_index(&target, index, &element, &pending, f)?
             }
             ArraySortOutput::Copy => {
-                let key = self.emit_array_native_index_key(index, f)?;
-                self.emit_create_data_property_or_throw(&target, &key, &element, &pending, f)?;
-                key.clear(f);
-                self.emit_array_native_propagate(&pending, f);
+                self.emit_array_indexed_publish_default_data(
+                    fresh_copy
+                        .as_ref()
+                        .expect("copy owns the fresh unexposed Array"),
+                    index,
+                    &element,
+                    f,
+                )?;
             }
         }
         self.emit_increment_local(index, 1, f);
@@ -3116,6 +3154,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        if let Some(fresh_copy) = fresh_copy {
+            fresh_copy.clear(f);
+        }
         if matches!(output, ArraySortOutput::Receiver) {
             let deleted = self.open_frame(ControlFrameKind::Block, f);
             let delete = self.open_frame(ControlFrameKind::Loop, f);
@@ -3131,6 +3172,8 @@ impl FunctionBuilder<'_> {
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
         }
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.completion().set_normal(&target, f);
         list.clear(f);
         s.release_i32_local(present, f);
@@ -3183,6 +3226,16 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
         f.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, f);
+        let direct_result = s.reserve_f64_local(f);
+        let handled =
+            self.emit_try_binary_numeric_callback(comparator, &left, &right, direct_result, f)?;
+        handled.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        direct_result.load(f);
+        f.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
+        f.instruction(&Instruction::F64Gt);
+        greater.store(f);
+        f.instruction(&Instruction::Else);
         // Snapshots are immutable and already rooted by the private sort.
         // Keep the argument vector fresh: callbacks can retain or mutate their
         // arguments and reenter sorting without changing the source snapshots.
@@ -3198,6 +3251,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
         f.instruction(&Instruction::F64Gt);
         greater.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(handled, f);
+        s.release_f64_local(direct_result, f);
         f.instruction(&Instruction::Else);
         self.emit_value_to_string_payload(&left, &comparison, f)?;
         self.emit_array_native_propagate(&comparison, f);

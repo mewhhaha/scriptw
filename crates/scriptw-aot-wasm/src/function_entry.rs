@@ -8,9 +8,11 @@ use crate::emit::{ControlFrameKind, FunctionBuilder};
 use crate::emitted_function::FunctionIdentity;
 use crate::module::StaticSignature;
 
+mod binary_numeric;
 mod body_entry_locals;
 mod call_inputs;
 mod executable_code;
+pub(crate) use binary_numeric::PlannedBinaryNumericEntry;
 mod runtime_dispatch;
 mod saved_activation_call;
 pub(crate) use body_entry_locals::{BodyEntryLocals, ResumableEntryLocals};
@@ -29,6 +31,7 @@ enum EntryOrigin {
         id: FunctionId,
         name: String,
         protocol: FunctionProtocolIr,
+        binary_numeric: Option<PlannedBinaryNumericEntry>,
     },
     PreparedScript {
         id: FunctionId,
@@ -47,14 +50,31 @@ pub(crate) struct PlannedFunctionEntry {
 }
 
 impl PlannedFunctionEntry {
-    pub(crate) fn user(source: &FunctionIr, wasm_index: u32) -> Self {
+    pub(crate) fn user(
+        source: &FunctionIr,
+        wasm_index: u32,
+        binary_numeric: Option<PlannedBinaryNumericEntry>,
+    ) -> Self {
+        if let Some(entry) = &binary_numeric {
+            entry.require_source(source);
+        }
         Self {
             origin: EntryOrigin::User {
                 id: source.id.clone(),
                 name: source.name.clone(),
                 protocol: source.protocol,
+                binary_numeric,
             },
             wasm_index,
+        }
+    }
+
+    pub(crate) fn binary_numeric(&self) -> Option<&PlannedBinaryNumericEntry> {
+        match &self.origin {
+            EntryOrigin::User { binary_numeric, .. } => binary_numeric.as_ref(),
+            EntryOrigin::PreparedScript { .. }
+            | EntryOrigin::StandardBuiltin(_)
+            | EntryOrigin::HostBuiltin(_) => None,
         }
     }
 

@@ -25,7 +25,7 @@ normal/abrupt return protocol. The synchronous leaf proof only omits an
 unobservable arguments object and mapping-only storage; it keeps those call
 activation operations. That proof alone cannot authorize a JS body inliner.
 
-A separate NumericLeafPlan admits only noncapturing ordinary functions with
+A separate NumericLeafPlan admits only noncapturing ordinary or arrow functions with
 1–4 unique simple parameters and a single return tree of at most 16 nodes:
 parameter reads, Number constants, unary plus/minus and addition, subtraction,
 multiplication or division. Exact arity, actual JavaScript code identity,
@@ -34,6 +34,16 @@ guard the substitution. Arguments evaluate once into roots before admission;
 fallback dispatch consumes those same values. The admitted expression allocates
 neither StoredValue argument boxes nor argv and has no calls, coercion effects,
 captures or activation/Realm observers. Other calls retain the ordinary ABI.
+
+Exactly two simple formals can also own a typed binary Number callback entry
+on their immutable `ExecutableCode`. The validated plan and auxiliary P body
+are paired before function layout. Native and excluded source bodies publish
+null. Array and TypedArray sorting require actual Number operands and the actual
+JavaScript code's typed reference. The defining P thunk checks source-depth
+admission and returns handled/result; a decline uses the original callable and
+saved operands. TypedArray retains NaN-to-zero normalization before stable
+comparison. This layout-35 field has its own scalar function role, separate from
+the ordinary Completion entry ABI; it does not remove the ordinary entry.
 
 `ConstantLeafPlan` separately validates a whole zero-formal ordinary function
 whose sole return is an immutable String, Number, Boolean, null or undefined
