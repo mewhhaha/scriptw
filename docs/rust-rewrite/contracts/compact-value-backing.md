@@ -46,6 +46,6 @@ Per-change code-size and residency effects require separate attribution.
 
 The historical layout-25 checkpoint recorded 4,869 native cases, 2,365 selected
 pinned Test262 executions and a matched 1.3–1.7× Scriptc RSS range. These results
-belong to that checkpoint, not the current layout-32 storage or current benchmark
+belong to that checkpoint, not the current layout-33 storage or current benchmark
 cohort, and do not isolate a causal saving from a particular change.
 See [verification and measurements](../memory-value-backings-20261027.md).

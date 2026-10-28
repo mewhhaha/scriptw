@@ -56,7 +56,7 @@ impl MethodPlan {
 pub(super) struct Selection {
     code: GcLocal<ExecutableCode, Nullable>,
     name: GcLocal<StringValue, Nullable>,
-    source: GcLocal<StringValue, Nullable>,
+    source: I32Local,
     length: I64Local,
 }
 impl Selection {
@@ -64,12 +64,12 @@ impl Selection {
         Self {
             code: s.reserve_gc_local(f).initialize_null(s, f),
             name: s.reserve_gc_local(f).initialize_null(s, f),
-            source: s.reserve_gc_local(f).initialize_null(s, f),
+            source: s.reserve_i32_local(f),
             length: s.reserve_i64_local(f),
         }
     }
     fn release(self, s: &RuntimeSchema, f: &mut Function) {
-        self.source.clear(f);
+        s.release_i32_local(self.source, f);
         self.name.clear(f);
         self.code.clear(f);
         s.release_i64_local(self.length, f);
@@ -118,12 +118,17 @@ impl FunctionBuilder<'_> {
         );
         selected.name.replace(name.load(s, f).nullable(), f);
         name.clear(f);
-        let source = s.reserve_gc_local(f).initialize(
-            self.emit_interned_string_reference(&plan.meta.to_string_value, f)?,
-            f,
-        );
-        selected.source.replace(source.load(s, f).nullable(), f);
-        source.clear(f);
+        let index = self
+            .strings
+            .pooled_string_index(&plan.meta.to_string_value)?;
+        let crate::data::PooledLiteralDomain::Runtime(source) =
+            self.strings.pooled_string_domain(index)?
+        else {
+            return Err(EmitError::unsupported(
+                "deferred native source must belong to the runtime string pool",
+            ));
+        };
+        selected.source.set_constant(source.ordinal() as i32, f);
         f.instruction(&Instruction::I64Const(
             (plan.meta.length as f64).to_bits() as i64
         ));
@@ -145,9 +150,6 @@ impl FunctionBuilder<'_> {
         let name = s
             .reserve_gc_local(f)
             .initialize(selected.name.load(s, f).require_non_null(f), f);
-        let source = s
-            .reserve_gc_local(f)
-            .initialize(selected.source.load(s, f).require_non_null(f), f);
         let prototype = s.reserve_value_local(f);
         prototype.set_reference(realm.function_prototype(), s, f);
         let yes = s.reserve_i32_local(f);
@@ -193,7 +195,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&object, s),
                     GcOperand::reference(&code, s),
                     GcOperand::reference(&context, s),
-                    GcOperand::reference(&source, s),
+                    GcOperand::null(s),
                     GcOperand::reference(&undefined, s),
                     GcOperand::boolean(true),
                     GcOperand::constant(scriptw_ir::ClassHeritageKind::None),
@@ -205,6 +207,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::constant(None::<crate::module::TypedArrayElementKind>),
                     GcOperand::null(s),
                     GcOperand::null(s),
+                    GcOperand::i32_local(selected.source),
                 ),
                 f,
             ),
@@ -238,7 +241,6 @@ impl FunctionBuilder<'_> {
         context.clear(f);
         object.clear(f);
         prototype.clear(f);
-        source.clear(f);
         name.clear(f);
         code.clear(f);
         s.release_i32_local(no, f);

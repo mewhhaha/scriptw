@@ -323,8 +323,8 @@ impl FunctionBuilder<'_> {
 
     fn emit_typed_array_numeric_compare(
         &mut self,
-        left: &ValueLocals,
-        right: &ValueLocals,
+        left_snapshot: &GcLocal<StoredValue>,
+        right_snapshot: &GcLocal<StoredValue>,
         comparator: &ValueLocals,
         result: &CompletionLocals,
         f: &mut Function,
@@ -338,7 +338,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
         f.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[left, right], f);
+        // The private sort already owns immutable snapshots. Each callback still
+        // gets a fresh argument vector, so arguments mutation or reentry cannot
+        // overwrite another invocation or the values awaiting sorted writeback.
+        let argv = self.emit_argument_vector_from_snapshots([left_snapshot, right_snapshot], f);
         self.emit_function_or_proxy_call_with_argv(comparator, &undefined, &argv, &pending, f)?;
         argv.clear(f);
         result.copy_from(&pending, f);
@@ -366,11 +369,15 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         f.instruction(&Instruction::Else);
+        let left = s.reserve_value_local(f);
+        let right = s.reserve_value_local(f);
+        self.emit_stored_value_to_locals(left_snapshot, &left, f);
+        self.emit_stored_value_to_locals(right_snapshot, &right, f);
         left.tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt.tag()));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_bigint_binary_op_to_locals(BigIntHelperOp::Compare, left, right, result, f)?;
+        self.emit_bigint_binary_op_to_locals(BigIntHelperOp::Compare, &left, &right, result, f)?;
         f.instruction(&Instruction::Else);
         f.instruction(&Instruction::I64Const(0));
         bits.store(f);
@@ -454,6 +461,8 @@ impl FunctionBuilder<'_> {
         result.set_normal(&undefined, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        right.clear(f);
+        left.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         pending.clear(f);
@@ -472,8 +481,6 @@ impl FunctionBuilder<'_> {
     ) -> Result<GcLocal<ValueArray>, EmitError> {
         let s = self.runtime_schema();
         let value = s.reserve_value_local(f);
-        let left = s.reserve_value_local(f);
-        let right = s.reserve_value_local(f);
         let comparison = s.reserve_completion(f);
         let count32 = s.reserve_i32_local(f);
         let cursor32 = s.reserve_i32_local(f);
@@ -499,6 +506,8 @@ impl FunctionBuilder<'_> {
         let stored = s
             .reserve_gc_local(f)
             .initialize(s.struct_type::<StoredValue>().from_value(&value, f), f);
+        let left = s.reserve_gc_local(f).initialize(stored.load(s, f), f);
+        let right = s.reserve_gc_local(f).initialize(stored.load(s, f), f);
         let list = s.reserve_gc_local(f).initialize(
             s.array_type::<ValueArray>()
                 .filled(GcOperand::reference(&stored, s), count32, f),
@@ -581,23 +590,21 @@ impl FunctionBuilder<'_> {
         l.load(f);
         f.instruction(&Instruction::I32WrapI64);
         cursor32.store(f);
-        stored.replace(
+        left.replace(
             s.array_type::<ValueArray>()
                 .read(&list, cursor32, s, f)
                 .reference(),
             f,
         );
-        self.emit_stored_value_to_locals(&stored, &left, f);
         r.load(f);
         f.instruction(&Instruction::I32WrapI64);
         cursor32.store(f);
-        stored.replace(
+        right.replace(
             s.array_type::<ValueArray>()
                 .read(&list, cursor32, s, f)
                 .reference(),
             f,
         );
-        self.emit_stored_value_to_locals(&stored, &right, f);
         self.emit_typed_array_numeric_compare(&left, &right, comparator, &comparison, f)?;
         self.emit_typed_array_method_abrupt_exit(&comparison, output, exit, f);
         comparison.value().scalar().load(f);

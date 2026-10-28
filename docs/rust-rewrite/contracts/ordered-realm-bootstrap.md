@@ -24,8 +24,9 @@ is introduced.
 `IntrinsicConstructorAllocate` receives the caller's already rooted native
 header, exact typed executable code, defining Realm and unresolved runtime source
 ordinal. Its checked producer admits only uniform strict native constructors.
-It retains home value, Context allocation, source resolution, undefined public
-prototype cache, FunctionObject allocation and ACTIVE_FUNCTION cycle order.
+It retains home value, Context allocation, undefined public prototype cache,
+FunctionObject allocation and ACTIVE_FUNCTION cycle order. The admitted source
+ordinal now stays unresolved until Function.prototype.toString observes it.
 Metadata publication follows the complete cycle in the caller. Typed-array
 element kinds derive from the immutable executable's builtin identity using the
 existing closed domain. All standard and host constructors remain eager.

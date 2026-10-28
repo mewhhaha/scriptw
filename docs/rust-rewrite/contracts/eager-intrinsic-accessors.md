@@ -9,11 +9,11 @@ Canonical lookup, insertion order and alias ownership remain at their old owners
 
 The caller still allocates the native object header and typed ExecutableCode,
 using the original defining Realm and Function prototype. One typed R helper then
-allocates FunctionContext, resolves the source ordinal through PooledStringResolve,
-allocates FunctionObject and closes ACTIVE_FUNCTION. Source materialization stays
-after context creation. Metadata publication remains after the closed cycle,
+allocates FunctionContext, retains the admitted source ordinal in FunctionObject
+and closes ACTIVE_FUNCTION. Function.prototype.toString resolves and caches the
+source on first observation. Metadata publication remains after the closed cycle,
 through the existing publisher and original metadata. Every creation still makes
-fresh records; this changes emitted-code duplication rather than allocation count.
+fresh callable/context records; unobserved native source strings remain unallocated.
 
 The plan's fields are private and the allocation wrapper accepts that plan rather
 than unchecked metadata. Runtime-helper parameter/result types retain GC roots
@@ -22,7 +22,7 @@ six-segment data contract and SCRWRM02 receipt format are unchanged. This remain
 the single Wasm GC backend requiring Scriptw's experimental Wasmtime capabilities.
 
 Prepared controls cover invalid planner metadata, the actual emitted R helper and
-its bootstrap callers, source/context/function/cycle order, getter metadata,
+its bootstrap callers, context/function/cycle order, deferred source, getter metadata,
 nonconstructibility, GC, borrowed foreign-Realm accessors and excluded canonical,
 RegExp alias and captured Intl-function identity paths.
 

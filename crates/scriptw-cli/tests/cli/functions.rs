@@ -1287,3 +1287,16 @@ fn run_wasm_backend_preserves_runtime_empty_argument_semantics() {
         "{stdout}"
     );
 }
+
+#[test]
+fn run_wasm_backend_preserves_lazy_native_function_source() {
+    let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
+        .args(["--jobs", "1", "run", "--execution-backend", "wasm"])
+        .arg(fixture_path("wasm_lazy_native_function_source.js"))
+        .output()
+        .expect("native source semantic fixture should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}\nstderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(stdout.contains("backend_used: WasmAot"), "{stdout}");
+    assert!(stdout.contains("lazy-native-function-source-ok"), "{stdout}");
+}

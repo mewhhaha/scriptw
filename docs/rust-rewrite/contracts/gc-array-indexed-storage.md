@@ -33,5 +33,5 @@ literal or cause later elements to evaluate after a throw.
 See [Array methods](native-array-gc-methods.md),
 [packed storage](packed-array-storage.md) and
 [descriptor rules](property-descriptor-lattice.md). The current private ABI is
-layout 32; artifact admission, snapshots and field access derive from the same
+layout 33; artifact admission, snapshots and field access derive from the same
 schema rather than a historical list of raw offsets.

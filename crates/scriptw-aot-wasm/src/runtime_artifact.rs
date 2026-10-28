@@ -69,7 +69,7 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 20 adds the checked retained embedding call/read/checkpoint kernels.
 // Version 23 stores prototypes as nullable actual object payload references.
 // Version 32 adds the closed-kind throwing-error allocation/diagnostic kernel.
-const LAYOUT_VERSION: u32 = 32;
+const LAYOUT_VERSION: u32 = 33;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

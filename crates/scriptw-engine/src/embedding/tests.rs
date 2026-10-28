@@ -193,6 +193,7 @@ fn persisted_artifact_and_two_owned_stores_keep_their_own_userdata_and_realms() 
         let instance = runtime.instantiate(&mut store, &mut linker).unwrap();
         assert_output(instance.evaluate(&mut store).unwrap(), expected);
         assert_eq!(store.data().user_data::<UserData>().unwrap().calls, 1);
+        #[cfg(feature = "native-source-compiler")]
         assert!(store.data().native_source_compiler.is_none());
     }
 }

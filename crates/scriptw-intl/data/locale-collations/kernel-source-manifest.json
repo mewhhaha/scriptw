@@ -372,7 +372,7 @@
     {
       "bytes": 10008,
       "path": "crates/scriptw-intl/data/collator-icu-2/manifest.json",
-      "sha256": "d56841a46b262d25f2a288e4acf2036da6076e6e11a09d10e72798a281142bf4"
+      "sha256": "5d2fcd8d36b6bcf249b07043aad6476ad69c1e1bb9c86b7965c94ae2835f4816"
     },
     {
       "bytes": 8076,
@@ -413,7 +413,7 @@
   ],
   "formatting_DefaultLocale_selection": false,
   "global_union_selection": false,
-  "kernel_sha256": "2e24cc8b04af48f28c7f1645000a44501da31772c1c52000eda962bb67481350",
+  "kernel_sha256": "5a4cd8b5a3e0e585ab10cd457b7f1e419c354ecc472d3942f45dc36cb40cbd35",
   "locale_independent_profile_admission": {
     "current_native_admission": "Setup loads and retains both profiles through existing checked ICU constructors; source-only recipe does not claim current execution.",
     "historical_admission_receipt_sha256": "3fe60ad649669c2e0a99e4374e3871bfaef222e339ebb3b6f1c808dd710f46e6",
@@ -525,14 +525,14 @@
   "producer_checks": "read-only historical genuine export/constructor ancestry; no new Cargo reexport or runtime admission",
   "production_sources": [
     {
-      "bytes": 93161,
+      "bytes": 93323,
       "path": "Cargo.lock",
-      "sha256": "924e7c5e0dabe1516b5d30cce54164a5ebfdf82d6e8d0e3293f2ab04eb0354aa"
+      "sha256": "0b43566e0294f61b012958d96a88143844564c28814461306b216e036d9b175e"
     },
     {
-      "bytes": 6224,
+      "bytes": 6341,
       "path": "Cargo.toml",
-      "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
+      "sha256": "22b986e19549ee2a3bf393717d16fa1544f10a556e0b88ca540042c79823e643"
     },
     {
       "bytes": 90596,
@@ -592,7 +592,7 @@
     {
       "bytes": 324,
       "path": "crates/scriptw-intl/src/collator/identity.rs",
-      "sha256": "f109b829f9a5dd4512b630e0bb2ea174c48fe27db41e6a3ffca17d4d26b614da"
+      "sha256": "7e8e699c89230b2d846dc281139b9159c8d2b94cd3f968d7f3b86bb3f9287cc7"
     },
     {
       "bytes": 37655,

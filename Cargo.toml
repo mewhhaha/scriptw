@@ -12,6 +12,7 @@ members = [
   "crates/scriptw-aot-wasm",
   "crates/scriptw-engine",
   "crates/scriptw-cli",
+  "crates/scriptw-precompiled-consumer",
   "crates/scriptw-test262",
 ]
 resolver = "2"
@@ -60,6 +61,9 @@ debug = "line-tables-only"
 # Keep symbols/panic locations; omit DWARF from the shipped CLI and examples.
 # Full executable identity hashing still covers every byte of those artifacts.
 [profile.release.package.scriptw-cli]
+strip = "debuginfo"
+
+[profile.release.package.scriptw-precompiled-consumer]
 strip = "debuginfo"
 
 # The runtime-image producer emits/adopts R in Rust before native compilation.

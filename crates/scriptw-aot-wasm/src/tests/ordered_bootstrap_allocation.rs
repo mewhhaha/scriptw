@@ -124,10 +124,17 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
     let contexts = allocations(&constructors, type_index::<FunctionContext>(schema));
     let callables = allocations(&constructors, type_index::<FunctionObject>(schema));
     let sources = calls(&constructors, key);
-    assert_eq!((contexts.len(), callables.len(), sources.len()), (1, 1, 1));
+    assert_eq!((contexts.len(), callables.len(), sources.len()), (1, 1, 0));
     assert!(
-        contexts[0] < sources[0] && sources[0] < callables[0],
-        "constructor context exists before source resolution and callable allocation"
+        contexts[0] < callables[0],
+        "constructor context exists before callable allocation; native source remains deferred"
+    );
+    assert!(
+        matches!(
+            constructors[callables[0] - 1],
+            Operator::LocalGet { local_index: 3 }
+        ),
+        "constructor allocation stores its admitted runtime-source ordinal"
     );
     assert_eq!(
         constructors

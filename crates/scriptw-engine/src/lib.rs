@@ -120,23 +120,28 @@ use wasmtime_config::{
 #[cfg(test)]
 #[path = "../tests/unit/native_compilation_dispatch.rs"]
 mod native_compilation_dispatch_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-source-compiler"))]
 mod native_direct_eval_compiler_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-source-compiler"))]
 mod native_function_compiler_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-source-compiler"))]
 mod native_global_script_compiler_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-source-compiler"))]
 mod native_language_feature_policy_tests;
 #[cfg(test)]
 mod source_compilation_profile_tests;
 mod wasm_compilation_policy;
 mod wasm_gc_completion;
 mod wasm_gc_host;
+#[cfg(feature = "native-source-compiler")]
 mod wasm_native_direct_eval_compiler;
+#[cfg(feature = "native-source-compiler")]
 mod wasm_native_function_compiler;
+#[cfg(feature = "native-source-compiler")]
 mod wasm_native_global_script_compiler;
+#[cfg(feature = "native-source-compiler")]
 mod wasm_native_program_template;
+#[cfg(feature = "native-source-compiler")]
 mod wasm_native_source_compiler;
 pub use wasm_compilation_policy::WasmCompilationPolicy;
 mod wasm_gc_intl_host;
@@ -162,6 +167,10 @@ pub use scriptw_ir::{
 pub use scriptw_ir::{RuntimeUnavailableCapability, WasmWeakReachabilityCapability};
 pub use scriptw_runtime::OracleExceptionPhase;
 pub use wasmtime_policy::WasmGcCapability;
+/// Whether this actual engine build contains native runtime source-compilation
+/// authority. Query the engine rather than the caller's feature flags: Cargo
+/// can unify this capability through another dependency in the same build.
+pub const NATIVE_SOURCE_COMPILER_ENABLED: bool = cfg!(feature = "native-source-compiler");
 use wasmtime_policy::{WasmtimeRuntimePolicy, PRODUCT_WASMTIME_POLICY};
 
 const WASM_THROW_ERROR_NAME_EXPORT: &str = "throw_error_name";
@@ -2213,13 +2222,13 @@ fn wasm_reject_runtime_semantics(operation_code: i64) -> wasmtime::Result<()> {
 
 pub struct Engine {
     realm: Realm,
-    #[cfg(test)]
+    #[cfg(all(test, feature = "native-source-compiler"))]
     native_function_compilation_observer:
         Option<Arc<wasm_native_function_compiler::NativeFunctionCompilationObserver>>,
-    #[cfg(test)]
+    #[cfg(all(test, feature = "native-source-compiler"))]
     native_global_script_compilation_observer:
         Option<Arc<wasm_native_global_script_compiler::NativeGlobalScriptCompilationObserver>>,
-    #[cfg(test)]
+    #[cfg(all(test, feature = "native-source-compiler"))]
     native_direct_eval_compilation_observer:
         Option<Arc<wasm_native_direct_eval_compiler::NativeDirectEvalCompilationObserver>>,
 }
@@ -2483,6 +2492,7 @@ struct WasmAgentExecution {
 }
 
 impl WasmAgentGroup {
+    #[cfg(feature = "native-source-compiler")]
     fn start(self: &Arc<Self>, source: String) -> Result<(), EngineError> {
         self.execution_control.remaining()?;
         let worker_source = source;
@@ -2699,11 +2709,11 @@ impl Engine {
     pub fn new(realm: Realm) -> Self {
         Self {
             realm,
-            #[cfg(test)]
+            #[cfg(all(test, feature = "native-source-compiler"))]
             native_function_compilation_observer: None,
-            #[cfg(test)]
+            #[cfg(all(test, feature = "native-source-compiler"))]
             native_global_script_compilation_observer: None,
-            #[cfg(test)]
+            #[cfg(all(test, feature = "native-source-compiler"))]
             native_direct_eval_compilation_observer: None,
         }
     }
@@ -4072,7 +4082,9 @@ impl Engine {
                 user_data: None,
                 embedding: None,
                 weak: wasm_gc_weak_host::WeakGcState::default(),
+                #[cfg(feature = "native-source-compiler")]
                 native_source_compiler: None,
+                #[cfg(feature = "native-source-compiler")]
                 native_template_instances: Default::default(),
                 realm: self.realm.clone(),
                 output_events: WasmOutputEvents::for_mode(mode),
@@ -4188,6 +4200,7 @@ impl Engine {
         if agent_execution.is_none() {
             execution_control.arm(execution_started, timeout_ms);
         }
+        #[cfg(feature = "native-source-compiler")]
         if let (Some(runtime), Some(policy)) = (program.runtime, program.compilation_policy) {
             if runtime.source_compilation_profile()
                 == scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost

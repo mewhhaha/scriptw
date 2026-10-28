@@ -4219,3 +4219,5 @@ fn dense_literals_avoid_sparse_bookkeeping_and_sparse_writes_share_one_body() {
         "896 literal elements added {added_bytes} bytes"
     );
 }
+
+mod typed_array_sort_snapshots;

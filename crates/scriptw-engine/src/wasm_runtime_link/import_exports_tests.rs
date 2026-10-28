@@ -74,7 +74,9 @@ fn state() -> WasmHostState {
         user_data: None,
         embedding: None,
         weak: Default::default(),
+        #[cfg(feature = "native-source-compiler")]
         native_source_compiler: None,
+        #[cfg(feature = "native-source-compiler")]
         native_template_instances: Default::default(),
         monotonic_clock_origin: realm.host_clock().monotonic_instant(),
         realm,

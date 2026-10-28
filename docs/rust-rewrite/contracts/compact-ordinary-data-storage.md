@@ -1,6 +1,6 @@
 # Compact ordinary data storage
 
-The current private runtime ABI is layout 32. Compact ordinary property storage
+The current private runtime ABI is layout 33. Compact ordinary property storage
 belongs to the single Wasm GC object model and requires the experimental
 Wasmtime GC/reference feature baseline. Layout 31 adds the inline representation
 and shared store kernel described in

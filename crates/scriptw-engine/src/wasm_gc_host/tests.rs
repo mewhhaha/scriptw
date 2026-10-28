@@ -64,13 +64,22 @@ fn emitted_portable_and_native_r_keep_actual_compiler_import_domains() {
                 );
             }
             let mut linker = WasmtimeLinker::new(&engine);
-            link(&mut linker, &module).unwrap();
+            let linked = link(&mut linker, &module);
+            if expected && !cfg!(feature = "native-source-compiler") {
+                assert!(linked
+                    .unwrap_err()
+                    .to_string()
+                    .contains("native source compilation is unavailable"));
+            } else {
+                linked.unwrap();
+            }
         }
         Ok::<_, EngineError>(())
     })
     .unwrap();
 }
 
+#[cfg(feature = "native-source-compiler")]
 #[test]
 fn present_compiler_names_preserve_wrong_signature_kind_and_duplicate_rejection() {
     let engine = shared_wasm_engine().unwrap();
@@ -105,6 +114,7 @@ fn present_compiler_names_preserve_wrong_signature_kind_and_duplicate_rejection(
     }
 }
 
+#[cfg(feature = "native-source-compiler")]
 #[test]
 fn native_compilers_still_arm_after_linking_before_all_three_dynamic_calls() {
     let function =
@@ -138,4 +148,29 @@ if (compiled() !== 23 || globalThis[token] !== 31 || local('value + 1; /* ' + to
     assert!(function.snapshot().requests > 0 && function.snapshot().completed_factories > 0);
     assert!(global.snapshot().requests > 0 && global.snapshot().completed_factories > 0);
     assert!(direct.snapshot().requests > 0 && direct.snapshot().completed_factories > 0);
+}
+
+#[cfg(not(feature = "native-source-compiler"))]
+#[test]
+fn feature_off_rejects_all_native_compiler_import_names_before_binding() {
+    let engine = shared_wasm_engine().unwrap();
+    for row in SOURCE_COMPILER_IMPORTS {
+        for (descriptor, copies) in [(&[0, 0][..], 1), (&[2, 0, 1][..], 1), (&[0, 0][..], 2)] {
+            let module = compile_wasm_module(
+                &engine,
+                &imported(row.module(), row.name(), descriptor, copies),
+            )
+            .unwrap();
+            let error = link(&mut WasmtimeLinker::new(&engine), &module).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("native source compilation is unavailable"),
+                "{error}"
+            );
+        }
+        let unrelated =
+            compile_wasm_module(&engine, &imported("unrelated", row.name(), &[0, 0], 1)).unwrap();
+        link(&mut WasmtimeLinker::new(&engine), &unrelated).unwrap();
+    }
 }

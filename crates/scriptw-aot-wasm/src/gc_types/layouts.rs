@@ -1012,7 +1012,7 @@ gc_layout_registry! {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             CODE: GcRef<ExecutableCode>, Immutable, NonNullable;
             CONTEXT: GcRef<FunctionContext>, Immutable, NonNullable;
-            TO_STRING: GcRef<StringValue>, Immutable, NonNullable;
+            TO_STRING: GcRef<StringValue>, Mutable, Nullable;
             PUBLIC_PROTOTYPE_CACHE: GcRef<StoredValue>, Mutable, NonNullable;
             STRICT: bool, Immutable, NonNullable;
             CLASS_HERITAGE: scriptw_ir::ClassHeritageKind, Immutable, NonNullable;
@@ -1024,6 +1024,8 @@ gc_layout_registry! {
             TYPED_ARRAY_ELEMENT_KIND: Option<crate::module::TypedArrayElementKind>, Immutable, NonNullable;
             LEGACY_CALLER: GcRef<LegacyReflectionPropertyState>, Mutable, Nullable;
             LEGACY_ARGUMENTS: GcRef<LegacyReflectionPropertyState>, Mutable, Nullable;
+            // Used only while TO_STRING is absent; admitted from the runtime pool.
+            SOURCE_ORDINAL: I32Value, Immutable, NonNullable;
         }
         // Only the original optional legacy data properties own publication.
         // Their last StoredValue is a mutation token, not a JavaScript value

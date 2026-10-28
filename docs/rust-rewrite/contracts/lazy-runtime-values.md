@@ -81,3 +81,19 @@ Linux mmap-backed GC heaps prefer base pages before initialization, and retain
 that preference through in-place growth and relocation. Advice refusal keeps
 valid memory usable; custom/malloc backing retains its own allocation policy.
 These policies do not request extra collections or purge benchmark state.
+
+Runtime layout 33 keeps native function source text deferred independently of
+callable creation. FunctionObject stores a nullable cached source StringValue
+and the producer-admitted runtime-pool ordinal. Constructor, accessor and
+method allocation retain that ordinal without resolving the source. User
+JavaScript source and program-owned native text retain their original materialized
+strings. No native source recipe object or additional string table is allocated.
+
+Function.prototype.toString resolves an absent source through the existing
+canonical runtime string cache, then publishes the completed StringValue on the
+actual callable. It reads no public name, prototype or toString property and
+executes no user code. Bound functions and callable proxies retain their existing
+native-string path. Borrowed and cross-Realm calls use the original callable's
+source; collection before or after first observation preserves that source.
+The schema change requires matching runtime/program artifacts. Allocation and
+residency improvements require the matched measurements, not source counts.

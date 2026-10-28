@@ -54,6 +54,28 @@ class MaintenanceSourceGuards(unittest.TestCase):
             before, before + '\n"crates/scriptw-engine/src/wasm_gc_host.rs",'),
             "fingerprint_allowlist")
 
+    def test_native_control_gates_require_test_and_source_compiler_capability(self):
+        sources = {name: (ROOT / name).read_text() for name in host.FILES}
+        self.assertEqual(host.check(sources), [])
+        path = host.ENGINE + "src/lib.rs"
+        source = host.compact(sources[path])
+        for owner, count in host.NATIVE_TEST_GATES.items():
+            before = host.NATIVE_TEST_GATE + owner
+            self.assertEqual(source.count(before), count)
+            for weaker in ("", "#[cfg(test)]",
+                           '#[cfg(feature="native-source-compiler")]',
+                           '#[cfg(any(test,feature="native-source-compiler"))]'):
+                # Test both the field and initializer independently when the
+                # same declaration prefix occurs twice.
+                for occurrence in range(count):
+                    with self.subTest(owner=owner, gate=weaker, occurrence=occurrence):
+                        position = [m.start() for m in re.finditer(re.escape(before), source)][occurrence]
+                        changed = dict(sources)
+                        changed[path] = source[:position] + weaker + owner + source[position + len(before):]
+                        self.assertIn("static_test_gates", {
+                            row["invariant"] for row in host.check(changed)
+                        })
+
     def test_immutable_pool_requires_shared_proof_and_all_three_callers(self):
         self.assertEqual(pool.check(ROOT), [])
         path = pool.A + "runtime_artifact/validated_profile.rs"

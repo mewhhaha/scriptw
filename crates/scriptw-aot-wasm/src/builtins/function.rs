@@ -1,5 +1,7 @@
 use super::super::*;
-use crate::gc_types::{FunctionObject, FunctionObjectSchema, GcNullability, ValueLocals};
+use crate::gc_types::{
+    FunctionObject, FunctionObjectSchema, GcNullability, GcOperand, ValueLocals,
+};
 
 mod constructor;
 mod dynamic_constructor;
@@ -180,8 +182,39 @@ impl FunctionBuilder<'_> {
                         .reference(),
                     function,
                 );
-                argument.set_reference(&text, schema, function);
+                text.load(schema, function).is_null(function);
+                self.open_frame(ControlFrameKind::If, function);
+                let ordinal = schema.reserve_i32_local(function);
+                schema
+                    .field(FunctionObjectSchema::SOURCE_ORDINAL)
+                    .read(&callable, schema, function)
+                    .store(ordinal, function);
+                let resolved = schema.reserve_gc_local(function).initialize(
+                    schema.resolve_pooled_string_reference(
+                        ordinal,
+                        self.runtime_helper_base()?,
+                        function,
+                    ),
+                    function,
+                );
+                schema.field(FunctionObjectSchema::TO_STRING).write(
+                    &callable,
+                    GcOperand::nullable_reference(&resolved, schema),
+                    schema,
+                    function,
+                );
+                text.replace(resolved.load(schema, function).nullable(), function);
+                resolved.clear(function);
+                schema.release_i32_local(ordinal, function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                let resolved = schema.reserve_gc_local(function).initialize(
+                    text.load(schema, function).require_non_null(function),
+                    function,
+                );
+                argument.set_reference(&resolved, schema, function);
                 result.set_normal(&argument, function);
+                resolved.clear(function);
                 text.clear(function);
                 callable.clear(function);
                 function.instruction(&Instruction::Else);

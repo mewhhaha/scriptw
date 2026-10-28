@@ -1273,3 +1273,22 @@ fn run_wasm_backend_preserves_hidden_typedarray_constructor_identity() {
     assert!(stdout.contains("backend_used: WasmAot"));
     assert!(stdout.contains("boolean(true)"), "{stdout}");
 }
+
+#[test]
+fn run_wasm_backend_keeps_typedarray_sort_snapshots_across_arguments_mutation_and_gc() {
+    let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
+        .arg("run")
+        .arg("--execution-backend")
+        .arg("wasm")
+        .arg(fixture_path("wasm_typedarray_sort_snapshot_arguments.js"))
+        .output()
+        .expect("run command should run");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("backend_used: WasmAot"), "{stdout}");
+    assert!(stdout.contains("boolean(true)"), "{stdout}");
+}

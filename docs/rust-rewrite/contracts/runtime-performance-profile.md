@@ -413,7 +413,7 @@ rejects layout 15. Every string carries the field even if it is never hashed;
 retained-string measurements must account for that cost.
 
 Binding cells retain immutable StoredValue snapshots. This records the historical
-layout-16 checkpoint; the current private runtime ABI is layout 32.
+layout-16 checkpoint; the current private runtime ABI is layout 33.
 The earlier, unrelated inline-payload experiment also used draft layout 16; it
 did not establish a closure benefit and is removed. Its raw measurements remain
 historical evidence. Descriptor

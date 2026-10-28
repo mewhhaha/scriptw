@@ -30,7 +30,7 @@ pub(super) struct FunctionAllocationInputs<'a> {
 
 impl FunctionBuilder<'_> {
     /// The checked eager-accessor domain has no caller/program captures. Its
-    /// source ordinal stays unresolved until the shared tail has made Context.
+    /// source ordinal stays unresolved until Function.prototype.toString observes it.
     pub(crate) fn emit_validated_intrinsic_accessor_record(
         &mut self,
         plan: &crate::intrinsics::eager_accessors::AccessorPlan,
@@ -627,11 +627,32 @@ impl FunctionBuilder<'_> {
         );
         initializer.clear(function);
         let source_text = schema
-            .reserve_gc_local::<StringValue, NonNullable>(function)
-            .initialize(
+            .reserve_gc_local::<StringValue, Nullable>(function)
+            .initialize_null(schema, function);
+        let source_ordinal = schema.reserve_i32_local(function);
+        let runtime_source = match executable_kind {
+            ExecutableCodeKind::JavaScript => None,
+            ExecutableCodeKind::StandardBuiltin | ExecutableCodeKind::HostBuiltin => {
+                let index = self.strings.pooled_string_index(&meta.to_string_value)?;
+                match self.strings.pooled_string_domain(index)? {
+                    crate::data::PooledLiteralDomain::Runtime(index) => Some(index),
+                    crate::data::PooledLiteralDomain::Program(_) => None,
+                }
+            }
+        };
+        if let Some(index) = runtime_source {
+            source_ordinal.set_constant(index.ordinal() as i32, function);
+        } else {
+            // User source and program-owned native text retain their actual
+            // source owner; only the sealed runtime pool can be deferred.
+            let materialized = schema.reserve_gc_local(function).initialize(
                 self.emit_interned_string_reference(&meta.to_string_value, function)?,
                 function,
             );
+            source_text.replace(materialized.load(schema, function).nullable(), function);
+            materialized.clear(function);
+            source_ordinal.set_constant(-1, function);
+        }
         // Publication replaces this field's edge when it creates a prototype;
         // the immutable undefined snapshot never acquires object identity.
         let stored_public_prototype = schema
@@ -655,6 +676,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::constant(inputs.typed_array_element_kind),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::i32_local(source_ordinal),
                 ),
                 function,
             ),
@@ -681,6 +703,7 @@ impl FunctionBuilder<'_> {
         )?;
         stored_public_prototype.clear(function);
         source_text.clear(function);
+        schema.release_i32_local(source_ordinal, function);
         stored_home.clear(function);
         context.clear(function);
         code.clear(function);

@@ -73,7 +73,3 @@ pub(super) fn run_with_config(
     write_new(&output.join("producer.json"), report.to_string().as_bytes())?;
     Ok(report)
 }
-
-pub(super) fn hash_key(key: &[u8; 32]) -> String {
-    key.iter().map(|byte| format!("{byte:02x}")).collect()
-}

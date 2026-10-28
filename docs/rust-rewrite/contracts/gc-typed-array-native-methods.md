@@ -36,7 +36,12 @@ Stable bottom-up merging is O(n log n), choosing the earlier left value on
 comparison equality. Default comparison uses exact BigInt Compare or Number
 ordering with NaNs last and negative zero before positive zero. A supplied
 comparator uses actual Call with undefined this, then actual ToNumber; NaN is
-canonical comparison equality. Every comparison completes before writeback, so
+canonical comparison equality. Each callback gets a fresh argument ValueArray
+referencing the sort's existing immutable StoredValues. Mutating or retaining
+the callback's arguments cannot alter another call or the private sort snapshot;
+both operands stay rooted across reentry, collection and result coercion.
+Default comparison alone unpacks those snapshots into its numeric operands.
+Every comparison completes before writeback, so
 callbacks may mutate/detach the original buffer without changing the captured
 list, and comparison Throws retain the original value. Detached in-place writes
 use the existing specified suppressed-write behavior. Temporary lists contain

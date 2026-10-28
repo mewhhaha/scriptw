@@ -35,12 +35,8 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        // Resolving after Context allocation preserves the old factory order.
-        // The producer passes a checked pooled ordinal, never an eager String.
-        let source = s.reserve_gc_local(f).initialize(
-            s.resolve_pooled_string_reference(p.source_ordinal, self.runtime_helper_base()?, f),
-            f,
-        );
+        // Retain the producer-admitted ordinal. The first toString observation
+        // resolves its StringValue through the existing runtime string cache.
         let public_prototype = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
         let callable = s.reserve_gc_local(f).initialize(
             s.struct_type::<FunctionObject>().construct(
@@ -48,7 +44,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&p.header, s),
                     GcOperand::reference(&p.code, s),
                     GcOperand::reference(&context, s),
-                    GcOperand::reference(&source, s),
+                    GcOperand::null(s),
                     GcOperand::reference(&public_prototype, s),
                     GcOperand::boolean(true),
                     GcOperand::constant(scriptw_ir::ClassHeritageKind::None),
@@ -60,6 +56,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::constant(None::<crate::module::TypedArrayElementKind>),
                     GcOperand::null(s),
                     GcOperand::null(s),
+                    GcOperand::i32_local(p.source_ordinal),
                 ),
                 f,
             ),
@@ -72,7 +69,6 @@ impl FunctionBuilder<'_> {
             f,
         );
         public_prototype.clear(f);
-        source.clear(f);
         home.clear(f);
         context.clear(f);
         callable.load(s, f);

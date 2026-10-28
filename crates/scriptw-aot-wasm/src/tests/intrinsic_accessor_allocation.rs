@@ -86,10 +86,16 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
                 .then_some(offset)
         })
         .collect::<Vec<_>>();
-    assert_eq!(
-        source.len(),
-        1,
-        "source stays with the checked pooled-string resolver"
+    assert!(
+        source.is_empty(),
+        "native source stays unresolved during allocation"
+    );
+    assert!(
+        matches!(
+            helper[callable[0] - 1],
+            Operator::LocalGet { local_index: 3 }
+        ),
+        "the validated source ordinal is stored as the last immutable field"
     );
     let close = helper
         .iter()
@@ -107,8 +113,8 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
         "close the actual context/function cycle once"
     );
     assert!(
-        context[0] < source[0] && source[0] < callable[0] && callable[0] < close[0],
-        "retain context, source resolution, callable, ACTIVE_FUNCTION publication order"
+        context[0] < callable[0] && callable[0] < close[0],
+        "retain context, callable, ACTIVE_FUNCTION publication order"
     );
     assert!(
         !helper

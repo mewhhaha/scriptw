@@ -52,19 +52,28 @@ pub(super) fn agent_call(
     })?;
     match operation {
         AgentHostOperation::Start => {
-            let group = group.as_ref().ok_or_else(|| {
-                wasmtime::Error::msg("agent.start used without an active Test262 agent group")
-            })?;
-            let source = String::from_utf8(read_bytes(&caller, first, second)?).map_err(|err| {
-                wasmtime::Error::msg(format!("Test262 agent source is not UTF-8: {err}"))
-            })?;
-            group.start(source).map_err(|err| {
-                wasmtime::Error::new(err).context("failed to compile or start Test262 agent")
-            })?;
-            if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-                eprintln!("scriptw wasm trace: Test262 agent started");
+            #[cfg(not(feature = "native-source-compiler"))]
+            {
+                Err(wasmtime::Error::msg(
+                    "agent.start source compilation is unavailable in this build; enable native-source-compiler",
+                ))
             }
-            Ok(0)
+            #[cfg(feature = "native-source-compiler")]
+            {
+                let group = group.as_ref().ok_or_else(|| {
+                    wasmtime::Error::msg("agent.start used without an active Test262 agent group")
+                })?;
+                let source = String::from_utf8(read_bytes(&caller, first, second)?).map_err(|err| {
+                    wasmtime::Error::msg(format!("Test262 agent source is not UTF-8: {err}"))
+                })?;
+                group.start(source).map_err(|err| {
+                    wasmtime::Error::new(err).context("failed to compile or start Test262 agent")
+                })?;
+                if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
+                    eprintln!("scriptw wasm trace: Test262 agent started");
+                }
+                Ok(0)
+            }
         }
         AgentHostOperation::Report => {
             let group = group.as_ref().ok_or_else(|| {

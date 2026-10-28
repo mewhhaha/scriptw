@@ -41,8 +41,10 @@ mod tests;
 /// pooled by this API.
 pub struct WasmStoreState {
     pub(super) weak: wasm_gc_weak_host::WeakGcState,
+    #[cfg(feature = "native-source-compiler")]
     pub(super) native_source_compiler:
         Option<Arc<wasm_native_source_compiler::NativeSourceCompilerContext>>,
+    #[cfg(feature = "native-source-compiler")]
     pub(super) native_template_instances: memory_module_cache::MemoryNativeInstanceCache,
     pub(super) realm: Realm,
     pub(super) output_events: WasmOutputEvents,
@@ -245,7 +247,9 @@ impl EmbeddedRuntime {
             .transpose()?;
         Ok(WasmStoreState {
             weak: Default::default(),
+            #[cfg(feature = "native-source-compiler")]
             native_source_compiler: None,
+            #[cfg(feature = "native-source-compiler")]
             native_template_instances: Default::default(),
             monotonic_clock_origin: realm.host_clock().monotonic_instant(),
             realm,

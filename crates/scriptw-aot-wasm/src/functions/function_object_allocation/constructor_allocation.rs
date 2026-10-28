@@ -165,12 +165,8 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        // Keep source resolution after Context allocation. Passing an eager
-        // String would change the old allocation/key-materialization order.
-        let source = s.reserve_gc_local(f).initialize(
-            s.resolve_pooled_string_reference(p.source_ordinal, self.runtime_helper_base()?, f),
-            f,
-        );
+        // Retain the producer-admitted ordinal. The first toString observation
+        // resolves its StringValue through the existing runtime string cache.
         let public_prototype = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
         // The exact typed executable was already admitted by the producer.
         // Derive this closed field from that immutable code identity, never
@@ -197,7 +193,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&p.header, s),
                     GcOperand::reference(&p.code, s),
                     GcOperand::reference(&context, s),
-                    GcOperand::reference(&source, s),
+                    GcOperand::null(s),
                     GcOperand::reference(&public_prototype, s),
                     GcOperand::boolean(true),
                     GcOperand::constant(scriptw_ir::ClassHeritageKind::None),
@@ -209,6 +205,7 @@ impl FunctionBuilder<'_> {
                     element_kind.operand(),
                     GcOperand::null(s),
                     GcOperand::null(s),
+                    GcOperand::i32_local(p.source_ordinal),
                 ),
                 f,
             ),
@@ -223,7 +220,6 @@ impl FunctionBuilder<'_> {
         element_kind.clear(s, f);
         s.release_i32_local(builtin, f);
         public_prototype.clear(f);
-        source.clear(f);
         context.clear(f);
         home.clear(f);
         callable.load(s, f);

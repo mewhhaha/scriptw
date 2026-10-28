@@ -1,0 +1,20 @@
+[package]
+name = "scriptw-precompiled-consumer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+build = "../scriptw-cli/build.rs"
+
+[dependencies]
+scriptw-engine = { path = "../scriptw-engine", default-features = false }
+serde_json = "1.0"
+sha2 = "0.10.9"
+wasmtime = { version = "=47.0.0", default-features = false, features = ["runtime", "std"] }
+wasmtime-wasi = { version = "=47.0.0", default-features = false, features = ["p1"] }
+
+[features]
+# Enables the same excluded mapping diagnostic as the producer host.
+benchmark-module-images = ["scriptw-engine/benchmark-module-images"]
+# Control build for same-source capability-on/off experiments.
+native-source-compiler = ["scriptw-engine/native-source-compiler"]

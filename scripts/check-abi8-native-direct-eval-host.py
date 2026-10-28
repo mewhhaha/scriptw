@@ -30,6 +30,18 @@ MOVED_TEST_GATES = {
     AOT + "control_flow.rs": "#[cfg(test)]modtests;",
     "crates/scriptw-runtime/src/rooted_snapshot.rs": "#[cfg(test)]modtests;",
 }
+NATIVE_TEST_GATE = '#[cfg(all(test,feature="native-source-compiler"))]'
+# Native controls need both test isolation and the source-compiler capability.
+# Observer fields and their initializers must carry the same complete gate.
+NATIVE_TEST_GATES = {
+    "modnative_direct_eval_compiler_tests;": 1,
+    "modnative_function_compiler_tests;": 1,
+    "modnative_global_script_compiler_tests;": 1,
+    "modnative_language_feature_policy_tests;": 1,
+    "native_direct_eval_compilation_observer:": 2,
+    "native_function_compilation_observer:": 2,
+    "native_global_script_compilation_observer:": 2,
+}
 
 AUTHORED_CONTROLS = [['crates/scriptw-engine/src/native_direct_eval_compiler_tests/caller_records.rs', 'native_direct_eval_keeps_caller_lexical_writes_var_admission_and_strictness'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/caller_records.rs', 'native_direct_eval_uses_actual_this_arguments_and_new_target_records'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/caller_records.rs', 'native_unicode_private_names_keep_hidden_ancestor_scope_and_escaping_gc_roots'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/caller_records.rs', 'native_super_arrow_initializes_the_defining_constructor_after_gc'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/ownership.rs', 'native_nested_eval_and_old_program_reentry_keep_separate_defining_owners'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/ownership.rs', 'direct_eval_native_compilation_and_execution_keep_the_original_parent_timeout'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/source_and_errors.rs', 'native_direct_syntax_uses_real_caller_grammar_and_intrinsic_error_identity'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/source_and_errors.rs', 'native_direct_source_keeps_exact_lone_utf16_units_and_non_string_identity'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/source_and_errors.rs', 'unused_external_import_bodies_do_not_reject_native_direct_eval'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/source_and_errors.rs', 'external_import_operand_throws_precede_its_runtime_capability_boundary'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/source_and_errors.rs', 'executed_external_import_keeps_its_distinct_uncatchable_capability_error'], ['crates/scriptw-engine/src/wasm_native_direct_eval_compiler/tests.rs', 'only_malformed_javascript_parse_rejections_become_direct_eval_syntax_messages'], ['crates/scriptw-engine/src/wasm_native_direct_eval_compiler/tests.rs', 'factory_request_identity_includes_hidden_private_floor_and_exact_utf16_source'], ['crates/scriptw-engine/src/wasm_native_direct_eval_compiler/tests.rs', 'actual_syntax_and_thrown_reference_roots_survive_temporary_scope_exit_and_gc']]
 EMPTY_BLOCK_CONTROLS = [['crates/scriptw-engine/src/native_direct_eval_compiler_tests/empty_blocks.rs', 'native_direct_empty_blocks_preserve_update_empty_and_nested_values'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/empty_blocks.rs', 'native_direct_empty_loop_bodies_keep_condition_and_update_effects'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/empty_blocks.rs', 'native_direct_empty_blocks_keep_lexical_shadowing_and_early_errors'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/empty_blocks.rs', 'native_direct_empty_try_clauses_keep_update_empty_and_catch_ownership'], ['crates/scriptw-engine/src/native_direct_eval_compiler_tests/empty_blocks.rs', 'native_direct_empty_statement_lists_keep_declarations_and_resource_lifetimes']]
@@ -206,15 +218,15 @@ def check(sources: dict[str, str]) -> list[dict[str, str]]:
     require(all(c[ENGINE + "src/tests.rs"].count(f'#[path="tests/{Path(name).name}"]mod{Path(name).stem};') == 1
                 for name in ENGINE_TEST_CHILDREN),
             "moved_test_gates", "all nine engine children have one exact cfg(test) parent declaration")
-    require("#[cfg(test)]modnative_direct_eval_compiler_tests;" in engine and
+    require(all(engine.count(NATIVE_TEST_GATE + owner) == count
+                for owner, count in NATIVE_TEST_GATES.items()) and
             "#[cfg(test)]modobserver;" in host and "#[cfg(test)]modtests;" in host and
             "#[cfg(test)]pub(super)useobserver::{" in host and
-            "#[cfg(test)]native_direct_eval_compilation_observer:" in engine and
             "#[cfg(test)]letcontext=context.with_test_observers(" in engine and
             "#[cfg(test)]pub(super)direct_eval_test_observer:" in context and
             "#[cfg(test)]pub(super)fnwith_test_observers(" in context and
             '"crates/scriptw-engine/src"' in fingerprint,
-            "static_test_gates", "observer and control owners remain statically cfg(test) while production tree stays covered")
+            "static_test_gates", "native controls and observer fields require test plus source capability; child observers remain test-only and production stays covered")
     helper = c[ENGINE + "src/native_direct_eval_compiler_tests.rs"]
     require("!script.prepared_scripts.iter().any(" in helper and
             "decode_js_string_utf16(&row.source)==*source" in helper and

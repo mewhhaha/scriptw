@@ -53,7 +53,7 @@ jobs:
           python3 -B -m unittest scripts.tests.test_precompiled_comparison scripts.tests.test_tooling_benchmark_boundary scripts.tests.test_precompiled_mapping_diagnostic scripts.tests.test_benchmark_module_images -v
           bash scripts/check-no-legacy-js.sh
           python3 -B scripts/intl_source_identities.py
-          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --no-default-features --doc
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --no-default-features --features native-source-compiler --doc
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --features benchmark-module-images --lib -- \
             --exact --include-ignored --test-threads=1 --color=never \
             embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop \

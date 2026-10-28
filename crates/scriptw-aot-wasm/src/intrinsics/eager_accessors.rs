@@ -1,4 +1,4 @@
-//! An eager accessor keeps its original identity and source-materialization order.
+//! An eager accessor keeps its identity and defers its admitted native source text.
 use super::*;
 use crate::data::{PooledLiteralDomain, PooledStringIndex, StringPool};
 use crate::emitted_function::FunctionIdentity;
