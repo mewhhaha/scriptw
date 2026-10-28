@@ -102,6 +102,11 @@ a memory or speed gain: the [controlled capacity probe](docs/rust-rewrite/memory
 grew back to 16 MiB on retained objects and roughly doubled their execution time.
 Its diagnostic RSS is separate from the comparison below.
 
+The next [error-preparation change](docs/rust-rewrite/contracts/runtime-error-for-throw.md)
+shares repeated allocation and diagnostic code while preserving caller Realm,
+message ownership and throw completion. Verification and matched measurements
+are pending; no resident-memory saving is established yet.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

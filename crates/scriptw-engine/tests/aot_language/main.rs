@@ -41,6 +41,7 @@ mod aot_private_numeric_updates;
 mod aot_property_flow_boundaries;
 mod aot_public_class_fields;
 mod aot_remaining_invocation_references;
+mod aot_runtime_error_for_throw;
 mod aot_scalar_execution;
 mod aot_source_recursion;
 mod aot_string_addition;

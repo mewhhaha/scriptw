@@ -1318,6 +1318,7 @@ fn emit_script_module_with_factory(
                 helper_bodies.insert(RuntimeHelperId::$id, builder.$compile()?);
             })+ };
         }
+        register_runtime_helper!(RuntimeErrorForThrow, compile_runtime_error_for_throw_helper);
         register_runtime_helper!(
             GlobalLexicalDeclarationCheck,
             compile_global_lexical_declaration_check_helper

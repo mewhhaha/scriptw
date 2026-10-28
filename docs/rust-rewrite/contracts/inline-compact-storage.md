@@ -27,8 +27,9 @@ record uses 96 bytes instead of 144 bytes, including its object header. For the
 storage and 16,384 GC allocations. These are layout calculations, not measured
 process RSS savings. Extra dispatch and native code can offset them.
 
-The changed GC types and shared helper require runtime layout 31; old runtime
-artifacts are rejected. The [verified checkpoint](../memory-inline-compact-storage-20261028.md)
+The changed GC types and shared store helper were introduced in runtime layout
+31. The current ABI is layout 32 with shared throwing-error preparation; old
+runtime artifacts are rejected. The [layout-31 checkpoint](../memory-inline-compact-storage-20261028.md)
 records 4,912 fresh native passes across 19 full targets and all 17 matched
 workload checksums. The [ordinary-storage contract](compact-ordinary-data-storage.md)
 describes the current schema and accounting. The allocation calculation does

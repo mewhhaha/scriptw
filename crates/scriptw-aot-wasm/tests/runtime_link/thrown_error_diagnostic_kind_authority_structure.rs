@@ -80,28 +80,30 @@ fn diagnostic_publisher_accepts_only_native_error_kind() {
 fn all_three_producers_forward_the_error_kind_they_already_own() {
     assert!(
         !PARENT_ERRORS_SOURCE.contains("emit_set_thrown_error_text("),
-        "the private runtime-error child owns the publisher and all producers"
+        "the private runtime-error child retains diagnostic ownership"
     );
-    assert_eq!(
-        ERRORS_SOURCE.matches("emit_set_thrown_error_text(").count(),
-        4,
-        "one publisher and three producers own every mention"
+    let source = normalized(ERRORS_SOURCE);
+    let throwing = bounded(
+        &source,
+        "pub(crate)fnemit_throw_runtime_error_with_prototype(",
+        "pub(crate)fnemit_throw_current_function_realm_type_error(",
     );
-    assert_eq!(
-        ERRORS_SOURCE
-            .matches("self.emit_set_thrown_error_text(kind, Some(message), function)?;")
-            .count(),
-        2,
-        "global-prototype and resolved-prototype paths forward their existing kind"
+    assert!(throwing.contains("RuntimeErrorForThrowArguments::new(kind,prototype,&message)"));
+    assert!(!throwing.contains("emit_set_thrown_error_text("));
+    let shared = bounded(
+        &source,
+        "pub(crate)fncompile_runtime_error_for_throw_helper(",
+        "fnemit_set_thrown_error_text(",
     );
-    assert_eq!(
-        ERRORS_SOURCE
-            .matches(
-                "self.emit_set_thrown_error_text(NativeErrorKind::TypeError, None, function)?;"
-            )
-            .count(),
-        1,
-        "message-less TypeError names its closed kind"
+    assert!(shared.contains("forkindinNativeErrorKind::ALL"));
+    assert!(shared.contains("parameters.kind.emit_is(kind,&mutfunction)"));
+    assert!(shared.contains("self.emit_interned_string_reference(kind.as_str(),&mutfunction)?"));
+    assert!(!shared.contains("ThrowDiagnosticRole::ConstructorName"));
+    assert!(
+        source.contains(
+            "self.emit_set_thrown_error_text(NativeErrorKind::TypeError,None,function)?;"
+        ),
+        "the message-less producer still owns its closed TypeError kind"
     );
     for forbidden in [
         "emit_set_thrown_error_text(name",
@@ -115,36 +117,62 @@ fn all_three_producers_forward_the_error_kind_they_already_own() {
 
 #[test]
 fn diagnostic_publication_follows_object_creation_and_precedes_throw_completion() {
+    let source = normalized(ERRORS_SOURCE);
     let global_prototype_path = bounded(
-        ERRORS_SOURCE,
-        "    pub(crate) fn emit_throw_runtime_error(",
-        "    pub(crate) fn emit_throw_current_function_realm_error(",
+        &source,
+        "pub(crate)fnemit_throw_runtime_error(",
+        "pub(crate)fnemit_throw_current_function_realm_error(",
     );
     assert_before(
         global_prototype_path,
-        "self.emit_runtime_error_object(kind, message, &value, function)?;",
-        "self.emit_set_thrown_error_text(kind, Some(message), function)?;",
+        "self.emit_execution_realm(function)",
+        "prototype_slot(kind)",
     );
     assert_before(
         global_prototype_path,
-        "self.emit_set_thrown_error_text(kind, Some(message), function)?;",
-        "result.set_throw(&value, function);",
+        "prototype_slot(kind)",
+        "self.emit_throw_runtime_error_with_prototype(kind,message,&prototype,result,function)?",
     );
-
     let resolved_prototype_path = bounded(
-        ERRORS_SOURCE,
-        "    pub(crate) fn emit_throw_runtime_error_with_prototype(",
-        "    pub(crate) fn emit_throw_current_function_realm_type_error(",
+        &source,
+        "pub(crate)fnemit_throw_runtime_error_with_prototype(",
+        "pub(crate)fnemit_throw_current_function_realm_type_error(",
     );
     assert_before(
         resolved_prototype_path,
-        "self.emit_fresh_native_error_object(",
-        "self.emit_set_thrown_error_text(kind, Some(message), function)?;",
+        "self.emit_runtime_error_message_reference(message,function)?",
+        "RuntimeErrorForThrowArguments::new(kind,prototype,&message)",
     );
     assert_before(
         resolved_prototype_path,
-        "self.emit_set_thrown_error_text(kind, Some(message), function)?;",
-        "result.set_throw(&value, function);",
+        "RuntimeErrorForThrowArguments::new(kind,prototype,&message)",
+        "result.set_throw(&value,function)",
+    );
+    assert!(!resolved_prototype_path.contains("emit_execution_realm"));
+    let shared = bounded(
+        &source,
+        "pub(crate)fncompile_runtime_error_for_throw_helper(",
+        "fnemit_set_thrown_error_text(",
+    );
+    assert_before(
+        shared,
+        "RuntimeErrorObjectArguments::new(&parameters.prototype,&parameters.message)",
+        "self.emit_clear_throw_diagnostic(ThrowDiagnosticRole::Name,&mutfunction)",
+    );
+    assert_before(
+        shared,
+        "self.emit_clear_throw_diagnostic(ThrowDiagnosticRole::Name,&mutfunction)",
+        "self.emit_interned_string_reference(kind.as_str(),&mutfunction)?",
+    );
+    assert_before(
+        shared,
+        "self.emit_interned_string_reference(kind.as_str(),&mutfunction)?",
+        "self.emit_store_throw_diagnostic(ThrowDiagnosticRole::Name,&name,&mutfunction)",
+    );
+    assert_before(shared,"self.emit_store_throw_diagnostic(ThrowDiagnosticRole::Name,&name,&mutfunction)","self.emit_store_throw_diagnostic(ThrowDiagnosticRole::Message,&parameters.message,&mutfunction,)");
+    assert!(
+        !shared.contains("result.set_throw("),
+        "Completion belongs to the actual caller, outside the R publication tail"
     );
 }
 

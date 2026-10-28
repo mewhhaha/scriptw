@@ -182,6 +182,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::ModuleBodyReaction
             | RuntimeHelperId::RegExpProgramCandidate
             | RuntimeHelperId::RuntimeErrorObject
+            | RuntimeHelperId::RuntimeErrorForThrow
             | RuntimeHelperId::PooledStringResolve
             | RuntimeHelperId::IntegerDecimalString
             | RuntimeHelperId::PooledStringsInitialize

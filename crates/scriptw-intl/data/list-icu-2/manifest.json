@@ -2,9 +2,9 @@
   "conditional_projection": "valid UTF16 pairs decode normally; isolated surrogates become U+FFFD only for ICU template selection; output uses indexed original strings",
   "files": [
     {
-      "bytes": 82766,
+      "bytes": 82862,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "13eb1efe1ddcc7774869905f7a1b241f695c3422e69f1e828dad50840e4e3f62"
+      "sha256": "dfb95265b1b005b012b8f5d154bc9458fecb9bcfb75508523afa0e51af5cb931"
     },
     {
       "bytes": 90596,
@@ -338,7 +338,7 @@
       }
     ]
   },
-  "provider_data_sha256": "708df02e5a1fc0d15734e4f1003de37269d86b404360beafbd263e22336c1493",
+  "provider_data_sha256": "9a6b83339650da0432cb4c4452f8ca9c42e8cc4eb2965f8ec4e3409ec4e32315",
   "purpose": "pinned ICU list templates, conditional DFA and exact UTF16/indexed parts kernel",
   "schema_version": 1,
   "source_archive_sha256": "f64d583886e9a8201535b5296be9fb2f299d6e21f84d39488ce51affdd6c8f5e"
