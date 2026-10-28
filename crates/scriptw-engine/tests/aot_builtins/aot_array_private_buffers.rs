@@ -52,6 +52,14 @@ fn sort_snapshots_gets_and_preserves_comparator_abrupt_and_writeback_semantics()
 }
 
 #[test]
+fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/packed_push.js"),
+        "array-packed-push:ok",
+    );
+}
+
+#[test]
 fn string_buffer_preserves_live_join_order_reentrancy_and_utf16() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/join.js"),

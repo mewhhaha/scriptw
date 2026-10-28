@@ -22,6 +22,7 @@ mod aot_bigint_numeric_updates;
 mod aot_bigint_relational_coercion;
 mod aot_bound_function_metadata;
 mod aot_buffer_backing_store;
+mod aot_compact_intrinsic_installation;
 mod aot_date_legacy_space;
 mod aot_date_parsing;
 mod aot_define_property_entry;

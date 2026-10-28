@@ -432,37 +432,12 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<ValueLocals, EmitError> {
         let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        for (name, builtin) in [
-            ("construct", StandardBuiltinId::ReflectConstruct),
-            ("apply", StandardBuiltinId::ReflectApply),
-            ("get", StandardBuiltinId::ReflectGet),
-            ("getPrototypeOf", StandardBuiltinId::ReflectGetPrototypeOf),
-            (
-                "getOwnPropertyDescriptor",
-                StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-            ),
-            ("set", StandardBuiltinId::ReflectSet),
-            ("has", StandardBuiltinId::ReflectHas),
-            ("defineProperty", StandardBuiltinId::ReflectDefineProperty),
-            ("deleteProperty", StandardBuiltinId::ReflectDeleteProperty),
-            ("isExtensible", StandardBuiltinId::ReflectIsExtensible),
-            (
-                "preventExtensions",
-                StandardBuiltinId::ReflectPreventExtensions,
-            ),
-            ("setPrototypeOf", StandardBuiltinId::ReflectSetPrototypeOf),
-            ("ownKeys", StandardBuiltinId::ReflectOwnKeys),
-        ] {
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            &object,
+            crate::intrinsics::IntrinsicMethodPlan::Reflect,
+            realm,
+            function,
+        )?;
         self.emit_install_intrinsic_string(
             &object,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
@@ -622,55 +597,12 @@ impl<'a> FunctionBuilder<'a> {
                 &object, name, value, false, false, false, function,
             )?;
         }
-        for (name, builtin) in [
-            ("abs", StandardBuiltinId::MathAbs),
-            ("acos", StandardBuiltinId::MathAcos),
-            ("acosh", StandardBuiltinId::MathAcosh),
-            ("asin", StandardBuiltinId::MathAsin),
-            ("asinh", StandardBuiltinId::MathAsinh),
-            ("atan", StandardBuiltinId::MathAtan),
-            ("atan2", StandardBuiltinId::MathAtan2),
-            ("atanh", StandardBuiltinId::MathAtanh),
-            ("cbrt", StandardBuiltinId::MathCbrt),
-            ("ceil", StandardBuiltinId::MathCeil),
-            ("clz32", StandardBuiltinId::MathClz32),
-            ("cos", StandardBuiltinId::MathCos),
-            ("cosh", StandardBuiltinId::MathCosh),
-            ("exp", StandardBuiltinId::MathExp),
-            ("expm1", StandardBuiltinId::MathExpm1),
-            ("f16round", StandardBuiltinId::MathF16Round),
-            ("floor", StandardBuiltinId::MathFloor),
-            ("fround", StandardBuiltinId::MathFround),
-            ("hypot", StandardBuiltinId::MathHypot),
-            ("imul", StandardBuiltinId::MathImul),
-            ("log", StandardBuiltinId::MathLog),
-            ("log10", StandardBuiltinId::MathLog10),
-            ("log1p", StandardBuiltinId::MathLog1p),
-            ("log2", StandardBuiltinId::MathLog2),
-            ("pow", StandardBuiltinId::MathPow),
-            ("random", StandardBuiltinId::MathRandom),
-            ("round", StandardBuiltinId::MathRound),
-            ("sign", StandardBuiltinId::MathSign),
-            ("sin", StandardBuiltinId::MathSin),
-            ("sinh", StandardBuiltinId::MathSinh),
-            ("sqrt", StandardBuiltinId::MathSqrt),
-            ("sumPrecise", StandardBuiltinId::MathSumPrecise),
-            ("tan", StandardBuiltinId::MathTan),
-            ("tanh", StandardBuiltinId::MathTanh),
-            ("trunc", StandardBuiltinId::MathTrunc),
-            ("min", StandardBuiltinId::MathMin),
-            ("max", StandardBuiltinId::MathMax),
-        ] {
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            &object,
+            crate::intrinsics::IntrinsicMethodPlan::Math,
+            realm,
+            function,
+        )?;
         self.emit_install_intrinsic_string(
             &object,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
@@ -699,22 +631,12 @@ impl<'a> FunctionBuilder<'a> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("parse", StandardBuiltinId::JsonParse),
-            ("stringify", StandardBuiltinId::JsonStringify),
-            ("rawJSON", StandardBuiltinId::JsonRawJson),
-            ("isRawJSON", StandardBuiltinId::JsonIsRawJson),
-        ] {
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            &object,
+            crate::intrinsics::IntrinsicMethodPlan::Json,
+            realm,
+            function,
+        )?;
         Ok(object)
     }
 
@@ -813,42 +735,12 @@ impl<'a> FunctionBuilder<'a> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("at", StandardBuiltinId::TypedArrayPrototypeAt),
-            ("includes", StandardBuiltinId::TypedArrayPrototypeIncludes),
-            ("indexOf", StandardBuiltinId::TypedArrayPrototypeIndexOf),
-            (
-                "lastIndexOf",
-                StandardBuiltinId::TypedArrayPrototypeLastIndexOf,
-            ),
-            ("find", StandardBuiltinId::TypedArrayPrototypeFind),
-            ("findIndex", StandardBuiltinId::TypedArrayPrototypeFindIndex),
-            ("findLast", StandardBuiltinId::TypedArrayPrototypeFindLast),
-            (
-                "findLastIndex",
-                StandardBuiltinId::TypedArrayPrototypeFindLastIndex,
-            ),
-            ("every", StandardBuiltinId::TypedArrayPrototypeEvery),
-            ("some", StandardBuiltinId::TypedArrayPrototypeSome),
-            ("map", StandardBuiltinId::TypedArrayPrototypeMap),
-            ("filter", StandardBuiltinId::TypedArrayPrototypeFilter),
-            ("forEach", StandardBuiltinId::TypedArrayPrototypeForEach),
-            ("reduce", StandardBuiltinId::TypedArrayPrototypeReduce),
-            (
-                "reduceRight",
-                StandardBuiltinId::TypedArrayPrototypeReduceRight,
-            ),
-        ] {
-            self.emit_install_intrinsic_method(
-                &prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            &prototype,
+            crate::intrinsics::IntrinsicMethodPlan::TypedArrayPrototypeBeforeAliases,
+            realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             &prototype,
             &[
@@ -861,56 +753,18 @@ impl<'a> FunctionBuilder<'a> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("keys", StandardBuiltinId::TypedArrayPrototypeKeys),
-            ("entries", StandardBuiltinId::TypedArrayPrototypeEntries),
-            ("fill", StandardBuiltinId::TypedArrayPrototypeFill),
-            ("join", StandardBuiltinId::TypedArrayPrototypeJoin),
-            ("subarray", StandardBuiltinId::TypedArrayPrototypeSubarray),
-            ("slice", StandardBuiltinId::TypedArrayPrototypeSlice),
-            ("set", StandardBuiltinId::TypedArrayPrototypeSet),
-            ("reverse", StandardBuiltinId::TypedArrayPrototypeReverse),
-            (
-                "copyWithin",
-                StandardBuiltinId::TypedArrayPrototypeCopyWithin,
-            ),
-            ("sort", StandardBuiltinId::TypedArrayPrototypeSort),
-            (
-                "toReversed",
-                StandardBuiltinId::TypedArrayPrototypeToReversed,
-            ),
-            ("toSorted", StandardBuiltinId::TypedArrayPrototypeToSorted),
-            ("with", StandardBuiltinId::TypedArrayPrototypeWith),
-            ("toString", StandardBuiltinId::TypedArrayPrototypeToString),
-            (
-                "toLocaleString",
-                StandardBuiltinId::TypedArrayPrototypeToLocaleString,
-            ),
-        ] {
-            self.emit_install_intrinsic_method(
-                &prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        for (name, builtin) in [
-            ("from", StandardBuiltinId::TypedArrayFrom),
-            ("of", StandardBuiltinId::TypedArrayOf),
-        ] {
-            self.emit_install_intrinsic_method(
-                &constructor_value,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            &prototype,
+            crate::intrinsics::IntrinsicMethodPlan::TypedArrayPrototypeAfterAliases,
+            realm,
+            function,
+        )?;
+        self.emit_install_intrinsic_methods(
+            &constructor_value,
+            crate::intrinsics::IntrinsicMethodPlan::TypedArrayConstructor,
+            realm,
+            function,
+        )?;
         constructor_value.clear(function);
         constructor.clear(function);
         prototype.clear(function);

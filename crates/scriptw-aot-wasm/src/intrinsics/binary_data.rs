@@ -116,32 +116,12 @@ impl FunctionBuilder<'_> {
             function,
         )?;
         if !shared {
-            for (name, builtin) in [
-                ("resize", StandardBuiltinId::ArrayBufferPrototypeResize),
-                ("transfer", StandardBuiltinId::ArrayBufferPrototypeTransfer),
-                (
-                    "transferToFixedLength",
-                    StandardBuiltinId::ArrayBufferPrototypeTransferToFixedLength,
-                ),
-                (
-                    "transferToImmutable",
-                    StandardBuiltinId::ArrayBufferPrototypeTransferToImmutable,
-                ),
-                (
-                    "sliceToImmutable",
-                    StandardBuiltinId::ArrayBufferPrototypeSliceToImmutable,
-                ),
-            ] {
-                self.emit_install_intrinsic_method(
-                    context.prototype,
-                    IntrinsicKey::Name(name),
-                    builtin,
-                    context.realm,
-                    true,
-                    true,
-                    function,
-                )?;
-            }
+            self.emit_install_intrinsic_methods(
+                context.prototype,
+                crate::intrinsics::IntrinsicMethodPlan::ArrayBufferPrototypeMutable,
+                context.realm,
+                function,
+            )?;
         }
         self.emit_install_intrinsic_string(
             context.prototype,
@@ -184,52 +164,12 @@ impl FunctionBuilder<'_> {
                 function,
             )?;
         }
-        for (name, builtin) in [
-            ("getUint8", StandardBuiltinId::DataViewPrototypeGetUint8),
-            ("setUint8", StandardBuiltinId::DataViewPrototypeSetUint8),
-            ("getInt8", StandardBuiltinId::DataViewPrototypeGetInt8),
-            ("setInt8", StandardBuiltinId::DataViewPrototypeSetInt8),
-            ("getUint16", StandardBuiltinId::DataViewPrototypeGetUint16),
-            ("setUint16", StandardBuiltinId::DataViewPrototypeSetUint16),
-            ("getInt16", StandardBuiltinId::DataViewPrototypeGetInt16),
-            ("setInt16", StandardBuiltinId::DataViewPrototypeSetInt16),
-            ("getUint32", StandardBuiltinId::DataViewPrototypeGetUint32),
-            ("setUint32", StandardBuiltinId::DataViewPrototypeSetUint32),
-            ("getInt32", StandardBuiltinId::DataViewPrototypeGetInt32),
-            ("setInt32", StandardBuiltinId::DataViewPrototypeSetInt32),
-            ("getFloat16", StandardBuiltinId::DataViewPrototypeGetFloat16),
-            ("setFloat16", StandardBuiltinId::DataViewPrototypeSetFloat16),
-            ("getFloat32", StandardBuiltinId::DataViewPrototypeGetFloat32),
-            ("setFloat32", StandardBuiltinId::DataViewPrototypeSetFloat32),
-            ("getFloat64", StandardBuiltinId::DataViewPrototypeGetFloat64),
-            ("setFloat64", StandardBuiltinId::DataViewPrototypeSetFloat64),
-            (
-                "getBigInt64",
-                StandardBuiltinId::DataViewPrototypeGetBigInt64,
-            ),
-            (
-                "setBigInt64",
-                StandardBuiltinId::DataViewPrototypeSetBigInt64,
-            ),
-            (
-                "getBigUint64",
-                StandardBuiltinId::DataViewPrototypeGetBigUint64,
-            ),
-            (
-                "setBigUint64",
-                StandardBuiltinId::DataViewPrototypeSetBigUint64,
-            ),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::DataViewPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_string(
             context.prototype,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),

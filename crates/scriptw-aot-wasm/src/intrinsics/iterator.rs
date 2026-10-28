@@ -11,49 +11,18 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("from", StandardBuiltinId::IteratorFrom),
-            ("concat", StandardBuiltinId::IteratorConcat),
-            ("zip", StandardBuiltinId::IteratorZip),
-            ("zipKeyed", StandardBuiltinId::IteratorZipKeyed),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.constructor,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        for (name, builtin) in [
-            ("toArray", StandardBuiltinId::IteratorPrototypeToArray),
-            ("includes", StandardBuiltinId::IteratorPrototypeIncludes),
-            ("join", StandardBuiltinId::IteratorPrototypeJoin),
-            ("forEach", StandardBuiltinId::IteratorPrototypeForEach),
-            ("every", StandardBuiltinId::IteratorPrototypeEvery),
-            ("some", StandardBuiltinId::IteratorPrototypeSome),
-            ("find", StandardBuiltinId::IteratorPrototypeFind),
-            ("reduce", StandardBuiltinId::IteratorPrototypeReduce),
-            ("map", StandardBuiltinId::IteratorPrototypeMap),
-            ("filter", StandardBuiltinId::IteratorPrototypeFilter),
-            ("flatMap", StandardBuiltinId::IteratorPrototypeFlatMap),
-            ("take", StandardBuiltinId::IteratorPrototypeTake),
-            ("drop", StandardBuiltinId::IteratorPrototypeDrop),
-            ("chunks", StandardBuiltinId::IteratorPrototypeChunks),
-            ("windows", StandardBuiltinId::IteratorPrototypeWindows),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.constructor,
+            crate::intrinsics::IntrinsicMethodPlan::IteratorConstructor,
+            context.realm,
+            function,
+        )?;
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::IteratorPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_accessor(
             context.prototype,
             IntrinsicKey::Name("constructor"),

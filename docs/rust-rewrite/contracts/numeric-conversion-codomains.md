@@ -17,6 +17,20 @@ cannot be encoded as binary XOR with a Number minus one. BigInt unsigned right
 shift remains a TypeError. Coercion and abrupt completion preserve operand
 order and the original thrown value.
 
+Closed ordinary-function Number loops can keep their complete test/body/update
+region in primitive Wasm locals. The bounded IR proof admits actual local binding
+identities and excludes captured cells, dynamic environments, suspension and
+observable callbacks. Entry tags and initialization checks select the scalar
+region; misses use the original loop. Exits publish all dirty values, including
+writes in the final false test, and retain the last body completion.
+
+Invariant `Math.imul` additionally requires nonallocating cached-key and own-data
+descriptor checks, the actual builtin code or immutable deferred recipe, and its
+defining Realm. Shadowing, accessors, proxies and missing metadata decline without
+invoking getters or materializing functions. Proven signed/unsigned integer ranges
+can simplify ToUint32; arithmetic remains binary64 and arbitrary Numbers retain
+the complete modulo conversion.
+
 Formatting calls first acquire the live property and evaluate their arguments,
 then use the native formatting algorithm. Compiler folds must not bypass an
 override, receiver coercion or argument effects. ToFixed, ToExponential and

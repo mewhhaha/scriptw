@@ -13,13 +13,25 @@ use crate::runtime_helpers::{
 };
 
 mod installation;
+mod installation_runs;
 mod materialization;
 use materialization::{MethodPlan, Selection};
 
 #[derive(Clone, Copy)]
-pub(super) struct DeferredIntrinsicMethod(StandardBuiltinId);
+pub(crate) struct DeferredIntrinsicMethod(StandardBuiltinId);
 
 impl DeferredIntrinsicMethod {
+    pub(crate) fn validated(
+        builtin: StandardBuiltinId,
+        meta: &WasmFunctionMeta,
+    ) -> Result<Option<Self>, EmitError> {
+        let Some(method) = Self::new(builtin) else {
+            return Ok(None);
+        };
+        MethodPlan::new(method, meta.clone())?;
+        Ok(Some(method))
+    }
+
     pub(super) fn new(builtin: StandardBuiltinId) -> Option<Self> {
         (crate::module::standard_builtin_function_realm_slot(builtin).is_none()
             && !builtin.constructable()
@@ -65,8 +77,8 @@ impl FunctionBuilder<'_> {
                 DeferredIntrinsicInstallArguments::new(
                     target,
                     realm.realm(),
-                    plan.method.0,
-                    &key,
+                    plan.method.0.into(),
+                    (&key).into(),
                     writable_flag,
                     configurable_flag,
                 ),

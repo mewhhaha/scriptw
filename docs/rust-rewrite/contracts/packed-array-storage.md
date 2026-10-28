@@ -65,6 +65,22 @@ backings remain rooted until the private storage fields and count are published
 without allocation. Other tags use the same captured values and shared R
 publisher; holes and larger literals retain their existing construction path.
 
+The standard push builtin can append through that same publisher after proving
+the captured length matches a contiguous packed receiver, length is writable,
+the object is extensible and the live prototype chain cannot intercept any new
+index. The bounded chain proof rejects proxies/exotics, indexed Array prototypes
+and any ordinary inherited descriptor at those indices. All guards precede the
+first write; each append publishes length in order. Zero arguments, overflow and
+guard misses retain ordinary strict Set, including partial writes and throws.
+
+Join converts its separator before attempting a packed snapshot. Present own
+String/null/undefined values permit one checked UTF-16 length pass and one exact
+allocation/copy pass; empty and singleton strings reuse immutable values. The
+captured length must still match after separator effects. Holes, object conversions
+and other unsupported states use the ordered generic path. Array, backing,
+separator and construction roots survive allocation; no user code runs between
+validation and copying.
+
 The opt-in host graph snapshot reads raw bits and bitmap words directly, with
 a typed mode decoder and declaration-derived field/layout witnesses. It checks
 inactive backings are empty, capacity/bitmap bounds, unused high presence bits,

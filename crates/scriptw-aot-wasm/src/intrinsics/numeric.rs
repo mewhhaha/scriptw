@@ -18,38 +18,18 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("toString", StandardBuiltinId::BigIntPrototypeToString),
-            (
-                "toLocaleString",
-                StandardBuiltinId::BigIntPrototypeToLocaleString,
-            ),
-            ("valueOf", StandardBuiltinId::BigIntPrototypeValueOf),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        for (name, builtin) in [
-            ("asIntN", StandardBuiltinId::BigIntAsIntN),
-            ("asUintN", StandardBuiltinId::BigIntAsUintN),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.constructor,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::BigIntPrototype,
+            context.realm,
+            function,
+        )?;
+        self.emit_install_intrinsic_methods(
+            context.constructor,
+            crate::intrinsics::IntrinsicMethodPlan::BigIntConstructor,
+            context.realm,
+            function,
+        )?;
         Ok(())
     }
 
@@ -78,24 +58,12 @@ impl FunctionBuilder<'_> {
                 function,
             )?;
         }
-        for builtin in [
-            StandardBuiltinId::NumberIsInteger,
-            StandardBuiltinId::NumberIsSafeInteger,
-            StandardBuiltinId::NumberIsFinite,
-            StandardBuiltinId::NumberIsNaN,
-        ] {
-            self.emit_install_intrinsic_method(
-                context.constructor,
-                IntrinsicKey::Name(builtin.native_function_name().ok_or_else(|| {
-                    EmitError::unsupported("planned Number static method has no native name")
-                })?),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.constructor,
+            crate::intrinsics::IntrinsicMethodPlan::NumberConstructor,
+            context.realm,
+            function,
+        )?;
         for builtin in [HostBuiltinId::ParseInt, HostBuiltinId::ParseFloat] {
             let schema = self.runtime_schema();
             let callable =
@@ -114,26 +82,12 @@ impl FunctionBuilder<'_> {
             value.clear(function);
             callable.clear(function);
         }
-        for builtin in [
-            StandardBuiltinId::NumberPrototypeToFixed,
-            StandardBuiltinId::NumberPrototypeToExponential,
-            StandardBuiltinId::NumberPrototypeToPrecision,
-            StandardBuiltinId::NumberPrototypeToString,
-            StandardBuiltinId::NumberPrototypeToLocaleString,
-            StandardBuiltinId::NumberPrototypeValueOf,
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(builtin.native_function_name().ok_or_else(|| {
-                    EmitError::unsupported("planned Number prototype method has no native name")
-                })?),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::NumberPrototype,
+            context.realm,
+            function,
+        )?;
         Ok(())
     }
 
@@ -142,20 +96,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("toString", StandardBuiltinId::BooleanPrototypeToString),
-            ("valueOf", StandardBuiltinId::BooleanPrototypeValueOf),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::BooleanPrototype,
+            context.realm,
+            function,
+        )?;
         Ok(())
     }
 }

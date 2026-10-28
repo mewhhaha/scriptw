@@ -69,6 +69,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::IntrinsicAccessorAllocate
             | RuntimeHelperId::IntrinsicConstructorAllocate
             | RuntimeHelperId::DeferredIntrinsicInstall
+            | RuntimeHelperId::DeferredIntrinsicInstallRun
             | RuntimeHelperId::NativeFunctionAllocate
             | RuntimeHelperId::ArgumentListAppend
             | RuntimeHelperId::CachedPropertyRead => {}

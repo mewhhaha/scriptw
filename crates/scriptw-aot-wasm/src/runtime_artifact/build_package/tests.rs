@@ -403,6 +403,11 @@ fn abi29_package_is_replaced_before_lazy_calendar_rows_are_admitted() {
     assert_previous_build_package_replaced(29);
 }
 
+#[test]
+fn abi32_package_is_replaced_before_intrinsic_installation_rows_are_admitted() {
+    assert_previous_build_package_replaced(32);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

@@ -1,7 +1,8 @@
 # Ordered shared Realm installation
 
-Runtime layout 29 adds two runtime-owned typed Wasm helpers to the real Realm
-bootstrap. The [verified checkpoint](../memory-ordered-bootstrap-20261028.md) records
+Runtime layout 33 adds sealed installation rows and a counted Wasm helper for
+contiguous deferred-method runs. The earlier layout-29
+[verified checkpoint](../memory-ordered-bootstrap-20261028.md) records
 4,894 native test executions, 28 fresh original Test262 executions and all 17
 paired workload checksums. It reports static code sizes and unscored ownership
 captures separately. This does not establish an overall RSS/speed saving,
@@ -17,9 +18,18 @@ lists, missing native entries, mismatched method metadata and program-owned key
 ordinals fail emission. String keys cross the helper boundary as checked
 runtime-pool plans; Symbol keys retain their closed `WellKnownSymbol` identities.
 Neither is resolved before recipe allocation. The typed helper argument domain
-accepts a real `StandardBuiltinId`, so a raw integer cannot populate the recipe's
-builtin field. No table, instruction interpreter or extra GC packaging object
-is introduced.
+accepts a real `StandardBuiltinId` or a builtin parameter read through the sealed
+installation-row authority. Arbitrary integers cannot populate a recipe.
+
+Shared method plans collect and emit the same ordered keys and builtin identities.
+Their immutable 16-byte rows contain builtin, key kind/ordinal and attributes,
+inside R's checked static boundary. Only the validated pool can mint a row span;
+the run helper checks its alignment and bounds before reading. One compiled loop
+calls the existing installer for each row. Eager/canonical methods split runs;
+aliases and accessors keep their existing ordered paths. Rows contain installation
+metadata, while user programs remain compiled Wasm. Every Realm still allocates
+its own recipes and mutable descriptors. The new helper and static boundary require
+layout-33 admission; previous packages and cache entries are replaced.
 
 `IntrinsicConstructorAllocate` receives the caller's already rooted native
 header, exact typed executable code, defining Realm and unresolved runtime source

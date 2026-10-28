@@ -47,6 +47,7 @@ pub(crate) use for_in::FOR_IN_INTRINSICS;
 mod repeated_identifier_reads;
 mod resumed_identifier_assignment;
 mod return_position;
+mod scalar_number_loop;
 mod statement_completion;
 use for_await_iterator_plan::ForAwaitIteratorPlan;
 use for_await_iterator_symbol::ForAwaitIteratorSymbol;
@@ -6899,6 +6900,57 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(environment) = lexical_environment {
             self.emit_replace_lexical_environment(environment, function)?;
         }
+        let scalar_plan = lexical_environment
+            .is_none()
+            .then(|| scalar_number_loop::ScalarNumberLoop::new(self, test, update, body))
+            .flatten();
+        if let Some(plan) = scalar_plan {
+            plan.emit_entry_guard(self, function)?;
+            self.open_frame(ControlFrameKind::If, function);
+            self.compile_scalar_number_loop(&plan, function);
+            function.instruction(&Instruction::Else);
+            self.compile_classic_for_iterations(
+                test,
+                update,
+                body,
+                lexical_environment,
+                labels,
+                break_frame,
+                function,
+            )?;
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        } else {
+            self.compile_classic_for_iterations(
+                test,
+                update,
+                body,
+                lexical_environment,
+                labels,
+                break_frame,
+                function,
+            )?;
+        }
+        self.breakable_stack.pop();
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        if runtime_environment.is_some() {
+            self.end_lexical_environment_scope();
+        }
+        self.pop_scope();
+        Ok(())
+    }
+
+    fn compile_classic_for_iterations(
+        &mut self,
+        test: Option<&TypedExpr>,
+        update: Option<&TypedExpr>,
+        body: &StatementIr,
+        lexical_environment: Option<&ForLexicalEnvironmentIr>,
+        labels: &[String],
+        break_frame: ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let loop_frame = self.open_frame(ControlFrameKind::Loop, function);
         if let Some(test) = test {
             self.compile_classic_for_test(test, break_frame, function)?;
@@ -6920,13 +6972,6 @@ impl<'a> FunctionBuilder<'a> {
         function.branch_to_label(loop_frame.label);
         self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);
-        self.breakable_stack.pop();
-        self.pop_control(ControlFrameKind::Block);
-        function.instruction(&Instruction::End);
-        if runtime_environment.is_some() {
-            self.end_lexical_environment_scope();
-        }
-        self.pop_scope();
         Ok(())
     }
 

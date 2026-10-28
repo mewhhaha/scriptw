@@ -4,7 +4,7 @@ use crate::objects::{AccessorDescriptor, AccessorGetter};
 
 /// Every implemented Temporal constructor family. Both bootstrap paths and
 /// allocation policies consume this closed domain.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum TemporalIntrinsicFamily {
     Instant,
     Duration,
@@ -17,6 +17,33 @@ pub(crate) enum TemporalIntrinsicFamily {
 }
 
 impl TemporalIntrinsicFamily {
+    pub(crate) fn constructor_installation_methods(
+        self,
+    ) -> Result<Vec<crate::intrinsics::IntrinsicMethodSpec>, EmitError> {
+        self.constructor_methods()
+            .iter()
+            .copied()
+            .map(Self::installation_method)
+            .collect()
+    }
+
+    pub(crate) fn prototype_installation_methods(
+        self,
+    ) -> Result<Vec<crate::intrinsics::IntrinsicMethodSpec>, EmitError> {
+        self.methods().map(Self::installation_method).collect()
+    }
+
+    fn installation_method(
+        builtin: StandardBuiltinId,
+    ) -> Result<crate::intrinsics::IntrinsicMethodSpec, EmitError> {
+        Ok(crate::intrinsics::IntrinsicMethodSpec {
+            key: IntrinsicKey::Name(temporal_intrinsic_property_key(builtin)?),
+            builtin,
+            writable: true,
+            configurable: true,
+        })
+    }
+
     pub(crate) const ALL: [Self; 8] = [
         Self::Instant,
         Self::PlainDate,
@@ -337,17 +364,12 @@ impl FunctionBuilder<'_> {
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for builtin in family.constructor_methods() {
-            self.emit_install_intrinsic_method(
-                constructor,
-                IntrinsicKey::Name(temporal_intrinsic_property_key(*builtin)?),
-                *builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            constructor,
+            crate::intrinsics::IntrinsicMethodPlan::TemporalConstructor(family),
+            realm,
+            function,
+        )?;
         for builtin in family.getters() {
             self.emit_install_intrinsic_accessor(
                 prototype,
@@ -358,17 +380,12 @@ impl FunctionBuilder<'_> {
                 function,
             )?;
         }
-        for builtin in family.methods() {
-            self.emit_install_intrinsic_method(
-                prototype,
-                IntrinsicKey::Name(temporal_intrinsic_property_key(builtin)?),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            prototype,
+            crate::intrinsics::IntrinsicMethodPlan::TemporalPrototype(family),
+            realm,
+            function,
+        )?;
         self.emit_define_temporal_intrinsic_to_string_tag(
             prototype,
             family.constructor().debug_name(),

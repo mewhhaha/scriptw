@@ -12,6 +12,7 @@ mod copy_within;
 mod find_via_predicate;
 mod flat;
 mod literal;
+mod packed_join;
 mod sort;
 mod string_buffer;
 use callback_iteration::ArrayCallbackIterationKind;
@@ -3926,6 +3927,34 @@ impl FunctionBuilder<'_> {
                 self.emit_builtin_arg_to_value(1, &options, f);
             }
         }
+        let joined = self.open_frame(ControlFrameKind::Block, f);
+        if matches!(operation, ArrayStringOperation::Join) {
+            // The captured zero length needs no indexed reads even if separator
+            // conversion changed the receiver. Conversion has already finished.
+            length.load(f);
+            f.instruction(&Instruction::I64Eqz);
+            self.open_frame(ControlFrameKind::If, f);
+            let empty = s
+                .reserve_gc_local(f)
+                .initialize(self.emit_interned_string_reference("", f)?, f);
+            result.set_reference(&empty, s, f);
+            empty.clear(f);
+            self.emit_branch_to_target(joined, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        if matches!(operation, ArrayStringOperation::Join) {
+            match &receiver_kind {
+                ToLocaleStringReceiverKind::ArrayLike => {
+                    let handled =
+                        self.emit_try_packed_array_join(&receiver, length, &separator, &result, f)?;
+                    handled.load(f);
+                    s.release_i32_local(handled, f);
+                    self.emit_branch_if_to_target(joined, f);
+                }
+                ToLocaleStringReceiverKind::TypedArray => {}
+            }
+        }
         let text = string_buffer::ArrayStringBuffer::new(s, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
@@ -3996,8 +4025,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         let text = text.finish(s, f);
         result.set_reference(&text, s, f);
-        self.completion().set_normal(&result, f);
         text.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.completion().set_normal(&result, f);
         separator.clear(f);
         s.release_i64_local(index, f);
         s.release_i64_local(length, f);

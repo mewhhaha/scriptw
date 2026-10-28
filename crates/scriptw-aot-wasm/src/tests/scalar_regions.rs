@@ -77,7 +77,9 @@ fn numeric_expression_depth_does_not_grow_tag_or_reference_scratch() {
 fn fixed_argument_count_does_not_grow_evaluation_tag_or_eqref_scratch() {
     fn source(count: usize) -> String {
         let arguments = vec!["input"; count].join(",");
-        format!("function invoke(input) {{ return globalThis.consume({arguments}); }} invoke(globalThis.input);")
+        format!(
+            "function invoke(input) {{ return globalThis.consume({arguments}); }} invoke(globalThis.input);"
+        )
     }
     let one = scalar_traffic(&source(1), "invoke");
     let sixteen = scalar_traffic(&source(16), "invoke");
@@ -88,5 +90,221 @@ fn fixed_argument_count_does_not_grow_evaluation_tag_or_eqref_scratch() {
     assert!(
         sixteen.1 <= one.1,
         "fixed arguments add scratch roots: {one:?} -> {sixteen:?}"
+    );
+}
+
+fn with_source_operators(source: &str, name: &str, check: impl FnOnce(&[Operator<'_>])) {
+    let artifact = emit_script(source).expect("loop control emits");
+    expect_valid_module(&artifact, 1);
+    let target = function_names(&artifact)
+        .into_iter()
+        .find_map(|(index, actual)| actual.starts_with(&format!("js::{name}#")).then_some(index))
+        .expect("loop source body has a Wasm name");
+    let mut index = imported_function_count(&artifact);
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        let Payload::CodeSectionEntry(body) = payload.expect("module parses") else {
+            continue;
+        };
+        if index == target {
+            let operators = body
+                .get_operators_reader()
+                .expect("source operators parse")
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("source operators decode");
+            check(&operators);
+            return;
+        }
+        index += 1;
+    }
+    panic!("named source body is absent");
+}
+
+fn loop_regions<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Operator<'a>]> {
+    let mut frames = Vec::new();
+    let mut loops = Vec::new();
+    for (index, operator) in operators.iter().enumerate() {
+        match operator {
+            Operator::Loop { .. } => frames.push(Some(index)),
+            Operator::Block { .. } | Operator::If { .. } | Operator::TryTable { .. } => {
+                frames.push(None)
+            }
+            Operator::End => {
+                if let Some(Some(start)) = frames.pop() {
+                    loops.push(&operators[start + 1..index]);
+                }
+            }
+            _ => {}
+        }
+    }
+    loops
+}
+
+fn scalar_arithmetic_loop(operators: &[Operator<'_>]) -> bool {
+    operators.iter().any(|op| matches!(op, Operator::F64Mul))
+        && operators.iter().any(|op| matches!(op, Operator::F64Lt))
+        && operators.iter().all(|op| {
+            matches!(
+                op,
+                Operator::LocalGet { .. }
+                    | Operator::LocalSet { .. }
+                    | Operator::LocalTee { .. }
+                    | Operator::F64Const { .. }
+                    | Operator::F64Add
+                    | Operator::F64Sub
+                    | Operator::F64Mul
+                    | Operator::F64Div
+                    | Operator::F64Lt
+                    | Operator::I32Const { .. }
+                    | Operator::I32Eqz
+                    | Operator::Br { .. }
+                    | Operator::BrIf { .. }
+                    | Operator::Drop
+            )
+        })
+}
+
+#[test]
+fn original_numeric_workloads_contain_a_primitive_loop_and_the_generic_fallback() {
+    for source in [
+        include_str!(
+            "../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/numeric-loop-10000.js"
+        ),
+        include_str!(
+            "../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/numeric-loop-50000.js"
+        ),
+    ] {
+        with_source_operators(source, "workload", |operators| {
+            let loops = loop_regions(operators);
+            assert_eq!(
+                loops
+                    .iter()
+                    .filter(|region| scalar_arithmetic_loop(region))
+                    .count(),
+                1,
+                "the original recurrence needs one scalar loop, without calls, references, tags or completion copies"
+            );
+            assert!(
+                loops.iter().any(
+                    |region| region.iter().any(|op| matches!(op, Operator::F64Mul))
+                        && region
+                            .iter()
+                            .any(|op| matches!(op, Operator::I64ReinterpretF64))
+                ),
+                "a failed Number guard must retain ordinary numeric/coercion dispatch"
+            );
+        });
+    }
+}
+
+#[test]
+fn numeric_loop_admission_uses_operations_and_binding_identity() {
+    for (source, expected) in [
+        (
+            "function varied(total, stop) { \"use strict\"; for(var step=0;(step+0)<stop;step++) total+=step*2+0.5; return total; } varied(1,7);",
+            true,
+        ),
+        (
+            "function varied(total, stop) { \"use strict\"; function capture(){return total;} for(var step=0;(step+0)<stop;step++) total+=step*2+0.5; return capture(); } varied(1,7);",
+            false,
+        ),
+        (
+            "function varied(total, stop) { \"use strict\"; for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; globalThis.observe(total); } return total; } varied(1,7);",
+            false,
+        ),
+        (
+            "function varied(total, stop) { \"use strict\"; for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; if(step) break; } return total; } varied(1,7);",
+            false,
+        ),
+        (
+            "function varied(total, stop) { \"use strict\"; for(let step=0;(step+0)<stop;step++) total+=step*2+0.5; return total; } varied(1,7);",
+            false,
+        ),
+        (
+            "function varied() { const total=0; for(var step=0;(step+0)<3;step++) total+=step*2+0.5; } varied();",
+            false,
+        ),
+    ] {
+        with_source_operators(source, "varied", |operators| {
+            assert_eq!(
+                loop_regions(operators)
+                    .iter()
+                    .any(|region| scalar_arithmetic_loop(region)),
+                expected,
+                "{source}"
+            );
+        });
+    }
+}
+
+#[test]
+fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard() {
+    with_source_operators(
+        include_str!("../../../scriptw-cli/tests/fixtures/v8_baseline/integer.js"),
+        "workload",
+        |operators| {
+            let loops = loop_regions(operators);
+            let primitive_imul = loops
+                .iter()
+                .filter(|region| {
+                    region.iter().any(|op| matches!(op, Operator::I32Mul))
+                        && region.iter().any(|op| matches!(op, Operator::F64Lt))
+                        && region.iter().all(|op| {
+                            matches!(
+                                op,
+                                Operator::LocalGet { .. }
+                                    | Operator::LocalSet { .. }
+                                    | Operator::F64Const { .. }
+                                    | Operator::I32Const { .. }
+                                    | Operator::F64Add
+                                    | Operator::F64Sub
+                                    | Operator::F64Mul
+                                    | Operator::F64Div
+                                    | Operator::F64Floor
+                                    | Operator::F64Trunc
+                                    | Operator::F64Lt
+                                    | Operator::I32Mul
+                                    | Operator::I32ShrU
+                                    | Operator::I32WrapI64
+                                    | Operator::I32Eqz
+                                    | Operator::I32TruncSatF64S
+                                    | Operator::I32TruncSatF64U
+                                    | Operator::I64TruncSatF64U
+                                    | Operator::I64TruncSatF64S
+                                    | Operator::I64ReinterpretF64
+                                    | Operator::F64ReinterpretI64
+                                    | Operator::F64ConvertI32S
+                                    | Operator::F64ConvertI32U
+                                    | Operator::Br { .. }
+                                    | Operator::BrIf { .. }
+                                    | Operator::Drop
+                            )
+                        })
+                })
+                .count();
+            assert_eq!(primitive_imul, 1,
+                "the unchanged integer recurrence needs one loop with no per-iteration property/call/Realm/GC traffic");
+            assert!(
+                loops.iter().any(
+                    |region| region.iter().any(|op| matches!(op, Operator::I32Mul))
+                        && region
+                            .iter()
+                            .any(|op| matches!(op, Operator::I32TruncSatF64U))
+                ),
+                "the uint32 state invariant removes its arbitrary-Number modulo conversion"
+            );
+            assert!(loops.iter().any(|region|
+                region.iter().any(|op| matches!(op, Operator::I32Mul))
+                && region.iter().any(|op| matches!(op, Operator::I64TruncSatF64S))
+                && !region.iter().any(|op| matches!(op, Operator::F64Floor))),
+                "the exact bounded sum keeps f64 addition and converts its residue without floating modulo");
+            assert!(
+                loops.iter().any(|region| region
+                    .iter()
+                    .any(|op| matches!(op, Operator::Call { .. }))
+                    && region.iter().any(|op| matches!(op, Operator::I32Mul))),
+                "failed invariant/native guards retain the existing ordered call path"
+            );
+        },
     );
 }

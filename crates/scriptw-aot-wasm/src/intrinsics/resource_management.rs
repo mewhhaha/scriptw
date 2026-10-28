@@ -10,22 +10,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("use", StandardBuiltinId::DisposableStackPrototypeUse),
-            ("adopt", StandardBuiltinId::DisposableStackPrototypeAdopt),
-            ("defer", StandardBuiltinId::DisposableStackPrototypeDefer),
-            ("move", StandardBuiltinId::DisposableStackPrototypeMove),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::DisposableStackPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             context.prototype,
             &[

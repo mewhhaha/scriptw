@@ -62,6 +62,18 @@ Feature expansion should extend the registry schema only when a new piece of
 bootstrap data is genuinely shared. Feature-specific methods and algorithms do
 not belong in this table.
 
+The Wasm backend seals separate immutable method-installation metadata into R's
+existing static image. Each 16-byte row carries a validated deferred builtin,
+runtime String or well-known Symbol key, and data-property attributes. A compiled
+Wasm loop consumes checked contiguous spans for one target and defining Realm.
+Its shared recipe/publication helpers still allocate fresh Realm-owned recipes
+and independent mutable descriptors in the original installation order.
+
+Canonical-slot methods remain eager and split spans. Accessors, aliases, target
+changes and intervening publications keep their existing ordered paths; actual
+aliases alone share one recipe. Program metadata cannot extend the table, and
+runtime admission checks cover its bytes with the rest of the sealed R image.
+
 ## Defining-realm attachment
 
 The Wasm emitter represents a proven realm-record local as

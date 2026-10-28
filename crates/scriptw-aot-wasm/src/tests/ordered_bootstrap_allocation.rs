@@ -54,6 +54,7 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
         indices[0]
     };
     let install = named("helper::deferred_intrinsic_install");
+    let batch = named("helper::deferred_intrinsic_install_run");
     let constructor = named("helper::intrinsic_constructor_allocate");
     let publish = named("helper::intrinsic_data_publish");
     let key = named("helper::pooled_string_resolve");
@@ -235,4 +236,197 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
         assert_eq!(signature.params(), parameters);
         assert_eq!(signature.results(), [result]);
     }
+    let wasmparser::CompositeInnerType::Func(signature) = &types
+        [declarations[batch as usize] as usize]
+        .composite_type
+        .inner
+    else {
+        panic!("compact installation has a real function signature");
+    };
+    assert_eq!(
+        signature.params(),
+        [
+            wasmparser::ValType::I32,
+            wasmparser::ValType::I64,
+            wasmparser::ValType::Ref(wasmparser::RefType::EQREF),
+            reference(type_index::<RealmRecord>(schema)),
+            wasmparser::ValType::I32,
+            wasmparser::ValType::I32,
+        ]
+    );
+    assert!(signature.results().is_empty());
+}
+
+#[test]
+fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
+    let artifact = emit_script("Math.abs; Array.prototype.map; Temporal.Instant;").unwrap();
+    expect_valid_module(&artifact, 0);
+    let bytes = artifact.runtime().unwrap().bytes();
+    let names = function_names_in_bytes(bytes);
+    let named = |requested: &str| {
+        names
+            .iter()
+            .find_map(|(&index, name)| (name == requested).then_some(index))
+            .expect("actual registered R installation body")
+    };
+    let batch = named("helper::deferred_intrinsic_install_run");
+    let install = named("helper::deferred_intrinsic_install");
+    let resolve = named("helper::property_value_resolve");
+    let bootstrap_index = named("helper::realm_initialize_intrinsics");
+    let bootstrap = body(bytes, bootstrap_index);
+    let loop_body = body(bytes, batch);
+    assert_eq!(
+        loop_body
+            .iter()
+            .filter(|op| matches!(op, Operator::Loop { .. }))
+            .count(),
+        1,
+        "one physical counted loop, rather than unrolled row dispatch"
+    );
+    let loads: Vec<_> = loop_body
+        .iter()
+        .enumerate()
+        .filter_map(|(i, op)| matches!(op, Operator::I32Load { .. }).then_some(i))
+        .collect();
+    assert_eq!(loads.len(), 4, "read exactly the four immutable row words");
+    let calls: Vec<_> = loop_body
+        .iter()
+        .enumerate()
+        .filter_map(|(i, op)| {
+            matches!(op, Operator::Call { function_index } if *function_index == install)
+                .then_some(i)
+        })
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "all rows reuse the original recipe/publication helper"
+    );
+    assert!(loads[3] < calls[0]);
+    assert!(matches!(loop_body[calls[0] + 1], Operator::Drop));
+    assert!(
+        !loop_body.iter().any(|op| matches!(
+            op,
+            Operator::StructNew { .. }
+                | Operator::ArrayNew { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::ArrayNewFixed { .. }
+        )),
+        "the batch adds no mutable GC record or packaging allocation"
+    );
+    assert!(
+        !loop_body.iter().any(|op| matches!(op,
+            Operator::Call { function_index } if *function_index == resolve
+        )),
+        "installation never observes the deferred callable"
+    );
+    assert!(
+        loop_body[..loads[0]]
+            .iter()
+            .filter(|op| matches!(op, Operator::Unreachable))
+            .count()
+            >= 2,
+        "static table/alignment and count checks precede the first memory read"
+    );
+    assert!(
+        loop_body[calls[0]..]
+            .iter()
+            .any(|op| matches!(op, Operator::Br { relative_depth: 0 })),
+        "the real helper returns to the counted loop"
+    );
+
+    let spans: Vec<_> = bootstrap.windows(3).filter_map(|ops| match ops {
+        [Operator::I32Const { value: start }, Operator::I32Const { value: count },
+         Operator::Call { function_index }] if *function_index == batch => Some((*start as u32, *count as u32)),
+        _ => None,
+    }).collect();
+    let total_rows = spans
+        .iter()
+        .map(|(_, count)| *count as usize)
+        .sum::<usize>();
+    assert!(spans.len() >= 40 && total_rows > 400,
+        "the actual executed initializer batches methods across builtin families: {} spans, {total_rows} rows", spans.len());
+    let direct_installs = bootstrap
+        .iter()
+        .filter(|op| {
+            matches!(op,
+                Operator::Call { function_index } if *function_index == install
+            )
+        })
+        .count();
+    assert!(
+        direct_installs < total_rows / 2,
+        "most per-method operand setup has left the initializer; aliases keep the original path"
+    );
+
+    // Inspect actual active R data at the emitted call operands, not the Rust
+    // plan or a source spelling. Every counted row is wholly in one sealed
+    // static segment and retains a closed builtin/key/attribute domain.
+    let mut segments = Vec::new();
+    let mut bootstrap_bytes = 0;
+    let mut next = imported_function_count_in_bytes(bytes);
+    for payload in Parser::new(0).parse_all(bytes) {
+        match payload.unwrap() {
+            Payload::CodeSectionEntry(encoded) => {
+                if next == bootstrap_index {
+                    bootstrap_bytes = encoded.range().len();
+                }
+                next += 1;
+            }
+            Payload::DataSection(data) => {
+                for entry in data {
+                    let entry = entry.unwrap();
+                    if let wasmparser::DataKind::Active {
+                        memory_index: 0,
+                        offset_expr,
+                    } = entry.kind
+                    {
+                        let mut ops = offset_expr.get_operators_reader();
+                        let Operator::I32Const { value } = ops.read().unwrap() else {
+                            panic!("R static data has a constant address");
+                        };
+                        segments.push((value as u32, entry.data));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut symbols = 0;
+    let mut nonwritable = 0;
+    for (start, count) in spans {
+        assert!(count > 0);
+        let row_bytes = count.checked_mul(16).unwrap();
+        let end = start.checked_add(row_bytes).unwrap();
+        let (base, data) = segments
+            .iter()
+            .find(|(base, data)| start >= *base && end as u64 <= *base as u64 + data.len() as u64)
+            .expect("the complete installation span belongs to active R static data");
+        let offset = (start - base) as usize;
+        for row in data[offset..offset + row_bytes as usize].chunks_exact(16) {
+            let words: [u32; 4] = std::array::from_fn(|i| {
+                u32::from_le_bytes(row[i * 4..i * 4 + 4].try_into().unwrap())
+            });
+            let builtin = *StandardBuiltinId::ALL
+                .iter()
+                .find(|id| **id as u32 == words[0])
+                .expect("encoded rows retain an actual StandardBuiltinId");
+            assert!(!builtin.constructable() && builtin.global_name().is_none());
+            assert!(
+                crate::module::standard_builtin_function_realm_slot(builtin).is_none(),
+                "canonical identities are eager ordering barriers"
+            );
+            assert!(words[1] <= 1 && words[3] & !3 == 0);
+            if words[1] == 1 {
+                symbols += 1;
+                assert!(words[2] < scriptw_ir::WellKnownSymbol::ALL.len() as u32);
+            }
+            nonwritable += usize::from(words[3] & 1 == 0);
+        }
+    }
+    assert!(
+        symbols >= 4 && nonwritable >= 1,
+        "actual rows exercise Symbol identity and nonuniform writable attributes"
+    );
+    eprintln!("compact Realm bootstrap: {bootstrap_bytes} encoded body bytes, {total_rows} batched method rows, {direct_installs} direct deferred installations");
 }

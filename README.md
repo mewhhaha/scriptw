@@ -20,12 +20,10 @@ An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-c
 can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
-Retained-object execution now avoids near-full-heap copying loops and numeric
-Array key strings, with direct packed initialization for small numeric literals.
-The [local before/after checkpoint](docs/rust-rewrite/retained-runtime-20261028.json)
-measured the original workload at **45.9 → 38.2 ms** and a separate 16,384-row
-scaling case at **191.8 → 73.1 ms**. These measurements use matched precompiled
-hosts; the CI graphs below retain their own recorded source and configuration.
+Runtime initialization uses compact intrinsic-installation tables. Guarded
+Number loops and packed Array push/join kernels avoid repeated conversion,
+dispatch and allocation when their semantic checks pass. The benchmark sections
+below identify each measurement's source and configuration.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the

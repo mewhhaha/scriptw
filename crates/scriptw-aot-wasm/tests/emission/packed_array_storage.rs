@@ -167,6 +167,82 @@ fn calls(body: &[Operator<'_>], target: u32) -> bool {
 }
 
 #[test]
+fn real_push_and_join_builtins_reach_guarded_canonical_packed_kernels() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let lowered = lower(
+                &parse(
+                    "[Array.prototype.push, Array.prototype.join];",
+                    ParseOptions::script(),
+                )
+                .unwrap(),
+            );
+            let artifact = emit_with_rooted_snapshot(
+                &lowered,
+                PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal,
+            )
+            .unwrap();
+            let runtime = artifact.runtime().unwrap();
+            for bytes in [&artifact.bytes[..], runtime.bytes()] {
+                Validator::new_with_features(WasmFeatures::all())
+                    .validate_all(bytes)
+                    .expect("actual packed builtin modules validate");
+            }
+            let runtime = Module::read(runtime.bytes());
+            let array = runtime.witness_type(GcSnapshotLayout::Array);
+            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let values = runtime.witness_type(GcSnapshotLayout::ArrayValues);
+            let units = runtime.witness_type(GcSnapshotLayout::CodeUnits);
+            let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
+            let (own_descriptor, _) = runtime.named("helper::ordinary_own_descriptor");
+            let (ordinary_set, _) = runtime.named("helper::ordinary_set");
+            let (_, push) = runtime.named("builtin::Array.prototype.push");
+            let publication = push
+                .iter()
+                .position(|op| matches!(op, Operator::Call { function_index } if *function_index == publish))
+                .expect("the actual push builtin reaches the sole canonical growth/publication helper");
+            for (owner, field) in [
+                (array, scriptw_aot_wasm::GcSnapshotField::ArrayLengthWritable),
+                (storage, scriptw_aot_wasm::GcSnapshotField::ArrayCount),
+            ] {
+                assert!(push[..publication].iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == owner && *field_index == field.index())),
+                    "push checks {field:?} before any canonical publication");
+            }
+            assert!(calls(&push[..publication], own_descriptor),
+                "live ordinary prototype descriptors are checked before publication");
+            assert!(calls(&push[publication..], ordinary_set),
+                "the actual builtin retains strict ordinary Set for declined cases and zero arguments");
+            assert!(push[publication..].iter().any(|op| matches!(op,
+                Operator::StructSet { struct_type_index, field_index }
+                    if *struct_type_index == array && *field_index == scriptw_aot_wasm::GcSnapshotField::ArrayLength.index())),
+                "successful packed append publishes the canonical receiver length");
+            let (_, join) = runtime.named("builtin::Array.prototype.join");
+            let first_value_read = join.iter().position(|op| matches!(op,
+                Operator::ArrayGet { array_type_index } if *array_type_index == values))
+                .expect("actual join builtin validates packed immutable value slots");
+            let exact_allocation = join.iter().position(|op| matches!(op,
+                Operator::ArrayNew { array_type_index } if *array_type_index == units))
+                .expect("actual join builtin allocates a result backing");
+            assert!(first_value_read < exact_allocation,
+                "packed value validation precedes the first result allocation");
+            assert!(join[exact_allocation..].iter().any(|op| matches!(op,
+                Operator::ArrayGet { array_type_index } if *array_type_index == values)),
+                "the exact-size result consumes the validated packed backing");
+            assert!(join[exact_allocation..].iter().any(|op| matches!(op,
+                Operator::ArrayCopy { array_type_index_dst, array_type_index_src }
+                    if *array_type_index_dst == units && *array_type_index_src == units)),
+                "join copies exact UTF16 units through the private String construction owner");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
 fn compiled_numbers_use_bitmap_arrays_and_keep_real_descriptor_fallback() {
     std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(|| {
         // Publish callable values without directly calling them. This retains

@@ -601,6 +601,11 @@ fn abi29_runtime_cache_is_replaced_before_lazy_calendar_rows_are_admitted() {
     assert_previous_runtime_cache_entry_replaced(29);
 }
 
+#[test]
+fn abi32_runtime_cache_is_replaced_before_intrinsic_installation_rows_are_admitted() {
+    assert_previous_runtime_cache_entry_replaced(32);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

@@ -10,22 +10,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("from", StandardBuiltinId::ArrayFrom),
-            ("fromAsync", StandardBuiltinId::ArrayFromAsync),
-            ("of", StandardBuiltinId::ArrayOf),
-            ("isArray", StandardBuiltinId::ArrayIsArray),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.constructor,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.constructor,
+            crate::intrinsics::IntrinsicMethodPlan::ArrayConstructor,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_accessor(
             context.constructor,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Species),
@@ -34,61 +24,12 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("toString", StandardBuiltinId::TypedArrayPrototypeToString),
-            ("concat", StandardBuiltinId::ArrayPrototypeConcat),
-            ("join", StandardBuiltinId::ArrayPrototypeJoin),
-            ("slice", StandardBuiltinId::ArrayPrototypeSlice),
-            ("splice", StandardBuiltinId::ArrayPrototypeSplice),
-            ("fill", StandardBuiltinId::ArrayPrototypeFill),
-            ("sort", StandardBuiltinId::ArrayPrototypeSort),
-            (
-                "toLocaleString",
-                StandardBuiltinId::ArrayPrototypeToLocaleString,
-            ),
-            ("flat", StandardBuiltinId::ArrayPrototypeFlat),
-            ("flatMap", StandardBuiltinId::ArrayPrototypeFlatMap),
-            ("at", StandardBuiltinId::ArrayPrototypeAt),
-            ("toReversed", StandardBuiltinId::ArrayPrototypeToReversed),
-            ("toSpliced", StandardBuiltinId::ArrayPrototypeToSpliced),
-            ("toSorted", StandardBuiltinId::ArrayPrototypeToSorted),
-            ("with", StandardBuiltinId::ArrayPrototypeWith),
-            ("reverse", StandardBuiltinId::ArrayPrototypeReverse),
-            ("copyWithin", StandardBuiltinId::ArrayPrototypeCopyWithin),
-            ("includes", StandardBuiltinId::ArrayPrototypeIncludes),
-            ("indexOf", StandardBuiltinId::ArrayPrototypeIndexOf),
-            ("lastIndexOf", StandardBuiltinId::ArrayPrototypeLastIndexOf),
-            ("find", StandardBuiltinId::ArrayPrototypeFind),
-            ("findIndex", StandardBuiltinId::ArrayPrototypeFindIndex),
-            ("findLast", StandardBuiltinId::ArrayPrototypeFindLast),
-            (
-                "findLastIndex",
-                StandardBuiltinId::ArrayPrototypeFindLastIndex,
-            ),
-            ("every", StandardBuiltinId::ArrayPrototypeEvery),
-            ("some", StandardBuiltinId::ArrayPrototypeSome),
-            ("forEach", StandardBuiltinId::ArrayPrototypeForEach),
-            ("filter", StandardBuiltinId::ArrayPrototypeFilter),
-            ("map", StandardBuiltinId::ArrayPrototypeMap),
-            ("reduce", StandardBuiltinId::ArrayPrototypeReduce),
-            ("reduceRight", StandardBuiltinId::ArrayPrototypeReduceRight),
-            ("pop", StandardBuiltinId::ArrayPrototypePop),
-            ("push", StandardBuiltinId::ArrayPrototypePush),
-            ("shift", StandardBuiltinId::ArrayPrototypeShift),
-            ("unshift", StandardBuiltinId::ArrayPrototypeUnshift),
-            ("keys", StandardBuiltinId::ArrayPrototypeKeys),
-            ("entries", StandardBuiltinId::ArrayPrototypeEntries),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::ArrayPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             context.prototype,
             &[

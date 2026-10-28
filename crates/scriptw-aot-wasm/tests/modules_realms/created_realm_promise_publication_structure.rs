@@ -4,7 +4,7 @@ const CLI_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_promise_created_realm.js");
 
 #[test]
-fn promise_publication_catalogs_are_complete_and_shared_by_both_realms() {
+fn promise_publication_catalogs_are_complete() {
     let prototype_catalog = MAIN_REALM_SOURCE
         .split_once("pub(crate) const PROMISE_PROTOTYPE_METHOD_PUBLICATIONS")
         .expect("Promise prototype catalog")
@@ -48,21 +48,6 @@ fn promise_publication_catalogs_are_complete_and_shared_by_both_realms() {
     }
     assert!(MAIN_REALM_SOURCE.contains("[StandardBuiltinId; 3]"));
     assert!(MAIN_REALM_SOURCE.contains("[StandardBuiltinId; 10]"));
-    for source in [MAIN_REALM_SOURCE] {
-        assert_eq!(
-            source
-                .matches("for builtin in PROMISE_PROTOTYPE_METHOD_PUBLICATIONS")
-                .count(),
-            1
-        );
-        assert_eq!(
-            source
-                .matches("for builtin in PROMISE_STATIC_METHOD_PUBLICATIONS")
-                .count(),
-            1
-        );
-        assert!(source.contains("builtin.native_function_name()"));
-    }
 }
 
 #[test]

@@ -74,8 +74,8 @@ fn receiver_kind_is_an_exact_private_non_derived_domain() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     assert_eq!(
         count_in_rust_sources(&source_root, "ToLocaleStringReceiverKind"),
-        10,
-        "declaration, four fixed Join/Locale producers, owned parameter and four arms"
+        12,
+        "declaration, four fixed Join/Locale producers, owned parameter and six exhaustive consumer arms"
     );
     for variant in ["ArrayLike", "TypedArray"] {
         assert_eq!(
@@ -83,7 +83,7 @@ fn receiver_kind_is_an_exact_private_non_derived_domain() {
                 &source_root,
                 &format!("ToLocaleStringReceiverKind::{variant}")
             ),
-            4
+            5
         );
     }
     for capability in ["Clone", "Copy", "Debug", "Default", "PartialEq", "Eq"] {
@@ -141,7 +141,7 @@ fn receiver_validation_precedes_exhaustive_locale_diagnostics_and_invocation() {
         "pub(crate) fn compile_typed_array_prototype_to_string_builtin(",
     ));
     assert!(shared.contains("receiver_kind:ToLocaleStringReceiverKind,"));
-    assert_eq!(shared.matches("match&receiver_kind{").count(), 1);
+    assert_eq!(shared.matches("match&receiver_kind{").count(), 2);
     assert_eq!(shared.matches("matchreceiver_kind{").count(), 1);
     assert!(shared.contains("ToLocaleStringReceiverKind::ArrayLike=>{self.emit_array_like_length_snapshot(&receiver,length,&pending,f)?}"));
     assert!(shared.contains(

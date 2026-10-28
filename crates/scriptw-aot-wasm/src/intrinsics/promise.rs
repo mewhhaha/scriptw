@@ -29,20 +29,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for builtin in PROMISE_PROTOTYPE_METHOD_PUBLICATIONS {
-            let name = builtin.native_function_name().ok_or_else(|| {
-                EmitError::unsupported("planned Promise prototype method has no native name")
-            })?;
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::PromisePrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_string(
             context.prototype,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
@@ -52,20 +44,12 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        for builtin in PROMISE_STATIC_METHOD_PUBLICATIONS {
-            let name = builtin.native_function_name().ok_or_else(|| {
-                EmitError::unsupported("planned Promise static method has no native name")
-            })?;
-            self.emit_install_intrinsic_method(
-                context.constructor,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.constructor,
+            crate::intrinsics::IntrinsicMethodPlan::PromiseConstructor,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_accessor(
             context.constructor,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Species),

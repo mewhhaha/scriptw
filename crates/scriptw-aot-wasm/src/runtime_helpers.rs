@@ -694,8 +694,8 @@ impl RealmInitializeIntrinsicsCallResult {
     }
 }
 
-/// This parameter can be acquired only by a helper whose caller accepts an
-/// actual StandardBuiltinId. An arbitrary I32 cannot populate a recipe's domain.
+/// Only an actual StandardBuiltinId or a checked immutable installation row
+/// can populate this parameter. An arbitrary I32 cannot enter a recipe's domain.
 pub(crate) struct RuntimeHelperStandardBuiltinParameter {
     local: I32Local,
 }
@@ -724,6 +724,12 @@ pub(crate) struct RuntimeHelperIntrinsicKeyParameter {
     is_symbol: I32Local,
     ordinal: I32Local,
 }
+
+mod intrinsic_installation_rows;
+pub(crate) use intrinsic_installation_rows::{
+    RuntimeHelperInstallationSpanParameter, RuntimeHelperIntrinsicKeyArgument,
+    RuntimeHelperStandardBuiltinArgument,
+};
 impl RuntimeHelperIntrinsicKeyParameter {
     pub(crate) fn is_symbol(&self) -> I32Local {
         self.is_symbol
@@ -772,9 +778,10 @@ macro_rules! helper_field {
     (@argument OptionalValue) => { Option<&'a ValueLocals> };
     (@argument Completion) => { &'a CompletionLocals };
     (@argument Key) => { &'a crate::operations::PropertyKeyLocals };
-    (@argument StandardBuiltin) => { scriptw_ir::StandardBuiltinId };
+    (@argument StandardBuiltin) => { RuntimeHelperStandardBuiltinArgument<'a> };
     (@argument NativeErrorKind) => { scriptw_ir::NativeErrorKind };
-    (@argument InstallationKey) => { &'a crate::operations::IntrinsicInstallationKey };
+    (@argument InstallationKey) => { RuntimeHelperIntrinsicKeyArgument<'a> };
+    (@argument InstallationSpan) => { crate::data::RInstallationSpan };
     (@argument I32) => { I32Local };
     (@argument I64) => { I64Local };
     (@argument (Ref $ty:ident $null:ident)) => { &'a GcLocal<$ty, $null> };
@@ -786,6 +793,7 @@ macro_rules! helper_field {
     (@parameter StandardBuiltin) => { RuntimeHelperStandardBuiltinParameter };
     (@parameter NativeErrorKind) => { RuntimeHelperNativeErrorKindParameter };
     (@parameter InstallationKey) => { RuntimeHelperIntrinsicKeyParameter };
+    (@parameter InstallationSpan) => { RuntimeHelperInstallationSpanParameter };
     (@parameter I32) => { I32Local };
     (@parameter I64) => { I64Local };
     (@parameter (Ref $ty:ident $null:ident)) => { GcLocal<$ty, $null> };
@@ -797,6 +805,7 @@ macro_rules! helper_field {
     (@abi StandardBuiltin) => { &[AbiType::I32] };
     (@abi NativeErrorKind) => { &[AbiType::I32] };
     (@abi InstallationKey) => { &[AbiType::I32, AbiType::I32] };
+    (@abi InstallationSpan) => { &[AbiType::I32, AbiType::I32] };
     (@abi I32) => { &[AbiType::I32] };
     (@abi I64) => { &[AbiType::I64] };
     (@abi (Ref $ty:ident $null:ident)) => { &[AbiType::Gc(GcLayout::$ty, GcNullability::$null)] };
@@ -805,9 +814,10 @@ macro_rules! helper_field {
     (@emit $value:expr, $schema:ident, $function:ident, OptionalValue) => { RuntimeHelperOptionalValueParameter::emit_argument($value, $function) };
     (@emit $value:expr, $schema:ident, $function:ident, Completion) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, Key) => { $value.value().emit($function) };
-    (@emit $value:expr, $schema:ident, $function:ident, StandardBuiltin) => { $function.instruction(&Instruction::I32Const($value as i32)) };
+    (@emit $value:expr, $schema:ident, $function:ident, StandardBuiltin) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, NativeErrorKind) => { $function.instruction(&Instruction::I32Const($value as i32)) };
     (@emit $value:expr, $schema:ident, $function:ident, InstallationKey) => { $value.emit($function) };
+    (@emit $value:expr, $schema:ident, $function:ident, InstallationSpan) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I32) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I64) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, (Ref $ty:ident $null:ident)) => { { $value.load($schema, $function); } };
@@ -828,6 +838,7 @@ macro_rules! helper_field {
     (@acquire $schema:ident, $index:ident, $function:ident, StandardBuiltin) => { RuntimeHelperStandardBuiltinParameter { local: $schema.parameter_i32($index, $function) } };
     (@acquire $schema:ident, $index:ident, $function:ident, NativeErrorKind) => { RuntimeHelperNativeErrorKindParameter { local: $schema.parameter_i32($index, $function) } };
     (@acquire $schema:ident, $index:ident, $function:ident, InstallationKey) => { RuntimeHelperIntrinsicKeyParameter { is_symbol: $schema.parameter_i32($index, $function), ordinal: $schema.parameter_i32($index + 1, $function) } };
+    (@acquire $schema:ident, $index:ident, $function:ident, InstallationSpan) => { RuntimeHelperInstallationSpanParameter::acquire($schema, $index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, I32) => { $schema.parameter_i32($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, I64) => { $schema.parameter_i64($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, (Ref $ty:ident $null:ident)) => { $schema.parameter_gc::<$ty, $null>($index, $function) };
@@ -839,6 +850,7 @@ macro_rules! helper_field {
     (@release $value:expr, $function:ident, StandardBuiltin) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, NativeErrorKind) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, InstallationKey) => { { let _ = $value; } };
+    (@release $value:expr, $function:ident, InstallationSpan) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I32) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I64) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, (Ref $ty:ident $null:ident)) => { $value.clear($function) };
@@ -1138,6 +1150,7 @@ runtime_helper_domain! {
     IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
     IntrinsicConstructorAllocate / IntrinsicConstructorAllocateArguments / IntrinsicConstructorAllocateParameters / "intrinsic_constructor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
     DeferredIntrinsicInstall / DeferredIntrinsicInstallArguments / DeferredIntrinsicInstallParameters / "deferred_intrinsic_install" { target:Value,realm:(Ref RealmRecord NonNullable),builtin:StandardBuiltin,key:InstallationKey,writable:I32,configurable:I32 } => (Ref PropertyValue NonNullable);
+    DeferredIntrinsicInstallRun / DeferredIntrinsicInstallRunArguments / DeferredIntrinsicInstallRunParameters / "deferred_intrinsic_install_run" { target:Value,realm:(Ref RealmRecord NonNullable),rows:InstallationSpan } => Void;
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
     CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1304,6 +1317,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorAllocate => HelperOwner::Runtime,
             Self::IntrinsicConstructorAllocate => HelperOwner::Runtime,
             Self::DeferredIntrinsicInstall => HelperOwner::Runtime,
+            Self::DeferredIntrinsicInstallRun => HelperOwner::Runtime,
             Self::ArgumentListAppend => HelperOwner::Runtime,
             Self::CachedPropertyRead => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
@@ -1456,6 +1470,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorAllocate => true,
             Self::IntrinsicConstructorAllocate => true,
             Self::DeferredIntrinsicInstall => true,
+            Self::DeferredIntrinsicInstallRun => true,
             Self::ArgumentListAppend => true,
             Self::CachedPropertyRead => true,
             Self::OrdinaryPropertyFind => true,

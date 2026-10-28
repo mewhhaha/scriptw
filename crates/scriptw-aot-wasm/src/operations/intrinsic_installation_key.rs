@@ -34,7 +34,8 @@ impl IntrinsicInstallationKey {
         }))
     }
 
-    pub(crate) fn emit(&self, f: &mut Function) {
+    /// Serialization retains the same closed key proof for immutable R rows.
+    pub(crate) fn words(&self) -> [u32; 2] {
         let (is_symbol, ordinal) = match self.0 {
             InstallationKey::RuntimeName(index) => (false, index.ordinal()),
             InstallationKey::WellKnown(symbol) => (
@@ -45,7 +46,12 @@ impl IntrinsicInstallationKey {
                     .expect("closed well-known Symbol row") as u32,
             ),
         };
-        f.instruction(&Instruction::I32Const(i32::from(is_symbol)));
+        [u32::from(is_symbol), ordinal]
+    }
+
+    pub(crate) fn emit(&self, f: &mut Function) {
+        let [is_symbol, ordinal] = self.words();
+        f.instruction(&Instruction::I32Const(is_symbol as i32));
         f.instruction(&Instruction::I32Const(ordinal as i32));
     }
 }

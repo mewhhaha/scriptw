@@ -6,7 +6,9 @@ mod shared_pool_storage;
 pub(crate) use shared_pool_storage::PoolBytes;
 use shared_pool_storage::PoolStringRefs;
 mod compiler_owned_pool;
+mod intrinsic_installations;
 mod runtime_string_descriptors;
+pub(crate) use intrinsic_installations::{RInstallationRows, RInstallationSpan};
 pub(crate) use program_metadata::{
     PooledLiteralOperand, ProgramMetadataSpan, POOLED_LITERAL_PROGRAM_DOMAIN,
     POOLED_LITERAL_RUNTIME_DOMAIN,
@@ -434,6 +436,7 @@ pub(crate) struct StringPool {
     compiler_owned: PoolBoundary,
     shared_prefix: Option<std::sync::Arc<CompilerOwnedPool>>,
     runtime_string_descriptors: Option<RuntimeStringDescriptors>,
+    runtime_intrinsic_installations: Option<intrinsic_installations::RuntimeIntrinsicInstallations>,
     intl_supported_values: Option<Result<CompiledSupportedValuesTables, SupportedValuesPoolError>>,
     intl_default_locale: Option<scriptw_intl::CanonicalLocaleId>,
     pub(crate) bytes: PoolBytes,
@@ -2196,6 +2199,10 @@ impl CompilerOwnedPool {
         ] {
             pool.intern_string(name);
         }
+        // Names are complete and R-owned before installation keys are proved.
+        // Seal the final static boundary only after appending checked metadata.
+        pool.compiler_owned = pool.boundary();
+        pool.append_runtime_intrinsic_installations(function_metas)?;
         pool.append_runtime_string_descriptors()?;
         pool.compiler_owned = pool.boundary();
         Ok(Self(pool))

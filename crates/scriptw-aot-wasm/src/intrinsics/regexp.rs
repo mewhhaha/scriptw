@@ -10,22 +10,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("compile", StandardBuiltinId::RegExpPrototypeCompile),
-            ("toString", StandardBuiltinId::RegExpPrototypeToString),
-            ("exec", StandardBuiltinId::RegExpPrototypeExec),
-            ("test", StandardBuiltinId::RegExpPrototypeTest),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::RegExpPrototypeBeforeAccessors,
+            context.realm,
+            function,
+        )?;
         for (name, getter) in [
             ("source", StandardBuiltinId::RegExpPrototypeSourceGetter),
             (
@@ -59,38 +49,12 @@ impl FunctionBuilder<'_> {
                 function,
             )?;
         }
-        for (symbol, builtin) in [
-            (
-                scriptw_ir::WellKnownSymbol::Match,
-                StandardBuiltinId::RegExpPrototypeSymbolMatch,
-            ),
-            (
-                scriptw_ir::WellKnownSymbol::MatchAll,
-                StandardBuiltinId::RegExpPrototypeSymbolMatchAll,
-            ),
-            (
-                scriptw_ir::WellKnownSymbol::Replace,
-                StandardBuiltinId::RegExpPrototypeSymbolReplace,
-            ),
-            (
-                scriptw_ir::WellKnownSymbol::Search,
-                StandardBuiltinId::RegExpPrototypeSymbolSearch,
-            ),
-            (
-                scriptw_ir::WellKnownSymbol::Split,
-                StandardBuiltinId::RegExpPrototypeSymbolSplit,
-            ),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Symbol(symbol),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::RegExpSymbols,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method(
             context.constructor,
             IntrinsicKey::Name("escape"),

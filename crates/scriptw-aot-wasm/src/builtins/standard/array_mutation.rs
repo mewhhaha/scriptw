@@ -323,6 +323,24 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        if matches!(kind, GrowKind::Push) {
+            let handled = self.emit_try_packed_array_push(
+                &receiver.object,
+                receiver.length,
+                &arguments,
+                count,
+                length,
+                f,
+            )?;
+            handled.load(f);
+            s.release_i32_local(handled, f);
+            self.open_frame(ControlFrameKind::If, f);
+            self.emit_mutation_number(length, &value, f);
+            output.set_normal(&value, f);
+            self.emit_branch_to_target(exit, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
         match kind {
             GrowKind::Push => {
                 receiver.length.load(f);

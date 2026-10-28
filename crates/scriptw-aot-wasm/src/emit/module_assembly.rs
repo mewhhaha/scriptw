@@ -1340,6 +1340,7 @@ fn emit_script_module_with_factory(
             IntrinsicAccessorAllocate, compile_intrinsic_accessor_allocate_helper;
             IntrinsicConstructorAllocate, compile_intrinsic_constructor_allocate_helper;
             DeferredIntrinsicInstall, compile_deferred_intrinsic_install_helper;
+            DeferredIntrinsicInstallRun, compile_deferred_intrinsic_install_run_helper;
             IntrinsicDataPublish, compile_intrinsic_data_publish_helper;
             IntrinsicAccessorPublish, compile_intrinsic_accessor_publish_helper;
             PropertyValueResolve, compile_property_value_resolve_helper;

@@ -70,31 +70,12 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("clear", StandardBuiltinId::MapPrototypeClear),
-            ("delete", StandardBuiltinId::MapPrototypeDelete),
-            ("forEach", StandardBuiltinId::MapPrototypeForEach),
-            ("get", StandardBuiltinId::MapPrototypeGet),
-            ("getOrInsert", StandardBuiltinId::MapPrototypeGetOrInsert),
-            (
-                "getOrInsertComputed",
-                StandardBuiltinId::MapPrototypeGetOrInsertComputed,
-            ),
-            ("has", StandardBuiltinId::MapPrototypeHas),
-            ("keys", StandardBuiltinId::MapPrototypeKeys),
-            ("set", StandardBuiltinId::MapPrototypeSet),
-            ("values", StandardBuiltinId::MapPrototypeValues),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::MapPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             context.prototype,
             &[
@@ -130,30 +111,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("delete", StandardBuiltinId::WeakMapPrototypeDelete),
-            ("get", StandardBuiltinId::WeakMapPrototypeGet),
-            (
-                "getOrInsert",
-                StandardBuiltinId::WeakMapPrototypeGetOrInsert,
-            ),
-            (
-                "getOrInsertComputed",
-                StandardBuiltinId::WeakMapPrototypeGetOrInsertComputed,
-            ),
-            ("has", StandardBuiltinId::WeakMapPrototypeHas),
-            ("set", StandardBuiltinId::WeakMapPrototypeSet),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::WeakMapPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_collection_prototype_to_string_tag(
             CollectionPrototypeIntrinsic::WeakMap,
             context.prototype,
@@ -167,21 +130,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            ("add", StandardBuiltinId::WeakSetPrototypeAdd),
-            ("delete", StandardBuiltinId::WeakSetPrototypeDelete),
-            ("has", StandardBuiltinId::WeakSetPrototypeHas),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::WeakSetPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_collection_prototype_to_string_tag(
             CollectionPrototypeIntrinsic::WeakSet,
             context.prototype,
@@ -256,28 +210,12 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        for (name, builtin) in [
-            (
-                "adopt",
-                StandardBuiltinId::AsyncDisposableStackPrototypeAdopt,
-            ),
-            (
-                "defer",
-                StandardBuiltinId::AsyncDisposableStackPrototypeDefer,
-            ),
-            ("move", StandardBuiltinId::AsyncDisposableStackPrototypeMove),
-            ("use", StandardBuiltinId::AsyncDisposableStackPrototypeUse),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::AsyncDisposableStackPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             context.prototype,
             &[
@@ -325,36 +263,12 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        for (name, builtin) in [
-            ("add", StandardBuiltinId::SetPrototypeAdd),
-            ("clear", StandardBuiltinId::SetPrototypeClear),
-            ("delete", StandardBuiltinId::SetPrototypeDelete),
-            ("difference", StandardBuiltinId::SetPrototypeDifference),
-            ("forEach", StandardBuiltinId::SetPrototypeForEach),
-            ("has", StandardBuiltinId::SetPrototypeHas),
-            ("intersection", StandardBuiltinId::SetPrototypeIntersection),
-            (
-                "isDisjointFrom",
-                StandardBuiltinId::SetPrototypeIsDisjointFrom,
-            ),
-            ("isSubsetOf", StandardBuiltinId::SetPrototypeIsSubsetOf),
-            ("isSupersetOf", StandardBuiltinId::SetPrototypeIsSupersetOf),
-            (
-                "symmetricDifference",
-                StandardBuiltinId::SetPrototypeSymmetricDifference,
-            ),
-            ("union", StandardBuiltinId::SetPrototypeUnion),
-        ] {
-            self.emit_install_intrinsic_method(
-                context.prototype,
-                IntrinsicKey::Name(name),
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
+        self.emit_install_intrinsic_methods(
+            context.prototype,
+            crate::intrinsics::IntrinsicMethodPlan::SetPrototype,
+            context.realm,
+            function,
+        )?;
         self.emit_install_intrinsic_method_aliases(
             context.prototype,
             &[
