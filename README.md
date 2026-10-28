@@ -64,6 +64,22 @@ refresh does not rerun or refresh that full native checkpoint or Test262.
 [CI run](https://github.com/mewhhaha/scriptw/actions/runs/40674504933) ·
 [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
+**Local consumer experiment, 2026-10-28:** at `a5da57330`, excluding native
+source-compilation callbacks reduced Scriptw's mean post-execution RSS from
+**22.01 to 19.74 MiB (10.3%)**, with essentially unchanged execution time.
+Scriptc used **14.92 MiB** in the same capability-disabled host. These are means
+of per-workload medians over the original 17 inputs, with two balanced rounds,
+ten warmups and seven measured fresh Stores per round. All 136 processes passed.
+This measures the separate precompiled consumer; it does not refresh the graphs
+or measure ordinary CLI execution. Static compiler dependencies remain.
+
+The remaining gap already exists before Store creation: **17.71 versus
+12.39 MiB**, and nearly the same gap persists after Store drop. Loaded host/runtime
+memory needs further investigation. The combined lazy-function-text and TypedArray
+sort experiment did not lower aggregate RSS and increased callback-sort RSS;
+those changes remain on an experimental branch.
+[Results and raw evidence](docs/rust-rewrite/contracts/precompiled-comparison.md#consumer-capability-experiment).
+
 ## Benchmarks
 
 ![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
@@ -88,25 +104,6 @@ recorded `rustc 1.99.1 (58cf8f9c3 2026-10-13)`. The paths/configurations differ,
 are not a causal cross-cohort comparison. [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 [Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40674499711).
-
-**Separate local memory checkpoint, 2026-10-26:** compiler `736f0f120`,
-compared with `25909ef75` in a paired rerun. Ordinary post-execution process RSS
-was mostly flat: it fell in **10 of 17 workloads** and increased in **7**.
-Integer execution used **81.62 → 82.06 MiB**; retained objects used
-**99.57 → 100.08 MiB**. Fresh-Realm timing medians fell in all 17 workloads,
-while separate existing-Realm calls regressed **30.3% for retained objects**
-and **26.4% for small joins**. These local observations are separate from the
-GitHub Actions comparison above.
-
-The candidate-only compiler-disabled precompiled diagnostic measured
-**49.31 MiB for integer execution** and **66.09 MiB for retained objects**.
-Native loading reached a **111.93 MiB sampled RSS maximum**, which may miss
-shorter transients. There is no older API baseline; loading/decode costs remain
-recorded and these samples do not enter the comparison above. RSS includes
-host/runtime, code residency, setup and warmup history; it is neither live
-JavaScript heap usage nor whole-child peak memory.
-[Local measurements and evidence](docs/rust-rewrite/execution-memory-packed-records-20261026.md) ·
-[Memory ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
 
 ## Tests
 

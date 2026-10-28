@@ -8,6 +8,13 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Latest verification
 
+The [consumer capability checkpoint](memory-consumer-capability-20261028.json)
+at `a5da57330` passed **46 capability-disabled and six capability-enabled engine
+tests**, **280 source-only checks**, and all 15 Intl identity checks. The same-source
+memory comparison passed all 136 processes. This focused checkpoint does not
+refresh full native or Test262 coverage; rejected heap experiments retain their
+own source-bound results in its evidence archive.
+
 The [runtime error-tail checkpoint](memory-runtime-error-tail-20261028.md)
 records **4,917 fresh native passes across 19 complete affected targets** at
 `0658e6ae6`, retaining all 4,912 predecessor IDs and five additions. It credits
@@ -19,7 +26,9 @@ refresh either native coverage or Test262.
 
 - Continue memory work from the [runtime ownership contract](contracts/runtime-byte-ownership.md)
   and [performance queue](../performance-hills.md), using current source-bound
-  measurements to choose the next change. Retain all benchmark graphs and their
+  measurements to choose the next change. The consumer experiment leaves a
+  5.32-MiB RSS gap before Store creation that persists after drop; investigate
+  host/runtime residency next. Retain all benchmark graphs and their
   evidence. The [8-MiB GC capacity probe](memory-gc-capacity-20261028.md) already
   found growth back to 16 MiB and slower retained-object execution; ordinary
   execution remains at 16 MiB.

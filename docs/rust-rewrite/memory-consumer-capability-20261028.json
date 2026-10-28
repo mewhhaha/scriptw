@@ -1,0 +1,1359 @@
+{
+  "schema": "scriptw-local-consumer-memory-result-v1",
+  "date": "2026-10-28",
+  "source_commit": "a5da573301ee1793f03df3f24bc13e34bb2653d5",
+  "source_fingerprint": "698ec9b2c615c755b0a2046c0f3262a74cf8f9a82e6e0ca9e782e1517ca7220d",
+  "runtime_abi": 32,
+  "scope": "Local precompiled consumer capability comparison; excluded from canonical graphs and ordinary CLI cohorts. Process endpoints, not live GC bytes or peak RSS.",
+  "aggregation": "Arithmetic means of per-case medians across 14 measured Stores; paired ratios are geometric means.",
+  "inputs": "17 original workloads and outputs; Scriptc 0.4.5 raw Wasm reused from GitHub run 40674504933. Both adapters freshly precompiled for this host; Scriptc frontend not rerun.",
+  "samples_per_round": 7,
+  "warmups_per_round": 10,
+  "balanced_rounds": 2,
+  "passed_execution_processes": 136,
+  "passed_output_checks": 2312,
+  "resources": {
+    "cpu_affinity": [
+      0
+    ],
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "20328448",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "107384832",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "hosts": {
+    "enabled": {
+      "path": "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/consumer-only-on/host",
+      "sha256": "ddc2dc23062494dd772245f19dfc256492029a815aff0bf48be070267914df70",
+      "identity": {
+        "adapter": "shared",
+        "comparison_cohort": "scriptw-consumer-capability-diagnostic-v1",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "excluded_from_ordinary_cohorts": true,
+        "excluded_from_scored_cohorts": true,
+        "executable_sha256": "ddc2dc23062494dd772245f19dfc256492029a815aff0bf48be070267914df70",
+        "native_source_compiler_enabled": true,
+        "schema": "scriptw-precompiled-consumer-v1",
+        "scope": "consumer-only entrypoints; compiler dependencies remain; fresh Stores; exact trusted producer images",
+        "shared_configuration": {
+          "collector": "copying",
+          "consumer_compiler_enabled": false,
+          "epoch_deadline": 9223372036854775807,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_compilation_mode": "size-optimized",
+          "register_allocation": "backtracking",
+          "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+          "store_memory_limit_bytes": 1073741824,
+          "target": "generic",
+          "target_triple": "x86_64-unknown-linux-gnu",
+          "wasm_backtrace_details": "disable",
+          "wasmtime_version": "47.0.0",
+          "worker_stack_bytes": 67108864
+        },
+        "source_commit": "a5da573301ee1793f03df3f24bc13e34bb2653d5",
+        "source_fingerprint": "698ec9b2c615c755b0a2046c0f3262a74cf8f9a82e6e0ca9e782e1517ca7220d"
+      }
+    },
+    "disabled": {
+      "path": "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/consumer-only-off/host",
+      "sha256": "14ce54677b09ded33bd440c6ec9846c3e6390b675249fce07a2021913875b33a",
+      "identity": {
+        "adapter": "shared",
+        "comparison_cohort": "scriptw-consumer-capability-diagnostic-v1",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "excluded_from_ordinary_cohorts": true,
+        "excluded_from_scored_cohorts": true,
+        "executable_sha256": "14ce54677b09ded33bd440c6ec9846c3e6390b675249fce07a2021913875b33a",
+        "native_source_compiler_enabled": false,
+        "schema": "scriptw-precompiled-consumer-v1",
+        "scope": "consumer-only entrypoints; compiler dependencies remain; fresh Stores; exact trusted producer images",
+        "shared_configuration": {
+          "collector": "copying",
+          "consumer_compiler_enabled": false,
+          "epoch_deadline": 9223372036854775807,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_compilation_mode": "size-optimized",
+          "register_allocation": "backtracking",
+          "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+          "store_memory_limit_bytes": 1073741824,
+          "target": "generic",
+          "target_triple": "x86_64-unknown-linux-gnu",
+          "wasm_backtrace_details": "disable",
+          "wasmtime_version": "47.0.0",
+          "worker_stack_bytes": 67108864
+        },
+        "source_commit": "a5da573301ee1793f03df3f24bc13e34bb2653d5",
+        "source_fingerprint": "698ec9b2c615c755b0a2046c0f3262a74cf8f9a82e6e0ca9e782e1517ca7220d"
+      }
+    }
+  },
+  "executable_disk_bytes": {
+    "enabled": 212546504,
+    "disabled": 139476184
+  },
+  "aggregates": {
+    "scriptw": {
+      "enabled": {
+        "execution_ms": 3.933597,
+        "lifecycle": {
+          "before_store": {
+            "rss_bytes": 20955376.94117647,
+            "pss_bytes": 18321287.529411763,
+            "private_dirty_bytes": 2623608.470588235
+          },
+          "after_instantiate": {
+            "rss_bytes": 21211256.470588237,
+            "pss_bytes": 18577528.470588237,
+            "private_dirty_bytes": 2880451.7647058824
+          },
+          "after_execution": {
+            "rss_bytes": 23079152.94117647,
+            "pss_bytes": 20445184.0,
+            "private_dirty_bytes": 4748709.647058823
+          },
+          "after_store_drop": {
+            "rss_bytes": 20962484.70588235,
+            "pss_bytes": 18328515.76470588,
+            "private_dirty_bytes": 2632041.411764706
+          }
+        }
+      },
+      "disabled": {
+        "execution_ms": 3.9288296470588238,
+        "lifecycle": {
+          "before_store": {
+            "rss_bytes": 18573673.411764707,
+            "pss_bytes": 15926723.764705881,
+            "private_dirty_bytes": 2207503.0588235296
+          },
+          "after_instantiate": {
+            "rss_bytes": 18829071.05882353,
+            "pss_bytes": 16181880.470588235,
+            "private_dirty_bytes": 2463382.588235294
+          },
+          "after_execution": {
+            "rss_bytes": 20696967.529411763,
+            "pss_bytes": 18049987.76470588,
+            "private_dirty_bytes": 4330797.176470588
+          },
+          "after_store_drop": {
+            "rss_bytes": 18580299.29411765,
+            "pss_bytes": 15933319.529411765,
+            "private_dirty_bytes": 2214128.9411764704
+          }
+        }
+      },
+      "geometric_mean_disabled_over_enabled": {
+        "rss_bytes": 0.8959911588725763,
+        "pss_bytes": 0.8817327494044489,
+        "private_dirty_bytes": 0.90442529854721,
+        "execution_ms": 0.9974430190355227
+      }
+    },
+    "wasi": {
+      "enabled": {
+        "execution_ms": 1.4151420588235295,
+        "lifecycle": {
+          "before_store": {
+            "rss_bytes": 13379102.11764706,
+            "pss_bytes": 10807446.588235294,
+            "private_dirty_bytes": 2666857.411764706
+          },
+          "after_instantiate": {
+            "rss_bytes": 13386089.411764706,
+            "pss_bytes": 10814433.88235294,
+            "private_dirty_bytes": 2673724.2352941176
+          },
+          "after_execution": {
+            "rss_bytes": 16032707.764705881,
+            "pss_bytes": 13461052.235294119,
+            "private_dirty_bytes": 5320824.470588235
+          },
+          "after_store_drop": {
+            "rss_bytes": 13386932.705882354,
+            "pss_bytes": 10815277.176470589,
+            "private_dirty_bytes": 2675049.411764706
+          }
+        }
+      },
+      "disabled": {
+        "execution_ms": 1.4236794705882354,
+        "lifecycle": {
+          "before_store": {
+            "rss_bytes": 12994800.94117647,
+            "pss_bytes": 10423868.235294119,
+            "private_dirty_bytes": 2249547.294117647
+          },
+          "after_instantiate": {
+            "rss_bytes": 13001908.705882354,
+            "pss_bytes": 10430976.0,
+            "private_dirty_bytes": 2256534.588235294
+          },
+          "after_execution": {
+            "rss_bytes": 15648888.470588235,
+            "pss_bytes": 13077955.764705881,
+            "private_dirty_bytes": 4902912.0
+          },
+          "after_store_drop": {
+            "rss_bytes": 13003113.411764706,
+            "pss_bytes": 10432180.705882354,
+            "private_dirty_bytes": 2257136.9411764704
+          }
+        }
+      },
+      "geometric_mean_disabled_over_enabled": {
+        "rss_bytes": 0.9757746138192404,
+        "pss_bytes": 0.9711164027441471,
+        "private_dirty_bytes": 0.9176318986273246,
+        "execution_ms": 0.9995531925761422
+      }
+    }
+  },
+  "rows": [
+    {
+      "file": "sort-reverse-128.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.9074365,
+        "rss_bytes": 22454272.0,
+        "pss_bytes": 19831808.0,
+        "private_dirty_bytes": 4050944.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.908946,
+        "rss_bytes": 20140032.0,
+        "pss_bytes": 17475072.0,
+        "private_dirty_bytes": 3627008.0
+      }
+    },
+    {
+      "file": "sort-reverse-128.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.090605,
+        "rss_bytes": 15929344.0,
+        "pss_bytes": 13358080.0,
+        "private_dirty_bytes": 5191680.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.089865,
+        "rss_bytes": 15306752.0,
+        "pss_bytes": 12721664.0,
+        "private_dirty_bytes": 4775936.0
+      }
+    },
+    {
+      "file": "sort-reverse-512.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.915308,
+        "rss_bytes": 25276416.0,
+        "pss_bytes": 22625280.0,
+        "private_dirty_bytes": 6787072.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.9013185,
+        "rss_bytes": 22996992.0,
+        "pss_bytes": 20359168.0,
+        "private_dirty_bytes": 6363136.0
+      }
+    },
+    {
+      "file": "sort-reverse-512.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.211179,
+        "rss_bytes": 16023552.0,
+        "pss_bytes": 13467648.0,
+        "private_dirty_bytes": 5244928.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.2087145,
+        "rss_bytes": 15611904.0,
+        "pss_bytes": 13042688.0,
+        "private_dirty_bytes": 4829184.0
+      }
+    },
+    {
+      "file": "sort-sorted-512.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.528969,
+        "rss_bytes": 22654976.0,
+        "pss_bytes": 20030464.0,
+        "private_dirty_bytes": 4399104.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.522224,
+        "rss_bytes": 20713472.0,
+        "pss_bytes": 18058240.0,
+        "private_dirty_bytes": 3987456.0
+      }
+    },
+    {
+      "file": "sort-sorted-512.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.2158345,
+        "rss_bytes": 15972352.0,
+        "pss_bytes": 13412352.0,
+        "private_dirty_bytes": 5246976.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.213889,
+        "rss_bytes": 15366144.0,
+        "pss_bytes": 12776960.0,
+        "private_dirty_bytes": 4827136.0
+      }
+    },
+    {
+      "file": "to-sorted-512.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 3.5794155,
+        "rss_bytes": 26245120.0,
+        "pss_bytes": 23607296.0,
+        "private_dirty_bytes": 7542784.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 3.5878505,
+        "rss_bytes": 23930880.0,
+        "pss_bytes": 21278720.0,
+        "private_dirty_bytes": 7131136.0
+      }
+    },
+    {
+      "file": "to-sorted-512.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.232824,
+        "rss_bytes": 15929344.0,
+        "pss_bytes": 13349376.0,
+        "private_dirty_bytes": 5259264.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.2292895,
+        "rss_bytes": 15511552.0,
+        "pss_bytes": 12961792.0,
+        "private_dirty_bytes": 4839424.0
+      }
+    },
+    {
+      "file": "join-1024.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.6335735,
+        "rss_bytes": 22571008.0,
+        "pss_bytes": 19929088.0,
+        "private_dirty_bytes": 3962880.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.6039335,
+        "rss_bytes": 20269056.0,
+        "pss_bytes": 17629184.0,
+        "private_dirty_bytes": 3545088.0
+      }
+    },
+    {
+      "file": "join-1024.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.281184,
+        "rss_bytes": 16093184.0,
+        "pss_bytes": 13541376.0,
+        "private_dirty_bytes": 5269504.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.2868235,
+        "rss_bytes": 15755264.0,
+        "pss_bytes": 13193216.0,
+        "private_dirty_bytes": 4849664.0
+      }
+    },
+    {
+      "file": "join-4096.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 5.4144535,
+        "rss_bytes": 24588288.0,
+        "pss_bytes": 21941248.0,
+        "private_dirty_bytes": 5789696.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 5.3886735,
+        "rss_bytes": 22118400.0,
+        "pss_bytes": 19478528.0,
+        "private_dirty_bytes": 5367808.0
+      }
+    },
+    {
+      "file": "join-4096.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.928572,
+        "rss_bytes": 16406528.0,
+        "pss_bytes": 13820928.0,
+        "private_dirty_bytes": 5767168.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.921787,
+        "rss_bytes": 16447488.0,
+        "pss_bytes": 13870080.0,
+        "private_dirty_bytes": 5351424.0
+      }
+    },
+    {
+      "file": "join-mixed-1024.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.7925875,
+        "rss_bytes": 22773760.0,
+        "pss_bytes": 20149248.0,
+        "private_dirty_bytes": 3936256.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.8002125,
+        "rss_bytes": 20224000.0,
+        "pss_bytes": 17573888.0,
+        "private_dirty_bytes": 3518464.0
+      }
+    },
+    {
+      "file": "join-mixed-1024.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.181094,
+        "rss_bytes": 15783936.0,
+        "pss_bytes": 13215744.0,
+        "private_dirty_bytes": 5201920.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.182569,
+        "rss_bytes": 15652864.0,
+        "pss_bytes": 13084672.0,
+        "private_dirty_bytes": 4780032.0
+      }
+    },
+    {
+      "file": "numeric-loop-10000.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.951801,
+        "rss_bytes": 20848640.0,
+        "pss_bytes": 18237440.0,
+        "private_dirty_bytes": 3297280.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.945881,
+        "rss_bytes": 18300928.0,
+        "pss_bytes": 15654912.0,
+        "private_dirty_bytes": 2875392.0
+      }
+    },
+    {
+      "file": "numeric-loop-10000.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.0706095,
+        "rss_bytes": 15087616.0,
+        "pss_bytes": 12512256.0,
+        "private_dirty_bytes": 4493312.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.069744,
+        "rss_bytes": 14804992.0,
+        "pss_bytes": 12208640.0,
+        "private_dirty_bytes": 4073472.0
+      }
+    },
+    {
+      "file": "numeric-loop-50000.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 3.289736,
+        "rss_bytes": 20742144.0,
+        "pss_bytes": 18091008.0,
+        "private_dirty_bytes": 3297280.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 3.2865065,
+        "rss_bytes": 18651136.0,
+        "pss_bytes": 15997952.0,
+        "private_dirty_bytes": 2877440.0
+      }
+    },
+    {
+      "file": "numeric-loop-50000.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1433695,
+        "rss_bytes": 15507456.0,
+        "pss_bytes": 12943872.0,
+        "private_dirty_bytes": 4497408.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1440795,
+        "rss_bytes": 14774272.0,
+        "pss_bytes": 12196864.0,
+        "private_dirty_bytes": 4079616.0
+      }
+    },
+    {
+      "file": "folded-string-4096.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.325945,
+        "rss_bytes": 21547008.0,
+        "pss_bytes": 18908160.0,
+        "private_dirty_bytes": 3454976.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.3027445,
+        "rss_bytes": 18931712.0,
+        "pss_bytes": 16292864.0,
+        "private_dirty_bytes": 3035136.0
+      }
+    },
+    {
+      "file": "folded-string-4096.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.4277385,
+        "rss_bytes": 15050752.0,
+        "pss_bytes": 12477440.0,
+        "private_dirty_bytes": 4511744.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.426428,
+        "rss_bytes": 14888960.0,
+        "pss_bytes": 12317696.0,
+        "private_dirty_bytes": 4093952.0
+      }
+    },
+    {
+      "file": "dynamic-string-4096.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.5413885,
+        "rss_bytes": 21442560.0,
+        "pss_bytes": 18795520.0,
+        "private_dirty_bytes": 3643392.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.546024,
+        "rss_bytes": 18698240.0,
+        "pss_bytes": 16040448.0,
+        "private_dirty_bytes": 3227648.0
+      }
+    },
+    {
+      "file": "dynamic-string-4096.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1688195,
+        "rss_bytes": 15450112.0,
+        "pss_bytes": 12866048.0,
+        "private_dirty_bytes": 4495360.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1739145,
+        "rss_bytes": 14858240.0,
+        "pss_bytes": 12313600.0,
+        "private_dirty_bytes": 4079616.0
+      }
+    },
+    {
+      "file": "integer.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.306181,
+        "rss_bytes": 21499904.0,
+        "pss_bytes": 18871296.0,
+        "private_dirty_bytes": 3328000.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.3333355,
+        "rss_bytes": 19222528.0,
+        "pss_bytes": 16567296.0,
+        "private_dirty_bytes": 2908160.0
+      }
+    },
+    {
+      "file": "integer.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.053915,
+        "rss_bytes": 14966784.0,
+        "pss_bytes": 12396544.0,
+        "private_dirty_bytes": 4497408.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.0535345,
+        "rss_bytes": 14596096.0,
+        "pss_bytes": 12030976.0,
+        "private_dirty_bytes": 4079616.0
+      }
+    },
+    {
+      "file": "objects.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.2680045,
+        "rss_bytes": 22601728.0,
+        "pss_bytes": 19964928.0,
+        "private_dirty_bytes": 3756032.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 1.267455,
+        "rss_bytes": 19746816.0,
+        "pss_bytes": 17120256.0,
+        "private_dirty_bytes": 3336192.0
+      }
+    },
+    {
+      "file": "objects.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.3991535,
+        "rss_bytes": 16134144.0,
+        "pss_bytes": 13569024.0,
+        "private_dirty_bytes": 5322752.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.406223,
+        "rss_bytes": 15726592.0,
+        "pss_bytes": 13151232.0,
+        "private_dirty_bytes": 4904960.0
+      }
+    },
+    {
+      "file": "retained-objects.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 31.378853,
+        "rss_bytes": 26558464.0,
+        "pss_bytes": 23963648.0,
+        "private_dirty_bytes": 7735296.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 31.3771035,
+        "rss_bytes": 24338432.0,
+        "pss_bytes": 21696512.0,
+        "private_dirty_bytes": 7317504.0
+      }
+    },
+    {
+      "file": "retained-objects.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 20.285518,
+        "rss_bytes": 21954560.0,
+        "pss_bytes": 19398656.0,
+        "private_dirty_bytes": 11343872.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 20.430527,
+        "rss_bytes": 21590016.0,
+        "pss_bytes": 19031040.0,
+        "private_dirty_bytes": 10926080.0
+      }
+    },
+    {
+      "file": "join-empty-1024.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.240186,
+        "rss_bytes": 23310336.0,
+        "pss_bytes": 20681728.0,
+        "private_dirty_bytes": 5183488.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.24035,
+        "rss_bytes": 20928512.0,
+        "pss_bytes": 18297856.0,
+        "private_dirty_bytes": 4763648.0
+      }
+    },
+    {
+      "file": "join-empty-1024.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1613595,
+        "rss_bytes": 15761408.0,
+        "pss_bytes": 13172736.0,
+        "private_dirty_bytes": 5109760.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.162774,
+        "rss_bytes": 15417344.0,
+        "pss_bytes": 12825600.0,
+        "private_dirty_bytes": 4691968.0
+      }
+    },
+    {
+      "file": "join-singleton-1024.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.3559305,
+        "rss_bytes": 23658496.0,
+        "pss_bytes": 21010432.0,
+        "private_dirty_bytes": 5271552.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.3151955,
+        "rss_bytes": 21260288.0,
+        "pss_bytes": 18610176.0,
+        "private_dirty_bytes": 4861952.0
+      }
+    },
+    {
+      "file": "join-singleton-1024.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.0878,
+        "rss_bytes": 15243264.0,
+        "pss_bytes": 12662784.0,
+        "private_dirty_bytes": 4495360.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.0872245,
+        "rss_bytes": 14800896.0,
+        "pss_bytes": 12240896.0,
+        "private_dirty_bytes": 4079616.0
+      }
+    },
+    {
+      "file": "join-small-1024.js",
+      "adapter": "scriptw",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.44138,
+        "rss_bytes": 23572480.0,
+        "pss_bytes": 20929536.0,
+        "private_dirty_bytes": 5292032.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 2.46235,
+        "rss_bytes": 21377024.0,
+        "pss_bytes": 18718720.0,
+        "private_dirty_bytes": 4880384.0
+      }
+    },
+    {
+      "file": "join-small-1024.js",
+      "adapter": "wasi",
+      "enabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1178395,
+        "rss_bytes": 15261696.0,
+        "pss_bytes": 12673024.0,
+        "private_dirty_bytes": 4505600.0
+      },
+      "disabled": {
+        "status": "ok",
+        "samples": 14,
+        "execution_ms": 0.1151645,
+        "rss_bytes": 14921728.0,
+        "pss_bytes": 12357632.0,
+        "private_dirty_bytes": 4087808.0
+      }
+    }
+  ],
+  "limitations": [
+    "Static Rust compiler and Cranelift dependencies remain; callback and Store-context exclusion is not complete compiler removal.",
+    "GC capacity remains 16 MiB; no live-allocation or collection counters are claimed.",
+    "The warmed before-Store and after-drop RSS gaps persist; endpoints do not attribute them to specific mappings or allocations.",
+    "The Rust Realm metadata review found no duplicate JS object graph or megabyte-scale removable allocation."
+  ],
+  "verification": {
+    "source_commit": "a5da573301ee1793f03df3f24bc13e34bb2653d5",
+    "capability_disabled_engine_passes": 46,
+    "capability_enabled_engine_passes": 6,
+    "source_only_passes": 280,
+    "intl_identity_checks": 15,
+    "conformance_owners": "passed",
+    "full_current_source_native_or_test262_refresh": false,
+    "retained_checkpoint": {
+      "source_commit": "0658e6ae6",
+      "native_passes": 4917,
+      "evidence": "memory-runtime-error-tail-20261028.json"
+    },
+    "unchanged_scope": "AOT and CLI test trees match baseline 76b7fccf1; no repeated full native/CLI/Test262 run after rejecting heap changes.",
+    "reports": [
+      "consumer-only-off-native/report.json",
+      "consumer-only-on-native/report.json",
+      "consumer-only-source-guards/receipt.json"
+    ]
+  },
+  "rejected_combined_heap_trial": {
+    "source_commit": "11ce8b6394e737c58f70f817dbcd06e99a968c44",
+    "baseline_commit": "76b7fccf19adabe4feeae9daf1d2b5690d3966d8",
+    "branch": "memory-consumer-experiments-20261028",
+    "changes": [
+      "Lazy native Function.toString text",
+      "TypedArray sort StoredValue snapshot reuse"
+    ],
+    "decision": "Not promoted: aggregate RSS did not improve; callback sort used more RSS/private dirty and ran slower. Combined experiment cannot isolate either change causally.",
+    "suites": [
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "scriptw",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 4.053531882352941,
+          "rss_bytes": 22437888.0,
+          "pss_bytes": 19796871.529411763,
+          "private_dirty_bytes": 4750034.823529412,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20315437.17647059,
+              "pss_bytes": 17673517.17647059,
+              "private_dirty_bytes": 2625897.411764706
+            },
+            "after_instantiate": {
+              "rss_bytes": 20570352.94117647,
+              "pss_bytes": 17928854.588235293,
+              "private_dirty_bytes": 2881415.529411765
+            },
+            "after_execution": {
+              "rss_bytes": 22437888.0,
+              "pss_bytes": 19796871.529411763,
+              "private_dirty_bytes": 4750034.823529412
+            },
+            "after_store_drop": {
+              "rss_bytes": 20321219.76470588,
+              "pss_bytes": 17680203.29411765,
+              "private_dirty_bytes": 2633366.588235294
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 3.9922731470588237,
+          "rss_bytes": 22621364.70588235,
+          "pss_bytes": 19984143.05882353,
+          "private_dirty_bytes": 4720158.117647059,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20527344.94117647,
+              "pss_bytes": 17890123.29411765,
+              "private_dirty_bytes": 2625415.529411765
+            },
+            "after_instantiate": {
+              "rss_bytes": 20782983.529411763,
+              "pss_bytes": 18145761.88235294,
+              "private_dirty_bytes": 2881054.117647059
+            },
+            "after_execution": {
+              "rss_bytes": 22621364.70588235,
+              "pss_bytes": 19984143.05882353,
+              "private_dirty_bytes": 4720158.117647059
+            },
+            "after_store_drop": {
+              "rss_bytes": 20533850.352941178,
+              "pss_bytes": 17896628.70588235,
+              "private_dirty_bytes": 2632643.7647058824
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.9888699942500249,
+          "rss_bytes": 1.0080261656085716,
+          "pss_bytes": 1.009259573131374,
+          "private_dirty_bytes": 0.9933933795585493
+        }
+      },
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "wasi",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 1.4353855882352942,
+          "rss_bytes": 15693703.529411765,
+          "pss_bytes": 13117650.823529411,
+          "private_dirty_bytes": 5321185.882352941,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 13039856.94117647,
+              "pss_bytes": 10463683.764705881,
+              "private_dirty_bytes": 2667098.3529411764
+            },
+            "after_instantiate": {
+              "rss_bytes": 13046964.705882354,
+              "pss_bytes": 10471152.94117647,
+              "private_dirty_bytes": 2673965.1764705884
+            },
+            "after_execution": {
+              "rss_bytes": 15693703.529411765,
+              "pss_bytes": 13117650.823529411,
+              "private_dirty_bytes": 5321185.882352941
+            },
+            "after_store_drop": {
+              "rss_bytes": 13047928.470588235,
+              "pss_bytes": 10471875.764705881,
+              "private_dirty_bytes": 2675410.8235294116
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 1.4346298823529413,
+          "rss_bytes": 15532634.352941176,
+          "pss_bytes": 12956129.88235294,
+          "private_dirty_bytes": 5320944.94117647,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 12878787.764705881,
+              "pss_bytes": 10302283.294117646,
+              "private_dirty_bytes": 2667218.8235294116
+            },
+            "after_instantiate": {
+              "rss_bytes": 12885413.647058824,
+              "pss_bytes": 10308969.411764706,
+              "private_dirty_bytes": 2674326.588235294
+            },
+            "after_execution": {
+              "rss_bytes": 15532634.352941176,
+              "pss_bytes": 12956129.88235294,
+              "private_dirty_bytes": 5320944.94117647
+            },
+            "after_store_drop": {
+              "rss_bytes": 12886859.294117646,
+              "pss_bytes": 10310354.823529411,
+              "private_dirty_bytes": 2675169.882352941
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.9957752301833849,
+          "rss_bytes": 0.9897983679494128,
+          "pss_bytes": 0.9877397132893382,
+          "private_dirty_bytes": 0.9999770329417041
+        }
+      },
+      {
+        "group": "targeted-typed-sort-2",
+        "adapter": "scriptw",
+        "cases": 2,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 145.313363,
+          "rss_bytes": 26557440.0,
+          "pss_bytes": 23922944.0,
+          "private_dirty_bytes": 7415808.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21792768.0,
+              "pss_bytes": 19158272.0,
+              "private_dirty_bytes": 2652160.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 22050816.0,
+              "pss_bytes": 19416320.0,
+              "private_dirty_bytes": 2910208.0
+            },
+            "after_execution": {
+              "rss_bytes": 26557440.0,
+              "pss_bytes": 23922944.0,
+              "private_dirty_bytes": 7415808.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21801984.0,
+              "pss_bytes": 19167488.0,
+              "private_dirty_bytes": 2660352.0
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 148.368678,
+          "rss_bytes": 27406336.0,
+          "pss_bytes": 24760576.0,
+          "private_dirty_bytes": 7666688.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 22388736.0,
+              "pss_bytes": 19742976.0,
+              "private_dirty_bytes": 2649088.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 22645760.0,
+              "pss_bytes": 20000000.0,
+              "private_dirty_bytes": 2907136.0
+            },
+            "after_execution": {
+              "rss_bytes": 27406336.0,
+              "pss_bytes": 24760576.0,
+              "private_dirty_bytes": 7666688.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 22396928.0,
+              "pss_bytes": 19751168.0,
+              "private_dirty_bytes": 2657280.0
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 1.0230738016433731,
+          "rss_bytes": 1.0315274516850979,
+          "pss_bytes": 1.0344719579544577,
+          "private_dirty_bytes": 1.031159251056923
+        }
+      }
+    ],
+    "targeted_rows": [
+      {
+        "file": "typed-sort-callback.js",
+        "group": "targeted-typed-sort-2",
+        "adapter": "scriptw",
+        "baseline": {
+          "status": "ok",
+          "samples": 14,
+          "execution_ms": 187.728799,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 22063104.0,
+              "pss_bytes": 19426816.0,
+              "private_dirty_bytes": 2664448.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 22321152.0,
+              "pss_bytes": 19684864.0,
+              "private_dirty_bytes": 2922496.0
+            },
+            "after_execution": {
+              "rss_bytes": 26933248.0,
+              "pss_bytes": 24296960.0,
+              "private_dirty_bytes": 7534592.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 22071296.0,
+              "pss_bytes": 19435008.0,
+              "private_dirty_bytes": 2672640.0
+            }
+          },
+          "phases_ms": {
+            "state_linker": 0.01565,
+            "register": 0.105174,
+            "instantiate": 0.269413,
+            "execution": 187.728799,
+            "total": 188.497168
+          },
+          "gc_capacity_before_bytes": 16777216.0,
+          "gc_capacity_after_bytes": 16777216.0,
+          "rss_bytes": 26933248.0,
+          "pss_bytes": 24296960.0,
+          "private_dirty_bytes": 7534592.0
+        },
+        "candidate": {
+          "status": "ok",
+          "samples": 14,
+          "execution_ms": 190.7319545,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 22722560.0,
+              "pss_bytes": 20079616.0,
+              "private_dirty_bytes": 2660352.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 22980608.0,
+              "pss_bytes": 20337664.0,
+              "private_dirty_bytes": 2918400.0
+            },
+            "after_execution": {
+              "rss_bytes": 28293120.0,
+              "pss_bytes": 25650176.0,
+              "private_dirty_bytes": 8230912.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 22730752.0,
+              "pss_bytes": 20087808.0,
+              "private_dirty_bytes": 2668544.0
+            }
+          },
+          "phases_ms": {
+            "state_linker": 0.0167645,
+            "register": 0.110024,
+            "instantiate": 0.286513,
+            "execution": 190.7319545,
+            "total": 191.581342
+          },
+          "gc_capacity_before_bytes": 16777216.0,
+          "gc_capacity_after_bytes": 16777216.0,
+          "rss_bytes": 28293120.0,
+          "pss_bytes": 25650176.0,
+          "private_dirty_bytes": 8230912.0
+        },
+        "candidate_over_baseline": {
+          "execution_ms": 1.015997308436411,
+          "rss_bytes": 1.0504904569994677,
+          "pss_bytes": 1.0556948688230956,
+          "private_dirty_bytes": 1.0924164175047568
+        }
+      },
+      {
+        "file": "typed-sort-default.js",
+        "group": "targeted-typed-sort-2",
+        "adapter": "scriptw",
+        "baseline": {
+          "status": "ok",
+          "samples": 14,
+          "execution_ms": 102.897927,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21522432.0,
+              "pss_bytes": 18889728.0,
+              "private_dirty_bytes": 2639872.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 21780480.0,
+              "pss_bytes": 19147776.0,
+              "private_dirty_bytes": 2897920.0
+            },
+            "after_execution": {
+              "rss_bytes": 26181632.0,
+              "pss_bytes": 23548928.0,
+              "private_dirty_bytes": 7297024.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21532672.0,
+              "pss_bytes": 18899968.0,
+              "private_dirty_bytes": 2648064.0
+            }
+          },
+          "phases_ms": {
+            "state_linker": 0.01661,
+            "register": 0.107524,
+            "instantiate": 0.271087,
+            "execution": 102.897927,
+            "total": 103.7016955
+          },
+          "gc_capacity_before_bytes": 16777216.0,
+          "gc_capacity_after_bytes": 16777216.0,
+          "rss_bytes": 26181632.0,
+          "pss_bytes": 23548928.0,
+          "private_dirty_bytes": 7297024.0
+        },
+        "candidate": {
+          "status": "ok",
+          "samples": 14,
+          "execution_ms": 106.0054015,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 22054912.0,
+              "pss_bytes": 19406336.0,
+              "private_dirty_bytes": 2637824.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 22310912.0,
+              "pss_bytes": 19662336.0,
+              "private_dirty_bytes": 2895872.0
+            },
+            "after_execution": {
+              "rss_bytes": 26519552.0,
+              "pss_bytes": 23870976.0,
+              "private_dirty_bytes": 7102464.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 22063104.0,
+              "pss_bytes": 19414528.0,
+              "private_dirty_bytes": 2646016.0
+            }
+          },
+          "phases_ms": {
+            "state_linker": 0.0168295,
+            "register": 0.107954,
+            "instantiate": 0.277553,
+            "execution": 106.0054015,
+            "total": 106.8224055
+          },
+          "gc_capacity_before_bytes": 16777216.0,
+          "gc_capacity_after_bytes": 16777216.0,
+          "rss_bytes": 26519552.0,
+          "pss_bytes": 23870976.0,
+          "private_dirty_bytes": 7102464.0
+        },
+        "candidate_over_baseline": {
+          "execution_ms": 1.0301995831266844,
+          "rss_bytes": 1.01290675844806,
+          "pss_bytes": 1.0136756968300213,
+          "private_dirty_bytes": 0.9733370754981757
+        }
+      }
+    ],
+    "verification": {
+      "native_passes": 4917,
+      "cli_family_passes": 134,
+      "capability_disabled_passes": 46,
+      "selected_original_test262_passes": 260
+    },
+    "reports": [
+      "comparison-11ce-r1/report.json",
+      "capability-11ce-r1/report.json",
+      "native-11ce8b639-r1/report.json",
+      "test262-focus-11ce8b639-r1/report.json"
+    ],
+    "prior_failed_attempt": "native-38dc48e86-r1/report.json; incomplete after a stale structural assertion, original failed streams retained"
+  },
+  "archive": {
+    "file": "memory-consumer-capability-20261028-inert.tar.xz",
+    "sha256": "2c75588fcdfda00cb26b021ffa694ed43e11d4a6d1bd0fbaa5dff2d344e03a28",
+    "bytes": 5825000,
+    "member_count": 2126,
+    "uncompressed_file_bytes": 825268794,
+    "maximum_member_bytes": 67108864,
+    "maximum_total_bytes": 1073741824,
+    "contains": "Original reports, raw streams, build transcripts, fixtures, portable Scriptc Wasm, producer receipts, ignored vendor Cargo.lock build input and failed attempts.",
+    "excludes": "Executables, serialized native images, build caches and worktrees."
+  },
+  "raw_report": "memory-experiments-20261028/consumer-only-capability/report.json"
+}
