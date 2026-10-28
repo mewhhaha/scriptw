@@ -1992,6 +1992,7 @@ fn data_segment_at(bytes: &[u8], index: usize) -> Vec<u8> {
 /// publication. The deferred payload belongs in the gap, not either active
 /// fragment; callers that reason about virtual addresses must include it.
 fn runtime_virtual_static_image(bytes: &[u8]) -> Vec<u8> {
+    use crate::data::{RUNTIME_DATA_SEGMENT_COUNT, RUNTIME_STATIC_SEGMENT_ORDER};
     use wasmparser::DataKind;
     let mut rows = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
@@ -2002,19 +2003,19 @@ fn runtime_virtual_static_image(bytes: &[u8]) -> Vec<u8> {
     }
     assert_eq!(
         rows.len(),
-        6,
-        "R owns three passive images and three active fragments"
+        RUNTIME_DATA_SEGMENT_COUNT,
+        "R owns four passive images and four active fragments"
     );
     assert!(
-        !rows[1].data.is_empty() && !rows[2].data.is_empty(),
-        "full R retains both sealed cold catalogs"
+        rows[1..4].iter().all(|row| !row.data.is_empty()),
+        "full R retains all three sealed cold catalogs"
     );
-    for index in 0..3 {
+    for index in 0..4 {
         assert!(matches!(rows[index].kind, DataKind::Passive));
     }
     let mut image = Vec::new();
-    for index in [3, 2, 4, 1, 5] {
-        if [3, 4, 5].contains(&index) {
+    for index in RUNTIME_STATIC_SEGMENT_ORDER {
+        if index >= RUNTIME_STATIC_SEGMENT_ORDER[0] {
             let DataKind::Active {
                 memory_index: 0,
                 offset_expr,
@@ -3048,13 +3049,17 @@ fn preseeded_wire_data_stays_in_private_memory() {
     assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 1));
 
     // A heap program's preseed is R's active prefix; later active fragments
-    // skip the passive property and normalization images. P retains passive images.
+    // skip all three passive cold-table images. P retains passive images.
     let artifact = emit_script("({ value: \",\" });").expect("emit should work");
     expect_valid_module(&artifact, 0);
     let runtime = artifact.runtime().expect("heap program links R");
-    assert!(data_segment_at(runtime.bytes(), 3).starts_with(&expected_prefix));
+    assert!(data_segment_at(
+        runtime.bytes(),
+        crate::data::RUNTIME_STATIC_SEGMENT_ORDER[0]
+    )
+    .starts_with(&expected_prefix));
     assert!(runtime_virtual_static_image(runtime.bytes()).starts_with(&expected_prefix));
-    assert_eq!(wire_data_segment_counts(runtime.bytes()), (3, 3));
+    assert_eq!(wire_data_segment_counts(runtime.bytes()), (4, 4));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));
     assert!(data_segment_at(&artifact.bytes, 3).is_empty());
     assert!(artifact
