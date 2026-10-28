@@ -14,6 +14,25 @@ struct NativeValue {
     reference: Option<Rooted<EqRef>>,
 }
 
+enum NativeCompactPayloads {
+    Arrays {
+        tags: Rooted<wasmtime::ArrayRef>,
+        scalars: Option<Rooted<wasmtime::ArrayRef>>,
+        references: Option<Rooted<wasmtime::ArrayRef>>,
+    },
+    Inline {
+        packed_tags: u32,
+        scalars: [i64; 2],
+        references: [Option<Rooted<EqRef>>; 2],
+    },
+}
+
+#[derive(Clone, Copy)]
+enum NativeCompactStorageKind {
+    Arrays,
+    Inline,
+}
+
 fn invariant(detail: impl std::fmt::Display) -> SnapshotRejection {
     SnapshotRejection::BackendInvariant {
         detail: detail.to_string(),
@@ -871,11 +890,22 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             ));
         }
         let storage = self.required_reference(header, F::ObjectProperties)?;
-        if self.has_layout(storage, L::CompactStorage)? {
+        let compact_kind = if self.has_layout(storage, L::ArrayCompactStorage)? {
+            Some(NativeCompactStorageKind::Arrays)
+        } else if self.has_layout(storage, L::InlineCompactStorage)? {
+            Some(NativeCompactStorageKind::Inline)
+        } else {
+            None
+        };
+        if let Some(kind) = compact_kind {
             if array.is_some() {
                 return Err(invariant("compact literal storage on Array header"));
             }
-            let shape = self.required_reference(storage, F::CompactShape)?;
+            let shape_field = match kind {
+                NativeCompactStorageKind::Arrays => F::ArrayCompactShape,
+                NativeCompactStorageKind::Inline => F::InlineCompactShape,
+            };
+            let shape = self.required_reference(storage, shape_field)?;
             let keys = self.required_reference(shape, F::CompactKeys)?;
             let attributes = u32::try_from(self.integer(shape, F::CompactAttributes)?)
                 .map_err(|_| invariant("compact attributes exceed their unsigned word"))?;
@@ -885,33 +915,58 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             if accessor {
                 return Err(invariant("compact data shape has accessor attributes"));
             }
-            let tags = self.required_reference(storage, F::CompactTags)?;
-            let scalars = self.reference(storage, F::CompactScalars)?;
-            let references = self.reference(storage, F::CompactReferences)?;
             let keys = self.array(keys, L::CompactKeys)?;
-            let tags = self.array(tags, L::CompactTags)?;
-            let scalars = scalars
-                .map(|value| self.array(value, L::CompactScalars))
-                .transpose()?;
-            let references = references
-                .map(|value| self.array(value, L::CompactReferences))
-                .transpose()?;
             let length = keys.len(&*self.store).map_err(invariant)?;
-            if length > 16
-                || tags.len(&*self.store).map_err(invariant)? != length
-                || scalars
-                    .as_ref()
-                    .map(|values| values.len(&*self.store).map_err(invariant))
-                    .transpose()?
-                    .is_some_and(|count| count != length)
-                || references
-                    .as_ref()
-                    .map(|values| values.len(&*self.store).map_err(invariant))
-                    .transpose()?
-                    .is_some_and(|count| count != length)
-            {
-                return Err(invariant("invalid compact property extent"));
-            }
+            let payloads = match kind {
+                NativeCompactStorageKind::Arrays => {
+                    let tags = self.required_reference(storage, F::CompactTags)?;
+                    let scalars = self.reference(storage, F::CompactScalars)?;
+                    let references = self.reference(storage, F::CompactReferences)?;
+                    let tags = self.array(tags, L::CompactTags)?;
+                    let scalars = scalars
+                        .map(|value| self.array(value, L::CompactScalars))
+                        .transpose()?;
+                    let references = references
+                        .map(|value| self.array(value, L::CompactReferences))
+                        .transpose()?;
+                    if length > 16
+                        || tags.len(&*self.store).map_err(invariant)? != length
+                        || scalars
+                            .as_ref()
+                            .map(|values| values.len(&*self.store).map_err(invariant))
+                            .transpose()?
+                            .is_some_and(|count| count != length)
+                        || references
+                            .as_ref()
+                            .map(|values| values.len(&*self.store).map_err(invariant))
+                            .transpose()?
+                            .is_some_and(|count| count != length)
+                    {
+                        return Err(invariant("invalid array compact property extent"));
+                    }
+                    NativeCompactPayloads::Arrays {
+                        tags,
+                        scalars,
+                        references,
+                    }
+                }
+                NativeCompactStorageKind::Inline => {
+                    if !matches!(length, 1 | 2) {
+                        return Err(invariant("invalid inline compact property extent"));
+                    }
+                    NativeCompactPayloads::Inline {
+                        packed_tags: self.integer(storage, F::InlinePackedTags)? as u32,
+                        scalars: [
+                            self.integer(storage, F::InlineScalar0)?,
+                            self.integer(storage, F::InlineScalar1)?,
+                        ],
+                        references: [
+                            self.reference(storage, F::InlineReference0)?,
+                            self.reference(storage, F::InlineReference1)?,
+                        ],
+                    }
+                }
+            };
             budget.work(length as usize)?;
             for ordinal in 0..length {
                 if ordered.len() >= remaining {
@@ -923,30 +978,51 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 self.require(key, L::String)?;
                 let key = self.string(key, budget)?;
                 let index = array_index(key.units());
-                let WasmtimeVal::I32(tag) =
-                    tags.get(&mut *self.store, ordinal).map_err(invariant)?
-                else {
-                    return Err(invariant("invalid compact value tag"));
-                };
-                let scalar = match &scalars {
-                    Some(scalars) => {
-                        let WasmtimeVal::I64(value) =
-                            scalars.get(&mut *self.store, ordinal).map_err(invariant)?
+                let (tag, scalar, reference) = match &payloads {
+                    NativeCompactPayloads::Arrays {
+                        tags,
+                        scalars,
+                        references,
+                    } => {
+                        let WasmtimeVal::I32(tag) =
+                            tags.get(&mut *self.store, ordinal).map_err(invariant)?
                         else {
-                            return Err(invariant("invalid compact value scalar"));
+                            return Err(invariant("invalid compact value tag"));
                         };
-                        value
+                        let scalar = match scalars {
+                            Some(scalars) => {
+                                let WasmtimeVal::I64(value) =
+                                    scalars.get(&mut *self.store, ordinal).map_err(invariant)?
+                                else {
+                                    return Err(invariant("invalid compact value scalar"));
+                                };
+                                value
+                            }
+                            None => 0,
+                        };
+                        let reference = match references {
+                            Some(references) => {
+                                let raw = references
+                                    .get(&mut *self.store, ordinal)
+                                    .map_err(invariant)?;
+                                eq_reference(self.store, raw)?
+                            }
+                            None => None,
+                        };
+                        (tag, scalar, reference)
                     }
-                    None => 0,
-                };
-                let reference = match &references {
-                    Some(references) => {
-                        let raw = references
-                            .get(&mut *self.store, ordinal)
-                            .map_err(invariant)?;
-                        eq_reference(self.store, raw)?
+                    NativeCompactPayloads::Inline {
+                        packed_tags,
+                        scalars,
+                        references,
+                    } => {
+                        let slot = ordinal as usize;
+                        (
+                            ((packed_tags >> (ordinal * 8)) & 0xff) as i32,
+                            scalars[slot],
+                            references[slot],
+                        )
                     }
-                    None => None,
                 };
                 scriptw_aot_wasm::GcHostValue::check(tag, scalar, reference.is_some())
                     .map_err(invariant)?;

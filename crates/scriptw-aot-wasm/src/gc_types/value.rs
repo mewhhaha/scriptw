@@ -2635,6 +2635,13 @@ impl<'a, T: GcHeapType> GcOperand<'a, GcRef<T>, Nullable> {
     }
 }
 impl<'a> GcOperand<'a, AnyGcRef, Nullable> {
+    pub(crate) fn null_eq() -> Self {
+        Self {
+            source: OperandSource::Null(RefType::EQREF.heap_type),
+            shape: PhantomData,
+        }
+    }
+
     pub(crate) fn eq_reference(value: &'a EqRefLocal) -> Self {
         Self {
             source: OperandSource::Local(value.index),

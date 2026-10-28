@@ -95,9 +95,9 @@
         "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
       },
       {
-        "bytes": 82701,
+        "bytes": 82766,
         "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-        "sha256": "935fd113c8433c48dd470450a7208ae0b34db73312ac847ec8a6c441f173eea5"
+        "sha256": "13eb1efe1ddcc7774869905f7a1b241f695c3422e69f1e828dad50840e4e3f62"
       },
       {
         "bytes": 33961,
@@ -277,7 +277,7 @@
       {
         "bytes": 31947,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "9eb15383325e160d1bf36768d20a938c853ea5abdfc08d8d9329660e4944200d"
+        "sha256": "eedc9bf2aa9b71ea27d531937314387c114922c622eae1f844626400b41f26b3"
       },
       {
         "bytes": 4610,
@@ -297,7 +297,7 @@
       {
         "bytes": 21615,
         "path": "crates/scriptw-intl/data/iana-tzdb-2026a/manifest.json",
-        "sha256": "7aae9f35de853a0b59f8edfe9903e5fe0ff20eb4336fef0f4cc0e28b0b74e717"
+        "sha256": "e3108a8fede2e952b95b52d6ab73faf383b0671700bb8c19ed476da3d3c4cfef"
       },
       {
         "bytes": 51680,
@@ -507,7 +507,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "f000b8e4a72db340dd155977a97c28a0a2e399c858ee609631a2be4deed72c48"
+        "sha256": "4442701be3f31f954d85f137aa48dc97e8abf5e8691211050234525619181386"
       },
       {
         "bytes": 8582,
@@ -717,7 +717,7 @@
       {
         "bytes": 565,
         "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-        "sha256": "b68562236f906291c79fb618ffbe5e3c602eb044b388b74abb839a9727e4a6e0"
+        "sha256": "578a1efbbf7ef489f6f2b74e5e6c5f4564f11cf3f368807c7c83d44495ec80c5"
       },
       {
         "bytes": 5089,
@@ -1021,7 +1021,7 @@
       }
     ]
   },
-  "kernel_sha256": "c9ccd48895d2575088a2c761170caa361f54b643d65b16425bfaf69f76e073af",
+  "kernel_sha256": "1a09ccc6f646b16ea794634c857adaacc7f157e2aa3f75382790de4e548542e3",
   "language_region_selector_count": 0,
   "normative_source": "https://tc39.es/ecma402/#sec-calendarsoflocale",
   "ordering": "calendar preference order; canonical BCP47 aliases; stable uniqueness; runtime filter against actual checked DateTime AvailableCalendars",

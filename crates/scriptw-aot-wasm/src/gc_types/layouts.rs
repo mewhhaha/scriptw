@@ -626,7 +626,7 @@ macro_rules! gc_layout_registry {
                     $(Self::$owner => gc_layout_registry!(@definition $kind $owner
                         layouts; $($field: $value, $mutability, $nullability;)*)),+
                 };
-                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::PropertyValue | Self::JavaScriptObject);
+                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::CompactDataStorage | Self::PropertyValue | Self::JavaScriptObject);
                 let supertype_idx = match self {
                     $(Self::$owner => gc_layout_registry!(@parent layouts; $($parent)?)),+
                 };
@@ -703,6 +703,17 @@ macro_rules! gc_layout_registry {
         impl GcStructHeapType for PropertyValue { const FIELD_COUNT: u32 = 0; }
         // The fieldless sum has no allocating constructor.
         pub(crate) type PropertyValueSchema = GcStructType<PropertyValue>;
+    };
+    (@schema struct CompactDataStorage CompactDataStorageSchema; $($fields:tt)+) => {
+        impl sealed::Struct for CompactDataStorage {}
+        impl GcStructHeapType for CompactDataStorage {
+            const FIELD_COUNT: u32 = gc_layout_registry!(@field_count $($fields)+);
+        }
+        // The common shape-bearing sum has fields but no allocating constructor.
+        pub(crate) type CompactDataStorageSchema = GcStructType<CompactDataStorage>;
+        impl GcStructType<CompactDataStorage> {
+            gc_layout_registry!(@fields CompactDataStorage 0; $($fields)+);
+        }
     };
     (@schema struct $owner:ident $schema:ident; $($fields:tt)+) => {
         impl sealed::Struct for $owner {}
@@ -887,10 +898,22 @@ gc_layout_registry! {
         struct ObjectPropertyStorage => ObjectPropertyStorageSchema {}
         struct CompactDataStorage: ObjectPropertyStorage => CompactDataStorageSchema {
             SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
+        }
+        // Concrete subtypes repeat the inherited prefix in their physical layout.
+        struct ArrayCompactDataStorage: CompactDataStorage => ArrayCompactDataStorageSchema {
+            SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
             TAGS: GcRef<CompactTagArray>, Immutable, NonNullable;
             SCALARS: GcRef<CompactScalarArray>, Mutable, Nullable;
             // Null backing means every slot has a null reference payload.
             REFERENCES: GcRef<CompactReferenceArray>, Mutable, Nullable;
+        }
+        struct InlineCompactDataStorage: CompactDataStorage => InlineCompactDataStorageSchema {
+            SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
+            PACKED_TAGS: I32Value, Mutable, NonNullable;
+            SCALAR0: I64Value, Mutable, NonNullable;
+            SCALAR1: I64Value, Mutable, NonNullable;
+            REFERENCE0: AnyGcRef, Mutable, Nullable;
+            REFERENCE1: AnyGcRef, Mutable, Nullable;
         }
         // Shape graphs retain only immutable primitive string metadata.
         struct CompactDataShape => CompactDataShapeSchema {

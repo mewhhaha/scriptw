@@ -97,6 +97,41 @@ impl FunctionBuilder<'_> {
             .array_type::<CompactShapeKeys>()
             .length(&keys, schema, &mut f);
         length.store(&mut f);
+        let selected = schema
+            .reserve_gc_local::<CompactDataStorage, Nullable>(&mut f)
+            .initialize_null(schema, &mut f);
+        // Unsigned (length - 1) < 2 admits exactly one or two keys, including
+        // rejection of the wrapping zero-key case. Larger shapes keep SoA.
+        length.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let undefined = WasmRuntimeValueTag::Undefined as i32;
+        let inline = schema.reserve_gc_local(&mut f).initialize(
+            schema.struct_type::<InlineCompactDataStorage>().construct(
+                (
+                    GcOperand::reference(&p.shape, schema),
+                    GcOperand::i32(undefined | (undefined << 8)),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
+                    GcOperand::null_eq(),
+                    GcOperand::null_eq(),
+                ),
+                &mut f,
+            ),
+            &mut f,
+        );
+        selected.replace(
+            inline
+                .load(schema, &mut f)
+                .upcast::<CompactDataStorage>()
+                .nullable(),
+            &mut f,
+        );
+        inline.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let tags = schema.reserve_gc_local(&mut f).initialize(
             schema.array_type::<CompactTagArray>().filled(
                 GcOperand::i32(WasmRuntimeValueTag::Undefined as i32),
@@ -105,8 +140,8 @@ impl FunctionBuilder<'_> {
             ),
             &mut f,
         );
-        let compact = schema.reserve_gc_local(&mut f).initialize(
-            schema.struct_type::<CompactDataStorage>().construct(
+        let array = schema.reserve_gc_local(&mut f).initialize(
+            schema.struct_type::<ArrayCompactDataStorage>().construct(
                 (
                     GcOperand::reference(&p.shape, schema),
                     GcOperand::reference(&tags, schema),
@@ -117,6 +152,21 @@ impl FunctionBuilder<'_> {
             ),
             &mut f,
         );
+        selected.replace(
+            array
+                .load(schema, &mut f)
+                .upcast::<CompactDataStorage>()
+                .nullable(),
+            &mut f,
+        );
+        array.clear(&mut f);
+        tags.clear(&mut f);
+        f.instruction(&Instruction::End);
+        let compact = schema.reserve_gc_local(&mut f).initialize(
+            selected.load(schema, &mut f).require_non_null(&mut f),
+            &mut f,
+        );
+        selected.clear(&mut f);
         let base = schema
             .reserve_gc_local(&mut f)
             .initialize(compact.load(schema, &mut f).upcast(), &mut f);
@@ -127,7 +177,6 @@ impl FunctionBuilder<'_> {
             self.emit_alloc_object_header_with_storage(&p.prototype, mutable, &base, &mut f);
         base.clear(&mut f);
         compact.clear(&mut f);
-        tags.clear(&mut f);
         keys.clear(&mut f);
         schema.release_i32_local(mutable, &mut f);
         schema.release_i32_local(length, &mut f);

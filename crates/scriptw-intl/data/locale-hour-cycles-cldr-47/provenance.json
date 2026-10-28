@@ -42,9 +42,9 @@
         "sha256": "9d23710c505fbfafedeee74ec93ec432e3967af64b19ffa408f20da26dfbb834"
       },
       {
-        "bytes": 82701,
+        "bytes": 82766,
         "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-        "sha256": "935fd113c8433c48dd470450a7208ae0b34db73312ac847ec8a6c441f173eea5"
+        "sha256": "13eb1efe1ddcc7774869905f7a1b241f695c3422e69f1e828dad50840e4e3f62"
       },
       {
         "bytes": 90596,
@@ -74,7 +74,7 @@
       {
         "bytes": 31947,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "9eb15383325e160d1bf36768d20a938c853ea5abdfc08d8d9329660e4944200d"
+        "sha256": "eedc9bf2aa9b71ea27d531937314387c114922c622eae1f844626400b41f26b3"
       },
       {
         "bytes": 34690,
@@ -149,7 +149,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "f000b8e4a72db340dd155977a97c28a0a2e399c858ee609631a2be4deed72c48"
+        "sha256": "4442701be3f31f954d85f137aa48dc97e8abf5e8691211050234525619181386"
       },
       {
         "bytes": 3906,
@@ -268,7 +268,7 @@
       }
     ]
   },
-  "kernel_sha256": "1fe7238d36079dcc3ad819225b8117b6ded1cb9c84fd7ac37adb440d4e3c6fe5",
+  "kernel_sha256": "b836d318066ef945ac6b5d6428908a3f5d23930108dd6c2d1351958ebd5bde19",
   "language_region_selector_count": 23,
   "normative_source": "https://tc39.es/ecma402/#sec-hourcyclesoflocale",
   "ordering": "allowed preference order; stable uniqueness after projection; never prepend preferred",

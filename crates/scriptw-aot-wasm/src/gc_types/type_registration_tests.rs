@@ -382,7 +382,10 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         GcLayout::CompactDataStorage,
     ] {
         let subtype = &types[index(layout) as usize];
-        assert!(subtype.is_final);
+        assert_eq!(
+            subtype.is_final,
+            layout == GcLayout::OrdinaryPropertyStorage
+        );
         assert_eq!(
             subtype.supertype_idx.map(|parent| parent.unpack()),
             Some(wasmparser::UnpackedIndex::Module(base))

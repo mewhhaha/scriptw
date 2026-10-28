@@ -191,12 +191,12 @@ fn prototype_edges_accept_only_the_sealed_actual_object_payload_family() {
     );
     assert!(object.fields[0].mutable);
     let compact_index = schema
-        .struct_type::<CompactDataStorage>()
+        .struct_type::<ArrayCompactDataStorage>()
         .type_index()
         .raw();
     let CompositeInnerType::Struct(compact) = &types[compact_index as usize].composite_type.inner
     else {
-        panic!("compact data storage remains a single storage subtype");
+        panic!("array compact storage retains its backing fields");
     };
     let scalar_index = schema.array_type::<CompactScalarArray>().type_index().raw();
     assert_eq!(
@@ -243,5 +243,121 @@ fn prototype_edges_accept_only_the_sealed_actual_object_payload_family() {
     assert!(
         references.0.mutable,
         "null overwrites must retire strong edges"
+    );
+}
+
+#[test]
+fn compact_storage_has_a_shape_only_base_and_two_sealed_physical_variants() {
+    let (runtime, bytes) = encoded(ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ));
+    let (types, _, _) = declarations(&bytes);
+    let schema = runtime.globals().schema();
+    let index = |layout| schema.layouts().layout_index(layout);
+    let fields = |layout| match &types[index(layout) as usize].composite_type.inner {
+        CompositeInnerType::Struct(record) => record.fields.as_ref(),
+        _ => panic!("compact storage is a GC struct"),
+    };
+    let reference = |layout, nullable| {
+        wasmparser::StorageType::Val(wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                nullable,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index(layout))),
+            )
+            .unwrap(),
+        ))
+    };
+    let base = index(GcLayout::CompactDataStorage);
+    assert!(!types[base as usize].is_final);
+    let base_fields = fields(GcLayout::CompactDataStorage);
+    assert_eq!(base_fields.len(), 1);
+    assert_eq!(
+        base_fields[0].element_type,
+        reference(GcLayout::CompactDataShape, false)
+    );
+    assert!(!base_fields[0].mutable);
+    let mut alternatives = types
+        .iter()
+        .enumerate()
+        .filter_map(|(ordinal, ty)| {
+            (ty.supertype_idx.map(|parent| parent.unpack())
+                == Some(wasmparser::UnpackedIndex::Module(base)))
+            .then(|| {
+                assert!(ty.is_final, "physical storage alternatives are sealed");
+                ordinal as u32
+            })
+        })
+        .collect::<Vec<_>>();
+    alternatives.sort_unstable();
+    let mut expected = vec![
+        index(GcLayout::ArrayCompactDataStorage),
+        index(GcLayout::InlineCompactDataStorage),
+    ];
+    expected.sort_unstable();
+    assert_eq!(alternatives, expected);
+    for layout in [
+        GcLayout::ArrayCompactDataStorage,
+        GcLayout::InlineCompactDataStorage,
+    ] {
+        assert_eq!(
+            fields(layout)[0],
+            base_fields[0],
+            "{layout:?} repeats the inherited SHAPE prefix"
+        );
+    }
+    let array = fields(GcLayout::ArrayCompactDataStorage);
+    assert_eq!(array.len(), 4);
+    assert_eq!(
+        array[1].element_type,
+        reference(GcLayout::CompactTagArray, false)
+    );
+    assert!(!array[1].mutable);
+    assert_eq!(
+        array[2].element_type,
+        reference(GcLayout::CompactScalarArray, true)
+    );
+    assert_eq!(
+        array[3].element_type,
+        reference(GcLayout::CompactReferenceArray, true)
+    );
+    assert!(array[2..].iter().all(|field| field.mutable));
+    let inline = fields(GcLayout::InlineCompactDataStorage);
+    assert_eq!(inline.len(), 6);
+    assert_eq!(
+        inline[1].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I32)
+    );
+    for field in &inline[2..4] {
+        assert_eq!(
+            field.element_type,
+            wasmparser::StorageType::Val(wasmparser::ValType::I64)
+        );
+    }
+    for field in &inline[4..] {
+        assert_eq!(
+            field.element_type,
+            wasmparser::StorageType::Val(wasmparser::ValType::Ref(wasmparser::RefType::EQREF))
+        );
+    }
+    assert!(inline[1..].iter().all(|field| field.mutable));
+    assert_eq!(CompactDataStorageSchema::SHAPE.ordinal().raw(), 0);
+    assert_eq!(ArrayCompactDataStorageSchema::SHAPE.ordinal().raw(), 0);
+    assert_eq!(ArrayCompactDataStorageSchema::TAGS.ordinal().raw(), 1);
+    assert_eq!(ArrayCompactDataStorageSchema::SCALARS.ordinal().raw(), 2);
+    assert_eq!(ArrayCompactDataStorageSchema::REFERENCES.ordinal().raw(), 3);
+    assert_eq!(InlineCompactDataStorageSchema::SHAPE.ordinal().raw(), 0);
+    assert_eq!(
+        InlineCompactDataStorageSchema::PACKED_TAGS.ordinal().raw(),
+        1
+    );
+    assert_eq!(InlineCompactDataStorageSchema::SCALAR0.ordinal().raw(), 2);
+    assert_eq!(InlineCompactDataStorageSchema::SCALAR1.ordinal().raw(), 3);
+    assert_eq!(
+        InlineCompactDataStorageSchema::REFERENCE0.ordinal().raw(),
+        4
+    );
+    assert_eq!(
+        InlineCompactDataStorageSchema::REFERENCE1.ordinal().raw(),
+        5
     );
 }

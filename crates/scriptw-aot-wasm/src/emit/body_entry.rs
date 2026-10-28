@@ -63,6 +63,7 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeHelperId::OrdinaryPropertyStorageEnsure
             | RuntimeHelperId::OrdinaryOwnDescriptor
             | RuntimeHelperId::CompactLiteralAllocate
+            | RuntimeHelperId::CompactDataStore
             | RuntimeHelperId::IntrinsicDataPublish
             | RuntimeHelperId::IntrinsicAccessorPublish
             | RuntimeHelperId::IntrinsicAccessorAllocate
