@@ -1,6 +1,6 @@
 # GitHub compiler comparison
 
-Measured 2026-10-26T13:01:37.206476+00:00; Scriptw source `8517b20464d876ebc0e169770ec2c14501ff23d9`.
+Measured 2026-10-28T11:17:11.914705+00:00; Scriptw source `a0d1366aeb8da2acdd992e86d884519f96b5730e`.
 
 Scriptc `0.4.5`, Zig `0.16.0`; v24.12.0. Wasmtime 47.0.0 with the product Fast/copying-GC configuration.
 
@@ -12,23 +12,23 @@ Scriptc receives the unchanged JavaScript prefixed only with the recorded `print
 
 | Workload | Scriptw ms | V8 ms | Scriptc ms / status |
 | --- | ---: | ---: | --- |
-| sort-reverse-128.js | 3.500 | 0.020 | 0.229 |
-| sort-reverse-512.js | 14.272 | 0.149 | 0.517 |
-| sort-sorted-512.js | 11.191 | 0.150 | 0.520 |
-| to-sorted-512.js | 11.506 | 0.146 | 0.572 |
-| join-1024.js | 12.427 | 0.062 | 0.683 |
-| join-4096.js | 47.060 | 0.476 | 2.208 |
-| join-mixed-1024.js | 13.233 | 0.331 | 0.439 |
-| numeric-loop-10000.js | 1.331 | 0.982 | 0.133 |
-| numeric-loop-50000.js | 3.632 | 1.420 | 0.197 |
-| folded-string-4096.js | 2.330 | 0.699 | 1.194 |
-| dynamic-string-4096.js | 2.957 | 0.773 | 0.420 |
-| integer.js | 3.694 | 2.483 | 0.126 |
-| objects.js | 6.698 | 0.069 | 1.062 |
-| retained-objects.js | 521.957 | 4.526 | 55.382 |
-| join-empty-1024.js | 3.757 | 0.242 | 0.393 |
-| join-singleton-1024.js | 3.942 | 0.285 | 0.209 |
-| join-small-1024.js | 5.594 | 0.349 | 0.302 |
+| sort-reverse-128.js | 1.580 | 0.022 | 0.176 |
+| sort-reverse-512.js | 5.456 | 0.140 | 0.470 |
+| sort-sorted-512.js | 2.555 | 0.146 | 0.467 |
+| to-sorted-512.js | 6.568 | 0.130 | 0.538 |
+| join-1024.js | 2.387 | 0.062 | 0.656 |
+| join-4096.js | 7.906 | 0.422 | 2.186 |
+| join-mixed-1024.js | 3.105 | 0.264 | 0.414 |
+| numeric-loop-10000.js | 1.447 | 0.233 | 0.097 |
+| numeric-loop-50000.js | 5.054 | 1.048 | 0.170 |
+| folded-string-4096.js | 2.218 | 0.783 | 1.196 |
+| dynamic-string-4096.js | 3.453 | 0.857 | 0.404 |
+| integer.js | 5.241 | 2.436 | 0.082 |
+| objects.js | 2.058 | 0.065 | 0.951 |
+| retained-objects.js | 52.357 | 3.186 | 49.040 |
+| join-empty-1024.js | 3.333 | 0.204 | 0.369 |
+| join-singleton-1024.js | 3.625 | 0.218 | 0.178 |
+| join-small-1024.js | 3.747 | 0.279 | 0.294 |
 
 [Execution time](assets/execution-performance.svg) · [Process memory](assets/execution-memory.svg)
 

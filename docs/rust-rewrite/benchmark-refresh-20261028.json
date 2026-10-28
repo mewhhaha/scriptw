@@ -1,0 +1,236 @@
+{
+  "schema": "scriptw-benchmark-refresh-v1",
+  "source_commit": "a0d1366aeb8da2acdd992e86d884519f96b5730e",
+  "source_fingerprint": "b3d43fc17aca01dfc089129b33b4060cdbd7b096649a95a75119eadc24832889",
+  "paired": {
+    "run": 40674504933,
+    "validation_report_sha256": "b6b76069d91598a0ea635235d14ab9b0f2ff7ea230d42ceaf7feb60adceb7292",
+    "raw_report_sha256": "fe3624a976da38e3f5bd297d0ab2f47758639c9271612b3e5354d9fa21841fff",
+    "attempts": 68,
+    "workloads": 17,
+    "native_observer_controls": 6,
+    "unscored_diagnostic_cases": 4,
+    "rust_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "shared_configuration": {
+      "collector": "copying",
+      "consumer_compiler_enabled": false,
+      "epoch_deadline": 9223372036854775807,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_compilation_mode": "size-optimized",
+      "register_allocation": "backtracking",
+      "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+      "store_memory_limit_bytes": 1073741824,
+      "target": "generic",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "wasm_backtrace_details": "disable",
+      "wasmtime_version": "47.0.0",
+      "worker_stack_bytes": 67108864
+    },
+    "resources": {
+      "before": {
+        "memory.max": "4294967296",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "12648448",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "after": {
+        "memory.max": "4294967296",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "671404032",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "cpu_affinity": [
+        0
+      ]
+    }
+  },
+  "three": {
+    "run": 40674499711,
+    "validation_report_sha256": "2225bde1e0a75578d9dcb5fe00640740a3414910d7ca10cfa5bdeeca26c38463",
+    "raw_report_sha256": "6ca9bc7cc3fc9f56ed0b9d4822057ad336f385423b7c35909dbcf3eb7afec5a4",
+    "attempts": 102,
+    "workloads": 17,
+    "scriptc": {
+      "attempt_statuses": {
+        "ok": 34,
+        "compile-failed": 0,
+        "run-failed": 0,
+        "checksum-mismatch": 0
+      },
+      "successful_workloads": 17,
+      "rows": [
+        {
+          "file": "sort-reverse-128.js",
+          "status": "ok",
+          "ms": 0.176001,
+          "rss_mib": 28.91015625
+        },
+        {
+          "file": "sort-reverse-512.js",
+          "status": "ok",
+          "ms": 0.4696305,
+          "rss_mib": 28.970703125
+        },
+        {
+          "file": "sort-sorted-512.js",
+          "status": "ok",
+          "ms": 0.4668965,
+          "rss_mib": 29.009765625
+        },
+        {
+          "file": "to-sorted-512.js",
+          "status": "ok",
+          "ms": 0.537921,
+          "rss_mib": 29.35546875
+        },
+        {
+          "file": "join-1024.js",
+          "status": "ok",
+          "ms": 0.6562765,
+          "rss_mib": 28.302734375
+        },
+        {
+          "file": "join-4096.js",
+          "status": "ok",
+          "ms": 2.1855765,
+          "rss_mib": 28.8828125
+        },
+        {
+          "file": "join-mixed-1024.js",
+          "status": "ok",
+          "ms": 0.413918,
+          "rss_mib": 28.662109375
+        },
+        {
+          "file": "numeric-loop-10000.js",
+          "status": "ok",
+          "ms": 0.0973995,
+          "rss_mib": 23.619140625
+        },
+        {
+          "file": "numeric-loop-50000.js",
+          "status": "ok",
+          "ms": 0.169947,
+          "rss_mib": 23.58203125
+        },
+        {
+          "file": "folded-string-4096.js",
+          "status": "ok",
+          "ms": 1.196226,
+          "rss_mib": 23.546875
+        },
+        {
+          "file": "dynamic-string-4096.js",
+          "status": "ok",
+          "ms": 0.404239,
+          "rss_mib": 23.642578125
+        },
+        {
+          "file": "integer.js",
+          "status": "ok",
+          "ms": 0.0815705,
+          "rss_mib": 23.681640625
+        },
+        {
+          "file": "objects.js",
+          "status": "ok",
+          "ms": 0.951414,
+          "rss_mib": 28.8828125
+        },
+        {
+          "file": "retained-objects.js",
+          "status": "ok",
+          "ms": 49.040341,
+          "rss_mib": 35.47265625
+        },
+        {
+          "file": "join-empty-1024.js",
+          "status": "ok",
+          "ms": 0.369062,
+          "rss_mib": 28.453125
+        },
+        {
+          "file": "join-singleton-1024.js",
+          "status": "ok",
+          "ms": 0.178174,
+          "rss_mib": 23.423828125
+        },
+        {
+          "file": "join-small-1024.js",
+          "status": "ok",
+          "ms": 0.2937205,
+          "rss_mib": 23.517578125
+        }
+      ]
+    },
+    "rust_version": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "policy": {
+      "execution": "fresh Store/context; source/Wasm compilation and instance/context setup excluded; output/completion included",
+      "memory": "post-execution process RSS while Store/context alive; includes compilation/runtime/warmup effects; not peak or live heap",
+      "wasmtime": "vendored 47.0.0; product Fast/OptLevel::None, single-pass, copying GC; Scriptw linked R retains its admitted build policy",
+      "order": "rotate first runtime by workload and round; second round reverses case order",
+      "limitations": "GitHub shared host; descriptive observations; no statistical-significance or conformance claim"
+    },
+    "runtime_policy": "reference-types=required function-references=required gc=required exceptions=required threads=required shared-memory=required collector=copying cycle-collection=available js-semantic-heap=wasm-gc weak-references=copying-collector ephemerons=owner-key-fixed-point",
+    "resources": {
+      "status": "recorded-cap-and-affinity-only",
+      "memory_cap_bytes": 4294967296,
+      "measurement_affinity": [
+        0
+      ],
+      "swap_max": "0",
+      "before_after_events_available": false,
+      "oom_events": null,
+      "peak_bytes": null,
+      "grouped_oom_receipt_available": false,
+      "interpretation": "The measurement schema records cgroup cap/swap/one-CPU facts at startup. It records no end counters, memory.events, memory.peak or memory.oom.group. No zero-OOM/end-scope receipt or full native verification is inferred."
+    }
+  },
+  "artifact_validation": {
+    "paired_validator_sha256": "f1f84c46c1d0a17d9976940ecd9f04c8c7f29703b449fece3a47e33b824010de",
+    "three_validator_sha256": "a2bfb577f82c51a36fb091d1176dda6138594c7e6a7640e9f37da4aa44c0a4d4",
+    "paired_processing_resources": {
+      "before": {
+        "memory.max": "1073741824",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "46583808",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "after": {
+        "memory.max": "1073741824",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "213704704",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      }
+    },
+    "three_processing_resources": {
+      "before": {
+        "memory.max": "1073741824",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "46219264",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      },
+      "after": {
+        "memory.max": "1073741824",
+        "memory.swap.max": "0",
+        "memory.oom.group": "1",
+        "memory.peak": "131620864",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+      }
+    }
+  },
+  "historical_native_checkpoint": {
+    "file": "memory-runtime-error-tail-20261028.md",
+    "source": "0658e6ae61981becc6dd338bcf1b1abd4b39feb3",
+    "historical_passes": 4917,
+    "fresh_full_native_executions_in_this_refresh": 0,
+    "test262_executions_in_this_refresh": 0
+  },
+  "interpretation": "Two separately co-measured cohorts at the same source. Compiler placement and Wasmtime policy differ. Toolchains are recorded independently. No causal delta, native-byte equivalence, parity, or new full-native/Test262 claim. The canonical cohort archives retain raw evidence; the original transport ZIP/native payloads are not published."
+}
