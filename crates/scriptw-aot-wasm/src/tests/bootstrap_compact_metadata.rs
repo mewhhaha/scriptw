@@ -51,6 +51,7 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     };
     let allocate = index("helper::native_function_allocate");
     let accessor_allocate = index("helper::intrinsic_accessor_allocate");
+    let constructor_allocate = index("helper::intrinsic_constructor_allocate");
     let compact = index("helper::compact_literal_allocate");
     let bootstrap = named_body(
         runtime.bytes(),
@@ -63,6 +64,10 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     let shared_accessors = bootstrap
         .iter()
         .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == accessor_allocate))
+        .count();
+    let shared_constructors = bootstrap
+        .iter()
+        .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == constructor_allocate))
         .count();
     let accessor_allocator = named_body(runtime.bytes(), accessor_allocate);
     assert_eq!(
@@ -78,12 +83,12 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
         .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == allocate))
         .count();
     assert!(
-        inline_callables > 0 && shared_accessors > 0,
-        "inspect both real bootstrap construction paths"
+        inline_callables > 0 && shared_accessors > 0 && shared_constructors > 0,
+        "inspect the inline, accessor and constructor bootstrap paths"
     );
     assert_eq!(
         native_headers,
-        inline_callables + shared_accessors,
+        inline_callables + shared_accessors + shared_constructors,
         "each native callable gets its own compact header"
     );
     let allocator = named_body(runtime.bytes(), allocate);

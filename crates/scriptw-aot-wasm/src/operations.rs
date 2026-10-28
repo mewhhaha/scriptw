@@ -13,6 +13,8 @@ use scriptw_ir::StaticRegExpCompilation;
 
 mod coercive_add;
 mod has_instance;
+mod intrinsic_installation_key;
+pub(crate) use intrinsic_installation_key::IntrinsicInstallationKey;
 mod number_remainder;
 mod number_to_string;
 mod property_key_hash;

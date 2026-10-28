@@ -7,8 +7,12 @@
 
 use super::*;
 use crate::gc_types::*;
-use crate::runtime_helpers::{HelperParameters, IntrinsicDataPublishArguments, RuntimeHelperId};
+use crate::runtime_helpers::{
+    DeferredIntrinsicInstallArguments, HelperParameters, IntrinsicDataPublishArguments,
+    RuntimeHelperId,
+};
 
+mod installation;
 mod materialization;
 use materialization::{MethodPlan, Selection};
 
@@ -35,61 +39,72 @@ impl FunctionBuilder<'_> {
         configurable: bool,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        // Planning is checked at recipe creation, rather than failing only
-        // when a previously unread property is finally observed.
-        if self.functions.get(&method.0.function_id()).is_none() {
-            return Err(EmitError::unsupported(
-                "deferred intrinsic lacks planned native entry",
-            ));
-        }
+        let (&first, aliases) = keys.split_first().ok_or_else(|| {
+            EmitError::unsupported("deferred intrinsic installation requires a property key")
+        })?;
+        // Admit the exact native entry before emitting any installation code,
+        // rather than discovering an invalid entry on first observation.
+        let meta = self
+            .functions
+            .get(&method.0.function_id())
+            .cloned()
+            .ok_or_else(|| {
+                EmitError::unsupported("deferred intrinsic lacks planned native entry")
+            })?;
+        let plan = MethodPlan::new(method, meta)?;
+        let key = crate::operations::IntrinsicInstallationKey::new(first, self.strings)?;
         let s = self.runtime_schema();
-        let recipe = s.reserve_gc_local(f).initialize(
-            s.struct_type::<DeferredIntrinsicValue>().construct(
-                (
-                    GcOperand::reference(realm.realm(), s),
-                    GcOperand::constant(method.0),
-                    GcOperand::null(s),
-                ),
-                f,
-            ),
-            f,
-        );
-        let value = s
-            .reserve_gc_local(f)
-            .initialize(recipe.load(s, f).upcast(), f);
         let writable_flag = s.reserve_i32_local(f);
         writable_flag.set_constant(i32::from(writable), f);
-        let enumerable_flag = s.reserve_i32_local(f);
-        enumerable_flag.set_constant(0, f);
         let configurable_flag = s.reserve_i32_local(f);
         configurable_flag.set_constant(i32::from(configurable), f);
-        let header = s
-            .reserve_gc_local(f)
-            .initialize(self.emit_object_header_projection(target, f), f);
-        for &key in keys {
-            let key = self.intrinsic_key(key, f)?;
-            // Aliases share the immutable recipe, but independently mutable
-            // descriptor records, just like eager native data properties.
-            s.call_helper(
-                IntrinsicDataPublishArguments::new(
-                    &header,
+        // One call owns the original recipe allocation, target projection,
+        // first key resolution and first fresh-descriptor publication.
+        let value = s.reserve_gc_local(f).initialize(
+            s.helper_reference_on_stack(s.call_helper(
+                DeferredIntrinsicInstallArguments::new(
+                    target,
+                    realm.realm(),
+                    plan.method.0,
                     &key,
-                    &value,
                     writable_flag,
-                    enumerable_flag,
                     configurable_flag,
                 ),
                 self.runtime_helper_base()?,
                 f,
-            );
-            key.clear(f);
+            )),
+            f,
+        );
+        if !aliases.is_empty() {
+            let enumerable_flag = s.reserve_i32_local(f);
+            enumerable_flag.set_constant(0, f);
+            let header = s
+                .reserve_gc_local(f)
+                .initialize(self.emit_object_header_projection(target, f), f);
+            for &key in aliases {
+                let key = self.intrinsic_key(key, f)?;
+                // Later aliases resolve and publish in order. They share only
+                // the recipe, never its independently mutable descriptors.
+                s.call_helper(
+                    IntrinsicDataPublishArguments::new(
+                        &header,
+                        &key,
+                        &value,
+                        writable_flag,
+                        enumerable_flag,
+                        configurable_flag,
+                    ),
+                    self.runtime_helper_base()?,
+                    f,
+                );
+                key.clear(f);
+            }
+            header.clear(f);
+            s.release_i32_local(enumerable_flag, f);
         }
-        header.clear(f);
-        s.release_i32_local(configurable_flag, f);
-        s.release_i32_local(enumerable_flag, f);
-        s.release_i32_local(writable_flag, f);
         value.clear(f);
-        recipe.clear(f);
+        s.release_i32_local(configurable_flag, f);
+        s.release_i32_local(writable_flag, f);
         Ok(())
     }
 

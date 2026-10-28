@@ -6,7 +6,7 @@ use scriptw_engine::{
 fn assert_intrinsic_method_semantics(source: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("one bounded compilation worker");
     let source = format!(
-        "function assert(value, message) {{ if (!value) throw new Error(message); }}\n{source}\nprint('ok');"
+        "function assert(value, message) {{ if (!value) {{ print('assertion failed: '+message); throw new Error(message); }} }}\n{source}\nprint('ok');"
     );
     let outcome = Engine::new(RealmBuilder::new().build())
         .observe_script(
@@ -25,8 +25,9 @@ fn assert_intrinsic_method_semantics(source: &str) {
     assert_eq!(outcome.backend_used, ExecutionBackend::WasmAot);
     assert!(
         matches!(outcome.completion, ObservedCompletion::Normal(_)),
-        "{:?}\n{source}",
+        "{:?}\noutput: {:?}\n{source}",
         outcome.completion,
+        outcome.output_events,
     );
     assert_eq!(
         outcome.output_events,
@@ -106,6 +107,76 @@ assert(keys===setPrototype.values && keys===setPrototype[Symbol.iterator] && key
 assert(Object.getPrototypeOf(keys)===foreignFunctionPrototype && keys.name==='values' && keys.length===0 && !Object.prototype.hasOwnProperty.call(keys,'prototype') && keys.call(new Set([29])).next().value===29,'foreign deferred Set method keeps defining Realm and metadata');
 assert(Object.getOwnPropertyDescriptor(setPrototype,'values').value===keys,'foreign deferred alias descriptor retains identity');
 assert(Object.getOwnPropertyDescriptor(arrayPrototype,'values').value===values,'descriptor reads retain materialized identity');
+"#,
+    );
+}
+
+#[test]
+fn ordered_deferred_installation_keeps_alias_descriptors_independent_across_gc() {
+    assert_intrinsic_method_semantics(
+        r#"
+var first=__scriptwCreateRealm().global,second=__scriptwCreateRealm().global;
+var prototype=first.Set.prototype,foreignFunctionPrototype=first.Function.prototype;
+var order=Reflect.ownKeys(prototype);
+assert(order.indexOf('values')<order.indexOf('keys') && order.indexOf('keys')<order.indexOf(Symbol.iterator),'ordered String and Symbol alias publication');
+Object.defineProperty(prototype,'keys',{writable:false,configurable:false});
+assert(delete prototype[Symbol.iterator],'delete one unobserved alias');
+gc();
+var keys=Object.getOwnPropertyDescriptor(prototype,'keys'),values=Object.getOwnPropertyDescriptor(prototype,'values');
+assert(keys.value===values.value && !keys.writable && !keys.configurable && values.writable && values.configurable,'aliases own separate mutable descriptors');
+assert(!('get' in keys) && !keys.enumerable && !('get' in values) && !values.enumerable,'both aliases remain real data properties');
+assert(Object.getPrototypeOf(keys.value)===foreignFunctionPrototype && keys.value!==second.Set.prototype.values,'recipe retains its defining Realm and per-Realm identity');
+var replacement=function replacement(){};
+assert(Reflect.defineProperty(prototype,'values',{value:replacement}),'replace the independently configurable alias');
+assert(prototype.values===replacement && prototype.keys===keys.value && !Object.prototype.hasOwnProperty.call(prototype,Symbol.iterator),'replacing/deleting aliases cannot mutate the shared callable or other descriptor');
+Object.freeze(prototype);gc();
+assert(prototype.keys.call(new Set([31])).next().value===31,'surviving recipe remains callable after collection and freeze');
+assert(!Reflect.defineProperty(prototype,'keys',{value:replacement}),'frozen alias compares actual callable identity');
+var stringPrototype=first.String.prototype;
+Object.defineProperty(stringPrototype,'trimLeft',{value:replacement});gc();
+assert(stringPrototype.trimStart!==replacement && stringPrototype.trimStart.call('  x')==='x','String aliases also retain independent descriptors');
+"#,
+    );
+}
+
+#[test]
+fn shared_constructor_allocation_keeps_eager_realm_links_and_bootstrap_exceptions() {
+    assert_intrinsic_method_semantics(
+        r#"
+var foreign=__scriptwCreateRealm().global,second=__scriptwCreateRealm().global;
+var array=foreign.Array,typed=foreign.Uint16Array,error=foreign.TypeError,object=foreign.Object,fn=foreign.Function;
+gc();
+assert(array!==Array && array!==second.Array && Object.getPrototypeOf(array)===fn.prototype,'fresh eager constructor and defining Function prototype');
+var prototype=Object.getOwnPropertyDescriptor(array,'prototype'),backlink=Object.getOwnPropertyDescriptor(array.prototype,'constructor');
+assert(prototype.value===array.prototype && !prototype.writable && !prototype.enumerable && !prototype.configurable,'canonical public prototype descriptor');
+assert(backlink.value===array && backlink.writable && !backlink.enumerable && backlink.configurable,'independent constructor backlink');
+assert(Object.getPrototypeOf(error)===foreign.Error && Object.getPrototypeOf(foreign.EvalError)===foreign.Error,'Error subclass constructor inheritance');
+assert(Object.getPrototypeOf(typed)===Object.getPrototypeOf(foreign.Int8Array),'typed constructors inherit the canonical TypedArray constructor');
+var bytes=Object.getOwnPropertyDescriptor(typed,'BYTES_PER_ELEMENT'),prototypeBytes=Object.getOwnPropertyDescriptor(typed.prototype,'BYTES_PER_ELEMENT');
+assert(bytes.value===2 && !bytes.writable && !bytes.enumerable && !bytes.configurable,'typed constructor element-size descriptor');
+assert(prototypeBytes.value===2 && !prototypeBytes.writable && !prototypeBytes.enumerable && !prototypeBytes.configurable,'typed prototype element-size descriptor');
+assert(!Object.getOwnPropertyDescriptor(foreign.Proxy,'prototype'),'Proxy retains its missing public prototype');
+var iterator=foreign.Iterator,iteratorPrototype=iterator.prototype;
+var iteratorBacklink=Object.getOwnPropertyDescriptor(iteratorPrototype,'constructor');
+assert(!!iteratorBacklink,'Iterator prototype has its own constructor accessor');
+assert(typeof iteratorBacklink.get==='function' && typeof iteratorBacklink.set==='function' && !('value' in iteratorBacklink) && !('writable' in iteratorBacklink) && !iteratorBacklink.enumerable && iteratorBacklink.configurable,'Iterator constructor backlink remains an accessor with its required attributes');
+assert(Object.getPrototypeOf(iteratorBacklink.get)===fn.prototype && Object.getPrototypeOf(iteratorBacklink.set)===fn.prototype,'Iterator constructor accessors retain the defining Function prototype');
+assert(iteratorPrototype.constructor===iterator && iteratorBacklink.get.call(null)===iterator && iteratorBacklink.get.call(second.Iterator.prototype)===iterator && iterator!==Iterator && iterator!==second.Iterator,'Iterator constructor getter returns its defining Realm intrinsic independently of its receiver');
+var receiver=Object.create(iteratorPrototype);
+assert(iteratorBacklink.set.call(receiver,array)===undefined,'Iterator constructor setter returns undefined');
+var receiverBacklink=Object.getOwnPropertyDescriptor(receiver,'constructor');
+assert(receiverBacklink.value===array && receiverBacklink.writable && receiverBacklink.enumerable && receiverBacklink.configurable && iteratorPrototype.constructor===iterator,'Iterator constructor setter creates a receiver-owned data property without replacing the prototype accessor');
+var prototypeAssignmentRejected=false;
+try{iteratorBacklink.set.call(iteratorPrototype,array);}catch(thrown){prototypeAssignmentRejected=Object.getPrototypeOf(thrown)===foreign.TypeError.prototype;}
+assert(prototypeAssignmentRejected,'Iterator constructor setter rejects its defining prototype with a defining-Realm TypeError');
+foreign.Function=function ReplacementFunction(){};foreign.Array=function ReplacementArray(){};foreign.Iterator=function ReplacementIterator(){};gc();
+assert(iteratorPrototype.constructor===iterator && iteratorBacklink.get.call({})===iterator,'Iterator constructor accessor keeps its canonical intrinsic after public constructor replacement and collection');
+var instance=new array(2),buffer=new typed([257,513]),failure=new error('message');
+assert(Object.getPrototypeOf(instance)===array.prototype && instance.length===2,'Array construction retains canonical prototype cache');
+assert(Object.getPrototypeOf(buffer)===typed.prototype && buffer[0]===257 && buffer[1]===513,'typed constructor retains its exact element kind');
+assert(Object.getPrototypeOf(failure)===error.prototype && failure.message==='message','Error construction retains its defining Realm');
+assert(Object.getPrototypeOf(object)===fn.prototype && Object.getOwnPropertyDescriptor(fn.prototype,'constructor').value===fn,'canonical Function/Object graph remains eager');
+assert(array.name==='Array' && array.length===1 && Function.prototype.toString.call(array)==='function Array() { [native code] }','constructor metadata survives the complete context cycle');
 "#,
     );
 }

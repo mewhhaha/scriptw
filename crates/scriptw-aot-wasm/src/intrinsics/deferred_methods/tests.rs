@@ -44,7 +44,7 @@ fn deferred_method_descriptors_are_fresh_in_one_shared_publication_body() {
             for publish in [publish,accessor] {
             let body=&bodies[&publish];
             let allocations=body.iter().enumerate().filter_map(|(i,op)|matches!(op,Operator::StructNew{..}).then_some(i)).collect::<Vec<_>>();
-            assert_eq!(allocations.len(),1,"every helper invocation constructs its own mutable descriptor; recipe remains caller-owned");
+            assert_eq!(allocations.len(),1,"every helper invocation constructs its own mutable descriptor; each recipe retains its installation ownership");
             let appends=body.iter().enumerate().filter_map(|(i,op)|matches!(op,Operator::Call{function_index} if *function_index==append).then_some(i)).collect::<Vec<_>>();
             assert_eq!(appends.len(),1,"retain the existing insertion/storage algorithm");
             assert!(allocations[0]<appends[0],"descriptor exists and is rooted before append can grow storage");

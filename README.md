@@ -47,6 +47,11 @@ order. The selected verification and matched measurements are recorded in the
 [checkpoint](docs/rust-rewrite/memory-eager-accessors-20261027.md) and the
 [allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
 
+Deferred method installation and eager native constructor allocation share
+ordered typed Wasm routines while retaining Realm ownership, alias descriptors
+and bootstrap exceptions. Verification and matched memory measurements are
+pending; see the [ordered bootstrap contract](docs/rust-rewrite/contracts/ordered-realm-bootstrap.md).
+
 The RegExp matcher shares one in-function backtracking body while preserving
 choice restoration, cursor/capture state and candidate retry order. The
 Array.fromAsync fulfilled continuation shares its mapper and commit/drive paths
