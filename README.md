@@ -35,40 +35,28 @@ build, debug and verification loop.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-28 on one GitHub Actions runner**, compiler `a0d1366ae`.
-The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `f02efa8c5`.
+The [precompiled workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
-in separate producer processes; measured consumers disable compilation and use
-identical native optimization and runtime settings. Both passed the original
-checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS is **1.341–1.905× Scriptc's**:
+in separate producers; consumers disable compilation and share native optimization
+and runtime settings. Both passed the original checksums on **17/17 workloads**.
+Scriptw's median post-execution RSS is **1.329–1.906× Scriptc's**.
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 20.0 MiB | 12.1 MiB |
-| Objects | 20.9 MiB | 12.9 MiB |
-| Retained objects | 25.0 MiB | 18.6 MiB |
+| Integer | 20.1 MiB | 12.3 MiB |
+| Objects | 20.7 MiB | 13.2 MiB |
+| Retained objects | 25.1 MiB | 18.9 MiB |
 
-These are medians of 14 measured samples per runtime and workload after ten
-checked warmups per round, with each Store still alive. RSS includes code,
-runtime and allocator history; it is neither live JS heap nor peak memory.
-Cross-runner observations do not establish causal savings or Scriptc parity.
+Medians pool fourteen measured fresh Stores after ten checked warmups per round.
+RSS includes host, code, runtime and allocator history; it is neither live JS
+heap nor peak memory. This cohort uses size-optimized/backtracking native code,
+a generic ISA and a 16 MiB initial copying-GC heap. Ordinary execution below
+uses its own Fast configuration and includes in-process Scriptw/V8 compilation
+history. Cross-cohort RSS differences do not establish causal savings.
 
-This cohort uses size-optimized native code, backtracking register allocation,
-a generic ISA target and a 16 MiB copying-GC initial heap, with both consumer
-compilers disabled. The three-runtime cohort below uses its own ordinary
-Fast configuration and includes in-process Scriptw/V8 compilation history.
-These distinct footprint paths must be interpreted separately.
-
-Rust recorded for this cohort: `rustc 1.99.1 (58cf8f9c3 2026-10-13)`. Six native observer controls
-and four unscored ownership captures were separately validated.
-
-**Historical implementation verification:** the [error-tail checkpoint](docs/rust-rewrite/memory-runtime-error-tail-20261028.md)
-records 4,917 native executions across 19 targets at `0658e6ae6`. This benchmark
-refresh does not rerun or refresh that full native checkpoint or Test262.
-
-[Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40674504933) ·
+[Execution timing and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40760954840) ·
 [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Benchmarks
@@ -77,7 +65,7 @@ refresh does not rerun or refresh that full native checkpoint or Test262.
 
 ![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
 
-**Measured 2026-10-28 on GitHub Actions**, compiler `a0d1366ae`.
+**Measured 2026-10-28 on GitHub Actions**, compiler `f02efa8c5`.
 All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
 and **Node / V8**. Scriptc passed the original checksums on **17/17 workloads**;
 the remaining cases retain explicit failure labels and diagnostics.
@@ -90,11 +78,7 @@ Shared-runner observations are descriptive. The existing pinned Test262 status b
 [Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
 [Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
 
-This three-runtime cohort recorded `rustc 1.99.0 (b940084d7 2026-09-28)`; the separate paired cohort
-recorded `rustc 1.99.1 (58cf8f9c3 2026-10-13)`. The paths/configurations differ, so their RSS values
-are not a causal cross-cohort comparison. [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
-
-[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40674499711).
+[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40760950405) · [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Tests
 

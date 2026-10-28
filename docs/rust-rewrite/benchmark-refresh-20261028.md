@@ -1,17 +1,27 @@
 # Benchmark refresh, 2026-10-28
 
-Source `a0d1366aeb8da2acdd992e86d884519f96b5730e`; compiler-input fingerprint `b3d43fc17aca01dfc089129b33b4060cdbd7b096649a95a75119eadc24832889`.
+Both cohorts measure compiler `f02efa8c5458ee62c3158b5d1aac2b5b59c1b560`; input fingerprint `43be01c80460b80f7fb9700a90b14c7a64cfc6d597b2c5c52d0a6f1dfb7e9b4b`.
 
-Paired [CI 40674504933](https://github.com/mewhhaha/scriptw/actions/runs/40674504933): 68/68 attempts and 17 workload checksums, plus six native observer controls and four separately validated unscored ownership captures. Recorded Rust: `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Precompiled CI 40760954840](https://github.com/mewhhaha/scriptw/actions/runs/40760954840): 68 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Three-runtime CI 40760950405](https://github.com/mewhhaha/scriptw/actions/runs/40760950405): 102 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
 
-Three-runtime [CI 40674499711](https://github.com/mewhhaha/scriptw/actions/runs/40674499711): 102 attempts and 17 workloads; Scriptc successful rows: 17/17, with actual failure labels retained. Recorded Rust: `rustc 1.99.0 (b940084d7 2026-09-28)`.
+Each cohort uses two balanced rounds, ten checked warmups and seven measurements
+per runtime/workload/round. The shared precompiled host disables compilation and
+uses size-optimized/backtracking native code. Ordinary execution uses Fast mode
+and includes in-process Scriptw/V8 compilation history; Scriptc's frontend is
+separate. Interpret each cohort on its own: endpoint RSS includes runtime, code,
+setup and warmup history, and is neither live heap nor peak memory.
 
-The paired cohort executes precompiled native images with both consumer compilers disabled, size-optimized/backtracking code and the shared generic ISA configuration. The three-runtime cohort uses ordinary Fast execution and includes in-process Scriptw/V8 source compilation history; Scriptc source compilation is separate. Endpoint RSS includes runtime/code/setup/warmup history, not live JS heap or a process peak. Do not subtract values across cohorts or infer causal savings.
+The precompiled report retains before/after resource counters. The older ordinary
+schema records startup cap/swap/affinity facts without end counters; no zero-OOM
+or measured-peak claim is inferred. Both existing inert validators readmitted the
+original evidence and all four SVGs were regenerated under a 1-GiB, one-CPU,
+no-swap scope. Downloaded native code was never executed locally.
 
-Each cohort uses two rounds, ten checked warmups and seven measurements per runtime/workload/round; the median pools fourteen measured observations. All original 17 cases remain.
+The [implementation checkpoint](retained-runtime-20261028.json) retains its actual
+native/selected-Test262 source identities; this graph refresh does not rerun full
+native acceptance or the pinned Test262 publication.
 
-The paired measurement retains its actual resource counters. The older three-runtime schema records only startup cap/swap/single-CPU facts; before/after OOM events, peak and grouped-OOM receipts are unavailable and remain explicit. Both inert validators have separate actual 1 GiB CPU0 processing counters.
-
-The 4,917 native-test checkpoint is historical implementation verification at 0658e6ae6, not a rerun in this refresh. Pinned Test262 status is unchanged.
-
-[Paired table/evidence](precompiled-comparison.md) · [Three-runtime table/evidence](compiler-comparison.md) · [Refresh metadata](benchmark-refresh-20261028.json).
+[Precompiled table and evidence](precompiled-comparison.md) ·
+[Three-runtime table and evidence](compiler-comparison.md) ·
+[Refresh metadata](benchmark-refresh-20261028.json).

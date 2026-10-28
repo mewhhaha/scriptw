@@ -41,8 +41,9 @@ All ran serially within the local 4-GiB/no-swap limit. The separate
 - The historical 5,365-case failure replay lacks its original aggregate input.
   Keep that replay blocked until the genuine input is available; do not synthesize
   a substitute or infer its results from newer runs.
-- Repair pre-existing identity and module-boundary audit findings without rewriting
-  original evidence or weakening compiler invariants. This cleanup does not clear them.
+- Repair pre-existing workspace formatting, stale shortcut inventory, identity
+  and module-boundary audit findings. Preserve original evidence and compiler
+  invariants; focused native verification does not clear these separate gates.
 - Repair pinned Wasmtime's owned-reference downcast: `AnyRef::as_struct` can
   construct a LIFO `Rooted` from an `OwnedRooted` index. Collector tests use a
   scoped view after collection; that preserves their coverage without repairing
