@@ -1296,7 +1296,14 @@ fn run_wasm_backend_preserves_lazy_native_function_source() {
         .output()
         .expect("native source semantic fixture should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(output.status.success(), "{stdout}\nstderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(stdout.contains("backend_used: WasmAot"), "{stdout}");
-    assert!(stdout.contains("lazy-native-function-source-ok"), "{stdout}");
+    assert!(
+        stdout.contains("lazy-native-function-source-ok"),
+        "{stdout}"
+    );
 }
