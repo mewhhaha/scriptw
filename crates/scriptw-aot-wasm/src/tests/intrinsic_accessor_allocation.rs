@@ -115,7 +115,7 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
             .iter()
             .any(|op| matches!(op, Operator::Call { function_index }
         if *function_index == header || *function_index == metadata)),
-        "caller retains its own native header and post-cycle metadata publication"
+        "native headers and any nonempty post-cycle metadata remain caller-owned"
     );
     let calls = |target| {
         bootstrap
@@ -133,9 +133,10 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
         calls(header) >= calls(allocate),
         "eager callers still construct independent native headers"
     );
-    assert!(
-        calls(metadata) >= calls(allocate),
-        "eager callers retain metadata publication after allocation"
+    assert_eq!(
+        calls(metadata),
+        1,
+        "only the thrower's non-extensibility still needs metadata publication"
     );
 
     // Validate the physical helper's declared ABI using actual R exports and

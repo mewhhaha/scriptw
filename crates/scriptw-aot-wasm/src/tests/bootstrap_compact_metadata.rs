@@ -127,3 +127,90 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     );
     expect_valid_module(&artifact, 0);
 }
+
+#[test]
+fn native_bootstrap_omits_empty_metadata_but_retains_thrower_and_source_publication() {
+    let artifact = emit_script(
+        "'use strict'; function Source(a) {} const arrow = (a, b) => a + b; print(Source.prototype.constructor === Source, arrow.name);",
+    )
+    .unwrap();
+    let runtime = artifact.runtime().unwrap();
+    let names = function_names_in_bytes(runtime.bytes());
+    let index = |wanted| {
+        names
+            .iter()
+            .find_map(|(index, name)| (name == wanted).then_some(*index))
+            .expect("actual R helper is registered")
+    };
+    let metadata = index("helper::function_metadata_publish");
+    let bootstrap = named_body(
+        runtime.bytes(),
+        index("helper::realm_initialize_intrinsics"),
+    );
+    assert_eq!(
+        bootstrap
+            .iter()
+            .filter(
+                |op| matches!(op, Operator::Call { function_index } if *function_index == metadata)
+            )
+            .count(),
+        1,
+        "ThrowTypeError retains publication; ordinary native headers are already complete"
+    );
+
+    // Resolve the actual R export and P import; their function ordinals are
+    // separate domains and must never be equated by a test fixture.
+    let mut exported_name = None;
+    for payload in Parser::new(0).parse_all(runtime.bytes()) {
+        if let Payload::ExportSection(exports) = payload.unwrap() {
+            for export in exports {
+                let export = export.unwrap();
+                if export.kind == wasmparser::ExternalKind::Func && export.index == metadata {
+                    assert!(exported_name.replace(export.name.to_owned()).is_none());
+                }
+            }
+        }
+    }
+    let exported_name = exported_name.unwrap();
+    let mut imported_functions = 0;
+    let mut program_metadata = None;
+    let mut source_calls = Vec::new();
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        match payload.unwrap() {
+            Payload::ImportSection(imports) => {
+                for import in imports.into_imports() {
+                    let import = import.unwrap();
+                    if matches!(
+                        import.ty,
+                        wasmparser::TypeRef::Func(_) | wasmparser::TypeRef::FuncExact(_)
+                    ) {
+                        if import.module == crate::RUNTIME_IMPORT_NAMESPACE
+                            && import.name == exported_name
+                        {
+                            assert!(program_metadata.replace(imported_functions).is_none());
+                        }
+                        imported_functions += 1;
+                    }
+                }
+            }
+            Payload::CodeSectionEntry(body) => {
+                for op in body.get_operators_reader().unwrap() {
+                    if let Operator::Call { function_index } = op.unwrap() {
+                        source_calls.push(function_index);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let program_metadata = program_metadata.expect("P imports the real metadata helper");
+    assert_eq!(
+        source_calls
+            .iter()
+            .filter(|index| **index == program_metadata)
+            .count(),
+        2,
+        "both the source constructor and strict nonconstructor arrow retain metadata publication"
+    );
+    expect_valid_module(&artifact, 0);
+}

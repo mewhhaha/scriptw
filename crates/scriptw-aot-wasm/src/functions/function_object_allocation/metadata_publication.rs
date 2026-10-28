@@ -30,6 +30,20 @@ impl FunctionBuilder<'_> {
                     meta.protocol().execution_kind(),
                     FunctionExecutionKind::Generator | FunctionExecutionKind::AsyncGenerator
                 ));
+        let native = match meta.entry.executable_kind()? {
+            crate::gc_types::ExecutableCodeKind::JavaScript => false,
+            crate::gc_types::ExecutableCodeKind::StandardBuiltin
+            | crate::gc_types::ExecutableCodeKind::HostBuiltin => true,
+        };
+        if native && meta.strict && !create_prototype && meta.length_name_configurable {
+            // Every allocation owner already installed compact name/length in
+            // this native header before constructing the Context/callable.
+            // All four publication effects are absent: JavaScript metadata,
+            // legacy caller fields, automatic prototype, non-extensibility.
+            // The later name lookup would hit the same strongly rooted pooled
+            // String; other arguments are constants/nulls, never JS or allocation.
+            return Ok(());
+        }
         let constructor_back_reference = match meta.protocol().execution_kind() {
             FunctionExecutionKind::Ordinary | FunctionExecutionKind::Async => true,
             FunctionExecutionKind::Generator | FunctionExecutionKind::AsyncGenerator => false,
