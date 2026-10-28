@@ -176,11 +176,12 @@ impl FunctionBuilder<'_> {
         handled.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
+        let saved_arguments = [&separator_value];
         let list = self.emit_pre_evaluated_arg_vector(
             if arguments.is_empty() {
                 &[]
             } else {
-                &[&separator_value]
+                &saved_arguments
             },
             function,
         );
