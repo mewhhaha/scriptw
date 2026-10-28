@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   measure:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/memory-calendar-rows-ci-20261028'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     steps:
