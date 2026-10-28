@@ -81,48 +81,48 @@ before entering their binding routines. Source-bound verification and matched
 observations are recorded in the [checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md).
 No overall causal RSS saving is established.
 
-The next [bootstrap fold batch](docs/rust-rewrite/contracts/native-bootstrap-metadata-folds.md)
+The [bootstrap fold batch](docs/rust-rewrite/contracts/native-bootstrap-metadata-folds.md)
 omits proven-empty native metadata publication and routes fifteen Intl getters
-through the checked shared accessor allocator. Verification and matched
-measurements are pending.
+through the checked shared accessor allocator. The [verified checkpoint](docs/rust-rewrite/memory-bootstrap-metadata-folds-20261028.md)
+records native coverage and the matched Scriptc comparison.
 
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-28 on one GitHub Actions runner**, compiler `7b81ba6c9`.
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `7f9bacff0`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.205–1.599× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.422–1.979× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.0 MiB | 13.6 MiB |
-| Objects | 18.7 MiB | 14.4 MiB |
-| Retained objects | 24.2 MiB | 20.1 MiB |
+| Integer | 20.1 MiB | 12.2 MiB |
+| Objects | 21.0 MiB | 12.9 MiB |
+| Retained objects | 26.6 MiB | 18.7 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
 Scriptc parity remains open. Cross-runner comparisons do not establish causal savings.
 
-[The memory checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md) records **1,766 fresh native
-test executions**: 1,763 across nine complete affected targets plus three selected
-engine controls. It includes all 512 AOT library tests, GC, Realm, Temporal and
-RegExp coverage. No original Test262 execution is counted in this checkpoint.
-Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
-retention. Earlier checkpoints retain their own conformance evidence.
+[The memory checkpoint](docs/rust-rewrite/memory-bootstrap-metadata-folds-20261028.md) records **4,906 fresh native
+test executions across 19 complete affected targets**, including all 514 AOT
+library tests and all 1,056 engine library tests. Four focused emission and
+Intl Realm/GC controls count once within those targets. No original Test262
+execution is counted in this checkpoint. Verification used one CPU, a 4-GiB
+process-tree cap, no swap and bounded module retention.
 
-The calendar change removes **133,712 bytes from eager initialization** without
-changing the logical data image. Four unscored ownership captures separately
-record code and metadata residency. These do not establish an overall RSS or
-execution-time saving.
+The compiler omits proven-empty native metadata publication and shares the
+checked allocation path for fifteen Intl getters. Four unscored ownership
+captures separately record code and metadata residency. These do not establish
+an overall RSS or execution-time saving.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40621647185).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40630427913).
 
 ## Benchmarks
 

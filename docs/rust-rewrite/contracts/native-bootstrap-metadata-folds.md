@@ -19,7 +19,7 @@ Collator.compare getters. Its plan validates their actual native entry,
 strictness, capture/class flags, source ordinal and typed Wasm code. The
 callable and its metadata remain independent in each defining Realm.
 
-This changes emitted code within the existing runtime layout 30. It introduces
-no helper ABI or object representation. Native verification, code-size checks
-and a fresh matched Scriptc comparison are pending. No memory or speed saving
-is established by the source changes.
+This changes emitted code within runtime layout 30. The [verified checkpoint](../memory-bootstrap-metadata-folds-20261028.md)
+records 4,906 fresh native tests across 19 full targets and all 17 matched
+workload checksums. It introduces no helper ABI or object representation.
+No overall causal memory or speed saving is established.
