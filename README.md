@@ -75,49 +75,49 @@ identifies eager calendar data and GC stack maps as further targets. These
 unscored observations do not change the matched comparison below.
 
 The [deferred calendar-row change](docs/rust-rewrite/contracts/cold-calendar-rows.md)
-removes 133,712 bytes from eager runtime data initialization. Verification and
-matched RSS measurement are pending.
-The same batch [prefilters absent native-source imports](docs/rust-rewrite/contracts/native-source-import-prefilter.md)
-before entering their binding routines; its RSS effect is also unmeasured.
+removes 133,712 bytes from eager runtime data initialization. The same batch
+[prefilters absent native-source imports](docs/rust-rewrite/contracts/native-source-import-prefilter.md)
+before entering their binding routines. Source-bound verification and matched
+observations are recorded in the [checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md).
+No overall causal RSS saving is established.
 
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-28 on one GitHub Actions runner**, compiler `1721e1b6d`.
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `7b81ba6c9`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.223–1.606× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.205–1.599× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.1 MiB | 13.4 MiB |
-| Objects | 18.6 MiB | 14.3 MiB |
-| Retained objects | 24.4 MiB | 19.9 MiB |
+| Integer | 18.0 MiB | 13.6 MiB |
+| Objects | 18.7 MiB | 14.4 MiB |
+| Retained objects | 24.2 MiB | 20.1 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
 Scriptc parity remains open. Cross-runner comparisons do not establish causal savings.
 
-[The startup checkpoint](docs/rust-rewrite/memory-ordered-bootstrap-20261028.md) records **4,894 native test
-executions across 19 targets and 28 fresh original Test262 executions**.
-The selected original families cover Iterator’s constructor accessor and Array’s
-`values` method; this is not a full pinned-suite refresh. Verification used one
-CPU, a 4-GiB process-tree cap, no swap and bounded module retention.
+[The memory checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md) records **1,766 fresh native
+test executions**: 1,763 across nine complete affected targets plus three selected
+engine controls. It includes all 512 AOT library tests, GC, Realm, Temporal and
+RegExp coverage. No original Test262 execution is counted in this checkpoint.
+Verification used one CPU, a 4-GiB process-tree cap, no swap and bounded module
+retention. Earlier checkpoints retain their own conformance evidence.
 
-The Portable initializer plus its new helpers is **26.4% smaller** in native
-code. This does not establish an overall RSS or execution-time saving.
-The four unscored ownership captures still show **2.12–2.67 MiB of extra
-compiled-module pages** after Store drop in the sampled integer/retained-object
-workloads, plus extra host executable pages. Shared page counts are nonadditive;
-presence does not prove execution or causality.
+The calendar change removes **133,712 bytes from eager initialization** without
+changing the logical data image. Four unscored ownership captures separately
+record code and metadata residency. These do not establish an overall RSS or
+execution-time saving.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40611080497).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40621647185).
 
 ## Benchmarks
 

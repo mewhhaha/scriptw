@@ -12,7 +12,7 @@ execution still links before arming its native compiler context. Missing-context
 errors, dynamic evaluation support, coercion/Realm/abrupt-completion behavior and
 the original late-arming lifecycle are unchanged.
 
-This is a bounded code-entry/page-locality experiment. The latest actual
+This is a bounded code-entry/page-locality experiment. Pre-change actual
 Portable captures associate the three linker bodies with 3, 3 and 2 warm
 host RX page overlaps after zero at transport. These are shared, nonexclusive
 pages; they neither establish an eight-page saving nor explain the full
@@ -20,6 +20,4 @@ approximately 2.3-MiB difference. The existing linkers return before full
 signature validation/capture for absent imports. This change avoids entering
 their larger bodies when the immutable Module needs none of them.
 
-Compilation, focused native regressions and paired end-to-end RSS/page/noise
-measurement are pending. A smaller body or a source guard pass is not a memory
-result. Retire any performance claim if matched measurements show no gain.
+The [verified checkpoint](../memory-calendar-rows-20261028.md) records the three selected import/ABI/late-arming controls within 1,766 native executions, plus all 17 matched workload checksums. No overall causal RSS saving is established.

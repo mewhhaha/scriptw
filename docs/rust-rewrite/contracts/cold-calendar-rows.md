@@ -23,4 +23,4 @@ the roles with empty spans ordered before the following real region.
 
 The static active-byte reduction is 366,448 to 232,736 bytes for the measured
 Portable runtime. It establishes neither resident savings nor Scriptc parity.
-Fresh native verification and a matched comparison are pending.
+The [verified checkpoint](../memory-calendar-rows-20261028.md) records 1,766 native executions and all 17 matched workload checksums. Overall RSS savings and Scriptc parity remain unproven.
