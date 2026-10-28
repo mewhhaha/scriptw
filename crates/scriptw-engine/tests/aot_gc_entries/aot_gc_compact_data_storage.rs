@@ -392,13 +392,16 @@ assert(foreign.call([23]).next().value===23 && Object.getPrototypeOf(foreign)===
 
 #[test]
 fn rooted_snapshot_projects_inline_slots_without_losing_bits_or_reference_identity() {
-    use scriptw_runtime::rooted_snapshot::{SnapshotDescriptor, SnapshotKey, SnapshotValue};
+    use scriptw_runtime::rooted_snapshot::{
+        SnapshotDescriptor, SnapshotKey, SnapshotSymbolOrigin, SnapshotValue,
+        SnapshotWellKnownSymbol,
+    };
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     let observed = Engine::new(RealmBuilder::new().build())
         .observe_script_graph(
             r#"
 var token={},symbol=Symbol('inline');
-var result={negative:{left:-0,right:token},nan:{left:token,right:NaN},references:{left:11n,right:symbol},single:{left:NaN},cleared:{left:token,right:symbol}};
+var result={negative:{left:-0,right:token},nan:{left:token,right:NaN},references:{left:11n,right:symbol},symbols:{left:symbol,right:symbol},single:{left:NaN},cleared:{left:token,right:symbol}};
 result.cleared.left=undefined;result.cleared.right=null;gc();result;
 "#,
             CompileOptions {
@@ -438,7 +441,7 @@ result.cleared.left=undefined;result.cleared.right=null;gc();result;
     };
     assert_eq!(graph.root(), &SnapshotValue::Object { id: 0 });
     let root = &graph.nodes()[0];
-    assert_eq!(root.properties.len(), 5);
+    assert_eq!(root.properties.len(), 6);
     let child = |name| {
         let SnapshotValue::Object { id } = data(root, name) else {
             panic!("nested compact record");
@@ -448,9 +451,10 @@ result.cleared.left=undefined;result.cleared.right=null;gc();result;
     let negative = child("negative");
     let nan = child("nan");
     let references = child("references");
+    let symbols = child("symbols");
     let single = child("single");
     let cleared = child("cleared");
-    for node in [negative, nan, references, cleared] {
+    for node in [negative, nan, references, symbols, cleared] {
         assert_eq!(node.properties.len(), 2);
     }
     assert_eq!(
@@ -480,11 +484,42 @@ result.cleared.left=undefined;result.cleared.right=null;gc();result;
     assert!(
         matches!(data(references, "left"), SnapshotValue::BigInt { decimal } if decimal.decimal() == "11")
     );
+    let symbol = data(references, "right");
+    let SnapshotValue::Symbol { id } = &symbol else {
+        panic!("inline reference holds the local Symbol");
+    };
+    assert_eq!(data(symbols, "left"), symbol);
+    assert_eq!(data(symbols, "right"), symbol);
+    let symbol_data = &graph.symbols()[*id as usize].data;
     assert!(matches!(
-        data(references, "right"),
-        SnapshotValue::Symbol { .. }
+        &symbol_data.origin,
+        SnapshotSymbolOrigin::Local {}
     ));
+    assert_eq!(
+        symbol_data.description.as_ref().unwrap().units(),
+        "inline".encode_utf16().collect::<Vec<_>>()
+    );
     assert_eq!(data(cleared, "left"), SnapshotValue::Undefined {});
     assert_eq!(data(cleared, "right"), SnapshotValue::Null {});
-    assert_eq!(graph.symbols().len(), 1);
+    assert_eq!(
+        graph
+            .symbols()
+            .iter()
+            .filter(|symbol| matches!(&symbol.data.origin, SnapshotSymbolOrigin::Local {}))
+            .count(),
+        1,
+        "all inline references preserve one local Symbol identity"
+    );
+    // Prototypes are part of the snapshot graph as well: Object.prototype's
+    // constructor reaches Function.prototype and its Symbol.hasInstance key.
+    assert!(
+        graph.symbols().iter().any(|symbol| matches!(
+            &symbol.data.origin,
+            SnapshotSymbolOrigin::WellKnown {
+                name: SnapshotWellKnownSymbol::HasInstance
+            }
+        )),
+        "prototype Symbol is distinct from the fixture's local Symbol: {:?}",
+        graph.symbols()
+    );
 }
