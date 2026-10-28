@@ -11,7 +11,9 @@ use wasmtime::{AsContext, AsContextMut, ExnRef, ExnRefPre, ExnType, FuncType, In
 #[cfg(feature = "benchmark-module-images")]
 mod benchmark_module_images;
 #[cfg(feature = "benchmark-module-images")]
-pub use benchmark_module_images::{BenchmarkModuleImage, BenchmarkModuleImages};
+pub use benchmark_module_images::{
+    BenchmarkModuleImage, BenchmarkModuleImages, BenchmarkModuleSection, BenchmarkModuleSections,
+};
 
 mod async_host;
 mod foreign_host;
@@ -109,9 +111,9 @@ pub fn configure_wasm_runtime(config: &mut wasmtime::Config) {
 #[cfg_attr(
     not(feature = "benchmark-module-images"),
     doc = "
-The default product API has no benchmark module-address hook:
+The default product API has no benchmark module-image/section hook:
 ```compile_fail,E0432
-use scriptw_engine::BenchmarkModuleImages;
+use scriptw_engine::{BenchmarkModuleImage, BenchmarkModuleImages, BenchmarkModuleSection, BenchmarkModuleSections};
 ```
 "
 )]

@@ -67,6 +67,11 @@ embedding API. See the [verified checkpoint](docs/rust-rewrite/memory-module-own
 and [diagnostic ownership contract](docs/rust-rewrite/contracts/benchmark-module-images.md).
 No RSS improvement is claimed.
 
+The diagnostic now also records bounded section metadata from the actual owned
+native images after the final capture. It anchors serialized sections to the
+live image and text ranges; shared boundary pages remain nonadditive.
+Verification of this section-attribution extension is pending.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

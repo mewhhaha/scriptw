@@ -60,7 +60,9 @@ pub use runtime_profile::{
 };
 mod embedding;
 #[cfg(feature = "benchmark-module-images")]
-pub use embedding::{BenchmarkModuleImage, BenchmarkModuleImages};
+pub use embedding::{
+    BenchmarkModuleImage, BenchmarkModuleImages, BenchmarkModuleSection, BenchmarkModuleSections,
+};
 mod execution_failure;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,

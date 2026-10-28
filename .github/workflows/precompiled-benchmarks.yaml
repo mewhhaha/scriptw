@@ -50,7 +50,29 @@ jobs:
           bash scripts/check-no-legacy-js.sh
           python3 -B scripts/intl_source_identities.py
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --no-default-features --doc
-          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --features benchmark-module-images --lib embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop -- --exact --test-threads=1
+          bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-engine --features benchmark-module-images --lib -- \
+            --exact --include-ignored --test-threads=1 --color=never \
+            embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop \
+            embedding::benchmark_module_images::sections::tests::relocatable_no_program_headers_yields_only_exact_file_backed_metadata \
+            embedding::benchmark_module_images::sections::tests::malformed_headers_extended_counts_and_table_extents_are_rejected \
+            embedding::benchmark_module_images::sections::tests::section_arithmetic_overlap_nobits_and_text_anchors_fail_closed \
+            embedding::benchmark_module_images::sections::tests::names_require_unique_bounded_terminated_utf8_and_in_table_offsets \
+            embedding::benchmark_module_images::sections::tests::name_budget_is_aggregate_even_for_omitted_logical_sections \
+            > "$RUNNER_TEMP/module-sections-native.stdout" 2> "$RUNNER_TEMP/module-sections-native.stderr"
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import os, re, sys
+          sys.path.insert(0, 'scripts')
+          from native_test_protocol import result_summaries
+          text = (Path(os.environ['RUNNER_TEMP']) / 'module-sections-native.stdout').read_text()
+          passed = re.findall(r'^test ([^\r\n]+) \.\.\. ok$', text, re.M)
+          assert len(passed) == len(set(passed)) == 6
+          assert sum(name.startswith('embedding::benchmark_module_images::sections::tests::') for name in passed) == 5
+          assert 'embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop' in passed
+          summary = result_summaries(text)
+          assert len(summary) == 1 and summary[0][:5] == ('ok', '6', '0', '0', '0')
+          print('All six native module-section controls passed.')
+          PY
           bash scripts/run-benchmark-scope.sh cargo test --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline -- --test-threads=1
           bash scripts/run-benchmark-scope.sh cargo build --locked --release --jobs 1 -p scriptw-cli --features benchmark-module-images --example compiler_precompiled_baseline --message-format=json > "$RUNNER_TEMP/precompiled-cargo.jsonl"
       - name: Measure both compiler-free consumers
@@ -103,6 +125,8 @@ jobs:
             ${{ runner.temp }}/precompiled-measurements/expected
             ${{ runner.temp }}/precompiled-measurements/build
             ${{ runner.temp }}/precompiled-cargo.jsonl
+            ${{ runner.temp }}/module-sections-native.stdout
+            ${{ runner.temp }}/module-sections-native.stderr
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
