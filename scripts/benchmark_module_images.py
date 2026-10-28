@@ -11,6 +11,11 @@ import re
 import stat
 import struct
 
+if __package__:
+    from . import benchmark_module_sections as module_sections
+else:
+    import benchmark_module_sections as module_sections
+
 MAX_ADDRESS = 2**64 - 1
 MAX_PAGES = 131072  # 512 MiB at the usual 4-KiB base page size.
 MAX_MAPPINGS = 4096
@@ -115,7 +120,7 @@ def covered(rows, lo, hi, executable=False):
 
 def validate_module_images(value, runtime, nonce, observation_index, snapshots, identity):
     require(isinstance(value, dict) and set(value) == {'schema', 'nonce', 'observation_index', 'owners'}, 'module image keys differ')
-    require(value['schema'] == 'scriptw-precompiled-module-images-v1' and value['nonce'] == nonce
+    require(value['schema'] == 'scriptw-precompiled-module-images-v2' and value['nonce'] == nonce
             and type(value['observation_index']) is int and value['observation_index'] == observation_index,
             'module image schema/nonce/index differs')
     required_identity={'source_commit','source_fingerprint','executable_sha256','image_sha256','program_native_sha256','runtime_key','shared_configuration'}
@@ -131,7 +136,7 @@ def validate_module_images(value, runtime, nonce, observation_index, snapshots, 
             ['after_transport_drop', 'after_instantiate', 'after_execution', 'after_store_drop'], 'owner evidence needs all four phases')
     owners = {}; occupied = set(); page,_ = presence_pages(snapshots[0])
     for owner in value['owners']:
-        require(isinstance(owner, dict) and set(owner) == {'role', 'image', 'text'}, 'owner keys differ')
+        require(isinstance(owner, dict) and set(owner) == {'role', 'image', 'text', 'sections'}, 'owner keys differ')
         role = owner['role']; require(isinstance(role,str) and role in expected and role not in owners, 'duplicate/unknown owner role')
         image, text = interval(owner['image'], 'image'), interval(owner['text'], 'text')
         require(image[0] % page == 0, 'module image base is not page aligned')
@@ -146,11 +151,13 @@ def validate_module_images(value, runtime, nonce, observation_index, snapshots, 
         union = views['image'] | views['text']
         require(len(union) <= MAX_PAGES and not occupied & union, 'ambiguous/shared owner pages')
         occupied.update(union);require(len(occupied)<=MAX_PAGES,'combined module page bound exceeded')
-        owners[role] = dict(image=image, text=text, relation='text-inside-image' if inside else 'separate-text', views=views, union=union)
-    result = dict(schema='scriptw-module-page-attribution-v1', identity=dict(identity), owners=[],
+        sections = module_sections.prepare(owner['sections'], image, text, page,
+            expected_native_sha256=identity['program_native_sha256'] if role == 'program' else None)
+        owners[role] = dict(image=image, text=text, relation='text-inside-image' if inside else 'separate-text', views=views, union=union, sections=sections)
+    result = dict(schema='scriptw-module-page-attribution-v2', identity=dict(identity), owners=[],
                   interpretation='PTE-present base pages and whole-VMA RSS only; function/page overlap is not execution. Views overlap within an owner and must not be summed.')
     for role, owner in owners.items():
-        entry = dict(role=role, image=dict(zip(('start','end'), owner['image'])), text=dict(zip(('start','end'), owner['text'])), relation=owner['relation'], phases=[])
+        entry = dict(role=role, image=dict(zip(('start','end'), owner['image'])), text=dict(zip(('start','end'), owner['text'])), relation=owner['relation'], section_metadata=owner['sections']['metadata'], phases=[])
         for snapshot in snapshots:
             require(snapshot['sequence']==len(entry['phases'])+1,'snapshot sequence differs')
             require(snapshot['nonce'] == nonce and snapshot['observation_index'] == observation_index, 'snapshot ownership nonce/index differs')
@@ -166,7 +173,8 @@ def validate_module_images(value, runtime, nonce, observation_index, snapshots, 
             entry['phases'].append(dict(phase=snapshot['phase'], page_bytes=page,
                 image_present_pages=len(present & owner['views']['image']), text_present_pages=len(present & owner['views']['text']),
                 union_present_pages=len(present & owner['union']), whole_vma_rss_bytes=sum(r['Rss'] for r in whole),
-                partial_vma_count=len(partial), partial_vma_rss_bytes=None))
+                partial_vma_count=len(partial), partial_vma_rss_bytes=None,
+                sections=module_sections.attribute(owner['sections'], present)))
         result['owners'].append(entry)
     return result
 

@@ -94,7 +94,7 @@ struct Active {
     socket: std::os::unix::net::UnixStream,
 }
 
-/// Address records are constructed only after capture; roles cannot be supplied
+/// Module records are constructed only after capture; roles cannot be supplied
 /// as arbitrary strings by an adapter.
 #[cfg(feature = "benchmark-module-images")]
 enum ModuleRole {
@@ -106,12 +106,35 @@ enum ModuleRole {
 pub(super) struct ModuleImageAddresses {
     image: std::ops::Range<usize>,
     text: std::ops::Range<usize>,
+    sections: Value,
 }
 
 #[cfg(feature = "benchmark-module-images")]
 impl ModuleImageAddresses {
-    pub(super) fn new(image: std::ops::Range<usize>, text: std::ops::Range<usize>) -> Self {
-        Self { image, text }
+    pub(super) fn new(image: &scriptw_engine::BenchmarkModuleImage) -> Self {
+        let sections = image.sections();
+        let elf_header = sections.elf_header_range();
+        let section_headers = sections.section_table_range();
+        let file_sections = sections
+            .file_sections()
+            .iter()
+            .map(|section| {
+                json!({"name":section.name(),"offset":section.offset(),"bytes":section.bytes(),
+                    "flags":section.flags(),"section_type":section.section_type()})
+            })
+            .collect::<Vec<_>>();
+        // Engine metadata remains a closed validated type. JSON exists only at
+        // this CLI wire boundary, inside the post-acknowledgement collector.
+        Self {
+            image: image.image_range(),
+            text: image.text_range(),
+            sections: json!({"schema":"scriptw-module-sections-v1",
+                "serialized_sha256":sections.serialized_sha256(),
+                "serialized_bytes":sections.serialized_bytes(),
+                "elf_header":{"offset":elf_header.start,"bytes":elf_header.end-elf_header.start},
+                "section_headers":{"offset":section_headers.start,"bytes":section_headers.end-section_headers.start},
+                "sections":file_sections}),
+        }
     }
 
     fn value(self, role: ModuleRole) -> Value {
@@ -120,7 +143,7 @@ impl ModuleImageAddresses {
             ModuleRole::Runtime => "runtime",
         };
         json!({"role":role,"image":{"start":self.image.start,"end":self.image.end},
-            "text":{"start":self.text.start,"end":self.text.end}})
+            "text":{"start":self.text.start,"end":self.text.end},"sections":self.sections})
     }
 }
 
@@ -237,7 +260,7 @@ impl Barriers {
     pub(super) fn finish_with_module_images(
         self,
         report: &mut Value,
-        collect: impl FnOnce() -> ModuleImages,
+        collect: impl FnOnce() -> Result<ModuleImages, String>,
     ) -> Result<(), String> {
         let Some(active) = self.active.as_ref() else {
             return self.finish(report);
@@ -248,13 +271,15 @@ impl Barriers {
         let nonce = active.config.nonce.clone();
         let observation_index = active.config.index;
         self.finish(report)?;
-        let images = collect();
+        let images = collect().map_err(|error| {
+            format!("module section metadata collection failed after phase captures: {error}")
+        })?;
         let mut owners = vec![images.program.value(ModuleRole::Program)];
         if let Some(runtime) = images.runtime {
             owners.push(runtime.value(ModuleRole::Runtime));
         }
         report["phase_barriers"]["module_images"] = json!({
-            "schema":"scriptw-precompiled-module-images-v1", "nonce":nonce,
+            "schema":"scriptw-precompiled-module-images-v2", "nonce":nonce,
             "observation_index":observation_index, "owners":owners});
         Ok(())
     }
@@ -443,6 +468,15 @@ mod tests {
             })
             .unwrap();
         assert_eq!(report, json!({"existing":true}));
+        let calls = std::cell::Cell::new(0);
+        Barriers { active: None }
+            .finish_with_module_images(&mut report, || {
+                calls.set(calls.get() + 1);
+                Err("an inactive collector failure must remain unobserved".into())
+            })
+            .unwrap();
+        assert_eq!(calls.get(), 0);
+        assert_eq!(report, json!({"existing":true}));
     }
 
     #[cfg(all(feature = "benchmark-module-images", target_os = "linux"))]
@@ -544,17 +578,34 @@ mod tests {
             barriers
                 .finish_with_module_images(&mut report, || {
                     calls.set(calls.get() + 1);
-                    // Independent ranges: the hook must not impose containment.
-                    ModuleImages::new(ModuleImageAddresses::new(100..200, 300..400), None)
+                    // This inert wire fixture tests protocol/serialization only;
+                    // actual native ELF admission belongs to the engine capture.
+                    Ok(ModuleImages::new(
+                        ModuleImageAddresses {
+                            image: 1000..1256,
+                            text: 1064..1080,
+                            sections: json!({"schema":"scriptw-module-sections-v1",
+                                "serialized_sha256":"a".repeat(64),"serialized_bytes":256,
+                                "elf_header":{"offset":0,"bytes":64},
+                                "section_headers":{"offset":128,"bytes":128},
+                                "sections":[{"name":".text","offset":64,"bytes":16,"flags":6,"section_type":1}]}),
+                        },
+                        None,
+                    ))
                 })
                 .unwrap();
             assert_eq!(calls.get(), 1);
             assert_eq!(
                 report["phase_barriers"]["module_images"],
                 json!({
-                "schema":"scriptw-precompiled-module-images-v1", "nonce":NONCE,
+                "schema":"scriptw-precompiled-module-images-v2", "nonce":NONCE,
                 "observation_index":16,"owners":[{"role":"program",
-                "image":{"start":100,"end":200},"text":{"start":300,"end":400}}]})
+                "image":{"start":1000,"end":1256},"text":{"start":1064,"end":1080},
+                "sections":{"schema":"scriptw-module-sections-v1",
+                    "serialized_sha256":"a".repeat(64),"serialized_bytes":256,
+                    "elf_header":{"offset":0,"bytes":64},
+                    "section_headers":{"offset":128,"bytes":128},
+                    "sections":[{"name":".text","offset":64,"bytes":16,"flags":6,"section_type":1}]}}]})
             );
         }
         #[cfg(not(feature = "benchmark-module-images"))]
@@ -569,6 +620,68 @@ mod tests {
         let mut unchanged = json!({"untouched":true});
         Barriers { active: None }.finish(&mut unchanged).unwrap();
         assert_eq!(unchanged, json!({"untouched":true}));
+    }
+
+    #[cfg(all(feature = "benchmark-module-images", target_os = "linux"))]
+    #[test]
+    fn module_metadata_collection_failure_is_reported_after_four_acknowledgements() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let (socket, peer) = std::os::unix::net::UnixStream::pair().unwrap();
+        let acknowledged = Arc::new(AtomicUsize::new(0));
+        let peer_acknowledged = Arc::clone(&acknowledged);
+        let worker = std::thread::spawn(move || {
+            peer.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+            let mut peer = BufReader::new(peer);
+            for (sequence, phase) in PHASES.iter().enumerate() {
+                let mut event = String::new();
+                peer.read_line(&mut event).unwrap();
+                assert_eq!(
+                    event,
+                    format!("SWPHASE1 {NONCE} {} {phase} 16\n", sequence + 1)
+                );
+                peer_acknowledged.store(sequence + 1, Ordering::SeqCst);
+                peer.get_mut()
+                    .write_all(event.replacen("SWPHASE1", "SWACK1", 1).as_bytes())
+                    .unwrap();
+            }
+        });
+        let config = configuration(values("3", NONCE, "16"), 7, 10)
+            .unwrap()
+            .unwrap();
+        let mut barriers = Barriers {
+            active: Some(Active {
+                config,
+                completed: 0,
+                socket,
+            }),
+        };
+        barriers.after_transport_drop().unwrap();
+        barriers.after_instantiate(16).unwrap();
+        barriers.after_execution(16).unwrap();
+        barriers.after_store_drop(16).unwrap();
+        let calls = std::cell::Cell::new(0);
+        let mut report = json!({"existing":true});
+        let error = barriers
+            .finish_with_module_images(&mut report, || {
+                assert_eq!(acknowledged.load(Ordering::SeqCst), PHASES.len());
+                calls.set(calls.get() + 1);
+                Err("injected native section validation failure".into())
+            })
+            .unwrap_err();
+        assert_eq!(calls.get(), 1);
+        assert!(error.contains("module section metadata collection failed after phase captures"));
+        assert!(error.contains("injected native section validation failure"));
+        assert_eq!(report["phase_barriers"]["completed_phases"], json!(PHASES));
+        assert!(report["phase_barriers"].get("module_images").is_none());
+        assert_eq!(report["existing"], true);
+        assert_eq!(report["excluded_from_scored_cohorts"], true);
+        assert_eq!(
+            report["diagnostic_total_timings_include_barrier_waits"],
+            true
+        );
+        worker.join().unwrap();
     }
 
     #[cfg(target_os = "linux")]

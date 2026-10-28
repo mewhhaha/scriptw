@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from scripts import benchmark_module_images as m
+from scripts import benchmark_module_sections as sections
 
 PHASES = ['after_transport_drop', 'after_instantiate', 'after_execution', 'after_store_drop']
 NONCE = 'a' * 32
@@ -28,15 +29,23 @@ def snapshots(rows=None):
             for index, phase in enumerate(PHASES)]
 
 
+def section_metadata():
+    return dict(schema='scriptw-module-sections-v1', serialized_sha256='e'*64, serialized_bytes=4096,
+                elf_header=dict(offset=0, bytes=64), section_headers=dict(offset=0xe00, bytes=256),
+                sections=[dict(name='.text', offset=0x100, bytes=32, flags=6, section_type=1),
+                          dict(name='.wasmtime.info', offset=0x400, bytes=512, flags=2, section_type=1),
+                          dict(name='.shstrtab', offset=0x800, bytes=128, flags=0, section_type=3)])
+
+
 def owners(runtime=False, separate=False):
-    value = dict(schema='scriptw-precompiled-module-images-v1', nonce=NONCE,
+    value = dict(schema='scriptw-precompiled-module-images-v2', nonce=NONCE,
                  observation_index=16, owners=[dict(role='program',
                     image=dict(start=0x400000, end=0x401000),
-                    text=dict(start=0x401020 if separate else 0x400020,
-                              end=0x401040 if separate else 0x400040))])
+                    text=dict(start=0x401100 if separate else 0x400100,
+                              end=0x401120 if separate else 0x400120), sections=section_metadata())])
     if runtime:
         value['owners'].append(dict(role='runtime', image=dict(start=0x401000, end=0x402000),
-                                   text=dict(start=0x401020, end=0x401040)))
+                                   text=dict(start=0x401100, end=0x401120), sections=section_metadata()))
     return value
 
 
@@ -82,11 +91,13 @@ class ModuleImageControls(unittest.TestCase):
                                         snapshots() if shots is None else shots,
                                         copy.deepcopy(IDENTITY) if identity is None else dict(copy.deepcopy(IDENTITY), **identity))
 
-    def test_actual_independent_image_text_and_optional_runtime_roles(self):
-        result = self.validate(owners(separate=True))
-        self.assertEqual(result['owners'][0]['relation'], 'separate-text')
+    def test_actual_serialized_text_anchor_and_optional_runtime_roles(self):
+        result = self.validate(owners(), snapshots([row(0x400000, 0x401000)]))
+        self.assertEqual(result['owners'][0]['relation'], 'text-inside-image')
         self.assertEqual(result['owners'][0]['phases'][0]['union_present_pages'], 1)
-        self.assertEqual(result['owners'][0]['phases'][0]['whole_vma_rss_bytes'], 8192)
+        self.assertEqual(result['owners'][0]['phases'][0]['whole_vma_rss_bytes'], 4096)
+        with self.assertRaisesRegex(ValueError, 'text inside'):
+            self.validate(owners(separate=True))
         partial = self.validate(owners())['owners'][0]['phases'][0]
         self.assertEqual(partial['whole_vma_rss_bytes'], 0)
         self.assertEqual(partial['partial_vma_count'], 1)
@@ -152,6 +163,85 @@ class ModuleImageControls(unittest.TestCase):
             value = m.readable_presence(123, [row(0x400000, 0x402000)], 4096)
         self.assertEqual(value['mappings'][0]['present_bits_lsb_hex'], '01')
         self.assertEqual(set(value['mappings'][0]), {'start', 'end', 'pages', 'present_bits_lsb_hex'})
+
+
+class ModuleSectionControls(unittest.TestCase):
+    def prepare(self, value=None, image=(0x400000, 0x401000), text=(0x400100, 0x400120)):
+        return sections.prepare(section_metadata() if value is None else value, image, text, 4096,
+                                expected_native_sha256='e'*64)
+
+    def test_shared_boundaries_are_nonadditive_and_not_whole_page_rss(self):
+        result = sections.attribute(self.prepare(), {0x400000})
+        self.assertEqual(result['image_present_pages'], 1)
+        self.assertEqual(result['section_union_present_pages'], 1)
+        self.assertEqual(result['mixed_section_present_pages'], 1)
+        self.assertEqual(result['section_boundary_present_pages'], 1)
+        self.assertEqual(result['elf_header_present_page_overlaps'], 1)
+        self.assertEqual(result['section_headers_present_page_overlaps'], 1)
+        self.assertEqual([r['present_page_overlaps'] for r in result['sections']], [1, 1, 1])
+        self.assertEqual([r['full_present_pages'] for r in result['sections']], [0, 0, 0])
+        self.assertNotIn('rss_bytes', result)
+
+    def test_nontext_whole_pages_and_uncovered_headers_or_padding_remain_distinct(self):
+        value = section_metadata()
+        value.update(serialized_bytes=0x5000, section_headers=dict(offset=0x4e00, bytes=256))
+        value['sections'][0].update(offset=0x1000, bytes=4096)
+        value['sections'][1].update(offset=0x2000, bytes=4096)
+        value['sections'][2].update(offset=0x3000, bytes=128)
+        prepared = self.prepare(value, (0x400000, 0x405000), (0x401000, 0x402000))
+        result = sections.attribute(prepared, {0x400000, 0x401000, 0x402000, 0x404000})
+        self.assertEqual(result['image_present_pages'], 4)
+        self.assertEqual(result['nontext_image_present_pages'], 3)
+        self.assertEqual(result['uncovered_present_image_pages'], 2)
+        self.assertEqual(result['mixed_section_present_pages'], 0)
+        self.assertEqual([r['full_present_pages'] for r in result['sections']], [1, 1, 0])
+
+    def test_serialized_identity_length_and_actual_text_anchor_cannot_be_substituted(self):
+        for field, bad in [('serialized_sha256', 'f'*64), ('serialized_sha256', 'E'*64),
+                           ('serialized_bytes', True), ('serialized_bytes', 4095),
+                           ('serialized_bytes', sections.MAX_IMAGE_BYTES+1), ('schema', 'future')]:
+            value = section_metadata(); value[field] = bad
+            with self.subTest(field=field, value=bad), self.assertRaises(ValueError): self.prepare(value)
+        for field, bad in [('offset', 0x101), ('bytes', 31), ('flags', 2), ('section_type', 3)]:
+            value = section_metadata(); value['sections'][0][field] = bad
+            with self.subTest(field=field), self.assertRaises(ValueError): self.prepare(value)
+
+    def test_section_extents_flags_inventory_and_structural_overlap_are_bounded(self):
+        cases = []
+        for field, bad in [('offset', 2**64-1), ('bytes', 2**64-1), ('bytes', 0),
+                           ('flags', -1), ('flags', True), ('section_type', 8), ('section_type', 0)]:
+            value = section_metadata(); value['sections'][1][field] = bad; cases.append(value)
+        for offset in (0, 0x100, 0xe00):
+            value = section_metadata(); value['sections'][1].update(offset=offset, bytes=16); cases.append(value)
+        for table in (dict(offset=63, bytes=256), dict(offset=0xe01, bytes=256),
+                      dict(offset=0xe00, bytes=65), dict(offset=0xe00, bytes=64),
+                      dict(offset=0xff0, bytes=256)):
+            value = section_metadata(); value['section_headers'] = table; cases.append(value)
+        value = section_metadata(); value['sections'] *= 2000; cases.append(value)
+        value = section_metadata(); value['sections'][0]['extra'] = True; cases.append(value)
+        for value in cases:
+            with self.subTest(value=value), self.assertRaises(ValueError): self.prepare(value)
+
+    def test_section_names_keep_encoding_uniqueness_and_aggregate_limits(self):
+        for name in ('', '.text', 'bad\0name', '\ud800', 'n'*(sections.MAX_SECTION_NAME_BYTES+1)):
+            value = section_metadata(); value['sections'][1]['name'] = name
+            with self.subTest(name=repr(name)), self.assertRaises(ValueError): self.prepare(value)
+        value = section_metadata(); value['sections'][1]['name'] = 'n'*sections.MAX_SECTION_NAME_BYTES
+        self.prepare(value)
+        with patch.object(sections, 'MAX_TOTAL_NAME_BYTES', 8), self.assertRaisesRegex(ValueError, 'byte budget'):
+            self.prepare()
+        with patch.object(sections, 'MAX_PAGE_WORK', 2), self.assertRaisesRegex(ValueError, 'work exceeds'):
+            self.prepare()
+
+    def test_owner_attribution_rejects_missing_sections_and_wrong_program_digest(self):
+        for change in ('missing', 'old-schema', 'digest', 'header'):
+            value = owners()
+            if change == 'missing': del value['owners'][0]['sections']
+            elif change == 'old-schema': value['schema'] = 'scriptw-precompiled-module-images-v1'
+            elif change == 'digest': value['owners'][0]['sections']['serialized_sha256'] = 'f'*64
+            else: value['owners'][0]['sections']['elf_header']['bytes'] = 63
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                m.validate_module_images(value, 'scriptc', NONCE, 16, snapshots(), copy.deepcopy(IDENTITY))
 
 
 class ElfControls(unittest.TestCase):

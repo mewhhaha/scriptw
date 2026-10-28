@@ -131,15 +131,12 @@ pub(super) fn execute(
     #[cfg(feature = "benchmark-module-images")]
     barriers.finish_with_module_images(&mut report, || {
         // This exact Module remains owned throughout the acknowledged captures.
-        let image = module.image_range();
-        let text = module.text().as_ptr_range();
-        phase_barriers::ModuleImages::new(
-            phase_barriers::ModuleImageAddresses::new(
-                image.start.addr()..image.end.addr(),
-                text.start.addr()..text.end.addr(),
-            ),
+        let image = scriptw_engine::BenchmarkModuleImage::capture(&module)
+            .map_err(|error| error.to_string())?;
+        Ok(phase_barriers::ModuleImages::new(
+            phase_barriers::ModuleImageAddresses::new(&image),
             None,
-        )
+        ))
     })?;
     #[cfg(not(feature = "benchmark-module-images"))]
     barriers.finish(&mut report)?;
