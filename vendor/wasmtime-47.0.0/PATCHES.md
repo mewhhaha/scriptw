@@ -20,11 +20,21 @@ token capability by default.
 
 The changes are confined to `src/runtime/gc/enabled{.rs,/weakref.rs}`,
 `src/runtime/vm/gc{.rs,/weak.rs,/gc_runtime.rs,/enabled/copying.rs,
-/enabled/copying/{weak.rs,marking.rs}}` and a cancellation control in
+/enabled/copying/{weak.rs,marking.rs}}` and collection controls in
 `src/runtime/store/gc.rs`. They do not change the JIT heap-header or VMContext ABI.
 The manifest adds an independent unit-test workspace, the existing local cache
 patch and matching dependency optimization profiles. Its separate lockfile pins
 the upstream test dependencies; it does not replace the root workspace lockfile.
+
+The copying collector's allocation-failure policy uses the current active
+semi-space rather than the physical backing-memory size. It still tries
+collection first, then prefers growth when the previous collection and pending
+allocation leave less than one eighth of that semi-space as headroom. This
+avoids repeatedly copying an almost full retained graph while allowing live
+sets with more headroom to reuse the existing heap. The public capacity metric
+and initial heap size are unchanged. Other collectors retain their previous
+growth policy. Native controls cover retained and temporary allocations, both
+semi-space orientations, denied growth, real OOM and reuse after full reclamation.
 
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write

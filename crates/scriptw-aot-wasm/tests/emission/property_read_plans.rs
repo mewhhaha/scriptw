@@ -1,4 +1,4 @@
-//! Encoded source sites call optimized R caches; Array reads retain runtime Get.
+//! Source read plans retain guarded own-data loads and complete Get fallbacks.
 use scriptw_aot_wasm::{emit, RUNTIME_IMPORT_NAMESPACE};
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower, ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind};
@@ -132,8 +132,59 @@ fn calls(body: &[Operator<'_>], target: u32) -> bool {
     })
 }
 
+fn assert_numeric_probe_before_conversion(body: &[Operator<'_>], conversion: u32) {
+    let conversion = body
+        .iter()
+        .position(|operator| {
+            matches!(operator, Operator::Call { function_index } if *function_index == conversion)
+        })
+        .expect("the original property-key conversion remains available on a miss");
+    let prefix = &body[..conversion];
+    let cast = prefix
+        .iter()
+        .position(|operator| matches!(operator, Operator::I64TruncF64U))
+        .expect("the admitted numeric key becomes an integer before conversion");
+    let guard = &prefix[..cast];
+    assert!(
+        guard
+            .iter()
+            .any(|op| matches!(op, Operator::RefTestNonNull { .. }))
+            && guard.iter().any(|op| matches!(op, Operator::F64Ge))
+            && guard.iter().any(|op| matches!(op, Operator::F64Lt))
+            && guard.iter().any(|op| matches!(op, Operator::F64Trunc))
+            && guard.iter().any(|op| matches!(op, Operator::F64Eq)),
+        "concrete Array and finite integral index guards precede the trapping cast"
+    );
+    let load = prefix
+        .iter()
+        .rposition(|op| matches!(op, Operator::ArrayGet { .. }))
+        .expect("the source path loads existing packed data before allocating a key");
+    assert!(
+        load > cast,
+        "the guarded index addresses the packed backing"
+    );
+    assert!(
+        prefix[load..]
+            .iter()
+            .any(|op| matches!(op, Operator::BrIf { .. })),
+        "a successful own-data load bypasses property-key conversion"
+    );
+    assert!(
+        !prefix[cast..].iter().any(|op| matches!(
+            op,
+            Operator::StructNew { .. }
+                | Operator::ArrayNew { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::ArrayNewFixed { .. }
+                | Operator::Call { .. }
+                | Operator::CallRef { .. }
+        )),
+        "the packed read arm allocates no descriptors or keys and calls no user code"
+    );
+}
+
 #[test]
-fn own_data_cache_checks_live_shape_in_r_and_arrays_keep_runtime_get() {
+fn own_data_cache_and_numeric_array_reads_keep_guarded_loads_and_get_fallbacks() {
     std::thread::Builder::new()
         .name("property-read-plan-emission".into())
         .stack_size(64 * 1024 * 1024)
@@ -188,6 +239,13 @@ function computedRead(record, key) { return record[key]; }
                 "unresolved static source read takes canonical GetV: {:?}",
                 returned("unresolvedRead")
             );
+            assert!(
+                matches!(&returned("computedRead").expr,
+                ExprIr::SpecOperation { operation: SpecOperationIr::GetV, operands }
+                    if operands.len() == 2
+                    && operands[1].possible_kinds.contains(ValueKind::Number)),
+                "the indexed-read control exercises canonical GetV, not only PropertyRead"
+            );
             let artifact = emit(&lowered).expect("property fixtures emit compiled Wasm");
             let program = Module::read(&artifact.bytes, true);
             let runtime = Module::read(
@@ -197,7 +255,7 @@ function computedRead(record, key) { return record[key]; }
                     .bytes(),
                 true,
             );
-            let (definition, _) = runtime.named("helper::dynamic_property_read");
+            let (definition, dynamic_read) = runtime.named("helper::dynamic_property_read");
             let fallback = program.imported_runtime_function(&runtime, definition);
             let (object_read_definition, _) = runtime.named("helper::object_read");
             let canonical_get = program.imported_runtime_function(&runtime, object_read_definition);
@@ -238,8 +296,14 @@ function computedRead(record, key) { return record[key]; }
             );
             assert!(
                 !calls(computed, cache) && calls(computed, canonical_get),
-                "effectful/computed GetV keeps the existing canonical property operation"
+                "computed GetV retains the complete canonical operation for guarded misses"
             );
+            let (key_conversion, _) = runtime.named("helper::value_to_property_key");
+            assert_numeric_probe_before_conversion(
+                computed,
+                program.imported_runtime_function(&runtime, key_conversion),
+            );
+            assert_numeric_probe_before_conversion(dynamic_read, key_conversion);
             assert!(
                 calls(cached_body, object_read_definition),
                 "cache miss retains full Get with its canonical key and explicit receiver"

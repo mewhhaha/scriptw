@@ -57,6 +57,7 @@ mod regexp_literal;
 pub(crate) use proxy_own_keys_list::CompletedOwnPropertyKeys;
 mod proxy_target_descriptor;
 pub(crate) use proxy_target_descriptor::CompletedProxyTargetDescriptor;
+mod raw_numeric_array_read;
 mod typed_array_elements;
 mod typed_array_species_create;
 

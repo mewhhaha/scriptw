@@ -10,6 +10,13 @@ retains automatic native-mode selection, a 16 MiB initial heap and SinglePass.
 All cohorts retain the required copying collector, GC/reference/exception
 features, Store limits, deadlines and a fresh Store/Realm for every invocation.
 
+Copying-GC growth decisions use its active semispace, while reported capacity
+continues to count the complete heap. When the last live set plus the pending
+allocation would leave less than one eighth of the active space free, a failed
+allocation prefers growth to another low-yield collection. The initial 16 MiB and resource limits stay in
+force; failed growth still attempts collection. Retained and ephemeral workloads
+must be measured together because earlier growth can trade memory for time.
+
 The runtime-baseline example accepts trailing `--native-mode
 fast|size-optimized|speed`, `--gc-initial-mib 8|16|32|64|128` and `--regalloc
 single-pass|backtracking` options (each flag and value are separate arguments).

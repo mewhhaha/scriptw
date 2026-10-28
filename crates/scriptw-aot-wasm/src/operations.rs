@@ -619,6 +619,19 @@ impl<'a> FunctionBuilder<'a> {
                     }
                     _ => unreachable!("closed property group"),
                 }
+                if operation == SpecOperationIr::GetV
+                    && operands[1].possible_kinds.contains(ValueKind::Number)
+                {
+                    // Source computed reads commonly lower to GetV. Both
+                    // operands and ToObject have completed; a primitive Number
+                    // key has no observable conversion before an own data read.
+                    let found = self.emit_raw_numeric_array_own_data_read(
+                        &lookup, &inputs[1], &pending, function,
+                    );
+                    found.load(function);
+                    schema.release_i32_local(found, function);
+                    self.emit_branch_if_to_target(property_exit, function);
+                }
                 self.emit_value_to_property_key_completion(&inputs[1], &key_result, function)?;
                 key_result.kind().load(function);
                 function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));

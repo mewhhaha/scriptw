@@ -24,6 +24,14 @@ and publishes it before returning a reference. Every returned mutable
 descriptor handle therefore belongs to the actual active store; no temporary
 descriptor can absorb a later mutation.
 
+Source numeric reads use the same packed backing before allocating a property
+name. Canonical `GetV` probes after operand evaluation and `ToObject`;
+`DynamicPropertyRead` probes after its nullish check. Only finite integral
+Number keys below `2^32-1` and concrete Arrays can hit, with numeric `-0` mapping
+to zero. A hit requires present packed own data. Misses retain the evaluated
+lookup, original receiver and raw key for ordinary conversion and lookup, so
+holes, accessors, proxies and nonindex keys keep their observable behavior.
+
 Publication of replacement number and presence arrays follows both complete
 allocations/copies. Old and new backings stay strongly rooted through the last
 allocation. Cold descriptor materialization likewise retains the old numeric

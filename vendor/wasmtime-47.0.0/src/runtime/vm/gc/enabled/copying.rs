@@ -975,6 +975,29 @@ unsafe impl GcHeap for CopyingHeap {
         usize::try_from(self.bump_ptr() - self.active_space_start).unwrap()
     }
 
+    fn should_collect_before_growth(
+        &self,
+        bytes_needed: u64,
+        last_post_gc_allocated_bytes: usize,
+    ) -> bool {
+        let capacity = usize::try_from(self.active_space_end() - self.active_space_start).unwrap();
+
+        // Only the active semi-space can satisfy allocations. Wait for a
+        // collection to leave less than one eighth of that space as headroom
+        // before preferring growth: a half-full live set can keep reusing the
+        // existing heap, while a nearly full retained graph cannot cause a
+        // long sequence of ever-less-productive copying collections.
+        // Use the current regions, since growth can defer their resizing until
+        // the next flip. alloc_raw reports twice the allocation's size to
+        // reserve room in both semi-spaces; convert back to allocation bytes.
+        super::super::should_collect_first(
+            bytes_needed.div_ceil(2),
+            capacity,
+            last_post_gc_allocated_bytes,
+            capacity - capacity / 8,
+        )
+    }
+
     fn gc<'a, 'b>(
         &'a mut self,
         roots: GcRootsIter<'a>,
@@ -1393,6 +1416,31 @@ mod tests {
         #[cfg(target_pointer_width = "64")]
         for len in [1usize << 32, 3usize << 32] {
             check(len);
+        }
+    }
+
+    #[test]
+    fn allocation_growth_policy_uses_active_space_and_allocation_bytes() {
+        let mut heap = CopyingHeap::new().unwrap();
+        assert!(!heap.should_collect_before_growth(0, 0));
+        assert!(!heap.should_collect_before_growth(32, 0));
+
+        let capacity = 8 * 1024 * 1024;
+        // Both semi-space orientations, including an old region size when a
+        // larger backing memory has not yet been incorporated by a flip.
+        for start in [0, capacity] {
+            heap.active_space_start = start;
+            heap.set_active_space_end(start + capacity);
+
+            assert!(heap.should_collect_before_growth(0, capacity as usize));
+            assert!(heap.should_collect_before_growth(32, 0));
+            assert!(heap.should_collect_before_growth(32, capacity as usize * 3 / 4));
+            assert!(!heap.should_collect_before_growth(32, capacity as usize * 15 / 16));
+
+            // A 1 MiB object needs 2 MiB of backing growth. Treating that as
+            // 2 MiB of active allocation would incorrectly grow this heap.
+            assert!(heap.should_collect_before_growth(2 * 1024 * 1024, 11 * 1024 * 1024 / 2));
+            assert!(!heap.should_collect_before_growth(2 * u64::from(capacity), 0));
         }
     }
 }

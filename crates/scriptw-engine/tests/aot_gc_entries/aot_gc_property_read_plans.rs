@@ -138,3 +138,75 @@ assert(!Reflect.set(record, 'x', token) && record.x === 23, 'frozen ordinary slo
 "#,
     );
 }
+
+#[test]
+fn canonical_numeric_read_keeps_presence_number_bits_and_storage_transitions() {
+    assert_reads(
+        r#"
+function read(array, key) { return array[key]; }
+function literalRead(value) { var array = [value]; return array[0]; }
+var token = {}, array = [-0, NaN, 3], inheritedReads = 0;
+assert(Object.is(read(array, -0), -0) && Number.isNaN(read(array, 1)), 'packed Number payloads');
+assert(literalRead(token) === token && Object.is(literalRead(-0), -0), 'shaped source read uses the same numeric probe');
+var proto = Object.create(Array.prototype);
+Object.defineProperty(proto, '2', {get: function() { inheritedReads++; return token; }, configurable: true});
+Object.setPrototypeOf(array, proto);
+array[2] = undefined;
+assert(read(array, 2) === undefined && inheritedReads === 0, 'present packed undefined shadows prototype');
+delete array[2];
+assert(read(array, 2) === token && inheritedReads === 1, 'a packed hole falls through to the prototype');
+array['-0'] = 19;
+assert(Object.is(read(array, -0), -0) && read(array, '-0') === 19, 'only numeric negative zero is index zero');
+var keys = [-1, 1.5, NaN, Infinity, -Infinity, 4294967295, 9007199254740992];
+for (var i = 0; i < keys.length; i++) array[keys[i]] = 100 + i;
+for (var i = 0; i < keys.length; i++) assert(read(array, keys[i]) === 100 + i, 'nonindex Number keeps its exact property name');
+Object.defineProperty(array, '1', {value: token, writable: false, configurable: false});
+assert(read(array, 1) === token && Object.is(read(array, 0), -0), 'descriptor transition keeps current own data');
+var edge = [];
+edge[4294967294] = token; edge[4294967295] = 37;
+assert(read(edge, 4294967294) === token && read(edge, 4294967295) === 37, 'last index and first nonindex survive sparse fallback');
+assert(edge.length === 4294967295, 'numeric name does not extend array length');
+"#,
+    );
+}
+
+#[test]
+fn canonical_numeric_read_preserves_key_effects_and_distinct_getter_receivers() {
+    assert_reads(
+        r#"
+function read(array, key) { return array[key]; }
+var token = {}, array = [1], events = '', getterReads = 0;
+function receiver() { events += 'receiver;'; return array; }
+function key() {
+  events += 'key;';
+  Object.defineProperty(array, '0', {get: function() {
+    getterReads++; events += 'get;'; assert(this === array, 'source getter receiver'); return token;
+  }, configurable: true});
+  return -0;
+}
+assert(read(receiver(), key()) === token && events === 'receiver;key;get;' && getterReads === 1, 'key effects finish before own-data admission');
+var different = {mark: 41};
+Object.defineProperty(array, '0', {get: function() { return this.mark; }, configurable: true});
+assert(Reflect.get(array, 0, different) === 41, 'general Get preserves its explicit receiver');
+var inherited = Object.create(array); inherited.mark = 43;
+assert(read(inherited, 0) === 43, 'an ordinary object inheriting an Array retains its receiver');
+var proxy, traps = 0;
+proxy = new Proxy([token], {get: function(target, name, original) {
+  traps++; assert(name === '0' && original === proxy, 'numeric proxy key and receiver'); return Reflect.get(target, name, original);
+}});
+assert(read(proxy, -0) === token && traps === 1, 'a Proxy never passes the concrete Array guard');
+var evaluations = 0, coercions = 0, coercible = {};
+coercible[Symbol.toPrimitive] = function(hint) {
+  coercions++; assert(hint === 'string', 'property key hint'); array = [token]; return 0;
+};
+function evaluateKey() { evaluations++; return coercible; }
+try { read(null, evaluateKey()); throw 1; } catch (error) {
+  assert(error instanceof TypeError && evaluations === 1 && coercions === 0, 'key expression precedes nullish error but conversion does not');
+}
+var original = [7];
+assert(read(original, evaluateKey()) === 7 && evaluations === 2 && coercions === 1, 'object conversion runs once and cannot replace the evaluated receiver');
+var abrupt = {}; abrupt[Symbol.toPrimitive] = function() { throw token; };
+try { read(original, abrupt); throw 1; } catch (error) { assert(error === token, 'coercion abrupt identity'); }
+"#,
+    );
+}

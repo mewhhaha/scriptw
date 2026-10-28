@@ -410,11 +410,9 @@ impl StoreOpaque {
     /// Attempt an allocation, if it fails due to GC OOM, apply the
     /// grow-or-collect heuristic and retry.
     ///
-    /// The heuristic is:
-    /// - If the last post-collection heap usage is less than half the current
-    ///   capacity, collect first, then retry. If that still fails, grow and
-    ///   retry one final time.
-    /// - Otherwise, grow first and retry.
+    /// The collector uses its allocation capacity and last post-collection
+    /// usage to choose whether to collect or grow first. A failed collection
+    /// is followed by growth; failed growth is followed by collection.
     pub(crate) async fn retry_after_gc_async<T, U>(
         &mut self,
         mut limiter: Option<&mut StoreResourceLimiter<'_>>,
@@ -438,15 +436,14 @@ impl StoreOpaque {
 
                     let mut store = WithoutGcZealAllocCounter::new(self);
 
-                    let gc_heap_capacity = store
-                        .gc_store
-                        .as_ref()
-                        .map_or(0, |gc_store| gc_store.gc_heap_capacity());
-                    let last_gc_heap_usage = store.gc_store.as_ref().map_or(0, |gc_store| {
-                        gc_store.last_post_gc_allocated_bytes.unwrap_or(0)
+                    let collect_first = store.gc_store.as_ref().is_some_and(|gc_store| {
+                        gc_store.gc_heap.should_collect_before_growth(
+                            bytes_needed,
+                            gc_store.last_post_gc_allocated_bytes.unwrap_or(0),
+                        )
                     });
 
-                    if should_collect_first(bytes_needed, gc_heap_capacity, last_gc_heap_usage) {
+                    if collect_first {
                         log::trace!(
                             "Collecting first, then retrying; growing GC heap if collecting didn't \
                              free up enough space, then retrying again"
@@ -1057,68 +1054,9 @@ impl<'a> WithoutGcZealAllocCounter<'a> {
     }
 }
 
-/// Given that we've hit a `GcHeapOutOfMemory` error, should we try freeing up
-/// space by collecting first or by growing the GC heap first?
-///
-/// * `bytes_needed`: the number of bytes the mutator wants to allocate
-///
-/// * `gc_heap_capacity`: The current size of the GC heap.
-///
-/// * `last_gc_heap_usage`: The precise GC heap usage after the last collection.
-#[track_caller]
-fn should_collect_first(
-    bytes_needed: u64,
-    gc_heap_capacity: usize,
-    last_gc_heap_usage: usize,
-) -> bool {
-    debug_assert!(last_gc_heap_usage <= gc_heap_capacity);
-
-    // If we haven't allocated the GC heap yet, there's nothing to collect.
-    //
-    // Make sure to grow in this scenario even when the GC zeal infrastructure
-    // passes `bytes_needed = 0`. This way our retry-after-gc logic doesn't
-    // auto-fail on its second attempt, which would be bad because it doesn't
-    // necessarily retry more than once.
-    if gc_heap_capacity == 0 {
-        return false;
-    }
-
-    // The GC zeal infrastructure will use `bytes_needed = 0` to trigger extra
-    // collections.
-    if bytes_needed == 0 {
-        return true;
-    }
-
-    let Ok(bytes_needed) = usize::try_from(bytes_needed) else {
-        // No point wasting time on collection if we will never be able to
-        // satisfy the allocation.
-        return false;
-    };
-
-    if bytes_needed > isize::MAX.cast_unsigned() {
-        // Similarly, no allocation can be larger than `isize::MAX` in Rust (or
-        // LLVM), so don't bother wasting time on collection if we will never be
-        // able to satisfy the allocation.
-        return false;
-    }
-
-    let Some(predicted_usage) = last_gc_heap_usage.checked_add(bytes_needed) else {
-        // If we can't represent our predicted usage as a `usize`, we won't be
-        // able to grow the GC heap to that size, so try collecting first to
-        // free up space.
-        return true;
-    };
-
-    // Common case: to balance collection frequency (and its time overhead) with
-    // GC heap growth (and its space overhead), only prefer growing first if the
-    // predicted GC heap utilization is greater than half the GC heap's
-    // capacity.
-    predicted_usage < gc_heap_capacity / 2
-}
-
 #[cfg(test)]
 mod tests {
-    use super::should_collect_first;
+    use crate::runtime::vm::should_collect_first;
     use crate::{AsContextMut, Config, Engine, ExternRef, Result, Store};
 
     #[cfg(feature = "gc-copying")]
@@ -1222,13 +1160,13 @@ mod tests {
     fn test_should_collect_first() {
         // No GC heap yet special case.
         for bytes_needed in 0..256 {
-            assert_eq!(should_collect_first(bytes_needed, 0, 0), false);
+            assert_eq!(should_collect_first(bytes_needed, 0, 0, 0), false);
         }
 
         // GC zeal special case.
         for cap in 1..256 {
             for usage in 0..=cap {
-                assert_eq!(should_collect_first(0, cap, usage), true);
+                assert_eq!(should_collect_first(0, cap, usage, cap / 2), true);
             }
         }
 
@@ -1238,21 +1176,24 @@ mod tests {
         // Allocation size larger than `isize::MAX` --> will never succeed, do
         // not bother collecting.
         assert_eq!(
-            should_collect_first(max_alloc_u64 + 1, max_alloc_usize, 0),
+            should_collect_first(max_alloc_u64 + 1, max_alloc_usize, 0, max_alloc_usize / 2),
             false,
         );
 
         // Predicted usage overflow --> growth will likely fail, collect first.
-        assert_eq!(should_collect_first(1, usize::MAX, usize::MAX), true);
+        assert_eq!(
+            should_collect_first(1, usize::MAX, usize::MAX, usize::MAX / 2),
+            true
+        );
 
         // Common case: predicted usage is low --> we likely have more than
         // enough space already, so collect first.
-        assert_eq!(should_collect_first(16, 1024, 64), true);
+        assert_eq!(should_collect_first(16, 1024, 64, 512), true);
 
         // Common case: predicted usage is high --> plausible we may not have
         // enough space, and we want to amortize the cost of collections, so
         // grow first.
-        assert_eq!(should_collect_first(16, 1024, 512), false);
+        assert_eq!(should_collect_first(16, 1024, 512, 512), false);
     }
 
     #[test]
@@ -1266,5 +1207,174 @@ mod tests {
         let gc_store = store.as_context_mut().0.unwrap_gc_store();
         assert_eq!(gc_store.gc_heap_capacity(), 1 << 20);
         Ok(())
+    }
+
+    #[cfg(all(feature = "gc-copying", not(gc_zeal)))]
+    mod copying_growth_tests {
+        use crate::{
+            AsContextMut, Collector, Config, Engine, ExternRef, ResourceLimiter, Result, RootScope,
+            Store,
+        };
+
+        const INITIAL_CAPACITY: usize = 64 * 1024;
+        const ALLOCATION_CAPACITY: usize = INITIAL_CAPACITY / 2;
+
+        fn engine() -> Result<Engine> {
+            let mut config = Config::new();
+            config
+                .enable_compiler(false)
+                .collector(Collector::Copying)
+                .gc_heap_initial_size(INITIAL_CAPACITY);
+            Engine::new(&config)
+        }
+
+        fn heap_state(mut store: impl AsContextMut) -> (usize, usize, u64) {
+            let context = store.as_context_mut();
+            let gc = context.0.unwrap_gc_store();
+            (
+                gc.gc_heap_capacity(),
+                gc.gc_heap.allocated_bytes(),
+                gc.weak_gc.epoch,
+            )
+        }
+
+        #[test]
+        fn retained_headroom_bounds_copying_without_growing_reusable_heaps() -> Result<()> {
+            let engine = engine()?;
+            for (numerator, denominator, expect_growth) in [(3, 4, false), (15, 16, true)] {
+                let mut store = Store::new(&engine, ());
+                {
+                    let mut roots = RootScope::new(&mut store);
+                    let mut live = Vec::new();
+                    live.push(ExternRef::new(&mut roots, 0usize)?);
+                    while heap_state(&mut roots).1 < ALLOCATION_CAPACITY * numerator / denominator {
+                        live.push(ExternRef::new(&mut roots, live.len())?);
+                    }
+                    assert_eq!(heap_state(&mut roots).0, INITIAL_CAPACITY);
+                    let before = heap_state(&mut roots).2;
+
+                    // Release each temporary before the next allocation. The
+                    // retained live set stays constant across actual copying
+                    // collections, rather than just testing a policy formula.
+                    for marker in 0..8192usize {
+                        {
+                            let mut temporary = RootScope::new(&mut roots);
+                            ExternRef::new(&mut temporary, marker)?;
+                        }
+                        if heap_state(&mut roots).0 > INITIAL_CAPACITY {
+                            break;
+                        }
+                    }
+                    let (capacity, _, epoch) = heap_state(&mut roots);
+                    if expect_growth {
+                        assert_eq!(capacity, 2 * INITIAL_CAPACITY);
+                        // One pressure collection, plus a mandatory flip if
+                        // growth finds the second semi-space active.
+                        assert!((1..=2).contains(&(epoch - before)));
+                    } else {
+                        assert_eq!(capacity, INITIAL_CAPACITY);
+                        assert!(epoch - before > 2);
+                    }
+                    for (marker, reference) in live.iter().enumerate() {
+                        assert_eq!(
+                            reference.data(&roots)?.unwrap().downcast_ref::<usize>(),
+                            Some(&marker),
+                        );
+                    }
+                }
+                store.gc(None)?;
+                assert_eq!(
+                    heap_state(&mut store).1,
+                    wasmtime_environ::copying::ALIGN as usize,
+                );
+            }
+            Ok(())
+        }
+
+        #[derive(Default)]
+        struct HeapLimit {
+            denied: usize,
+        }
+
+        impl ResourceLimiter for HeapLimit {
+            fn memory_growing(
+                &mut self,
+                _current: usize,
+                desired: usize,
+                _maximum: Option<usize>,
+            ) -> Result<bool> {
+                if desired > INITIAL_CAPACITY {
+                    self.denied += 1;
+                    Ok(false)
+                } else {
+                    Ok(true)
+                }
+            }
+
+            fn table_growing(
+                &mut self,
+                _current: usize,
+                _desired: usize,
+                _maximum: Option<usize>,
+            ) -> Result<bool> {
+                Ok(true)
+            }
+        }
+
+        #[test]
+        fn growth_denial_collects_then_reports_oom_and_heap_remains_reusable() -> Result<()> {
+            let mut store = Store::new(&engine()?, HeapLimit::default());
+            store.limiter(|limit| limit);
+            {
+                let mut roots = RootScope::new(&mut store);
+                let mut live = Vec::new();
+                live.push(ExternRef::new(&mut roots, 0usize)?);
+                while heap_state(&mut roots).1 < ALLOCATION_CAPACITY * 15 / 16 {
+                    live.push(ExternRef::new(&mut roots, live.len())?);
+                }
+
+                // Prefer growth after a low-yield pressure collection, then
+                // recover temporary garbage when the limiter refuses it.
+                for marker in 0..4096usize {
+                    let mut temporary = RootScope::new(&mut roots);
+                    ExternRef::new(&mut temporary, marker)?;
+                }
+                assert_eq!(heap_state(&mut roots).0, INITIAL_CAPACITY);
+
+                // A fully retained heap must still return its real OOM. All
+                // earlier references remain valid after failed growth and
+                // both orientations of the fallback copying collection.
+                loop {
+                    let marker = live.len();
+                    match ExternRef::new(&mut roots, marker) {
+                        Ok(reference) => live.push(reference),
+                        Err(error) => {
+                            assert!(error.is::<crate::GcHeapOutOfMemory<usize>>());
+                            break;
+                        }
+                    }
+                    assert!(live.len() < ALLOCATION_CAPACITY);
+                }
+                for (marker, reference) in live.iter().enumerate() {
+                    assert_eq!(
+                        reference.data(&roots)?.unwrap().downcast_ref::<usize>(),
+                        Some(&marker),
+                    );
+                }
+            }
+            assert!(store.data().denied > 0);
+            store.gc(None)?;
+            assert_eq!(heap_state(&mut store).0, INITIAL_CAPACITY);
+            assert_eq!(
+                heap_state(&mut store).1,
+                wasmtime_environ::copying::ALIGN as usize,
+            );
+            let reference = ExternRef::new(&mut store, 42usize)?;
+            assert_eq!(
+                reference.data(&store)?.unwrap().downcast_ref::<usize>(),
+                Some(&42)
+            );
+            Ok(())
+        }
     }
 }

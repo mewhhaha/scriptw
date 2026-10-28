@@ -371,6 +371,25 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
     /// This is distinct from the heap capacity.
     fn allocated_bytes(&self) -> usize;
 
+    /// Whether to collect before trying to grow after an allocation fails.
+    ///
+    /// `bytes_needed` uses the same units as this collector's allocation
+    /// failure. Collectors that reserve part of their memory, or report extra
+    /// growth bytes for each allocation, must account for that here.
+    fn should_collect_before_growth(
+        &self,
+        bytes_needed: u64,
+        last_post_gc_allocated_bytes: usize,
+    ) -> bool {
+        let capacity = self.heap_slice().len();
+        should_collect_first(
+            bytes_needed,
+            capacity,
+            last_post_gc_allocated_bytes,
+            capacity / 2,
+        )
+    }
+
     /// Whether a GC should be performed before the next heap growth.
     ///
     /// Some collectors (e.g. the copying collector) need to perform a GC before
@@ -809,6 +828,43 @@ pub trait GarbageCollection: Send + Sync {
             }
         }
     }
+}
+
+/// Choose collection when the predicted surviving allocation is below the
+/// collector's growth threshold. All sizes use allocation bytes rather than
+/// physical backing-memory bytes.
+#[track_caller]
+pub(crate) fn should_collect_first(
+    bytes_needed: u64,
+    allocation_capacity: usize,
+    last_gc_heap_usage: usize,
+    growth_threshold: usize,
+) -> bool {
+    debug_assert!(last_gc_heap_usage <= allocation_capacity);
+    debug_assert!(growth_threshold <= allocation_capacity);
+
+    // There is nothing to collect before the heap has been allocated, even
+    // when GC zeal uses a zero-size request to force a collection.
+    if allocation_capacity == 0 {
+        return false;
+    }
+    if bytes_needed == 0 {
+        return true;
+    }
+
+    let Ok(bytes_needed) = usize::try_from(bytes_needed) else {
+        return false;
+    };
+    if bytes_needed > isize::MAX.cast_unsigned() {
+        // Rust and LLVM cannot represent such an allocation.
+        return false;
+    }
+
+    let Some(predicted_usage) = last_gc_heap_usage.checked_add(bytes_needed) else {
+        // Growth cannot represent this usage either; try reclaiming space.
+        return true;
+    };
+    predicted_usage < growth_threshold
 }
 
 /// The result of doing an incremental amount of GC.
