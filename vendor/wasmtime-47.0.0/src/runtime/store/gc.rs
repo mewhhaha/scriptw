@@ -1211,6 +1211,7 @@ mod tests {
 
     #[cfg(all(feature = "gc-copying", not(gc_zeal)))]
     mod copying_growth_tests {
+        use crate::prelude::Vec;
         use crate::{
             AsContextMut, Collector, Config, Engine, ExternRef, ResourceLimiter, Result, RootScope,
             Store,

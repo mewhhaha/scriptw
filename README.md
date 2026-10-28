@@ -20,6 +20,13 @@ An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-c
 can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
+Retained-object execution now avoids near-full-heap copying loops and numeric
+Array key strings, with direct packed initialization for small numeric literals.
+The [local before/after checkpoint](docs/rust-rewrite/retained-runtime-20261028.json)
+measured the original workload at **45.9 → 38.2 ms** and a separate 16,384-row
+scaling case at **191.8 → 73.1 ms**. These measurements use matched precompiled
+hosts; the CI graphs below retain their own recorded source and configuration.
+
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 build, debug and verification loop.
@@ -63,22 +70,6 @@ refresh does not rerun or refresh that full native checkpoint or Test262.
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
 [CI run](https://github.com/mewhhaha/scriptw/actions/runs/40674504933) ·
 [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
-
-**Local consumer experiment, 2026-10-28:** at `a5da57330`, excluding native
-source-compilation callbacks reduced Scriptw's mean post-execution RSS from
-**22.01 to 19.74 MiB (10.3%)**, with essentially unchanged execution time.
-Scriptc used **14.92 MiB** in the same capability-disabled host. These are means
-of per-workload medians over the original 17 inputs, with two balanced rounds,
-ten warmups and seven measured fresh Stores per round. All 136 processes passed.
-This measures the separate precompiled consumer; it does not refresh the graphs
-or measure ordinary CLI execution. Static compiler dependencies remain.
-
-The remaining gap already exists before Store creation: **17.71 versus
-12.39 MiB**, and nearly the same gap persists after Store drop. Loaded host/runtime
-memory needs further investigation. The combined lazy-function-text and TypedArray
-sort experiment did not lower aggregate RSS and increased callback-sort RSS;
-those changes remain on an experimental branch.
-[Results and raw evidence](docs/rust-rewrite/contracts/precompiled-comparison.md#consumer-capability-experiment).
 
 ## Benchmarks
 

@@ -8,19 +8,15 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Latest verification
 
-The [consumer capability checkpoint](memory-consumer-capability-20261028.json)
-at `a5da57330` passed **46 capability-disabled and six capability-enabled engine
-tests**, **280 source-only checks**, and all 15 Intl identity checks. The same-source
-memory comparison passed all 136 processes. This focused checkpoint does not
-refresh full native or Test262 coverage; rejected heap experiments retain their
-own source-bound results in its evidence archive.
-
-The [runtime error-tail checkpoint](memory-runtime-error-tail-20261028.md)
-records **4,917 fresh native passes across 19 complete affected targets** at
-`0658e6ae6`, retaining all 4,912 predecessor IDs and five additions. It credits
-no original Test262 executions. The separate [full pinned publication](test262-current.md)
-remains bound to compiler `b9ecfe64b`; the October 28 benchmark refresh does not
-refresh either native coverage or Test262.
+The [retained-object checkpoint](retained-runtime-20261028.json) passed **4,937
+native tests across 20 complete affected targets** and **216 original Test262
+executions** at `65ffec2bf`. Its collector checkpoint passed 17 checks, retaining
+16 unchanged passes after one test-only correction. The final guard short circuit
+at `dce404dd1` passed all 34 emission tests and four strict/sloppy semantic controls;
+the broader checkpoint retains its earlier source identity. The final local
+performance corpus passed 144 processes, with another 52 scaling/control processes.
+All ran serially within the local 4-GiB/no-swap limit. The separate
+[full pinned publication](test262-current.md) remains bound to `b9ecfe64b`.
 
 ## Next work
 
@@ -47,6 +43,10 @@ refresh either native coverage or Test262.
   a substitute or infer its results from newer runs.
 - Repair pre-existing identity and module-boundary audit findings without rewriting
   original evidence or weakening compiler invariants. This cleanup does not clear them.
+- Repair pinned Wasmtime's owned-reference downcast: `AnyRef::as_struct` can
+  construct a LIFO `Rooted` from an `OwnedRooted` index. Collector tests use a
+  scoped view after collection; that preserves their coverage without repairing
+  the separate public API defect.
 
 ## Conformance boundaries
 

@@ -17,6 +17,25 @@ allocation prefers growth to another low-yield collection. The initial 16 MiB an
 force; failed growth still attempts collection. Retained and ephemeral workloads
 must be measured together because earlier growth can trade memory for time.
 
+The [2026-10-28 retained-object measurements](../retained-runtime-20261028.json)
+compare source `a5da57330` with `dce404dd1` in matched precompiled hosts. The
+unchanged 8,192-row workload fell from 45.87 to 38.19 ms. A separate scaling
+campaign measured the 16,384-row case at 191.80 to 73.06 ms, with post-execution
+RSS falling from 36.87 to 29.15 MiB. Debugger-only controls counted 20 to four
+collections per 16,384-row construction invocation; these counts contribute
+no timing samples. Small retained and ephemeral controls kept 16 MiB capacity.
+Each timing campaign uses two balanced rounds, ten checked warmups and seven
+measured fresh Stores per case/side/round. Original inputs, Scriptc controls,
+earlier campaigns, failed attempts and source-bound verification are retained
+in the linked result's inert archive. These local observations do not refresh
+the canonical CI graphs or establish live-heap size or V8 parity.
+
+The batch also avoids property-key strings on present own numeric Array reads
+and initializes fresh small numeric literals with complete packed backings.
+Literal-only phase comparisons showed modest gains. Existing `Array.push`
+retains strict Set and length semantics; an append fast path would need proof
+about inherited setters, proxies, extensibility and writable length.
+
 The runtime-baseline example accepts trailing `--native-mode
 fast|size-optimized|speed`, `--gc-initial-mib 8|16|32|64|128` and `--regalloc
 single-pass|backtracking` options (each flag and value are separate arguments).

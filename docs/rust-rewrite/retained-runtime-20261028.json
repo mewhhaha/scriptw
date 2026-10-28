@@ -1,0 +1,1162 @@
+{
+  "schema": "scriptw-local-retained-runtime-result-v1",
+  "date": "2026-10-28",
+  "source_commit": "dce404dd1faaa9866294535d34cc6474b843a28a",
+  "source_fingerprint": "6580c84000d0b2fa91a53361c51ca0f30dd2a7497a4f3a9af06bd18b355cbb1f",
+  "runtime_abi": 32,
+  "baseline_source": "a5da573301ee1793f03df3f24bc13e34bb2653d5",
+  "scope": "Local precompiled before/after; excluded from canonical CI graphs. Each host uses its own corresponding trusted native images; runtime settings and original inputs match.",
+  "changes": [
+    "Copying GC growth decision uses active semispace and 7/8 headroom, preserving failed-growth collection fallback and resource limits.",
+    "Primitive Number reads of present own packed Array elements bypass property-key string creation; all misses retain ordinary lookup.",
+    "Fresh dense 1..8-element numeric literals initialize complete packed backings once; power-of-two capacity, rooting, effects and generic fallback retained."
+  ],
+  "resources": {
+    "cpu_affinity": [
+      0
+    ],
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "14905344",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "355749888",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "corpus": {
+    "original_workloads": 17,
+    "additional_typed_array_controls": 2,
+    "rounds": 2,
+    "warmups_per_round": 10,
+    "samples_per_round": 7,
+    "passed_processes": 144,
+    "passed_output_checks": 2448,
+    "scriptc": "0.4.5 portable Wasm reused from CI run 40674504933; freshly native-compiled for each host, frontend not rerun",
+    "suites": [
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "scriptw",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 5.620674970588235,
+          "rss_bytes": 23247932.23529412,
+          "pss_bytes": 20610650.352941178,
+          "private_dirty_bytes": 4752444.235294118,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21124517.647058822,
+              "pss_bytes": 18487296.0,
+              "private_dirty_bytes": 2628065.882352941
+            },
+            "after_instantiate": {
+              "rss_bytes": 21380276.70588235,
+              "pss_bytes": 18743055.05882353,
+              "private_dirty_bytes": 2884909.1764705884
+            },
+            "after_execution": {
+              "rss_bytes": 23247932.23529412,
+              "pss_bytes": 20610650.352941178,
+              "private_dirty_bytes": 4752444.235294118
+            },
+            "after_store_drop": {
+              "rss_bytes": 21131264.0,
+              "pss_bytes": 18493982.11764706,
+              "private_dirty_bytes": 2635776.0
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 4.937860764705882,
+          "rss_bytes": 21945404.23529412,
+          "pss_bytes": 19299719.529411763,
+          "private_dirty_bytes": 4757022.117647059,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19819941.647058822,
+              "pss_bytes": 17174256.94117647,
+              "private_dirty_bytes": 2630957.1764705884
+            },
+            "after_instantiate": {
+              "rss_bytes": 20076423.529411763,
+              "pss_bytes": 17430829.17647059,
+              "private_dirty_bytes": 2887318.588235294
+            },
+            "after_execution": {
+              "rss_bytes": 21945404.23529412,
+              "pss_bytes": 19299719.529411763,
+              "private_dirty_bytes": 4757022.117647059
+            },
+            "after_store_drop": {
+              "rss_bytes": 19827049.411764707,
+              "pss_bytes": 17181364.70588235,
+              "private_dirty_bytes": 2638667.294117647
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.8898160187004425,
+          "rss_bytes": 0.9439122248258519,
+          "pss_bytes": 0.9362576111158117,
+          "private_dirty_bytes": 0.9999281773103126
+        }
+      },
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "wasi",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 2.040976882352941,
+          "rss_bytes": 15998012.235294119,
+          "pss_bytes": 13417441.88235294,
+          "private_dirty_bytes": 5325161.411764706,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 13343924.705882354,
+              "pss_bytes": 10763354.352941176,
+              "private_dirty_bytes": 2671314.8235294116
+            },
+            "after_instantiate": {
+              "rss_bytes": 13351273.411764706,
+              "pss_bytes": 10770582.588235294,
+              "private_dirty_bytes": 2678543.0588235296
+            },
+            "after_execution": {
+              "rss_bytes": 15998012.235294119,
+              "pss_bytes": 13417441.88235294,
+              "private_dirty_bytes": 5325161.411764706
+            },
+            "after_store_drop": {
+              "rss_bytes": 13352237.176470589,
+              "pss_bytes": 10771666.823529411,
+              "private_dirty_bytes": 2679386.3529411764
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 1.9256145294117648,
+          "rss_bytes": 15764660.705882354,
+          "pss_bytes": 13195173.647058824,
+          "private_dirty_bytes": 5324438.588235294,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 13110934.588235294,
+              "pss_bytes": 10541688.470588235,
+              "private_dirty_bytes": 2670712.470588235
+            },
+            "after_instantiate": {
+              "rss_bytes": 13117921.88235294,
+              "pss_bytes": 10548434.823529411,
+              "private_dirty_bytes": 2677940.705882353
+            },
+            "after_execution": {
+              "rss_bytes": 15764660.705882354,
+              "pss_bytes": 13195173.647058824,
+              "private_dirty_bytes": 5324438.588235294
+            },
+            "after_store_drop": {
+              "rss_bytes": 13118885.647058824,
+              "pss_bytes": 10549398.588235294,
+              "private_dirty_bytes": 2678663.529411765
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 1.008936652288251,
+          "rss_bytes": 0.9848007512137315,
+          "pss_bytes": 0.982602126505473,
+          "private_dirty_bytes": 0.9998770996461936
+        }
+      },
+      {
+        "group": "targeted-typed-sort-2",
+        "adapter": "scriptw",
+        "cases": 2,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 201.85897925,
+          "rss_bytes": 27564032.0,
+          "pss_bytes": 24902656.0,
+          "private_dirty_bytes": 7420928.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 22800384.0,
+              "pss_bytes": 20139264.0,
+              "private_dirty_bytes": 2657280.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 23057408.0,
+              "pss_bytes": 20396288.0,
+              "private_dirty_bytes": 2915328.0
+            },
+            "after_execution": {
+              "rss_bytes": 27564032.0,
+              "pss_bytes": 24902656.0,
+              "private_dirty_bytes": 7420928.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 22808576.0,
+              "pss_bytes": 20147200.0,
+              "private_dirty_bytes": 2665472.0
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 190.96261049999998,
+          "rss_bytes": 26113024.0,
+          "pss_bytes": 23467008.0,
+          "private_dirty_bytes": 7419904.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21349376.0,
+              "pss_bytes": 18703360.0,
+              "private_dirty_bytes": 2656256.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 21606400.0,
+              "pss_bytes": 18960384.0,
+              "private_dirty_bytes": 2914304.0
+            },
+            "after_execution": {
+              "rss_bytes": 26113024.0,
+              "pss_bytes": 23467008.0,
+              "private_dirty_bytes": 7419904.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21357568.0,
+              "pss_bytes": 18711552.0,
+              "private_dirty_bytes": 2664448.0
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.9545220250477878,
+          "rss_bytes": 0.9476229989224763,
+          "pss_bytes": 0.9426798147509812,
+          "private_dirty_bytes": 0.999859777044813
+        }
+      }
+    ],
+    "rows": [
+      {
+        "file": "sort-reverse-128.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.5054825,
+          "rss_mib": 21.484375,
+          "private_dirty_mib": 3.86328125
+        },
+        "candidate": {
+          "execution_ms": 1.0679905,
+          "rss_mib": 20.37109375,
+          "private_dirty_mib": 3.859375
+        }
+      },
+      {
+        "file": "sort-reverse-128.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.1162345,
+          "rss_mib": 15.158203125,
+          "private_dirty_mib": 4.95703125
+        },
+        "candidate": {
+          "execution_ms": 0.096425,
+          "rss_mib": 14.943359375,
+          "private_dirty_mib": 4.95703125
+        }
+      },
+      {
+        "file": "sort-reverse-512.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.7816225,
+          "rss_mib": 24.646484375,
+          "private_dirty_mib": 6.4765625
+        },
+        "candidate": {
+          "execution_ms": 4.4084745,
+          "rss_mib": 23.013671875,
+          "private_dirty_mib": 6.4453125
+        }
+      },
+      {
+        "file": "sort-reverse-512.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.3235635,
+          "rss_mib": 15.18359375,
+          "private_dirty_mib": 5.009765625
+        },
+        "candidate": {
+          "execution_ms": 0.3514685,
+          "rss_mib": 15.048828125,
+          "private_dirty_mib": 5.005859375
+        }
+      },
+      {
+        "file": "sort-sorted-512.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.383964,
+          "rss_mib": 22.0,
+          "private_dirty_mib": 4.203125
+        },
+        "candidate": {
+          "execution_ms": 1.7936765,
+          "rss_mib": 20.541015625,
+          "private_dirty_mib": 4.173828125
+        }
+      },
+      {
+        "file": "sort-sorted-512.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.3683335,
+          "rss_mib": 15.38671875,
+          "private_dirty_mib": 5.0078125
+        },
+        "candidate": {
+          "execution_ms": 0.2948035,
+          "rss_mib": 14.947265625,
+          "private_dirty_mib": 5.0078125
+        }
+      },
+      {
+        "file": "to-sorted-512.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 4.35788,
+          "rss_mib": 25.3828125,
+          "private_dirty_mib": 7.1953125
+        },
+        "candidate": {
+          "execution_ms": 4.484619,
+          "rss_mib": 23.916015625,
+          "private_dirty_mib": 7.169921875
+        }
+      },
+      {
+        "file": "to-sorted-512.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.3905085,
+          "rss_mib": 15.083984375,
+          "private_dirty_mib": 5.0234375
+        },
+        "candidate": {
+          "execution_ms": 0.3646685,
+          "rss_mib": 15.134765625,
+          "private_dirty_mib": 5.01953125
+        }
+      },
+      {
+        "file": "join-1024.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.4494485,
+          "rss_mib": 22.078125,
+          "private_dirty_mib": 3.783203125
+        },
+        "candidate": {
+          "execution_ms": 2.4204935,
+          "rss_mib": 20.7578125,
+          "private_dirty_mib": 3.783203125
+        }
+      },
+      {
+        "file": "join-1024.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.415193,
+          "rss_mib": 15.18359375,
+          "private_dirty_mib": 5.03125
+        },
+        "candidate": {
+          "execution_ms": 0.408173,
+          "rss_mib": 14.826171875,
+          "private_dirty_mib": 5.029296875
+        }
+      },
+      {
+        "file": "join-4096.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 7.408095,
+          "rss_mib": 23.41796875,
+          "private_dirty_mib": 5.525390625
+        },
+        "candidate": {
+          "execution_ms": 7.2069105,
+          "rss_mib": 22.173828125,
+          "private_dirty_mib": 5.525390625
+        }
+      },
+      {
+        "file": "join-4096.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.3327235,
+          "rss_mib": 15.474609375,
+          "private_dirty_mib": 5.50390625
+        },
+        "candidate": {
+          "execution_ms": 1.2568035,
+          "rss_mib": 15.421875,
+          "private_dirty_mib": 5.505859375
+        }
+      },
+      {
+        "file": "join-mixed-1024.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.8175615,
+          "rss_mib": 21.63671875,
+          "private_dirty_mib": 3.7578125
+        },
+        "candidate": {
+          "execution_ms": 2.8160565,
+          "rss_mib": 20.693359375,
+          "private_dirty_mib": 3.7578125
+        }
+      },
+      {
+        "file": "join-mixed-1024.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.246279,
+          "rss_mib": 15.142578125,
+          "private_dirty_mib": 4.962890625
+        },
+        "candidate": {
+          "execution_ms": 0.222104,
+          "rss_mib": 14.98046875,
+          "private_dirty_mib": 4.96484375
+        }
+      },
+      {
+        "file": "numeric-loop-10000.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.247199,
+          "rss_mib": 19.671875,
+          "private_dirty_mib": 3.1484375
+        },
+        "candidate": {
+          "execution_ms": 1.252634,
+          "rss_mib": 18.92578125,
+          "private_dirty_mib": 3.150390625
+        }
+      },
+      {
+        "file": "numeric-loop-10000.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.0756695,
+          "rss_mib": 14.6484375,
+          "private_dirty_mib": 4.291015625
+        },
+        "candidate": {
+          "execution_ms": 0.085865,
+          "rss_mib": 14.228515625,
+          "private_dirty_mib": 4.2890625
+        }
+      },
+      {
+        "file": "numeric-loop-50000.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 4.1113905,
+          "rss_mib": 20.37890625,
+          "private_dirty_mib": 3.14453125
+        },
+        "candidate": {
+          "execution_ms": 3.592223,
+          "rss_mib": 18.990234375,
+          "private_dirty_mib": 3.146484375
+        }
+      },
+      {
+        "file": "numeric-loop-50000.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.1630695,
+          "rss_mib": 14.62890625,
+          "private_dirty_mib": 4.291015625
+        },
+        "candidate": {
+          "execution_ms": 0.1658495,
+          "rss_mib": 14.38671875,
+          "private_dirty_mib": 4.291015625
+        }
+      },
+      {
+        "file": "folded-string-4096.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.6338125,
+          "rss_mib": 20.11328125,
+          "private_dirty_mib": 3.298828125
+        },
+        "candidate": {
+          "execution_ms": 1.510203,
+          "rss_mib": 19.1171875,
+          "private_dirty_mib": 3.294921875
+        }
+      },
+      {
+        "file": "folded-string-4096.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.7706315,
+          "rss_mib": 14.47265625,
+          "private_dirty_mib": 4.3046875
+        },
+        "candidate": {
+          "execution_ms": 0.5365925,
+          "rss_mib": 14.146484375,
+          "private_dirty_mib": 4.30859375
+        }
+      },
+      {
+        "file": "dynamic-string-4096.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.07347,
+          "rss_mib": 20.59765625,
+          "private_dirty_mib": 3.482421875
+        },
+        "candidate": {
+          "execution_ms": 1.8153315,
+          "rss_mib": 19.4296875,
+          "private_dirty_mib": 3.484375
+        }
+      },
+      {
+        "file": "dynamic-string-4096.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.210439,
+          "rss_mib": 14.671875,
+          "private_dirty_mib": 4.291015625
+        },
+        "candidate": {
+          "execution_ms": 0.237399,
+          "rss_mib": 14.197265625,
+          "private_dirty_mib": 4.2890625
+        }
+      },
+      {
+        "file": "integer.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.563533,
+          "rss_mib": 20.560546875,
+          "private_dirty_mib": 3.173828125
+        },
+        "candidate": {
+          "execution_ms": 3.766492,
+          "rss_mib": 19.23046875,
+          "private_dirty_mib": 3.173828125
+        }
+      },
+      {
+        "file": "integer.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.0572745,
+          "rss_mib": 14.509765625,
+          "private_dirty_mib": 4.291015625
+        },
+        "candidate": {
+          "execution_ms": 0.066,
+          "rss_mib": 14.296875,
+          "private_dirty_mib": 4.2890625
+        }
+      },
+      {
+        "file": "objects.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.9971055,
+          "rss_mib": 21.416015625,
+          "private_dirty_mib": 3.583984375
+        },
+        "candidate": {
+          "execution_ms": 1.409898,
+          "rss_mib": 19.82421875,
+          "private_dirty_mib": 3.53125
+        }
+      },
+      {
+        "file": "objects.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.549467,
+          "rss_mib": 15.205078125,
+          "private_dirty_mib": 5.078125
+        },
+        "candidate": {
+          "execution_ms": 0.674967,
+          "rss_mib": 14.962890625,
+          "private_dirty_mib": 5.080078125
+        }
+      },
+      {
+        "file": "retained-objects.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 45.8673335,
+          "rss_mib": 25.775390625,
+          "private_dirty_mib": 7.37890625
+        },
+        "candidate": {
+          "execution_ms": 38.1901545,
+          "rss_mib": 24.646484375,
+          "private_dirty_mib": 7.583984375
+        }
+      },
+      {
+        "file": "retained-objects.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 29.2057375,
+          "rss_mib": 20.697265625,
+          "private_dirty_mib": 10.82421875
+        },
+        "candidate": {
+          "execution_ms": 27.410141,
+          "rss_mib": 20.82421875,
+          "private_dirty_mib": 10.8203125
+        }
+      },
+      {
+        "file": "join-empty-1024.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.202015,
+          "rss_mib": 22.376953125,
+          "private_dirty_mib": 4.9453125
+        },
+        "candidate": {
+          "execution_ms": 2.6392525,
+          "rss_mib": 21.216796875,
+          "private_dirty_mib": 4.94921875
+        }
+      },
+      {
+        "file": "join-empty-1024.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.243069,
+          "rss_mib": 14.9765625,
+          "private_dirty_mib": 4.87890625
+        },
+        "candidate": {
+          "execution_ms": 0.2932085,
+          "rss_mib": 14.90234375,
+          "private_dirty_mib": 4.87890625
+        }
+      },
+      {
+        "file": "join-singleton-1024.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.16889,
+          "rss_mib": 22.71875,
+          "private_dirty_mib": 5.033203125
+        },
+        "candidate": {
+          "execution_ms": 2.8245565,
+          "rss_mib": 21.537109375,
+          "private_dirty_mib": 5.03515625
+        }
+      },
+      {
+        "file": "join-singleton-1024.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.1001395,
+          "rss_mib": 14.451171875,
+          "private_dirty_mib": 4.291015625
+        },
+        "candidate": {
+          "execution_ms": 0.145054,
+          "rss_mib": 14.185546875,
+          "private_dirty_mib": 4.287109375
+        }
+      },
+      {
+        "file": "join-small-1024.js",
+        "adapter": "scriptw",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.9826715,
+          "rss_mib": 22.650390625,
+          "private_dirty_mib": 5.0546875
+        },
+        "candidate": {
+          "execution_ms": 2.744667,
+          "rss_mib": 21.404296875,
+          "private_dirty_mib": 5.05859375
+        }
+      },
+      {
+        "file": "join-small-1024.js",
+        "adapter": "wasi",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 0.1282745,
+          "rss_mib": 14.4921875,
+          "private_dirty_mib": 4.296875
+        },
+        "candidate": {
+          "execution_ms": 0.1259245,
+          "rss_mib": 14.150390625,
+          "private_dirty_mib": 4.298828125
+        }
+      },
+      {
+        "file": "typed-sort-callback.js",
+        "adapter": "scriptw",
+        "group": "targeted-typed-sort-2",
+        "baseline": {
+          "execution_ms": 261.839822,
+          "rss_mib": 26.96875,
+          "private_dirty_mib": 7.189453125
+        },
+        "candidate": {
+          "execution_ms": 242.14359,
+          "rss_mib": 25.169921875,
+          "private_dirty_mib": 7.189453125
+        }
+      },
+      {
+        "file": "typed-sort-default.js",
+        "adapter": "scriptw",
+        "group": "targeted-typed-sort-2",
+        "baseline": {
+          "execution_ms": 141.8781365,
+          "rss_mib": 25.60546875,
+          "private_dirty_mib": 6.96484375
+        },
+        "candidate": {
+          "execution_ms": 139.781631,
+          "rss_mib": 24.63671875,
+          "private_dirty_mib": 6.962890625
+        }
+      }
+    ],
+    "raw_report": "target/memory-experiments-20261028/retained-dce404-comparison/report.json"
+  },
+  "scaling": {
+    "passed_processes": 52,
+    "passed_output_checks": 884,
+    "rows": [
+      {
+        "file": "n-1024.js",
+        "baseline": {
+          "execution_ms": 4.16843,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 22.400390625,
+          "private_dirty_mib": 4.703125
+        },
+        "candidate": {
+          "execution_ms": 4.592818,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 20.978515625,
+          "private_dirty_mib": 4.283203125
+        },
+        "execution_ratio": 1.101810033993614
+      },
+      {
+        "file": "n-4096.js",
+        "baseline": {
+          "execution_ms": 18.7506855,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 26.81640625,
+          "private_dirty_mib": 9.1796875
+        },
+        "candidate": {
+          "execution_ms": 13.0503625,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 23.697265625,
+          "private_dirty_mib": 7.44921875
+        },
+        "execution_ratio": 0.6959938877967955
+      },
+      {
+        "file": "n-8192.js",
+        "baseline": {
+          "execution_ms": 44.627093,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 25.478515625,
+          "private_dirty_mib": 7.375
+        },
+        "candidate": {
+          "execution_ms": 31.161352,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 24.396484375,
+          "private_dirty_mib": 7.580078125
+        },
+        "execution_ratio": 0.6982608524377781
+      },
+      {
+        "file": "n-16384.js",
+        "baseline": {
+          "execution_ms": 191.804287,
+          "gc_capacity_mib": [
+            32.0
+          ],
+          "rss_mib": 36.87109375,
+          "private_dirty_mib": 18.2578125
+        },
+        "candidate": {
+          "execution_ms": 73.0631825,
+          "gc_capacity_mib": [
+            32.0
+          ],
+          "rss_mib": 29.150390625,
+          "private_dirty_mib": 12.01171875
+        },
+        "execution_ratio": 0.38092570110281215
+      },
+      {
+        "file": "passes-0.js",
+        "baseline": {
+          "execution_ms": 22.892686,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 25.650390625,
+          "private_dirty_mib": 7.57421875
+        },
+        "candidate": {
+          "execution_ms": 20.605277,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 24.640625,
+          "private_dirty_mib": 7.587890625
+        },
+        "execution_ratio": 0.9000812311844927
+      },
+      {
+        "file": "passes-1.js",
+        "baseline": {
+          "execution_ms": 24.6984625,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 26.2578125,
+          "private_dirty_mib": 8.072265625
+        },
+        "candidate": {
+          "execution_ms": 21.9848855,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 24.509765625,
+          "private_dirty_mib": 7.595703125
+        },
+        "execution_ratio": 0.8901317440306253
+      },
+      {
+        "file": "passes-16.js",
+        "baseline": {
+          "execution_ms": 88.452185,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 28.625,
+          "private_dirty_mib": 10.517578125
+        },
+        "candidate": {
+          "execution_ms": 51.3659255,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 24.443359375,
+          "private_dirty_mib": 7.59375
+        },
+        "execution_ratio": 0.5807196905311045
+      },
+      {
+        "file": "no-name.js",
+        "baseline": {
+          "execution_ms": 31.9896075,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 27.736328125,
+          "private_dirty_mib": 9.712890625
+        },
+        "candidate": {
+          "execution_ms": 20.8459965,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 27.015625,
+          "private_dirty_mib": 10.544921875
+        },
+        "execution_ratio": 0.6516490238275039
+      },
+      {
+        "file": "row-major.js",
+        "baseline": {
+          "execution_ms": 36.4313565,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 25.603515625,
+          "private_dirty_mib": 7.37109375
+        },
+        "candidate": {
+          "execution_ms": 27.0163665,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 24.3828125,
+          "private_dirty_mib": 7.580078125
+        },
+        "execution_ratio": 0.7415690519237185
+      },
+      {
+        "file": "n-12288.js",
+        "baseline": {
+          "execution_ms": 68.2442955,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 27.822265625,
+          "private_dirty_mib": 9.724609375
+        },
+        "candidate": {
+          "execution_ms": 42.9808455,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 26.505859375,
+          "private_dirty_mib": 9.638671875
+        },
+        "execution_ratio": 0.629808618948964
+      },
+      {
+        "file": "construction-16384.js",
+        "baseline": {
+          "execution_ms": 155.186631,
+          "gc_capacity_mib": [
+            32.0
+          ],
+          "rss_mib": 29.919921875,
+          "private_dirty_mib": 11.259765625
+        },
+        "candidate": {
+          "execution_ms": 59.5927715,
+          "gc_capacity_mib": [
+            32.0
+          ],
+          "rss_mib": 29.384765625,
+          "private_dirty_mib": 12.0078125
+        },
+        "execution_ratio": 0.3840071217217158
+      },
+      {
+        "file": "retained-observed-names.js",
+        "baseline": {
+          "execution_ms": 67.817857,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 28.849609375,
+          "private_dirty_mib": 10.09765625
+        },
+        "candidate": {
+          "execution_ms": 59.80962,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 26.8828125,
+          "private_dirty_mib": 9.796875
+        },
+        "execution_ratio": 0.8819155108366222
+      },
+      {
+        "file": "ephemeral-16384.js",
+        "baseline": {
+          "execution_ms": 55.7552145,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 28.79296875,
+          "private_dirty_mib": 10.61328125
+        },
+        "candidate": {
+          "execution_ms": 44.3481585,
+          "gc_capacity_mib": [
+            16.0
+          ],
+          "rss_mib": 23.837890625,
+          "private_dirty_mib": 7.615234375
+        },
+        "execution_ratio": 0.7954082662528362
+      }
+    ],
+    "raw_report": "target/retained-runtime-20261028/implementation/final-probes/report.json"
+  },
+  "collection_counts": {
+    "scope": "Unscored debugger counts; no timing claim",
+    "rows": [
+      {
+        "side": "baseline",
+        "case": "construction-8192",
+        "fresh_stores": 4,
+        "collection_entries": 4,
+        "host_sha256": "1c949255c0d653ae97703ff08f36d01cd50de0ad01d80daa379443e128df3d60"
+      },
+      {
+        "side": "baseline",
+        "case": "original-8192",
+        "fresh_stores": 4,
+        "collection_entries": 8,
+        "host_sha256": "1c949255c0d653ae97703ff08f36d01cd50de0ad01d80daa379443e128df3d60"
+      },
+      {
+        "side": "baseline",
+        "case": "construction-16384",
+        "fresh_stores": 4,
+        "collection_entries": 80,
+        "host_sha256": "1c949255c0d653ae97703ff08f36d01cd50de0ad01d80daa379443e128df3d60"
+      },
+      {
+        "side": "candidate",
+        "case": "construction-8192",
+        "fresh_stores": 4,
+        "collection_entries": 4,
+        "host_sha256": "df7004c1e36012f431702287e4d7e909781385ae02ac95cc9fd0b270aa088e5b"
+      },
+      {
+        "side": "candidate",
+        "case": "original-8192",
+        "fresh_stores": 4,
+        "collection_entries": 4,
+        "host_sha256": "df7004c1e36012f431702287e4d7e909781385ae02ac95cc9fd0b270aa088e5b"
+      },
+      {
+        "side": "candidate",
+        "case": "construction-16384",
+        "fresh_stores": 4,
+        "collection_entries": 16,
+        "host_sha256": "df7004c1e36012f431702287e4d7e909781385ae02ac95cc9fd0b270aa088e5b"
+      }
+    ]
+  },
+  "verification": {
+    "full_workspace": false,
+    "full_pinned_test262": false,
+    "native_checkpoint": {
+      "source": "65ffec2bfc82855909aaafddd30fda0bf8dbeda6",
+      "targets": 20,
+      "passed": 4937,
+      "receipts": [
+        "target/retained-runtime-20261028/implementation/focused-native/receipt.json",
+        "target/retained-runtime-20261028/implementation/remaining-native/receipt.json"
+      ]
+    },
+    "collector": {
+      "passed": 17,
+      "retained_unchanged": 16,
+      "rerun_after_test_only_correction": 1,
+      "receipt": "target/retained-runtime-20261028/implementation/vendor-reclamation-retry/report.json",
+      "overlays": "Explicit Vec import in collector tests; existing reclamation test creates a scoped view after GC. Public owned-reference downcast defect remains tracked separately."
+    },
+    "selected_test262": {
+      "source": "65ffec2bfc82855909aaafddd30fda0bf8dbeda6",
+      "passed": 216,
+      "receipt": "target/retained-runtime-20261028/implementation/test262-selected/report.json"
+    },
+    "final_guard": {
+      "source": "dce404dd1faaa9866294535d34cc6474b843a28a",
+      "emission_tests": 34,
+      "semantic_cases": 4,
+      "checked_stores_per_case": 4,
+      "receipts": [
+        "target/retained-runtime-20261028/implementation/guard-emission/receipt.json",
+        "target/retained-runtime-20261028/implementation/guard-read-regressions/report.json"
+      ]
+    },
+    "cheap_checks": "280 source checks, ownership and 15 Intl identities passed; selected-file formatting passed. Whole-workspace formatting has pre-existing differences retained in preflight.log."
+  },
+  "limitations": [
+    "Process RSS includes host/runtime/code/history; it is not live heap, allocated bytes or peak memory.",
+    "Balanced local timings remain sensitive to scheduling and clock variation. Scriptc controls and all earlier observations are retained; no V8 parity or causal cross-cohort claim.",
+    "Ordinary CI benchmark graphs remain bound to their own explicitly recorded compiler until refreshed.",
+    "Numeric literal gains were modest in isolated phase1-to-phase2 measurements. Generic push retains full strict Set semantics; an append fast path needs independent prototype and length proofs.",
+    "Broad checkpoints retain their actual source identity across the final pure guard short circuit and subsequent test/documentation-only changes."
+  ],
+  "archive": {
+    "file": "retained-runtime-20261028-inert.tar.xz",
+    "sha256": "acfa1f3af3d3046eb253b42babc953ce30e8232a7315558992c01b211eea4e87",
+    "bytes": 2948676,
+    "member_count": 1802,
+    "expanded_bytes": 153640637
+  }
+}

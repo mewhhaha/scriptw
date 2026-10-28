@@ -1516,8 +1516,12 @@ mod reclamation_tests {
             let native = ExternRef::convert_any(&mut roots, value).unwrap();
             assert!(native.data(&roots).unwrap().unwrap().is::<Dropped>());
             assert_eq!(drops.load(Ordering::SeqCst), 0);
+            // Keep the owned key as the only root during collection. Create
+            // a scoped view afterwards: AnyRef::as_struct returns a LIFO root.
+            let key_view = key.to_rooted(&mut roots);
             assert_eq!(
-                key.as_struct(&roots)
+                key_view
+                    .as_struct(&roots)
                     .unwrap()
                     .unwrap()
                     .field(&mut roots, 0)
