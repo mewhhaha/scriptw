@@ -1,5 +1,4 @@
 use super::{WasmModuleMemoryCacheKey, WasmtimeModule};
-#[cfg(feature = "native-source-compiler")]
 mod native_templates;
 #[cfg(feature = "native-source-compiler")]
 pub(super) use native_templates::MemoryNativeInstanceCache;

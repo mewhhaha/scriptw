@@ -1,9 +1,11 @@
 use super::*;
+#[cfg(feature = "native-source-compiler")]
 mod instances;
+#[cfg(feature = "native-source-compiler")]
 pub(crate) use instances::MemoryNativeInstanceCache;
 
 impl MemoryWasmModuleCache {
-    /// Native templates use the same aggregate budget and actual image sizes.
+    /// Ordinary modules and native templates share this Engine-bound cache.
     /// A matching byte key never authorizes a Module from another Engine.
     pub(crate) fn get_for_engine(
         &mut self,
