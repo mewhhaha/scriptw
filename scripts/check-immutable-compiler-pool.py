@@ -58,22 +58,28 @@ def check(root, overrides=None):
             'actual runtime boundary and bytes precede prefix freezing')
     receipt = c[A + 'runtime_artifact/build_package/metadata.rs']
     require('Some(self.build_admission.as_ref()?.matches_pool(utf16,data))' in runtime and
-            'data:[SpanDigest;6]' in receipt and
-            'forindexin[3,2,4,1,5]' in receipt and
+            'pub(crate)constRUNTIME_DATA_SEGMENT_COUNT:usize=8;' in data and
+            'pub(crate)constRUNTIME_STATIC_SEGMENT_ORDER:[usize;7]=[4,2,5,1,6,3,7];' in data and
+            receipt.count('data:[SpanDigest;RUNTIME_DATA_SEGMENT_COUNT]') == 2 and
+            'letmutparts=[&[][..];RUNTIME_DATA_SEGMENT_COUNT];' in receipt and
+            'forindexinRUNTIME_STATIC_SEGMENT_ORDER' in receipt and
             'cursor.checked_add(self.data[index].span.len())' in receipt and
             'data.get(cursor..end)' in receipt and
             'ifcursor!=data.len(){returnfalse;}' in receipt and
             ('parts.into_iter().zip(&self.data).all(|(bytes,expected)|{'
              'bytes.len()==expected.span.len()&&Sha256::digest(bytes).as_slice()==expected.digest})') in receipt,
             'immutable pool proof checks both actual reconstructed image dimensions and hashes')
-    require('section.count()!=6' in pool and
+    require('section.count()asusize!=RUNTIME_DATA_SEGMENT_COUNT' in pool and
             'letregion=self.0.normalization_image_region();letspan=region.offsets();' in pool and
+            'letyears=self.0.temporal_east_asian_year_region();letyear=years.offsets();' in pool and
             '(&self.0.pooled_code_unit_bytes[..],None)' in pool and
             '(&self.0.bytes[span.clone()],None)' in pool and
             '(&self.0.bytes[property.clone()],None)' in pool and
+            '(&self.0.bytes[year.clone()],None)' in pool and
             '(&self.0.bytes[..property.start],Some(STATIC_DATA_OFFSET))' in pool and
             '(&self.0.bytes[property.end..span.start],Some(properties.end()),)'  in pool and
-            '(&self.0.bytes[span.end..],Some(region.end()))' in pool and
+            '(&self.0.bytes[span.end..year.start],Some(region.end()))' in pool and
+            '(&self.0.bytes[year.end..],Some(years.end()))' in pool and
             'for(row,(bytes,address))insection.into_iter().zip(expected)' in pool and
             'ifrow.data!=bytes' in pool and
             '(DataKind::Passive,None)=>{}' in pool and

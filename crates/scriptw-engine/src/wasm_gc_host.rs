@@ -5,6 +5,23 @@ use super::*;
 use scriptw_aot_wasm::GcHostImport;
 use wasmtime::{ExternRef, Rooted};
 
+#[cfg(test)]
+mod tests;
+
+const SOURCE_COMPILER_IMPORTS: [GcHostImport; 3] = [
+    GcHostImport::CompileDynamicFunction,
+    GcHostImport::CompileGlobalScript,
+    GcHostImport::CompileDirectEval,
+];
+
+fn imports_native_source_compiler(module: &WasmtimeModule) -> bool {
+    module.imports().any(|import| {
+        SOURCE_COMPILER_IMPORTS
+            .iter()
+            .any(|row| import.module() == row.module() && import.name() == row.name())
+    })
+}
+
 pub(super) fn resource(
     caller: &WasmtimeCaller<'_, WasmHostState>,
     reference: Rooted<ExternRef>,
@@ -223,9 +240,15 @@ pub(super) fn link(
         )
         .map_err(bind_error)?;
     wasm_gc_byte_array_host::link(linker, module)?;
-    wasm_native_function_compiler::link(linker, module)?;
-    wasm_native_global_script_compiler::link(linker, module)?;
-    wasm_native_direct_eval_compiler::link(linker, module)?;
+    // Portable R has no native source compiler imports. Avoid entering these
+    // larger binding routines for an immutable module that needs none of them.
+    // A present name still enters every original validator, regardless of its
+    // type or the Store's compiler context (which may be armed after linking).
+    if imports_native_source_compiler(module) {
+        wasm_native_function_compiler::link(linker, module)?;
+        wasm_native_global_script_compiler::link(linker, module)?;
+        wasm_native_direct_eval_compiler::link(linker, module)?;
+    }
     wasm_gc_intl_host::link(linker, module)?;
     wasm_gc_weak_host::link(linker)?;
     Ok(())

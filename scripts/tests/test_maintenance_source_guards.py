@@ -96,6 +96,8 @@ class MaintenanceSourceGuards(unittest.TestCase):
         invariant = "immutable pool proof checks both actual reconstructed image dimensions and hashes"
         for path, before in [
             (pool.A + "runtime_artifact.rs", "Some(self.build_admission.as_ref()?.matches_pool(utf16,data))"),
+            (pool.A + "data.rs", "pub(crate)constRUNTIME_DATA_SEGMENT_COUNT:usize=8;"),
+            (pool.A + "data.rs", "pub(crate)constRUNTIME_STATIC_SEGMENT_ORDER:[usize;7]=[4,2,5,1,6,3,7];"),
             (pool.A + "runtime_artifact/build_package/metadata.rs", "bytes.len()==expected.span.len()"),
             (pool.A + "runtime_artifact/build_package/metadata.rs", "Sha256::digest(bytes).as_slice()==expected.digest"),
         ]:
@@ -107,8 +109,9 @@ class MaintenanceSourceGuards(unittest.TestCase):
         invariant = "same-sized foreign data or offset cannot certify the canonical R prefix"
         path = pool.A + "data/compiler_owned_pool.rs"
         source = pool.compact((ROOT / path).read_text())
-        for before in ("section.count()!=4", "ifrow.data!=bytes",
-                       "Some(region.end())", "value==addressasi32", "!ops.eof()"):
+        for before in ("section.count()asusize!=RUNTIME_DATA_SEGMENT_COUNT", "ifrow.data!=bytes",
+                       "(&self.0.bytes[year.clone()],None)", "Some(region.end())",
+                       "value==addressasi32", "!ops.eof()"):
             with self.subTest(sparse_admission=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertIn(invariant, pool.check(ROOT, {path: source.replace(before, "true")}))

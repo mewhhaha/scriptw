@@ -27,6 +27,8 @@ mod regexp_unicode_properties;
 use regexp_unicode_properties::RegExpUnicodePropertiesGlobal;
 mod normalization_tables;
 use normalization_tables::NormalizationTablesGlobal;
+mod temporal_east_asian_years;
+use temporal_east_asian_years::TemporalEastAsianYearsGlobal;
 
 mod value;
 pub(crate) use value::*;
@@ -396,6 +398,7 @@ impl RuntimeGcTypes {
     ) -> FinalizedModuleGlobals {
         let regexp_unicode_properties = RegExpUnicodePropertiesGlobal::declare(&mut globals);
         let normalization_tables = NormalizationTablesGlobal::declare(&mut globals);
+        let temporal_east_asian_years = TemporalEastAsianYearsGlobal::declare(&mut globals);
         let pooled_strings = GcRootGlobal::declare(&self.layouts, &mut globals);
         let well_known_symbols = GcRootGlobal::declare(&self.layouts, &mut globals);
         let registered_symbols = GcRootGlobal::declare(&self.layouts, &mut globals);
@@ -433,6 +436,7 @@ impl RuntimeGcTypes {
         let runtime_schema = RuntimeSchema {
             types: self,
             normalization_tables,
+            temporal_east_asian_years,
             regexp_unicode_properties,
             pooled_strings,
             well_known_symbols,
@@ -760,6 +764,7 @@ impl CollectionKeyHashCounterGlobal {
 pub(crate) struct RuntimeSchema {
     types: RuntimeGcTypes,
     normalization_tables: NormalizationTablesGlobal,
+    temporal_east_asian_years: TemporalEastAsianYearsGlobal,
     regexp_unicode_properties: RegExpUnicodePropertiesGlobal,
     pooled_strings: GcRootGlobal<PooledStringTable>,
     well_known_symbols: GcRootGlobal<WellKnownSymbolTable>,

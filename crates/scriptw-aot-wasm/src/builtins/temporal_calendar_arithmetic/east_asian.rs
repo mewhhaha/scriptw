@@ -154,7 +154,6 @@ impl FunctionBuilder<'_> {
             .calendar(model.kind);
         let first = image.first_related_year();
         let count = i64::from(image.year_count());
-        let pointer = image.rows_ptr();
         (input).load(function);
         (model.year).store(function);
         for (bound, comparison) in [
@@ -178,6 +177,11 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64LtS);
         function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
+        let pointer = self.strings.temporal_east_asian_year_image().install_rows(
+            model.kind,
+            self.runtime_schema(),
+            function,
+        );
         let address = self.runtime_schema().reserve_i64_local(function);
         let packed = self.runtime_schema().reserve_i64_local(function);
         let one = self.runtime_schema().reserve_i64_local(function);
@@ -621,7 +625,6 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let image = self.strings.temporal_east_asian_year_image().calendar(kind);
-        let pointer = image.rows_ptr();
         let first = image.first_related_year();
         let count = i64::from(image.year_count());
         let total = image.total_months();
@@ -638,6 +641,11 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64LtS);
         function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
+        let pointer = self.strings.temporal_east_asian_year_image().install_rows(
+            kind,
+            self.runtime_schema(),
+            function,
+        );
         let low = self.runtime_schema().reserve_i64_local(function);
         let high = self.runtime_schema().reserve_i64_local(function);
         let middle = self.runtime_schema().reserve_i64_local(function);

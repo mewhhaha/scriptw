@@ -30,11 +30,11 @@ use scriptw_ir::{
 
 mod temporal_east_asian_years;
 pub(crate) use temporal_east_asian_years::{
-    TemporalEastAsianCalendar, TemporalEastAsianYearImage, TemporalEastAsianYearRowSlot,
-    EAST_ASIAN_LEAP_ORDINAL_SHIFT, EAST_ASIAN_MEAN_LUNAR_MONTH_MILLIS,
-    EAST_ASIAN_MEAN_SOLAR_TERM_MILLIS, EAST_ASIAN_MEAN_YEAR_MILLIS, EAST_ASIAN_MILLIS_PER_DAY,
-    EAST_ASIAN_MONTH_MASK, EAST_ASIAN_NEW_YEAR_OFFSET_SHIFT, EAST_ASIAN_YEAR_ROW_BYTES,
-    TEMPORAL_EAST_ASIAN_YEAR_ENVELOPE,
+    TemporalEastAsianCalendar, TemporalEastAsianYearImage, TemporalEastAsianYearRegion,
+    TemporalEastAsianYearRowSlot, EAST_ASIAN_LEAP_ORDINAL_SHIFT,
+    EAST_ASIAN_MEAN_LUNAR_MONTH_MILLIS, EAST_ASIAN_MEAN_SOLAR_TERM_MILLIS,
+    EAST_ASIAN_MEAN_YEAR_MILLIS, EAST_ASIAN_MILLIS_PER_DAY, EAST_ASIAN_MONTH_MASK,
+    EAST_ASIAN_NEW_YEAR_OFFSET_SHIFT, EAST_ASIAN_YEAR_ROW_BYTES, TEMPORAL_EAST_ASIAN_YEAR_ENVELOPE,
 };
 
 mod regexp_unicode_properties;
@@ -66,12 +66,13 @@ pub(crate) use runtime_error_message::{
 };
 
 /// Passive segment roles are distinct even though P and R both own UTF-16
-/// segment zero. Normalization exists only in R's sealed static image.
+/// segment zero. The other cold images exist only in R's sealed static image.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PassiveDataSegment {
     PooledCodeUnits,
     Normalization,
     RegExpUnicodeProperties,
+    TemporalEastAsianYears,
 }
 impl PassiveDataSegment {
     pub(crate) const fn index(self) -> u32 {
@@ -79,9 +80,14 @@ impl PassiveDataSegment {
             Self::PooledCodeUnits => 0,
             Self::Normalization => 1,
             Self::RegExpUnicodeProperties => 2,
+            Self::TemporalEastAsianYears => 3,
         }
     }
 }
+
+pub(crate) const RUNTIME_DATA_SEGMENT_COUNT: usize = 8;
+/// R's static arena in virtual-address order, excluding its UTF-16 segment.
+pub(crate) const RUNTIME_STATIC_SEGMENT_ORDER: [usize; 7] = [4, 2, 5, 1, 6, 3, 7];
 
 /// The exact virtual address range reserved by the sealed normalization group.
 /// Bytes remain in the canonical arena for address/identity admission but R
@@ -4532,15 +4538,10 @@ impl StringPool {
     }
 
     /// Partial compiler-only test pools keep the same physical segment roles
-    /// with an empty deferred region at the end of their static arena.
+    /// with an empty deferred region before the following calendar image.
     pub(super) fn normalization_image_region(&self) -> NormalizationRegion {
         self.normalization_region.unwrap_or_else(|| {
-            let end = STATIC_DATA_OFFSET
-                .checked_add(
-                    u32::try_from(self.compiler_owned.static_bytes)
-                        .expect("sealed static image fits wasm32"),
-                )
-                .expect("sealed image address fits wasm32");
+            let end = self.temporal_east_asian_year_region().start();
             NormalizationRegion { start: end, end }
         })
     }
@@ -4558,15 +4559,21 @@ impl StringPool {
         let norm = normalization.offsets();
         let properties = self.regexp_unicode_property_region();
         let property = properties.offsets();
-        assert!(property.end <= norm.start && norm.end <= boundary.static_bytes);
+        let years = self.temporal_east_asian_year_region();
+        let year = years.offsets();
+        assert!(property.end <= norm.start && norm.end <= year.start);
+        assert!(year.end <= boundary.static_bytes);
         assert_eq!(section.len(), normalization.segment().index());
         section.passive(self.bytes[norm.clone()].iter().copied());
         assert_eq!(section.len(), properties.segment().index());
         section.passive(self.bytes[property.clone()].iter().copied());
+        assert_eq!(section.len(), years.segment().index());
+        section.passive(self.bytes[year.clone()].iter().copied());
         for (span, address) in [
             (0..property.start, STATIC_DATA_OFFSET),
             (property.end..norm.start, properties.end()),
-            (norm.end..boundary.static_bytes, normalization.end()),
+            (norm.end..year.start, normalization.end()),
+            (year.end..boundary.static_bytes, years.end()),
         ] {
             section.active(
                 0,
@@ -4574,6 +4581,7 @@ impl StringPool {
                 self.bytes[span].iter().copied(),
             );
         }
+        assert_eq!(section.len() as usize, RUNTIME_DATA_SEGMENT_COUNT);
     }
 
     /// The program's passive UTF-16, metadata, descriptor and recipe images.

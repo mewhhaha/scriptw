@@ -232,82 +232,121 @@ fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
 #[test]
 fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_addresses() {
     use wasmparser::{DataKind, Operator, Parser, Payload};
-    let prefix = CompilerOwnedPool::collect(
-        &BTreeMap::new(),
-        &[StandardBuiltinId::StringPrototypeNormalize],
-        false,
-        &IntlDataSelection::new(IntlCompilationProfile::Minimal),
-    )
-    .unwrap();
-    let region = prefix.0.normalization_region.unwrap();
-    let span = region.offsets();
-    assert!(region.length() > 0);
-    let mut data = DataSection::new();
-    prefix.0.append_runtime_data(&mut data);
-    let mut module = Module::new();
-    module.section(&data);
-    let bytes = module.finish();
-    let mut rows = Vec::new();
-    for payload in Parser::new(0).parse_all(&bytes) {
-        if let Payload::DataSection(section) = payload.unwrap() {
-            rows.extend(section.into_iter().map(Result::unwrap));
-        }
-    }
-    assert_eq!(rows.len(), 6);
-    assert!(matches!(
-        &rows[PooledCodeUnits::DATA_SEGMENT.index() as usize].kind,
-        DataKind::Passive
-    ));
-    assert!(matches!(
-        &rows[region.segment().index() as usize].kind,
-        DataKind::Passive
-    ));
-    assert_eq!(
-        rows[region.segment().index() as usize].data,
-        &prefix.0.bytes[span.clone()]
-    );
-    let mut restored = vec![0u8; prefix.0.bytes.len()];
-    let mut active_bytes = 0;
-    for row in &rows {
-        if let DataKind::Active {
-            memory_index: 0,
-            offset_expr,
-        } = &row.kind
-        {
-            let Operator::I32Const { value } = offset_expr.get_operators_reader().read().unwrap()
-            else {
-                panic!("constant address");
+    for temporal in [false, true] {
+        for normalization in [false, true] {
+            let builtins = if normalization {
+                &[StandardBuiltinId::StringPrototypeNormalize][..]
+            } else {
+                &[]
             };
-            let offset = value as usize - STATIC_DATA_OFFSET as usize;
-            let end = offset + row.data.len();
-            assert!(
-                (end <= span.start || offset >= span.end) && {
-                    let property = prefix.0.regexp_unicode_property_region().offsets();
-                    end <= property.start || offset >= property.end
-                },
-                "no active copy may touch the deferred span, including zero placeholders"
+            let prefix = CompilerOwnedPool::collect(
+                &BTreeMap::new(),
+                builtins,
+                temporal,
+                &IntlDataSelection::new(IntlCompilationProfile::Minimal),
+            )
+            .unwrap();
+            let region = prefix.0.normalization_image_region();
+            let span = region.offsets();
+            assert_eq!(region.length() > 0, normalization);
+            let mut data = DataSection::new();
+            prefix.0.append_runtime_data(&mut data);
+            let mut module = Module::new();
+            module.section(&data);
+            let bytes = module.finish();
+            let mut rows = Vec::new();
+            for payload in Parser::new(0).parse_all(&bytes) {
+                if let Payload::DataSection(section) = payload.unwrap() {
+                    rows.extend(section.into_iter().map(Result::unwrap));
+                }
+            }
+            assert_eq!(rows.len(), RUNTIME_DATA_SEGMENT_COUNT);
+            let years = prefix.0.temporal_east_asian_year_region();
+            let year = years.offsets();
+            assert_eq!(year.len(), if temporal { 133_712 } else { 0 });
+            assert!(matches!(
+                rows[years.segment().index() as usize].kind,
+                DataKind::Passive
+            ));
+            assert_eq!(
+                rows[years.segment().index() as usize].data,
+                &prefix.0.bytes[year.clone()]
             );
-            restored[offset..end].copy_from_slice(row.data);
-            active_bytes += row.data.len();
+            assert!(matches!(
+                &rows[PooledCodeUnits::DATA_SEGMENT.index() as usize].kind,
+                DataKind::Passive
+            ));
+            assert!(matches!(
+                &rows[region.segment().index() as usize].kind,
+                DataKind::Passive
+            ));
+            assert_eq!(
+                rows[region.segment().index() as usize].data,
+                &prefix.0.bytes[span.clone()]
+            );
+            let mut restored = vec![0u8; prefix.0.bytes.len()];
+            let mut active_bytes = 0;
+            for row in &rows {
+                if let DataKind::Active {
+                    memory_index: 0,
+                    offset_expr,
+                } = &row.kind
+                {
+                    let Operator::I32Const { value } =
+                        offset_expr.get_operators_reader().read().unwrap()
+                    else {
+                        panic!("constant address");
+                    };
+                    let offset = value as usize - STATIC_DATA_OFFSET as usize;
+                    let end = offset + row.data.len();
+                    assert!(
+                        (end <= year.start || offset >= year.end)
+                            && (end <= span.start || offset >= span.end)
+                            && {
+                                let property = prefix.0.regexp_unicode_property_region().offsets();
+                                end <= property.start || offset >= property.end
+                            },
+                        "no active copy may touch the deferred span, including zero placeholders"
+                    );
+                    restored[offset..end].copy_from_slice(row.data);
+                    active_bytes += row.data.len();
+                }
+            }
+            let properties = prefix.0.regexp_unicode_property_region();
+            let property = properties.offsets();
+            assert!(property.len() > 0);
+            assert!(matches!(
+                rows[properties.segment().index() as usize].kind,
+                DataKind::Passive
+            ));
+            assert_eq!(
+                rows[properties.segment().index() as usize].data,
+                &prefix.0.bytes[property.clone()]
+            );
+            assert_eq!(
+                active_bytes + span.len() + property.len() + year.len(),
+                restored.len()
+            );
+            restored[year.clone()].copy_from_slice(rows[years.segment().index() as usize].data);
+            restored[property.clone()]
+                .copy_from_slice(rows[properties.segment().index() as usize].data);
+            restored[span.clone()].copy_from_slice(rows[region.segment().index() as usize].data);
+            assert_eq!(restored, &prefix.0.bytes[..]);
+            prefix.require_runtime_data(&bytes).unwrap();
+            if temporal {
+                let mut corrupted = bytes.clone();
+                let row = &rows[years.segment().index() as usize];
+                let calendar_byte = row.range.end - row.data.len();
+                corrupted[calendar_byte] ^= 1;
+                assert!(
+                    prefix.require_runtime_data(&corrupted).is_err(),
+                    "calendar bytes must be admitted exactly"
+                );
+            }
+            assert_eq!(
+                initial_memory_pages(prefix.0.bytes.len(), true),
+                (align_heap_start(prefix.0.bytes.len()) + WASM_PAGE_SIZE).div_ceil(WASM_PAGE_SIZE)
+            );
         }
     }
-    let properties = prefix.0.regexp_unicode_property_region();
-    let property = properties.offsets();
-    assert!(property.len() > 0);
-    assert!(matches!(
-        rows[properties.segment().index() as usize].kind,
-        DataKind::Passive
-    ));
-    assert_eq!(
-        rows[properties.segment().index() as usize].data,
-        &prefix.0.bytes[property.clone()]
-    );
-    assert_eq!(active_bytes + span.len() + property.len(), restored.len());
-    restored[property.clone()].copy_from_slice(rows[properties.segment().index() as usize].data);
-    restored[span.clone()].copy_from_slice(rows[region.segment().index() as usize].data);
-    assert_eq!(restored, &prefix.0.bytes[..]);
-    assert_eq!(
-        initial_memory_pages(prefix.0.bytes.len(), true),
-        (align_heap_start(prefix.0.bytes.len()) + WASM_PAGE_SIZE).div_ceil(WASM_PAGE_SIZE)
-    );
 }

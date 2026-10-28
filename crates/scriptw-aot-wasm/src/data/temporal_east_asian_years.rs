@@ -1,9 +1,9 @@
 //! Checked Chinese/Dangi years, validated once while building the compiler.
 //!
 //! Each worker copies the immutable retained rows instead of reconstructing
-//! 16,714 provider years. Emitted helpers and their Wasm data are unchanged.
+//! 16,714 provider years. R installs their rows only on the first retained read.
 
-use super::{EmitError, PoolBytes, StringPool, STATIC_DATA_OFFSET};
+use super::{EmitError, PassiveDataSegment, PoolBytes, StringPool, STATIC_DATA_OFFSET};
 #[cfg(test)]
 mod construction;
 mod format;
@@ -27,6 +27,32 @@ fn image_range() -> EmitError {
     EmitError::unsupported("Temporal Chinese/Dangi image exceeds Wasm memory32")
 }
 
+/// The exact reserved linear range of both immutable retained-year tables.
+/// Only the sealed image builder creates nonempty bounds.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TemporalEastAsianYearRegion {
+    start: u32,
+    end: u32,
+}
+
+impl TemporalEastAsianYearRegion {
+    pub(crate) const fn start(self) -> u32 {
+        self.start
+    }
+    pub(crate) const fn end(self) -> u32 {
+        self.end
+    }
+    pub(crate) const fn length(self) -> u32 {
+        self.end - self.start
+    }
+    pub(crate) const fn segment(self) -> PassiveDataSegment {
+        PassiveDataSegment::TemporalEastAsianYears
+    }
+    pub(super) fn offsets(self) -> std::ops::Range<usize> {
+        (self.start - STATIC_DATA_OFFSET) as usize..(self.end - STATIC_DATA_OFFSET) as usize
+    }
+}
+
 /// Checked addresses and native header values of one retained-year image.
 #[derive(Debug)]
 pub(crate) struct TemporalEastAsianCalendarImage {
@@ -35,9 +61,6 @@ pub(crate) struct TemporalEastAsianCalendarImage {
 }
 
 impl TemporalEastAsianCalendarImage {
-    pub(crate) const fn rows_ptr(&self) -> u32 {
-        self.rows_ptr
-    }
     pub(crate) const fn first_related_year(&self) -> i64 {
         FIRST_RELATED_YEAR as i64
     }
@@ -89,9 +112,22 @@ impl TemporalEastAsianCalendarImage {
 pub(crate) struct TemporalEastAsianYearImage {
     chinese: TemporalEastAsianCalendarImage,
     dangi: TemporalEastAsianCalendarImage,
+    region: TemporalEastAsianYearRegion,
 }
 
 impl TemporalEastAsianYearImage {
+    /// The sole executable row-address accessor emits the instance-local
+    /// readiness guard before making a row pointer available to its caller.
+    pub(crate) fn install_rows(
+        &self,
+        calendar: TemporalEastAsianCalendar,
+        schema: &crate::gc_types::RuntimeSchema,
+        function: &mut crate::Function,
+    ) -> u32 {
+        schema.ensure_temporal_east_asian_years(self.region, function);
+        self.calendar(calendar).rows_ptr
+    }
+
     pub(crate) fn calendar(
         &self,
         calendar: TemporalEastAsianCalendar,
@@ -121,19 +157,43 @@ impl TemporalEastAsianYearImage {
         let (chinese, dangi) = EMBEDDED_IMAGE
             .split_first_chunk::<CALENDAR_IMAGE_BYTES>()
             .expect("build-time image contains two complete calendars");
+        let chinese = TemporalEastAsianCalendarImage::append(bytes, chinese)?;
+        let dangi = TemporalEastAsianCalendarImage::append(
+            bytes,
+            dangi
+                .try_into()
+                .expect("build-time image contains one complete Dangi calendar"),
+        )?;
         Ok(Self {
-            chinese: TemporalEastAsianCalendarImage::append(bytes, chinese)?,
-            dangi: TemporalEastAsianCalendarImage::append(
-                bytes,
-                dangi
-                    .try_into()
-                    .expect("build-time image contains one complete Dangi calendar"),
-            )?,
+            region: TemporalEastAsianYearRegion {
+                start: chinese.rows_ptr,
+                end: STATIC_DATA_OFFSET + u32::try_from(end).map_err(|_| image_range())?,
+            },
+            chinese,
+            dangi,
         })
     }
 }
 
 impl StringPool {
+    pub(super) fn temporal_east_asian_year_region(&self) -> TemporalEastAsianYearRegion {
+        if let Some(image) = self.temporal_east_asian_year_image.as_ref().or_else(|| {
+            self.runtime_prefix()
+                .and_then(|prefix| prefix.temporal_east_asian_year_image.as_ref())
+        }) {
+            image.region
+        } else {
+            // Partial compiler test pools preserve all physical segment slots.
+            let end = STATIC_DATA_OFFSET
+                .checked_add(
+                    u32::try_from(self.compiler_owned.static_bytes)
+                        .expect("sealed image fits wasm32"),
+                )
+                .expect("sealed image address fits wasm32");
+            TemporalEastAsianYearRegion { start: end, end }
+        }
+    }
+
     pub(super) fn append_temporal_east_asian_year_image(&mut self) -> Result<(), EmitError> {
         self.temporal_east_asian_year_image =
             Some(TemporalEastAsianYearImage::append_to(&mut self.bytes)?);
@@ -185,7 +245,7 @@ mod tests {
                 let offset = start + ordinal * rows;
                 let reference_start = ordinal * CALENDAR_IMAGE_BYTES;
                 assert_eq!(
-                    calendar.rows_ptr() as usize,
+                    calendar.rows_ptr as usize,
                     STATIC_DATA_OFFSET as usize + offset
                 );
                 assert_eq!(

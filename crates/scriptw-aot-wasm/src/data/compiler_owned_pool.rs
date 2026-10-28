@@ -43,7 +43,7 @@ impl CompilerOwnedPool {
         let mut found = false;
         for payload in Parser::new(0).parse_all(bytes) {
             if let Payload::DataSection(section) = payload.map_err(|_| error())? {
-                if found || section.count() != 6 {
+                if found || section.count() as usize != RUNTIME_DATA_SEGMENT_COUNT {
                     return Err(error());
                 }
                 found = true;
@@ -51,16 +51,20 @@ impl CompilerOwnedPool {
                 let span = region.offsets();
                 let properties = self.0.regexp_unicode_property_region();
                 let property = properties.offsets();
+                let years = self.0.temporal_east_asian_year_region();
+                let year = years.offsets();
                 let expected = [
                     (&self.0.pooled_code_unit_bytes[..], None),
                     (&self.0.bytes[span.clone()], None),
                     (&self.0.bytes[property.clone()], None),
+                    (&self.0.bytes[year.clone()], None),
                     (&self.0.bytes[..property.start], Some(STATIC_DATA_OFFSET)),
                     (
                         &self.0.bytes[property.end..span.start],
                         Some(properties.end()),
                     ),
-                    (&self.0.bytes[span.end..], Some(region.end())),
+                    (&self.0.bytes[span.end..year.start], Some(region.end())),
+                    (&self.0.bytes[year.end..], Some(years.end())),
                 ];
                 for (row, (bytes, address)) in section.into_iter().zip(expected) {
                     let row = row.map_err(|_| error())?;

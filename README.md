@@ -74,6 +74,12 @@ The [verified section checkpoint](docs/rust-rewrite/memory-module-sections-20261
 identifies eager calendar data and GC stack maps as further targets. These
 unscored observations do not change the matched comparison below.
 
+The [deferred calendar-row change](docs/rust-rewrite/contracts/cold-calendar-rows.md)
+removes 133,712 bytes from eager runtime data initialization. Verification and
+matched RSS measurement are pending.
+The same batch [prefilters absent native-source imports](docs/rust-rewrite/contracts/native-source-import-prefilter.md)
+before entering their binding routines; its RSS effect is also unmeasured.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)

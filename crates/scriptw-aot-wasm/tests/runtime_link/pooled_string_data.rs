@@ -194,6 +194,136 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
 }
 
 #[test]
+fn calendar_rows_have_a_separate_lazy_passive_initializer() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            use std::collections::{BTreeMap, BTreeSet};
+            let source = parse(
+                "Temporal.PlainDate.from({calendar:'chinese',year:2000,monthCode:'M01',day:1});",
+                ParseOptions::script(),
+            )
+            .unwrap();
+            let artifact = scriptw_aot_wasm::emit(&lower(&source)).unwrap();
+            let bytes = artifact.runtime().expect("calendar fixture links actual R").bytes();
+            Validator::new_with_features(WasmFeatures::all())
+                .validate_all(bytes)
+                .expect("four passive runtime images validate");
+            let mut segments = Vec::new();
+            let mut globals = Vec::new();
+            let mut imported_globals = 0u32;
+            let mut readiness = BTreeMap::<u32, BTreeSet<u32>>::new();
+            let mut calendar_spans = BTreeSet::new();
+            let mut calendar_sites = 0;
+            for payload in Parser::new(0).parse_all(bytes) {
+                match payload.unwrap() {
+                    Payload::ImportSection(reader) => {
+                        for import in reader.into_imports() {
+                            if matches!(import.unwrap().ty, TypeRef::Global(_)) {
+                                imported_globals += 1;
+                            }
+                        }
+                    }
+                    Payload::GlobalSection(reader) => {
+                        for global in reader {
+                            let global = global.unwrap();
+                            globals.push((
+                                global.ty,
+                                global.init_expr.get_operators_reader().into_iter()
+                                    .map(Result::unwrap).collect::<Vec<_>>(),
+                            ));
+                        }
+                    }
+                    Payload::DataSection(reader) => {
+                        for segment in reader {
+                            let segment = segment.unwrap();
+                            let address = match segment.kind {
+                                DataKind::Passive => None,
+                                DataKind::Active { memory_index:0, offset_expr } => {
+                                    let mut ops = offset_expr.get_operators_reader();
+                                    let Operator::I32Const { value } = ops.read().unwrap() else {
+                                        panic!("static fragment has a canonical constant address")
+                                    };
+                                    assert!(matches!(ops.read().unwrap(), Operator::End));
+                                    assert!(ops.eof());
+                                    Some(value as u32)
+                                }
+                                DataKind::Active { .. } => panic!("runtime static data uses its sole memory"),
+                            };
+                            segments.push((address, segment.data.len()));
+                        }
+                    }
+                    Payload::CodeSectionEntry(body) => {
+                        let ops = body.get_operators_reader().unwrap().into_iter()
+                            .map(Result::unwrap).collect::<Vec<_>>();
+                        for (index, op) in ops.iter().enumerate() {
+                            assert!(!matches!(op, Operator::DataDrop { data_index:3 }),
+                                "fresh R instances and late first reads retain the calendar segment");
+                            let Operator::MemoryInit { data_index, mem:0 } = op else { continue };
+                            if !(1..=3).contains(data_index) { continue; }
+                            assert!(index >= 6 && index + 2 < ops.len());
+                            let Operator::GlobalGet { global_index } = ops[index-6] else {
+                                panic!("each image copy has its own instance-local readiness guard")
+                            };
+                            assert!(matches!(ops[index-5], Operator::I32Eqz));
+                            assert!(matches!(ops[index-4], Operator::If { .. }));
+                            assert!(matches!(ops[index+1], Operator::I32Const { value:1 }));
+                            assert!(matches!(ops[index+2], Operator::GlobalSet { global_index:written } if written == global_index),
+                                "readiness is published only after the complete memory.init");
+                            readiness.entry(*data_index).or_default().insert(global_index);
+                            if *data_index == 3 {
+                                calendar_sites += 1;
+                                assert!(index >= 8 && matches!(ops[index-7], Operator::If { .. })
+                                    && matches!(ops[index-8], Operator::I32And),
+                                    "calendar copy stays inside the retained year/serial bounds branch");
+                                let Operator::I32Const { value:start } = ops[index-3] else { panic!("fixed calendar address") };
+                                assert!(matches!(ops[index-2], Operator::I32Const { value:0 }));
+                                let Operator::I32Const { value:length } = ops[index-1] else { panic!("fixed complete image length") };
+                                assert_eq!(length, 133_712, "both exact 8357-row calendar images are copied together");
+                                calendar_spans.insert((start as u32, length as u32));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            assert_eq!(segments.len(), 8, "four passive images and four unchanged-address active fragments");
+            assert!(segments[..4].iter().all(|(address,_)|address.is_none()));
+            assert!(segments[4..].iter().all(|(address,_)|address.is_some()));
+            assert_eq!(segments[3].1, 133_712);
+            assert!(calendar_sites >= 4, "both calendar helpers and retained serial consumers have physical guarded readers");
+            assert_eq!(calendar_spans.len(), 1, "all readers install the same complete family range");
+            let (start, length) = calendar_spans.into_iter().next().unwrap();
+            let end = start.checked_add(length).unwrap();
+            for (address, bytes) in &segments[4..] {
+                let address = address.unwrap();
+                assert!(address + *bytes as u32 <= start || address >= end,
+                    "ordinary instantiation leaves the calendar range cold instead of copying active calendar bytes");
+            }
+            assert_eq!(readiness.len(), 3, "normalization, properties and calendars retain separate roles");
+            let bits = readiness.values().map(|bits| {
+                assert_eq!(bits.len(), 1, "each family has exactly one readiness bit");
+                *bits.iter().next().unwrap()
+            }).collect::<BTreeSet<_>>();
+            assert_eq!(bits.len(), 3, "one family's first use cannot mark another family ready");
+            for bit in bits {
+                let (ty, init) = &globals[(bit-imported_globals) as usize];
+                assert!(ty.mutable && !ty.shared && ty.content_type == wasmparser::ValType::I32);
+                assert!(matches!(init.as_slice(), [Operator::I32Const { value:0 }, Operator::End]),
+                    "every actual R instance begins with its own cold readiness bit");
+            }
+            let initialize = named_function_body(bytes, "helper::pooled_strings_initialize");
+            let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&initialize,0));
+            assert!(!body.get_operators_reader().unwrap().into_iter().any(|op|
+                matches!(op.unwrap(), Operator::MemoryInit { data_index:3, .. })),
+                "bootstrap cannot eagerly install calendar rows");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
 fn literal_count_grows_descriptor_data_without_expanding_main_initialization() {
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)
