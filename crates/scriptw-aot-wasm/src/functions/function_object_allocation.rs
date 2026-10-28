@@ -1,6 +1,7 @@
 //! Completed defining captures are installed before a callable is published.
 
 use super::*;
+use crate::gc_types::ExecutableCodeKind;
 use crate::gc_types::{
     BuiltinClosureCapture, Environment, ExecutableCode, FunctionContext, FunctionContextSchema,
     FunctionObject, FunctionProgramOwner, GcLocal, GcOperand, GcStackReference, NonNullable,
