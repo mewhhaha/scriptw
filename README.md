@@ -90,6 +90,8 @@ The following [compact-storage experiment](docs/rust-rewrite/contracts/inline-co
 stores one- and two-key records in one GC allocation and shares their store kernel.
 Its layout calculation removes 384 KiB and 16,384 allocations from the retained
 record workload. Native correctness and process RSS effects remain unverified.
+Subsequent matched benchmark runs pin Rust to 1.99.1; runner differences still
+prevent causal conclusions from comparisons across hosts.
 
 ## Precompiled comparison
 

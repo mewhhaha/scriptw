@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # GitHub-hosted Ubuntu has a system manager but need not have a user manager.
 set -euo pipefail
+scriptw_benchmark_toolchain_env=()
+if [[ -n "${RUSTUP_TOOLCHAIN:-}" ]]; then
+  scriptw_benchmark_toolchain_env=("RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN")
+fi
 exec sudo systemd-run --quiet --wait --pipe --collect \
   --unit="scriptw-benchmark-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${RANDOM}" \
   --property=MemoryMax=4G --property=MemorySwapMax=0 --property=OOMPolicy=kill \
@@ -10,4 +14,5 @@ exec sudo systemd-run --quiet --wait --pipe --collect \
   "CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}" "RUSTUP_HOME=${RUSTUP_HOME:-$HOME/.rustup}" \
   "SCRIPTC_RUNTIME_PACK=${SCRIPTC_RUNTIME_PACK:-}" \
   "BENCHMARK_RUN_URL=${BENCHMARK_RUN_URL:-}" \
+  "${scriptw_benchmark_toolchain_env[@]}" \
   python3 -B scripts/limited_verification.py --in-scope -- "$@"

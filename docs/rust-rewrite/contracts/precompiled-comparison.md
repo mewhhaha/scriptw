@@ -19,7 +19,11 @@ Run the read-only measurement workflow after the benchmark source is committed:
 gh workflow run precompiled-benchmarks.yaml --ref main
 ```
 
-The workflow pins Scriptc and its WASI runtime pack to 0.4.5 and Zig to 0.16.0.
+The workflow pins Rust to 1.99.1, Scriptc and its WASI runtime pack to 0.4.5,
+and Zig to 0.16.0. The scoped build process preserves the explicit Rust toolchain;
+the workspace's default toolchain is unchanged. Historical runs before this pin
+used the then-current stable Rust. Kernel and runner differences remain recorded,
+so the pin alone does not make cross-runner changes causal.
 Scriptc receives the original input with only the existing print adapter.
 Sources, expected outputs and all 17 workloads are unchanged. Builds and
 measurements use one CPU, a 4-GiB process-tree cap, no swap and grouped OOM.
