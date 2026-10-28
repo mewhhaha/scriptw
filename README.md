@@ -81,6 +81,11 @@ before entering their binding routines. Source-bound verification and matched
 observations are recorded in the [checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md).
 No overall causal RSS saving is established.
 
+The next [bootstrap fold batch](docs/rust-rewrite/contracts/native-bootstrap-metadata-folds.md)
+omits proven-empty native metadata publication and routes fifteen Intl getters
+through the checked shared accessor allocator. Verification and matched
+measurements are pending.
+
 ## Precompiled comparison
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
