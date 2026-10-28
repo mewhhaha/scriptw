@@ -299,6 +299,7 @@ fn runtime_cache_reconstructs_calendar_rows_between_exact_active_fragments() {
         .find_map(|payload| match payload.unwrap() {
             Payload::DataSection(reader) => Some(
                 reader
+                    .into_iter()
                     .map(|row| row.unwrap().data.to_vec())
                     .collect::<Vec<_>>(),
             ),
