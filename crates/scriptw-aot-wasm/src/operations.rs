@@ -389,6 +389,9 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         validate_spec_operation_operands(operation, operands.len())?;
+        if self.try_compile_concat_length_get_v(operation, operands, output, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let mut inputs = Vec::with_capacity(operands.len());
         for operand in operands {
@@ -583,6 +586,19 @@ impl<'a> FunctionBuilder<'a> {
                 let key_value = schema.reserve_value_local(function);
                 let key_result = schema.reserve_completion(function);
                 let property_exit = self.open_frame(ControlFrameKind::Block, function);
+                if operation == SpecOperationIr::GetV {
+                    let found = self.emit_get_v_primitive_string_length(
+                        &operands[1],
+                        &inputs[0],
+                        &pending,
+                        function,
+                    );
+                    if let Some(found) = found {
+                        found.load(function);
+                        schema.release_i32_local(found, function);
+                        self.emit_branch_if_to_target(property_exit, function);
+                    }
+                }
                 match operation {
                     SpecOperationIr::GetV | SpecOperationIr::GetMethod => {
                         self.emit_value_to_object_locals(&inputs[0], &pending, function)?;

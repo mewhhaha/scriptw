@@ -19,6 +19,7 @@ mod aot_compact_native_metadata;
 mod aot_compound_addition_flow;
 mod aot_compound_assignment_saved_value;
 mod aot_computed_numeric_method_calls;
+mod aot_constant_leaf_calls;
 mod aot_constant_number_condition;
 mod aot_constructor_throw_domain;
 mod aot_control_flow;

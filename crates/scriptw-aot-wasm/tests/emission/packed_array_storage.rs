@@ -198,6 +198,7 @@ fn real_push_and_join_builtins_reach_guarded_canonical_packed_kernels() {
             let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
             let (own_descriptor, _) = runtime.named("helper::ordinary_own_descriptor");
             let (ordinary_set, _) = runtime.named("helper::ordinary_set");
+            let (object_write, object_write_body) = runtime.named("helper::object_write");
             let (_, push) = runtime.named("builtin::Array.prototype.push");
             let publication = push
                 .iter()
@@ -214,25 +215,36 @@ fn real_push_and_join_builtins_reach_guarded_canonical_packed_kernels() {
             }
             assert!(calls(&push[..publication], own_descriptor),
                 "live ordinary prototype descriptors are checked before publication");
-            assert!(calls(&push[publication..], ordinary_set),
-                "the actual builtin retains strict ordinary Set for declined cases and zero arguments");
+            // emit_object_write_strict enters ObjectWrite with its strict flag;
+            // ObjectWrite owns rejection around the canonical [[Set]] result.
+            // Follow both real encoded edges instead of assuming push calls
+            // the lower OrdinarySet owner directly.
+            assert_eq!(push[publication..].iter().filter(|op| matches!(op,
+                Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                    if *function_index == object_write)).count(), 2,
+                "declined push retains indexed Set and the final length Set, including zero arguments");
+            assert!(calls(object_write_body, ordinary_set),
+                "the rejection owner reaches the canonical ordinary Set dispatcher");
             assert!(push[publication..].iter().any(|op| matches!(op,
                 Operator::StructSet { struct_type_index, field_index }
                     if *struct_type_index == array && *field_index == scriptw_aot_wasm::GcSnapshotField::ArrayLength.index())),
                 "successful packed append publishes the canonical receiver length");
             let (_, join) = runtime.named("builtin::Array.prototype.join");
-            let first_value_read = join.iter().position(|op| matches!(op,
+            let (packed_join, kernel) = runtime.named("helper::array_packed_join");
+            assert!(calls(join, packed_join),
+                "actual builtin join calls the sole shared String-producing kernel");
+            let first_value_read = kernel.iter().position(|op| matches!(op,
                 Operator::ArrayGet { array_type_index } if *array_type_index == values))
-                .expect("actual join builtin validates packed immutable value slots");
-            let exact_allocation = join.iter().position(|op| matches!(op,
+                .expect("shared join kernel validates packed immutable value slots");
+            let exact_allocation = kernel.iter().position(|op| matches!(op,
                 Operator::ArrayNew { array_type_index } if *array_type_index == units))
-                .expect("actual join builtin allocates a result backing");
+                .expect("shared join kernel allocates a result backing");
             assert!(first_value_read < exact_allocation,
                 "packed value validation precedes the first result allocation");
-            assert!(join[exact_allocation..].iter().any(|op| matches!(op,
+            assert!(kernel[exact_allocation..].iter().any(|op| matches!(op,
                 Operator::ArrayGet { array_type_index } if *array_type_index == values)),
                 "the exact-size result consumes the validated packed backing");
-            assert!(join[exact_allocation..].iter().any(|op| matches!(op,
+            assert!(kernel[exact_allocation..].iter().any(|op| matches!(op,
                 Operator::ArrayCopy { array_type_index_dst, array_type_index_src }
                     if *array_type_index_dst == units && *array_type_index_src == units)),
                 "join copies exact UTF16 units through the private String construction owner");
@@ -240,6 +252,59 @@ fn real_push_and_join_builtins_reach_guarded_canonical_packed_kernels() {
         .unwrap()
         .join()
         .unwrap();
+}
+
+#[test]
+fn source_join_calls_reach_shared_kernel_only_after_actual_code_realm_and_array_guards() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let lowered = lower(&parse(
+                "function joinOne(){var a=['x',null,'y'];var text=a.join(':');return text;} \
+                 function joinZero(){var a=['x'];var text=a.join();return text;} \
+                 function joinExtra(){var a=['x'];var text=a.join(':',undefined);return text;} \
+                 [joinOne,joinZero,joinExtra];",
+                ParseOptions::script(),
+            ).unwrap());
+            let artifact = emit_with_rooted_snapshot(&lowered, PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal).unwrap();
+            let runtime_bytes = artifact.runtime().unwrap().bytes();
+            for bytes in [&artifact.bytes[..], runtime_bytes] {
+                Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+            }
+            let runtime = Module::read(runtime_bytes);
+            let program = Module::read(&artifact.bytes);
+            let (kernel, _) = runtime.named("helper::array_packed_join");
+            let kernel = program.imported_runtime(&runtime, kernel);
+            let (call, _) = runtime.named("helper::proxy_call");
+            let call = program.imported_runtime(&runtime, call);
+            let array = runtime.witness_type(GcSnapshotLayout::Array);
+            let code = runtime.witness_type(GcSnapshotLayout::Code);
+            let context = runtime.witness_type(GcSnapshotLayout::Context);
+            for name in ["js::joinOne#", "js::joinZero#"] {
+                let (_, body) = program.named(name);
+                let direct = body.iter().position(|op| matches!(op,
+                    Operator::Call { function_index } if *function_index == kernel))
+                    .expect("ordinary source join reaches the shared packed kernel");
+                assert!(body[..direct].iter().any(|op| matches!(op,
+                    Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                        if *index == array)), "actual concrete Array guard precedes kernel call");
+                assert!(body[..direct].iter().filter(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, .. } if *struct_type_index == code)).count() >= 2,
+                    "actual immutable code kind and native builtin identity precede kernel call");
+                assert!(body[..direct].iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == context && *field_index == scriptw_aot_wasm::GcSnapshotField::ContextRealm.index())),
+                    "actual defining Realm is read before the direct kernel route");
+                assert!(body[..direct].iter().any(|op| matches!(op, Operator::RefEq)),
+                    "actual defining Realm identity is compared before the direct route");
+                assert!(calls(&body[direct..], call),
+                    "unhandled kernel/identity checks retain the saved-operand ordinary call");
+            }
+            let (_, extra) = program.named("js::joinExtra#");
+            assert!(!calls(extra, kernel), "extra arguments decline before direct-call argument evaluation");
+            assert!(calls(extra, call), "extra arguments retain ordinary invocation");
+        }).unwrap().join().unwrap();
 }
 
 #[test]

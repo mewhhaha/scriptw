@@ -407,7 +407,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
             let words: [u32; 4] = std::array::from_fn(|i| {
                 u32::from_le_bytes(row[i * 4..i * 4 + 4].try_into().unwrap())
             });
-            let builtin = *StandardBuiltinId::ALL
+            let builtin = *StandardBuiltinId::all_functions()
                 .iter()
                 .find(|id| **id as u32 == words[0])
                 .expect("encoded rows retain an actual StandardBuiltinId");

@@ -39,6 +39,7 @@ impl MethodPlan {
             && !meta.needs_active_function_identity
             && meta.class_instance_element_plan.is_none()
             && meta.template_source.is_none()
+            && meta.constant_leaf.is_none()
             && meta.numeric_leaf.is_none()
             && meta.async_generator_resume_environment_plan.is_none();
         if !valid {

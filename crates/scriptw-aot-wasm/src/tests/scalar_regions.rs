@@ -216,9 +216,11 @@ fn numeric_loop_admission_uses_operations_and_binding_identity() {
             "function varied(total, stop) { \"use strict\"; for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; if(step) break; } return total; } varied(1,7);",
             false,
         ),
+        // Uncaptured `let` heads need no materialized per-iteration cells.
+        // Admission follows actual local storage and IR environment ownership.
         (
             "function varied(total, stop) { \"use strict\"; for(let step=0;(step+0)<stop;step++) total+=step*2+0.5; return total; } varied(1,7);",
-            false,
+            true,
         ),
         (
             "function varied() { const total=0; for(var step=0;(step+0)<3;step++) total+=step*2+0.5; } varied();",

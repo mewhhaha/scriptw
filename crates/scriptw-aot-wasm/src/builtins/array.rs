@@ -3929,21 +3929,6 @@ impl FunctionBuilder<'_> {
         }
         let joined = self.open_frame(ControlFrameKind::Block, f);
         if matches!(operation, ArrayStringOperation::Join) {
-            // The captured zero length needs no indexed reads even if separator
-            // conversion changed the receiver. Conversion has already finished.
-            length.load(f);
-            f.instruction(&Instruction::I64Eqz);
-            self.open_frame(ControlFrameKind::If, f);
-            let empty = s
-                .reserve_gc_local(f)
-                .initialize(self.emit_interned_string_reference("", f)?, f);
-            result.set_reference(&empty, s, f);
-            empty.clear(f);
-            self.emit_branch_to_target(joined, f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
-        if matches!(operation, ArrayStringOperation::Join) {
             match &receiver_kind {
                 ToLocaleStringReceiverKind::ArrayLike => {
                     let handled =

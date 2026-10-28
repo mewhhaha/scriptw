@@ -11,6 +11,7 @@ use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone)]
 pub(crate) struct WasmFunctionMeta {
+    pub(crate) constant_leaf: Option<crate::functions::ConstantLeafPlan>,
     pub(crate) numeric_leaf: Option<crate::functions::NumericLeafPlan>,
     pub(crate) async_generator_resume_environment_plan:
         Option<scriptw_ir::AsyncGeneratorResumeEnvironmentPlanIr>,
@@ -5747,6 +5748,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             function.id.clone(),
             WasmFunctionMeta {
+                constant_leaf: crate::functions::ConstantLeafPlan::for_function(function),
                 numeric_leaf: crate::functions::NumericLeafPlan::for_function(function),
                 async_generator_resume_environment_plan: function
                     .resumable_plan
@@ -5783,6 +5785,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             unit.id.function_id(),
             WasmFunctionMeta {
+                constant_leaf: None,
                 numeric_leaf: None,
                 // Prepared Script thunks receive a lexical environment directly;
                 // their entry creates its own source instance.
@@ -5815,6 +5818,7 @@ pub(crate) fn build_function_metas<'a>(
     }
 
     let standard_builtin_meta = |builtin: StandardBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,
         template_source: None,
@@ -5845,6 +5849,7 @@ pub(crate) fn build_function_metas<'a>(
         needs_active_function_identity: false,
     };
     let host_builtin_meta = |builtin: HostBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,
         template_source: None,

@@ -408,6 +408,11 @@ fn abi32_package_is_replaced_before_intrinsic_installation_rows_are_admitted() {
     assert_previous_build_package_replaced(32);
 }
 
+#[test]
+fn abi33_package_is_replaced_before_shared_packed_join_is_admitted() {
+    assert_previous_build_package_replaced(33);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

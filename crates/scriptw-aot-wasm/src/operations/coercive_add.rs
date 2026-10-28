@@ -26,12 +26,31 @@ impl FunctionBuilder<'_> {
         // Both GetValue operations complete before the first ToPrimitive call.
         self.compile_expr_to_value(lhs, &left, function)?;
         self.compile_expr_to_value(rhs, &right, function)?;
+        self.emit_coercive_add_completion_from_values(&left, &right, &result, function)?;
+        right.clear(function);
+        left.clear(function);
+        self.finish_coercive_add_completion(&result, function)?;
+        output.copy_from(result.value(), function);
+        result.clear(function);
+        Ok(())
+    }
+
+    /// Borrow once-evaluated rooted operands. The caller releases its roots
+    /// before routing abrupt completion; ToPrimitive/ToString stay in R's
+    /// existing addition owner and cannot be duplicated by a consumer.
+    pub(crate) fn emit_coercive_add_completion_from_values(
+        &mut self,
+        left: &ValueLocals,
+        right: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let realm = self.emit_execution_realm(function);
-        schema
+        self.runtime_schema()
             .call_helper(
                 CoerciveAddArguments::new(
-                    &left,
-                    &right,
+                    left,
+                    right,
                     &realm,
                     self.current_environment(),
                     self.current_program(),
@@ -39,18 +58,17 @@ impl FunctionBuilder<'_> {
                 self.runtime_helper_base()?,
                 function,
             )
-            .store(&result, function);
+            .store(result, function);
         realm.clear(function);
-        right.clear(function);
-        left.clear(function);
-        self.finish_to_primitive_operation(
-            ToPrimitiveAbruptRoute::ActiveHandler,
-            &result,
-            function,
-        )?;
-        output.copy_from(result.value(), function);
-        result.clear(function);
         Ok(())
+    }
+
+    pub(crate) fn finish_coercive_add_completion(
+        &mut self,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.finish_to_primitive_operation(ToPrimitiveAbruptRoute::ActiveHandler, result, function)
     }
 
     pub(crate) fn compile_coercive_add_helper(&mut self) -> Result<Function, EmitError> {

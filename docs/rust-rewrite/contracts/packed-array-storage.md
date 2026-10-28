@@ -81,6 +81,14 @@ and other unsupported states use the ordered generic path. Array, backing,
 separator and construction roots survive allocation; no user code runs between
 validation and copying.
 
+The builtin and guarded direct calls share the typed `ArrayPackedJoin` R helper.
+Layout 34 admits its export and helper indices; earlier packages are replaced.
+Direct calls require the actual native join code, matching defining Realm, a
+concrete Array and at most one primitive String/undefined separator. Callee,
+receiver and arguments evaluate once before admission. A nullable result marks
+an unsupported packed snapshot; fallback invokes the saved ordinary callable
+and operands. The helper creates the real String and performs no source callback.
+
 The opt-in host graph snapshot reads raw bits and bitmap words directly, with
 a typed mode decoder and declaration-derived field/layout witnesses. It checks
 inactive backings are empty, capacity/bitmap bounds, unused high presence bits,

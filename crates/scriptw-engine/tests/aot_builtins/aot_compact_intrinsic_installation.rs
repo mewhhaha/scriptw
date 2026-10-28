@@ -101,7 +101,7 @@ check(keys[keys.length - 2] === 'acos' && keys[keys.length - 1] === Symbol.toStr
 check(Object.getOwnPropertyDescriptor(Math, 'acos').enumerable, 'reinsert descriptor');
 var trim = String.prototype.trimLeft;
 Object.defineProperty(String.prototype, 'trimStart', { value: marker, writable: false });
-check(String.prototype.trimLeft === trim && trim.call(' x ') === 'x' &&
+check(String.prototype.trimLeft === trim && trim.call(' x ') === 'x ' &&
   String.prototype.trimStart === marker, 'alias recipe identity and independent descriptors');
 check(Object.getOwnPropertyDescriptor(String.prototype, 'trimLeft').writable,
   'alias descriptor attributes remain independent');

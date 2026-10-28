@@ -35,6 +35,13 @@ fallback dispatch consumes those same values. The admitted expression allocates
 neither StoredValue argument boxes nor argv and has no calls, coercion effects,
 captures or activation/Realm observers. Other calls retain the ordinary ABI.
 
+`ConstantLeafPlan` separately validates a whole zero-formal ordinary function
+whose sole return is an immutable String, Number, Boolean, null or undefined
+literal. Only zero-argument calls qualify. Actual JavaScript code, defining P
+and source-depth guards precede substitution; replacement, bound, proxy and
+foreign-P callees use the saved ordinary call. Strings use the existing P/R
+literal owner. Callable identity, reflection and construction remain available.
+
 Pinned Wasmtime47 provides a separate native compiler inlining switch.
 `Config::compiler_inlining` and the pinned tunable defaults select `No` unless
 explicitly configured. Cranelift Speed alone does not enable it. The opt-in

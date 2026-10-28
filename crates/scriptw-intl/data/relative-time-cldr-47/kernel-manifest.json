@@ -11,9 +11,9 @@
       "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
     },
     {
-      "bytes": 82950,
+      "bytes": 83431,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "60c309a7059a6acb4daa300b9a8654b50b00dbf44c5073fcf769bd986bc5400b"
+      "sha256": "595a63f4190013090114316c4a559729a14a17f898479a076fac53a14f77be8b"
     },
     {
       "bytes": 33961,
@@ -764,7 +764,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "5a07e12e235e328cabb81c90547c5824e76b3c1f3ed9205ad01b0374ec6a8802",
+  "provider_data_sha256": "f63080963430dd2db85467412cbcf2096773910666afb4838870122ca658abeb",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "RelativeTimeFormat",

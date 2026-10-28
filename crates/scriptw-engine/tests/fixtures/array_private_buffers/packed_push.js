@@ -80,7 +80,7 @@ rejects(function() { overflow.push('last-index', 'named'); }, RangeError);
 check(overflow.length === 4294967295 && overflow[4294967294] === 'last-index' &&
   overflow[4294967295] === 'named', 'uint32 overflow retains both preceding writes');
 
-const other = $262.createRealm().global;
+const other = __scriptwCreateRealm().global;
 const borrowed = [];
 check(other.Array.prototype.push.call(borrowed, marker) === 1 && borrowed[0] === marker,
   'borrowed cross-Realm push uses receiver storage');

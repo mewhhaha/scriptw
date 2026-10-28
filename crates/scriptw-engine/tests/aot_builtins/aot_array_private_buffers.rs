@@ -60,6 +60,14 @@ fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
 }
 
 #[test]
+fn packed_join_call_preserves_actual_callable_arguments_fallbacks_and_realms() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/packed_join_call.js"),
+        "array-packed-join-call:ok",
+    );
+}
+
+#[test]
 fn string_buffer_preserves_live_join_order_reentrancy_and_utf16() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/join.js"),

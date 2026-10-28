@@ -88,6 +88,29 @@ impl FunctionBuilder<'_> {
             None => receiver.set_undefined(function),
         }
         let targets = callee_expression.function_targets.known_targets();
+        let constant_leaf = (targets.len() == 1)
+            .then(|| targets.iter().next().and_then(|id| self.functions.get(id)))
+            .flatten()
+            .filter(|meta| meta.constant_leaf.is_some())
+            .cloned();
+        if let Some(meta) = constant_leaf {
+            if self.try_emit_constant_leaf_call(
+                &meta,
+                meta.constant_leaf
+                    .as_ref()
+                    .expect("selected immutable-return leaf plan"),
+                &callee,
+                &receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )? {
+                receiver.clear(function);
+                callee.clear(function);
+                return Ok(());
+            }
+        }
         let numeric_leaf = (targets.len() == 1)
             .then(|| targets.iter().next().and_then(|id| self.functions.get(id)))
             .flatten()
@@ -108,6 +131,23 @@ impl FunctionBuilder<'_> {
                 callee.clear(function);
                 return Ok(());
             }
+        }
+        let packed_join_candidate = targets.iter().any(|id| {
+            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::ArrayPrototypeJoin)
+        });
+        if packed_join_candidate
+            && self.try_emit_packed_array_join_call(
+                &callee,
+                &receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )?
+        {
+            receiver.clear(function);
+            callee.clear(function);
+            return Ok(());
         }
         // Target knowledge selects a candidate only. The actual once-read
         // callee and evaluated operands still prove the guarded route at runtime.

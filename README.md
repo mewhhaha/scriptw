@@ -22,8 +22,10 @@ Portable embedding API remains available; static compiler dependencies remain.
 
 Runtime initialization uses compact intrinsic-installation tables. Guarded
 Number loops and packed Array push/join kernels avoid repeated conversion,
-dispatch and allocation when their semantic checks pass. The benchmark sections
-below identify each measurement's source and configuration.
+dispatch and allocation when their semantic checks pass. Primitive string-length
+reads and guarded constant-return calls eliminate temporary objects and call
+setup. The benchmark sections below identify each measurement's source and
+configuration.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the

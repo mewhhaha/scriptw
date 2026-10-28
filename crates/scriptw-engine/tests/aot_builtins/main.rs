@@ -55,6 +55,7 @@ mod aot_numeric_native_caller_effects;
 mod aot_parse_int_radix;
 mod aot_primitive_call_evaluation;
 mod aot_primitive_property_reads;
+mod aot_primitive_string_length;
 mod aot_promise_combinator_intrinsics;
 mod aot_promise_rejection_policy;
 mod aot_promise_try;

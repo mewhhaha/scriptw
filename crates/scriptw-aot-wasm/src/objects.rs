@@ -50,6 +50,7 @@ pub(crate) use descriptor_object::{
 
 use module_namespace::NamespaceBindingRead;
 pub(crate) use module_namespace::NamespaceOwnKeys;
+mod primitive_length;
 mod private_elements;
 mod property_read_plan;
 mod property_storage;
@@ -1033,6 +1034,9 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.try_compile_concat_length_property_read(target, key, output, function)? {
+            return Ok(());
+        }
         let receiver = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(target, &receiver, function)?;
         self.compile_property_read_from_locals(target, key, &receiver, output, function)?;
@@ -1043,6 +1047,22 @@ impl<'a> FunctionBuilder<'a> {
     /// Evaluate the computed key expression before RequireObjectCoercible;
     /// ToPropertyKey follows that check. The raw receiver remains unchanged.
     pub(crate) fn compile_property_read_from_locals(
+        &mut self,
+        target: &TypedExpr,
+        key: &PropertyKeyIr,
+        receiver: &ValueLocals,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        if self
+            .try_compile_primitive_string_static_length(target, key, receiver, output, function)?
+        {
+            return Ok(());
+        }
+        self.compile_ordinary_property_read_from_locals(target, key, receiver, output, function)
+    }
+
+    fn compile_ordinary_property_read_from_locals(
         &mut self,
         target: &TypedExpr,
         key: &PropertyKeyIr,

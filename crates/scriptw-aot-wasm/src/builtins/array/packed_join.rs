@@ -1,10 +1,95 @@
 //! Exact-size join for a stable packed snapshot of present primitive strings,
 //! null and undefined. Unsupported values return to the ordered generic loop.
 use super::*;
-use crate::gc_types::{CodeUnitArray, StringConstruction, StringValue, StringValueSchema};
+use crate::gc_types::{
+    CodeUnitArray, Nullable, StringConstruction, StringValue, StringValueSchema,
+};
+use crate::runtime_helpers::{
+    ArrayPackedJoinArguments, ArrayPackedJoinParameters, HelperParameters,
+};
 
 impl FunctionBuilder<'_> {
     pub(super) fn emit_try_packed_array_join(
+        &mut self,
+        receiver: &ValueLocals,
+        length: I64Local,
+        separator: &GcLocal<StringValue>,
+        result: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let s = self.runtime_schema();
+        let text = s
+            .call_helper(
+                ArrayPackedJoinArguments::new(receiver, length, separator),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .bind(s, s.reserve_gc_local(f), f);
+        let handled = s.reserve_i32_local(f);
+        text.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        handled.store(f);
+        handled.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let present = s
+            .reserve_gc_local(f)
+            .initialize(text.load(s, f).require_non_null(f), f);
+        result.set_reference(&present, s, f);
+        present.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        text.clear(f);
+        Ok(handled)
+    }
+
+    /// Null declines without observable reads/coercions; a String is the real
+    /// completed result. Both builtin entry and guarded source calls use this
+    /// sole String-producing kernel and its original resource checks.
+    pub(crate) fn compile_array_packed_join_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::ArrayPackedJoin);
+        let p = self.helper_parameters::<ArrayPackedJoinParameters>(&mut f);
+        let s = self.runtime_schema();
+        let text = s
+            .reserve_gc_local::<StringValue, Nullable>(&mut f)
+            .initialize_null(s, &mut f);
+        p.length.load(&mut f);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        // Length was captured before separator conversion in the builtin.
+        // Zero still needs no indexed reads if that conversion changed it.
+        text.replace(
+            self.emit_interned_string_reference("", &mut f)?.nullable(),
+            &mut f,
+        );
+        f.instruction(&Instruction::Else);
+        let result = s.reserve_value_local(&mut f);
+        let handled = self.emit_packed_array_join_kernel(
+            &p.receiver,
+            p.length,
+            &p.separator,
+            &result,
+            &mut f,
+        )?;
+        handled.load(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        text.replace(
+            result.cast_reference::<StringValue>(s, &mut f).nullable(),
+            &mut f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(handled, &mut f);
+        result.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        text.load(s, &mut f);
+        text.clear(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
+
+    fn emit_packed_array_join_kernel(
         &mut self,
         receiver: &ValueLocals,
         length: I64Local,

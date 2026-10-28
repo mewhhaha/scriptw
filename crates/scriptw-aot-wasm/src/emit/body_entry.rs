@@ -77,6 +77,7 @@ impl<'a> FunctionBuilder<'a> {
             // public facades retain registered call boundaries for recursion.
             RuntimeHelperId::TransientByteAlloc
             | RuntimeHelperId::ArrayIndexedPublishDefaultData
+            | RuntimeHelperId::ArrayPackedJoin
             | RuntimeHelperId::ArrayIndexedPublish
             | RuntimeHelperId::ArrayIndexedDelete
             | RuntimeHelperId::ObjectRead

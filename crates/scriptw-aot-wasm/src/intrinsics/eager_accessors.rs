@@ -48,6 +48,7 @@ impl AccessorPlan {
                 && !meta.needs_active_function_identity
                 && meta.class_instance_element_plan.is_none()
                 && meta.template_source.is_none()
+                && meta.constant_leaf.is_none()
                 && meta.numeric_leaf.is_none()
                 && meta.async_generator_resume_environment_plan.is_none(),
         )
@@ -115,6 +116,7 @@ mod tests {
     fn ordinary_meta() -> WasmFunctionMeta {
         let builtin = StandardBuiltinId::ArrayBufferPrototypeByteLengthGetter;
         WasmFunctionMeta {
+            constant_leaf: None,
             numeric_leaf: None,
             async_generator_resume_environment_plan: None,
             template_source: None,

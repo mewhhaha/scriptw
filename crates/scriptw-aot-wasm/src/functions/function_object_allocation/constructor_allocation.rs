@@ -62,6 +62,7 @@ impl<'a> ConstructorAllocationPlan<'a> {
             || meta.needs_active_function_identity
             || meta.class_instance_element_plan.is_some()
             || meta.template_source.is_some()
+            || meta.constant_leaf.is_some()
             || meta.numeric_leaf.is_some()
             || meta.async_generator_resume_environment_plan.is_some()
         {
@@ -241,6 +242,7 @@ mod tests {
     fn constructor_meta() -> WasmFunctionMeta {
         let builtin = StandardBuiltinId::ArrayConstructor;
         WasmFunctionMeta {
+            constant_leaf: None,
             numeric_leaf: None,
             async_generator_resume_environment_plan: None,
             template_source: None,

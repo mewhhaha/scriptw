@@ -70,7 +70,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 23 stores prototypes as nullable actual object payload references.
 // Version 32 adds the closed-kind throwing-error allocation/diagnostic kernel.
 // Version 33 adds sealed intrinsic-installation rows and the ordered run helper.
-const LAYOUT_VERSION: u32 = 33;
+// Version 34 shares the packed String join kernel with guarded direct callers.
+const LAYOUT_VERSION: u32 = 34;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

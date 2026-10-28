@@ -1083,6 +1083,19 @@ fn emit_script_module_with_factory(
             RuntimeHelperId::ArrayIndexedPublishDefaultData,
             default_publisher.compile_array_indexed_publish_default_data_helper()?,
         );
+        let mut joiner = FunctionBuilder::new_runtime_operation_helper(
+            module_package.schema(),
+            RuntimeHelperId::ArrayPackedJoin,
+            &string_pool,
+            &function_metas,
+            uses_heap,
+            runtime_bootstrap_plan.clone(),
+            runtime_helper_base,
+        );
+        array_indexed_helper_functions.insert(
+            RuntimeHelperId::ArrayPackedJoin,
+            joiner.compile_array_packed_join_helper()?,
+        );
         let mut publisher = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayIndexedPublish,

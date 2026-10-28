@@ -606,6 +606,11 @@ fn abi32_runtime_cache_is_replaced_before_intrinsic_installation_rows_are_admitt
     assert_previous_runtime_cache_entry_replaced(32);
 }
 
+#[test]
+fn abi33_runtime_cache_is_replaced_before_shared_packed_join_is_admitted() {
+    assert_previous_runtime_cache_entry_replaced(33);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

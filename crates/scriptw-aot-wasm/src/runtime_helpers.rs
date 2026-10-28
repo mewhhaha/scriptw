@@ -1135,6 +1135,7 @@ runtime_helper_domain! {
     EmbeddingCancel / EmbeddingCancelArguments / EmbeddingCancelParameters / "embedding_cancel" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
     TransientByteAlloc / TransientByteAllocArguments / TransientByteAllocParameters / "transient_byte_alloc" { size:I64 } => I64;
     ArrayIndexedPublishDefaultData / ArrayIndexedPublishDefaultDataArguments / ArrayIndexedPublishDefaultDataParameters / "array_indexed_publish_default_data" { array:(Ref ArrayObject NonNullable),index:I64,value:Value } => Void;
+    ArrayPackedJoin / ArrayPackedJoinArguments / ArrayPackedJoinParameters / "array_packed_join" { receiver:Value,length:I64,separator:(Ref StringValue NonNullable) } => (Ref StringValue Nullable);
     ArrayIndexedPublish / ArrayIndexedPublishArguments / ArrayIndexedPublishParameters / "array_indexed_publish" { storage:(Ref ArrayIndexStorage NonNullable),index:I64,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
     ArrayIndexedDelete / ArrayIndexedDeleteArguments / ArrayIndexedDeleteParameters / "array_indexed_delete" { storage:(Ref ArrayIndexStorage NonNullable),index:I64 } => Void;
     ObjectRead / ObjectReadArguments / ObjectReadParameters / "object_read" { target:Value,receiver:Value,key:Key,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1301,6 +1302,7 @@ impl RuntimeHelperId {
             | Self::EmbeddingCancel => HelperOwner::Runtime,
             Self::TransientByteAlloc => HelperOwner::Runtime,
             Self::ArrayIndexedPublishDefaultData => HelperOwner::Runtime,
+            Self::ArrayPackedJoin => HelperOwner::Runtime,
             Self::ArrayIndexedPublish => HelperOwner::Runtime,
             Self::ArrayIndexedDelete => HelperOwner::Runtime,
             Self::ObjectRead => HelperOwner::Runtime,
@@ -1454,6 +1456,7 @@ impl RuntimeHelperId {
             | Self::EmbeddingCancel => true,
             Self::TransientByteAlloc => true,
             Self::ArrayIndexedPublishDefaultData => true,
+            Self::ArrayPackedJoin => true,
             Self::ArrayIndexedPublish => true,
             Self::ArrayIndexedDelete => true,
             Self::ObjectRead => true,
