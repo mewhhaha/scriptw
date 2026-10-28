@@ -86,10 +86,12 @@ omits proven-empty native metadata publication and routes fifteen Intl getters
 through the checked shared accessor allocator. The [verified checkpoint](docs/rust-rewrite/memory-bootstrap-metadata-folds-20261028.md)
 records native coverage and the matched Scriptc comparison.
 
-The following [compact-storage experiment](docs/rust-rewrite/contracts/inline-compact-storage.md)
-stores one- and two-key records in one GC allocation and shares their store kernel.
-Its layout calculation removes 384 KiB and 16,384 allocations from the retained
-record workload. Native correctness and process RSS effects remain unverified.
+The [inline compact-storage change](docs/rust-rewrite/contracts/inline-compact-storage.md)
+stores one- and two-key property values in inline GC fields and shares their
+store kernel. Its [verified checkpoint](docs/rust-rewrite/memory-inline-compact-storage-20261028.md)
+records native correctness and matched observations. The 384 KiB / 16,384-object
+allocation calculation is not measured RSS savings; see the
+[storage contract](docs/rust-rewrite/contracts/compact-ordinary-data-storage.md).
 Subsequent matched benchmark runs pin Rust to 1.99.1; runner differences still
 prevent causal conclusions from comparisons across hosts.
 
@@ -97,39 +99,38 @@ prevent causal conclusions from comparisons across hosts.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-28 on one GitHub Actions runner**, compiler `7f9bacff0`.
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `a19ba7395`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.422–1.979× Scriptc's**:
+Scriptw's median post-execution process RSS is **1.135–1.565× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 20.1 MiB | 12.2 MiB |
-| Objects | 21.0 MiB | 12.9 MiB |
-| Retained objects | 26.6 MiB | 18.7 MiB |
+| Integer | 17.8 MiB | 13.6 MiB |
+| Objects | 18.7 MiB | 14.3 MiB |
+| Retained objects | 22.8 MiB | 20.1 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
-Scriptc parity remains open. Cross-runner comparisons do not establish causal savings.
+Cross-runner observations do not establish causal savings or Scriptc parity.
 
-[The memory checkpoint](docs/rust-rewrite/memory-bootstrap-metadata-folds-20261028.md) records **4,906 fresh native
-test executions across 19 complete affected targets**, including all 514 AOT
-library tests and all 1,056 engine library tests. Four focused emission and
-Intl Realm/GC controls count once within those targets. No original Test262
-execution is counted in this checkpoint. Verification used one CPU, a 4-GiB
-process-tree cap, no swap and bounded module retention.
+[The memory checkpoint](docs/rust-rewrite/memory-inline-compact-storage-20261028.md) records **4,912 fresh native
+test executions across 19 complete affected targets**, including all 517 AOT
+library tests, all 1,056 engine library tests and 234 GC tests. Six focused
+emission, mutation, Realm/GC and snapshot controls count once within those
+targets. No original Test262 execution is counted in this checkpoint.
 
-The compiler omits proven-empty native metadata publication and shares the
-checked allocation path for fifteen Intl getters. Four unscored ownership
-captures separately record code and metadata residency. These do not establish
-an overall RSS or execution-time saving.
+One- and two-key compact storage uses inline GC fields. For 8,192 retained
+records, its layout calculation removes 384 KiB of allocation and 16,384 GC
+objects. This is not measured RSS savings; extra dispatch and native code can
+offset it. Four unscored ownership captures record residency separately.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40630427913).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40640282249).
 
 ## Benchmarks
 

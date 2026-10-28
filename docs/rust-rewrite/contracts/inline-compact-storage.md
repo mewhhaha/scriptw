@@ -28,6 +28,8 @@ storage and 16,384 GC allocations. These are layout calculations, not measured
 process RSS savings. Extra dispatch and native code can offset them.
 
 The changed GC types and shared helper require runtime layout 31; old runtime
-artifacts are rejected. Native verification and a fresh matched Scriptc comparison
-are pending. The published README measurements still describe the preceding
-verified checkpoint.
+artifacts are rejected. The [verified checkpoint](../memory-inline-compact-storage-20261028.md)
+records 4,912 fresh native passes across 19 full targets and all 17 matched
+workload checksums. The [ordinary-storage contract](compact-ordinary-data-storage.md)
+describes the current schema and accounting. The allocation calculation does
+not establish an overall causal RSS or execution-time saving.
