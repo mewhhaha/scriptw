@@ -235,6 +235,53 @@ fn graph_snapshot_reads_packed_numbers_and_empty_sparse_mode_without_mutation() 
 }
 
 #[test]
+fn fresh_numeric_literal_padding_preserves_snapshot_capacity_and_occupied_keys() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    for length in [3, 5, 6, 7] {
+        let elements = vec!["value"; length].join(",");
+        let source = format!(
+            "function make(value) {{ return [{elements}]; }} var array=make(-0); gc(); array;"
+        );
+        let result = Engine::new(RealmBuilder::new().build())
+            .observe_script_graph(
+                &source,
+                CompileOptions {
+                    host_surface_policy: HostSurfacePolicy::Test262,
+                    ..CompileOptions::default()
+                },
+                RunOptions {
+                    backend: ExecutionBackend::WasmAot,
+                    timeout_ms: Some(30_000),
+                    ..RunOptions::default()
+                },
+                SnapshotLimits::default(),
+            )
+            .unwrap();
+        let SnapshotOutcome::Captured { graph } = result.completion.outcome else {
+            panic!("non-power-of-two literal must retain valid packed storage");
+        };
+        let node = &graph.nodes()[0];
+        assert_eq!(
+            node.properties.len(),
+            length + 1,
+            "padding is not an own property"
+        );
+        for (index, property) in node.properties[..length].iter().enumerate() {
+            assert!(matches!(&property.key, SnapshotKey::String { units }
+                if String::from_utf16(units.units()).unwrap() == index.to_string()));
+            assert!(matches!(&property.descriptor, SnapshotDescriptor::Data {
+                value: SnapshotValue::Number { bits }, writable: true, enumerable: true, configurable: true
+            } if *bits == (-0f64).to_bits()));
+        }
+        assert!(
+            matches!(&node.properties[length].descriptor, SnapshotDescriptor::Data {
+            value: SnapshotValue::Number { bits }, writable: true, enumerable: false, configurable: false
+        } if *bits == (length as f64).to_bits())
+        );
+    }
+}
+
+#[test]
 fn four_element_capacity_growth_keeps_holes_and_number_bits() {
     check(
         r#"

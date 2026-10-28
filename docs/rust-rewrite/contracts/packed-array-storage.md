@@ -1,7 +1,7 @@
 # Packed Number Array indices
 
 The single Wasm-GC Array index store has a closed active mode:
-`PackedNumbers`, `DenseDescriptors` or `SparseDescriptors`. Fresh arrays start
+`PackedNumbers`, `PackedValues`, `DenseDescriptors` or `SparseDescriptors`. Fresh arrays start
 with canonical empty Number-bit and presence arrays. A Number occupies its
 exact `i64` payload and a separate bit in a `u64` presence bitmap. Every Number,
 including `NaN`, either infinity and `-0`, remains distinct from a hole.
@@ -11,8 +11,8 @@ slots and a 1 Mi-slot ceiling. Growth outside existing capacity requires the
 new index to stay near occupancy (`index <= 2*count+8`). Observable Array
 length does not allocate either backing. A distant insertion retires packed
 storage and uses the existing bounded dense-to-sparse transition. These
-transitions are one way. Unsupported values, accessors or attributes likewise
-use the real descriptor representation.
+transitions are one way. Ordinary nonnumber data can use immutable packed
+StoredValues; accessors and nondefault attributes use real descriptors.
 
 `emit_array_own_indexed_value` probes without allocating and returns a separate
 found bit. A present `undefined` after descriptor transition is distinguishable
@@ -57,6 +57,13 @@ Number. Missing indices still traverse prototypes and can invoke inherited
 indexed setters. Proxies, distinct receivers and noncanonical/symbol keys keep
 their existing semantics. The concrete packed delete probe handles canonical
 indices only, whose packed attributes are known configurable.
+
+A fresh dense source literal of at most eight elements can capture its values
+in source order and install complete Number/presence backings directly when
+all actual tags are Number. The bound limits roots and emitted code. Both
+backings remain rooted until the private storage fields and count are published
+without allocation. Other tags use the same captured values and shared R
+publisher; holes and larger literals retain their existing construction path.
 
 The opt-in host graph snapshot reads raw bits and bitmap words directly, with
 a typed mode decoder and declaration-derived field/layout witnesses. It checks

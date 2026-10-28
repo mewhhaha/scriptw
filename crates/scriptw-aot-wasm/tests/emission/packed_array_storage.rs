@@ -337,3 +337,108 @@ fn many_short_array_literals_keep_publication_cfg_in_one_runtime_body() {
         .join()
         .unwrap();
 }
+#[test]
+fn bounded_dynamic_literals_guard_one_complete_number_backing_and_retain_the_runtime_fallback() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            // Publishing the functions keeps their original generic argument
+            // reads and prevents direct-call specialization from proving tags.
+            let source = "function three(a,b,c){return[a,b,c];}\
+                function four(a,b,c,d){return[a,b,c,d];}\
+                function eight(x){return[x,x,x,x,x,x,x,x];}\
+                function hole(x){return[x,,x,x];}\
+                function long(x){return[x,x,x,x,x,x,x,x,x];}\
+                function empty(){return[];}[three,four,eight,hole,long,empty];";
+            let lowered = lower(&parse(source, ParseOptions::script()).unwrap());
+            let artifact = emit_with_rooted_snapshot(
+                &lowered,
+                PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal,
+            )
+            .unwrap();
+            let features = WasmFeatures::default()
+                | WasmFeatures::THREADS
+                | WasmFeatures::MULTI_MEMORY
+                | WasmFeatures::REFERENCE_TYPES
+                | WasmFeatures::FUNCTION_REFERENCES
+                | WasmFeatures::GC
+                | WasmFeatures::EXCEPTIONS
+                | WasmFeatures::TAIL_CALL;
+            for bytes in [&artifact.bytes[..], artifact.runtime().unwrap().bytes()] {
+                Validator::new_with_features(features)
+                    .validate_all(bytes)
+                    .unwrap();
+            }
+            let program = Module::read(&artifact.bytes);
+            let runtime = Module::read(artifact.runtime().unwrap().bytes());
+            assert_eq!(&program.types[..runtime.types.len()], &runtime.types);
+            let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
+            let presence = runtime.witness_type(GcSnapshotLayout::ArrayNumberPresence);
+            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
+            let publish = program.imported_runtime(&runtime, publish);
+            for (name, length, capacity) in [("js::three#", 3, 4), ("js::four#", 4, 4), ("js::eight#", 8, 8)] {
+                let (_, body) = program.named(name);
+                let backing = body
+                    .iter()
+                    .position(|op| matches!(op, Operator::ArrayNewFixed { array_type_index, array_size }
+                        if *array_type_index == numbers && *array_size == capacity))
+                    .expect("one power-of-two Number backing in the original generic source body");
+                let guard = body[..backing]
+                    .iter()
+                    .rposition(|op| matches!(op, Operator::If { .. }))
+                    .expect("the Number backing is guarded");
+                // One combined run-time test checks actual captured Value tags;
+                // unknown parameters may subsequently be strings, BigInts or refs.
+                let condition_ops = (length * 4 - 1) as usize;
+                let condition = &body[guard - condition_ops..guard];
+                assert_eq!(condition.iter().filter(|op| matches!(op,
+                    Operator::I32Const { value } if *value == scriptw_ir::ValueKind::Number.tag() as i32)).count(), length as usize);
+                assert_eq!(condition.iter().filter(|op| matches!(op, Operator::I32Eq)).count(), length as usize);
+                assert_eq!(condition.iter().filter(|op| matches!(op, Operator::I32And)).count(), length as usize - 1);
+                assert!(body[backing..].iter().any(|op| matches!(op,
+                    Operator::ArrayNewFixed { array_type_index, array_size: 1 }
+                        if *array_type_index == presence)));
+                for field in [
+                    scriptw_aot_wasm::GcSnapshotField::ArrayNumbers,
+                    scriptw_aot_wasm::GcSnapshotField::ArrayNumberPresent,
+                    scriptw_aot_wasm::GcSnapshotField::ArrayCount,
+                ] {
+                    assert!(body[backing..].iter().any(|op| matches!(op,
+                        Operator::StructSet { struct_type_index, field_index }
+                            if *struct_type_index == storage && *field_index == field.index())),
+                        "complete Number backing publication writes {field:?}");
+                }
+                let alternative = body[backing..]
+                    .iter()
+                    .position(|op| matches!(op, Operator::Else))
+                    .map(|offset| backing + offset)
+                    .expect("non-Numbers retain their ordinary fallback");
+                let publications = body.iter().filter(|op| matches!(op,
+                    Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                        if *function_index == publish)).count();
+                assert_eq!(publications, length as usize);
+                assert!(!calls(&body[..alternative], publish));
+                assert!(calls(&body[alternative..], publish));
+                for array in [numbers, presence] {
+                    assert!(!body.iter().any(|op| matches!(op,
+                        Operator::ArraySet { array_type_index } if *array_type_index == array)),
+                        "bounded source bodies never duplicate the backing-growth CFG");
+                }
+            }
+            for (name, occupied) in [("js::hole#", 3), ("js::long#", 9), ("js::empty#", 0)] {
+                let (_, body) = program.named(name);
+                assert!(!body.iter().any(|op| matches!(op,
+                    Operator::ArrayNewFixed { array_type_index, .. }
+                        if *array_type_index == numbers || *array_type_index == presence)),
+                    "holes, empty and larger literals keep their existing path");
+                assert_eq!(body.iter().filter(|op| matches!(op,
+                    Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                        if *function_index == publish)).count(), occupied);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

@@ -13,6 +13,13 @@ kernel and descriptor fallback belong to R, so a program containing many short
 Array literals does not repeat that control flow for every element. The caller
 still owns element evaluation, abrupt completion and final length publication.
 
+Small dense fixed literals have a separate fresh-only initialization path:
+up to eight elements are evaluated once into rooted values, then a Number-tag
+guard admits complete packed backings before the Array escapes. The mixed-value
+fallback calls the shared publisher using those captured values. This grants
+no publication authority over an existing Array and changes no generic Set
+semantics; abrupt element evaluation still prevents later effects.
+
 Only callers that already constructed that exact default data descriptor before
 raw storage publication use the new operation:
 

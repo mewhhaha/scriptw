@@ -5,6 +5,7 @@ use super::*;
 use crate::gc_types::GcLocal;
 
 mod compact;
+mod numeric;
 
 /// There is no constructor from an existing Array and no borrowed-array view.
 /// Only consuming finish can publish this fresh object's whole Value.
@@ -66,6 +67,9 @@ impl FunctionBuilder<'_> {
         })?;
         if let Some(recipe) = self.strings.compact_array_recipe(elements)? {
             return self.compile_compact_array_literal(recipe, output, f);
+        }
+        if let Some(literal) = numeric::SmallDenseArrayLiteral::new(elements) {
+            return self.compile_small_dense_array_literal(literal, output, f);
         }
         let schema = self.runtime_schema();
         let value = schema.reserve_value_local(f);

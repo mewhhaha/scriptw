@@ -1224,7 +1224,7 @@ mod tests {
             config
                 .enable_compiler(false)
                 .collector(Collector::Copying)
-                .gc_heap_initial_size(INITIAL_CAPACITY);
+                .gc_heap_initial_size(INITIAL_CAPACITY as u64);
             Engine::new(&config)
         }
 
