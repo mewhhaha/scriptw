@@ -81,4 +81,4 @@ preserved in the source packet. Finite semantic Engine/CLI controls exercise
 the actual compiler path; all new controls remain unrun. Complete all task
 source, types, controls and documentation before verification. Later stages use
 the confirmed aggregate 4096 MiB cgroup cap, swap zero and serial workers.
-See [the batch workflow](../../../docs/rust-rewrite/batch-workflow.md).
+See [the development workflow](../../../CONTRIBUTING.md#verification).

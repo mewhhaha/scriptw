@@ -83,7 +83,7 @@ and a new CLI regression rejects unsupported commands before source loading.
 
 The dated [workflow](batch-workflow-history-20261021.md),
 [inventory](inventory-history-20261021.md) and
-[task history](../../tasks/history-through-20261021.md) are byte-identical copies
+[task history](https://github.com/mewhhaha/porffor/blob/59c2c777bcab11b7a1cd4122f8546048f48f7c7d/tasks/history-through-20261021.md) are byte-identical copies
 of baseline `6b3d9b449`. Maintained links, the 100 stable hill IDs, source guards,
 and unchanged generated README status/chart blocks are checked.
 

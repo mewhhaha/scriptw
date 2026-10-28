@@ -19,7 +19,7 @@ execution remain pending under the verification ladder.
 The selected weak/ephemeron facility remains explicitly unavailable, without a
 strong substitute or another object model. See the current
 [record architecture](../../crates/scriptw-aot-wasm/docs/heap-layout.md) and
-[batch workflow](batch-workflow.md).
+[development workflow](../../CONTRIBUTING.md#verification).
 
 ## Historical architecture and implementation checkpoints
 

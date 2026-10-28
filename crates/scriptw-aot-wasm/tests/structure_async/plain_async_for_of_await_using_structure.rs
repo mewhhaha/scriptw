@@ -19,7 +19,6 @@ const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-fail
 const CONTRACT: &str = include_str!(
     "../../../../docs/rust-rewrite/contracts/plain-async-function-for-of-await-using.md"
 );
-const README: &str = include_str!("../../../../README.md");
 
 const EXACT_FILES: [(&str, &str); 5] = [
     (

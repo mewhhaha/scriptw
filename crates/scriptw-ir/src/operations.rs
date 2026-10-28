@@ -10,8 +10,7 @@
 //! Everything else is a [`TrackedGapRow`], whose type has no field capable of
 //! holding an implementation status.
 //!
-//! See `docs/rust-rewrite/contracts/Spec-operation catalog evidence and the
-//! iterator-protocol obligation witness.md`.
+//! See `docs/rust-rewrite/contracts/spec-operations.md`.
 
 use crate::{
     iterator_obligations::{site_emits, EmissionSite, IteratorObligation},

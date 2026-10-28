@@ -58,7 +58,7 @@ Neither generic body may contain a `ValidatedMethodEntry` projection, a strict
 TypedArray receiver-brand error, `typed_brand_local` or `typed_array_only`.
 Those authorities belong only to the canonical TypedArray quantifier compiler
 described by
-[`typed-array-quantifier-family-buffer-witness.md`](typed-array-quantifier-family-buffer-witness.md).
+[`gc-typed-array-native-methods.md`](gc-typed-array-native-methods.md).
 
 ## Producer and consumer census
 

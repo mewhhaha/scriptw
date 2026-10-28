@@ -7,7 +7,7 @@ below is now retired through the existing captured-callee/spread/canonical
 Splice owners. Push production and these earlier receipts are unchanged by
 that batch. The ref97 combined all-target Rust type check passed; runtime
 verification remains pending. See the
-[Splice contract](array-splice-algorithm-owner.md).
+[Splice contract](native-array-gc-methods.md).
 
 Status: implemented and focused-verification complete for the Wasm-AOT
 compiler on 2026-08-28.

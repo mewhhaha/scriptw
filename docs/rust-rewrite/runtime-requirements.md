@@ -82,33 +82,26 @@ failures; an Unsupported failure kind cannot decide scope. No excluded execution
 is an existing failure or unimplemented result. The four remaining original
 failures stay red.
 
-[Exact scope and chart evidence](test262-chart-reconciliation-20261021.json)
-binds every selected source hash, execution ID, reason and ESID to the full native
-baseline archive and the verified vendored tree. The original 102,994 executions
-are preserved: blue partitions 429 historical native-host successes, and green
-contains the remaining in-scope successes. Canonical native outcome records remain
-unchanged. Blue describes product scope; it does not claim those tests failed.
+[The original scope audit](test262-chart-reconciliation-20261021.json) binds every
+selected source hash, execution ID, reason and ESID to the verified vendored tree.
+The [current complete publication](test262-current.md) retains that scope inventory
+and all original outcomes. Blue describes product scope; it does not claim those
+native-host executions failed or remove them from the complete result.
 
 ## Refreshing the README chart
 
-`python3 -B scripts/generate-test-graph.py --refresh-evidence` rebuilds the checked
-projection from the retained full baseline, the exact original-failure replay and
-the pinned source audit, then refreshes the README caption and
-[vertical bar chart](assets/test262-status.svg). `--check` verifies the evidence
-and both generated outputs without writing. It rejects changed pins, archives,
-source bytes, incomplete/duplicate replays, altered counts and scope decisions
-that would hide a non-success. Reviewed errata snapshots are never inputs.
+After a complete canonical publication,
+`python3 -B scripts/generate-test-graph.py --refresh-evidence --full-evidence`
+refreshes the README caption and [chart](assets/test262-status.svg) from its
+portable native snapshots. `--check` verifies the evidence and generated outputs
+without writing. The generator checks compiler/pins, exact disjoint execution IDs,
+outcomes and the unchanged scope inventory. A scope decision cannot hide a
+non-success; reviewed errata snapshots are never inputs.
 
 Green is in-scope Success, red is Bug plus Crash, gray is NotImplemented, and blue
-is the audited standalone dynamic-source scope subset. The graph reconciles the
-complete 2026-10-20 baseline with the 12 repaired original failures from the exact
-2026-10-21 replay: before scope classification, 102,990 historical/replayed passes
-and four remaining bugs. It does not claim the other baseline successes were
-rerun on the repaired compiler. The detailed canonical publication still records
-its original 102,978 passes and 16 bugs. A new full original-suite run is still
-required for current-source conformance publication. Unrun tests do not become
-unimplemented tests, and no scope decision silently skips execution.
-
-The previous 12,400-line README is preserved verbatim beneath a short provenance
-header in [development history](../../DEVELOPMENT_HISTORY.md). Its body and source
-revision are recorded in [the frozen history registry](scriptw-frozen-history.json).
+is the audited standalone dynamic-source scope subset. The graph uses the
+[complete 2026-10-23 run](test262-current.md), with every execution bound to its
+recorded compiler. Earlier baseline/replay reconciliation remains historical
+evidence. A new compiler requires a new complete publication before its counts
+can replace this result. Unrun tests do not become unimplemented tests, and no
+scope decision silently skips execution.

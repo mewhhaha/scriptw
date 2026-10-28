@@ -27,8 +27,7 @@
 //! rather than a ten-minute rung-G diff. The type stays `pub` only because it
 //! is the type of a `pub` enum variant's field.
 //!
-//! See `docs/rust-rewrite/contracts/Spec-operation catalog evidence and the
-//! iterator-protocol obligation witness.md`.
+//! See `docs/rust-rewrite/contracts/spec-operations.md`.
 
 /// The four 7.4 obligations a for-of head incurs. Closed by the spec.
 ///

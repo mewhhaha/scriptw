@@ -155,8 +155,7 @@ const LEDGER: &str = include_str!("../known-failures.tsv");
 ///
 /// The row's own text set the condition for deleting it rather than filling it:
 /// *"the moment `language`, `language_errors` and `language_numerics` all bank
-/// green"*. Batch 7's rung 5 met it, and this is how that was read rather than
-/// assumed (`docs/rust-rewrite/batch-findings/b7-runner-findings.md`, rung 5):
+/// green"*. Batch 7's rung 5 met it with the following recorded results:
 ///
 /// - `language` **45**, `language_errors` **29**, `language_numerics` **31**,
 ///   each `ok` with zero failures, each from ONE invocation. `language::` had

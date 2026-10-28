@@ -58,7 +58,7 @@ atomic source are uncompiled and unexecuted. Source review and isolated Rust
 formatting do not establish Wasm validity, runtime correctness or conformance.
 
 Finish the complete task batch before verification. Use the
-[batch workflow](../batch-workflow.md) and the confirmed 4096 MiB aggregate
+[batch workflow](../../../CONTRIBUTING.md#verification) and the confirmed 4096 MiB aggregate
 cgroup budget, no swap, grouped OOM termination and serial workers. No larger
 budget or uncapped fallback is allowed. The separate weak/ephemeron capability
 gap remains explicit under the [weak facility boundary](weak-unavailable-runtime-boundary.md).

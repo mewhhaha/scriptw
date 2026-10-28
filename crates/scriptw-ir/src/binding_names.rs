@@ -51,8 +51,7 @@
 //! here it would reintroduce it *with the wrong answer*, since `spec_name()` and
 //! `merged_in()` differ exactly on the case that matters.
 //!
-//! See `docs/rust-rewrite/contracts/Module binding-name domains: [[LocalName]] vs
-//! [[ExportName]] vs merged storage name.md`.
+//! See `docs/rust-rewrite/contracts/module-binding-names.md`.
 
 use crate::{ModuleUnitId, MODULE_ANONYMOUS_DEFAULT_LOCAL_NAME, MODULE_DEFAULT_EXPORT_NAME};
 

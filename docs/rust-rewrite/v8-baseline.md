@@ -300,7 +300,7 @@ the second completes all runtime bodies. Its sampled whole-cgroup maximum is
 34,343,419,904 bytes, with zero OOM/OOM-kill events; it includes shared files and
 temporary storage and is neither process RSS nor JavaScript heap usage.
 
-The new [source-only diagnostic](batch-workflow.md#fast-source-only-guards)
+The new [source-only diagnostic](../../CONTRIBUTING.md#verification)
 passes 143 guards in 3.471s compilation plus 1.46s execution, avoiding the Cargo
 dependency graph. Six runner controls pass, and the full166 Cargo target remains
 mandatory. Restoring missing tracked Cargo config prevents accidental Rustflags

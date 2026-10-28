@@ -4,8 +4,6 @@ const FIXTURE: &str = include_str!(
 const ITERATOR_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/iterator.rs");
 const CONTRACT: &str =
     include_str!("../../../../docs/rust-rewrite/contracts/iterator-close-error-realm.md");
-// Exact dated results live in the frozen overview linked by the current README.
-const HISTORICAL_OVERVIEW: &str = include_str!("../../../../DEVELOPMENT_HISTORY.md");
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -69,12 +67,10 @@ fn runtime_witness_uses_a_borrowed_iterator_helper_realm_for_both_errors() {
 fn published_boundary_names_the_owner_routes_witness_and_nonclaims() {
     for marker in [
         "emit_iterator_close",
+        "emit_iterator_close_preserving_current_throw",
+        "emit_iterator_close_preserving_saved_throw",
         "IteratorClose return method must be callable",
         "IteratorClose return result must be object",
-        "73 external entry routes",
-        "20 routes call `emit_iterator_close` directly",
-        "50 routes call `emit_iterator_close_preserving_current_throw`",
-        "3 routes call `emit_iterator_close_preserving_saved_throw` directly",
         "`Intl.ListFormat`",
         "builtins/intl_listformat/iterable.rs",
         "wasm_iterator_close_generated_error_realm.js",
@@ -82,10 +78,6 @@ fn published_boundary_names_the_owner_routes_witness_and_nonclaims() {
         "run_wasm_backend_uses_borrowed_iterator_helper_realm_for_iterator_close_errors",
     ] {
         assert!(CONTRACT.contains(marker), "contract marker: {marker}");
-    }
-    for source in [HISTORICAL_OVERVIEW] {
-        assert!(source.contains("iterator-close-error-realm.md"));
-        assert!(source.contains("68"));
     }
     for retired in ["LegacyMainRealm", "legacy main-Realm policy"] {
         assert!(

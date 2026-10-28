@@ -41,7 +41,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The private runtime layout is version 21. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 32. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate
@@ -52,7 +52,7 @@ Property descriptors retain separate closed types for legal stored attributes
 and query masks. Their four flag bits use 32-bit storage, reducing a complete
 descriptor from 48 to 32 bytes under the same collector layout. Field accesses
 and snapshot projections derive from the common schema. Old runtime packages,
-native caches and Portable bundles must be rebuilt for layout 21.
+native caches and Portable bundles must match that current ABI.
 
 These are per-record layout sizes, not measured process RSS reductions. GC
 headers, backing arrays, native code, compiler metadata and allocator retention

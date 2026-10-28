@@ -26,7 +26,6 @@ EXCLUDED = (
     "scripts/check-scriptw-identity.sh", "scripts/check-no-legacy-js.sh",
     "scripts/check-readme-status-artifacts.sh",
     "scripts/tests/check-readme-status-artifacts.sh",
-    "tasks/28-retire-legacy-js.md", f"tasks/29-{PREVIOUS}-identifier-migration.md",
 )
 RETIRED = "por" + "ffor"
 DOCTEST = (

@@ -20,13 +20,13 @@ fast writes require a present own slot. A missing slot or distinct receiver
 still follows prototype and receiver definition semantics. Nonconfigurable
 length-shrink rollback uses the descriptor representation.
 
-Compact ordinary object literals retain separate tags, optional scalar bits
-and optional reference backing. Null reference backing means every slot has a
-null reference payload. The tag still distinguishes present Undefined, Null,
-Boolean and Number values. The first nonnull reference write allocates backing
-with exactly the shape extent. Once allocated, null writes clear old strong
-edges. Transition reads and diagnostic snapshots use the same absent-backing
-meaning.
+Compact ordinary object literals use one SHAPE-only storage base and two sealed
+physical variants. One/two-slot shapes store packed tags, full scalar bits and
+nullable references inline. Other extents use separate tags and optional scalar
+and reference arrays; absent backing means all payloads in that component are
+zero/null. Full writes clear old reference edges in either representation.
+Dictionary conversion and diagnostic snapshots share the same slot semantics.
+See the [current ordinary-storage contract](compact-ordinary-data-storage.md).
 
 GC fields encode reference backing nullability and publication mutability.
 The runtime layout identity changes with these field/type changes; emitted
@@ -44,8 +44,8 @@ the existing caller. Focused controls inspect the emitted shared call and cover
 alias identity, independent descriptor mutation, GC and cross-Realm behavior.
 Per-change code-size and residency effects require separate attribution.
 
-The source-bound batch passed 4,869 native cases and 2,365 original pinned
-Test262 executions. The matched 17-workload comparison remains 1.3–1.7× Scriptc
-process RSS. These runner observations do not isolate a causal saving from any
-individual storage or publication change.
+The historical layout-25 checkpoint recorded 4,869 native cases, 2,365 selected
+pinned Test262 executions and a matched 1.3–1.7× Scriptc RSS range. These results
+belong to that checkpoint, not the current layout-32 storage or current benchmark
+cohort, and do not isolate a causal saving from a particular change.
 See [verification and measurements](../memory-value-backings-20261027.md).

@@ -23,8 +23,8 @@
 # tracking. Its run state (the done-file, the logs, the results file) correctly
 # stays under `target/`.
 #
-# `docs/rust-rewrite/batch-workflow.md` section "Rung 1c terminates, and checks
-# its own expectations" is the reference for what a green run means.
+# See `CONTRIBUTING.md#verification` for the bounded source sweep and
+# the distinction between focused checks and full native acceptance.
 #
 # # Three load-bearing properties. Do not "simplify" any of them.
 #
@@ -342,7 +342,7 @@ run_chunk() {
   #
   # THE VALUES ARE THIS BOX'S, NOT THE DEV MACHINE'S, and that is deliberate.
   # Batch 6 first wrote 8 GiB / 512 MiB / 512 MiB here, copying the shape of the
-  # sweep invocation in `docs/rust-rewrite/batch-workflow.md` (32 GiB function
+  # historical sweep invocation (32 GiB function
   # tier). Two measurements say that is wrong on this container:
   #
   #   * THE CACHE IS ONE SHARED DIRECTORY. `scriptw_cache_root()` is

@@ -8,7 +8,7 @@ const CORE_FIXTURE: &str =
 const INVOCATION_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_array_to_locale_string_invocation.js");
 const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/array-to-locale-string-receiver-kind.md");
+    include_str!("../../../../docs/rust-rewrite/contracts/native-array-gc-methods.md");
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source

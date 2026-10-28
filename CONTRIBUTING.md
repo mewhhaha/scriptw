@@ -1,183 +1,156 @@
 # Contributing to Scriptw
 
-Scriptw is a Rust JavaScript-to-Wasm AOT compiler, library, CLI, and conformance
-harness. It is a research project with an uncompromising goal: compile
-JavaScript directly through spec-shaped compiler stages to Wasm and reach full
-pinned Test262 conformance without hiding unsupported or failing cases.
+Read [AGENTS.md](AGENTS.md) for the compiler contract and
+[conformance ownership](docs/rust-rewrite/conformance-ownership.md) for the owning
+area. [Current work](docs/rust-rewrite/current-inventory.md) tracks open gates;
+[acceptance criteria](docs/rust-rewrite/conformance-acceptance.md) define completion.
 
-The repository is intentionally Rust-first. The retired JavaScript Porffor
-implementation is available through Git history, but it is not a development
-surface or an oracle. Do not reintroduce a JavaScript compiler/runtime, npm or
-JSR packaging, or a source evaluator inside emitted Wasm.
+## Checkout and build
 
-Before starting, read [AGENTS.md](AGENTS.md), the
-[conformance ownership](docs/rust-rewrite/conformance-ownership.md), and the
-[batch workflow](docs/rust-rewrite/batch-workflow.md).
-
-## Setup
-
-Install a current stable Rust toolchain with Cargo, clone the canonical
-repository, and build the CLI:
+Use the stable toolchain selected by `rust-toolchain.toml`. Keep the full checkout,
+including `.cargo/config.toml`, generated data, vendor sources and test fixtures.
+For an existing cone-mode sparse checkout:
 
 ```sh
-git clone https://github.com/mewhhaha/scriptw.git scriptw
-cd scriptw
-./scripts/dev.sh build
+git sparse-checkout add .cargo .github crates scripts vendor test262 docs snapshots
+cargo metadata --locked --offline --no-deps --format-version 1
 ```
 
-The development wrapper shares Cargo's normal `target/` directory, uses `lld`
-when available, and bounds parallelism for this large workspace. Set
-`SCRIPTW_JOBS` to request a lower job count.
+Offline metadata requires installed dependencies. Linux defaults require `lld`;
+`.cargo/config.toml` documents the override. `scripts/dev.sh` and ordinary Cargo
+share flags and `target/`. Avoid changing Rustflags when reusing build artifacts:
+a different fingerprint can rebuild the dependency graph.
 
-For sparse checkouts and shared Cargo caches, retain the
-[development inputs](docs/rust-rewrite/development-checkout.md), including
-`.cargo/config.toml`.
-
-Run the compiler from the built binary:
+Run native builds and tests through the resource wrapper:
 
 ```sh
-./target/debug/scriptw --help
-./target/debug/scriptw inspect crates/scriptw-cli/tests/fixtures/hello.js
+python3 -B scripts/limited_verification.py -- ./scripts/dev.sh build
 ./target/debug/scriptw run crates/scriptw-cli/tests/fixtures/hello.js
-./target/debug/scriptw build wasm crates/scriptw-cli/tests/fixtures/hello.js
 ```
 
-You can also invoke it through Cargo:
-
-```sh
-cargo run -p scriptw-cli -- inspect crates/scriptw-cli/tests/fixtures/hello.js
-```
-
-## Workspace architecture
-
-The product pipeline is:
-
-```text
-JavaScript source -> parse and early errors -> spec IR -> lowering IR -> Wasm
-```
-
-The primary crates are:
-
-- `scriptw-front`: parsing and source units.
-- `scriptw-ir`: spec-shaped IR, diagnostics, and lowering metadata.
-- `scriptw-runtime`: realms and host hooks.
-- `scriptw-aot-wasm`: direct Wasm code generation.
-- `scriptw-engine`: public Rust library API.
-- `scriptw-cli`: the `scriptw` command.
-- `scriptw-test262`: Test262 discovery, execution, snapshots, and reporting.
-- `scriptw-spec-exec`: feature-gated differential/debug oracle.
-
-Wasm-AOT is the sole product backend. C/native output and a REPL are outside scope.
-`spec-exec` must never become the product default, a silent fallback, or part of
-an emitted artifact.
-
-The [maintenance backlog](docs/maintenance-hills.md) lists prioritized cleanup
-hills and the evidence required to complete them.
-
-## Choosing and owning work
-
-Every non-trivial change should have a permanent
-[conformance owner](docs/rust-rewrite/conformance-ownership.md). Start with a
-reproducible failure or missing invariant, identify the smallest coherent
-feature batch, and coordinate edits to shared IR, lowering, object-operation,
-and Wasm backend files.
-
-Prefer compiler-enforced invariants over repeated runtime checks:
-
-- use enums and newtypes for closed domains;
-- make lifecycle and ordering constraints visible in types;
-- use exhaustive matches when adding a new case must force every consumer to
-  account for it;
-- keep mutation local where it materially improves performance;
-- avoid speculative abstractions that do not turn a plausible mistake into a
-  compile error.
-
-Conformance changes must implement general ECMAScript semantics. Never branch
-on a Test262 path, source string, or assertion text to manufacture a result.
+The local wrapper enforces one CPU, at most 4 GiB, no swap, grouped OOM termination,
+serial Cargo/libtest and bounded retained-module caches. On a managed cloud
+machine, explicit `--cloud` uses its finite inherited cgroup budget; serial
+defaults remain. Optional cloud CPU settings never authorize changing a campaign's
+workers, deadlines or cache policy. Missing resource controls must fail clearly.
 
 ## Development workflow
 
-Batch the code, tests, types, and documentation for a coherent change before
-running expensive suites. During implementation, use read-only inspection and
-cheap checks; compile early only when it resolves an uncertainty or validates a
-risky foundation.
+1. Start from a reproducible failure or missing invariant and choose one coherent
+   batch. Give shared files one owner; implement independent chunks concurrently
+   when that helps. Prefer existing domain boundaries over speculative abstractions.
+2. Finish the code, appropriate regressions, types and documentation before costly
+   verification. Use inspection and cheap checks while editing; compile early only
+   to resolve a blocking uncertainty or validate a risky foundation.
+3. Compile once, run focused and adjacent checks, then the required broader
+   checkpoint in sequence so Cargo reuses artifacts. Investigate failures and rerun
+   affected checks. Report commands, actual inventories, results and unverified work.
 
-Useful commands include:
+Prefer compiler-enforced invariants and focused consumer contracts. Keep tests
+that protect behavior; discard exploratory harnesses and duplicate prose checks.
+Never branch on Test262 paths, source text or assertion messages to manufacture
+conformance. Update README for user-visible changes; publish status numbers only
+through the verified status workflow.
+
+## Verification
+
+Start with formatting, ownership and affected source identities:
 
 ```sh
-./scripts/dev.sh check
 cargo fmt --all -- --check
-cargo test -p scriptw-engine --quiet
-cargo test -p scriptw-cli --quiet
-./scripts/conformance_owners.py
-./scripts/check-no-interpreter-in-product-graph.sh
+python3 -B scripts/conformance_owners.py
+python3 -B scripts/intl_source_identities.py
 ```
 
-Run focused regressions before broad suites, then finish with one broad
-verification checkpoint so Cargo can reuse build artifacts. Long-running
-commands should use the repository stall guard:
+Before a changed backend's dependency build, source guards provide a fast diagnostic:
 
 ```sh
-./scripts/run-watched.sh --label cli --stall 900 -- \
-  cargo test -p scriptw-cli --test cli -- --test-threads=2
+python3 -B scripts/limited_verification.py -- python3 -B scripts/check-source-guards.py
 ```
 
-See [docs/rust-rewrite/batch-workflow.md](docs/rust-rewrite/batch-workflow.md)
-for the measured verification ladder and current coordination hotspots.
-
-## Test262 evidence
-
-Repository fake suites are smoke tests, not ECMAScript conformance evidence.
-Only the complete pinned real Test262 suite through Wasm-AOT can establish
-product conformance. `Unsupported`, timeout, crash, and bug outcomes are all
-non-passing and must remain visible.
-
-For focused work, start with an exact real case or subtree and finish by running
-the same command after the fix. Also run adjacent filters that share the
-abstract operation or builtin you changed. Do not hand-edit published status
-counts; use the status publisher only after a complete verified matrix.
-
-Representative smoke commands are:
+They compile source-only Rust harnesses. Typed IR/Wasm modules remain in the full
+Cargo structural targets; guards do not replace native or semantic acceptance.
+Then run a focused target and the batch's broader checks under the same wrapper:
 
 ```sh
-./target/debug/scriptw test262 run language/wasm/pass \
-  --suite-root crates/scriptw-test262/tests/fixtures/fake_test262/vendor/test262 \
-  --execution-backend wasm
-
-./target/debug/scriptw test262 run \
-  --suite-root crates/scriptw-test262/tests/fixtures/fake_test262/vendor/test262
+python3 -B scripts/limited_verification.py -- cargo check --locked --workspace --all-targets
+python3 -B scripts/limited_verification.py -- cargo test --locked -p scriptw-aot-wasm --test structure_language -- --test-threads=1
+python3 -B scripts/limited_verification.py -- ./scripts/check-no-interpreter-in-product-graph.sh
 ```
 
-Use `./scripts/publish-real-status-low-ram.sh wasm-aot <snapshot-name>` only for
-a complete resumable real-suite publication.
+Select the owning target rather than copying the example for every change.
+A zero-test filter is not a passing regression check. Use
+`scripts/run_workspace_tests.py --plan-only --output <fresh-directory>` to inspect
+Cargo-selected scopes; use `--test-processes 1` for local execution. The driver
+supports source-bound receipts, focused scopes, debug/release profiles and bounded
+CLI partitions. `scripts/run_workspace_cohorts.py` bounds linking across larger
+inventories; explicitly select one test process locally. CI command groups live in
+`scripts/ci-targets.json`; `run-ci-target.py --print-command` shows their argv.
 
-## Tests worth keeping
+For the resumable per-module CLI baseline, run `scripts/rung1c-chunks.sh` under the
+resource wrapper with fresh `RUNG1C_DONE`, `RUNG1C_COUNTS` and `RUNG1C_RESULTS` paths
+per source cohort. Preserve them on an exact-source resume. Its count sidecar
+cannot detect same-count test edits or compiler changes: invalidate affected
+chunks after either. Incomplete, killed and zero-test chunks cannot establish a
+verdict. The disjoint chunk union must cover the complete selected inventory;
+chunking does not test whole-suite ordering effects.
 
-Temporary exploratory harnesses should live outside the permanent suite and be
-removed after the behavior is understood. Keep regression tests when they
-describe a contract that compiler or library consumers rely on. Prefer focused
-fixtures near the owning crate over broad duplicate coverage.
+```sh
+RUNG1C_DONE=target/watched/fresh-cli-done \
+RUNG1C_COUNTS=target/watched/fresh-cli-counts \
+RUNG1C_RESULTS=target/lane-notes/fresh-cli.md \
+python3 -B scripts/limited_verification.py -- ./scripts/rung1c-chunks.sh
+```
 
-## Pull request evidence
+Long checks use `scripts/run-watched.sh` with the scope's existing stall allowance.
+Silence alone does not establish a hang. Keep original failures and executable
+identities. Final release acceptance still requires the full default/all-feature,
+ignored, documentation, differential, robustness and conformance gates listed in
+[acceptance criteria](docs/rust-rewrite/conformance-acceptance.md).
 
-Report:
+## Test262
 
-- the owning task ID;
-- the exact baseline command and result;
-- the semantic invariant added or corrected;
-- the exact post-change commands and results;
-- files and modules touched;
-- materializations added or removed;
-- remaining failures and follow-up task IDs;
-- anything not verified.
+Use the built CLI, original pinned suite and an exact case or subtree first:
 
-If a change affects user-visible capabilities, CLI behavior, architecture,
-conformance, or workflow, update `README.md` in the same patch. Generated status
-numbers may change only through the status publication workflow.
+```sh
+python3 -B scripts/limited_verification.py -- ./target/debug/scriptw --jobs 1 test262 run built-ins/Array/prototype/find --execution-backend wasm-aot --suite-root test262/vendor/test262 --threads 1 --timeout-ms 60000
+```
 
-## Resources
+For a full baseline without publication, use a new snapshot family:
 
-- [ECMAScript language specification](https://tc39.es/ecma262/)
-- [Test262](https://github.com/tc39/test262)
-- [WebAssembly specifications](https://webassembly.github.io/spec/)
-- [Wasmtime documentation](https://docs.wasmtime.dev/)
+```sh
+python3 -B scripts/limited_verification.py -- ./target/debug/scriptw --jobs 1 test262 report-all --execution-backend wasm-aot --suite-root test262/vendor/test262 --snapshot-dir target/test262-baseline --snapshot-name fresh-baseline --threads 1 --timeout-ms 60000
+```
+
+For explicit sharding use `test262 shard --shard INDEX/TOTAL [filter]`, with
+one-based indices. A positional `1/2` is a literal filter. Preserve compiler,
+suite pins, workers, original deadlines and snapshot identity before adding
+`--resume`; never run two writers for one family. `progress-status` reads saved
+progress, which does not prove a process is alive.
+
+To publish a complete verified matrix, use:
+
+```sh
+python3 -B scripts/limited_verification.py -- ./scripts/publish-real-status-low-ram.sh wasm-aot <fresh-snapshot-name>
+```
+
+The publisher owns generated README counts. The chart can then be refreshed with
+`python3 -B scripts/generate-test-graph.py --refresh-evidence --full-evidence`
+and checked with `python3 -B scripts/generate-test-graph.py --check`.
+Fake suites and selected replays are separate evidence. `Unsupported`, timeout,
+crash and bug outcomes are non-passing; retain all four documented upstream
+disagreements as ordinary failures. A new complete publication is required to
+replace the [published full-suite result](docs/rust-rewrite/test262-current.md).
+
+## Artifact reuse
+
+Reuse requires exact source, features, dependency graph, runtime/program identities
+and resource policy; filenames alone prove nothing. Keep fresh evidence directories
+for new cohorts and preserve failed receipts. Shared immutable runtime images and
+bounded caches reduce rebuilds without sharing mutable JavaScript state.
+
+Keep evidence in durable workspace/archive storage; `/dev/shm` is scratch. Preserve
+outputs by digest before moving them, inspect symlink/hardlink destinations before
+a rebuild, and account for actual filesystem free space and cgroup file pages.
+Metadata-only cached-extern checks are diagnostics, not product builds or native
+acceptance. Never replace a failed original receipt with a passing diagnostic retry.

@@ -30,7 +30,7 @@ The independent copied-executable probe also preserves global symbols and
 dynamic-link tags, then passes three runtime-image admission controls. Product
 and doctest links keep their existing behavior. Rust backtraces lose DWARF source
 lines; global symbols and compiled panic locations remain. See the
-[workflow](batch-workflow.md#opt-in-iteration-tooling--2026-10-11).
+[workflow](../../CONTRIBUTING.md#verification).
 
 The old broad sweep was deliberately stopped with watcher exit 143 after the
 complete Engine library result. Async and builtin targets retain 159 and nine

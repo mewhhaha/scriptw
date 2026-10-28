@@ -153,5 +153,5 @@ Cold debug observations were about 20.3 seconds for the passing run and 7.9
 seconds for emission with its existing cache. These are diagnostic wall times,
 not a calibrated benchmark or a Node performance comparison. No Cargo rebuild
 or previously completed suite body was needed for this probe. The broader
-[unfinished verification and release work](current-inventory.md#verification-completed-failed-and-unrun)
+[unfinished verification and release work](current-inventory.md#next-work)
 is unchanged.

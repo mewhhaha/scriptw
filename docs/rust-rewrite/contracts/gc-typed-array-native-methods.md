@@ -1,9 +1,8 @@
 # TypedArray native mutation, copying and sorting
 
-This is authored source in the atomic Wasm GC draft. Rust types, emitted Wasm,
-JavaScript fixture parsing and semantic execution are unverified. MAIN has not
-received this cutover. All task source must finish before verification; later
-checks require the confirmed aggregate 4096 MiB cgroup cap and one worker.
+TypedArray algorithms retain one Wasm GC object model and the shared buffer,
+element-access, callable and Realm owners. The GC schema supplies the actual
+receiver brand; public properties cannot forge it.
 
 The six actual standard entries select an exhaustive TypedArrayNativeMethod.
 The private receiver constructor admits only a concrete TypedArrayObject and
@@ -55,9 +54,21 @@ until their real owning paths are updated; this method port does not claim them
 complete. The runtime target is experimental Wasmtime with Wasm GC, reference
 and declared shared-resource support, with no second heap representation.
 
-Eight authored paired strict/sloppy Engine controls cover all twelve element
-kinds, same-type intrinsic construction, exact copying bytes and overlap,
-coercion/resize ordering, With current-index validity, exact numeric/BigInt/stable
-sorting, GC roots and callback/detach/Throw behavior, concrete brands and borrowed
-Realms, and immutable mutation rejection including empty receivers. These tests
-are authored and unexecuted; there is no new conformance claim or skip list.
+Traversal methods take their initial typed length/read-view admission and use
+live element operations. Join converts the separator before element reads;
+locale formatting preserves element/method Get, original receiver, locale/options,
+Call and ToString. Every/Some stop at the first decisive callback result.
+Search retains each method's range, direction, equality and presence rules.
+
+Map creates and write-validates its species result before callbacks. Filter
+retains selected original values until callbacks finish, then creates and
+write-validates its result, including empty output. Slice also validates empty
+species results; a nonempty copy revalidates the source after species effects,
+then uses ascending same-kind byte copies or ordered unlike-kind conversion.
+
+The focused native controls cover element kinds, exact bytes/overlap,
+coercion/resize, intrinsic construction, sorting, GC/Throw, borrowed Realms and
+immutable admission. They live with the engine's GC entry tests. Current
+[verification guidance](../../../CONTRIBUTING.md#verification) and source-bound
+published checkpoints govern execution; this contract carries no independent
+conformance count.

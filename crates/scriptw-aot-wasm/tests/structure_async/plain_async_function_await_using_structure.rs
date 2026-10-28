@@ -15,7 +15,6 @@ const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-fail
 const CONTRACT: &str = include_str!(
     "../../../../docs/rust-rewrite/contracts/plain-async-function-await-using-scope.md"
 );
-const README: &str = include_str!("../../../../README.md");
 
 const EXACT_PATHS: [&str; 2] = [
     "language/statements/await-using/initializer-Symbol.asyncDispose-called-at-end-of-asyncfunctionbody.js",

@@ -226,5 +226,5 @@ python3 scripts/limited_verification.py -- python3 scripts/policy_break_even.py 
 
 Use a clean frozen checkout and retain Cargo JSON separately from stderr for
 the ordinary baseline's build admission. Use
-[the batch workflow](batch-workflow.md) for bounded native verification.
+[the development workflow](../../CONTRIBUTING.md#verification) for bounded native verification.
 Only the native Test262 publisher refreshes the pinned full-suite README block.

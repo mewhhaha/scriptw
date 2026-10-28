@@ -53,9 +53,10 @@ JavaScript object payload. All object layouts belong to a nonallocating typed
 base; strings, BigInts and Symbols do not. This removes per-header StoredValue
 snapshots while retaining Array, Function, BoundFunction, Arguments and Proxy
 identity and behavior. The same schema owns prototype-tag reconstruction.
-Compact ordinary scalar backing starts absent (all scalar words zero) and
-materializes at the first nonzero write. Reference-only records need no scalar
-array; later zero writes clear prior values. Packed numeric arrays start at
+For the Array variant of compact ordinary storage, scalar backing starts absent
+(all scalar words zero) and materializes at the first nonzero write; later zero
+writes clear prior values. One/two-slot records instead retain full scalar and
+reference fields inline; see [current storage](compact-ordinary-data-storage.md). Packed numeric arrays start at
 four elements and retain their occupancy-based growth bounds.
 
 On supported Linux anonymous mappings, normal copying collection releases

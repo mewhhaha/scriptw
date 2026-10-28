@@ -9,104 +9,16 @@ functions, retain and call JavaScript exports, and settle async host operations
 through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
 source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
 
-Trusted Wasmtime native program images also support fresh-process execution
-with the native compiler disabled; the contract records their host-specific
-format and explicit native-code admission boundary.
-On Linux, Cargo native runtime loading streams through bounded buffers into
-private disk backing. It reads linked image data through the executable file
-when its exact inode and mapped range can be established; see the
-[runtime ownership contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md).
-Runtime strings and noncanonical intrinsic method functions materialize on first
-use; their real data properties and alias identities remain intact. See the
-[lazy allocation contract](docs/rust-rewrite/contracts/lazy-runtime-values.md).
-Object storage avoids boxed prototype links and allocates scalar backing on
-demand. On Linux, the copying collector releases dead pages after collection
-while preserving heap capacity for reuse.
-Normalization tables and Intl catalogue metadata initialize on first use.
-The RegExp Unicode property catalogue also initializes on first lookup; see the
-[data contract](docs/rust-rewrite/contracts/regexp-unicode-property-data.md).
-Trusted precompiled loading reuses producer-admitted execution facts.
-Internal Array descriptor queries use a typed Array kernel and capture a fresh
-record. Set receiver updates use normalized data definitions through the same
-Array exotic checks; see the [receiver contract](docs/rust-rewrite/contracts/array-set-receiver-data-definition.md).
-Linux runtime-image reads can prove the main executable's identity from kernel
-ELF headers when file and mapping device IDs differ.
-Final program modules retain only referenced runtime imports; instantiation
-registers the exports requested by the actual module. See the
-[import contract](docs/rust-rewrite/contracts/runtime-program-import-compaction.md).
-Ordinary Array data and compact literal backing use typed storage states; see
-[the compact backing contract](docs/rust-rewrite/contracts/compact-value-backing.md).
-Intrinsic data and accessor installation share typed descriptor-publication
-helpers while preserving independent descriptors, flags and defining-Realm values.
-Deferred method reads share a function-construction tail after selecting their
-metadata. See the [publication contract](docs/rust-rewrite/contracts/intrinsic-property-publication.md).
+Trusted Wasmtime native program images support fresh-process execution with
+the native compiler disabled. Their format is host-specific and requires
+explicit admission of native code. Process RSS includes the host, runtime,
+code and execution history; it is not a measurement of the live JavaScript heap.
+See [runtime memory ownership](docs/rust-rewrite/contracts/runtime-byte-ownership.md)
+and [compact object storage](docs/rust-rewrite/contracts/compact-ordinary-data-storage.md).
 
-Eligible eager intrinsic accessors share context/record allocation through a
-typed Wasm helper, with source creation and metadata publication retaining their
-order. The selected verification and matched measurements are recorded in the
-[checkpoint](docs/rust-rewrite/memory-eager-accessors-20261027.md) and the
-[allocation contract](docs/rust-rewrite/contracts/eager-intrinsic-accessors.md).
-
-Deferred method installation and eager native constructor allocation share
-ordered typed Wasm routines while retaining Realm ownership, alias descriptors
-and bootstrap exceptions. See the [verified checkpoint](docs/rust-rewrite/memory-ordered-bootstrap-20261028.md)
-and [ordered bootstrap contract](docs/rust-rewrite/contracts/ordered-realm-bootstrap.md).
-
-The RegExp matcher shares one in-function backtracking body while preserving
-choice restoration, cursor/capture state and candidate retry order. The
-Array.fromAsync fulfilled continuation shares its mapper and commit/drive paths
-while retaining await and iterator-close ordering. See the
-[source-bound checkpoint](docs/rust-rewrite/memory-regexp-backtrack-20261027.md), the
-[backtracking contract](docs/rust-rewrite/contracts/regexp-shared-backtrack.md) and
-[continuation contract](docs/rust-rewrite/contracts/array-from-async-shared-fulfilled.md).
-
-An opt-in `benchmark-module-images` feature adds owner-aware Linux mapping
-metadata to excluded phase diagnostics after all four captures are acknowledged.
-It does not change JavaScript semantics, scored measurements or the default
-embedding API. See the [verified checkpoint](docs/rust-rewrite/memory-module-ownership-20261027.md)
-and [diagnostic ownership contract](docs/rust-rewrite/contracts/benchmark-module-images.md).
-No RSS improvement is claimed.
-
-The diagnostic now also records bounded section metadata from the actual owned
-native images after the final capture. It anchors serialized sections to the
-live image and text ranges; shared boundary pages remain nonadditive.
-The [verified section checkpoint](docs/rust-rewrite/memory-module-sections-20261028.md)
-identifies eager calendar data and GC stack maps as further targets. These
-unscored observations do not change the matched comparison below.
-
-The [deferred calendar-row change](docs/rust-rewrite/contracts/cold-calendar-rows.md)
-removes 133,712 bytes from eager runtime data initialization. The same batch
-[prefilters absent native-source imports](docs/rust-rewrite/contracts/native-source-import-prefilter.md)
-before entering their binding routines. Source-bound verification and matched
-observations are recorded in the [checkpoint](docs/rust-rewrite/memory-calendar-rows-20261028.md).
-No overall causal RSS saving is established.
-
-The [bootstrap fold batch](docs/rust-rewrite/contracts/native-bootstrap-metadata-folds.md)
-omits proven-empty native metadata publication and routes fifteen Intl getters
-through the checked shared accessor allocator. The [verified checkpoint](docs/rust-rewrite/memory-bootstrap-metadata-folds-20261028.md)
-records native coverage and the matched Scriptc comparison.
-
-The [inline compact-storage change](docs/rust-rewrite/contracts/inline-compact-storage.md)
-stores one- and two-key property values in inline GC fields and shares their
-store kernel. Its [verified checkpoint](docs/rust-rewrite/memory-inline-compact-storage-20261028.md)
-records native correctness and matched observations. The 384 KiB / 16,384-object
-allocation calculation is not measured RSS savings; see the
-[storage contract](docs/rust-rewrite/contracts/compact-ordinary-data-storage.md).
-Subsequent matched benchmark runs pin Rust to 1.99.1; runner differences still
-prevent causal conclusions from comparisons across hosts.
-
-The [runtime diagnostic](docs/rust-rewrite/contracts/runtime-performance-profile.md)
-also admits an explicit 8 MiB initial GC heap for controlled capacity experiments.
-Ordinary execution still starts at 16 MiB. The smaller setting has not established
-a memory or speed gain: the [controlled capacity probe](docs/rust-rewrite/memory-gc-capacity-20261028.md)
-grew back to 16 MiB on retained objects and roughly doubled their execution time.
-Its diagnostic RSS is separate from the comparison below.
-
-The [error-preparation change](docs/rust-rewrite/contracts/runtime-error-for-throw.md)
-shares repeated allocation and diagnostic code while preserving caller Realm,
-message ownership and throw completion. Its [verified checkpoint](docs/rust-rewrite/memory-runtime-error-tail-20261028.md)
-records native correctness and matched observations; these do not establish a
-causal resident-memory or execution-time saving.
+[Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
+and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+build, debug and verification loop.
 
 ## Precompiled comparison
 
@@ -208,36 +120,8 @@ These four failures remain open (upstream status checked 2026-10-21):
 **All four remain counted as failures.** Upstream tracking does not change their results.
 [Exact cases and verification](docs/rust-rewrite/failed-case-replay-20261021.md#remaining-four-recheck)
 · [Upstream status and related issues](test262/errata/proposals/upstream-status-20261021.md).
-The earlier `97036e5a8` checkpoint passed **4,083 native tests** across twelve
-affected targets and eighteen compiled semantic families. Its **13,104-case
-Test262 replay** has **13,100 passes and the same four failures**; the full chart
-below remains bound to `b9ecfe64b`. Native acceptance includes two complete
-target reruns after test-only fixture/trace repairs.
-[Full-run evidence](docs/rust-rewrite/test262-current.md) ·
-[Latest checkpoint](docs/rust-rewrite/v8-baseline.md#cached-string-hash-checkpoint--published-2026-10-23).
-The [performance checkpoint](docs/rust-rewrite/performance-six-workstreams-20261024.md)
-reports its own native checks and selected original-case replay. The full
-chart below remains bound to `b9ecfe64b`.
-
-The [retained-embedding checkpoint](docs/rust-rewrite/embedding-bridge-20261024.md),
-refreshed 2026-10-25, passed **5,700 affected native checks** and both standalone
-embedding examples. Its complete module-code and Function apply/bind/call
-subsets plus known-failure controls passed **980 / 984 executions**, with the
-same four failures and zero crashes, unsupported cases or timeouts. Verification
-used one CPU and a 4-GiB memory cap. The linked record retains refresh commands
-and exact inventories; this checkpoint does not refresh the full Test262 chart.
-
-The [packed-record memory checkpoint](docs/rust-rewrite/execution-memory-packed-records-20261026.md),
-refreshed 2026-10-26 at `736f0f120`, records **7,118 affected native
-checks across 32 targets**. This combines 31 unchanged targets executed at
-`e36a4f029` with the complete repaired structural target at `736f0f120`;
-the exact test-only source comparison and original execution identities are
-retained. It is not a fresh full native sweep on the later merged compiler.
-The measured `736f0f120` compiler's selected Test262 replay passed **20,264 / 20,268 executions**,
-with **4 failures, 0 crashes, 0 unsupported cases and
-0 timeouts**. Verification used one CPU, a 4-GiB memory cap and no swap.
-Existing source-tooling failures remain recorded; refresh commands and exact
-inventories are linked. The full pinned Test262 chart is unchanged.
+[Latest development verification](docs/rust-rewrite/current-inventory.md) is separate
+from this published full-suite result.
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)
@@ -335,9 +219,8 @@ When counts move, update this block in same change. Do not claim full Test262 `1
 
 ## Documentation
 
-[Project inventory](docs/rust-rewrite/current-inventory.md) ·
-[Rust architecture and development](docs/rust-rewrite/README.md) ·
+[Current work](docs/rust-rewrite/current-inventory.md) ·
+[Development and verification](CONTRIBUTING.md) ·
 [Runtime memory ownership and profiling](docs/rust-rewrite/contracts/runtime-byte-ownership.md) ·
-[Conformance commands and shard syntax](docs/rust-rewrite/batch-workflow.md#full-test262-measurement-and-publication) ·
-[Contributing](CONTRIBUTING.md) ·
-[Development history](DEVELOPMENT_HISTORY.md).
+[Conformance commands](CONTRIBUTING.md#test262) ·
+[Compiler contracts](docs/rust-rewrite/contracts/README.md).

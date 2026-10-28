@@ -20,8 +20,6 @@ const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-fail
 const CONTRACT: &str = include_str!(
     "../../../../docs/rust-rewrite/contracts/ordinary-property-eager-compound-assignment-reference.md"
 );
-// Exact dated results live in the frozen overview linked by the current README.
-const HISTORICAL_OVERVIEW: &str = include_str!("../../../../DEVELOPMENT_HISTORY.md");
 
 macro_rules! exact_test262 {
     ($name:literal) => {
@@ -515,33 +513,9 @@ fn exact_a7_inventory_is_raw_unmasked_and_keeps_all_t3_controls() {
 
 #[test]
 fn status_records_the_exact_baseline_and_keeps_the_batch_bounded() {
-    for source in [HISTORICAL_OVERVIEW] {
-        for marker in [
-            "ae1bd994b",
-            "22/88",
-            "66",
-            "T1, T2 and T4",
-            "T3 control",
-            "Runtime/Bug",
-            "post-batch",
-            "88/88",
-            "zero unsupported",
-            "1/1",
-            "75.42s",
-        ] {
-            assert!(
-                source
-                    .to_ascii_lowercase()
-                    .contains(&marker.to_ascii_lowercase()),
-                "status lost {marker}"
-            );
-        }
-    }
     for marker in [
         "44 physical files",
         "for 88 matrix\nexecutions",
-        "22/88",
-        "66 failing executions",
         "Exponentiation has no file in this legacy matrix",
         "This batch does not change logical assignment",
         "prefix/postfix numeric update",

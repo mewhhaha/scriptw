@@ -19,7 +19,6 @@ const TEST262_RUNNER_SOURCE: &str = include_str!("../../../scriptw-test262/src/l
 const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-failures.tsv");
 const CONTRACT: &str =
     include_str!("../../../../docs/rust-rewrite/contracts/async-generator-await-using-scope.md");
-const README: &str = include_str!("../../../../README.md");
 
 const EXACT_FILES: [(&str, &str); 2] = [
     (

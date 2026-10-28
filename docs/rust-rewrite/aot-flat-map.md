@@ -44,8 +44,8 @@ inherited overrides. Generic integer-indexed property operations own live buffer
 checks after resizing or detachment. Existing direct-call, spread-argument and
 TypedArray fixture programs remain unchanged.
 
-The ownership contracts are [algorithm ownership](contracts/array-flat-map-algorithm-owner.md)
-and [TypedArray observation](contracts/array-flat-map-typed-array-buffer-witness.md).
+The ownership contracts are [algorithm ownership](contracts/native-array-gc-methods.md)
+and [TypedArray observation](contracts/native-array-gc-methods.md).
 
 ## Verification
 

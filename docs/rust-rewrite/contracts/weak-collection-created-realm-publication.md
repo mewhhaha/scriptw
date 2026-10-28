@@ -22,7 +22,7 @@ All source, types and controls for the atomic batch remain uncompiled and
 unexecuted. Final representation/helper/guard composition also remains pending.
 Earlier verification commands and results below retain their original source
 scope; they are historical records, not instructions to run during the full-task
-dry-source pass. Later verification follows the [batch workflow](../batch-workflow.md)
+dry-source pass. Later verification follows the [batch workflow](../../../CONTRIBUTING.md#verification)
 with a confirmed aggregate 4096 MiB cap, swap zero and serial execution.
 
 ## Historical predecessor record

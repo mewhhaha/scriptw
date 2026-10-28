@@ -24,7 +24,7 @@ that area. An owner code does not indicate support or acceptance. Reports must
 also retain the observed outcome, reason, source identity and evidence.
 
 Specific invariants live in the [technical contracts](contracts/), with
-verification commands and evidence policy in [batch workflow](batch-workflow.md).
+verification commands and evidence policy in [contribution guide](../../CONTRIBUTING.md#verification).
 
 <a id="t00"></a>
 
@@ -71,8 +71,8 @@ Technical contracts:
 - [host-import-function-indices-authority](contracts/host-import-function-indices-authority.md)
 - [temporal-zoned-date-time-direction-dispatch](contracts/temporal-zoned-date-time-direction-dispatch.md)
 - [intl-locale-string-slot-dispatch](contracts/intl-locale-string-slot-dispatch.md)
-- [array-sort-output](contracts/array-sort-output.md)
-- [array-callback-receiver-kind](contracts/array-callback-receiver-kind.md)
+- [array-sort-output](contracts/native-array-gc-methods.md)
+- [array-callback-receiver-kind](contracts/native-array-gc-methods.md)
 - [array-find-via-predicate](contracts/array-find-via-predicate.md)
 - [ecmascript-trim-mode](contracts/ecmascript-trim-mode.md)
 - [obsolete-builtin-emitter-removal](contracts/obsolete-builtin-emitter-removal.md)
@@ -222,7 +222,7 @@ Technical contracts:
 Technical contracts:
 
 - [short-circuit-previous-expression-exhaustiveness](contracts/short-circuit-previous-expression-exhaustiveness.md)
-- [module-binding-name-domains](contracts/module-binding-name-domains.md#13-shared-unicode-identifier-spelling-authority)
+- [module-binding-names](contracts/module-binding-names.md)
 
 <a id="t08"></a>
 
@@ -300,7 +300,7 @@ Technical contracts:
 - [script-computed-import-admission](contracts/script-computed-import-admission.md)
 - [script-dynamic-import-jobs](contracts/script-dynamic-import-jobs.md)
 - [dynamic-import-dispatcher-reference-ownership](contracts/dynamic-import-dispatcher-reference-ownership.md)
-- [module-binding-name-domains](contracts/module-binding-name-domains.md#13-shared-unicode-identifier-spelling-authority)
+- [module-binding-names](contracts/module-binding-names.md)
 
 <a id="t13"></a>
 
@@ -405,15 +405,15 @@ Technical contracts:
 
 - [invocation-shortcut-retirement](contracts/invocation-shortcut-retirement.md)
 - [indexed-collection-invocation-reference](contracts/indexed-collection-invocation-reference.md)
-- [array-splice-algorithm-owner](contracts/array-splice-algorithm-owner.md)
+- [array-splice-algorithm-owner](contracts/native-array-gc-methods.md)
 - [array-by-copy-realm](contracts/array-by-copy-realm.md)
-- [array-sort-output](contracts/array-sort-output.md)
+- [array-sort-output](contracts/native-array-gc-methods.md)
 - [array-species-consumer-ownership](contracts/array-species-consumer-ownership.md)
-- [array-flat-forward-traversal](contracts/array-flat-forward-traversal.md)
+- [array-flat-forward-traversal](contracts/native-array-gc-methods.md)
 - [array-from-async-result-definition-error-realm](contracts/array-from-async-result-definition-error-realm.md)
 - [array-quantifier-entry-boundary](contracts/array-quantifier-entry-boundary.md)
-- [array-callback-receiver-kind](contracts/array-callback-receiver-kind.md)
-- [array-flat-map-typed-array-buffer-witness](contracts/array-flat-map-typed-array-buffer-witness.md)
+- [array-callback-receiver-kind](contracts/native-array-gc-methods.md)
+- [array-flat-map-typed-array-buffer-witness](contracts/native-array-gc-methods.md)
 - [gc-array-from-async-execution](contracts/gc-array-from-async-execution.md)
 
 <a id="t17"></a>
@@ -436,24 +436,24 @@ Technical contracts:
 - [atomics-wait-outcome](contracts/atomics-wait-outcome.md)
 - [atomics-integer-operation](contracts/atomics-integer-operation.md)
 - [atomics-integer-element-kind-local](contracts/atomics-integer-element-kind-local.md)
-- [typed-array-search-kind](contracts/typed-array-search-kind.md)
-- [array-callback-receiver-kind](contracts/array-callback-receiver-kind.md)
+- [typed-array-search-kind](contracts/gc-typed-array-native-methods.md)
+- [array-callback-receiver-kind](contracts/native-array-gc-methods.md)
 - [typed-array-integer-index-buffer-witness](contracts/typed-array-integer-index-buffer-witness.md)
 - [array-buffer-slice-source-reobservation](contracts/array-buffer-slice-source-reobservation.md)
 - [typed-array-accessor-buffer-witness](contracts/typed-array-accessor-buffer-witness.md)
 - [typed-array-iterator-buffer-witness](contracts/typed-array-iterator-buffer-witness.md)
-- [typed-array-join-buffer-witness](contracts/typed-array-join-buffer-witness.md)
+- [typed-array-join-buffer-witness](contracts/gc-typed-array-native-methods.md)
 - [typed-array-reverse-family-buffer-witness](contracts/typed-array-reverse-family-buffer-witness.md)
 - [typed-array-sort-family-buffer-witness](contracts/typed-array-sort-family-buffer-witness.md)
 - [typed-array-find-family-buffer-witness](contracts/typed-array-find-family-buffer-witness.md)
-- [typed-array-quantifier-family-buffer-witness](contracts/typed-array-quantifier-family-buffer-witness.md)
+- [typed-array-quantifier-family-buffer-witness](contracts/gc-typed-array-native-methods.md)
 - [array-quantifier-entry-boundary](contracts/array-quantifier-entry-boundary.md)
-- [typed-array-to-locale-string-buffer-witness](contracts/typed-array-to-locale-string-buffer-witness.md)
-- [array-to-locale-string-typed-array-buffer-witness](contracts/array-to-locale-string-typed-array-buffer-witness.md)
-- [array-flat-map-typed-array-buffer-witness](contracts/array-flat-map-typed-array-buffer-witness.md)
-- [typed-array-map-filter-buffer-witness](contracts/typed-array-map-filter-buffer-witness.md)
+- [typed-array-to-locale-string-buffer-witness](contracts/gc-typed-array-native-methods.md)
+- [array-to-locale-string-typed-array-buffer-witness](contracts/native-array-gc-methods.md)
+- [array-flat-map-typed-array-buffer-witness](contracts/native-array-gc-methods.md)
+- [typed-array-map-filter-buffer-witness](contracts/gc-typed-array-native-methods.md)
 - [atomics-typed-array-buffer-witness](contracts/atomics-typed-array-buffer-witness.md)
-- [array-concat-typed-array-buffer-witness](contracts/array-concat-typed-array-buffer-witness.md)
+- [array-concat-typed-array-buffer-witness](contracts/native-array-gc-methods.md)
 - [object-get-own-property-names-typed-array-buffer-witness](contracts/object-get-own-property-names-typed-array-buffer-witness.md)
 - [typed-array-subarray-buffer-witness](contracts/typed-array-subarray-buffer-witness.md)
 - [typed-array-subarray-species-argument-arity](contracts/typed-array-subarray-species-argument-arity.md)
@@ -713,7 +713,7 @@ Technical contracts:
 - [invocation-shortcut-retirement](contracts/invocation-shortcut-retirement.md)
 - [indexed-collection-invocation-reference](contracts/indexed-collection-invocation-reference.md)
 - [plain-generator-synchronous-for-of-continuations](contracts/plain-generator-synchronous-for-of-continuations.md)
-- [array-splice-algorithm-owner](contracts/array-splice-algorithm-owner.md)
+- [array-splice-algorithm-owner](contracts/native-array-gc-methods.md)
 - [iterator-from-completed-record](contracts/iterator-from-completed-record.md)
 - [aggregate-error-iterator-list](contracts/aggregate-error-iterator-list.md)
 - [module-memory-image-budget](contracts/module-memory-image-budget.md)

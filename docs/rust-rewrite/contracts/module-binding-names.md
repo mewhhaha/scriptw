@@ -1,35 +1,25 @@
-# Contract: module binding-name domains — pointer
+# Module binding names
 
-The contract for the area *Module binding-name domains: `[[LocalName]]` vs
-`[[ExportName]]` vs merged storage name* lives at:
+`LocalName` is a name in one module's environment; `ExportName` is a name in
+its export table. An import's requested name belongs to the exporting module's
+ExportName domain. Local aliases, anonymous default spelling and compiler-minted
+names must cross these boundaries explicitly rather than through an implicit
+String conversion.
 
-`docs/rust-rewrite/contracts/module-binding-name-domains.md`
+The current product uses canonical per-module activations, environments and live
+binding cells, including cycles, top-level await and deferred requests. It does
+not use the historical one-environment merged Script driver. Script entries
+retain their own globals, strictness and completion and start module targets
+through import jobs. Surviving `MergedName` helpers do not change that ownership.
 
-This file exists because the area brief names `module-binding-names.md` in its
-`files_owned` list while the campaign's file-naming convention for contracts
-uses the full area title. There is one contract; that file is it.
+Host-normalized `ModuleKey` identity is distinct from source request spelling.
+Unicode identifier spelling has one shared authority. Reexports preserve the
+resolved target and live binding rather than taking an early value snapshot.
 
-**§10 of that document is the dry-run discrepancy pass and supersedes §§1–9
-where they disagree** — notably V6/K4, the minted-vs-source disjointness claim,
-ledger R1's stated reason, and the K1/K2 overclaims.
-
-§12 records the later typed `ModuleKey` follow-up. It separates host-normalized
-module identity from source request spelling; it does not claim the generated
-Script-text obligation R8 is closed.
-
----
-
-## INTEGRATOR stage
-
-The lane note's §2 ("edits needed in files this lane does not own") is **None**,
-and the containment claim was re-checked here rather than assumed: no type or
-minting function named in the note appears outside `crates/scriptw-ir/`, and the
-only hit inside `scriptw-ir` but outside `modules/` is
-`lowering.rs`'s `.map(ModuleLinkErrorIr::to_diagnostic)`, which is unaffected by
-adding a variant.
-
-The §3 shared-file coordination in `lib.rs` resolved cleanly: this lane's
-`mod binding_names;` and the iterator lane's `mod iterator_obligations;` are both
-present in the alphabetical run, with both `pub use` blocks intact.
-
-`cargo check -p scriptw-ir` and `cargo xc` are clean.
+Source-only JavaScript targets can be loaded and parsed without opening their
+dependencies. Unsupported static source bindings/forwarded source exports fail
+linking with SyntaxError; dynamic import.source rejects before evaluation,
+namespace creation or cell publication. A rejection marker is not a fabricated
+module-source object or runtime storage cell. See
+[source-phase rejection](source-text-module-source-phase-rejection.md) and
+[module request identity](module-request-identity.md).

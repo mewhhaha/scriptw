@@ -11,11 +11,6 @@ const PROGRAM_SOURCE: &str = include_str!("../../../scriptw-ir/src/regexp/progra
 const TEST262_RUNNER_SOURCE: &str = include_str!("../../../scriptw-test262/src/lib.rs");
 const SHORTCUT_ALLOWLIST: &str = include_str!("../../../../test262/backlog/shortcut-allowlist.tsv");
 const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-failures.tsv");
-// Exact dated results live in the frozen overview linked by the current README.
-const HISTORICAL_OVERVIEW: &str = include_str!("../../../../DEVELOPMENT_HISTORY.md");
-const HISTORICAL_STATUS: &str = include_str!(
-    "../../../../docs/rust-rewrite/regexp-finite-string-algebra-historical-evidence.md"
-);
 const CONTRACT: &str = include_str!(
     "../../../../docs/rust-rewrite/contracts/regexp-unicode-set-finite-string-algebra.md"
 );
@@ -387,16 +382,11 @@ fn exact_inventory_is_nine_union_nine_intersection_and_nine_difference_files() {
     for marker in [
         "That is 27 physical files and 54 strict/non-strict executions.",
         "The six adjacent generated files whose name contains",
-        "finite keycap extension below",
-        "properties of strings without exact finite tables remain the distinct",
-        "### Finite keycap property extension",
-        "`Basic_Emoji` and the remaining `RGI_Emoji*` properties retain",
         "Backward/lookbehind lowering preserves the same alternative priority",
         "The current static producer implements the finite tables for",
         "`Emoji_Keycap_Sequence`, `Basic_Emoji`, `RGI_Emoji_Flag_Sequence`",
         "`RGI_Emoji_Modifier_Sequence`, `RGI_Emoji_Tag_Sequence`, `RGI_Emoji_ZWJ_Sequence`",
         "and `RGI_Emoji`.",
-        "historical keycap-only capability limits are superseded",
         "does not add a new Wasm matcher opcode or data",
         "finite source and property strings lower to the existing ordered matcher",
     ] {
@@ -509,43 +499,4 @@ fn durable_fixture_exercises_complete_string_members_and_set_algebra() {
     }
     assert!(CLI_TEST_SOURCE.contains("fn run_wasm_backend_matches_unicode_sets_class_strings()"));
     assert!(CLI_TEST_SOURCE.contains("wasm_regexp_unicode_sets_class_strings.js"));
-}
-
-#[test]
-fn verified_status_preserves_baseline_and_exact_scope() {
-    for (source, scope) in [
-        (
-            HISTORICAL_OVERVIEW,
-            "This records no broader UnicodeSets or RegExp completion claim.",
-        ),
-        (
-            HISTORICAL_STATUS,
-            "this historical evidence records no broader UnicodeSets closure.",
-        ),
-    ] {
-        let source = source.split_whitespace().collect::<Vec<_>>().join(" ");
-        for marker in [
-            "f580b424d",
-            "string-literal-union-string-literal.js",
-            "string-literal-intersection-string-literal.js",
-            "string-literal-difference-string-literal.js",
-            "`0/2` sloppy/strict",
-            "All six measured",
-            "Runtime/NotImplemented",
-            "RegExp.prototype.exec unsupported",
-            "27-file/54-execution",
-            "workspace/all-target",
-            "`cargo xc`",
-            "`1/1`",
-            "`7/7`",
-            "`54/54`",
-            "zero parser, early-error, lowering, runtime, Wasm-backend",
-            "reverse",
-            "Unicode properties of strings",
-            "`/iv`",
-        ] {
-            assert!(source.contains(marker), "status lost {marker}");
-        }
-        assert!(source.contains(scope), "historical scope lost {scope}");
-    }
 }

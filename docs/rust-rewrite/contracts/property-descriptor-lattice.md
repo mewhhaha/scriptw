@@ -1,144 +1,31 @@
-# Contract: the Property Descriptor lattice (ECMA-262 6.2.6)
+# Property descriptors
 
-This is the short-name pointer the formalizer's document asked the encoder to
-write. The full contract — measurement table, spec basis, invariant index
-I1–I15, ledger LN1–LN10, mistake-class table, retrofit map, deviations, dry-run
-corpus and acceptance criteria — is:
+`scriptw-ir/src/property_descriptor.rs` owns the closed descriptor domain.
+`classify` derives data, accessor and generic kinds from field presence;
+`[[Writable]]` alone makes a data descriptor. Absent, statically present and
+runtime-dependent presence remain distinct. Validation rejects a descriptor
+with both data and accessor fields before an object is mutated.
 
-> `docs/rust-rewrite/contracts/property-descriptor-closed-domain-proposal.md`
+A descriptor mask describes fields to query or update; a stored descriptor word
+describes a legal value. They are different types. Kind-independent attribute
+updates cannot manufacture an accessor descriptor with a writable data bit.
+Consumers match the closed kind and presence domains exhaustively.
 
-Read that document before touching anything in this area. In particular read its
-**§5.2**: the obvious fix to the `data: None` + `data_present_local: Some(..)`
-pair deletes a required 10.1.6.3 step-6.a check unless the two kind-change
-obligations are first split apart, which is what
-`FunctionBuilder::emit_descriptor_kind_change_throw` now does.
+`ValidateAndApplyPropertyDescriptor` finishes compatibility checks before the
+first store. Non-configurable comparisons use SameValue, including NaN, signed
+zero and exact reference identity. An omitted field preserves the old field;
+a real kind transition supplies the new kind's defaults. A statically true
+kind-change condition must not disappear merely because it has no runtime
+terms. Array length changes follow successful indexed-property admission.
 
-## Where the types live
+Descriptor-shaped JavaScript objects have one construction owner,
+`objects/descriptor_object.rs`. It publishes fields in the specification's
+order with CreateDataPropertyOrThrow attributes. Reading an accessor descriptor
+returns its getter/setter values without invoking them.
 
-| Item | File |
-|---|---|
-| `DescriptorField`, `DescriptorSide`, `TO_PROPERTY_DESCRIPTOR_ORDER` | `crates/scriptw-ir/src/property_descriptor.rs` |
-| `Presence<T, R>`, `KnownPresence` | same |
-| `DescriptorCarrier`, `SourceText` | same |
-| `PartialDescriptor<C>`, `ValidatedDescriptor<C>`, `ValidateError`, `BothDataAndAccessor` | same |
-| `PropertyDescriptorKind`, `DescriptorClassification<C>`, `KindTerms<C>`, `classify` | same |
-| `CompleteDescriptor<C>`, `CompletionDefaults<C>`, `complete_property_descriptor` | same |
-| `DescriptorSourceText<DataSide \| AccessorSide>` | same |
-| `DescriptorBit`, `DescriptorWord`, `DescriptorMask`, `DescriptorFlags`, `MappedSlot` | `crates/scriptw-aot-wasm/src/heap.rs` |
-| `TaggedLocals`, `WasmLocals`, `StoredDescriptorKind`, `AttributeBit`, `DescriptorKindLocal<K>`, `DescriptorKindWord` | `crates/scriptw-aot-wasm/src/objects.rs` |
-| `DescriptorObjectFields`, `DescriptorFlag`, `DescriptorObjectPrototype`, `emit_from_property_descriptor` (6.2.6.4) | `crates/scriptw-aot-wasm/src/objects/descriptor_object.rs` |
-
-## The seven rules a later change must not break
-
-1. **`classify` is the only derivation of 6.2.6.1/6.2.6.2/6.2.6.3.** There is no
-   second `if data.is_some()`, no second `accessor: bool`, no second `bool`
-   named after a kind. The seed decision in
-   `emit_object_define_entry_validated` derives from the two `KindTerms`, never
-   from `[[Value]]` alone — 6.2.6.2 says a descriptor carrying only
-   `[[Writable]]` is a data descriptor, and a `[[Value]]` test gets that wrong.
-   The one residual tiebreak, for a descriptor whose *both* sides are
-   run-time-possible, is ledger row **LN9**.
-2. **No `_ =>` arm in any `match` over `PropertyDescriptorKind`,
-   `DescriptorClassification`, `KnownPresence`, `DescriptorField`,
-   `CompleteDescriptor`, `StoredDescriptorKind`, `DescriptorSide` or
-   `Presence`.** Adding a case must be a compile error at every consumer.
-3. **A mask is not a word.** `DescriptorMask` and `DescriptorWord` have no
-   conversion in either direction. `ACCESSOR | WRITABLE` is a legal mask and an
-   illegal value, and both facts are load-bearing.
-4. **Absent, Present and Runtime are three states, not two.** `Present` means
-   "the field is there and the compiler knows it"; `Runtime` means "presence is
-   decided when the program runs". Collapsing them re-creates mistake class M2
-   and M5′. `DescriptorCompatibilityPredicate` exhaustively projects those
-   states to `Never`, `Always` and `AtRuntime`, so a known-present field can no
-   longer silently skip 10.1.6.3 compatibility checks.
-5. **`[[Writable]]` is not an attribute in the kind-agnostic sense.** The
-   kind-agnostic word builders take `AttributeBit`, whose two inhabitants are
-   `[[Enumerable]]` and `[[Configurable]]` — 10.1.6.3 steps 6.b and 7's
-   surviving set. Widening them back to `DescriptorBit` re-opens mistake class
-   M1 through the side door: `set_bit_if_nonzero(DescriptorBit::Writable, …)` on
-   an accessor-seeded word stores the illegal word `ACCESSOR | WRITABLE`.
-6. **A statically-true side is not an absent side.** 10.1.6.3 step 6.a/7.a's
-   antecedent is `statically_true OR (run-time terms)`. Deciding whether to emit
-   the check from `runtime_flags().is_empty()` alone conflates "the antecedent is
-   false" with "the antecedent is unconditionally true"; the four cases are
-   matched exhaustively in `emit_descriptor_kind_change_throw`.
-
-7. **Descriptor objects have one owner.** Every object whose own properties
-   spell a descriptor — `Object.getOwnPropertyDescriptor(s)` and
-   `Reflect.getOwnPropertyDescriptor` results, module namespace descriptors,
-   Proxy `defineProperty` trap arguments, and the engine's private
-   null-prototype arguments to its canonical definition builtins — is built by
-   `objects/descriptor_object.rs`. Its private field writer takes no attribute
-   argument and always applies 6.2.6.4's CreateDataPropertyOrThrow attributes
-   (writable, **enumerable**, configurable), in `DescriptorField::ALL` order.
-   Producers choose only the descriptor (`DescriptorObjectFields` or a
-   `CompleteDescriptor`) and the prototype (`DescriptorObjectPrototype`);
-   `tests/descriptor_object_owner_structure.rs` keeps the producer census.
-
-## What remains runtime-checked
-
-The still-open ledger rows in the full contract, plus the lane's own additions, are recorded in
-`target/lane-notes/The Property Descriptor lattice: one closed 6.2.6 type and one derived ValidateAndApplyPropertyDescriptor, replacing a raw u64 bitfield re-derived at eight sites-theory-integration.md`,
-which also carries the per-site retrofit instructions for the files this lane
-does not own.
-
-## Current retrofit status
-
-The historical LN3 positional adapter is retired. The ordinary-object
-`Object.defineProperty` branches now construct the closed
-`ObjectDefinePropertyDescriptorLocals::{Data, Accessor}` domain and call
-`emit_object_define_entry_validated` directly. Each branch's opposite side is
-unrepresentable, so it uses ordinary `validate()`; the sole Wasm
-`from_runtime_checked()` obligation is the six-field Arguments `callee`
-boundary documented in `object-define-property-descriptor-roles.md`.
-
-The contract's historical LN6 routing is now closed for array named
-properties. `emit_array_define_named_data_descriptor` and
-`emit_array_define_named_accessor_descriptor` build one
-`ValidatedDescriptor<WasmLocals>` at the boundary, and
-`emit_validate_array_named_descriptor` consumes that value directly. Its
-6.2.6.1–3 decision comes only from `classify`/`KindTerms`; the parallel
-`requested_data_descriptor: bool`, six positional field fragments and the
-hand-written four-field presence fold have been deleted.
-
-Array-index `[[DefineOwnProperty]]` has the same boundary invariant: one
-`ValidatedDescriptor<WasmLocals>` crosses from `Object.defineProperty` into
-the Array exotic path. Validation reads the existing indexed descriptor and
-finishes before the first element, accessor or descriptor-word store. Absent
-fields preserve the corresponding existing field; a kind transition supplies
-the 6.2.6.6 defaults. Non-configurable compatibility uses tagged `SameValue`,
-so `NaN` may be redefined as `NaN`, `+0` and `-0` remain distinct, and
-object/function identity is exact. Array length changes only after descriptor
-compatibility succeeds. Indexed `[[GetOwnProperty]]` materialization also
-matches the stored kind: accessor entries expose their raw getter and setter
-without invoking either, rather than being flattened into data descriptors.
-
-Arguments `length` now retains the same distinction through storage and use.
-Its descriptor kind is updated from `PropertyDescriptorKind`, the observable
-value remains a tagged value, and getter/setter identity is preserved across a
-generic or one-sided accessor update. Reads, writes and descriptor
-materialization match the stored data/accessor kind exhaustively; a genuine
-kind transition supplies `undefined` for omitted fields rather than exposing a
-stale value from the previous kind.
-
-The arguments `callee` and `length` attribute-update tables now transport
-`DescriptorMask` as well. Their `[[Writable]]`, `[[Enumerable]]` and
-`[[Configurable]]` operands can no longer be replaced with a raw descriptor
-word without a Rust type error; conversion to the Wasm `i64` encoding occurs
-only where the instruction is emitted.
-
-This does not close T10 or the rest of the ledger. Array application paths and
-remaining arguments/exotic emitters still contain derived word operations.
-LN10 is closed: ordinary, Array-index and Array named-property compatibility
-consume the same private `DescriptorCompatibilityPredicate`, and static kind
-changes use its `Always` case. The full contract's note-routed LN6 text is kept as the
-historical design record; its current-state supersession is recorded in the
-appended integration section there. Arguments indexed descriptors are outside
-the Array-index lane, but now consume the same typed descriptor and stored
-compatibility authority through the separate exotic protocol in
-`arguments-index-descriptor-exotic.md`; its focused witnesses are Test262
-15.2.3.7-6-a-279 and 15.2.3.7-6-a-280.
-The LN10 structure target passes `6/6`, its focused CLI witness passes `1/1`,
-and seven selected `Object.defineProperty` leaves pass `14/14`. The following
-683-dump semantic golden passes `2/2` in 676.81 seconds, adds only that witness,
-removes none and preserves all 682 retained non-accounting summaries.
+Ordinary, Array-index, Array named-property and Arguments consumers retain
+these rules through their actual exotic operations. Arguments mapping and
+one-sided accessor updates must not expose stale payloads after a kind change.
+See [Arguments descriptors](arguments-index-descriptor-exotic.md) and
+[stored attributes](stored-property-attributes.md). The runtime representation
+comes from the GC schema, not an older descriptor bitfield recipe.

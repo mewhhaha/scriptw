@@ -27,7 +27,7 @@ and [current verification inventory](../current-inventory.md).
 
 The predecessor below describes the retired UTF-8 transport and narrower
 file-private policy. It remains historical evidence; current verification uses
-the [batch workflow](../batch-workflow.md), including the inherited finite
+the [batch workflow](../../../CONTRIBUTING.md#verification), including the inherited finite
 memory cap on managed cloud machines.
 
 ## Historical predecessor record

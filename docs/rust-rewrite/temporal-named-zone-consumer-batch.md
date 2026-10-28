@@ -127,7 +127,7 @@ earlier evidence in the [lookup-only authority contract](contracts/temporal-name
 and historical task notes; it is not evidence for this later consumer graph.
 
 After the complete source batch is final, follow the
-[batch verification ladder](batch-workflow.md), generating/checking the pinned
+[batch verification workflow](../../CONTRIBUTING.md#verification), generating/checking the pinned
 catalogue before the single coordinated compile. Focused native refreshes include:
 
 ```sh

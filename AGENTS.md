@@ -1,123 +1,46 @@
 # AGENTS.md
 
-## Project Direction
+## Product and compiler contract
 
-- Scriptw is a greenfield Rust rewrite until 1.0. Optimize for the future Rust library, CLI, compiler architecture, and conformance story.
-- Do not preserve legacy internals, APIs, file layouts, or behavior merely for compatibility. The retired JavaScript implementation exists only in Git history at the recovery commit recorded by T28; it is neither a development surface nor an oracle.
-- Breaking changes are acceptable and expected before 1.0 when they move the project toward the correct compiler architecture or better ECMAScript/Test262 conformance.
-- Prefer deleting or replacing legacy-shaped code over layering compatibility shims, unless a shim is the smallest temporary step toward the Rust compiler path.
+- Scriptw is a greenfield Rust library and CLI rewrite until 1.0. Breaking changes are welcome when they improve the compiler architecture or ECMAScript correctness; do not preserve legacy APIs, layouts or behavior merely for compatibility.
+- Wasm is the sole product compilation target. C/native JavaScript output and a REPL are outside scope.
+- Compile JavaScript through parsing, early errors, spec IR, lowering IR and real Wasm codegen. Never ship an interpreter or VM compiled to Wasm, or emit an evaluator blob instead of the compiled program. An interpreter may exist only as a hidden debugging or differential-testing tool, never as the product or CLI execution path.
+- Dynamic source evaluation (`eval`, `new Function`, cross-realm Function constructors) is explicitly unsupported in standalone Wasm when it would require bundling a parser, interpreter or VM. Report these cases; do not silently skip them.
 
-## Core Goal
+## Runtime and correctness
 
-- Rewrite Scriptw fully in Rust as a library and CLI.
-- Wasm is the sole product compilation target. C output, native JavaScript output and a REPL are outside project scope; do not implement them or count them as remaining acceptance work.
-- Scriptw must compile JavaScript itself to Wasm. It must not ship a JavaScript interpreter or VM compiled to Wasm as the execution strategy.
-- The target is literal 100% ECMAScript and Test262 conformance, with no spec cheats, no silent skips, and no regressions.
+- Experimental Wasmtime is the required backend baseline unless the task explicitly narrows it. The backend may require Wasm GC, reference types, typed function references, exception handling with `exnref`, and related experimental features.
+- Maintain one backend and object model. Reject runtimes missing required capabilities clearly; do not add parallel heaps, closures, exception mechanisms or compatibility backends to emulate missing baseline features.
+- Keep runtime assumptions explicit in code, tests and docs. Wasmtime support does not imply browser, wasm3, wasmi or other engine support.
+- Target literal 100% ECMAScript and pinned Test262 conformance. Correctness comes before speed. Every failure needs an owner and reason; permanent skip lists, silent expected failures and regressions are unacceptable.
+- Keep fake-suite results, subsets and full pinned Test262 results distinct. A green fixture suite is not 100% ECMAScript or Test262.
 
-## Compiler Contract
+## Enforce invariants in code
 
-- Build the real `JS -> Wasm` compiler path.
-- User program semantics must go through parsing, early errors, spec IR, lowering IR, and real Wasm codegen.
-- A tiny interpreter is allowed only as a hidden debug or differential-testing tool.
-- The interpreter must not be used as the product path, CLI runtime path, or emitted Wasm artifact path.
-- Dynamic source evaluation features such as `eval`, `new Function`, and cross-realm `Function` constructors do not need AOT support when support would require bundling a parser, interpreter, or VM into emitted Wasm. Track these as explicit Wasm-AOT unsupported dynamic-code-generation cases, not silent skips.
+- Validate once in a constructor and require the validated type at subsequent uses.
+- Use enums for closed domains, newtypes for distinct identifiers, and exhaustive matches so missing cases fail to compile.
+- Encode evaluation order and lifecycle requirements in types when this prevents a plausible mistake. Keep unreachable product paths out of the build rather than relying only on tests or public visibility to hide dead code.
+- Avoid speculative abstractions: if the type prevents no plausible mistake, prefer a plain function.
 
-## Wasm Runtime Target
+## Development and verification
 
-- Treat experimental Wasmtime as the lower-bound execution target for backend feature planning unless a task explicitly names a narrower runtime.
-- Treat that lower bound as a required backend capability set, not an optional optimization tier. Backend code may assume those features exist by default.
-- Design from that lower bound upward: absence of a lower-bound feature such as Wasm GC is a runtime rejection condition, not a requirement to implement a compatibility backend or fallback representation.
-- This means Scriptw may rely on Wasmtime-gated Wasm features when they materially improve the compiler architecture or ECMAScript correctness, including Wasm GC, exception handling with `exnref`, typed function references, reference types, and related GC/reference-heavy infrastructure.
-- Do not add complex fallback implementations merely to support runtimes without those lower-bound features. If a backend design is clean with Wasm GC, typed function references, or `exnref`, prefer that design over maintaining a non-GC/non-reference fallback path, and treat non-GC runtimes as outside this backend target unless a task explicitly changes the target.
-- Do not build or preserve a second object model, closure representation, exception mechanism, memory layout, or compiler backend solely for engines that lack the experimental Wasmtime lower-bound feature set.
-- Treat missing Wasm GC support as an unsupported runtime capability gap for this backend, not as a reason to add a parallel manual heap/object model solely for compatibility.
-- Do not spend compiler complexity emulating lower-bound Wasm features that the selected runtime lacks. If GC, reference types, typed function references, `exnref`, or related Wasmtime experimental features are required for the clean design, require that runtime capability and fail clearly when it is absent.
-- When the experimental Wasmtime lower bound provides a feature, do not spend implementation complexity preserving support for runtimes that lack it. For example, if GC is required by the chosen object model, the boundary should reject non-GC runtimes instead of adding a second non-GC representation.
-- Do not design every Wasm feature around a lowest-common-denominator fallback. For example, if an object model, closure representation, exception path, or reference layout depends on GC, `exnref`, typed function references, or reference types, implement the clean experimental-Wasmtime path and report unsupported runtimes at the boundary.
-- Keep those features explicit in code, tests, and docs as Wasmtime experimental/runtime-gated assumptions. Do not imply that wasm3, wasmi, browsers, or every Wasm engine supports the same feature surface.
-- Prefer runtime capability checks, feature flags, or clear backend errors over compatibility shims or silent fallbacks when emitted Wasm requires these experimental Wasmtime features.
+- Identify the whole coherent batch and its independent chunks before implementation. Implement independent chunks concurrently with subagents; coordinate ownership of shared files. Create only the smallest necessary seam when work is coupled.
+- Finish code, tests, types and docs before expensive builds or broad suites. Use inspection and cheap source checks during implementation; compile early only to resolve an uncertainty or risky dependency.
+- After the batch, compile once, run focused regressions, then affected broader suites sequentially to reuse artifacts. Fix failures, rerun affected checks and finish with a broad verification checkpoint appropriate to the change. Report exactly what ran and what remains unverified.
+- Do not add tests that only mirror reversible, low-impact edits. Prefer checks that enforce meaningful compiler or tooling behavior.
+- Local verification uses `python3 scripts/limited_verification.py -- <command>`: at most 4 GiB, no swap, grouped OOM termination, serial CPU/workers and bounded retained-module caches. Do not run uncapped expensive verification.
+- On managed cloud machines, use `--cloud` with the inherited finite cgroup budget. The opt-in `--cloud-cpus auto` mode respects affinity and CPU quotas; Cargo and libtest remain serial. Preserve explicit worker counts, cache bounds and deadlines.
+- [CONTRIBUTING.md](CONTRIBUTING.md) owns checkout, build, verification and publication commands. [Current work](docs/rust-rewrite/current-inventory.md) owns the short unresolved queue. Keep completed narratives in Git, not new diaries.
 
-## Correctness Rules
+## README and published status
 
-- Spec correctness comes before speed, cleverness, or legacy compatibility.
-- Every conformance failure needs an owner and a reason.
-- Permanent skip lists and silent expected failures are not acceptable.
-- Never call fake-suite green "100% ECMAScript" or "100% Test262". Fake subset truth and full pinned Test262 truth must stay separate.
+- Update `README.md` with user-visible capability, conformance, CLI, architecture or workflow changes.
+- When status changes, refresh generated counts, commands and date together. Never hand-edit the pinned Test262 status numbers.
+- Publish with `scriptw test262 publish-status --execution-backend <spec-exec|wasm-aot>` or the equivalent `cargo run -p scriptw-cli -- ...` command. For low RAM, use `./scripts/publish-real-status-low-ram.sh <backend> <snapshot-name>`; it checkpoints one node per process and publishes only after verified completion.
 
-## Code Invariants Before Test Invariants
+## Workspace and retirement boundary
 
-Prefer an invariant the compiler enforces over one a test discovers. A full
-conformance run is measured in hours; `cargo check` is measured in seconds, and
-it never forgets to run.
-
-- Make illegal states unrepresentable. If a value must be validated, validate it
-  once in a constructor that returns the only type the rest of the code accepts,
-  rather than re-checking at each use and hoping a test covers the path that
-  forgets.
-- Prefer enums to strings and newtypes to bare integers wherever the domain is
-  closed. A rounding mode, an overflow behavior, a property attribute and a
-  temporal unit are all closed sets; spelling them as `&str` or `u32` moves the
-  error from compile time to run time.
-- Prefer exhaustive `match` to a catch-all. An exhaustive match over a builtin or
-  an opcode turns "you forgot to handle the new case" into a compile error. A
-  `_ => ...` arm turns the same omission into a silent wrong answer, and this
-  repository has shipped both.
-- Encode ordering and lifecycle requirements in the types. If two operands must
-  be evaluated before either is coerced, a builder that will not emit the
-  coercion until it holds both is worth more than a comment saying so.
-- If something is unreachable from the product path, that should fail to build,
-  not merely fail to run. Code with no call site has been written here more than
-  once; it compiled, formatted cleanly and produced no dead-code warning because
-  it was `pub`.
-
-This is not a licence to add speculative abstraction. The test is whether a
-plausible mistake becomes a compile error. If it does not, the type is decoration
-and a plain function is better.
-
-## Development Workflow
-
-- Batch implementation before expensive verification. At the start of a task, identify the complete coherent feature batch and the independent chunks within it.
-- Implement independent chunks concurrently with subagents. When work is unnecessarily coupled, first create the smallest clean seam that lets the chunks proceed independently; do not add speculative abstractions merely to enable parallel work.
-- Finish the code, tests, types, and documentation for the whole batch before running expensive compilation or broad test suites. Do not repeatedly rebuild after every small edit.
-- During implementation, prefer read-only inspection and cheap non-compiling checks. Run a focused compile or test early only when its result is needed to resolve an uncertainty, validate a risky foundation, or unblock later code.
-- After the batch is written, compile once, run the focused regressions, then run the broad suites sequentially so they reuse build artifacts. Fix all discovered failures, rerun affected focused tests, and finish with one broad verification checkpoint.
-- Verification remains mandatory before declaring the work complete. Report exactly what ran and what remains unverified.
-- On managed cloud machines, the machine's finite inherited cgroup memory limit is the verification budget. Use `python3 scripts/limited_verification.py --cloud -- <command>`; a separate local systemd scope or 4 GiB cap is not required there. Keep serial CPU/worker defaults and bounded retained-module caches. For native compilation, the verified opt-in `--cloud-cpus auto` mode uses no more than the inherited CPU affinity and visible cgroup CPU quotas; Cargo and libtest remain serial. Preserve explicit CLI worker counts and deadlines. Local machines retain the existing 4 GiB/no-swap/grouped-OOM scope policy.
-- `docs/rust-rewrite/batch-workflow.md` is the operational form of this section: the measured verification ladder, how to run a batch across several lanes, the baseline sweep invocation, and the current list of shared files that still force lanes to coordinate.
-
-## README And Status
-
-- Keep `README.md` current when work changes user-visible capabilities, conformance, CLI behavior, architecture, or development workflow.
-- If fake suite counts, wasm-safe subset counts, pinned real Test262 status, or major green/red milestones change, update the README status block in the same patch.
-- The README status block must include refresh commands, exact counts, and the refresh date when changed.
-- Use `./target/debug/scriptw test262 publish-status --execution-backend <spec-exec|wasm-aot>` or equivalent `cargo run -p scriptw-cli -- test262 publish-status ...` to refresh pinned real-suite artifacts and the README block. Do not hand-edit status numbers.
-- For low-RAM real-suite refreshes, use `./scripts/publish-real-status-low-ram.sh <spec-exec|wasm-aot> <snapshot-name>` so the top-level matrix checkpoints one node per process, then publishes the README only after verified completion.
-
-## Workspace Map
-
-- Rust workspace: `crates/`
-- Public library face: `crates/scriptw-engine`
-- Clean-break CLI face: `crates/scriptw-cli` and the `scriptw` command
-- Conformance taxonomy and harness rewrite: `crates/scriptw-test262`
-
-## Legacy Retirement Boundary
-
-- The supported product and development surfaces are the Rust workspace, Rust
-  CLI, and Rust-owned conformance tooling.
-- Do not restore a JavaScript compiler/runtime, package entrypoint, npm/JSR
-  publishing path, JavaScript Test262 runner, or browser compiler playground.
-- JavaScript may remain only as pinned Test262 content, embedded harness data,
-  Rust test fixtures and reproducers, or vendored dependencies. These files may
-  not implement or dispatch the product compiler/runtime.
-- Use Git commit `2107dfe9ad58c730e3d19b0cc1c73ed4390602f8` to inspect the retired
-  implementation. Do not add an archive copy to the working tree.
-- T29's coordinated identity cutover is complete for current product surfaces.
-  Keep all Rust packages, commands, configuration, caches and host interfaces
-  under the canonical Scriptw identity.
-
-## Hard Bans
-
-- Do not compile a JavaScript interpreter to Wasm and feed source into it.
-- Do not make `build wasm` emit an evaluator blob instead of the compiled user program.
-- Do not keep compatibility with legacy Porffor behavior when it conflicts with the Rust AOT compiler direction or ECMAScript correctness.
-- Do not reintroduce the retired JavaScript Porffor product or its publication surfaces.
+- Workspace: `crates/`; public API: `crates/scriptw-engine`; CLI: `crates/scriptw-cli` / `scriptw`; conformance tooling: `crates/scriptw-test262`.
+- Keep packages, commands, configuration, caches and host interfaces under the canonical Scriptw identity.
+- The retired JavaScript implementation exists only in Git at `2107dfe9ad58c730e3d19b0cc1c73ed4390602f8`. It is neither a development surface nor an oracle; do not restore or archive it in the working tree.
+- Do not restore a JavaScript compiler/runtime, npm/JSR entrypoints, JavaScript Test262 runner or browser compiler playground. JavaScript may remain as pinned Test262 content, embedded harness data, Rust fixtures/reproducers or vendored dependencies, never as the product compiler/runtime.
