@@ -49,8 +49,8 @@ order. The selected verification and matched measurements are recorded in the
 
 Deferred method installation and eager native constructor allocation share
 ordered typed Wasm routines while retaining Realm ownership, alias descriptors
-and bootstrap exceptions. Verification and matched memory measurements are
-pending; see the [ordered bootstrap contract](docs/rust-rewrite/contracts/ordered-realm-bootstrap.md).
+and bootstrap exceptions. See the [verified checkpoint](docs/rust-rewrite/memory-ordered-bootstrap-20261028.md)
+and [ordered bootstrap contract](docs/rust-rewrite/contracts/ordered-realm-bootstrap.md).
 
 The RegExp matcher shares one in-function backtracking body while preserving
 choice restoration, cursor/capture state and candidate retry order. The
@@ -71,40 +71,40 @@ No RSS improvement is claimed.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-27 on one GitHub Actions runner**, compiler `c79ab6838`.
+**Measured 2026-10-28 on one GitHub Actions runner**, compiler `1721e1b6d`.
 The [precompiled benchmark workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producer processes; measured consumers disable compilation and use
 identical native optimization and runtime settings. Both passed the original
 checksums on **17/17 workloads** across two rounds.
-Scriptw's median post-execution process RSS remains **1.228–1.653× Scriptc's**:
+Scriptw's median post-execution process RSS remains **1.223–1.606× Scriptc's**:
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 17.9 MiB | 13.5 MiB |
-| Objects | 19.0 MiB | 14.2 MiB |
-| Retained objects | 24.5 MiB | 20.0 MiB |
+| Integer | 18.1 MiB | 13.4 MiB |
+| Objects | 18.6 MiB | 14.3 MiB |
+| Retained objects | 24.4 MiB | 19.9 MiB |
 
 These are medians of 14 measured samples per runtime and workload after ten
 checked warmups per round, with each Store still alive. RSS includes code,
 runtime and allocator history; it is neither live JS heap nor peak memory.
 Scriptc parity remains open. Cross-runner comparisons do not establish causal savings.
 
-[The ownership checkpoint](docs/rust-rewrite/memory-module-ownership-20261027.md) records **31 native
-diagnostic test executions and 63 Python tests**, default-build API exclusion, and
-validated P/R module ownership across four unscored lifecycle captures.
-In the sampled integer and retained-object workloads, Scriptw retains
-**2.28–2.89 MiB more compiled-module pages** than Scriptc after Store drop.
-Host executable pages also contribute; page/symbol overlap does not prove execution.
+[The startup checkpoint](docs/rust-rewrite/memory-ordered-bootstrap-20261028.md) records **4,894 native test
+executions across 19 targets and 28 fresh original Test262 executions**.
+The selected original families cover Iterator’s constructor accessor and Array’s
+`values` method; this is not a full pinned-suite refresh. Verification used one
+CPU, a 4-GiB process-tree cap, no swap and bounded module retention.
 
-The [earlier compiler checkpoint](docs/rust-rewrite/memory-regexp-backtrack-20261027.md)
-records **4,889 native cases and 6,307 unique selected pinned Test262 executions**.
-The diagnostic feature inherits those selected JS results through exact runtime
-Wasm/package and native compatibility-stamp proofs; no fresh full-suite run is claimed.
-Verification uses one CPU, a 4-GiB process-tree cap, no swap and bounded module retention.
+The Portable initializer plus its new helpers is **26.4% smaller** in native
+code. This does not establish an overall RSS or execution-time saving.
+The four unscored ownership captures still show **2.12–2.67 MiB of extra
+compiled-module pages** after Store drop in the sampled integer/retained-object
+workloads, plus extra host executable pages. Shared page counts are nonadditive;
+presence does not prove execution or causality.
 
 [Execution timing](docs/rust-rewrite/assets/precompiled-execution.svg) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40594118953).
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40611080497).
 
 ## Benchmarks
 

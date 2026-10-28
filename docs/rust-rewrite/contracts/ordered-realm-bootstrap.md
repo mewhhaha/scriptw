@@ -1,9 +1,11 @@
 # Ordered shared Realm installation
 
 Runtime layout 29 adds two runtime-owned typed Wasm helpers to the real Realm
-bootstrap. Verification and matched native-size/residency measurements are
-pending. This change does not establish a measured memory saving or full-suite
-conformance result.
+bootstrap. The [verified checkpoint](../memory-ordered-bootstrap-20261028.md) records
+4,894 native test executions, 28 fresh original Test262 executions and all 17
+paired workload checksums. It reports static code sizes and unscored ownership
+captures separately. This does not establish an overall RSS/speed saving,
+Scriptc parity or a full-suite conformance result.
 
 `DeferredIntrinsicInstall` allocates the existing one deferred-method recipe,
 captures its defining Realm and exact admitted builtin, projects the target
@@ -30,7 +32,7 @@ existing closed domain. All standard and host constructors remain eager.
 
 The ordered Realm graph and property insertion order are unchanged. Bootstrap
 continues to own Error and typed-array constructor inheritance; Proxy's absent
-public prototype; Iterator's absent constructor backlink; public prototype and
+public prototype; Iterator's constructor accessor; public prototype and
 cache publication; typed-array `BYTES_PER_ELEMENT`; canonical Realm-slot
 publication; and the subsequent exhaustive family installer. Accessors retain
 their eager allocation path. Every Realm owns its existing GC objects and
