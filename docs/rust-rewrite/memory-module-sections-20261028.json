@@ -1,0 +1,3962 @@
+{
+  "schema": "scriptw-module-sections-diagnostic-v1",
+  "recorded_at": "2026-10-28T02:07:51.372939+00:00",
+  "scored": false,
+  "excluded_from_scored_cohorts": true,
+  "feature_source_commit": "1fd6940fb3db57b999dc535595f5a185870cae69",
+  "measured_source_commit": "45f26184b16ba0841346c537e517112d08aa74ab",
+  "source_fingerprint": "38dcec36d31ea52fed69deb88b1fd81fc02ded4b81b3f33859280c1f8df8bec2",
+  "github_run": 40611737589,
+  "validation": {
+    "report_sha256": "9457518d3888e7e607bade6b0a004b70ba91c325d6e9edf3819f7c8385d23931",
+    "native_controls": {
+      "status": "validated",
+      "passed": 6,
+      "test_ids": [
+        "embedding::benchmark_module_images::sections::tests::malformed_headers_extended_counts_and_table_extents_are_rejected",
+        "embedding::benchmark_module_images::sections::tests::name_budget_is_aggregate_even_for_omitted_logical_sections",
+        "embedding::benchmark_module_images::sections::tests::names_require_unique_bounded_terminated_utf8_and_in_table_offsets",
+        "embedding::benchmark_module_images::sections::tests::relocatable_no_program_headers_yields_only_exact_file_backed_metadata",
+        "embedding::benchmark_module_images::sections::tests::section_arithmetic_overlap_nobits_and_text_anchors_fail_closed",
+        "embedding::tests::benchmark_module_images::diagnostic_images_match_actual_program_runtime_and_survive_store_drop"
+      ],
+      "summary": [
+        [
+          "ok",
+          "6",
+          "0",
+          "0",
+          "0",
+          "1053"
+        ]
+      ],
+      "stdout_sha256": "1a61b04a793b82830e2ea298feed40aa74af3052ea66133680a4c011e187815a",
+      "stderr_sha256": "9e1a4b41f146c84473fa33533149feaab8a16883383aa575b9b46ec072314c53"
+    },
+    "cli_example_controls": {
+      "status": "raw-job-log-unavailable",
+      "exact_pass_count": null,
+      "ci_build_step_success": true,
+      "reason": "Downloaded scored/native artifacts retain the six engine controls; no raw CLI example-test job log is present. No CLI example count is inferred."
+    },
+    "prior_processing_failure": {
+      "report_sha256": "25917f3e69e687791d585b55d0e21a99a949367f01e99e5eabcc4ae66f53219b",
+      "complete": false,
+      "reason": "The first processor incorrectly asserted that one section would lead both observations. All scored/endpoint/page joins had passed; the per-case leader differs.",
+      "report_path": "/home/mewhhaha/src/porffor/target/memory-module-sections-20261028-evidence/ci-40611737589-validated/report.json",
+      "executed_driver_sha256": "a0ed175850de59c5c5bf14d258433cbafe6092be808b8abdc06b337ce5806aab"
+    },
+    "before": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "46755840",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "after": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "257277952",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "validator_sources": {
+      "benchmark_module_images.py": {
+        "source_commit": "1fd6940fb3db57b999dc535595f5a185870cae69",
+        "sha256": "37ac2f4e3b8ef0a40e153420bf541e9843d217446b17bd555ffada3dd065332c"
+      },
+      "benchmark_module_sections.py": {
+        "source_commit": "1fd6940fb3db57b999dc535595f5a185870cae69",
+        "sha256": "c9d46e5038f19dc69dba605af83424d97fe298d66947cde11577a8b3bd92e7ee"
+      },
+      "diagnose-precompiled-mappings.py": {
+        "source_commit": "1fd6940fb3db57b999dc535595f5a185870cae69",
+        "sha256": "2e98f6c136e242cb6140c3cd6db3986b5b2abe73ae4f1b4988f4c7e24f18860f"
+      }
+    }
+  },
+  "scored_context": {
+    "attempts": 68,
+    "workloads": 17,
+    "all_checksums_validated": true,
+    "new_scores_published": false,
+    "existing_reference": {
+      "file": "memory-ordered-bootstrap-20261028.json",
+      "sha256": "77d6d72301c254ef459688e8a738daceb01e14d88c48b7a38019536eeea46667",
+      "interpretation": "The published matched Core cohort remains the scored reference. No README or graph cohort is replaced by this unscored section diagnostic."
+    }
+  },
+  "runtime_identity_comparison": {
+    "prior_run": 40611080497,
+    "current_run": 40611737589,
+    "runtime_keys": [
+      "cb6a7a8e7d8ee812ccfbf03e9509ec648cce8972ab4fa634dc2a432f42e142e8"
+    ],
+    "layout": 29,
+    "prior_raw_wasm_sha256": "358d83203977a8d0e424a0e4bd115a7717476a7e7478cf7e0a711f22fe82e047",
+    "prior_raw_wasm_bytes": 39562796,
+    "interpretation": "The admitted scored Portable R content key equals the prior validated layout29 key, which hashes layout+raw R Wasm. This binds unchanged raw runtime identity; it does not assert cross-runner native byte equality."
+  },
+  "captures": [
+    {
+      "runtime": "scriptw",
+      "file": "integer.js",
+      "nonce": "2183cba88856d92ca4973a8c2e64f51f",
+      "observation_index": 16,
+      "image_sha256": "9b6146673f59ed205132cfa2e7ccf28ef774cb5849673e40a7f980961b430265",
+      "host_executable_sha256": "d26cb5d266e2df6cb52fdbc18dbc286c7afa0982cbe881bb6200df7a7d27199f",
+      "owners": [
+        {
+          "role": "program",
+          "image": {
+            "end": 140015123895752,
+            "start": 140015123517440
+          },
+          "text": {
+            "end": 140015123787776,
+            "start": 140015123521536
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 960,
+              "offset": 377352
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 266240,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 7188,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 270336,
+                "section_type": 1
+              },
+              {
+                "bytes": 32005,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 277524,
+                "section_type": 1
+              },
+              {
+                "bytes": 23972,
+                "flags": 2,
+                "name": ".wasmtime.stackmap",
+                "offset": 309529,
+                "section_type": 1
+              },
+              {
+                "bytes": 8710,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 333501,
+                "section_type": 1
+              },
+              {
+                "bytes": 536,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 342211,
+                "section_type": 1
+              },
+              {
+                "bytes": 651,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 344064,
+                "section_type": 1
+              },
+              {
+                "bytes": 569,
+                "flags": 2,
+                "name": ".name.wasm",
+                "offset": 344715,
+                "section_type": 1
+              },
+              {
+                "bytes": 20766,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 345284,
+                "section_type": 1
+              },
+              {
+                "bytes": 4056,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 366056,
+                "section_type": 2
+              },
+              {
+                "bytes": 7051,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 370112,
+                "section_type": 3
+              },
+              {
+                "bytes": 187,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 377163,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 378312,
+            "serialized_sha256": "c070f4a74b33cbfa713400ba6a83accc394f4e353403b8fb4005984cf5a98e38"
+          }
+        },
+        {
+          "role": "runtime",
+          "image": {
+            "end": 140014658679944,
+            "start": 140014591672320
+          },
+          "text": {
+            "end": 140014642651136,
+            "start": 140014591676416
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 960,
+              "offset": 67006664
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 50974720,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 107316,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 50978816,
+                "section_type": 1
+              },
+              {
+                "bytes": 7182758,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 51086132,
+                "section_type": 1
+              },
+              {
+                "bytes": 4294388,
+                "flags": 2,
+                "name": ".wasmtime.stackmap",
+                "offset": 58268890,
+                "section_type": 1
+              },
+              {
+                "bytes": 2112068,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 62563278,
+                "section_type": 1
+              },
+              {
+                "bytes": 25544,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 64675346,
+                "section_type": 1
+              },
+              {
+                "bytes": 2039616,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 64700890,
+                "section_type": 1
+              },
+              {
+                "bytes": 38327,
+                "flags": 2,
+                "name": ".name.wasm",
+                "offset": 66740506,
+                "section_type": 1
+              },
+              {
+                "bytes": 61968,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 66778833,
+                "section_type": 1
+              },
+              {
+                "bytes": 54072,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 66840808,
+                "section_type": 2
+              },
+              {
+                "bytes": 111597,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 66894880,
+                "section_type": 3
+              },
+              {
+                "bytes": 187,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 67006477,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 67007624,
+            "serialized_sha256": "a06eebbdb6d3f5a6c42d7504f6babd5d42c9155bb1c0d81abd940d1486468f11"
+          }
+        }
+      ],
+      "host_phases": [
+        {
+          "phase": "after_transport_drop",
+          "load_bias": 94555363450880,
+          "present_host_rx_pages": 1527,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_instantiate",
+          "load_bias": 94555363450880,
+          "present_host_rx_pages": 1895,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_execution",
+          "load_bias": 94555363450880,
+          "present_host_rx_pages": 1895,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_store_drop",
+          "load_bias": 94555363450880,
+          "present_host_rx_pages": 1895,
+          "page_bytes": 4096
+        }
+      ],
+      "host_nonexclusive_function_count": 17660
+    },
+    {
+      "runtime": "scriptc",
+      "file": "integer.js",
+      "nonce": "f0d3e7620964ecc0ca091beddb0e6ce4",
+      "observation_index": 16,
+      "image_sha256": "43e1331dfd890c8941513b55429dba833ea63cf4826fb535759781ae0c78004f",
+      "host_executable_sha256": "d26cb5d266e2df6cb52fdbc18dbc286c7afa0982cbe881bb6200df7a7d27199f",
+      "owners": [
+        {
+          "role": "program",
+          "image": {
+            "end": 140556422978224,
+            "start": 140556422033408
+          },
+          "text": {
+            "end": 140556422742016,
+            "start": 140556422037504
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 832,
+              "offset": 943984
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 704512,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 32948,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 708608,
+                "section_type": 1
+              },
+              {
+                "bytes": 107757,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 741556,
+                "section_type": 1
+              },
+              {
+                "bytes": 15232,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 849313,
+                "section_type": 1
+              },
+              {
+                "bytes": 2576,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 864545,
+                "section_type": 1
+              },
+              {
+                "bytes": 28672,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 868352,
+                "section_type": 1
+              },
+              {
+                "bytes": 10347,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 897024,
+                "section_type": 1
+              },
+              {
+                "bytes": 17304,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 907376,
+                "section_type": 2
+              },
+              {
+                "bytes": 19142,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 924680,
+                "section_type": 3
+              },
+              {
+                "bytes": 157,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 943822,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 944816,
+            "serialized_sha256": "68b78f1b5f50eec8b7de144ad1ca2c53c41c6f838c143946093f8fddbffc1a38"
+          }
+        }
+      ],
+      "host_phases": [
+        {
+          "phase": "after_transport_drop",
+          "load_bias": 94060666548224,
+          "present_host_rx_pages": 1068,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_instantiate",
+          "load_bias": 94060666548224,
+          "present_host_rx_pages": 1321,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_execution",
+          "load_bias": 94060666548224,
+          "present_host_rx_pages": 1321,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_store_drop",
+          "load_bias": 94060666548224,
+          "present_host_rx_pages": 1321,
+          "page_bytes": 4096
+        }
+      ],
+      "host_nonexclusive_function_count": 15639
+    },
+    {
+      "runtime": "scriptw",
+      "file": "retained-objects.js",
+      "nonce": "fcffd23ec88d4b4ef182b81b215ce5ca",
+      "observation_index": 16,
+      "image_sha256": "84b56c20828a9efff34e75c6fcb438dba83f60cfeeab131516e78c7523f67b98",
+      "host_executable_sha256": "d26cb5d266e2df6cb52fdbc18dbc286c7afa0982cbe881bb6200df7a7d27199f",
+      "owners": [
+        {
+          "role": "program",
+          "image": {
+            "end": 140296178362320,
+            "start": 140296177934336
+          },
+          "text": {
+            "end": 140296178245632,
+            "start": 140296177938432
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 960,
+              "offset": 427024
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 307200,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 7108,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 311296,
+                "section_type": 1
+              },
+              {
+                "bytes": 35453,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 318404,
+                "section_type": 1
+              },
+              {
+                "bytes": 26588,
+                "flags": 2,
+                "name": ".wasmtime.stackmap",
+                "offset": 353857,
+                "section_type": 1
+              },
+              {
+                "bytes": 9675,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 380445,
+                "section_type": 1
+              },
+              {
+                "bytes": 536,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 390120,
+                "section_type": 1
+              },
+              {
+                "bytes": 1134,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 393216,
+                "section_type": 1
+              },
+              {
+                "bytes": 569,
+                "flags": 2,
+                "name": ".name.wasm",
+                "offset": 394350,
+                "section_type": 1
+              },
+              {
+                "bytes": 20911,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 394919,
+                "section_type": 1
+              },
+              {
+                "bytes": 4008,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 415832,
+                "section_type": 2
+              },
+              {
+                "bytes": 6997,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 419840,
+                "section_type": 3
+              },
+              {
+                "bytes": 187,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 426837,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 427984,
+            "serialized_sha256": "6a55dd90c66039d96b998550a8518b55c796d2aee8bbbc07f59c04191fdb655b"
+          }
+        },
+        {
+          "role": "runtime",
+          "image": {
+            "end": 140295710602376,
+            "start": 140295643594752
+          },
+          "text": {
+            "end": 140295694573568,
+            "start": 140295643598848
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 960,
+              "offset": 67006664
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 50974720,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 107316,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 50978816,
+                "section_type": 1
+              },
+              {
+                "bytes": 7182758,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 51086132,
+                "section_type": 1
+              },
+              {
+                "bytes": 4294388,
+                "flags": 2,
+                "name": ".wasmtime.stackmap",
+                "offset": 58268890,
+                "section_type": 1
+              },
+              {
+                "bytes": 2112068,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 62563278,
+                "section_type": 1
+              },
+              {
+                "bytes": 25544,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 64675346,
+                "section_type": 1
+              },
+              {
+                "bytes": 2039616,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 64700890,
+                "section_type": 1
+              },
+              {
+                "bytes": 38327,
+                "flags": 2,
+                "name": ".name.wasm",
+                "offset": 66740506,
+                "section_type": 1
+              },
+              {
+                "bytes": 61968,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 66778833,
+                "section_type": 1
+              },
+              {
+                "bytes": 54072,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 66840808,
+                "section_type": 2
+              },
+              {
+                "bytes": 111597,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 66894880,
+                "section_type": 3
+              },
+              {
+                "bytes": 187,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 67006477,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 67007624,
+            "serialized_sha256": "a06eebbdb6d3f5a6c42d7504f6babd5d42c9155bb1c0d81abd940d1486468f11"
+          }
+        }
+      ],
+      "host_phases": [
+        {
+          "phase": "after_transport_drop",
+          "load_bias": 94324048830464,
+          "present_host_rx_pages": 1527,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_instantiate",
+          "load_bias": 94324048830464,
+          "present_host_rx_pages": 1911,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_execution",
+          "load_bias": 94324048830464,
+          "present_host_rx_pages": 1911,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_store_drop",
+          "load_bias": 94324048830464,
+          "present_host_rx_pages": 1911,
+          "page_bytes": 4096
+        }
+      ],
+      "host_nonexclusive_function_count": 17712
+    },
+    {
+      "runtime": "scriptc",
+      "file": "retained-objects.js",
+      "nonce": "9bf7875435027a6ffa6ea85e94017613",
+      "observation_index": 16,
+      "image_sha256": "e4c890bb5555110448141c33b54da3f7c432cdfb9811f9a3efa69eb0da47ff32",
+      "host_executable_sha256": "d26cb5d266e2df6cb52fdbc18dbc286c7afa0982cbe881bb6200df7a7d27199f",
+      "owners": [
+        {
+          "role": "program",
+          "image": {
+            "end": 140411077223296,
+            "start": 140411075633152
+          },
+          "text": {
+            "end": 140411076853760,
+            "start": 140411075637248
+          },
+          "sections": {
+            "elf_header": {
+              "bytes": 64,
+              "offset": 0
+            },
+            "schema": "scriptw-module-sections-v1",
+            "section_headers": {
+              "bytes": 832,
+              "offset": 1589312
+            },
+            "sections": [
+              {
+                "bytes": 1102,
+                "flags": 2,
+                "name": ".wasmtime.engine",
+                "offset": 64,
+                "section_type": 1
+              },
+              {
+                "bytes": 1,
+                "flags": 2,
+                "name": ".wasmtime.bti",
+                "offset": 1166,
+                "section_type": 1
+              },
+              {
+                "bytes": 1216512,
+                "flags": 6,
+                "name": ".text",
+                "offset": 4096,
+                "section_type": 1
+              },
+              {
+                "bytes": 49204,
+                "flags": 2,
+                "name": ".eh_frame",
+                "offset": 1220608,
+                "section_type": 1
+              },
+              {
+                "bytes": 180468,
+                "flags": 2,
+                "name": ".wasmtime.addrmap",
+                "offset": 1269812,
+                "section_type": 1
+              },
+              {
+                "bytes": 25555,
+                "flags": 2,
+                "name": ".wasmtime.traps",
+                "offset": 1450280,
+                "section_type": 1
+              },
+              {
+                "bytes": 3608,
+                "flags": 2,
+                "name": ".wasmtime.exceptions",
+                "offset": 1475835,
+                "section_type": 1
+              },
+              {
+                "bytes": 36864,
+                "flags": 2,
+                "name": ".rodata.wasm",
+                "offset": 1482752,
+                "section_type": 1
+              },
+              {
+                "bytes": 15414,
+                "flags": 2,
+                "name": ".wasmtime.info",
+                "offset": 1519616,
+                "section_type": 1
+              },
+              {
+                "bytes": 25776,
+                "flags": 0,
+                "name": ".symtab",
+                "offset": 1535032,
+                "section_type": 2
+              },
+              {
+                "bytes": 28346,
+                "flags": 0,
+                "name": ".strtab",
+                "offset": 1560808,
+                "section_type": 3
+              },
+              {
+                "bytes": 157,
+                "flags": 0,
+                "name": ".shstrtab",
+                "offset": 1589154,
+                "section_type": 3
+              }
+            ],
+            "serialized_bytes": 1590144,
+            "serialized_sha256": "4fd088453bf8d7dc21ae6491fbcf94b253d9497f2816d65e4225885fe927b6ba"
+          }
+        }
+      ],
+      "host_phases": [
+        {
+          "phase": "after_transport_drop",
+          "load_bias": 94210036752384,
+          "present_host_rx_pages": 1059,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_instantiate",
+          "load_bias": 94210036752384,
+          "present_host_rx_pages": 1299,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_execution",
+          "load_bias": 94210036752384,
+          "present_host_rx_pages": 1299,
+          "page_bytes": 4096
+        },
+        {
+          "phase": "after_store_drop",
+          "load_bias": 94210036752384,
+          "present_host_rx_pages": 1299,
+          "page_bytes": 4096
+        }
+      ],
+      "host_nonexclusive_function_count": 15737
+    }
+  ],
+  "runtime_sections": [
+    {
+      "file": "integer.js",
+      "serialized_bytes": 67007624,
+      "serialized_sha256": "a06eebbdb6d3f5a6c42d7504f6babd5d42c9155bb1c0d81abd940d1486468f11",
+      "phases": [
+        {
+          "phase": "after_transport_drop",
+          "page_bytes": 4096,
+          "image_present_pages": 90,
+          "text_present_pages": 15,
+          "nontext_image_present_pages": 75,
+          "section_union_present_pages": 90,
+          "mixed_section_present_pages": 6,
+          "section_boundary_present_pages": 6,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 7,
+              "full_present_pages": 6
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_instantiate",
+          "page_bytes": 4096,
+          "image_present_pages": 680,
+          "text_present_pages": 461,
+          "nontext_image_present_pages": 219,
+          "section_union_present_pages": 680,
+          "mixed_section_present_pages": 7,
+          "section_boundary_present_pages": 7,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_execution",
+          "page_bytes": 4096,
+          "image_present_pages": 680,
+          "text_present_pages": 461,
+          "nontext_image_present_pages": 219,
+          "section_union_present_pages": 680,
+          "mixed_section_present_pages": 7,
+          "section_boundary_present_pages": 7,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_store_drop",
+          "page_bytes": 4096,
+          "image_present_pages": 680,
+          "text_present_pages": 461,
+          "nontext_image_present_pages": 219,
+          "section_union_present_pages": 680,
+          "mixed_section_present_pages": 7,
+          "section_boundary_present_pages": 7,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        }
+      ],
+      "largest_warm_nontext_section_by_whole_present_pages": {
+        "bytes": 2039616,
+        "flags": 2,
+        "name": ".rodata.wasm",
+        "offset": 64700890,
+        "section_type": 1,
+        "present_page_overlaps": 147,
+        "full_present_pages": 145
+      },
+      "interpretation": "after_store_drop is the retained warm endpoint at observation16, after16 earlier calls. Section overlaps share boundary pages; never sum overlap counts or prorate RSS."
+    },
+    {
+      "file": "retained-objects.js",
+      "serialized_bytes": 67007624,
+      "serialized_sha256": "a06eebbdb6d3f5a6c42d7504f6babd5d42c9155bb1c0d81abd940d1486468f11",
+      "phases": [
+        {
+          "phase": "after_transport_drop",
+          "page_bytes": 4096,
+          "image_present_pages": 90,
+          "text_present_pages": 15,
+          "nontext_image_present_pages": 75,
+          "section_union_present_pages": 90,
+          "mixed_section_present_pages": 6,
+          "section_boundary_present_pages": 6,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 7,
+              "full_present_pages": 6
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_instantiate",
+          "page_bytes": 4096,
+          "image_present_pages": 968,
+          "text_present_pages": 557,
+          "nontext_image_present_pages": 411,
+          "section_union_present_pages": 968,
+          "mixed_section_present_pages": 8,
+          "section_boundary_present_pages": 8,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 191,
+              "full_present_pages": 190
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_execution",
+          "page_bytes": 4096,
+          "image_present_pages": 968,
+          "text_present_pages": 557,
+          "nontext_image_present_pages": 411,
+          "section_union_present_pages": 968,
+          "mixed_section_present_pages": 8,
+          "section_boundary_present_pages": 8,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 191,
+              "full_present_pages": 190
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        },
+        {
+          "phase": "after_store_drop",
+          "page_bytes": 4096,
+          "image_present_pages": 968,
+          "text_present_pages": 557,
+          "nontext_image_present_pages": 411,
+          "section_union_present_pages": 968,
+          "mixed_section_present_pages": 8,
+          "section_boundary_present_pages": 8,
+          "uncovered_present_image_pages": 0,
+          "elf_header_present_page_overlaps": 1,
+          "section_headers_present_page_overlaps": 1,
+          "nontext_sections": [
+            {
+              "bytes": 1102,
+              "flags": 2,
+              "name": ".wasmtime.engine",
+              "offset": 64,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 1,
+              "flags": 2,
+              "name": ".wasmtime.bti",
+              "offset": 1166,
+              "section_type": 1,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 107316,
+              "flags": 2,
+              "name": ".eh_frame",
+              "offset": 50978816,
+              "section_type": 1,
+              "present_page_overlaps": 27,
+              "full_present_pages": 26
+            },
+            {
+              "bytes": 7182758,
+              "flags": 2,
+              "name": ".wasmtime.addrmap",
+              "offset": 51086132,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 4294388,
+              "flags": 2,
+              "name": ".wasmtime.stackmap",
+              "offset": 58268890,
+              "section_type": 1,
+              "present_page_overlaps": 191,
+              "full_present_pages": 190
+            },
+            {
+              "bytes": 2112068,
+              "flags": 2,
+              "name": ".wasmtime.traps",
+              "offset": 62563278,
+              "section_type": 1,
+              "present_page_overlaps": 0,
+              "full_present_pages": 0
+            },
+            {
+              "bytes": 25544,
+              "flags": 2,
+              "name": ".wasmtime.exceptions",
+              "offset": 64675346,
+              "section_type": 1,
+              "present_page_overlaps": 5,
+              "full_present_pages": 4
+            },
+            {
+              "bytes": 2039616,
+              "flags": 2,
+              "name": ".rodata.wasm",
+              "offset": 64700890,
+              "section_type": 1,
+              "present_page_overlaps": 147,
+              "full_present_pages": 145
+            },
+            {
+              "bytes": 38327,
+              "flags": 2,
+              "name": ".name.wasm",
+              "offset": 66740506,
+              "section_type": 1,
+              "present_page_overlaps": 10,
+              "full_present_pages": 8
+            },
+            {
+              "bytes": 61968,
+              "flags": 2,
+              "name": ".wasmtime.info",
+              "offset": 66778833,
+              "section_type": 1,
+              "present_page_overlaps": 16,
+              "full_present_pages": 14
+            },
+            {
+              "bytes": 54072,
+              "flags": 0,
+              "name": ".symtab",
+              "offset": 66840808,
+              "section_type": 2,
+              "present_page_overlaps": 2,
+              "full_present_pages": 1
+            },
+            {
+              "bytes": 111597,
+              "flags": 0,
+              "name": ".strtab",
+              "offset": 66894880,
+              "section_type": 3,
+              "present_page_overlaps": 8,
+              "full_present_pages": 7
+            },
+            {
+              "bytes": 187,
+              "flags": 0,
+              "name": ".shstrtab",
+              "offset": 67006477,
+              "section_type": 3,
+              "present_page_overlaps": 1,
+              "full_present_pages": 0
+            }
+          ]
+        }
+      ],
+      "largest_warm_nontext_section_by_whole_present_pages": {
+        "bytes": 4294388,
+        "flags": 2,
+        "name": ".wasmtime.stackmap",
+        "offset": 58268890,
+        "section_type": 1,
+        "present_page_overlaps": 191,
+        "full_present_pages": 190
+      },
+      "interpretation": "after_store_drop is the retained warm endpoint at observation16, after16 earlier calls. Section overlaps share boundary pages; never sum overlap counts or prorate RSS."
+    }
+  ],
+  "next_measurement_targets": [
+    {
+      "file": "integer.js",
+      "section": {
+        "bytes": 2039616,
+        "flags": 2,
+        "name": ".rodata.wasm",
+        "offset": 64700890,
+        "section_type": 1,
+        "present_page_overlaps": 147,
+        "full_present_pages": 145
+      },
+      "evidence": "Largest nontext section by full present pages in this retained warm R observation.",
+      "constraint": "Inspect required runtime data or GC metadata origins before a matched intervention. Presence does not identify live JS objects or authorize omitting globals/data/GC stack maps."
+    },
+    {
+      "file": "retained-objects.js",
+      "section": {
+        "bytes": 4294388,
+        "flags": 2,
+        "name": ".wasmtime.stackmap",
+        "offset": 58268890,
+        "section_type": 1,
+        "present_page_overlaps": 191,
+        "full_present_pages": 190
+      },
+      "evidence": "Largest nontext section by full present pages in this retained warm R observation.",
+      "constraint": "Inspect required runtime data or GC metadata origins before a matched intervention. Presence does not identify live JS objects or authorize omitting globals/data/GC stack maps."
+    }
+  ],
+  "archive": {
+    "file": "memory-module-sections-20261028-inert.tar.xz",
+    "bytes": 1787124,
+    "sha256": "13031258dc2c5ba4691464da5463ae0407fe6ca03e482903ac842de86b3dc5bb",
+    "expanded_bytes": 93523834,
+    "member_count": 366,
+    "max_member_bytes": 67108864,
+    "max_expanded_bytes": 268435456,
+    "max_compressed_bytes": 67108864,
+    "roundtrip_sha256_verified": true,
+    "native_payloads_retained": false,
+    "members": [
+      {
+        "path": "evidence/ci-40611737589-validated-r1/report.json",
+        "bytes": 509258,
+        "sha256": "9457518d3888e7e607bade6b0a004b70ba91c325d6e9edf3819f7c8385d23931"
+      },
+      {
+        "path": "evidence/ci-40611737589-validated-r1/summary.md",
+        "bytes": 2690,
+        "sha256": "e47895c9a69b6293837e251d8f9d9ac2e2d78cfd2e4490d9c0dca461858369ba"
+      },
+      {
+        "path": "evidence/ci-40611737589-validated/report.json",
+        "bytes": 507378,
+        "sha256": "25917f3e69e687791d585b55d0e21a99a949367f01e99e5eabcc4ae66f53219b"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/host-elf-symbols.json",
+        "bytes": 7692995,
+        "sha256": "6b98596f2ebd57e86963511115ec142b6d37b732d7aacb010c02f1c63ab272d8"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/host-symbol-overlap-scriptc-integer.js.json",
+        "bytes": 7765495,
+        "sha256": "fa16ad8e48199f885d219a72717078f21bce314058e1daa3e4be972481cdfb05"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/host-symbol-overlap-scriptc-retained-objects.js.json",
+        "bytes": 7798284,
+        "sha256": "a0d8b5add93712729ecac8cf05e7f95bf0411f3fecc7d7d8307e6c68c3025d32"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/host-symbol-overlap-scriptw-integer.js.json",
+        "bytes": 8710056,
+        "sha256": "42a07bcd4905d75e5a3412bafcab8e65c44812ce005d8088f4921f9ea413f935"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/host-symbol-overlap-scriptw-retained-objects.js.json",
+        "bytes": 8734340,
+        "sha256": "d311a7cb71f0d64845687c11ac08ff8c25d4fcb2e6115ca447ba0c20df33f066"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/report.json",
+        "bytes": 1346444,
+        "sha256": "db91e06833abacc1a3d506a6397a57f38e52f8630b41cdb59dd1ba63f4d3c469"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/001-after_transport_drop.smaps",
+        "bytes": 36287,
+        "sha256": "8a0e5a63d378169042fd494ef074deb89a4f7e02d6fda37a27be71241cd5a2c4"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/002-after_instantiate.smaps",
+        "bytes": 44250,
+        "sha256": "962063d0c66efcbeb5781f764c54e37191b40d8dac599802445f79112beecad0"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/003-after_execution.smaps",
+        "bytes": 44250,
+        "sha256": "340422c5b1a710c591e0986fef48c92f9908949d0039240d8a946d5a277810b0"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/004-after_store_drop.smaps",
+        "bytes": 40598,
+        "sha256": "55113908221342d7cdf3aa0043a1c4dd7648ec8f83039580e4a38cdb44cf626f"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/control",
+        "bytes": 260,
+        "sha256": "826b1cfbd016120c35b22aa7a9fb6d56b70f1d59a2026808d8a00dd0acd7659d"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-integer.js/stdout",
+        "bytes": 21587,
+        "sha256": "5f0a266aa879537800b4b26ebb57683208e0980e5ccc1998f67dbef3a1749971"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/001-after_transport_drop.smaps",
+        "bytes": 36287,
+        "sha256": "e694841c031c910e5673ce6566dd11637e62c6d24b93eefdbf5cb5810d1538c1"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/002-after_instantiate.smaps",
+        "bytes": 44250,
+        "sha256": "5205b07779985ef3b9f1758cdc62a30f1a4177ac115642b5ffe9281936b3a75c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/003-after_execution.smaps",
+        "bytes": 44250,
+        "sha256": "62a855d053ed03c49c4383d8c91bb2aecc24875e3aed4e9c11db315ef9f180e7"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/004-after_store_drop.smaps",
+        "bytes": 40598,
+        "sha256": "9f65d96f173677f16d00dbd4aa2b04afd9fb4d598e7006a54741b462d0d89e77"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/control",
+        "bytes": 260,
+        "sha256": "d3b4531f244c06a80eaa21651648c0969fd1c54c4aa6d39cc17611236c48002c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptc-retained-objects.js/stdout",
+        "bytes": 21747,
+        "sha256": "f16d6f7d95a549848e181b9eb9f351c32f5b547d22a6d0535976f9f26a03f1f9"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/001-after_transport_drop.smaps",
+        "bytes": 40231,
+        "sha256": "18f67fd07d00687fe5b52d0b8130c196b134068f2e5a3f84a52461004330e210"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/002-after_instantiate.smaps",
+        "bytes": 44539,
+        "sha256": "7441312abda2d3b125e2e1dd6bf71605ab42638d62badf85f4e72bc2954fba6c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/003-after_execution.smaps",
+        "bytes": 44539,
+        "sha256": "34a2597f52f029ab128728f3206802c46f5ffd3f6caf92b2446e638f2a5a4b2f"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/004-after_store_drop.smaps",
+        "bytes": 38792,
+        "sha256": "e5abe9add4c04a769439f087f26327afbb0357667e7db2613972128e8192e66e"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/control",
+        "bytes": 260,
+        "sha256": "32a0932aa2c19ff3a818f6c6ffe9cf483f4ec2926fdb0c70910e8838130dcc72"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/stderr",
+        "bytes": 132,
+        "sha256": "861234478d05b9397976c01282c73c8b9d2f016e52d024735ab67a5506e5122c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-integer.js/stdout",
+        "bytes": 22178,
+        "sha256": "4d46addd031381066a0739d20bea23d2dc1c9f0b5cd702a334c1e620f4dae3df"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/001-after_transport_drop.smaps",
+        "bytes": 40231,
+        "sha256": "7d551950c6be0e8021584471d8a400014d5aa14c85bb0e96359004c45bd3d72d"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/002-after_instantiate.smaps",
+        "bytes": 44539,
+        "sha256": "46337adda373404e99a138d7ea9865257ea095c5866b948ca9a980389fec12ee"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/003-after_execution.smaps",
+        "bytes": 44539,
+        "sha256": "2f25b955e32e8586f362acdf8aef62adacb5bdf7a6b608c4a16521b7c969145e"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/004-after_store_drop.smaps",
+        "bytes": 38792,
+        "sha256": "0731659553ea65d376cf5dd6817baaacae75b59ee9dfad9b1da9ad813e57506c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/control",
+        "bytes": 260,
+        "sha256": "e544149faca9bcc79a197a250920e362b2e9efcee59dfc594d4543f55d826e6c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/stderr",
+        "bytes": 132,
+        "sha256": "861234478d05b9397976c01282c73c8b9d2f016e52d024735ab67a5506e5122c"
+      },
+      {
+        "path": "evidence/github-40611737589-diagnostic/scriptw-retained-objects.js/stdout",
+        "bytes": 22212,
+        "sha256": "df87c86be350b6f90af0c1669452c417332c8492283482d0b735ef0e3c2d2e74"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/module-sections-native.stderr",
+        "bytes": 180287,
+        "sha256": "9e1a4b41f146c84473fa33533149feaab8a16883383aa575b9b46ec072314c53"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/module-sections-native.stdout",
+        "bytes": 889,
+        "sha256": "1a61b04a793b82830e2ea298feed40aa74af3052ea66133680a4c011e187815a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/dynamic-string-4096.js",
+        "bytes": 199,
+        "sha256": "e52f63515198aa6ec8e4bacf444e310f1ba1d1c54eeacc2fbb78ae6cad2b329e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/folded-string-4096.js",
+        "bytes": 194,
+        "sha256": "be4d5bed1a508df8eae2e8709e1d97f1f8c11f1bc37d441c7afbb6d867119520"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/integer.js",
+        "bytes": 232,
+        "sha256": "06fbaccff07fa2c04063224e82e6c2a54192d0acf2c61d7098d7cf3871cc59c7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-1024.js",
+        "bytes": 220,
+        "sha256": "a96649885979c384e342feb1fb7005351acf6a0a73ba6709b152990ee434f77d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-4096.js",
+        "bytes": 220,
+        "sha256": "378b5ecf11e4992583456138f7d137e27b7995e0d324b6b18668eeda52231c5e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-empty-1024.js",
+        "bytes": 150,
+        "sha256": "1047697c7f07cab67ef6acad010e4ee4c0840f304f94ebf215a2d467bc7d79fd"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-mixed-1024.js",
+        "bytes": 197,
+        "sha256": "b4277db01362cb55961ccf93b12a9770c33be288451095f7c69fbdfa8eaa64f2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-singleton-1024.js",
+        "bytes": 156,
+        "sha256": "5a488506b46ac55c9880f70315d7e88332fee778784f6cb56dab41b72a0ec4d4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/join-small-1024.js",
+        "bytes": 165,
+        "sha256": "f8a9cf7555255521c74b7c54432cb749ac293c89fa9ce9d99ac1779173c18d4b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/numeric-loop-10000.js",
+        "bytes": 137,
+        "sha256": "3f604f960fbe6cc53008a5a8d8f3ca57b0e31cfeb14c61f065536940b38293ff"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/numeric-loop-50000.js",
+        "bytes": 137,
+        "sha256": "cf1fb7efeab5a3ddeddd4db4f32e78187c61110ca28f19f98c9d3c3476af97f2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/objects.js",
+        "bytes": 276,
+        "sha256": "9f121e57ed44bdefaaa331d5ffe98f6e042dd7d8c084f39fef35a6514728fd66"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/retained-objects.js",
+        "bytes": 442,
+        "sha256": "7f2941608618c4b9f38f70a49320d6de3e9c2f1bc80e1f68b79f7fa29c809e16"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/sort-reverse-128.js",
+        "bytes": 217,
+        "sha256": "1fae8effc6ff711627d32658bc502513b644b18862a6cb163ce6f5f2ec9e0500"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/sort-reverse-512.js",
+        "bytes": 217,
+        "sha256": "ad4eb490c25152c838a4657854816de116efd52843c1b92d4e56f04096c2d292"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/sort-sorted-512.js",
+        "bytes": 218,
+        "sha256": "335e0501e76d4f050222e0bee48ee2eff142ed5f290c39d75f3b66f50986f26e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/adapted/to-sorted-512.js",
+        "bytes": 230,
+        "sha256": "2caaf53094e7342da0cf652fe32a79a9c3b77503c1b253df3e9be25a0705532e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/build/cargo.jsonl",
+        "bytes": 40225083,
+        "sha256": "44a4dd224e48b5fca5591160740237ca1447c4353b6bbb8ed2143d5fb3a77095"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/build/package-lock.json",
+        "bytes": 4426,
+        "sha256": "9233abe85b00f00014246d7d73e9dd11ebd89fcfbec5c6ad7e20a6d863ca5c8f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/dynamic-string-4096.js",
+        "bytes": 6,
+        "sha256": "de33640a0eb4eaa5ecd485dccb29eab8e5af8268c84edd0794b4c6a4acae7607"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/folded-string-4096.js",
+        "bytes": 6,
+        "sha256": "2d9bc02c27dfffdb06538ce9e39591861392571820ae1d16e477f1ef943e4d85"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/integer.js",
+        "bytes": 10,
+        "sha256": "e816b0f7d667f370677adf7268c53b9f39f001973cc3f8d62091aa454b1c4f69"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-1024.js",
+        "bytes": 6,
+        "sha256": "1fb8b439dcae351e9a615e16065c3dce7afd33967f7104eaabf78dff57def9d0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-4096.js",
+        "bytes": 6,
+        "sha256": "d8d32d4a7d7fc052f8d3c6e62c55afb7660852c9214b866a1d186792787a2ef4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-empty-1024.js",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-mixed-1024.js",
+        "bytes": 5,
+        "sha256": "6ece62b766157fb272713fd26aecd1c4e0d6747be0fee831b7a05b1abd488496"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-singleton-1024.js",
+        "bytes": 5,
+        "sha256": "25ac87b7309b7946b51c32e824793ff48b56b735efa16875cf33e4ba67523d91"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/join-small-1024.js",
+        "bytes": 5,
+        "sha256": "337272adaaec693715758645e05bdce6da090486fbbb988ffb2e3be355091919"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/numeric-loop-10000.js",
+        "bytes": 10,
+        "sha256": "f586b038c4c7371912a8ab680b1ab86008dd4204fe480809f9946fd1b083077e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/numeric-loop-50000.js",
+        "bytes": 11,
+        "sha256": "dedc800c8633645d516bca92976f811f083dd65c477ea649b25a94a7756245d6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/objects.js",
+        "bytes": 7,
+        "sha256": "27674984c7e992af9eeb6d40dc1de6c1ef1fdcf8eb7be58c57d449c4c496d742"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/retained-objects.js",
+        "bytes": 10,
+        "sha256": "f870ee7f3ca69b5d2f43677a695f6ce6f638e8fd9bee515153e77bd2ac9ffda4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/sort-reverse-128.js",
+        "bytes": 7,
+        "sha256": "48c15bb0b9e7b6735b6b30e8a684999bc6e867480dc5349b4befbc5d5a0ff005"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/sort-reverse-512.js",
+        "bytes": 9,
+        "sha256": "1472843af51ffb2b1b3e601c757e6a290613e61c94568acc18a055d36be0882e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/sort-sorted-512.js",
+        "bytes": 9,
+        "sha256": "1472843af51ffb2b1b3e601c757e6a290613e61c94568acc18a055d36be0882e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/expected/to-sorted-512.js",
+        "bytes": 9,
+        "sha256": "6fb113586c2ad96691f8e34e44697db20265a27208623860b323fb9fafd6a2bd"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/host-identity.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/host-identity.stdout",
+        "bytes": 1028,
+        "sha256": "3cc660410f7c62992ce3e8f8a5baa72e061484fa52b2360a781e8bd779016ab8"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-dynamic-string-4096.js.stdout",
+        "bytes": 1618,
+        "sha256": "e61ada3151a517f584d98ddd9f806110dfe5df83fe11da5b304c0dbc2cbda42c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-folded-string-4096.js.stdout",
+        "bytes": 1614,
+        "sha256": "c18c07f7296432e45ac358748741dca90a318c3babe0dbfbaa070a98aed07fa4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-integer.js.stdout",
+        "bytes": 1581,
+        "sha256": "9a5d884ce71d0dfdaee418d91a34d29514289fe11662ea798c8324e870f67555"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-1024.js.stdout",
+        "bytes": 1589,
+        "sha256": "001b36bff20ea989c63ed2ae21e19e05f185440ac079c7db6c94f9acc982e66e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-4096.js.stdout",
+        "bytes": 1589,
+        "sha256": "d40b2990201c77efb8f66494d804cf00009c0d3f2ffd1f40e4953e911f7de982"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-empty-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-empty-1024.js.stdout",
+        "bytes": 1607,
+        "sha256": "e2dcdc08442e043c3b3b4c22ae7f559bb3ce9ac932d7ce0d2de8bdbee5ca8c2e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-mixed-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-mixed-1024.js.stdout",
+        "bytes": 1607,
+        "sha256": "126c5c61f2b1507ffe9524c2c7b7adf5978357c2674227be1bb02c4cb6663d44"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-singleton-1024.js.stdout",
+        "bytes": 1617,
+        "sha256": "f9d83eb0289cdc36f94d465aff16389e1916545c23e6844f55cd13ae5e8d3b16"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-join-small-1024.js.stdout",
+        "bytes": 1605,
+        "sha256": "30cb3bf6d2a065dc8da1bedfdebd9c2a6ff8231a8f144d5bc3a9946b26609c06"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-numeric-loop-10000.js.stdout",
+        "bytes": 1615,
+        "sha256": "7b94362c4e3710b8b210fe56bd25100726a930639ff886a6b40fa59952ea8c31"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-numeric-loop-50000.js.stdout",
+        "bytes": 1615,
+        "sha256": "0078579fec5a0619f7867b73ab22e258d80331c9e955787de18ed63435cd8b89"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-objects.js.stdout",
+        "bytes": 1583,
+        "sha256": "c7ac690c53451b5abf8bba14cd54400867726926db604d0a15af5a5f8c541000"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-retained-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-retained-objects.js.stdout",
+        "bytes": 1610,
+        "sha256": "a3012fbd866868f0d46fc50fcaaaa3ac2460b1999bde6b37a66f9a81c766670a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-reverse-128.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-reverse-128.js.stdout",
+        "bytes": 1609,
+        "sha256": "2a0201250f982b2d51bd67b7f49447eadd96aa6e7e18a42d4eec76dbdc6d2358"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-reverse-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-reverse-512.js.stdout",
+        "bytes": 1609,
+        "sha256": "721bb846e9369a152519c682a2356d15154bec6de9f86d94742a508861805050"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-sort-sorted-512.js.stdout",
+        "bytes": 1606,
+        "sha256": "800843db78b9b3841523a8e290b9961b75d3e0d3281b5a5b056a365451f01b3b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-to-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/native-scriptc-to-sorted-512.js.stdout",
+        "bytes": 1600,
+        "sha256": "ab2208e6f292fd7ab90ebb1473ec8f5d0917219204a1ca93002486a68fdc8271"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/prepare-scriptw.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/prepare-scriptw.stdout",
+        "bytes": 14594,
+        "sha256": "1eed46fe54a3947e9eb1d3c16d4e6012e521064b15100bbfea2e847b39f75a98"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-dynamic-string-4096.js.stdout",
+        "bytes": 19712,
+        "sha256": "9be2fe7bd9d89be1f99d5c93c61d40bf892e6da4cfb78f77b201d0949a301feb"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-folded-string-4096.js.stdout",
+        "bytes": 19727,
+        "sha256": "780284cd564ab38a9e0336bb446af840375f9485fdc82522f56de7e53be33443"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-integer.js.stdout",
+        "bytes": 19769,
+        "sha256": "50c21bb24ad5a11b1638a4c6e64c52b250c5ceda94b75350b6f25528a5d332dd"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-1024.js.stdout",
+        "bytes": 19779,
+        "sha256": "7dc935f33c785f690baf347869a737b092a7d615e62e936b10dbf5c21d42ccda"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-4096.js.stdout",
+        "bytes": 19812,
+        "sha256": "675698be4fc58a0da7a80345cdec936bcee1d7ad5d07850e616150e8d5a9eb4a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-empty-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-empty-1024.js.stdout",
+        "bytes": 19694,
+        "sha256": "f8508340464e7ed351f21f813b248ce9c4e942fbd5909caa13dd9f34594839b7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-mixed-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-mixed-1024.js.stdout",
+        "bytes": 19745,
+        "sha256": "3c5a109b5ab7e97197ddc1be53e8fcad61eff9be16fa63bd820d997cee0dba45"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-singleton-1024.js.stdout",
+        "bytes": 19694,
+        "sha256": "6f39f7dea8fc35f1dfb0e960dfdf0e6dea1b03195a688b1704cb429e25e2464f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-join-small-1024.js.stdout",
+        "bytes": 19695,
+        "sha256": "44c961dff52122b70a093df2c320a075a3abdc19d21417d6b7345fb274014e88"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-numeric-loop-10000.js.stdout",
+        "bytes": 19779,
+        "sha256": "0c14263e37ccc29db80e04bd6c7fe7de269326b16f67df178a67a231b1cfdb10"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-numeric-loop-50000.js.stdout",
+        "bytes": 19797,
+        "sha256": "9332bc4e3cdcce42f3be3d9f8c1c2c65e6bbc37f4f8f98890c6d5476f364697d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-objects.js.stdout",
+        "bytes": 19795,
+        "sha256": "f7c7cd9dd90e175c782dea03a83ed459aeccf34d6dbe48aaaff6aa67b3183f7f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-retained-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-retained-objects.js.stdout",
+        "bytes": 19914,
+        "sha256": "4ed63e1e07862edb0ae1e3d3ecda7e2301e108b8976c3fb80274b11a01000abf"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-reverse-128.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-reverse-128.js.stdout",
+        "bytes": 19795,
+        "sha256": "309c49f94872c33f14db5d1fc7de877cc17d8a4ed943979b8a04e6035df62542"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-reverse-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-reverse-512.js.stdout",
+        "bytes": 19832,
+        "sha256": "ab6bbd78a5d207fd3ef9e0af65579bc39be07a7ba291329d2d106c3ee3189443"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-sort-sorted-512.js.stdout",
+        "bytes": 19830,
+        "sha256": "b256a8c5c4bd9f89efe0d24b06103bf5a91a243d78987d1765eb4c597847fc74"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-to-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptc-to-sorted-512.js.stdout",
+        "bytes": 19831,
+        "sha256": "b7f933d98494caf9c506bf1ac8b2feedcd8275cee7de8464a6d34cce8638af67"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-dynamic-string-4096.js.stdout",
+        "bytes": 18581,
+        "sha256": "6a23d538d7c085e47b209444cae25b91fb78ba52c6bda0225b6fcbfd24ae383e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-folded-string-4096.js.stdout",
+        "bytes": 18581,
+        "sha256": "f609be970d2c5805eeddb1e213ba4b6995ff3c6ab5301292da5984e018285759"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-integer.js.stdout",
+        "bytes": 18649,
+        "sha256": "91df43e1f72184eb4bdce502e1f7acd878176aadf5510ffeafdb9feabc2f3ce4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-1024.js.stdout",
+        "bytes": 18649,
+        "sha256": "56f54d9f1a0aa3d14f06709d61333c3e26886add6102cffefe9ee479e06b649a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-4096.js.stdout",
+        "bytes": 18581,
+        "sha256": "886cc6100f157f59a5e2eece246cf6de3a20d1814b86c6522edd61058eb48dc9"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-empty-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-empty-1024.js.stdout",
+        "bytes": 18513,
+        "sha256": "306942bde356151f0419cb1b3fccc6bce1ef1f44e09c1e399b172492fbf5c607"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-mixed-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-mixed-1024.js.stdout",
+        "bytes": 18566,
+        "sha256": "b6b9987bc24e3f96df0ef069f716b4713555cd506cf46a47b5938d2e9f9b47f3"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-singleton-1024.js.stdout",
+        "bytes": 18564,
+        "sha256": "206e609c8ac11a6e9dfe5dff6463d7ee1e85866b279a86f670a83dc2558ea0c6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-join-small-1024.js.stdout",
+        "bytes": 18564,
+        "sha256": "c8a5d3ec679464b9f32c7fe8a70f301704b24aed1cbf9876ec3b0fd8b834c661"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-numeric-loop-10000.js.stdout",
+        "bytes": 18648,
+        "sha256": "1427b737bdf563c3b1b522659b1f29a4ecc1d3978a21499abfa92e1cc09d8d5e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-numeric-loop-50000.js.stdout",
+        "bytes": 18666,
+        "sha256": "157c6af08cb2d41b127af042f933d6684b9fbeeb43eab7a093278882ebccf4a2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-objects.js.stdout",
+        "bytes": 18597,
+        "sha256": "d4222cd809b4ff80b40c4462fea9cbf6c9ae16c9eb505bf988c7beaeaebef8c7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-retained-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-retained-objects.js.stdout",
+        "bytes": 18683,
+        "sha256": "f6ea2ec87fb9fe1fa21ece36f152124a1389d2ae239cdae06436430c1e679daa"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-reverse-128.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-reverse-128.js.stdout",
+        "bytes": 18664,
+        "sha256": "7aab9487abf2619a5f8aec3fd8f85b7108d22419c74a008dc5757fa7bd1b82fc"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-reverse-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-reverse-512.js.stdout",
+        "bytes": 18700,
+        "sha256": "518bb5d418d9ebdef02ae75ea0b5c5f9f5d1a8b9aa639b3a9a4928dbdfcbed01"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-sort-sorted-512.js.stdout",
+        "bytes": 18700,
+        "sha256": "c9211318b1e5a5b3e5d889b965800b8b5a80cfe2971bc70e327dfe7926ddf9b4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-to-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-0-scriptw-to-sorted-512.js.stdout",
+        "bytes": 18700,
+        "sha256": "ef52e054fefc95a7a60662544f5f0cebf46c8465390367e34548ea11920f2744"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-dynamic-string-4096.js.stdout",
+        "bytes": 19712,
+        "sha256": "02f2507f7881a1126bba3354d41d3701633f8b413dd659ed9f0198489fef2d86"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-folded-string-4096.js.stdout",
+        "bytes": 19728,
+        "sha256": "6d73f690c8e6e22c302408d1f556322b60a5f1366ff01ca0cd2c2ae937f29039"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-integer.js.stdout",
+        "bytes": 19765,
+        "sha256": "f2d125b144c85b6c3f52903cefadbfc9da22bc727f607b40935644df6fb5a061"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-1024.js.stdout",
+        "bytes": 19764,
+        "sha256": "536271db8baf11eecfb73e96dd2a1444b73fe0845722c723a61ebfd024e01396"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-4096.js.stdout",
+        "bytes": 19795,
+        "sha256": "8c319db4dc1c0f316510b16d58d82681b67275b23603de82945efd41785705fe"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-empty-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-empty-1024.js.stdout",
+        "bytes": 19695,
+        "sha256": "35001a82993872a763a2a7cd2110b7ca7456d280b22daf775e517c22177998c7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-mixed-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-mixed-1024.js.stdout",
+        "bytes": 19745,
+        "sha256": "a04bc866983ecc683cec432bfed397343f701c93c668225775de624e00ba0937"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-singleton-1024.js.stdout",
+        "bytes": 19694,
+        "sha256": "3774e94c6cceeba9b778efb97108e5c1f976cb35b35578c04735e66d88af754e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-join-small-1024.js.stdout",
+        "bytes": 19696,
+        "sha256": "2c77923545f1738e4f4797e1099001a559c096d13c57bb04dc9d57321c477a60"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-numeric-loop-10000.js.stdout",
+        "bytes": 19779,
+        "sha256": "7fe97f2d7561df4920442df93b0230cc6f55347cdf2833a08bea55c7bb8f9fb5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-numeric-loop-50000.js.stdout",
+        "bytes": 19797,
+        "sha256": "6dd2ac1a2fa597e13af56243e939b2c0e306338794f7cce5f6b0c06b7f8052a8"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-objects.js.stdout",
+        "bytes": 19795,
+        "sha256": "79bf8bf077eebb40ffca0f4305ec7d31dac843e48f5d56a27c387946c57ddfb1"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-retained-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-retained-objects.js.stdout",
+        "bytes": 19919,
+        "sha256": "e3202280d4d3f048b847102ddc311884ead7b2e523d6360c171544a1c1cdca9a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-reverse-128.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-reverse-128.js.stdout",
+        "bytes": 19780,
+        "sha256": "94656902d16b44f6366121e4a1e468129d6701db95d7694479acdeb59cf084f7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-reverse-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-reverse-512.js.stdout",
+        "bytes": 19814,
+        "sha256": "08550f28f1a1c9800b10df299d57add5ef866343acb2b91f9c7d154045b75fac"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-sort-sorted-512.js.stdout",
+        "bytes": 19814,
+        "sha256": "8d9da3ba79d2b960f3f3e91984d41b3c7109aecb314a8772a1189b145d3bbfe2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-to-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptc-to-sorted-512.js.stdout",
+        "bytes": 19813,
+        "sha256": "bd8d704e9a38a21ceb244995891d7d22a6c8f764404d7c1bca3b651adade709b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-dynamic-string-4096.js.stdout",
+        "bytes": 18581,
+        "sha256": "c2a4f55a3c5546463ce9c4aa83207a01d9f03c0449d39ec415b11a6e888ca457"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-folded-string-4096.js.stdout",
+        "bytes": 18580,
+        "sha256": "a0be507b33dfb0315f7f0ee57bb6116dd2db7d34fd17985586d870615a66abb5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-integer.js.stdout",
+        "bytes": 18649,
+        "sha256": "5d924ca5235b400ff60057c84fda9a22e805fb6c9d390a2a0451979e27db783d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-1024.js.stdout",
+        "bytes": 18582,
+        "sha256": "f3865b667a8e3de040d7b43d4b006e7c4318f6908d1de059843afbc2ba97ee3e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-4096.js.stdout",
+        "bytes": 18581,
+        "sha256": "f545f33d8297046631fc6987cd70a4e494d789e5627c21e78b02d64b143e6415"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-empty-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-empty-1024.js.stdout",
+        "bytes": 18513,
+        "sha256": "953ceaf31ea461d049f7c4597da8356abc6c6cfa1c9bf964414eec3f0fdeb76a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-mixed-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-mixed-1024.js.stdout",
+        "bytes": 18564,
+        "sha256": "d6d97594492ccab49dab3a680447fd47e0c74e5fd7dfd93b4cbacaca3a06b40d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-singleton-1024.js.stdout",
+        "bytes": 18563,
+        "sha256": "b674252b4d8a73f2a71274cb10c79b58b3659e5ceb6f4b42890a8f16bb77e20f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-join-small-1024.js.stdout",
+        "bytes": 18563,
+        "sha256": "fabf52d15ffe18fbc3a3513d49076a8080a085ce66a7259201b3fa238880f697"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-numeric-loop-10000.js.stdout",
+        "bytes": 18648,
+        "sha256": "120139357c5b8a1f4e36a8132c59a1c8acc3a0564f3caba73fdeaa77ccd2d40c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-numeric-loop-50000.js.stdout",
+        "bytes": 18666,
+        "sha256": "84cfa736015c4c333c4537cdeeb56e2cda38484d4be5aa97accc1ec60340bd60"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-objects.js.stdout",
+        "bytes": 18598,
+        "sha256": "47f919ac2ac17ef1a50ae122155ec0928eb21e19814385ccc1fa11c268772fb5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-retained-objects.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-retained-objects.js.stdout",
+        "bytes": 18683,
+        "sha256": "0b6d75e6227052922c52200d849e19d567ccd35f8e9d360a54c799e0802098ef"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-reverse-128.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-reverse-128.js.stdout",
+        "bytes": 18598,
+        "sha256": "6c7f648d1b512c43ed88357dd3d8d4280561252c0d34f471e478ed2c6e9f8ebb"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-reverse-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-reverse-512.js.stdout",
+        "bytes": 18632,
+        "sha256": "b9e093172e6d80eda8d70071041adee9124361bfb1709069c0a6687b09b68f89"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-sort-sorted-512.js.stdout",
+        "bytes": 18632,
+        "sha256": "7d3af382dcc4072281f1a7801de450d17cee4cbafe7b7fe8fda76397d1f1ecc2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-to-sorted-512.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/round-1-scriptw-to-sorted-512.js.stdout",
+        "bytes": 18632,
+        "sha256": "7e7811469f9e93def2dd553bc703da6289e05fe0c399671423279f9a817a69bf"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-dynamic-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-dynamic-string-4096.js.stdout",
+        "bytes": 90,
+        "sha256": "0bdea43d262beea36cd4ca459a35a268df63fab4512fa57a819b11eedba34b7c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-folded-string-4096.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-folded-string-4096.js.stdout",
+        "bytes": 89,
+        "sha256": "7eeebf87974e0e3e07a4b34009f4f93637009d24e2ee0603f030bf65d7b3a088"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-integer.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-integer.js.stdout",
+        "bytes": 78,
+        "sha256": "7bee7cb8ad954906b6357a96b4b1df4aff0bd3ba04ab53b3b5aa6cfce4c543e9"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-1024.js.stderr",
+        "bytes": 353,
+        "sha256": "3d707158f766b31f8e33124c6560dd030f02a003201b19eb762f1db670498118"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-1024.js.stdout",
+        "bytes": 80,
+        "sha256": "e5cbd239f01df19b5d1dede89fc1f173cd6ae826bf72418eae7ed87a8822def7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-4096.js.stderr",
+        "bytes": 353,
+        "sha256": "81d19a953540d0258e18866e2fd080701cd8ff24358dfa40292c9d08742e4085"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-4096.js.stdout",
+        "bytes": 80,
+        "sha256": "436868a36532eda360403d4adb7035b705e77642b3c6c4ddbb262ddf0ca27a59"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-empty-1024.js.stderr",
+        "bytes": 359,
+        "sha256": "90cd9461eca4b3b298ea29b099c3e1deed26f87e185769280826efe88b49346a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-empty-1024.js.stdout",
+        "bytes": 86,
+        "sha256": "db12346728373fe9e83f00ce1fc63ccc236e6f89ce66b576e5a0c76678c24c8a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-mixed-1024.js.stderr",
+        "bytes": 359,
+        "sha256": "4166413392f86fcfab79e2f10d6ca89718f9decec33edf33fa31e5d1fd90547d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-mixed-1024.js.stdout",
+        "bytes": 86,
+        "sha256": "835d73d10b43fd40128a3034d9c052e92c7d599553962e929286b8f4e451d95d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-singleton-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-singleton-1024.js.stdout",
+        "bytes": 90,
+        "sha256": "7652cdbdf5db4062fcc7319ff6fb8b9acc6a08bd0dd0a408291af7603b669887"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-small-1024.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-join-small-1024.js.stdout",
+        "bytes": 86,
+        "sha256": "9a2ff1115a19dd68da0f32da27675fbc9e6410f698bd0ff5cab4f77a06b50d9e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-numeric-loop-10000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-numeric-loop-10000.js.stdout",
+        "bytes": 89,
+        "sha256": "fcaae767bed1a669451f26fbb99ccab6955245a20de4f2a1edf4fd5e1ecf462b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-numeric-loop-50000.js.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-numeric-loop-50000.js.stdout",
+        "bytes": 89,
+        "sha256": "2c3e1f7805a23b3e11f1b82900cc540dcb835de20f95bc39b6f906fdc5c2dee0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-objects.js.stderr",
+        "bytes": 351,
+        "sha256": "93c8aef98774231870cfc74af2ce07418f230d9e0c34dbf767821dcbca56396f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-objects.js.stdout",
+        "bytes": 78,
+        "sha256": "ca8bc794c00bafc50bed00829606a14e34c62730f7b5873e3cfa078157a5a8e6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-retained-objects.js.stderr",
+        "bytes": 360,
+        "sha256": "eb15364bec452d1023ea0e97dff150b6ea417996b9d89cd7618bb5c5acea38bd"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-retained-objects.js.stdout",
+        "bytes": 87,
+        "sha256": "32809b9fd79f19d944f18856eb0dae41074dcb7264d9f3596b3cb9647dc9d4c7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-reverse-128.js.stderr",
+        "bytes": 360,
+        "sha256": "807eaba1e67535b8bda070020752bd1573929bc670f091eb307dc9dbaa18532c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-reverse-128.js.stdout",
+        "bytes": 87,
+        "sha256": "bf6b6e1c2e4ab6d223bf3f7dc18aff2a9e7678a8669b31f2a55883703dc610e7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-reverse-512.js.stderr",
+        "bytes": 360,
+        "sha256": "6f4936025b5b4de8f7366f9288c54237abfceb854574f4cc8956c8916a9dde52"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-reverse-512.js.stdout",
+        "bytes": 87,
+        "sha256": "87af16ff1dc685f59eceed86a510e7f7c21553b1dfa551cfa915525fdf0a533d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-sorted-512.js.stderr",
+        "bytes": 359,
+        "sha256": "9b9db16e1271db77b98dfeac828dce15951aa73ebed11cb8e3f6b7663f91b602"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-sort-sorted-512.js.stdout",
+        "bytes": 86,
+        "sha256": "35adb675c4c9c6478e26b095cdeb0fe63d3012e98387bac411acea777d12bad2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-to-sorted-512.js.stderr",
+        "bytes": 357,
+        "sha256": "3d0f9e2b21d7a1e94474aab8dd896fca68d20f378c542266132d340c156b6be5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/source-scriptc-to-sorted-512.js.stdout",
+        "bytes": 84,
+        "sha256": "a2db4afef620b5b1cf2c5d3f86c9ac918ad90fee196dd22d66ad937df90dca85"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-rustc.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-rustc.stdout",
+        "bytes": 36,
+        "sha256": "8dc912acd5bfeafc70b01b1d2a2afb0844afa02f5dba2f1ae8d5c212d005afb6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-scriptc.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-scriptc.stdout",
+        "bytes": 6,
+        "sha256": "345a551b61a5dc33388b9bf40df339c9a0d9446ced7eeaeb576e3dbf4321918e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-zig.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/logs/version-zig.stdout",
+        "bytes": 7,
+        "sha256": "aa037454b5e8320521a32b278a3f4aff05fc79009ab5503f5d4a1b9a33b38c47"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/report.json",
+        "bytes": 225940,
+        "sha256": "3db6ac390bb0a2f32a7a2a14df7534be1f126da3dcda08056b359662d0091802"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/dynamic-string-4096.js",
+        "bytes": 145,
+        "sha256": "77e871388666cba861f92b3198298629ac553089f18bf5c313a9302e1d5c7e87"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/folded-string-4096.js",
+        "bytes": 140,
+        "sha256": "821723ecb9b4bf828e5447fa289a42688ac2a6eafa84316a8e668700e4bdc44e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/integer.js",
+        "bytes": 178,
+        "sha256": "bbf3e6bb123b44f3f39acaa46140af1bd3f4801cce1d19e8b390f21a33637f3c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-1024.js",
+        "bytes": 166,
+        "sha256": "0ece87d734083e7956428a0b546bb52e290df60fc0bc6edca864441a9b200e06"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-4096.js",
+        "bytes": 166,
+        "sha256": "8b30570ea8f6b22d8dbe91526b86634c0152457ed57a86e5d8fe13ee8dc7667f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-empty-1024.js",
+        "bytes": 96,
+        "sha256": "dadbd8cdf5f2d732bd89327581d63975ed5c52d26130b7fd4b978a72ce060cb0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-mixed-1024.js",
+        "bytes": 143,
+        "sha256": "6fc9aa48d1d577fc0f5c14424838636f529b2d4acf2e7994975d12b56547bcff"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-singleton-1024.js",
+        "bytes": 102,
+        "sha256": "a79413e8ef5250ddd75037680268821e8d08bbc0bc5f896381ae83e52e87ffd2"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/join-small-1024.js",
+        "bytes": 111,
+        "sha256": "95e16da16d4b656b766a774ca0ba33f83ec026afe1c754e2a95f4f122d430d85"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/manifest.json",
+        "bytes": 2767,
+        "sha256": "36779b0cbba7187da99914663995f92928d4e31063e2dc2c6d3f949ef3a2929f"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/numeric-loop-10000.js",
+        "bytes": 83,
+        "sha256": "867d762eecaf5619ae33934577669ff56415d6ae69a81ebb05b97dda630bc040"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/numeric-loop-50000.js",
+        "bytes": 83,
+        "sha256": "3767d7de64987f8d89d6f20ae31fbd5752836b2be0b439d36b2efb6af0d800c0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/objects.js",
+        "bytes": 222,
+        "sha256": "22a86d6fd5ee43b42ff3ca36273f0be2a3089b91c79d3c064ff7e4fb35b7b22d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/retained-objects.js",
+        "bytes": 388,
+        "sha256": "9648fbc87f9361de8b2b0bb418929af1c79331a58ebf38817cc511dc512c5911"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/sort-reverse-128.js",
+        "bytes": 163,
+        "sha256": "71625f52de39a4bc2b698ae8ffc4ac81d2035bd96d391477a09742a2742a3794"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/sort-reverse-512.js",
+        "bytes": 163,
+        "sha256": "d38825f64f853170f6da0f8375990bd1da83799c921505dd21d5d5dfe7e4e3e5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/sort-sorted-512.js",
+        "bytes": 164,
+        "sha256": "68b786bf2ae8b4a6d1f6e1c4e9adb1c8940f819dcce8d25e0c9cb5fb2888939c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/sources/to-sorted-512.js",
+        "bytes": 176,
+        "sha256": "0e40c47ddc2f946f5d27c63996ff16361eb0f176d07d32a051ae3a17ebc551b0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/dynamic-string-4096.js.wasm",
+        "bytes": 248370,
+        "sha256": "96a98c00c00ea609bc95b6aeafed94ca82c894c8b53f9623068a71fbaad9f700"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/folded-string-4096.js.wasm",
+        "bytes": 249748,
+        "sha256": "28f940d6ff10dd512ee241a16dadf76261856a885aef590e840cad95563b076c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/integer.js.wasm",
+        "bytes": 248096,
+        "sha256": "e8dd5e4e41ed4a5cbae52aa8ae0c05543f750f23d467cb187a40ade1e26ce0c5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-1024.js.wasm",
+        "bytes": 374157,
+        "sha256": "cbf798150fb480d5b8296cee9ea66e97778407095637480fcbfcd0117b49883b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-4096.js.wasm",
+        "bytes": 374157,
+        "sha256": "12d6750d4c0b8faa62b7de6cbed2d13184010ff3656ca0aae5f57cc1aea2bb2b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-empty-1024.js.wasm",
+        "bytes": 383451,
+        "sha256": "66e89352070c06edb6cdb9cd400baae5982fe726d57d000b70559b87cb0c099b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-mixed-1024.js.wasm",
+        "bytes": 384003,
+        "sha256": "ec73885d20533f7d5db2f075e187c9014ec442658d99fe143acee408b57c8ed0"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-singleton-1024.js.wasm",
+        "bytes": 248622,
+        "sha256": "784c14883387f6201db4f235478dadca8f51786075c25616c11a576696b18e70"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/join-small-1024.js.wasm",
+        "bytes": 249978,
+        "sha256": "567615a54d1675702155c2dae99965f4cd4b2db819e3fbc1c981e912608d346b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/numeric-loop-10000.js.wasm",
+        "bytes": 248168,
+        "sha256": "86d27700c84511974ca1204d9fcacbefeea54c8586e176ef265f6232d4675584"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/numeric-loop-50000.js.wasm",
+        "bytes": 248168,
+        "sha256": "266573b9aae2ca50e52f2248680981d314926b9f6fa91ec7c462fcd957d9329d"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/objects.js.wasm",
+        "bytes": 393114,
+        "sha256": "d497cb618912318a7b15eff57019013b4a0afe53272fccd3269c1dac0bc4bedc"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/retained-objects.js.wasm",
+        "bytes": 406061,
+        "sha256": "67c60c1b45a30a7d3d06183742232cab758743dd74608e04d86531d8a22e6913"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/sort-reverse-128.js.wasm",
+        "bytes": 404290,
+        "sha256": "70c8f87a67148a87d28cd9f3ba49e6b6853d5b82a717b690e43f82dbf4516e03"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/sort-reverse-512.js.wasm",
+        "bytes": 404299,
+        "sha256": "b2c4c85d2ba92f5b24574cc895bebf2b9b3c2b981a657c875bac1f26743e324b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/sort-sorted-512.js.wasm",
+        "bytes": 404293,
+        "sha256": "8b4bf203938c17d34a48597732df26dc6a717271a1b65e946a26844053b3d8dc"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptc/to-sorted-512.js.wasm",
+        "bytes": 404865,
+        "sha256": "be296e0708126ae0096be0bf11f8282909758e5f8f3ac79ca63bcbc9a2219e9a"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/dynamic-string-4096.js.wasm",
+        "bytes": 66584,
+        "sha256": "437f1d859a6fb95039120ef5f4c24af79e8fbc5159d39b7a3067a545d9206ef6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/folded-string-4096.js.wasm",
+        "bytes": 68698,
+        "sha256": "5d3b6578471a7705ef214710b81e9fc1c379efbbc62867bb999e64db66de15d4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/integer.js.wasm",
+        "bytes": 65248,
+        "sha256": "4e7fdaacc3fddd5516e0b87581682821b1eb093b5b1298ea1358159f96597212"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-1024.js.wasm",
+        "bytes": 73220,
+        "sha256": "7ff887ed862fde69c345b1c2988dc112de2109eb7fd7c08ef1d45c0137fe63d4"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-4096.js.wasm",
+        "bytes": 73220,
+        "sha256": "519bf5e1c4e3fee395da8f5d00fbff149c503e8ea25d2503e8cf12b38c873aae"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-empty-1024.js.wasm",
+        "bytes": 64435,
+        "sha256": "16dbcfcdcfdc75d0d568195c6b62627d51e4e552ccc73ab7cf30a69d7aeb99ea"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-mixed-1024.js.wasm",
+        "bytes": 73949,
+        "sha256": "26d2a00a006878e31cbcb1f97ba25c0e8339a8c220c7b33e405c058860f2b457"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-singleton-1024.js.wasm",
+        "bytes": 64713,
+        "sha256": "a7e0646da3799a9ad9ada9ac7bc55b9a748003ff10a6622ae2618792dd858ea7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/join-small-1024.js.wasm",
+        "bytes": 65037,
+        "sha256": "937cc4c59c8050238ce8eb03203777ed47fbc1a6ea40f2e153f3eda1f36b7122"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/numeric-loop-10000.js.wasm",
+        "bytes": 61509,
+        "sha256": "9cab86577dca0c8e4efdae134f37127d981ce4a1def14e850ea0c1277236c5c5"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/numeric-loop-50000.js.wasm",
+        "bytes": 61509,
+        "sha256": "fe521823627eb0c178eda3a7c4e00911028608981cc06ef3a1d2396e89387eb7"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/objects.js.wasm",
+        "bytes": 73189,
+        "sha256": "6192d067f2e6d4f170a6ee44365c2473d1c0d75536f77a417afec78b8aa5c10e"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/retained-objects.js.wasm",
+        "bytes": 75043,
+        "sha256": "bf84df95795b153dcf8b52da2ca9b551b36fedca716ea3d71a5871410ca9f3e6"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/sort-reverse-128.js.wasm",
+        "bytes": 75642,
+        "sha256": "66e712bbd2f37a50bc5f2974c14f0abbdce2292d8b2e48ce2dabe795bd070e01"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/sort-reverse-512.js.wasm",
+        "bytes": 75642,
+        "sha256": "274f035f9965c5ad35dbcbf813d852267d847a4d3afe4a05d00f5cf28cbc6a2b"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/sort-sorted-512.js.wasm",
+        "bytes": 75661,
+        "sha256": "2211f42e967bcd2f13ef8b4bc6654692232658bb905ac6ee78a9beb64005cb3c"
+      },
+      {
+        "path": "evidence/github-40611737589-scored/precompiled-evidence/wasm/scriptw/to-sorted-512.js.wasm",
+        "bytes": 76355,
+        "sha256": "1d355b83c36a0f5d4a459d84c57fc8d79daf101623b7dfe837bb956850b7ecd9"
+      },
+      {
+        "path": "evidence/github-run-40611737589.json",
+        "bytes": 3719,
+        "sha256": "7be28942124cffef19dc7fc2c62a87f83b13d596cc17c9045cd83be2797ae6c5"
+      },
+      {
+        "path": "evidence/source-bindings-sections-equivalence.json",
+        "bytes": 1764,
+        "sha256": "f2db137b93054d5477a9757254faea4044fd5bd7a0ee6a8c0dcc3a6dab49bebf"
+      },
+      {
+        "path": "evidence/source-bindings-sections.py",
+        "bytes": 3733,
+        "sha256": "680f54c2befae54c82b72e18f34b1356a7e933971af64968bc653d502f4f18b8"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589-r1-reviewed.py",
+        "bytes": 17114,
+        "sha256": "3d12fc6189d387819fece7e497a29b8f4c8c377c04873ec1f4bb536557af24fb"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589-r1.stderr",
+        "bytes": 157,
+        "sha256": "355d99bc575cdc52ad07bc6bbb84c7287e52dc24b7cd4f7deab017f46e9c387e"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589-r1.stdout",
+        "bytes": 224,
+        "sha256": "2fa2876ed3d63575e8141a7c1070e1909eee01988edce43e7cbb1b120230b2b6"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589-reviewed.py",
+        "bytes": 16470,
+        "sha256": "a0ed175850de59c5c5bf14d258433cbafe6092be808b8abdc06b337ce5806aab"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589.stderr",
+        "bytes": 837,
+        "sha256": "be672dfdbee737f472f46cffd388a70ee207cbf6743b97e84b0f5bfd66dc2104"
+      },
+      {
+        "path": "evidence/validate-ci-40611737589.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "reproduce/feature-source/.github/workflows/precompiled-benchmarks.yaml",
+        "bytes": 7722,
+        "sha256": "441104d2636d914101119c1d642caef1f19b69ab07b9c8ba2a0370707499407a"
+      },
+      {
+        "path": "reproduce/feature-source/crates/scriptw-cli/examples/runtime_precompiled/phase_barriers.rs",
+        "bytes": 26545,
+        "sha256": "71f4fc08148156ef99cd57a9ae7c27c167f32e7b88438174608d0f05c8297349"
+      },
+      {
+        "path": "reproduce/feature-source/crates/scriptw-engine/src/embedding/benchmark_module_images.rs",
+        "bytes": 3800,
+        "sha256": "e22f6691500ab295f8e757c1476252bc30a252256263ec8192d0f137cdc5667f"
+      },
+      {
+        "path": "reproduce/feature-source/crates/scriptw-engine/src/embedding/benchmark_module_images/sections.rs",
+        "bytes": 10219,
+        "sha256": "db92caeb077c1ca6a211c38822690093f3fe1563658b2e6d3e97cdabba54e158"
+      },
+      {
+        "path": "reproduce/feature-source/crates/scriptw-engine/src/embedding/benchmark_module_images/sections/tests.rs",
+        "bytes": 6642,
+        "sha256": "172462af6ca242d92d65baac79e12adf44cd5b8b12576331eba0d8e66260c704"
+      },
+      {
+        "path": "reproduce/ownership-validator-pattern.py",
+        "bytes": 26093,
+        "sha256": "1455de1eb46d3190cafc4bf33150baa236e648287e1b31df404b55293e88a70b"
+      },
+      {
+        "path": "reproduce/publication-driver.py",
+        "bytes": 14697,
+        "sha256": "a3334e5b4165effd3fc4aa15df90a8f825b7944fa24e67885c9086167c390545"
+      },
+      {
+        "path": "reproduce/scripts/limited_verification.py",
+        "bytes": 12494,
+        "sha256": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57"
+      },
+      {
+        "path": "reproduce/scripts/native_test_protocol.py",
+        "bytes": 1359,
+        "sha256": "34999f205d1d0d501ef9cf19e3e73fea8b8b6d8cc0f9d838822df1483482aa06"
+      },
+      {
+        "path": "reproduce/scripts/precompiled_comparison.py",
+        "bytes": 52481,
+        "sha256": "58bf6f6e87aad8126dfb81feac2a8c3f4e09a1c5ffb552f00373d75eef2aa1f8"
+      },
+      {
+        "path": "reproduce/target/memory-module-sections-20261028/scripts/benchmark_module_images.py",
+        "bytes": 18978,
+        "sha256": "37ac2f4e3b8ef0a40e153420bf541e9843d217446b17bd555ffada3dd065332c"
+      },
+      {
+        "path": "reproduce/target/memory-module-sections-20261028/scripts/benchmark_module_sections.py",
+        "bytes": 6953,
+        "sha256": "c9d46e5038f19dc69dba605af83424d97fe298d66947cde11577a8b3bd92e7ee"
+      },
+      {
+        "path": "reproduce/target/memory-module-sections-20261028/scripts/diagnose-precompiled-mappings.py",
+        "bytes": 27919,
+        "sha256": "2e98f6c136e242cb6140c3cd6db3986b5b2abe73ae4f1b4988f4c7e24f18860f"
+      },
+      {
+        "path": "reproduce/target/memory-ordered-bootstrap-20261027-evidence/ci-40611080497-validated/report.json",
+        "bytes": 352585,
+        "sha256": "8993659b61ac82a5b09a7a07df8f8502318c1855b710a649fb96402b40c255f4"
+      },
+      {
+        "path": "reproduce/target/memory-ordered-bootstrap-20261027-evidence/github-40611080497-scored/precompiled-evidence/report.json",
+        "bytes": 225940,
+        "sha256": "17bbf297bcd3ef31c8b845b8e9872bf3135af8931f765b0f080de787a2dede44"
+      }
+    ]
+  },
+  "publication_processing": {
+    "complete": true,
+    "started_at": "2026-10-28T02:07:50.057963+00:00",
+    "cpu_affinity": [
+      0
+    ],
+    "before": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "62750720",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "driver": {
+      "path": "/home/mewhhaha/src/porffor/target/memory-module-sections-20261028-evidence/publish-private-sections-40611737589-reviewed.py",
+      "sha256": "a3334e5b4165effd3fc4aa15df90a8f825b7944fa24e67885c9086167c390545"
+    },
+    "root_source": "8456f8017eea69c0ce24c66bc7e914e505404aa6",
+    "publication_checkout": "45f26184b16ba0841346c537e517112d08aa74ab",
+    "scope": "Three isolated-worktree diagnostic files only; no README, graphs, main, build, native image or workload execution.",
+    "after": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "163909632",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "finished_at": "2026-10-28T02:07:51.372927+00:00"
+  },
+  "interpretation": "Unscored section/page attribution only. Section overlaps, image/text views and host function/page counts are nonadditive. Warm observation16 follows16 prior calls. Presence proves neither execution nor causal memory savings; required data/GC metadata cannot be omitted on this evidence. Validator reads retained benchmark fixture text and metadata; it loads no native image and executes no workload. No parity or goal-completion claim. Existing matched Core, V8, README/status and graphs remain unchanged."
+}

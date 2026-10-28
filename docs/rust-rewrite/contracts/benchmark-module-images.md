@@ -43,7 +43,9 @@ ownership captures remain unscored. No RSS improvement follows from this feature
 
 ## Actual owned image sections
 
-The section-attribution extension remains pending verification. It uses the
+The [section-attribution checkpoint](../memory-module-sections-20261028.md)
+verifies the extension against six native controls and four actual ownership
+captures. It uses the
 same lazy hook, exclusively after all four captures are acknowledged. Pinned
 Wasmtime 47 serializes the same immutable image buffer exposed by `image_range`.
 The observer safely serializes the actual retained P and optional R; the WASI

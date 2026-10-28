@@ -70,7 +70,9 @@ No RSS improvement is claimed.
 The diagnostic now also records bounded section metadata from the actual owned
 native images after the final capture. It anchors serialized sections to the
 live image and text ranges; shared boundary pages remain nonadditive.
-Verification of this section-attribution extension is pending.
+The [verified section checkpoint](docs/rust-rewrite/memory-module-sections-20261028.md)
+identifies eager calendar data and GC stack maps as further targets. These
+unscored observations do not change the matched comparison below.
 
 ## Precompiled comparison
 
