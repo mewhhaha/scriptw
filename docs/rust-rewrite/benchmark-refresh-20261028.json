@@ -1,13 +1,13 @@
 {
   "schema": "scriptw-benchmark-refresh-v2",
   "date": "2026-10-29",
-  "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
-  "source_fingerprint": "7f17a9cb49312aa999dc1a6bf4659a2106bd685c84b91b280b8ff3d3419b2052",
+  "source_commit": "54a28246ee78d8e58b07c8c5e3c705d3c2ab03e8",
+  "source_fingerprint": "d2c4f2a64b261f708eb2160d7e6e000f773b5fda1f8927e4453e8fe552ec0458",
   "paired": {
-    "run": 40895619031,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895619031",
-    "finished_at": "2026-10-29T15:11:33.955150+00:00",
-    "raw_report_sha256": "9cb2610af61052aa719df6521ddb401b4deda7ccd8d05954704ac19c316292b5",
+    "run": 40948863776,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40948863776",
+    "finished_at": "2026-10-29T20:49:15.379341+00:00",
+    "raw_report_sha256": "cf90a935a38a84eaf19d7498160e5542217c6237fff3f795ed838e44174f325e",
     "attempts": 68,
     "workloads": 17,
     "rust_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
@@ -32,14 +32,14 @@
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "12898304",
+        "memory.peak": "12910592",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "673202176",
+        "memory.peak": "650055680",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "cpu_affinity": [
@@ -48,10 +48,10 @@
     }
   },
   "three": {
-    "run": 40895618949,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895618949",
-    "finished_at": "2026-10-29T15:06:53.697221+00:00",
-    "raw_report_sha256": "b45b2d942c0d60cb599e44b14a030d18d305aaf19f47c0a12f12a06092449fd0",
+    "run": 40948858641,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40948858641",
+    "finished_at": "2026-10-29T20:52:18.078448+00:00",
+    "raw_report_sha256": "d9c622a39a4365cfc0f71263f87965a654aeee97550f69abf75a34c2b34ff103",
     "attempts": 102,
     "workloads": 17,
     "successful_scriptc_workloads": 17,
@@ -59,7 +59,7 @@
     "machine": {
       "system": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
       "architecture": "x86_64",
-      "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+      "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
       "host_logical_cpus": 4,
       "affinity_before_pin": [
         0
@@ -94,19 +94,242 @@
   "validation": {
     "raw_evidence_readmitted": true,
     "published_archives_readmitted": true,
+    "all_per_benchmark_svgs_reproduced": true,
+    "svg_cards": 34,
+    "cards": [
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/sort-reverse-128.svg",
+        "sha256": "90eceb4fe0d3da6f9ecc0aff3a8e94dfab865c49b67f7659d835a819e9347187",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/sort-reverse-128.png",
+        "preview_sha256": "d29b1119a11ca15e20d7b5d74cd1197b97172d710357026724b8d6e861fa3b79"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/sort-reverse-512.svg",
+        "sha256": "0ab9d76266e086c7c46d08bd606889133bba501b584af8f750ec86ed53766236",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/sort-reverse-512.png",
+        "preview_sha256": "dd650c17bea3096ab74cdf73591075488621b045bf33133fc86f4e17aa0cbb3b"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/sort-sorted-512.svg",
+        "sha256": "a318a65c4e1310cab7393407365787ff7a94b352138eb728d51b051471801ee0",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/sort-sorted-512.png",
+        "preview_sha256": "8ac12d86ecbff52f0c416d32e819e4678526779b736e1cb614f9ae91ea08d8d8"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/to-sorted-512.svg",
+        "sha256": "b6f957d48ba177fb518160fdf02de7d63afc15369011c04808bdf5fec09562a3",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/to-sorted-512.png",
+        "preview_sha256": "d7102a740969cf273c694f39045b49fe2e589a2a97eb21ddbd9f24d87493a8f4"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-1024.svg",
+        "sha256": "7b54b6712425a052dd4be168f4d3e989b99e5d0ae38a7988530599dbdf4a01ef",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-1024.png",
+        "preview_sha256": "922ae08c21bb88800d088333546026f8923c26fca7dc283279704dd3d15c725c"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-4096.svg",
+        "sha256": "91eda7c502ab2e3e3dffee7bf8f709ce52cdfe82959ab65aafd7d84f16b5718a",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-4096.png",
+        "preview_sha256": "dbc4ffede13c4e916bf6f046b00ae941043d4cac46498cac827c292117ec5823"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-mixed-1024.svg",
+        "sha256": "26b7602da9519fbe45c4a6552f241ef82b4cb656fd545de8a5ba822e047768da",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-mixed-1024.png",
+        "preview_sha256": "9600256e3ce27c06fea3826248be7de7466febd8bc12255ba164325b107e8114"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/numeric-loop-10000.svg",
+        "sha256": "67b1080ce8ac02ea6ccc92ce2d1d7d6b10d430d551e914b16f5e670cae579b47",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/numeric-loop-10000.png",
+        "preview_sha256": "65af31e28c4fe7f15f840175a3f4e83651313422fa8932188d6b43c4e9f588e0"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/numeric-loop-50000.svg",
+        "sha256": "3ae1da9294f0216e4d689db09f0507e4182152dd74868571c269ceb6829bfa3c",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/numeric-loop-50000.png",
+        "preview_sha256": "10fa1368a7e2a0604de8cb254956946ec690eec59609f395eca517b3f1d33aff"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/folded-string-4096.svg",
+        "sha256": "e869d85576ee01416645103cb8e3cfa33ec31aa4a84a99ef5aa03202bef8e81f",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/folded-string-4096.png",
+        "preview_sha256": "6b42a288b591f669b6b8c367f81e537224a70537daf9079ed1472e8fb43eb840"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/dynamic-string-4096.svg",
+        "sha256": "6edc7e5373c6e41ca3a47034a9d7cf251b2ccd9fc6b8181a0a7ae071875f1a17",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/dynamic-string-4096.png",
+        "preview_sha256": "68cee25eb0063b17f2923fe790a7c616775dd5bf7575a8d94059216bb4ef2b71"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/integer.svg",
+        "sha256": "ad4ee73bf55f65bc7fc6c056c74a26828b42736b9164d6554c102df4783195ce",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/integer.png",
+        "preview_sha256": "f9e6d1e4b268e469bf1d9613ab7a8a346e06f9192709c2b3204ddcb23d87fdf2"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/objects.svg",
+        "sha256": "f9dd5fc75a6c2b31df46f000d2850afb22d157c885c85a2cbafa9c436c920b6c",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/objects.png",
+        "preview_sha256": "62c318704f1612d33aec991ff9fc94140404e1ba4aab6f7d630ef91a38449e25"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/retained-objects.svg",
+        "sha256": "64335291bd17016ab1b2e1aab6c7522a22867e463e16765f8a7474cd387e107c",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/retained-objects.png",
+        "preview_sha256": "82a52217680729a3dcf7b9a287defb700b7701b9017a5feb2be3e9fb6a6ffdf9"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-empty-1024.svg",
+        "sha256": "b7d188084b26215ee291f0889a21279aa603306c7a0332b6f028e3ebb39e364e",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-empty-1024.png",
+        "preview_sha256": "12006b7400a743ab7e7d8714de7833f3705fcc42c79465dee9ff5fcd4f083081"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-singleton-1024.svg",
+        "sha256": "a336e45ac6679afacd95f6fd6f6adc1c471decbbf50898ccb685be97c07bac9d",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-singleton-1024.png",
+        "preview_sha256": "00215c6a1d080c6b03ea231a782606f586a8818b10a4951799095462a111dda3"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/precompiled/join-small-1024.svg",
+        "sha256": "f750102b25f890c97dac1465e68e87c1d2df15b6e219cc4747bebf35d683ae8c",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/precompiled/join-small-1024.png",
+        "preview_sha256": "6b4d379b3887a43b00a06f053974ef669d782a66081982d2a9d82957672c8f3f"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/sort-reverse-128.svg",
+        "sha256": "c2d03262d7afe6c03e3c2f50c4254c3c96443ff499e26434320e7b5d0a77db12",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/sort-reverse-128.png",
+        "preview_sha256": "5d4374d392f645ca69f98587d65cda50aafc6d737a204c4e7d24d4d4d6a9490b"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/sort-reverse-512.svg",
+        "sha256": "144423a020a03cf34716521256cc1c3e24b8bb055893630a718086fa8570cde2",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/sort-reverse-512.png",
+        "preview_sha256": "99ff87e8d6959e168b7fe7ed8b291b4ddb114e6b43018c9743162be8f8b84b8a"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/sort-sorted-512.svg",
+        "sha256": "cf6781bb29f001630c922b32975c115b437d2e6dc2a21f46e7ddfc1397f33c41",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/sort-sorted-512.png",
+        "preview_sha256": "03587c062847f1665578516cfd4a3d6962e3d35912ba66857b5af4e0850eed82"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/to-sorted-512.svg",
+        "sha256": "cd5e94a8a6433442c40649747058a8afdaf6f0a41a61920f5d75ce6740810a96",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/to-sorted-512.png",
+        "preview_sha256": "40615edb967816429ae9ae67b21c2035682f861151f291228e66c3d581f00729"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-1024.svg",
+        "sha256": "f9c2d02b91cdab04753a6598578ee88e3d33aa4b0d6676a025e06236b403b888",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-1024.png",
+        "preview_sha256": "c5edb72f8b75e7ab1772863a222ba0f1c96b35c257f23fd100a5497d2687bdd3"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-4096.svg",
+        "sha256": "bd7b04ed749cebd15d1c13b98e81d19e1f60e134b48876350b218bd68d418b31",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-4096.png",
+        "preview_sha256": "0c76154fd69813591cef08fe6920817774f5da47ed0ddf6ca5266a3587a7c65f"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-mixed-1024.svg",
+        "sha256": "9e1b406cec28e7dcebd045443a33d714c435b9f6dcad6a8afb0ed7e082adb23a",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-mixed-1024.png",
+        "preview_sha256": "a36be54f7e300a1f5153ab81b3f93907e40342a573c0a6c19f23822aa4e71705"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/numeric-loop-10000.svg",
+        "sha256": "96ac8c0c8311faa06e00f28bb1c73ae2171fbd590f5fe95f9a8a0c73d2375ce0",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/numeric-loop-10000.png",
+        "preview_sha256": "5425c83578674206bcbb120adfee879f60a3686ed251e33bf28cffd6f2897275"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/numeric-loop-50000.svg",
+        "sha256": "1d1ef039c3cc1f112c0c1eee9a69fce5e84643b0a29d2092eb9bf7c60f9293fb",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/numeric-loop-50000.png",
+        "preview_sha256": "a3d9bbe4acd68d4975aafaca7a119d3770c41f39c09d3854872f7bff4913609f"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/folded-string-4096.svg",
+        "sha256": "890556368aedd4ae5635b9e41a8696dcfb0ef172680c1052d912cf5433467305",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/folded-string-4096.png",
+        "preview_sha256": "4b7890f9cffe239937af684a9621f6d7eaf146bee0b1ebd2fd6ed7d09c057f86"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/dynamic-string-4096.svg",
+        "sha256": "c3c7ea5e8d745fe588ca1d59a68ba914a812206cb404d00de18a9b3807bd4a28",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/dynamic-string-4096.png",
+        "preview_sha256": "45dda686e19cd47e5e6ef874855806750f9620e184a4ec5785e6a762552c1a49"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/integer.svg",
+        "sha256": "51a0f20f6edd7180308edbcbe472a782ccc198f345209eb93f5326876d8ee837",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/integer.png",
+        "preview_sha256": "51b8181abfb7996a48f3d6748fbada88b02c387adbcc567d2d715a6e32f3611a"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/objects.svg",
+        "sha256": "8b1f331eb413465337b56449e36b996211cc75fbd8d23fb332c1027a911b8a92",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/objects.png",
+        "preview_sha256": "1de8b003dd2cca98252b1d45588816c8b09147286d650f6fbe31e83e1ef81dfd"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/retained-objects.svg",
+        "sha256": "18c4d61b0d5be7dac36aabfea2c518d176fb31ce8c12a3b476f67ec5ee74a63c",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/retained-objects.png",
+        "preview_sha256": "bef5afd054319f417abb72338385a24536f4622091ad04372a13fc7a96dab8a9"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-empty-1024.svg",
+        "sha256": "db150846ab9688c5f773c84e5499e2ade06119709ec5ffa937844472d2d2351a",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-empty-1024.png",
+        "preview_sha256": "df07dfb58e990cdbf83ce2d61801d770ebfce305c24bbc5baf9fd76481777834"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-singleton-1024.svg",
+        "sha256": "f0bcb4f0d5a1f52ef0de86399df08a77e726cad2ab87e85f03f78e0beedf99a6",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-singleton-1024.png",
+        "preview_sha256": "31b6108de48d6bdb21f911e1f0c3ade9fc20d4a95cb87cf7a87335c7ea19c1c0"
+      },
+      {
+        "path": "docs/rust-rewrite/assets/benchmarks/join-small-1024.svg",
+        "sha256": "2d2db33c6cc6064447408de43c3ac77a2d94394100c6966ef9b58de182768748",
+        "preview": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/previews/benchmarks/join-small-1024.png",
+        "preview_sha256": "da81f8d61ed18d4f01ee198a9a1b47cc86d9e4e44b12fc6367f43bb3a0c3d432"
+      }
+    ],
     "pinned_status_bytes_unchanged": true,
+    "pinned_status_sha256": "b7360d7186b305e1f5c91c7b654d7d71d65a7e0bc0a1810fbd6ed6bf77dd8260",
     "staged_files": [
       "README.md",
-      "docs/rust-rewrite/loader-admission-20261029.json",
+      "docs/rust-rewrite/execution-parity-20261029.json",
       "docs/rust-rewrite/precompiled-comparison.json",
       "docs/rust-rewrite/precompiled-comparison.md",
       "docs/rust-rewrite/precompiled-comparison.tar.gz",
       "docs/rust-rewrite/compiler-comparison.json",
       "docs/rust-rewrite/compiler-comparison.md",
       "docs/rust-rewrite/compiler-comparison.tar.gz",
-      "docs/rust-rewrite/benchmark-refresh-20261028.json",
-      "docs/rust-rewrite/benchmark-refresh-20261028.md",
-      "docs/rust-rewrite/benchmark-refresh-20261028-mappings.tar.xz",
+      "docs/rust-rewrite/assets/precompiled/sort-reverse-128.svg",
+      "docs/rust-rewrite/assets/precompiled/sort-reverse-512.svg",
+      "docs/rust-rewrite/assets/precompiled/sort-sorted-512.svg",
+      "docs/rust-rewrite/assets/precompiled/to-sorted-512.svg",
+      "docs/rust-rewrite/assets/precompiled/join-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/join-mixed-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/numeric-loop-10000.svg",
+      "docs/rust-rewrite/assets/precompiled/numeric-loop-50000.svg",
+      "docs/rust-rewrite/assets/precompiled/folded-string-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/dynamic-string-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/integer.svg",
+      "docs/rust-rewrite/assets/precompiled/objects.svg",
+      "docs/rust-rewrite/assets/precompiled/retained-objects.svg",
+      "docs/rust-rewrite/assets/precompiled/join-empty-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-singleton-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-small-1024.svg",
       "docs/rust-rewrite/assets/benchmarks/sort-reverse-128.svg",
       "docs/rust-rewrite/assets/benchmarks/sort-reverse-512.svg",
       "docs/rust-rewrite/assets/benchmarks/sort-sorted-512.svg",
@@ -124,73 +347,72 @@
       "docs/rust-rewrite/assets/benchmarks/join-empty-1024.svg",
       "docs/rust-rewrite/assets/benchmarks/join-singleton-1024.svg",
       "docs/rust-rewrite/assets/benchmarks/join-small-1024.svg",
-      "docs/rust-rewrite/assets/precompiled/sort-reverse-128.svg",
-      "docs/rust-rewrite/assets/precompiled/sort-reverse-512.svg",
-      "docs/rust-rewrite/assets/precompiled/sort-sorted-512.svg",
-      "docs/rust-rewrite/assets/precompiled/to-sorted-512.svg",
-      "docs/rust-rewrite/assets/precompiled/join-1024.svg",
-      "docs/rust-rewrite/assets/precompiled/join-4096.svg",
-      "docs/rust-rewrite/assets/precompiled/join-mixed-1024.svg",
-      "docs/rust-rewrite/assets/precompiled/numeric-loop-10000.svg",
-      "docs/rust-rewrite/assets/precompiled/numeric-loop-50000.svg",
-      "docs/rust-rewrite/assets/precompiled/folded-string-4096.svg",
-      "docs/rust-rewrite/assets/precompiled/dynamic-string-4096.svg",
-      "docs/rust-rewrite/assets/precompiled/integer.svg",
-      "docs/rust-rewrite/assets/precompiled/objects.svg",
-      "docs/rust-rewrite/assets/precompiled/retained-objects.svg",
-      "docs/rust-rewrite/assets/precompiled/join-empty-1024.svg",
-      "docs/rust-rewrite/assets/precompiled/join-singleton-1024.svg",
-      "docs/rust-rewrite/assets/precompiled/join-small-1024.svg"
+      "docs/rust-rewrite/benchmark-refresh-20261028.json",
+      "docs/rust-rewrite/benchmark-refresh-20261028.md"
     ],
-    "paired_validator_sha256": "605224d6ec93b9635f5bf6005f2527a9e6f92afefb3bf651a9727a805511e5be",
-    "three_validator_sha256": "343254a32fa2d8b84acc83801196b9d9c065274a2dc0ef529b8406068f81a2b6",
+    "inputs": [
+      {
+        "path": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/config.json",
+        "sha256": "a2cdc635376517d6eb98d2c6bab7442c2625a7e4b9dd44b160b705fe3832e114"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/docs/rust-rewrite/execution-parity-20261029.json",
+        "sha256": "424a8dec22fe3d865031fc5f753d06de094ed8e22358b8092cc0f24b93d44f16"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/paired/precompiled-evidence/report.json",
+        "sha256": "cf90a935a38a84eaf19d7498160e5542217c6237fff3f795ed838e44174f325e"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/ordinary/compiler-measurements/report.json",
+        "sha256": "d9c622a39a4365cfc0f71263f87965a654aeee97550f69abf75a34c2b34ff103"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/README.md",
+        "sha256": "c496a11b1fc22a47a4f70b971570561a32b1abbb49bec4dbe8b9abffe019c738"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/execution-parity-20261029/ci-refresh/publish.py",
+        "sha256": "70b027e5095c8a3f5be8388a1907e87a28d777bd8bc05a74b21a0ab9c456bcde"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/precompiled_comparison.py",
+        "sha256": "605224d6ec93b9635f5bf6005f2527a9e6f92afefb3bf651a9727a805511e5be"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/compiler_comparison.py",
+        "sha256": "343254a32fa2d8b84acc83801196b9d9c065274a2dc0ef529b8406068f81a2b6"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/benchmark_charts.py",
+        "sha256": "b0dde44199ee37d424368c6f8cac61de1c743c54dfbf18022c403d7881cfc024"
+      }
+    ],
     "resources": {
       "before": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "14581760",
+        "memory.peak": "13910016",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "253263872",
+        "memory.peak": "437829632",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-      }
-    },
-    "all_workload_svgs_reproduced": true,
-    "workload_svg_count": 34,
-    "chart_renderer_sha256": "b0dde44199ee37d424368c6f8cac61de1c743c54dfbf18022c403d7881cfc024"
+      },
+      "cpu_affinity": [
+        0
+      ]
+    }
   },
-  "implementation_checkpoint": "loader-admission-20261029.json",
-  "implementation_checkpoint_sha256": "086039297d869ff7bad1b83c206e4c29adbb33225acac75027715aab4d7704f5",
+  "implementation_checkpoint": "execution-parity-20261029.json",
+  "implementation_checkpoint_sha256": "424a8dec22fe3d865031fc5f753d06de094ed8e22358b8092cc0f24b93d44f16",
   "local_producer_identity": {
-    "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
-    "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767"
+    "source_commit": "a5448d285613194db3db42758307acc98262880b",
+    "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0"
   },
-  "interpretation": "Separately co-measured CI cohorts at the configured source; local admission results retain their own producer identity. Policy, frontend placement and toolchains are recorded independently. Local whole-process RSS/PSS improved, private dirty memory and broad execution were flat, and focused integer timing retained a small cost. No universal CPU gain, causal cross-cohort savings, parity or full Test262/native acceptance claim.",
-  "unscored_mapping_diagnostic": {
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895619031",
-    "artifact_name": "precompiled-mapping-diagnostic-unscored",
-    "artifact_id": 12906874627,
-    "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
-    "source_fingerprint": "7f17a9cb49312aa999dc1a6bf4659a2106bd685c84b91b280b8ff3d3419b2052",
-    "executable_sha256": "cc2f3a3684b6ae5807a7cb32b8ea57eeaf429db300c5f9c2682fcf176c316783",
-    "scored": false,
-    "cases": 4,
-    "snapshots": 16,
-    "raw_report_sha256": "251417d95f0f10ea5c0c62b5e36f6ea1a81cc5d358d4ee1dd945601283cd39e2",
-    "scored_report_sha256": "9cb2610af61052aa719df6521ddb401b4deda7ccd8d05954704ac19c316292b5",
-    "module_function_attribution_status": "deferred: no exact owned native ELF symbol binding is collected",
-    "archive": {
-      "file": "benchmark-refresh-20261028-mappings.tar.xz",
-      "sha256": "4269cd12ac899d0b3db8dd7c83b7d6a71a4d485b54749e9e85ddcb4074c9bbfd",
-      "bytes": 2110696,
-      "member_count": 35,
-      "expanded_bytes": 40059726
-    },
-    "interpretation": "Exact image/text/section range bindings and host-page presence are diagnostic. Neither present bits nor range overlap establishes executed functions or the cause of a before/after performance change."
-  }
+  "interpretation": "Separate co-measured CI cohorts retain their actual source/configuration/toolchains. The local checkpoint retains its own producer identity and acceptance scope. No cross-cohort causal subtraction, full Test262 rerun, universal CPU gain or achieved Scriptc parity is inferred."
 }

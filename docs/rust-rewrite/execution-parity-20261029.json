@@ -1,0 +1,1495 @@
+{
+  "schema": "scriptw-local-execution-parity-result-v1",
+  "date": "2026-10-29",
+  "source_commit": "a5448d285613194db3db42758307acc98262880b",
+  "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0",
+  "verification_source_commit": "54a28246ee78d8e58b07c8c5e3c705d3c2ab03e8",
+  "verification_source_binding": "Caller-supplied final test-only commit; actual native heads and each exact tracked patch/source map remain recorded separately.",
+  "local_test_correction": {
+    "base_source": "a5448d285613194db3db42758307acc98262880b",
+    "original_privacy_patch_sha256": "748e5cacd200233fe8d6b72b97307b9cd5b389cbb34c3db072649b06199a9a2b",
+    "combined_patch_sha256": "0e90d10ca8f5b86184812b69cdb76bfd2ae9f5359ea653a5d0fc502a653aff7f",
+    "receipt": {
+      "path": "target/execution-parity-20261029/intl-test-corrections.patch",
+      "bytes": 5075,
+      "sha256": "0e90d10ca8f5b86184812b69cdb76bfd2ae9f5359ea653a5d0fc502a653aff7f"
+    }
+  },
+  "canonical_publication": false,
+  "all_scriptc_parity": false,
+  "full_suite": false,
+  "full_pinned_test262": false,
+  "full_workspace": false,
+  "source_identities": {
+    "ca": {
+      "host": {
+        "source_commit": "ca044e7cae69186c0165c9c700e1db41a9f3e1f0",
+        "source_fingerprint": "7b9931e9771598265ecccb6ca3d62eca8fa6a9282aa855d1d3d3ac9e397e6760",
+        "sha256": "e9d7075db38dad98582acb053e8925bdcf17e476a508937bf25247c7713b053f",
+        "bytes": 213302240
+      },
+      "scriptw": {
+        "source_commit": "ca044e7cae69186c0165c9c700e1db41a9f3e1f0",
+        "source_fingerprint": "7b9931e9771598265ecccb6ca3d62eca8fa6a9282aa855d1d3d3ac9e397e6760",
+        "sha256": "d72923b0fefcff95826b9bf32c3f5bd37448e4db5e4dc61fef0f0b726ac04fbf",
+        "bytes": 216641368
+      }
+    },
+    "remainder": {
+      "host": {
+        "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+        "source_fingerprint": "979659c72aa9a69ba32abe002605a9fd89f31c7abb7612db350827e041f447f2",
+        "sha256": "873c35a0270aaf0cd4832c564078bbd344cfdb1be99b4562a8f6a95593b9badf",
+        "bytes": 213303728
+      },
+      "scriptw": {
+        "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+        "source_fingerprint": "979659c72aa9a69ba32abe002605a9fd89f31c7abb7612db350827e041f447f2",
+        "sha256": "5dfe57a7994034baf18452678817e6dc973792c6f3b977a08d38d742377fb931",
+        "bytes": 216642856
+      }
+    },
+    "guarded": {
+      "host": {
+        "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+        "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+        "sha256": "9b29c481140379c018f704a14d3cb52cf25e55b05997e0f9870126048363c0df",
+        "bytes": 213305376
+      },
+      "scriptw": {
+        "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+        "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+        "sha256": "c178d4d6fa9bf52e6495fa182a9aae891010b610e9baf836439ee012fee46fa6",
+        "bytes": 216644440
+      }
+    },
+    "intl": {
+      "host": {
+        "source_commit": "a5448d285613194db3db42758307acc98262880b",
+        "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0",
+        "sha256": "8b365ba47f09d3fa556a95d2ecc4067d81ab7553f0a04a990b9e55b34ee795de",
+        "bytes": 213342544
+      },
+      "scriptw": {
+        "source_commit": "a5448d285613194db3db42758307acc98262880b",
+        "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0",
+        "sha256": "e7beefa7a16416559a35279a8a1a5fd81851b014c5d77ab6d1afdc8531e4afc0",
+        "bytes": 216681488
+      }
+    }
+  },
+  "verification": {
+    "native_final": {
+      "passed": 5063,
+      "targets": [
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "emission",
+          "kind": "test",
+          "executable_sha256": "eb51b4a8e45da09c6703a19dcba02cdf98bc248ee00ec3e7ecb3dbdda7953cb5",
+          "native_filter": null,
+          "passed": 38,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0001-scriptw-aot-wasm-emission.log",
+            "bytes": 4338,
+            "sha256": "6318463822ab3334c8ffc97682ece602b973543042a4b079910cd003cd236fc1"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "intl_temporal",
+          "kind": "test",
+          "executable_sha256": "7b40059aa14a5a91b4d13db5d5d1de3ce2c43114f249520d0692cd959b275c7d",
+          "native_filter": null,
+          "passed": 89,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0002-scriptw-aot-wasm-intl_temporal.log",
+            "bytes": 10713,
+            "sha256": "a686288c0f705d98a60440453c9c96a7b52df57f15981345cc69de2c67576d7d"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "modules_realms",
+          "kind": "test",
+          "executable_sha256": "2fb626a921332e4fcc38438963395c2a54a579ea623c5a6e1f6adc847e4af6cc",
+          "native_filter": null,
+          "passed": 74,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0003-scriptw-aot-wasm-modules_realms.log",
+            "bytes": 9021,
+            "sha256": "7336336eb76d6fe9c20035d686f9e428fc8d97d9be533d2afeafae0cfb82e467"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "runtime_link",
+          "kind": "test",
+          "executable_sha256": "fbd599a5a4d7e3bab05ce29371869f801c54276a2d43b8bbf85cb3079156c656",
+          "native_filter": null,
+          "passed": 31,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0004-scriptw-aot-wasm-runtime_link.log",
+            "bytes": 3827,
+            "sha256": "5650cd59b8288457cda9757ff0b3a59e4fb8c322ab9fbe0c4e3c703b88b862d5"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_async",
+          "kind": "test",
+          "executable_sha256": "85a86bd0471c72153fed811ff463135466db62a0ad9ef615a0299088af34cce6",
+          "native_filter": null,
+          "passed": 116,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0005-scriptw-aot-wasm-structure_async.log",
+            "bytes": 14753,
+            "sha256": "489d132a5bc0b4b6f83a8eb2f7cc30b7fd3a2a64566ca73c82a496a2a9111eb2"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_builtins",
+          "kind": "test",
+          "executable_sha256": "fd5216a7b1ed35aab3139b92158f203051f68a905645e481fe9cc7a09f010704",
+          "native_filter": null,
+          "passed": 169,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0006-scriptw-aot-wasm-structure_builtins.log",
+            "bytes": 19936,
+            "sha256": "c93f0c4beeaa41dac4c2066bd6149db6c3ab5bc6b6bd5db47009754d35c05d56"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_language",
+          "kind": "test",
+          "executable_sha256": "b0e37b0b3d84a078dac4da73e4bdccac1295f8c0cb99e835322269b5d02a95c2",
+          "native_filter": null,
+          "passed": 152,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0007-scriptw-aot-wasm-structure_language.log",
+            "bytes": 18375,
+            "sha256": "0bcbf7296edf5929a12f5ee87c4832a3562bb5b77dd040af734e8ebd1269ed58"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "scriptw_engine",
+          "kind": "lib",
+          "executable_sha256": "6fd4ca6e7e126f6a03d93d2f8dcccd3ef4246775f368e0fc68056fa8aecfb424",
+          "native_filter": null,
+          "passed": 1070,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0008-scriptw-engine-scriptw_engine.log",
+            "bytes": 107393,
+            "sha256": "1333fc56448eecbca3a7d9593b58cd0c6c93fbe614f714446fad03df211fde9f"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_async",
+          "kind": "test",
+          "executable_sha256": "6fac1093a0bee56588f7ec9987bd59794352bfa778b0aba2595c0614e4874870",
+          "native_filter": null,
+          "passed": 248,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0009-scriptw-engine-aot_async.log",
+            "bytes": 27444,
+            "sha256": "649f0f0cea65a1af3eb1ac2b13ae76f91d8d077dee886a34c3e51235f0f17908"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_builtins",
+          "kind": "test",
+          "executable_sha256": "4222b7e9f50e82280849b0aef1043c2f9e35838975d20df2c9f013d4f7fee2bf",
+          "native_filter": null,
+          "passed": 565,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0010-scriptw-engine-aot_builtins.log",
+            "bytes": 59632,
+            "sha256": "3ef2f330e9b1590444efe0fecececc95014bbd544b749af55b9991347463c812"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_gc_entries",
+          "kind": "test",
+          "executable_sha256": "6011da19d3f191b13d799f826e14da66b946f1e9a985bd426d0417e9bb591686",
+          "native_filter": null,
+          "passed": 237,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0011-scriptw-engine-aot_gc_entries.log",
+            "bytes": 25785,
+            "sha256": "139cd76c218b5b8705c7f41a45d43642331cd30bf5b5818e15ebba84cd64b952"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_generators",
+          "kind": "test",
+          "executable_sha256": "e506a48f7f966d5761e000f6e39e42765ea1e63ccf7d2cf2c4fcc3b543bb6e35",
+          "native_filter": null,
+          "passed": 167,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0012-scriptw-engine-aot_generators.log",
+            "bytes": 18852,
+            "sha256": "87dcde0df4e48f4050290f46bde4da8f7696318039308004b91f766ed852c2a9"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_intl",
+          "kind": "test",
+          "executable_sha256": "ffd5a6ec2a51ea7053deddfdeded6897e68af99b77b4c37e5024bd855df19e38",
+          "native_filter": null,
+          "passed": 307,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0013-scriptw-engine-aot_intl.log",
+            "bytes": 28122,
+            "sha256": "7547f3838e9acf8f8be00aacb1e343e38fdf45b9d46bdc3b171fc80b3e60244b"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_language",
+          "kind": "test",
+          "executable_sha256": "90194c8d57dcab0c880182baf74c07a97a77e107487dff30e22aa10094ef505f",
+          "native_filter": null,
+          "passed": 377,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0014-scriptw-engine-aot_language.log",
+            "bytes": 40528,
+            "sha256": "4e63ecda81e8178c6676f129cfd3a8980ee6d239aa1d342149302b7ed26ebe57"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_realm_modules",
+          "kind": "test",
+          "executable_sha256": "21f13517f511ce51574f018107fe2de4170a3bb23ebc2fdc2cbc42a9d6e9d249",
+          "native_filter": null,
+          "passed": 433,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0015-scriptw-engine-aot_realm_modules.log",
+            "bytes": 48219,
+            "sha256": "3f59ac148445faf3d61f4fdb6b68dda64390c32b6811b2304fb872fcfea363b3"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_regexp",
+          "kind": "test",
+          "executable_sha256": "32d01fc94c3b447491c710a8a05d3a41da313f203c522b920afe2e025b0d0b5c",
+          "native_filter": null,
+          "passed": 157,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0016-scriptw-engine-aot_regexp.log",
+            "bytes": 17505,
+            "sha256": "17433a8ac1deccad7fc8d755382139fc4c0652caa2854662f94485b28be3cd50"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_temporal",
+          "kind": "test",
+          "executable_sha256": "132b00911d90bf5d89e1f6f5f1d47c1a2d9e248ac33badfdb5c1388a6acacc64",
+          "native_filter": null,
+          "passed": 211,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0017-scriptw-engine-aot_temporal.log",
+            "bytes": 22533,
+            "sha256": "e56478779bc5a308d8a51c1363e718e15739e38782b59817e2d7d051d0e5bf53"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "structure",
+          "kind": "test",
+          "executable_sha256": "4aefb3f97bfb89dd7298d664b679baf97ec79d411859d0e24732e90548511ca0",
+          "native_filter": null,
+          "passed": 37,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0018-scriptw-engine-structure.log",
+            "bytes": 4423,
+            "sha256": "9868da50e4dfa31f5be44afc12752a75f4b5cca80d46b69299b70aa13233be36"
+          }
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "weak_gc_facility",
+          "kind": "test",
+          "executable_sha256": "48da4018265267a6fc88ad4210d1e471ce6a30b231111eba3cc7865a739dfa19",
+          "native_filter": null,
+          "passed": 14,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0019-scriptw-engine-weak_gc_facility.log",
+            "bytes": 1597,
+            "sha256": "f489cc34996582d4e8ebb0ddb7df9b92ad3aff89e2b51c408aad91beb9506e9e"
+          }
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "scriptw_aot_wasm",
+          "kind": "lib",
+          "executable_sha256": "1233e32b80901246ab3835fe82f22362395a95508c039e1e27a482785356c929",
+          "native_filter": null,
+          "passed": 553,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-corrected-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+            "bytes": 53768,
+            "sha256": "bf8576ee9a05d344af324cb065a981fe1d404b9ea96b6b5d2ac2d440a1d5389b"
+          }
+        },
+        {
+          "package": "scriptw-runtime-image",
+          "target": "scriptw_runtime_image",
+          "kind": "lib",
+          "executable_sha256": "557ee9d0152493c5ac56493396a3ea557eeed24a5045d303ac65b434dde1bf80",
+          "native_filter": null,
+          "passed": 18,
+          "transcript": {
+            "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-corrected-0002-scriptw-runtime-image-scriptw_runtime_image.log",
+            "bytes": 2194,
+            "sha256": "24fbb75bfb6ce480cea929552a9e1feea852d585790e19d4c85a1bf45a2ef29e"
+          }
+        }
+      ],
+      "original": {
+        "receipt": {
+          "path": "target/execution-parity-20261029/native-final/receipt.json",
+          "bytes": 218195,
+          "sha256": "28a3efd0224c036a8840ab0949cfc574c0a7602e639e8708aed6f4995a67f907"
+        },
+        "source_commit": "a5448d285613194db3db42758307acc98262880b",
+        "source_map_sha256": "b5f7f5b1149ce8727c61a586938ae6c080a740c4ced5bb2b9342415023e2869e",
+        "source_start": {
+          "path": "target/execution-parity-20261029/native-final/source-start.json",
+          "bytes": 162,
+          "sha256": "a900ed53b571572abd88e898f2672192984d8e5fa2120501d54201abbc4a4b93"
+        },
+        "tracked_patch_sha256": "748e5cacd200233fe8d6b72b97307b9cd5b389cbb34c3db072649b06199a9a2b",
+        "passed": 4492,
+        "targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "emission",
+            "kind": "test",
+            "executable_sha256": "eb51b4a8e45da09c6703a19dcba02cdf98bc248ee00ec3e7ecb3dbdda7953cb5",
+            "native_filter": null,
+            "passed": 38,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0001-scriptw-aot-wasm-emission.log",
+              "bytes": 4338,
+              "sha256": "6318463822ab3334c8ffc97682ece602b973543042a4b079910cd003cd236fc1"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "intl_temporal",
+            "kind": "test",
+            "executable_sha256": "7b40059aa14a5a91b4d13db5d5d1de3ce2c43114f249520d0692cd959b275c7d",
+            "native_filter": null,
+            "passed": 89,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0002-scriptw-aot-wasm-intl_temporal.log",
+              "bytes": 10713,
+              "sha256": "a686288c0f705d98a60440453c9c96a7b52df57f15981345cc69de2c67576d7d"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "modules_realms",
+            "kind": "test",
+            "executable_sha256": "2fb626a921332e4fcc38438963395c2a54a579ea623c5a6e1f6adc847e4af6cc",
+            "native_filter": null,
+            "passed": 74,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0003-scriptw-aot-wasm-modules_realms.log",
+              "bytes": 9021,
+              "sha256": "7336336eb76d6fe9c20035d686f9e428fc8d97d9be533d2afeafae0cfb82e467"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "runtime_link",
+            "kind": "test",
+            "executable_sha256": "fbd599a5a4d7e3bab05ce29371869f801c54276a2d43b8bbf85cb3079156c656",
+            "native_filter": null,
+            "passed": 31,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0004-scriptw-aot-wasm-runtime_link.log",
+              "bytes": 3827,
+              "sha256": "5650cd59b8288457cda9757ff0b3a59e4fb8c322ab9fbe0c4e3c703b88b862d5"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "structure_async",
+            "kind": "test",
+            "executable_sha256": "85a86bd0471c72153fed811ff463135466db62a0ad9ef615a0299088af34cce6",
+            "native_filter": null,
+            "passed": 116,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0005-scriptw-aot-wasm-structure_async.log",
+              "bytes": 14753,
+              "sha256": "489d132a5bc0b4b6f83a8eb2f7cc30b7fd3a2a64566ca73c82a496a2a9111eb2"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "structure_builtins",
+            "kind": "test",
+            "executable_sha256": "fd5216a7b1ed35aab3139b92158f203051f68a905645e481fe9cc7a09f010704",
+            "native_filter": null,
+            "passed": 169,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0006-scriptw-aot-wasm-structure_builtins.log",
+              "bytes": 19936,
+              "sha256": "c93f0c4beeaa41dac4c2066bd6149db6c3ab5bc6b6bd5db47009754d35c05d56"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "structure_language",
+            "kind": "test",
+            "executable_sha256": "b0e37b0b3d84a078dac4da73e4bdccac1295f8c0cb99e835322269b5d02a95c2",
+            "native_filter": null,
+            "passed": 152,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0007-scriptw-aot-wasm-structure_language.log",
+              "bytes": 18375,
+              "sha256": "0bcbf7296edf5929a12f5ee87c4832a3562bb5b77dd040af734e8ebd1269ed58"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "scriptw_engine",
+            "kind": "lib",
+            "executable_sha256": "6fd4ca6e7e126f6a03d93d2f8dcccd3ef4246775f368e0fc68056fa8aecfb424",
+            "native_filter": null,
+            "passed": 1070,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0008-scriptw-engine-scriptw_engine.log",
+              "bytes": 107393,
+              "sha256": "1333fc56448eecbca3a7d9593b58cd0c6c93fbe614f714446fad03df211fde9f"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_async",
+            "kind": "test",
+            "executable_sha256": "6fac1093a0bee56588f7ec9987bd59794352bfa778b0aba2595c0614e4874870",
+            "native_filter": null,
+            "passed": 248,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0009-scriptw-engine-aot_async.log",
+              "bytes": 27444,
+              "sha256": "649f0f0cea65a1af3eb1ac2b13ae76f91d8d077dee886a34c3e51235f0f17908"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_builtins",
+            "kind": "test",
+            "executable_sha256": "4222b7e9f50e82280849b0aef1043c2f9e35838975d20df2c9f013d4f7fee2bf",
+            "native_filter": null,
+            "passed": 565,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0010-scriptw-engine-aot_builtins.log",
+              "bytes": 59632,
+              "sha256": "3ef2f330e9b1590444efe0fecececc95014bbd544b749af55b9991347463c812"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_gc_entries",
+            "kind": "test",
+            "executable_sha256": "6011da19d3f191b13d799f826e14da66b946f1e9a985bd426d0417e9bb591686",
+            "native_filter": null,
+            "passed": 237,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0011-scriptw-engine-aot_gc_entries.log",
+              "bytes": 25785,
+              "sha256": "139cd76c218b5b8705c7f41a45d43642331cd30bf5b5818e15ebba84cd64b952"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_generators",
+            "kind": "test",
+            "executable_sha256": "e506a48f7f966d5761e000f6e39e42765ea1e63ccf7d2cf2c4fcc3b543bb6e35",
+            "native_filter": null,
+            "passed": 167,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0012-scriptw-engine-aot_generators.log",
+              "bytes": 18852,
+              "sha256": "87dcde0df4e48f4050290f46bde4da8f7696318039308004b91f766ed852c2a9"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_intl",
+            "kind": "test",
+            "executable_sha256": "ffd5a6ec2a51ea7053deddfdeded6897e68af99b77b4c37e5024bd855df19e38",
+            "native_filter": null,
+            "passed": 307,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0013-scriptw-engine-aot_intl.log",
+              "bytes": 28122,
+              "sha256": "7547f3838e9acf8f8be00aacb1e343e38fdf45b9d46bdc3b171fc80b3e60244b"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_language",
+            "kind": "test",
+            "executable_sha256": "90194c8d57dcab0c880182baf74c07a97a77e107487dff30e22aa10094ef505f",
+            "native_filter": null,
+            "passed": 377,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0014-scriptw-engine-aot_language.log",
+              "bytes": 40528,
+              "sha256": "4e63ecda81e8178c6676f129cfd3a8980ee6d239aa1d342149302b7ed26ebe57"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_realm_modules",
+            "kind": "test",
+            "executable_sha256": "21f13517f511ce51574f018107fe2de4170a3bb23ebc2fdc2cbc42a9d6e9d249",
+            "native_filter": null,
+            "passed": 433,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0015-scriptw-engine-aot_realm_modules.log",
+              "bytes": 48219,
+              "sha256": "3f59ac148445faf3d61f4fdb6b68dda64390c32b6811b2304fb872fcfea363b3"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_regexp",
+            "kind": "test",
+            "executable_sha256": "32d01fc94c3b447491c710a8a05d3a41da313f203c522b920afe2e025b0d0b5c",
+            "native_filter": null,
+            "passed": 157,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0016-scriptw-engine-aot_regexp.log",
+              "bytes": 17505,
+              "sha256": "17433a8ac1deccad7fc8d755382139fc4c0652caa2854662f94485b28be3cd50"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_temporal",
+            "kind": "test",
+            "executable_sha256": "132b00911d90bf5d89e1f6f5f1d47c1a2d9e248ac33badfdb5c1388a6acacc64",
+            "native_filter": null,
+            "passed": 211,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0017-scriptw-engine-aot_temporal.log",
+              "bytes": 22533,
+              "sha256": "e56478779bc5a308d8a51c1363e718e15739e38782b59817e2d7d051d0e5bf53"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "structure",
+            "kind": "test",
+            "executable_sha256": "4aefb3f97bfb89dd7298d664b679baf97ec79d411859d0e24732e90548511ca0",
+            "native_filter": null,
+            "passed": 37,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0018-scriptw-engine-structure.log",
+              "bytes": 4423,
+              "sha256": "9868da50e4dfa31f5be44afc12752a75f4b5cca80d46b69299b70aa13233be36"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "weak_gc_facility",
+            "kind": "test",
+            "executable_sha256": "48da4018265267a6fc88ad4210d1e471ce6a30b231111eba3cc7865a739dfa19",
+            "native_filter": null,
+            "passed": 14,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0019-scriptw-engine-weak_gc_facility.log",
+              "bytes": 1597,
+              "sha256": "f489cc34996582d4e8ebb0ddb7df9b92ad3aff89e2b51c408aad91beb9506e9e"
+            }
+          }
+        ],
+        "superseded_targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "scriptw_aot_wasm",
+            "state": "failed",
+            "outcomes": [
+              {
+                "passed": 552,
+                "failed": 1,
+                "ignored": 0
+              }
+            ],
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+              "bytes": 54297,
+              "sha256": "c3d16ea749ee5fd05aeff44b11267868613acd7fd32d7bb6069bd36a47f6d5ec"
+            }
+          },
+          {
+            "package": "scriptw-runtime-image",
+            "target": "scriptw_runtime_image",
+            "state": "passed",
+            "outcomes": [
+              {
+                "passed": 18,
+                "failed": 0,
+                "ignored": 0
+              }
+            ],
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-0020-scriptw-runtime-image-scriptw_runtime_image.log",
+              "bytes": 2194,
+              "sha256": "24fbb75bfb6ce480cea929552a9e1feea852d585790e19d4c85a1bf45a2ef29e"
+            }
+          }
+        ]
+      },
+      "corrected": {
+        "receipt": {
+          "path": "target/execution-parity-20261029/native-final-corrected/receipt.json",
+          "bytes": 34582,
+          "sha256": "f5b8243fc8d36f190df902a2abe420d7a04a151296e711f6e7632c357b218ebd"
+        },
+        "source_commit": "a5448d285613194db3db42758307acc98262880b",
+        "source_map_sha256": "e80700b83a7c5bdab4cbee4e055b742822b6622b06b2f7cd5037f61e9d87bd94",
+        "source_start": {
+          "path": "target/execution-parity-20261029/native-final-corrected/source-start.json",
+          "bytes": 162,
+          "sha256": "538c48e1a52bb065bd2e6e76a5b15d55bbbfc7d5f71d7c7dcca252c77f48a52e"
+        },
+        "tracked_patch_sha256": "0e90d10ca8f5b86184812b69cdb76bfd2ae9f5359ea653a5d0fc502a653aff7f",
+        "passed": 577,
+        "targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "scriptw_aot_wasm",
+            "kind": "lib",
+            "executable_sha256": "1233e32b80901246ab3835fe82f22362395a95508c039e1e27a482785356c929",
+            "native_filter": null,
+            "passed": 553,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-corrected-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+              "bytes": 53768,
+              "sha256": "bf8576ee9a05d344af324cb065a981fe1d404b9ea96b6b5d2ac2d440a1d5389b"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "scriptw_engine",
+            "kind": "lib",
+            "executable_sha256": "6fd4ca6e7e126f6a03d93d2f8dcccd3ef4246775f368e0fc68056fa8aecfb424",
+            "native_filter": "execution_stack",
+            "passed": 6,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-corrected-0001-scriptw-engine-scriptw_engine.log",
+              "bytes": 950,
+              "sha256": "1cc13c3fb1f7ecfbb8162b4deb9eab66dfaba0c1eed89c296f9e269eb6d7256c"
+            }
+          },
+          {
+            "package": "scriptw-runtime-image",
+            "target": "scriptw_runtime_image",
+            "kind": "lib",
+            "executable_sha256": "557ee9d0152493c5ac56493396a3ea557eeed24a5045d303ac65b434dde1bf80",
+            "native_filter": null,
+            "passed": 18,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-final-corrected-0002-scriptw-runtime-image-scriptw_runtime_image.log",
+              "bytes": 2194,
+              "sha256": "24fbb75bfb6ce480cea929552a9e1feea852d585790e19d4c85a1bf45a2ef29e"
+            }
+          }
+        ],
+        "superseded_targets": []
+      },
+      "overlap": "Corrected filtered execution_stack is a repeated scope; corrected full AOT and RuntimeImage replace their original scopes."
+    },
+    "earlier_focused_scopes": [
+      {
+        "receipt": {
+          "path": "target/execution-parity-20261029/native-focused/receipt.json",
+          "bytes": 44120,
+          "sha256": "f1174dbbfe1b29a6eef2a0668b733ce34dfa7b3958b741fbad3bc9d0e532f2d2"
+        },
+        "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+        "source_map_sha256": "48a1136e69bc95ea92826b6caa0d2d94faa1589484423c228f4237581fc0eab7",
+        "source_start": {
+          "path": "target/execution-parity-20261029/native-focused/source-start.json",
+          "bytes": 162,
+          "sha256": "d870062f35f47445082d09f0e698e13daa912f14e3ac994d71b73e658fb02085"
+        },
+        "tracked_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "passed": 147,
+        "targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "scriptw_aot_wasm",
+            "kind": "lib",
+            "executable_sha256": "34ac04d7736177ac97ecc272a7962d338c536a93da731e7e405f3bd00103873f",
+            "native_filter": "native_bootstrap",
+            "passed": 3,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-focused-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+              "bytes": 759,
+              "sha256": "95ba66dc40132c597eaaddb4cb2387b6506f490beabf0efdddb289b26ea651ef"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "scriptw_engine",
+            "kind": "lib",
+            "executable_sha256": "ebb92268139753df1e906dad03c1e0e9d1eece560a1c0b1ebb8e63b6b5a30207",
+            "native_filter": "execution",
+            "passed": 134,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-focused-0001-scriptw-engine-scriptw_engine.log",
+              "bytes": 13048,
+              "sha256": "b1b88d8f900006bc13ac11d083bbb819e6b47ddf7e221131a251bd642fa029e6"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_builtins",
+            "kind": "test",
+            "executable_sha256": "25da677fe294d1d7f4a7c2e88f9170b1e4fb78dcc60d4578929fd0e3b761b0c2",
+            "native_filter": "aot_number_remainder",
+            "passed": 6,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-focused-0002-scriptw-engine-aot_builtins.log",
+              "bytes": 967,
+              "sha256": "c9a7e0d4a7d1509a86294f70d7b47ca640aebd336552ad9189e4e5a17cd934f6"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_language",
+            "kind": "test",
+            "executable_sha256": "97abb84de1a1e4a14a0f182457c726909a7f777b9aefe563415404e19f064055",
+            "native_filter": "aot_compact_native_metadata",
+            "passed": 4,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-focused-0003-scriptw-engine-aot_language.log",
+              "bytes": 841,
+              "sha256": "c40762600f5a621144bfb162118bb87d0770ad83ba428d7a513f44222c30d35b"
+            }
+          }
+        ],
+        "superseded_targets": []
+      },
+      {
+        "receipt": {
+          "path": "target/execution-parity-20261029/native-guarded-focused/receipt.json",
+          "bytes": 35882,
+          "sha256": "e5e18da72fc48af0b62abefa68ae2e4c8cc2417e7c1b48cc2292ea974cd10b42"
+        },
+        "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+        "source_map_sha256": "afc453a85f94ddae510907906e2ece26785e2da057ea45fae82ba5d6edca9f2f",
+        "source_start": {
+          "path": "target/execution-parity-20261029/native-guarded-focused/source-start.json",
+          "bytes": 162,
+          "sha256": "097c56d274d6b95b9d818babfeaf528ccb6337b02ae64ed85a4b138892fe2439"
+        },
+        "tracked_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "passed": 12,
+        "targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "scriptw_aot_wasm",
+            "kind": "lib",
+            "executable_sha256": "9f4710812d4cca28d23fc60b45ed86a9417b4f86b2a9368ad209adfcb24e4699",
+            "native_filter": "guarded_number",
+            "passed": 2,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-guarded-focused-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+              "bytes": 629,
+              "sha256": "1cfaf5917bf9e2ed7dab3d258def2e7012d20b376226c2ae057bc9857840ce08"
+            }
+          },
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "emission",
+            "kind": "test",
+            "executable_sha256": "a5a1cd177bd1c245e990c435176d33d8d88651d0a254fac2f2d7dae17e9425af",
+            "native_filter": "aot_guarded_number_update",
+            "passed": 1,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-guarded-focused-0001-scriptw-aot-wasm-emission.log",
+              "bytes": 491,
+              "sha256": "2399fa558e48122a60dea986631cec4d621ae8fbd3cf80ad54882a541151b227"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_language",
+            "kind": "test",
+            "executable_sha256": "d8b6c4a4b38296b9cd8671657d10608ba095f928a91e7deb1e47d7940eb4c82c",
+            "native_filter": "aot_guarded_number",
+            "passed": 9,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-guarded-focused-0002-scriptw-engine-aot_language.log",
+              "bytes": 1354,
+              "sha256": "56941e3c4426c175794f964eb6d89de4688cb783bda68a10561e80275c4765f2"
+            }
+          }
+        ],
+        "superseded_targets": []
+      },
+      {
+        "receipt": {
+          "path": "target/execution-parity-20261029/native-intl-focused-corrected/receipt.json",
+          "bytes": 26427,
+          "sha256": "f29d1126ea6de0c06c890efdac221b64e7831398320b7f08e17837b72c70a7ac"
+        },
+        "source_commit": "a5448d285613194db3db42758307acc98262880b",
+        "source_map_sha256": "b5f7f5b1149ce8727c61a586938ae6c080a740c4ced5bb2b9342415023e2869e",
+        "source_start": {
+          "path": "target/execution-parity-20261029/native-intl-focused-corrected/source-start.json",
+          "bytes": 162,
+          "sha256": "a900ed53b571572abd88e898f2672192984d8e5fa2120501d54201abbc4a4b93"
+        },
+        "tracked_patch_sha256": "748e5cacd200233fe8d6b72b97307b9cd5b389cbb34c3db072649b06199a9a2b",
+        "passed": 10,
+        "targets": [
+          {
+            "package": "scriptw-aot-wasm",
+            "target": "scriptw_aot_wasm",
+            "kind": "lib",
+            "executable_sha256": "2f3bd0f3a4a9ba2df03d27d18edd671b84662095665fa6d47131e72867a61b13",
+            "native_filter": "intl_demand_initialization",
+            "passed": 3,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-intl-focused-corrected-0000-scriptw-aot-wasm-scriptw_aot_wasm.log",
+              "bytes": 744,
+              "sha256": "65b6a5d00daf94a3b6d0db52dbaa05b2b83c98b1f3ea42ecd436abb094c0927a"
+            }
+          },
+          {
+            "package": "scriptw-engine",
+            "target": "aot_intl",
+            "kind": "test",
+            "executable_sha256": "ffd5a6ec2a51ea7053deddfdeded6897e68af99b77b4c37e5024bd855df19e38",
+            "native_filter": "aot_intl_demand_initialization",
+            "passed": 7,
+            "transcript": {
+              "path": "target/memory-experiments-20261028/baseline-source/target/watched/workspace-native-intl-focused-corrected-0001-scriptw-engine-aot_intl.log",
+              "bytes": 1233,
+              "sha256": "c9dec223fa3085f13f869784c9222ab41b3294bce8d1c5d8b3a3d01d1172432e"
+            }
+          }
+        ],
+        "superseded_targets": []
+      }
+    ],
+    "source_guards": {
+      "passed": 356,
+      "groups": [
+        {
+          "receipt": {
+            "path": "target/execution-parity-20261029/source-guards/structure_builtins/receipt.json",
+            "bytes": 19729,
+            "sha256": "b05083cdb33a5401fec0ba7c71f4f217f3dd24c67d57dbe5e9db346842b8ed1b"
+          },
+          "transcript": {
+            "path": "target/execution-parity-20261029/source-guards/structure_builtins/tests.stdout",
+            "bytes": 16833,
+            "sha256": "64b393d20990113ffc644c153a72309edf10371b852fb7bdb0b946a08039ac8e"
+          },
+          "passed": 146
+        },
+        {
+          "receipt": {
+            "path": "target/execution-parity-20261029/source-guards/structure_language/receipt.json",
+            "bytes": 18132,
+            "sha256": "88edacdcf344907455489bb9ac7fb3dc45529e1a28b36f5040b17d0ccf1688a8"
+          },
+          "transcript": {
+            "path": "target/execution-parity-20261029/source-guards/structure_language/tests.stdout",
+            "bytes": 15890,
+            "sha256": "3ef6687f6c5785cbc120e1ccf9dd4e3c64f8c2c179e9657caa441df4b3731411"
+          },
+          "passed": 135
+        },
+        {
+          "receipt": {
+            "path": "target/execution-parity-20261029/source-guards/structure/receipt.json",
+            "bytes": 1518,
+            "sha256": "077d9c3bf1731eca554d36d207c73881a9202fbab264d0e979caa34a35f35124"
+          },
+          "transcript": {
+            "path": "target/execution-parity-20261029/source-guards/structure/tests.stdout",
+            "bytes": 437,
+            "sha256": "dde231bdead22c5eeedacf839d07a62931b05d190ebdda558a25818c217899ff"
+          },
+          "passed": 3
+        },
+        {
+          "receipt": {
+            "path": "target/execution-parity-20261029/intl-source-guards-corrected/receipt.json",
+            "bytes": 10711,
+            "sha256": "2469c725820617d898e4dbe9a1f940a8b80f835a7f33f5fb073514a8a73319fc"
+          },
+          "transcript": {
+            "path": "target/execution-parity-20261029/intl-source-guards-corrected/tests.stdout",
+            "bytes": 8693,
+            "sha256": "36a4fa1e99ffeddbecbb4aa90eadfbcd0e3f3566bfefb4c102e05866a968ccdf"
+          },
+          "passed": 72
+        }
+      ],
+      "original_failed_intl": {
+        "path": "target/execution-parity-20261029/intl-source-guards/receipt.json",
+        "bytes": 623,
+        "sha256": "0f6879073323fd5143293b99707d34d7223853e11539d0b1695eaa47988270c8"
+      }
+    },
+    "cli_example": {
+      "receipt": {
+        "path": "target/execution-parity-20261029/CLIexample-result.json",
+        "bytes": 2589,
+        "sha256": "3bb264027d63156058c2fd2fb510086ba74a530b395b6574700bfa9eb79146c1"
+      },
+      "source_commit": "a5448d285613194db3db42758307acc98262880b",
+      "executable": {
+        "path": "target/performance-work-20261024/build/release/examples/compiler_precompiled_baseline-7f0b75e3ad665d61",
+        "bytes": 4808888,
+        "sha256": "5842eb54f2d002c6c9afc5b300faad198b895fb671c1c64f3421c83a7d3783ac"
+      },
+      "cargo_producer": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///home/mewhhaha/src/porffor/target/memory-experiments-20261028/baseline-source/crates/scriptw-cli#0.1.0",
+        "manifest_path": "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/baseline-source/crates/scriptw-cli/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "compiler_precompiled_baseline",
+          "src_path": "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/baseline-source/crates/scriptw-cli/examples/compiler_precompiled_baseline.rs",
+          "edition": "2021",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": "line-tables-only",
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/examples/compiler_precompiled_baseline-7f0b75e3ad665d61"
+        ],
+        "executable": "/home/mewhhaha/src/porffor/target/performance-work-20261024/build/release/examples/compiler_precompiled_baseline-7f0b75e3ad665d61",
+        "fresh": false
+      },
+      "passed": 8
+    },
+    "original_pinned_subset": {
+      "receipt": {
+        "path": "target/execution-parity-20261029/finaltest262-intl/report.json",
+        "bytes": 337611,
+        "sha256": "0860db48e8b66d1446f44b503efba4d7d356121a1000352b3056a0d4c6f4a8aa"
+      },
+      "passed": 1214,
+      "scopes": [
+        {
+          "label": "object-function",
+          "inventory_count": 52,
+          "passed": 52
+        },
+        {
+          "label": "array-proxy",
+          "inventory_count": 28,
+          "passed": 28
+        },
+        {
+          "label": "error-families",
+          "inventory_count": 170,
+          "passed": 170
+        },
+        {
+          "label": "typedarray",
+          "inventory_count": 166,
+          "passed": 166
+        },
+        {
+          "label": "collections",
+          "inventory_count": 28,
+          "passed": 28
+        },
+        {
+          "label": "dynamic-function-constructors",
+          "inventory_count": 64,
+          "passed": 64
+        },
+        {
+          "label": "intl-constructor-metadata",
+          "inventory_count": 132,
+          "passed": 132
+        },
+        {
+          "label": "temporal-first-use",
+          "inventory_count": 136,
+          "passed": 136
+        },
+        {
+          "label": "number-remainder",
+          "inventory_count": 148,
+          "passed": 148
+        },
+        {
+          "label": "guarded-number-addition",
+          "inventory_count": 24,
+          "passed": 24
+        },
+        {
+          "label": "guarded-number-compound-addition",
+          "inventory_count": 14,
+          "passed": 14
+        },
+        {
+          "label": "guarded-number-less-than",
+          "inventory_count": 24,
+          "passed": 24
+        },
+        {
+          "label": "guarded-number-less-than-or-equal",
+          "inventory_count": 24,
+          "passed": 24
+        },
+        {
+          "label": "guarded-number-greater-than",
+          "inventory_count": 24,
+          "passed": 24
+        },
+        {
+          "label": "guarded-number-greater-than-or-equal",
+          "inventory_count": 24,
+          "passed": 24
+        },
+        {
+          "label": "guarded-number-prefix-increment",
+          "inventory_count": 17,
+          "passed": 17
+        },
+        {
+          "label": "guarded-number-postfix-increment",
+          "inventory_count": 17,
+          "passed": 17
+        },
+        {
+          "label": "guarded-number-prefix-decrement",
+          "inventory_count": 17,
+          "passed": 17
+        },
+        {
+          "label": "guarded-number-postfix-decrement",
+          "inventory_count": 17,
+          "passed": 17
+        },
+        {
+          "label": "intl-demand-number",
+          "inventory_count": 8,
+          "passed": 8
+        },
+        {
+          "label": "intl-demand-bigint",
+          "inventory_count": 10,
+          "passed": 10
+        },
+        {
+          "label": "intl-demand-string",
+          "inventory_count": 8,
+          "passed": 8
+        },
+        {
+          "label": "intl-demand-date",
+          "inventory_count": 10,
+          "passed": 10
+        },
+        {
+          "label": "intl-demand-duration",
+          "inventory_count": 8,
+          "passed": 8
+        },
+        {
+          "label": "intl-demand-namespace",
+          "inventory_count": 6,
+          "passed": 6
+        },
+        {
+          "label": "intl-demand-realm-defaults",
+          "inventory_count": 6,
+          "passed": 6
+        },
+        {
+          "label": "intl-demand-legacy-formatters",
+          "inventory_count": 12,
+          "passed": 12
+        },
+        {
+          "label": "intl-demand-segmenter-auxiliaries",
+          "inventory_count": 16,
+          "passed": 16
+        },
+        {
+          "label": "intl-demand-bound-formatters",
+          "inventory_count": 4,
+          "passed": 4
+        }
+      ]
+    }
+  },
+  "comparisons": [
+    {
+      "receipt": {
+        "path": "target/memory-experiments-20261028/execution-parity-comparison-9c0a3f137/report.json",
+        "bytes": 1996954,
+        "sha256": "c581871a51fd81fb31c7dcda5ab5ade8dd2d342080434e69991a7e13a3e929b5"
+      },
+      "processes": 144,
+      "output_checks": 2448,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+          "source_fingerprint": "979659c72aa9a69ba32abe002605a9fd89f31c7abb7612db350827e041f447f2",
+          "executable_sha256": "873c35a0270aaf0cd4832c564078bbd344cfdb1be99b4562a8f6a95593b9badf"
+        }
+      },
+      "suites": [
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "scriptw",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.8906822400804576,
+            "rss_bytes": 1.0055637802170816,
+            "pss_bytes": 1.0066587713398152,
+            "private_dirty_bytes": 1.0107868397680353
+          }
+        },
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "wasi",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 1.0003876680448247,
+            "rss_bytes": 0.9963102542649837,
+            "pss_bytes": 0.9961872707728329,
+            "private_dirty_bytes": 0.9997068702084725
+          }
+        },
+        {
+          "group": "targeted-typed-sort-2",
+          "adapter": "scriptw",
+          "cases": 2,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.994254973425699,
+            "rss_bytes": 1.0208447214120402,
+            "pss_bytes": 1.0241191284399769,
+            "private_dirty_bytes": 1.0063019997623837
+          }
+        }
+      ]
+    },
+    {
+      "receipt": {
+        "path": "target/memory-experiments-20261028/execution-parity-comparison-6da884249/report.json",
+        "bytes": 1997070,
+        "sha256": "1a2ceef7b3be756bbafe5d5901308c468cb3a0f11a4f34692f2abb158127af23"
+      },
+      "processes": 144,
+      "output_checks": 2448,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+          "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+          "executable_sha256": "9b29c481140379c018f704a14d3cb52cf25e55b05997e0f9870126048363c0df"
+        }
+      },
+      "suites": [
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "scriptw",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.7696160834468542,
+            "rss_bytes": 1.0543662689112667,
+            "pss_bytes": 1.0630653933818106,
+            "private_dirty_bytes": 1.0107062907044282
+          }
+        },
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "wasi",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 1.0155961013750707,
+            "rss_bytes": 1.0193168345846815,
+            "pss_bytes": 1.0231819381650318,
+            "private_dirty_bytes": 0.9999562208320409
+          }
+        },
+        {
+          "group": "targeted-typed-sort-2",
+          "adapter": "scriptw",
+          "cases": 2,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.9949747350207541,
+            "rss_bytes": 1.0500418942167618,
+            "pss_bytes": 1.0566264138712622,
+            "private_dirty_bytes": 1.005994831291291
+          }
+        }
+      ]
+    },
+    {
+      "receipt": {
+        "path": "target/memory-experiments-20261028/execution-parity-comparison-a5448d285/report.json",
+        "bytes": 1996691,
+        "sha256": "849492472c11c3bf1b4319a2588005eafe946515b5d9bc00cd687e441efa91f3"
+      },
+      "processes": 144,
+      "output_checks": 2448,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "a5448d285613194db3db42758307acc98262880b",
+          "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0",
+          "executable_sha256": "8b365ba47f09d3fa556a95d2ecc4067d81ab7553f0a04a990b9e55b34ee795de"
+        }
+      },
+      "suites": [
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "scriptw",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.7256677684481996,
+            "rss_bytes": 0.9570127984587693,
+            "pss_bytes": 0.9498263804801147,
+            "private_dirty_bytes": 0.9977081485820067
+          }
+        },
+        {
+          "group": "canonical-inputs-17",
+          "adapter": "wasi",
+          "cases": 17,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.9959573271436163,
+            "rss_bytes": 0.9785207052911008,
+            "pss_bytes": 0.974712988807432,
+            "private_dirty_bytes": 0.9997356974546968
+          }
+        },
+        {
+          "group": "targeted-typed-sort-2",
+          "adapter": "scriptw",
+          "cases": 2,
+          "geometric_mean_candidate_over_baseline": {
+            "execution_ms": 0.9782192304958904,
+            "rss_bytes": 0.952939913662317,
+            "pss_bytes": 0.9466543276633069,
+            "private_dirty_bytes": 0.9621743479631267
+          }
+        }
+      ]
+    }
+  ],
+  "accepted_geometric_candidate_over_baseline": {
+    "scriptw": {
+      "execution_ms": 0.7256677684481996,
+      "rss_bytes": 0.9570127984587693,
+      "pss_bytes": 0.9498263804801147,
+      "private_dirty_bytes": 0.9977081485820067
+    },
+    "wasi": {
+      "execution_ms": 0.9959573271436163,
+      "rss_bytes": 0.9785207052911008,
+      "pss_bytes": 0.974712988807432,
+      "private_dirty_bytes": 0.9997356974546968
+    }
+  },
+  "observed_change_percent": {
+    "scriptw": {
+      "execution_ms": -27.43322315518004,
+      "rss_bytes": -4.29872015412307,
+      "pss_bytes": -5.01736195198853,
+      "private_dirty_bytes": -0.22918514179932625
+    },
+    "wasi": {
+      "execution_ms": -0.4042672856383711,
+      "rss_bytes": -2.14792947088992,
+      "pss_bytes": -2.5287011192568043,
+      "private_dirty_bytes": -0.026430254530318553
+    }
+  },
+  "pilots": [
+    {
+      "receipt": {
+        "path": "target/execution-parity-20261029/focused-pilot/report.json",
+        "bytes": 1130151,
+        "sha256": "2e01a1f55354b26b3effdbe3813acf8afec91f16d5bb6e6d60207eb9a9b19138"
+      },
+      "processes": 64,
+      "output_checks": 1088,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "ca044e7cae69186c0165c9c700e1db41a9f3e1f0",
+          "source_fingerprint": "7b9931e9771598265ecccb6ca3d62eca8fa6a9282aa855d1d3d3ac9e397e6760",
+          "executable_sha256": "e9d7075db38dad98582acb053e8925bdcf17e476a508937bf25247c7713b053f"
+        }
+      }
+    },
+    {
+      "receipt": {
+        "path": "target/execution-parity-20261029/focused-pilot-remainder/report.json",
+        "bytes": 1129965,
+        "sha256": "a3f41e18cb35f3fe15f452f0274b60320d19b601bfbfe94bb8e60b7f133c6d52"
+      },
+      "processes": 64,
+      "output_checks": 1088,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+          "source_fingerprint": "979659c72aa9a69ba32abe002605a9fd89f31c7abb7612db350827e041f447f2",
+          "executable_sha256": "873c35a0270aaf0cd4832c564078bbd344cfdb1be99b4562a8f6a95593b9badf"
+        }
+      }
+    },
+    {
+      "receipt": {
+        "path": "target/execution-parity-20261029/focused-pilot-guarded/report.json",
+        "bytes": 1129867,
+        "sha256": "42bc7f89d3986650dd18ab05e2656693704a5a6f7c87ea19b23987596db051a8"
+      },
+      "processes": 64,
+      "output_checks": 1088,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+          "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767",
+          "executable_sha256": "324ad1cf4eec3413dd176f3d6308cb7ccb957346896935a95a2846d133bfa36e"
+        },
+        "candidate": {
+          "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+          "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+          "executable_sha256": "9b29c481140379c018f704a14d3cb52cf25e55b05997e0f9870126048363c0df"
+        }
+      }
+    },
+    {
+      "receipt": {
+        "path": "target/execution-parity-20261029/focused-pilot-guarded-regressions/report.json",
+        "bytes": 1129461,
+        "sha256": "3afac7fec5aa0e06996b21da22653096c2887c041227cfe2db2cdd87006d2fcb"
+      },
+      "processes": 64,
+      "output_checks": 1088,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "9c0a3f1375290141b2d123f992e1ca67ccd1410f",
+          "source_fingerprint": "979659c72aa9a69ba32abe002605a9fd89f31c7abb7612db350827e041f447f2",
+          "executable_sha256": "873c35a0270aaf0cd4832c564078bbd344cfdb1be99b4562a8f6a95593b9badf"
+        },
+        "candidate": {
+          "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+          "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+          "executable_sha256": "9b29c481140379c018f704a14d3cb52cf25e55b05997e0f9870126048363c0df"
+        }
+      }
+    },
+    {
+      "receipt": {
+        "path": "target/execution-parity-20261029/focused-pilot-intl/report.json",
+        "bytes": 1493436,
+        "sha256": "e3ab039aa5f0bbc14eda56ff14ab31158b0387791b3f06a5c416e529da745479"
+      },
+      "processes": 88,
+      "output_checks": 1496,
+      "source_identities": {
+        "baseline": {
+          "source_commit": "6da884249b0125534e86e66839a670c7935bb545",
+          "source_fingerprint": "38f3764414dc273d4e091146c6070924cd883f71bc27279c2494f36d8ea48b72",
+          "executable_sha256": "9b29c481140379c018f704a14d3cb52cf25e55b05997e0f9870126048363c0df"
+        },
+        "candidate": {
+          "source_commit": "a5448d285613194db3db42758307acc98262880b",
+          "source_fingerprint": "1c09229d0aea8576e791b4981fbecaaeabe28e1af00566c9a2303d0afd38a4f0",
+          "executable_sha256": "8b365ba47f09d3fa556a95d2ecc4067d81ab7553f0a04a990b9e55b34ee795de"
+        }
+      }
+    }
+  ],
+  "intl_store_associated_private_dirty_delta_bytes": {
+    "startup.js": [
+      -40960,
+      -40960,
+      -40960,
+      -40960
+    ],
+    "created-realms.js": [
+      -303104,
+      -303104,
+      -303104,
+      -303104
+    ],
+    "first-intl.js": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "historical_failures": "Raw failed cheap guards, first private-method test build and explicit aborted alternate-feature logs are retained; they are superseded, not current verdicts.",
+  "interpretation": "Local descriptive whole-process results: RSS attribution remains unresolved and WASI moves independently. Store-associated private dirty is after-execution minus after-Store-drop, not allocation/live-heap proof. Warm before-Store includes prior history. No every-case Scriptc parity, full-suite or causal memory claim.",
+  "archive": {
+    "file": "execution-parity-20261029.tar.gz",
+    "sha256": "486228470bd1d52048139fb967bc5ed98ed6fc72c171804805768eb5e05cb408",
+    "bytes": 16686975,
+    "expanded_bytes": 158489233,
+    "member_count": 2287,
+    "manifest_sha256": "564763fc502ef089852efe6636a02bcd686894ac3942ebc612d92e2be19a80fe"
+  }
+}

@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>join-empty-1024.js</dc:title>
-    <dc:description>{"finished_at": "2026-10-29T15:06:53.697221+00:00", "measured_date": "2026-10-29", "policy": {"execution": "fresh Store/context; source/Wasm compilation and instance/context setup excluded; output/completion included", "limitations": "GitHub shared host; descriptive observations; no statistical-significance or conformance claim", "memory": "post-execution process RSS while Store/context alive; includes compilation/runtime/warmup effects; not peak or live heap", "order": "rotate first runtime by workload and round; second round reverses case order", "wasmtime": "vendored 47.0.0; product Fast/OptLevel::None, single-pass, copying GC; Scriptw linked R retains its admitted build policy"}, "row": {"file": "join-empty-1024.js", "runtimes": {"scriptc": {"ms": 0.2120865, "rss_mib": 26.783203125, "status": "ok"}, "scriptw": {"ms": 0.6568795, "rss_mib": 50.392578125, "status": "ok"}, "v8": {"ms": 0.163143, "rss_mib": 54.0859375, "status": "ok"}}}, "runtimes": ["v8", "scriptw", "scriptc"], "schema": "scriptw-three-compiler-benchmark-v1", "shared_configuration": null, "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5", "started_at": "2026-10-29T15:06:14.977539+00:00"}</dc:description>
+    <dc:description>{"finished_at": "2026-10-29T20:52:18.078448+00:00", "measured_date": "2026-10-29", "policy": {"execution": "fresh Store/context; source/Wasm compilation and instance/context setup excluded; output/completion included", "limitations": "GitHub shared host; descriptive observations; no statistical-significance or conformance claim", "memory": "post-execution process RSS while Store/context alive; includes compilation/runtime/warmup effects; not peak or live heap", "order": "rotate first runtime by workload and round; second round reverses case order", "wasmtime": "vendored 47.0.0; product Fast/OptLevel::None, single-pass, copying GC; Scriptw linked R retains its admitted build policy"}, "row": {"file": "join-empty-1024.js", "runtimes": {"scriptc": {"ms": 0.308617, "rss_mib": 26.88671875, "status": "ok"}, "scriptw": {"ms": 0.86554, "rss_mib": 50.048828125, "status": "ok"}, "v8": {"ms": 0.2537475, "rss_mib": 53.810546875, "status": "ok"}}}, "runtimes": ["v8", "scriptw", "scriptc"], "schema": "scriptw-three-compiler-benchmark-v1", "shared_configuration": null, "source_commit": "54a28246ee78d8e58b07c8c5e3c705d3c2ab03e8", "started_at": "2026-10-29T20:51:23.935518+00:00"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -73,32 +73,32 @@ L 199.237091 191.232
     </g>
     <g id="ytick_2">
      <g id="line2d_6">
-      <path d="M 39.528 142.666718
-L 199.237091 142.666718
+      <path d="M 39.528 142.088824
+L 199.237091 142.088824
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
      <g id="text_5">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="145.70578" transform="rotate(-0 36.028 145.70578)">0.3</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="145.127886" transform="rotate(-0 36.028 145.127886)">0.4</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_8">
-      <path d="M 39.528 94.101435
-L 199.237091 94.101435
+      <path d="M 39.528 92.945648
+L 199.237091 92.945648
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_9"/>
      <g id="text_6">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="97.140498" transform="rotate(-0 36.028 97.140498)">0.6</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="95.98471" transform="rotate(-0 36.028 95.98471)">0.8</text>
      </g>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 52.504364 191.232
 L 86.442545 191.232
-L 86.442545 164.821714
-L 52.504364 164.821714
+L 86.442545 160.057105
+L 52.504364 160.057105
 z
 " clip-path="url(#p648741f3fb)" style="fill: #de8b36"/>
    </g>
@@ -113,8 +113,8 @@ z
    <g id="patch_5">
     <path d="M 152.322545 191.232
 L 186.260727 191.232
-L 186.260727 156.898531
-L 152.322545 156.898531
+L 186.260727 153.315951
+L 152.322545 153.315951
 z
 " clip-path="url(#p648741f3fb)" style="fill: #36835b"/>
    </g>
@@ -124,13 +124,13 @@ L 199.237091 191.232
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_7">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="69.473455" y="157.179136" transform="rotate(-0 69.473455 157.179136)">0.163</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="69.473455" y="152.414527" transform="rotate(-0 69.473455 152.414527)">0.254</text>
    </g>
    <g id="text_8">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="119.382545" y="77.25096" transform="rotate(-0 119.382545 77.25096)">0.657</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="119.382545" y="77.25096" transform="rotate(-0 119.382545 77.25096)">0.866</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="169.291636" y="149.255953" transform="rotate(-0 169.291636 149.255953)">0.212</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="169.291636" y="145.673373" transform="rotate(-0 169.291636 145.673373)">0.309</text>
    </g>
    <g id="text_10">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="39.528" y="41.992" transform="rotate(-0 39.528 41.992)">Time · ms</text>
@@ -179,24 +179,24 @@ L 426.024 191.232
     </g>
     <g id="ytick_5">
      <g id="line2d_15">
-      <path d="M 266.314909 142.079454
-L 426.024 142.079454
+      <path d="M 266.314909 141.827902
+L 426.024 141.827902
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_15">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="145.118516" transform="rotate(-0 262.814909 145.118516)">25</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="144.866964" transform="rotate(-0 262.814909 144.866964)">25</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_17">
-      <path d="M 266.314909 92.926908
-L 426.024 92.926908
+      <path d="M 266.314909 92.423804
+L 426.024 92.423804
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_18"/>
      <g id="text_16">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="95.96597" transform="rotate(-0 262.814909 95.96597)">50</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="95.462866" transform="rotate(-0 262.814909 95.462866)">50</text>
      </g>
     </g>
    </g>
@@ -211,16 +211,16 @@ z
    <g id="patch_9">
     <path d="M 329.200364 191.232
 L 363.138545 191.232
-L 363.138545 92.155059
-L 329.200364 92.155059
+L 363.138545 92.327311
+L 329.200364 92.327311
 z
 " clip-path="url(#pf3a1462166)" style="fill: #3378b5"/>
    </g>
    <g id="patch_10">
     <path d="M 379.109455 191.232
 L 413.047636 191.232
-L 413.047636 138.573495
-L 379.109455 138.573495
+L 413.047636 138.099436
+L 379.109455 138.099436
 z
 " clip-path="url(#pf3a1462166)" style="fill: #36835b"/>
    </g>
@@ -230,13 +230,13 @@ L 426.024 191.232
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_17">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="296.260364" y="77.25096" transform="rotate(-0 296.260364 77.25096)">54.1</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="296.260364" y="77.25096" transform="rotate(-0 296.260364 77.25096)">53.8</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="346.169455" y="84.512481" transform="rotate(-0 346.169455 84.512481)">50.4</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="346.169455" y="84.684733" transform="rotate(-0 346.169455 84.684733)">50.0</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="396.078545" y="130.930917" transform="rotate(-0 396.078545 130.930917)">26.8</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="396.078545" y="130.456858" transform="rotate(-0 396.078545 130.456858)">26.9</text>
    </g>
    <g id="text_20">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="266.314909" y="41.992" transform="rotate(-0 266.314909 41.992)">RSS · MiB</text>
