@@ -248,6 +248,7 @@ fn every_intl_getter_uses_the_checked_shared_accessor_allocation_tail() {
         runtime.bytes(),
         named("helper::realm_initialize_intrinsics"),
     );
+    let intl = body(runtime.bytes(), named("helper::realm_ensure_intl"));
     let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
         crate::RuntimeSourceCompilationProfile::Portable,
     ))
@@ -261,7 +262,12 @@ fn every_intl_getter_uses_the_checked_shared_accessor_allocation_tail() {
             crate::function_entry::PlannedFunctionEntry::standard(builtin, entry).protocol(),
             scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly
         );
-        let sites = bootstrap
+        assert!(
+            !bootstrap.iter().any(|op| matches!(op,
+            Operator::RefFunc { function_index } if *function_index == entry)),
+            "Intl getters must remain outside eager Realm allocation"
+        );
+        let sites = intl
             .iter()
             .enumerate()
             .filter_map(|(index, op)| {
@@ -272,15 +278,15 @@ fn every_intl_getter_uses_the_checked_shared_accessor_allocation_tail() {
         assert_eq!(
             sites.len(),
             1,
-            "one eager bootstrap installation for {}",
+            "one defining-Realm demand installation for {}",
             builtin.debug_name()
         );
         let start = sites[0];
-        let end = bootstrap[start + 1..]
+        let end = intl[start + 1..]
             .iter()
             .position(|op| matches!(op, Operator::RefFunc { .. }))
-            .map_or(bootstrap.len(), |offset| start + 1 + offset);
-        let installation = &bootstrap[start..end];
+            .map_or(intl.len(), |offset| start + 1 + offset);
+        let installation = &intl[start..end];
         assert_eq!(installation.iter().filter(|op|
             matches!(op, Operator::Call { function_index } if *function_index == allocate)).count(), 1,
             "{} must pass actual planned metadata and runtime-owned source admission", builtin.debug_name());

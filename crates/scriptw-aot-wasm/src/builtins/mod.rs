@@ -8,7 +8,9 @@ mod bigint;
 mod binary_data;
 mod boolean;
 mod bootstrap;
-pub(crate) use bootstrap::{created_realm_global_bindings, BootstrapRealm, TemporalIntrinsicBuild};
+pub(crate) use bootstrap::{
+    created_realm_global_bindings, BootstrapRealm, IntlIntrinsicBuild, TemporalIntrinsicBuild,
+};
 mod collections;
 mod data_view_access;
 mod date;

@@ -393,6 +393,35 @@ impl NonArrayRealmIntrinsicSlot {
         )
     }
 
+    /// Every externally observable identity owned by the Intl cluster.
+    pub(crate) const fn is_intl(self) -> bool {
+        matches!(
+            self,
+            Self::IntlLocalePrototype
+                | Self::IntlDateTimeFormatPrototype
+                | Self::IntlNumberFormatPrototype
+                | Self::IntlPluralRulesPrototype
+                | Self::IntlListFormatPrototype
+                | Self::IntlCollatorPrototype
+                | Self::IntlDisplayNamesPrototype
+                | Self::IntlRelativeTimeFormatPrototype
+                | Self::IntlSegmenterPrototype
+                | Self::IntlDurationFormatPrototype
+                | Self::IntlSegmentsPrototype
+                | Self::IntlSegmentIteratorPrototype
+                | Self::IntlLocaleConstructor
+                | Self::IntlDateTimeFormatConstructor
+                | Self::IntlNumberFormatConstructor
+                | Self::IntlPluralRulesConstructor
+                | Self::IntlListFormatConstructor
+                | Self::IntlCollatorConstructor
+                | Self::IntlDisplayNamesConstructor
+                | Self::IntlRelativeTimeFormatConstructor
+                | Self::IntlSegmenterConstructor
+                | Self::IntlDurationFormatConstructor
+        )
+    }
+
     pub(crate) const fn typed_array_constructor_identity(kind: TypedArrayElementKind) -> Self {
         match kind {
             TypedArrayElementKind::Float64 => Self::Float64ArrayConstructor,
@@ -654,6 +683,8 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(schema),
                 GcOperand::reference(&regexp_legacy, schema),
                 GcOperand::constant(crate::heap::TemporalInitializationState::Dormant),
+                GcOperand::null(schema),
+                GcOperand::constant(crate::heap::IntlInitializationState::Dormant),
                 GcOperand::null(schema),
             ),
             function,

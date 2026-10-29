@@ -1,7 +1,7 @@
 //! Intrinsic identities are rooted values from the supplied defining Realm.
 
 use super::*;
-use crate::builtins::TemporalIntrinsicBuild;
+use crate::builtins::{IntlIntrinsicBuild, TemporalIntrinsicBuild};
 use crate::gc_types::{
     ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcStackReference, IntrinsicTable,
     RealmRecord, RealmRecordSchema, StoredValue, ValueLocals,
@@ -79,6 +79,18 @@ impl FunctionBuilder<'_> {
                 .bind(schema, schema.reserve_gc_local(function), function);
             namespace.clear(function);
         }
+        if slot.is_intl() {
+            let schema = self.runtime_schema();
+            let namespace = schema
+                .call_helper(
+                    crate::runtime_helpers::RealmEnsureIntlArguments::new(realm),
+                    self.runtime_helper_base()
+                        .expect("Intl intrinsic reads require the registered runtime helpers"),
+                    function,
+                )
+                .bind(schema, schema.reserve_gc_local(function), function);
+            namespace.clear(function);
+        }
         self.emit_load_realm_intrinsic_at_index(realm, slot.gc_index(), result, function);
     }
 
@@ -94,6 +106,26 @@ impl FunctionBuilder<'_> {
         assert!(
             slot.is_temporal(),
             "Temporal build capability used for another cluster"
+        );
+        self.emit_load_realm_intrinsic_at_index(
+            building.realm(),
+            slot.gc_index(),
+            result,
+            function,
+        );
+    }
+
+    /// Only the Intl builder can read its completed slots during Building.
+    pub(crate) fn emit_load_building_intl_intrinsic(
+        &mut self,
+        building: &IntlIntrinsicBuild<'_>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        assert!(
+            slot.is_intl(),
+            "Intl build capability used for another cluster"
         );
         self.emit_load_realm_intrinsic_at_index(
             building.realm(),

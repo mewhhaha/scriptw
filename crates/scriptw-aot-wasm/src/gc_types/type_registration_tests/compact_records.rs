@@ -19,6 +19,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredTemporalNamespace>()
         .type_index()
         .raw();
+    let intl_index = schema
+        .struct_type::<DeferredIntlNamespace>()
+        .type_index()
+        .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
     let reference = |index, nullable| {
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
@@ -49,7 +53,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         })
         .collect::<Vec<_>>();
     alternatives.sort_unstable();
-    let mut expected = vec![stored_index, deferred_index, temporal_index];
+    let mut expected = vec![stored_index, deferred_index, temporal_index, intl_index];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
     let CompositeInnerType::Struct(stored) = &types[stored_index as usize].composite_type.inner
@@ -95,32 +99,45 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         ]
     );
 
-    let CompositeInnerType::Struct(temporal) = &types[temporal_index as usize].composite_type.inner
-    else {
-        panic!("DeferredTemporalNamespace must be a registered struct");
-    };
-    assert_eq!(
-        temporal
-            .fields
-            .iter()
-            .map(|field| (field.element_type, field.mutable))
-            .collect::<Vec<_>>(),
-        vec![(reference(realm_index, false), false)],
-        "the recipe retains only its defining Realm, which owns canonical identity"
-    );
+    for namespace_index in [temporal_index, intl_index] {
+        let CompositeInnerType::Struct(namespace) =
+            &types[namespace_index as usize].composite_type.inner
+        else {
+            panic!("deferred namespace must be a registered struct");
+        };
+        assert_eq!(
+            namespace
+                .fields
+                .iter()
+                .map(|field| (field.element_type, field.mutable))
+                .collect::<Vec<_>>(),
+            vec![(reference(realm_index, false), false)],
+            "the recipe retains only its defining Realm, which owns canonical identity"
+        );
+    }
     let CompositeInnerType::Struct(realm) = &types[realm_index as usize].composite_type.inner
     else {
         panic!("RealmRecord must be a registered struct");
     };
-    let state = &realm.fields[RealmRecordSchema::TEMPORAL_STATE.ordinal().raw() as usize];
-    assert!(state.mutable);
-    assert_eq!(
-        state.element_type,
-        wasmparser::StorageType::Val(wasmparser::ValType::I32)
-    );
-    let namespace = &realm.fields[RealmRecordSchema::TEMPORAL_NAMESPACE.ordinal().raw() as usize];
-    assert!(namespace.mutable);
-    assert_eq!(namespace.element_type, reference(stored_index, true));
+    for field in [
+        RealmRecordSchema::TEMPORAL_STATE.ordinal(),
+        RealmRecordSchema::INTL_STATE.ordinal(),
+    ] {
+        let state = &realm.fields[field.raw() as usize];
+        assert!(state.mutable);
+        assert_eq!(
+            state.element_type,
+            wasmparser::StorageType::Val(wasmparser::ValType::I32)
+        );
+    }
+    for field in [
+        RealmRecordSchema::TEMPORAL_NAMESPACE.ordinal(),
+        RealmRecordSchema::INTL_NAMESPACE.ordinal(),
+    ] {
+        let namespace = &realm.fields[field.raw() as usize];
+        assert!(namespace.mutable);
+        assert_eq!(namespace.element_type, reference(stored_index, true));
+    }
 
     let descriptor_index = schema
         .struct_type::<PropertyDescriptor>()

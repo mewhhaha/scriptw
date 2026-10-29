@@ -14,6 +14,7 @@ mod aot_intl_datetime_calendar16;
 mod aot_intl_datetime_numbering;
 mod aot_intl_datetime_provider;
 mod aot_intl_datetime_range_endpoints;
+mod aot_intl_demand_initialization;
 mod aot_intl_display_names;
 mod aot_intl_duration_format;
 mod aot_intl_keyword_aliases;

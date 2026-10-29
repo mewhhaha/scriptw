@@ -292,8 +292,8 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
     );
     assert_eq!(
         signature.results(),
-        [nullable_reference(type_index::<OrdinaryObject>(schema)); 5],
-        "eager bootstrap returns only Reflect, Math, JSON, Atomics and Intl"
+        [nullable_reference(type_index::<OrdinaryObject>(schema)); 4],
+        "eager bootstrap returns Reflect, Math, JSON and Atomics; Intl remains a defining-Realm recipe"
     );
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[batch as usize] as usize]

@@ -21,10 +21,10 @@ can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
 Runtime initialization uses compact intrinsic-installation tables and defers
-the complete Temporal namespace until its first observable or internal use.
+the complete Temporal and Intl namespaces until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 37
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 38
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;

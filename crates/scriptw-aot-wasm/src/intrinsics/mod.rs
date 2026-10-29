@@ -182,7 +182,7 @@ impl FunctionBuilder<'_> {
         value.set_undefined(function);
         let slot = crate::module::standard_builtin_function_realm_slot(builtin);
         if let Some(slot) = slot {
-            if slot.is_temporal() {
+            if slot.is_temporal() || slot.is_intl() {
                 self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
             } else {
                 self.emit_load_intrinsic_for_installation(realm.realm(), slot, &value, function);

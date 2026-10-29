@@ -1,6 +1,7 @@
 const PLANNING_SOURCE: &str = include_str!("../../src/planning.rs");
 const INTL_NAMESPACE_SOURCE: &str = include_str!("../../src/planning/intl_namespace.rs");
-const BOOTSTRAP_SOURCE: &str = include_str!("../../src/builtins/bootstrap.rs");
+const INTL_INITIALIZATION_SOURCE: &str =
+    include_str!("../../src/builtins/bootstrap/intl_initialization.rs");
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -226,9 +227,9 @@ fn intl_namespace_roots_and_policy_remain_parent_owned() {
 #[test]
 fn intl_bootstrap_consumes_only_the_rooted_member_witness() {
     let installer = bounded(
-        BOOTSTRAP_SOURCE,
-        "    pub(crate) fn init_intl_object(",
-        "    pub(crate) fn init_math_object(",
+        INTL_INITIALIZATION_SOURCE,
+        "    fn init_building_intl_object(",
+        "\n}\n",
     );
     assert_eq!(
         installer.matches("members: IntlNamespaceMembers,").count(),
@@ -254,12 +255,15 @@ fn intl_bootstrap_consumes_only_the_rooted_member_witness() {
     assert!(!installer.contains("IntlNamespacePlan"));
     assert!(!installer.contains("IntlRootsSeeded"));
     assert!(!installer.contains(".should_initialize_standard_builtin("));
+    assert!(installer.contains("building: &IntlIntrinsicBuild<'_>,"));
+    assert!(installer.contains("self.emit_load_building_intl_intrinsic("));
+    assert!(!installer.contains("self.emit_load_non_array_realm_intrinsic("));
 
     assert_eq!(
         INTL_NAMESPACE_SOURCE
             .matches("pub(crate) fn in_installation_order(")
             .count()
-            + BOOTSTRAP_SOURCE
+            + INTL_INITIALIZATION_SOURCE
                 .matches("members.in_installation_order()")
                 .count(),
         2,

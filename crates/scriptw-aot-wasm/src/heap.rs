@@ -144,6 +144,13 @@ runtime_scalar_domain!(TemporalInitializationState, 0, {
     Ready = 2,
 });
 
+// Initialization of one Realm's complete canonical Intl graph.
+runtime_scalar_domain!(IntlInitializationState, 0, {
+    Dormant = 0,
+    Building = 1,
+    Ready = 2,
+});
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DisposableStackState {
     Pending,

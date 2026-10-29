@@ -9,7 +9,9 @@ use crate::objects::{
 };
 use scriptw_ir::StandardBuiltinInstaller;
 
+mod intl_initialization;
 mod realm_initialization;
+pub(crate) use intl_initialization::IntlIntrinsicBuild;
 mod temporal_initialization;
 pub(crate) use temporal_initialization::TemporalIntrinsicBuild;
 
@@ -23,7 +25,6 @@ pub(crate) struct BootstrapRealm {
     math: Option<ValueLocals>,
     json: Option<ValueLocals>,
     atomics: Option<ValueLocals>,
-    intl: Option<ValueLocals>,
 }
 /// The canonical globals of every Realm the runtime creates. The string pool
 /// interns these names in its compiler-owned phase, so the bodies that install
@@ -65,7 +66,7 @@ pub(crate) fn created_realm_global_bindings() -> Vec<scriptw_ir::ScriptGlobalBin
 
 impl BootstrapRealm {
     fn clear(self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
-        for value in [self.intl, self.atomics, self.json, self.math, self.reflect]
+        for value in [self.atomics, self.json, self.math, self.reflect]
             .into_iter()
             .flatten()
         {
@@ -436,53 +437,6 @@ impl<'a> FunctionBuilder<'a> {
             &object,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
             "Reflect",
-            false,
-            false,
-            true,
-            function,
-        )?;
-        Ok(object)
-    }
-
-    pub(crate) fn init_intl_object(
-        &mut self,
-        members: IntlNamespaceMembers,
-        realm: &RealmFunctionMaterializationContext,
-        object_prototype: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        for (name, builtin) in members.methods_in_installation_order() {
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        let value = self.runtime_schema().reserve_value_local(function);
-        for (name, builtin) in members.in_installation_order() {
-            let slot = standard_builtin_constructor_realm_slot(builtin)
-                .ok_or_else(|| EmitError::unsupported("Intl constructor has no intrinsic slot"))?;
-            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
-            self.emit_install_intrinsic_data(
-                &object,
-                IntrinsicKey::Name(name),
-                &value,
-                true,
-                false,
-                true,
-                function,
-            )?;
-        }
-        value.clear(function);
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            "Intl",
             false,
             false,
             true,
@@ -1153,7 +1107,6 @@ impl<'a> FunctionBuilder<'a> {
             NonArrayRealmIntrinsicSlot::MapIteratorPrototype,
             NonArrayRealmIntrinsicSlot::SetIteratorPrototype,
             NonArrayRealmIntrinsicSlot::GeneratorPrototype,
-            NonArrayRealmIntrinsicSlot::IntlSegmentIteratorPrototype,
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &parent, function)?;
         }
@@ -1199,17 +1152,6 @@ impl<'a> FunctionBuilder<'a> {
             NonArrayRealmIntrinsicSlot::DataViewPrototype,
             NonArrayRealmIntrinsicSlot::TypedArrayPrototype,
             NonArrayRealmIntrinsicSlot::RegExpPrototype,
-            NonArrayRealmIntrinsicSlot::IntlLocalePrototype,
-            NonArrayRealmIntrinsicSlot::IntlDateTimeFormatPrototype,
-            NonArrayRealmIntrinsicSlot::IntlNumberFormatPrototype,
-            NonArrayRealmIntrinsicSlot::IntlPluralRulesPrototype,
-            NonArrayRealmIntrinsicSlot::IntlListFormatPrototype,
-            NonArrayRealmIntrinsicSlot::IntlCollatorPrototype,
-            NonArrayRealmIntrinsicSlot::IntlDisplayNamesPrototype,
-            NonArrayRealmIntrinsicSlot::IntlRelativeTimeFormatPrototype,
-            NonArrayRealmIntrinsicSlot::IntlSegmenterPrototype,
-            NonArrayRealmIntrinsicSlot::IntlDurationFormatPrototype,
-            NonArrayRealmIntrinsicSlot::IntlSegmentsPrototype,
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
         }
@@ -1396,46 +1338,6 @@ impl<'a> FunctionBuilder<'a> {
                 NonArrayRealmIntrinsicSlot::DatePrototype,
             ),
             (
-                StandardBuiltinId::IntlLocaleConstructor,
-                NonArrayRealmIntrinsicSlot::IntlLocalePrototype,
-            ),
-            (
-                StandardBuiltinId::IntlDateTimeFormatConstructor,
-                NonArrayRealmIntrinsicSlot::IntlDateTimeFormatPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlNumberFormatConstructor,
-                NonArrayRealmIntrinsicSlot::IntlNumberFormatPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlPluralRulesConstructor,
-                NonArrayRealmIntrinsicSlot::IntlPluralRulesPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlListFormatConstructor,
-                NonArrayRealmIntrinsicSlot::IntlListFormatPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlCollatorConstructor,
-                NonArrayRealmIntrinsicSlot::IntlCollatorPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlDisplayNamesConstructor,
-                NonArrayRealmIntrinsicSlot::IntlDisplayNamesPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlRelativeTimeFormatConstructor,
-                NonArrayRealmIntrinsicSlot::IntlRelativeTimeFormatPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlSegmenterConstructor,
-                NonArrayRealmIntrinsicSlot::IntlSegmenterPrototype,
-            ),
-            (
-                StandardBuiltinId::IntlDurationFormatConstructor,
-                NonArrayRealmIntrinsicSlot::IntlDurationFormatPrototype,
-            ),
-            (
                 StandardBuiltinId::RegExpConstructor,
                 NonArrayRealmIntrinsicSlot::RegExpPrototype,
             ),
@@ -1612,10 +1514,6 @@ impl<'a> FunctionBuilder<'a> {
         let atomics = (plan.full_standard_globals || plan.atomics_object)
             .then(|| self.init_atomics_object(&context, &object_prototype, function))
             .transpose()?;
-        let intl = plan
-            .intl_namespace_members()
-            .map(|members| self.init_intl_object(members, &context, &object_prototype, function))
-            .transpose()?;
         Ok(BootstrapRealm {
             realm: context,
             object_prototype,
@@ -1623,7 +1521,6 @@ impl<'a> FunctionBuilder<'a> {
             math,
             json,
             atomics,
-            intl,
         })
     }
 
@@ -1832,12 +1729,53 @@ impl<'a> FunctionBuilder<'a> {
                     recipe.clear(function);
                     continue;
                 }
-                GlobalPropertyInitializerIr::IntlObject => value.copy_from(
-                    bootstrap.intl.as_ref().ok_or_else(|| {
-                        EmitError::unsupported("planned intl namespace was not constructed")
-                    })?,
-                    function,
-                ),
+                GlobalPropertyInitializerIr::IntlObject => {
+                    // Keep Intl's original global insertion position and data
+                    // attributes. Private first use cannot recreate a deleted
+                    // or replaced public property.
+                    let recipe = schema.reserve_gc_local(function).initialize(
+                        schema.struct_type::<DeferredIntlNamespace>().construct(
+                            (GcOperand::reference(bootstrap.realm.realm(), schema),),
+                            function,
+                        ),
+                        function,
+                    );
+                    let deferred = schema
+                        .reserve_gc_local(function)
+                        .initialize(recipe.load(schema, function).upcast(), function);
+                    let header = schema.reserve_gc_local(function).initialize(
+                        self.emit_object_header_projection(&object, function),
+                        function,
+                    );
+                    let key = self.intrinsic_key(IntrinsicKey::Name(&binding.name), function)?;
+                    let writable = schema.reserve_i32_local(function);
+                    writable.set_constant(i32::from(binding.initializer.writable()), function);
+                    let enumerable = schema.reserve_i32_local(function);
+                    enumerable.set_constant(i32::from(binding.initializer.enumerable()), function);
+                    let configurable = schema.reserve_i32_local(function);
+                    configurable
+                        .set_constant(i32::from(binding.initializer.configurable()), function);
+                    schema.call_helper(
+                        crate::runtime_helpers::IntrinsicDataPublishArguments::new(
+                            &header,
+                            &key,
+                            &deferred,
+                            writable,
+                            enumerable,
+                            configurable,
+                        ),
+                        self.runtime_helper_base()?,
+                        function,
+                    );
+                    schema.release_i32_local(configurable, function);
+                    schema.release_i32_local(enumerable, function);
+                    schema.release_i32_local(writable, function);
+                    key.clear(function);
+                    header.clear(function);
+                    deferred.clear(function);
+                    recipe.clear(function);
+                    continue;
+                }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
                     if *builtin == StandardBuiltinId::EvalFunction {
                         self.emit_load_realm_eval_intrinsic_to_local(

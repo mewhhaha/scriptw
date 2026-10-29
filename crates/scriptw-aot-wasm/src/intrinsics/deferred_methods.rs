@@ -3,13 +3,13 @@
 //! A recipe is shared by an installation's aliases. It captures its defining
 //! Realm, never a public constructor/prototype lookup or the caller's Realm.
 //! Canonical-slot intrinsics use their Realm table as their identity authority;
-//! the Temporal namespace recipe initializes its complete graph together.
+//! namespace recipes initialize their complete defining-Realm graph together.
 
 use super::*;
 use crate::gc_types::*;
 use crate::runtime_helpers::{
     DeferredIntrinsicInstallArguments, HelperParameters, IntrinsicDataPublishArguments,
-    RealmEnsureTemporalArguments, RuntimeHelperId,
+    RealmEnsureIntlArguments, RealmEnsureTemporalArguments, RuntimeHelperId,
 };
 
 mod installation;
@@ -121,7 +121,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Ordinary stored values keep their direct read. Recipes enter the one
-    /// shared resolver for function materialization or Temporal initialization.
+    /// shared resolver for function materialization or namespace initialization.
     pub(crate) fn emit_property_value_into(
         &self,
         value: &GcLocal<PropertyValue>,
@@ -165,6 +165,38 @@ impl FunctionBuilder<'_> {
             .value
             .load(s, &mut f)
             .cast_subtype::<StoredValue>(s, &mut f);
+        f.instruction(&Instruction::Return);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
+            .is_subtype::<DeferredIntlNamespace>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredIntlNamespace>(s, &mut f),
+            &mut f,
+        );
+        let realm = s.reserve_gc_local(&mut f).initialize(
+            s.field(DeferredIntlNamespaceSchema::REALM)
+                .read(&recipe, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let stored = s.reserve_gc_local(&mut f).initialize(
+            s.helper_reference_on_stack(s.call_helper(
+                RealmEnsureIntlArguments::new(&realm),
+                self.runtime_helper_base()?,
+                &mut f,
+            )),
+            &mut f,
+        );
+        stored.load(s, &mut f);
+        stored.clear(&mut f);
+        realm.clear(&mut f);
+        recipe.clear(&mut f);
         f.instruction(&Instruction::Return);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

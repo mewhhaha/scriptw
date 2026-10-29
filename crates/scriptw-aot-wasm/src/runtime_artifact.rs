@@ -75,7 +75,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 36 adds defining-Realm Temporal demand initialization and its property recipe.
 // Version 37 adds the typed eager-constructor dictionary header helper and shifts
 // the conditional JSON helper's runtime ordinal.
-const LAYOUT_VERSION: u32 = 37;
+// Version 38 demand-initializes defining-Realm Intl, retains its namespace and
+// state, and returns four eager namespaces from Realm initialization.
+const LAYOUT_VERSION: u32 = 38;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

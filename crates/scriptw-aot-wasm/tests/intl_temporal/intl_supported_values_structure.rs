@@ -7,7 +7,8 @@ const INTL_EMIT: &str = include_str!("../../src/emit/module_assembly/intl.rs");
 const EMISSION: &str = include_str!("../../src/emit.rs");
 const NAMES: &str = include_str!("../../../scriptw-ir/src/names.rs");
 const SHAPE: &str = include_str!("../../../scriptw-ir/src/lowering/builtin_shapes.rs");
-const BOOTSTRAP: &str = include_str!("../../src/builtins/bootstrap.rs");
+const INTL_INITIALIZATION: &str =
+    include_str!("../../src/builtins/bootstrap/intl_initialization.rs");
 const PLANNING: &str = include_str!("../../src/planning.rs");
 fn ordered(source: &str, markers: &[&str]) {
     let mut cursor = 0;
@@ -115,7 +116,7 @@ fn namespace_methods_share_shape_entry_and_created_realm_roots() {
     assert!(NAMES.contains("pub const INTL_NAMESPACE_METHODS:"));
     assert!(NAMES.contains("StandardBuiltinId::IntlSupportedValuesOf"));
     assert!(SHAPE.contains("for (name, builtin) in INTL_NAMESPACE_METHODS"));
-    assert!(BOOTSTRAP.contains("members.methods_in_installation_order()"));
-    assert!(BOOTSTRAP.contains("members.in_installation_order()"));
+    assert!(INTL_INITIALIZATION.contains("members.methods_in_installation_order()"));
+    assert!(INTL_INITIALIZATION.contains("members.in_installation_order()"));
     assert!(PLANNING.contains("while method < INTL_NAMESPACE_METHODS.len()"));
 }

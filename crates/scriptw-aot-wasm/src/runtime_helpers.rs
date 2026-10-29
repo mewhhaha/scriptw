@@ -668,9 +668,9 @@ impl ModuleGatherCallResult {
     }
 }
 
-/// Reflect, Math, JSON, Atomics and Intl remain rooted across the
+/// Reflect, Math, JSON and Atomics remain rooted across the
 /// initialization/publication boundary. An absent namespace has a null result.
-#[must_use = "all five Realm namespace results must be rooted before publication"]
+#[must_use = "all four Realm namespace results must be rooted before publication"]
 pub(crate) struct RealmInitializeIntrinsicsCallResult {
     private: (),
 }
@@ -679,10 +679,10 @@ impl RealmInitializeIntrinsicsCallResult {
         self,
         schema: &RuntimeSchema,
         function: &mut Function,
-    ) -> [GcLocal<OrdinaryObject, Nullable>; 5] {
+    ) -> [GcLocal<OrdinaryObject, Nullable>; 4] {
         // Bind every stack result before the caller can allocate. Results are
         // popped in reverse ABI order, then returned in publication order.
-        let mut roots: [GcLocal<OrdinaryObject, Nullable>; 5] = std::array::from_fn(|_| {
+        let mut roots: [GcLocal<OrdinaryObject, Nullable>; 4] = std::array::from_fn(|_| {
             let slot = schema.reserve_gc_local(function);
             ReferenceHelperResult {
                 private: std::marker::PhantomData,
@@ -906,7 +906,7 @@ macro_rules! helper_field {
         types
     } };
     (@result_abi ModuleGather) => { vec![AbiType::Gc(GcLayout::ModuleRegistry, GcNullability::NonNullable), AbiType::I64] };
-    (@result_abi RealmInitializeIntrinsics) => { vec![AbiType::Gc(GcLayout::OrdinaryObject, GcNullability::Nullable); 5] };
+    (@result_abi RealmInitializeIntrinsics) => { vec![AbiType::Gc(GcLayout::OrdinaryObject, GcNullability::Nullable); 4] };
     (@result Completion) => { HelperCompletion { private: () } };
     (@result Void) => { () };
     (@result I32) => { I32HelperResult { private: () } };
@@ -1171,6 +1171,7 @@ runtime_helper_domain! {
     FunctionMetadataPublish / FunctionMetadataPublishArguments / FunctionMetadataPublishParameters / "function_metadata_publish" { callable:(Ref FunctionObject NonNullable),length_bits:I64,name:(Ref StringValue NonNullable),configurable:I32,has_caller:I32,create_prototype:I32,constructor_back_reference:I32,prototype_parent:Value } => Void;
     RealmInitializeIntrinsics / RealmInitializeIntrinsicsArguments / RealmInitializeIntrinsicsParameters / "realm_initialize_intrinsics" { realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => RealmInitializeIntrinsics;
     RealmEnsureTemporal / RealmEnsureTemporalArguments / RealmEnsureTemporalParameters / "realm_ensure_temporal" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
+    RealmEnsureIntl / RealmEnsureIntlArguments / RealmEnsureIntlParameters / "realm_ensure_intl" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     ArrayIteratorStepValue / ArrayIteratorStepValueArguments / ArrayIteratorStepValueParameters / "array_iterator_step_value" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ArrayIteratorElision / ArrayIteratorElisionArguments / ArrayIteratorElisionParameters / "array_iterator_elision" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ArrayIteratorClose / ArrayIteratorCloseArguments / ArrayIteratorCloseParameters / "array_iterator_close" { iterator:(Ref IteratorRecord NonNullable),pending:Completion,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1341,6 +1342,7 @@ impl RuntimeHelperId {
             Self::FunctionMetadataPublish => HelperOwner::Runtime,
             Self::RealmInitializeIntrinsics => HelperOwner::Runtime,
             Self::RealmEnsureTemporal => HelperOwner::Runtime,
+            Self::RealmEnsureIntl => HelperOwner::Runtime,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision
             | Self::ArrayIteratorClose
@@ -1497,6 +1499,7 @@ impl RuntimeHelperId {
             Self::FunctionMetadataPublish => true,
             Self::RealmInitializeIntrinsics => true,
             Self::RealmEnsureTemporal => true,
+            Self::RealmEnsureIntl => true,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision
             | Self::ArrayIteratorClose
