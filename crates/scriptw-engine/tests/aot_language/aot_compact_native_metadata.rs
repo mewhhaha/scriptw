@@ -136,6 +136,79 @@ read(alias) === 'accessor:8' && compact.name === 'min';
 }
 
 #[test]
+fn eager_constructor_metadata_preserves_order_attributes_and_fresh_realms() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let engine = Engine::new(RealmBuilder::new().build());
+    let artifact = engine
+        .profile_script_compilation(
+            r#"
+function check(ok) { if (!ok) throw 'constructor metadata'; }
+var generator = Object.getPrototypeOf(function* () {}).constructor;
+var asynchronous = Object.getPrototypeOf(async function () {}).constructor;
+var asyncGenerator = Object.getPrototypeOf(async function* () {}).constructor;
+var constructors = [
+  [Object, 'Object', 1], [Function, 'Function', 1], [Array, 'Array', 1],
+  [Proxy, 'Proxy', 2], [Number, 'Number', 1], [Symbol, 'Symbol', 0],
+  [BigInt, 'BigInt', 1], [Int8Array, 'Int8Array', 3], [TypeError, 'TypeError', 1],
+  [generator, 'GeneratorFunction', 1], [asynchronous, 'AsyncFunction', 1],
+  [asyncGenerator, 'AsyncGeneratorFunction', 1]
+];
+for (var item of constructors) {
+  var fn = item[0];
+  check(fn.name === item[1] && fn.length === item[2]);
+  check(Object.getOwnPropertyNames(fn).slice(0, 2).join(',') === 'length,name');
+  var length = Object.getOwnPropertyDescriptor(fn, 'length');
+  var name = Object.getOwnPropertyDescriptor(fn, 'name');
+  check(length.value === item[2] && !length.writable && !length.enumerable && length.configurable);
+  check(name.value === item[1] && !name.writable && !name.enumerable && name.configurable);
+  check(!('get' in length) && !('get' in name));
+  if (fn === Proxy) {
+    check(!Object.hasOwn(fn, 'prototype'));
+    check(Object.getOwnPropertyNames(fn).slice(0, 3).join(',') === 'length,name,revocable');
+  } else {
+    var prototype = Object.getOwnPropertyDescriptor(fn, 'prototype');
+    check(prototype.value === fn.prototype && !prototype.writable && !prototype.enumerable && !prototype.configurable);
+    check(Object.getOwnPropertyNames(fn).slice(0, 3).join(',') === 'length,name,prototype');
+  }
+}
+var left = __scriptwCreateRealm().global, right = __scriptwCreateRealm().global;
+var foreign = left.Array, other = right.Array;
+check(foreign !== Array && foreign !== other && foreign.name === 'Array' && other.name === 'Array');
+check(Object.getPrototypeOf(foreign) === left.Function.prototype);
+check(Object.getPrototypeOf(left.Int8Array) === Object.getPrototypeOf(left.Uint8Array));
+check(Object.getPrototypeOf(left.TypeError) === left.Error);
+Object.defineProperty(foreign, 'name', {value:'changed', writable:true, enumerable:true});
+check(foreign.name === 'changed' && other.name === 'Array' && Array.name === 'Array');
+check(delete foreign.length);
+Object.defineProperty(foreign, 'length', {value:7, writable:true, configurable:true});
+var names = Object.getOwnPropertyNames(foreign);
+check(names[0] === 'name' && names[1] === 'prototype' && names[names.length - 1] === 'length');
+check(Reflect.set(foreign, 'length', 8) && foreign.length === 8);
+check(!Reflect.deleteProperty(foreign, 'prototype'));
+var instance = new foreign(2);
+check(instance.length === 2 && Object.getPrototypeOf(instance) === foreign.prototype);
+Object.freeze(foreign);
+check(Object.isFrozen(foreign) && !Reflect.set(foreign, 'length', 9));
+check(!Reflect.deleteProperty(foreign, 'name') && other.length === 1 && Array.length === 1);
+gc();
+foreign.name === 'changed' && foreign.length === 8 && other.name === 'Array' && other.length === 1;
+"#,
+            options(),
+        )
+        .unwrap()
+        .artifact;
+    for _ in 0..2 {
+        let profile = engine
+            .profile_wasm_execution(&artifact, Some(60_000), false)
+            .unwrap();
+        assert_eq!(
+            profile.outcome.completion,
+            ObservedCompletion::Normal(ObservedJsValue::Boolean(true))
+        );
+    }
+}
+
+#[test]
 fn rooted_native_metadata_snapshots_preserve_compact_and_promoted_attributes() {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     for (setup, writable, enumerable, configurable) in [

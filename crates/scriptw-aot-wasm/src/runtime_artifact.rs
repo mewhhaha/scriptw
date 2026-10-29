@@ -73,7 +73,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 34 shares the packed String join kernel with guarded direct callers.
 // Version 35 adds the optional typed binary-Number source callback entry.
 // Version 36 adds defining-Realm Temporal demand initialization and its property recipe.
-const LAYOUT_VERSION: u32 = 36;
+// Version 37 adds the typed eager-constructor dictionary header helper and shifts
+// the conditional JSON helper's runtime ordinal.
+const LAYOUT_VERSION: u32 = 37;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

@@ -1272,6 +1272,7 @@ runtime_helper_domain! {
     GlobalLexicalDeclarationCheck / GlobalLexicalDeclarationCheckArguments / GlobalLexicalDeclarationCheckParameters / "global_lexical_declaration_check" { key:(Ref StringValue NonNullable),global_environment:(Ref Environment NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     GlobalVarDeclarationCheck / GlobalVarDeclarationCheckArguments / GlobalVarDeclarationCheckParameters / "global_var_declaration_check" { object:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     GlobalVarDeclarationInstall / GlobalVarDeclarationInstallArguments / GlobalVarDeclarationInstallParameters / "global_var_declaration_install" { object:Value,key:Key,deletable:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    NativeConstructorHeaderAllocate / NativeConstructorHeaderAllocateArguments / NativeConstructorHeaderAllocateParameters / "native_constructor_header_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:(Ref StringValue NonNullable),context:(Ref JsonStringifyContext NonNullable),indent:I64,seen:(Ref ValueArray NonNullable),caller_program:Program } => Completion;
 }
 
@@ -1317,6 +1318,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
+            Self::NativeConstructorHeaderAllocate => HelperOwner::Runtime,
             Self::IntrinsicAccessorAllocate => HelperOwner::Runtime,
             Self::IntrinsicConstructorAllocate => HelperOwner::Runtime,
             Self::DeferredIntrinsicInstall => HelperOwner::Runtime,
@@ -1472,6 +1474,7 @@ impl RuntimeHelperId {
             Self::IntrinsicAccessorPublish => true,
             Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
+            Self::NativeConstructorHeaderAllocate => true,
             Self::IntrinsicAccessorAllocate => true,
             Self::IntrinsicConstructorAllocate => true,
             Self::DeferredIntrinsicInstall => true,

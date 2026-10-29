@@ -47,7 +47,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The current private runtime ABI is layout 36. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 37. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate
@@ -63,6 +63,18 @@ native caches and Portable bundles must match that current ABI.
 These are per-record layout sizes, not measured process RSS reductions. GC
 headers, backing arrays, native code, compiler metadata and allocator retention
 remain separate costs.
+
+Eager Realm constructors allocate their initial dictionary metadata directly,
+then bootstrap adds prototype and family properties. This avoids temporary
+compact-storage conversion. Ordinary native methods retain compact metadata.
+
+## Execution stacks
+
+Embedded calls reuse one 64-MiB execution worker per calling host thread.
+Borrowed work joins before returning; the worker retains no Store or Realm.
+Nested entry and overlapping jobs from an external Rayon caller use independent
+scoped stacks. Compilation keeps its temporary workers. Touched execution-stack
+pages can remain resident until the owning caller thread exits.
 
 ## Compiler scratch ownership
 

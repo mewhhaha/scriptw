@@ -36,6 +36,7 @@ mod descriptor_object;
 mod has_property;
 mod header_projection;
 mod module_namespace;
+mod native_constructor;
 mod object_literal_property;
 mod packed_array_builtin;
 mod packed_array_index;

@@ -10,6 +10,7 @@ use scriptw_ir::foreign::{
 
 mod async_operations;
 mod compact_records;
+mod reentrant_execution;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {
     let mut registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(

@@ -71,6 +71,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::DeferredIntrinsicInstall
             | RuntimeHelperId::DeferredIntrinsicInstallRun
             | RuntimeHelperId::NativeFunctionAllocate
+            | RuntimeHelperId::NativeConstructorHeaderAllocate
             | RuntimeHelperId::ArgumentListAppend
             | RuntimeHelperId::CachedPropertyRead => {}
             // These bodies call their physical typed kernel directly. Their

@@ -60,10 +60,9 @@ the closed schema and requires those exact canonical bytes, including rejecting
 unknown fields and noncanonical duplicate-key spellings. This API decodes
 artifact requirements; it is not a permissive JSON configuration loader.
 
-This is a pre-1.0 breaking change: foreign ABI v1 declarations and Portable
-bundles using the previous private runtime ABI must be recompiled. Foreign ABI
-v2 and private runtime ABI 36 are checked at artifact admission. The stored-value
-field layout changes; the foreign call argument order remains unchanged.
+Foreign ABI v2 and private runtime ABI 37 are checked at artifact admission.
+Older Portable bundles and native images must be rebuilt. Runtime ABI 37 adds
+an eager-constructor allocation helper; foreign call signatures follow ABI v2.
 
 ## Precompiled execution
 

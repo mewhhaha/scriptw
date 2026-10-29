@@ -365,7 +365,7 @@ impl EmbeddedRuntime {
         store: &mut WasmtimeStore<WasmStoreState>,
         linker: &mut WasmtimeLinker<WasmStoreState>,
     ) -> Result<EmbeddedInstance, EngineError> {
-        run_on_sized_stack(|| self.instantiate_inner(store, linker))
+        run_on_execution_stack(|| self.instantiate_inner(store, linker))
     }
 
     fn instantiate_inner(
@@ -455,7 +455,7 @@ impl EmbeddedInstance {
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<EmbeddedEvaluation, EngineError> {
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let state = store
                 .data_mut()
                 .embedding

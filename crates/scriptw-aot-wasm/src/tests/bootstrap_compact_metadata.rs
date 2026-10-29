@@ -35,7 +35,7 @@ fn named_body<'a>(bytes: &'a [u8], index: u32) -> Vec<Operator<'a>> {
 }
 
 #[test]
-fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() {
+fn native_bootstrap_keeps_method_metadata_compact_and_constructor_metadata_in_dictionaries() {
     let artifact = emit_script("Math.max.name;").unwrap();
     let runtime = artifact.runtime().unwrap();
     let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
@@ -53,6 +53,7 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     let allocate = index("helper::native_function_allocate");
     let accessor_allocate = index("helper::intrinsic_accessor_allocate");
     let constructor_allocate = index("helper::intrinsic_constructor_allocate");
+    let constructor_header = index("helper::native_constructor_header_allocate");
     let compact = index("helper::compact_literal_allocate");
     let bootstrap = named_body(
         runtime.bytes(),
@@ -89,8 +90,16 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
     );
     assert_eq!(
         native_headers,
-        inline_callables + shared_accessors + shared_constructors,
-        "each native callable gets its own compact header"
+        inline_callables + shared_accessors,
+        "ordinary native callables and accessors keep their own compact headers"
+    );
+    assert_eq!(
+        bootstrap
+            .iter()
+            .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == constructor_header))
+            .count(),
+        shared_constructors,
+        "each eager constructor gets its own direct dictionary header"
     );
     let allocator = named_body(runtime.bytes(), allocate);
     assert_eq!(
@@ -132,6 +141,46 @@ fn native_bootstrap_allocates_compact_metadata_without_eager_property_records() 
         0,
         "typed prototype references and compact metadata allocate no value boxes"
     );
+    let dictionary_allocator = named_body(runtime.bytes(), constructor_header);
+    for (dictionary_type, expected) in [
+        (type_index::<OrdinaryPropertyStorage>(schema), 1),
+        (type_index::<PropertyDescriptor>(schema), 2),
+        (type_index::<PropertyEntry>(schema), 2),
+    ] {
+        assert_eq!(
+            dictionary_allocator
+                .iter()
+                .filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == dictionary_type))
+                .count(),
+            expected,
+            "one ordinary dictionary owns two fresh metadata descriptors and ordered entries"
+        );
+    }
+    assert_eq!(
+        stored_values(&dictionary_allocator),
+        4,
+        "two metadata values and two dictionary keys get their ordinary value boxes"
+    );
+    for forbidden in [
+        allocate,
+        compact,
+        index("helper::ordinary_property_storage_ensure"),
+        index("helper::ordinary_property_find"),
+        index("helper::ordinary_property_append"),
+    ] {
+        assert!(
+            !dictionary_allocator.iter().any(
+                |op| matches!(op, Operator::Call { function_index } if *function_index == forbidden)
+            ),
+            "fresh constructor metadata needs no compact allocation, promotion or absence probe"
+        );
+    }
+    for compact_type in [
+        type_index::<ArrayCompactDataStorage>(schema),
+        type_index::<InlineCompactDataStorage>(schema),
+    ] {
+        assert!(!dictionary_allocator.iter().any(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == compact_type)), "constructor metadata allocates no transient compact storage");
+    }
     expect_valid_module(&artifact, 0);
 }
 

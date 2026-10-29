@@ -98,6 +98,8 @@ mod intl_time_zone_host;
 mod memory_module_cache;
 use memory_module_cache::MemoryWasmModuleCache;
 mod embedded_runtime;
+mod execution_stack;
+use execution_stack::run_on_execution_stack;
 mod module_loader;
 #[cfg(test)]
 mod system_time_zone_host_tests;

@@ -3,7 +3,7 @@ use super::*;
 use crate::gc_types::{
     DeferredIntrinsicValue, Environment, ExecutableCode, FunctionContext, FunctionObject,
     GcHeapType, GcNullability, GlobalLedger, OrdinaryObject, PropertyValue, RealmRecord,
-    RuntimeModuleTypes, RuntimeSchema, StoredValue,
+    RuntimeModuleTypes, RuntimeSchema, StoredValue, StringValue,
 };
 
 fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -56,6 +56,7 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
     let install = named("helper::deferred_intrinsic_install");
     let batch = named("helper::deferred_intrinsic_install_run");
     let constructor = named("helper::intrinsic_constructor_allocate");
+    let constructor_header = named("helper::native_constructor_header_allocate");
     let publish = named("helper::intrinsic_data_publish");
     let key = named("helper::pooled_string_resolve");
     let header = named("helper::object_header_projection");
@@ -83,6 +84,16 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
         calls(&bootstrap, install).len() > 1 && calls(&bootstrap, constructor).len() > 1,
         "the executed Realm initializer must call both actual shared bodies"
     );
+    let header_calls = calls(&bootstrap, constructor_header);
+    let constructor_calls = calls(&bootstrap, constructor);
+    assert_eq!(header_calls.len(), constructor_calls.len());
+    for (position, (&header, &callable)) in header_calls.iter().zip(&constructor_calls).enumerate()
+    {
+        assert!(
+            header < callable && (position == 0 || constructor_calls[position - 1] < header),
+            "each eager constructor builds its own dictionary header before its context/callable tail"
+        );
+    }
     assert!(
         allocations(&bootstrap, type_index::<DeferredIntrinsicValue>(schema)).is_empty(),
         "repeated inline recipe setup has left the actual Realm initializer"
@@ -201,6 +212,18 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
         )
     };
     for (helper, parameters, result) in [
+        (
+            constructor_header,
+            vec![
+                wasmparser::ValType::I32,
+                wasmparser::ValType::I64,
+                wasmparser::ValType::Ref(wasmparser::RefType::EQREF),
+                reference(type_index::<StringValue>(schema)),
+                wasmparser::ValType::I64,
+                wasmparser::ValType::I32,
+            ],
+            reference(type_index::<OrdinaryObject>(schema)),
+        ),
         (
             constructor,
             vec![

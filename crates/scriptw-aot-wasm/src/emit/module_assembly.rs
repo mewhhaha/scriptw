@@ -1363,6 +1363,7 @@ fn emit_script_module_with_factory(
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
             CompactDataStore, compile_compact_data_store_helper;
             NativeFunctionAllocate, compile_native_function_allocate_helper;
+            NativeConstructorHeaderAllocate, compile_native_constructor_header_allocate_helper;
             IntrinsicAccessorAllocate, compile_intrinsic_accessor_allocate_helper;
             IntrinsicConstructorAllocate, compile_intrinsic_constructor_allocate_helper;
             DeferredIntrinsicInstall, compile_deferred_intrinsic_install_helper;

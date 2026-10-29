@@ -98,7 +98,7 @@ impl EmbeddedInstance {
         value: ForeignValue,
     ) -> Result<JsValue, EngineError> {
         self.check_store(store)?;
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             self.value_inner(&mut roots, value)
         })
@@ -182,7 +182,7 @@ impl EmbeddedInstance {
         name: &[u16],
     ) -> Result<JsCompletion, EngineError> {
         self.check_ready(store)?;
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             let key = self.value_inner(&mut roots, ForeignValue::StringUtf16(name.to_vec()))?;
             let (realm, _, program) = self.context(&mut roots)?;
@@ -214,7 +214,7 @@ impl EmbeddedInstance {
     ) -> Result<JsCompletion, EngineError> {
         self.check_ready(store)?;
         target.check(store)?;
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             let key = self.value_inner(&mut roots, ForeignValue::StringUtf16(key.to_vec()))?;
             let mut inputs = target.arguments(&mut roots)?.to_vec();
@@ -251,7 +251,7 @@ impl EmbeddedInstance {
         for argument in arguments {
             argument.check(store)?;
         }
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             self.call_inner(&mut roots, callable, receiver, arguments)
         })
@@ -329,7 +329,7 @@ impl EmbeddedInstance {
     ) -> Result<Vec<u8>, EngineError> {
         self.check_store(store)?;
         value.check(store)?;
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             let inputs = value.arguments(&mut roots)?;
             let function = self.function(&mut roots, "scriptw.embed.bytes.read", false)?;
@@ -356,7 +356,7 @@ impl EmbeddedInstance {
     ) -> Result<JsPromiseState, EngineError> {
         self.check_store(store)?;
         value.check(store)?;
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             let inputs = value.arguments(&mut roots)?;
             let function = self.function(&mut roots, "scriptw.embed.promise", false)?;
@@ -399,7 +399,7 @@ impl EmbeddedInstance {
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<EmbeddedEvaluation, EngineError> {
         self.check_store(store)?;
-        let result = run_on_sized_stack(|| {
+        let result = run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(&mut *store);
             let ready = roots
                 .as_context_mut()

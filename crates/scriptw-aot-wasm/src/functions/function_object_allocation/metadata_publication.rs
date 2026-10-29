@@ -36,8 +36,8 @@ impl FunctionBuilder<'_> {
             | crate::gc_types::ExecutableCodeKind::HostBuiltin => true,
         };
         if native && meta.strict && !create_prototype && meta.length_name_configurable {
-            // Every allocation owner already installed compact name/length in
-            // this native header before constructing the Context/callable.
+            // Every allocation owner already installed name/length in this
+            // native header before constructing the Context/callable.
             // All four publication effects are absent: JavaScript metadata,
             // legacy caller fields, automatic prototype, non-extensibility.
             // The later name lookup would hit the same strongly rooted pooled
@@ -159,8 +159,8 @@ impl FunctionBuilder<'_> {
         ));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
-        // Native allocation already publishes these two fields in its own
-        // compact arrays. Source metadata retains its ordinary descriptor path.
+        // Native allocation already publishes these two fields in its header.
+        // Source metadata retains its ordinary descriptor path.
         value.set_number(parameters.length_bits, function);
         self.emit_define_function_runtime_metadata_property(
             &object,

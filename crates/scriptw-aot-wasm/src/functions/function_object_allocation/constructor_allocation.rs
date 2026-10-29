@@ -1,15 +1,16 @@
 //! One allocation tail for source-validated eager native Realm constructors.
 //!
-//! The caller still allocates the native header and its exact typed executable
-//! code. Only their uniform Context/FunctionObject allocation is shared; public
-//! metadata, constructor inheritance and prototype links keep their old owners.
+//! The validated producer selects a dictionary metadata header and its exact
+//! typed executable code. Context/FunctionObject allocation is shared; constructor
+//! inheritance, public prototype links and canonical slots keep their old owners.
 use super::*;
 use crate::data::{PooledLiteralDomain, PooledStringIndex, StringPool};
 use crate::emitted_function::FunctionIdentity;
 use crate::gc_types::*;
 use crate::runtime_helpers::{
     HelperParameters, IntrinsicConstructorAllocateArguments,
-    IntrinsicConstructorAllocateParameters, RuntimeHelperId,
+    IntrinsicConstructorAllocateParameters, NativeConstructorHeaderAllocateArguments,
+    RuntimeHelperId,
 };
 
 /// No caller can use the shared tail without admitting its exact native entry,
@@ -97,10 +98,33 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let prototype = s.reserve_value_local(f);
         prototype.set_reference(realm.function_prototype(), s, f);
-        let header = s.reserve_gc_local(f).initialize(
-            self.emit_alloc_native_function_header(plan.meta, &prototype, f)?,
+        let configurable = s.reserve_i32_local(f);
+        configurable.set_constant(i32::from(plan.meta.length_name_configurable), f);
+        let length = s.reserve_i64_local(f);
+        f.instruction(&Instruction::I64Const(
+            (plan.meta.length as f64).to_bits() as i64
+        ));
+        length.store(f);
+        let name = s.reserve_gc_local(f).initialize(
+            self.emit_interned_string_reference(plan.meta.runtime_name(), f)?,
             f,
         );
+        let header = s.reserve_gc_local(f).initialize(
+            s.helper_reference_on_stack(s.call_helper(
+                NativeConstructorHeaderAllocateArguments::new(
+                    &prototype,
+                    &name,
+                    length,
+                    configurable,
+                ),
+                self.runtime_helper_base()?,
+                f,
+            )),
+            f,
+        );
+        name.clear(f);
+        s.release_i64_local(length, f);
+        s.release_i32_local(configurable, f);
         let code = s.reserve_gc_local(f).initialize(
             plan.meta
                 .entry
