@@ -52,12 +52,22 @@ fn runtime_remainders_match_exact_finite_and_exceptional_number_results() {
         -0.0,
         1.0,
         -1.0,
+        2.0,
+        -2.0,
         7.0,
         -7.0,
+        9_007_199_254_740_991.0,
+        -9_007_199_254_740_991.0,
+        9_007_199_254_740_992.0,
+        -9_007_199_254_740_992.0,
+        9_007_199_254_740_994.0,
+        -9_007_199_254_740_994.0,
         0.1,
         -0.1,
         f64::from_bits(1),
+        -f64::from_bits(1),
         f64::from_bits(3),
+        -f64::from_bits(3),
         f64::MIN_POSITIVE,
         f64::from_bits(0x0010_0000_0000_0001),
         f64::MAX,
@@ -214,6 +224,44 @@ print(readonly.value);
             "true",
             "-1",
         ],
+    );
+}
+
+#[test]
+fn integer_and_exact_remainders_convert_each_operand_once_in_spec_order() {
+    assert_trace(
+        r#"
+function check(left, right, expected) {
+  var log = [];
+  var lhs = { [Symbol.toPrimitive](hint) { log.push('left:' + hint); return left; } };
+  var rhs = { [Symbol.toPrimitive](hint) { log.push('right:' + hint); return right; } };
+  function leftExpression() { log.push('left expression'); return lhs; }
+  function rightExpression() { log.push('right expression'); return rhs; }
+  var actual = leftExpression() % rightExpression();
+  if (!Object.is(actual, expected) || log.join(',') !== 'left expression,right expression,left:number,right:number') throw 'binary order';
+  log = [];
+  var stored = lhs;
+  var target = {
+    get value() { log.push('get'); return stored; },
+    set value(value) { log.push('set'); stored = value; }
+  };
+  actual = target.value %= rightExpression();
+  if (!Object.is(actual, expected) || !Object.is(stored, expected) || log.join(',') !== 'get,right expression,left:number,right:number,set') throw 'compound order';
+}
+check(-0, 2, -0);
+check(-7, -3, -1);
+check(9007199254740991, -2, 1);
+check(-9007199254740991, 9007199254740991, -0);
+check(9007199254740992, 3, 2);
+check(7.5, -3, 1.5);
+check(7, -0, NaN);
+check(-5e-324, 2, -5e-324);
+check(7, Infinity, 7);
+check(Infinity, 2, NaN);
+check(NaN, 2, NaN);
+print('ordered');
+"#,
+        &["ordered"],
     );
 }
 
