@@ -139,7 +139,10 @@ impl<'a> ExecutionReceipt<'a> {
         if !body.is_empty() {
             return None;
         }
-        let receipt = Self {
+        // Fixed-width fields, exact-length opaque bytes and ordered component
+        // tags have one encoding. EOF and the verified body checksum establish
+        // canonical framing without allocating and hashing an encoded copy.
+        Some(Self {
             layout,
             profile,
             source,
@@ -154,8 +157,7 @@ impl<'a> ExecutionReceipt<'a> {
             intl_digest,
             intl_identity,
             frames,
-        };
-        (receipt.encode()?.as_slice() == bytes).then_some(receipt)
+        })
     }
 }
 

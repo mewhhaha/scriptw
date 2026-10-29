@@ -17,7 +17,7 @@
     }
   ],
   "domain": "scriptw-locale-time-zones-native-v1",
-  "kernel_sha256": "6061cf522ef333db12d383f91e56ea62b6426b64a3a51eef7686b07ac8a40d5b",
+  "kernel_sha256": "ee4fb9fbfce087cfb9aeeec8af00b9a6483a8b241551fc6f53eb360be2224b87",
   "production_sources": [
     {
       "bytes": 93323,
@@ -70,6 +70,11 @@
       "sha256": "52508dfd4f0bca47b39443589c97e959361f1f57d7324876f0b681b0509012f4"
     },
     {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+    },
+    {
       "bytes": 8388,
       "path": "crates/scriptw-intl/src/identifiers.rs",
       "sha256": "08bc33c06227bcddc779dc16212be0634361cb5dc77d0c4f83d3b5882a1e79b6"
@@ -95,9 +100,9 @@
       "sha256": "00e4e549e194cc3109e2169f15a7ae1fe050f008958d21c914ee2f47825ebc1e"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 8955,
@@ -182,7 +187,7 @@
     {
       "bytes": 565,
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-      "sha256": "134c05086f26c408d545964ee5c603d5ea2f11a907a16ed0319192d974c46816"
+      "sha256": "ab46e41c226dd273af40ff7f8c5424253fe9b6f4708ccc6b70d54b853a58c0f4"
     },
     {
       "bytes": 3624,
@@ -245,9 +250,9 @@
       "sha256": "d0cf2310c60c078d652c86b6c0a11c3103e6830eea419af176219a4a8a218ea6"
     },
     {
-      "bytes": 10788,
+      "bytes": 10840,
       "path": "scripts/generate-intl-locale-time-zones-profile.py",
-      "sha256": "530dd2d3ccc2763b73311aa189347fe5d0228c5affeb55d8def559a33371f9f0"
+      "sha256": "9df1cb0bc3613e94727a603c65bd3750eb5322e38056c015589142db3ff985b8"
     }
   ],
   "schema": 1

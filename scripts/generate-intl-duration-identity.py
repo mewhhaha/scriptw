@@ -19,7 +19,8 @@ def generate(root):
   if sha(raw)!=row['sha256'] or len(raw)!=row['bytes']:raise ValueError('captured Duration input changed: '+str(name))
   paths.add(name.as_posix())
  paths|={'Cargo.toml','Cargo.lock','crates/scriptw-intl/Cargo.toml','scripts/generate-intl-duration-identity.py',
-  'crates/scriptw-intl/src/lib.rs','crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/provider/conformance.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs','crates/scriptw-intl/src/protocol.rs',
+  'crates/scriptw-intl/src/lib.rs','crates/scriptw-intl/src/artifact_identity.rs',
+  'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/provider/conformance.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs','crates/scriptw-intl/src/protocol.rs',
   'crates/scriptw-intl/src/service_selection.rs','crates/scriptw-intl/src/selection/manifest.rs','crates/scriptw-intl/src/selection/export.rs',
   'crates/scriptw-intl/src/supported_values.rs','crates/scriptw-intl/src/duration_wire.rs',
   'crates/scriptw-intl/src/number_protocol.rs','crates/scriptw-engine/src/intl_duration_host.rs',

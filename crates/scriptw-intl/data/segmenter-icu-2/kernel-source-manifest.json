@@ -10,7 +10,7 @@
     ]
   },
   "host_call_abi": 17,
-  "kernel_sha256": "cd15e7d45a2b2b727fd7cab5c0eba4878753153dd9387396a6f0d0d0d36a5b73",
+  "kernel_sha256": "3c70ee1876e3e3e9594d968a162d3cd76e671776220b395e8456cc655692930f",
   "operations_reserved": [
     33,
     34,
@@ -468,6 +468,11 @@
       "sha256": "5360a2fbe97f617c4f8b944356dedb36d423f7da7f13c070995cf89e59f01220"
     },
     {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+    },
+    {
       "bytes": 8388,
       "path": "crates/scriptw-intl/src/identifiers.rs",
       "sha256": "08bc33c06227bcddc779dc16212be0634361cb5dc77d0c4f83d3b5882a1e79b6"
@@ -498,9 +503,9 @@
       "sha256": "7751d28d97851a838bd80faf8577d37a3b90d4052e8126773689c585cdcce36f"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 8955,
@@ -663,9 +668,9 @@
       "sha256": "02e37589b6bccb09a44f589c330edd5ab47c977b571a0a2d31c546f480d065b6"
     },
     {
-      "bytes": 15707,
+      "bytes": 15763,
       "path": "scripts/generate-intl-segmenter-identity.py",
-      "sha256": "90188cf75c944dcc12b2919b75db3a73b5a8186bba6c2f8da80d824ed4fc81a6"
+      "sha256": "114f73c8b4fcb35b64751076ee0df07a0f8cf16dbd452ac307dac033bc31b912"
     },
     {
       "bytes": 8104,

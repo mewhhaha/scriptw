@@ -114,12 +114,9 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
     let registry_start = body.len() - rest.len();
     let execution_facts = registry_start..registry_start + registry_length;
     let registry = take(&mut rest, registry_length)?;
+    // The constructor checks exact canonical bytes as well as declarations,
+    // rejecting duplicate/unsupported fields and alternate whitespace/order.
     let foreign = ForeignModuleRegistry::from_normalized_json(registry).map_err(|_| invalid())?;
-    // Reject duplicate JSON keys, noncanonical ordering/whitespace, unsupported
-    // fields and invalid declarations before constructing any opaque owner.
-    if foreign.to_normalized_json() != registry {
-        return Err(invalid());
-    }
     let facts = ProgramExecutionFacts {
         foreign,
         runtime: match runtime_key {

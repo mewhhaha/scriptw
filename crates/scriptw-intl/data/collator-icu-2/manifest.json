@@ -68,7 +68,7 @@
     },
     {
       "path": "scripts/generate-intl-collator-data.py",
-      "sha256": "ae4d6ce7cab7cb1f78e87704d13cf67d7383ea41ea2d87c30ad83fe73d9649d8"
+      "sha256": "1afa6307bb1c3e5e18c9e463388b1b56c338b403b9a63dcf89cd46e3e3a377dc"
     },
     {
       "path": "crates/scriptw-intl/src/provider.rs",
@@ -124,7 +124,11 @@
     },
     {
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
+    },
+    {
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
     },
     {
       "path": "crates/scriptw-intl/src/protocol.rs",
@@ -253,5 +257,5 @@
   "utf16_policy": "direct pinned compare_utf16; isolated units have ICU replacement weights, valid pairs are scalar; raw units preserved; no lexical tie-breaker",
   "available_locales_count": null,
   "available_sort_collations_count": null,
-  "data_sha256": "39c8980789f36a2b4b04971937f223f9346f4d3b73cc5eed35aff72ffe189889"
+  "data_sha256": "c4f0abb2519c6ce2aae2e72388e8035182504b4449f7ef0636259e3260336a5f"
 }

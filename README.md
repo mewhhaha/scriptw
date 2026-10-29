@@ -23,6 +23,7 @@ Portable embedding API remains available; static compiler dependencies remain.
 Runtime initialization uses compact intrinsic-installation tables and defers
 the complete Temporal namespace until its first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
+Runtime admission avoids re-serializing validated receipts.
 Guarded
 Number loops and packed Array push/join kernels avoid repeated conversion,
 dispatch and allocation when their semantic checks pass. Primitive string-length

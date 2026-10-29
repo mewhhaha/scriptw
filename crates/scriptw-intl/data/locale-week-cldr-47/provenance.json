@@ -89,9 +89,9 @@
         "sha256": "544e4349c169a72ba2433447d84505c067114eb098b82c72732e2b1f21f932e8"
       },
       {
-        "bytes": 31947,
+        "bytes": 32127,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "63f3838d791d8041e5dd7e11af38885c7097c278da75ee83f79bb27f21029b1a"
+        "sha256": "aeaf9f9be289f3c498c7bfb8574440490b686593d84353ae8592c37ecc232609"
       },
       {
         "bytes": 34690,
@@ -107,6 +107,11 @@
         "bytes": 11416,
         "path": "crates/scriptw-intl/data/locale-text-cldr-47/profile.json",
         "sha256": "b85256e1db8dc6a087cd02af4e3ca27348f41f545d8ba072beda7e0f1e5a7fd3"
+      },
+      {
+        "bytes": 13441,
+        "path": "crates/scriptw-intl/src/artifact_identity.rs",
+        "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
       },
       {
         "bytes": 16886,
@@ -139,9 +144,9 @@
         "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
       },
       {
-        "bytes": 41725,
+        "bytes": 38877,
         "path": "crates/scriptw-intl/src/lib.rs",
-        "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+        "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
       },
       {
         "bytes": 8955,
@@ -161,7 +166,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "8710ce4a4f83f39ba9e27e5ff712355a9d96be3d00b9a43ccb43170b68a3cf60"
+        "sha256": "2ebf344608bd169c63982beb252e6291268ea63c9d958d07000bef2e36d6a134"
       },
       {
         "bytes": 3906,
@@ -274,13 +279,13 @@
         "sha256": "d0cf2310c60c078d652c86b6c0a11c3103e6830eea419af176219a4a8a218ea6"
       },
       {
-        "bytes": 11908,
+        "bytes": 11960,
         "path": "scripts/generate-intl-locale-week-profile.py",
-        "sha256": "354dadb51af88b8883929280108dc1f950f5ab30ccc83b8e18cacca72982ecd7"
+        "sha256": "c0b83acdcfd3b196dcba7500dd78a286fbb3b46461ecc78d11295f8d8760b3f9"
       }
     ]
   },
-  "kernel_sha256": "379fe930e187c77b6d4430e2a4be8c0078ab32475708cd2550c61a9c1aaf5e13",
+  "kernel_sha256": "697fc62e4c958dba52b049a6a333850ff1f89d578c77a3a45bee7601eda528ca",
   "kernel_source_closure": "explicit production module inventory; missing/added production modules reject",
   "minimalDays_exposed": false,
   "primary_manifest_path": "crates/scriptw-intl/data/datetime-cldr-47/manifest.json",

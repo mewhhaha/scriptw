@@ -191,9 +191,9 @@
       "sha256": "38ae2b82a51ff319f10fb3fe18e60fc431a782d057e0dde8c941d8fbd4cd0137"
     },
     {
-      "bytes": 13040,
+      "bytes": 13220,
       "path": "crates/scriptw-intl/data/list-icu-2/manifest.json",
-      "sha256": "e735040b338344dc4e6d0151154de1cf8b9ea4c4420a0f093cca7b07391f5d6a"
+      "sha256": "3abf58f7cfefacc12e84642753c0a59f598dced92ff1396b0bd6f71d2b8959a2"
     },
     {
       "bytes": 3359,
@@ -254,6 +254,11 @@
       "bytes": 2198209,
       "path": "crates/scriptw-intl/data/numbering-tols-cldr-48/ucd/UnicodeData.txt",
       "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+    },
+    {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
     },
     {
       "bytes": 4618,
@@ -361,9 +366,9 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 7480,
@@ -373,7 +378,7 @@
     {
       "bytes": 327,
       "path": "crates/scriptw-intl/src/list_format/identity.rs",
-      "sha256": "9f767e33ea75c29a53af74d6f1319f726d06945c785b3bca302c415bc629f968"
+      "sha256": "5f70fed211f4f02fd5fc726ce2c13991adf72850bccea2d5bc40bf6deb6e8437"
     },
     {
       "bytes": 5033,
@@ -666,9 +671,9 @@
       "sha256": "02e37589b6bccb09a44f589c330edd5ab47c977b571a0a2d31c546f480d065b6"
     },
     {
-      "bytes": 7317,
+      "bytes": 7367,
       "path": "scripts/generate-intl-duration-identity.py",
-      "sha256": "cecc1a0e7bd5c75a2716e9c8f46d30790e2e528925140d76977bb373c6f52b2c"
+      "sha256": "87704515de0719a9bfec81091c6dfbb0b5f531252cab2888a39fccd6ce4dfcf9"
     },
     {
       "bytes": 11210,
@@ -1053,7 +1058,7 @@
       "version": "1.0.21"
     }
   ],
-  "provider_data_sha256": "bcd9343de31db96b92b92cb41e2e57274a432ca6984068c0905939d6434f1f6f",
+  "provider_data_sha256": "f5605d8e27277a573b1e9bd0cefe0ea594c08e45f362441066135a827ec9b619",
   "schema_version": 1,
   "scope": "actual immutable native Duration image, retained selected Number/List owners, global/native/host source, complete primitive codecs and primary CLDR47 authority; native and AOT execution pending",
   "service": "DurationFormat"

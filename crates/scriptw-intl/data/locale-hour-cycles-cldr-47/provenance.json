@@ -72,9 +72,9 @@
         "sha256": "544e4349c169a72ba2433447d84505c067114eb098b82c72732e2b1f21f932e8"
       },
       {
-        "bytes": 31947,
+        "bytes": 32127,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "63f3838d791d8041e5dd7e11af38885c7097c278da75ee83f79bb27f21029b1a"
+        "sha256": "aeaf9f9be289f3c498c7bfb8574440490b686593d84353ae8592c37ecc232609"
       },
       {
         "bytes": 34690,
@@ -90,6 +90,11 @@
         "bytes": 24415,
         "path": "crates/scriptw-intl/data/locale-week-cldr-47/profile.json",
         "sha256": "32464118c9ed0333083a695069825245f29572038a6e80c6c56675f7065c18c8"
+      },
+      {
+        "bytes": 13441,
+        "path": "crates/scriptw-intl/src/artifact_identity.rs",
+        "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
       },
       {
         "bytes": 13920,
@@ -127,9 +132,9 @@
         "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
       },
       {
-        "bytes": 41725,
+        "bytes": 38877,
         "path": "crates/scriptw-intl/src/lib.rs",
-        "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+        "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
       },
       {
         "bytes": 8955,
@@ -149,7 +154,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "8710ce4a4f83f39ba9e27e5ff712355a9d96be3d00b9a43ccb43170b68a3cf60"
+        "sha256": "2ebf344608bd169c63982beb252e6291268ea63c9d958d07000bef2e36d6a134"
       },
       {
         "bytes": 3906,
@@ -262,13 +267,13 @@
         "sha256": "d0cf2310c60c078d652c86b6c0a11c3103e6830eea419af176219a4a8a218ea6"
       },
       {
-        "bytes": 12577,
+        "bytes": 12629,
         "path": "scripts/generate-intl-locale-hour-cycles-profile.py",
-        "sha256": "5782e6c3f98c8c84363b5fa8020e163c723ade2dd8559f6abd407f0ddee0f705"
+        "sha256": "2907d197898e37ee25defd532d1c6fa2ee5fb60793dc91370fa635d9bd10909b"
       }
     ]
   },
-  "kernel_sha256": "c2c626b974a2a6934280853fc24a8579e2afdb2b315b14bd3bd064e1dab3617a",
+  "kernel_sha256": "b8e961833c5620d794160b4785aa77e86215c7b35fb8e92b6836b9f9c5e8fe94",
   "language_region_selector_count": 23,
   "normative_source": "https://tc39.es/ecma402/#sec-hourcyclesoflocale",
   "ordering": "allowed preference order; stable uniqueness after projection; never prepend preferred",

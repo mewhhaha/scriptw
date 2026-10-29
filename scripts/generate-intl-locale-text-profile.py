@@ -26,6 +26,7 @@ HELPERS = [Path(p) for p in ['crates/scriptw-intl/src/provider/language_domain.r
 HELPERS.extend(Path(path) for path in [
     'crates/scriptw-intl/build.rs',
     'crates/scriptw-intl/src/lib.rs',
+    'crates/scriptw-intl/src/artifact_identity.rs',
     'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs',
     'crates/scriptw-intl/src/protocol.rs',
     'crates/scriptw-intl/src/image.rs',

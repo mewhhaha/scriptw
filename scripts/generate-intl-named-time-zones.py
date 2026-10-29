@@ -269,6 +269,7 @@ def outputs(root):
         'crates/scriptw-intl/Cargo.toml',
         'crates/scriptw-intl/build.rs',
         'crates/scriptw-intl/src/lib.rs',
+        'crates/scriptw-intl/src/artifact_identity.rs',
         'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs',
         'crates/scriptw-intl/src/provider/conformance.rs',
         'crates/scriptw-intl/src/service_selection.rs',

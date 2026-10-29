@@ -321,6 +321,11 @@
       "sha256": "b325fad81280d6a47f3ef762e7f4968007134960f50a16df81d98be9f981d44f"
     },
     {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+    },
+    {
       "bytes": 8388,
       "path": "crates/scriptw-intl/src/identifiers.rs",
       "sha256": "08bc33c06227bcddc779dc16212be0634361cb5dc77d0c4f83d3b5882a1e79b6"
@@ -341,9 +346,9 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 8955,
@@ -666,9 +671,9 @@
       "sha256": "02e37589b6bccb09a44f589c330edd5ab47c977b571a0a2d31c546f480d065b6"
     },
     {
-      "bytes": 10065,
+      "bytes": 10117,
       "path": "scripts/generate-intl-display-relative-identity.py",
-      "sha256": "2832dd3195e3eee2039c46f6d87a3787204bad01c7863386e9e0572022786022"
+      "sha256": "618c3b8aa716c1c3b82e30ccfc9ec040a01a776c554a1d5d83ef1c69ed41749a"
     },
     {
       "bytes": 10535,
@@ -764,7 +769,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "b2085fbf0e1118d20f3a117405417451b4cea9ae7295d44070c893b34e7266ff",
+  "provider_data_sha256": "c05218aed6984d4bc230e37309d1381bf3b8ef9f6a04f588f723cebce1817841",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "RelativeTimeFormat",

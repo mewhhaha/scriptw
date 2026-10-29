@@ -42,6 +42,11 @@
       "sha256": "ed7d4cc28a9fe9e1e798f0c540b12b4b2c43d789f274d9915cef0fbe999da9f8"
     },
     {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+    },
+    {
       "bytes": 136434,
       "path": "crates/scriptw-intl/src/duration_format/generated/profile.json",
       "sha256": "351c8447d4df24ce6ea8d50d24829e467fdedc3c19fe5cbd1ef3759959122fea"
@@ -77,9 +82,9 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 5033,
@@ -192,9 +197,9 @@
       "sha256": "ef1a57d9ed9b457f7574a6d589dda692f3d5c8290ba57cd563b3cdba068f6dd1"
     },
     {
-      "bytes": 10647,
+      "bytes": 10714,
       "path": "scripts/generate-intl-list-identity.py",
-      "sha256": "12bd32fbcc0658ce139d6213541043618517cca330016a4258b26490d7ed3f78"
+      "sha256": "8ac257a9a2b3eb16c606a81a3e515b146fde2b29d0f23ff5e8c5a30bc2c85039"
     }
   ],
   "packages": [
@@ -338,7 +343,7 @@
       }
     ]
   },
-  "provider_data_sha256": "0688de444183bd55394d8ac1d0ae69ae00163146e1b6daa797fb5c3b370cc7ed",
+  "provider_data_sha256": "6ae51e1e247499be70f3a3fa992980d968f710299c1e8a366801cae23df4b9c8",
   "purpose": "pinned ICU list templates, conditional DFA and exact UTF16/indexed parts kernel",
   "schema_version": 1,
   "source_archive_sha256": "f64d583886e9a8201535b5296be9fb2f299d6e21f84d39488ce51affdd6c8f5e"

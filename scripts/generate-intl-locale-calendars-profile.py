@@ -16,7 +16,7 @@ NATIVE = Path('crates/scriptw-intl/src/provider/locale_calendars')
 IDENTITY = NATIVE / 'profile_identity.rs'
 REGION_HELPER = Path('crates/scriptw-intl/src/provider/region_preference.rs')
 PRODUCTION = [NATIVE.with_suffix('.rs'), NATIVE / 'record.rs', NATIVE / 'profile.rs']
-HELPERS = [Path(p) for p in ['crates/scriptw-intl/src/lib.rs', 'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs',
+HELPERS = [Path(p) for p in ['crates/scriptw-intl/src/lib.rs', 'crates/scriptw-intl/src/artifact_identity.rs', 'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs',
     'crates/scriptw-intl/src/protocol.rs', 'crates/scriptw-intl/src/locale_information_wire.rs',
     'crates/scriptw-intl/src/provider/language_domain.rs',
     'crates/scriptw-intl/src/provider/keyword_aliases.rs',

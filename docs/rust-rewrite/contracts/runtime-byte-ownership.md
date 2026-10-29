@@ -33,6 +33,11 @@ The native manifest's package digest can be reused only for the exact package
 pointer/length retained by the admitted owner; source, target, configuration,
 runtime key and decoded native-image digest checks still precede deserialization.
 
+Canonical Intl identity bytes use compile-time name order and direct byte
+emission. Fixed-width receipt and manifest readers establish unique encodings
+while parsing; the foreign-registry constructor owns its JSON canonicality
+check. Consumers do not re-serialize those validated values to check them again.
+
 This removes a second raw runtime allocation when the identical bytes already
 exist in the executable. It changes Rust byte ownership, without changing the
 R/P Wasm layout, foreign ABI, JavaScript object representation or GC policy.

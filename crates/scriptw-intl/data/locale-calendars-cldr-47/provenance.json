@@ -275,9 +275,9 @@
         "sha256": "71a427fdc899544cb7ff29bc84c0c0f1fb5c29cbd80a35336ace332004235ff7"
       },
       {
-        "bytes": 31947,
+        "bytes": 32127,
         "path": "crates/scriptw-intl/data/datetime-cldr-47/kernel-identity.json",
-        "sha256": "63f3838d791d8041e5dd7e11af38885c7097c278da75ee83f79bb27f21029b1a"
+        "sha256": "aeaf9f9be289f3c498c7bfb8574440490b686593d84353ae8592c37ecc232609"
       },
       {
         "bytes": 4610,
@@ -295,9 +295,9 @@
         "sha256": "bd10c0094e5542508260bb02480f202203cc106252b692e8260070c5cec8436a"
       },
       {
-        "bytes": 21615,
+        "bytes": 21805,
         "path": "crates/scriptw-intl/data/iana-tzdb-2026a/manifest.json",
-        "sha256": "8fcfc6a17c45cf4ed2dd670837a468af6b33c458a9630408f7bc6a6dbec832b0"
+        "sha256": "53b71584d57feb9e6edf19b8ac014e31fa1dea08b7b4e8475958f064b747f462"
       },
       {
         "bytes": 51680,
@@ -365,6 +365,11 @@
         "sha256": "52508dfd4f0bca47b39443589c97e959361f1f57d7324876f0b681b0509012f4"
       },
       {
+        "bytes": 13441,
+        "path": "crates/scriptw-intl/src/artifact_identity.rs",
+        "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+      },
+      {
         "bytes": 13920,
         "path": "crates/scriptw-intl/src/datetime.rs",
         "sha256": "5af6c557f72da03b49f24c449b93745e1d8fa9a1a30ba0dd24251380e8533163"
@@ -420,9 +425,9 @@
         "sha256": "00e4e549e194cc3109e2169f15a7ae1fe050f008958d21c914ee2f47825ebc1e"
       },
       {
-        "bytes": 41725,
+        "bytes": 38877,
         "path": "crates/scriptw-intl/src/lib.rs",
-        "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+        "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
       },
       {
         "bytes": 8955,
@@ -507,7 +512,7 @@
       {
         "bytes": 328,
         "path": "crates/scriptw-intl/src/provider/datetime/identity.rs",
-        "sha256": "8710ce4a4f83f39ba9e27e5ff712355a9d96be3d00b9a43ccb43170b68a3cf60"
+        "sha256": "2ebf344608bd169c63982beb252e6291268ea63c9d958d07000bef2e36d6a134"
       },
       {
         "bytes": 8582,
@@ -717,7 +722,7 @@
       {
         "bytes": 565,
         "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-        "sha256": "134c05086f26c408d545964ee5c603d5ea2f11a907a16ed0319192d974c46816"
+        "sha256": "ab46e41c226dd273af40ff7f8c5424253fe9b6f4708ccc6b70d54b853a58c0f4"
       },
       {
         "bytes": 5089,
@@ -775,9 +780,9 @@
         "sha256": "a810a5fe0ad9ba67a77c860fbfe38adb84da36ec9a1b019a8eb177d04e6858eb"
       },
       {
-        "bytes": 9001,
+        "bytes": 9057,
         "path": "scripts/generate-intl-datetime-identity.py",
-        "sha256": "a5d112628249a7f68ecf64a1f084d74e2d58b0a96be3bf4e53414d4f8e3c2a3b"
+        "sha256": "7a1ab158dcd94abf7969f02a0c27b10ef7790f4bbb9dd52244f282b203b62c63"
       },
       {
         "bytes": 18121,
@@ -790,9 +795,9 @@
         "sha256": "d0cf2310c60c078d652c86b6c0a11c3103e6830eea419af176219a4a8a218ea6"
       },
       {
-        "bytes": 14270,
+        "bytes": 14318,
         "path": "scripts/generate-intl-locale-calendars-profile.py",
-        "sha256": "d4c63ec417dc93db8d3fef0292baee9ea983fc48277e3ee49427951209ae5e1a"
+        "sha256": "0876c5dac6edcb4212b46aafd1865026e88f204e1d658d50fff8e2c5599bc0c5"
       },
       {
         "bytes": 22024,
@@ -1021,7 +1026,7 @@
       }
     ]
   },
-  "kernel_sha256": "5a97e423e938cc57e844b224d8b3f4f39d50fd3016ca0afe2d3ffdfe89cf0473",
+  "kernel_sha256": "bbb6c930826f793a7a133d7be0f376ce38ed0b4b3fd620263dde3963a8919316",
   "language_region_selector_count": 0,
   "normative_source": "https://tc39.es/ecma402/#sec-calendarsoflocale",
   "ordering": "calendar preference order; canonical BCP47 aliases; stable uniqueness; runtime filter against actual checked DateTime AvailableCalendars",

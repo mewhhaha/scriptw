@@ -34,6 +34,7 @@ HELPERS = [
     'crates/scriptw-intl/src/provider/region_preference.rs',
     'crates/scriptw-intl/src/provider.rs', 'crates/scriptw-intl/src/selection.rs', 'crates/scriptw-intl/src/selection/minimal_admission.rs',
     'crates/scriptw-intl/src/lib.rs',
+    'crates/scriptw-intl/src/artifact_identity.rs',
     'crates/scriptw-intl/src/protocol.rs',
     'crates/scriptw-intl/src/locale_information_wire.rs',
     'Cargo.lock', 'Cargo.toml', 'crates/scriptw-intl/Cargo.toml',

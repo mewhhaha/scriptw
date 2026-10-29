@@ -24,7 +24,7 @@
   ],
   "decimal_numbering_systems": 78,
   "domain": "scriptw-locale-numbering-systems-native-v1",
-  "kernel_sha256": "5899fbd768842ed112bd045ce67b83f6b797e09cade2d377f4619fd177b4d08b",
+  "kernel_sha256": "373e34d66f78321aa3c13775dfbb9749c3468e6c7c0dbb86235f06bb08d295ad",
   "number_locales": 1082,
   "production_sources": [
     {
@@ -68,6 +68,11 @@
       "sha256": "544e4349c169a72ba2433447d84505c067114eb098b82c72732e2b1f21f932e8"
     },
     {
+      "bytes": 13441,
+      "path": "crates/scriptw-intl/src/artifact_identity.rs",
+      "sha256": "896895d7d8c2c18d61ad73514a8266931b8a98c1ea6363f28c326985eadb4921"
+    },
+    {
       "bytes": 8388,
       "path": "crates/scriptw-intl/src/identifiers.rs",
       "sha256": "08bc33c06227bcddc779dc16212be0634361cb5dc77d0c4f83d3b5882a1e79b6"
@@ -88,9 +93,9 @@
       "sha256": "ec0fcbc2d88ff06f33804439b74328f0628391920916c40d861226b6cec005e6"
     },
     {
-      "bytes": 41725,
+      "bytes": 38877,
       "path": "crates/scriptw-intl/src/lib.rs",
-      "sha256": "d5958987b05445f43654de7b1cf1cf02f81882f9f62424656ff303a3880c086e"
+      "sha256": "d8baadfaa05c063ee111c3b0e315619a03800a01e3b4ad68f44407f0be9069d8"
     },
     {
       "bytes": 8955,
@@ -313,9 +318,9 @@
       "sha256": "d0cf2310c60c078d652c86b6c0a11c3103e6830eea419af176219a4a8a218ea6"
     },
     {
-      "bytes": 9355,
+      "bytes": 9407,
       "path": "scripts/generate-intl-locale-numbering-systems-identity.py",
-      "sha256": "47f99993560fc1c0aca663795134e481a2f883ef40191444fa0fcac423335ef9"
+      "sha256": "87b27af100d95fd72e366987658175829c8f483ad137e0275f8c4061faccd4f6"
     },
     {
       "bytes": 4857,

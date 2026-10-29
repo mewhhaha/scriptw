@@ -75,6 +75,8 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
+    // This shared module is also compiled by the Cargo image producer.
+    #[allow(dead_code)]
     pub(crate) fn encode(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(MAGIC);
@@ -118,7 +120,6 @@ impl Manifest {
             *bytes = rest;
             field.try_into().ok()
         }
-        let original = bytes;
         if &take::<8>(&mut bytes)? != MAGIC || u32::from_le_bytes(take(&mut bytes)?) != VERSION {
             return None;
         }
@@ -161,7 +162,34 @@ impl Manifest {
             package_digest: take(&mut bytes)?,
             native_digest: take(&mut bytes)?,
         };
-        (bytes.is_empty() && result.encode() == original).then_some(result)
+        // Fixed-width fields and exact enum tags have one encoding. The bounded
+        // target length and strict UTF-8 preserve its exact bytes, so EOF proves
+        // canonical framing without serializing the parsed manifest again.
+        bytes.is_empty().then_some(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_rejects_invalid_utf8_with_complete_fixed_fields() {
+        let manifest = Manifest {
+            source: [1; 32],
+            target: "was".to_owned(),
+            configuration: 1,
+            modes: COMPILATION_MODES,
+            runtime_key: [2; 32],
+            package_digest: [3; 32],
+            native_digest: [4; 32],
+        };
+        let encoded = manifest.encode();
+        for target in [[0xff, b'a', b's'], [0xc0, 0xaf, b's'], [0xed, 0xa0, 0x80]] {
+            let mut invalid = encoded.clone();
+            invalid[21..24].copy_from_slice(&target);
+            assert!(Manifest::decode(&invalid).is_none());
+        }
     }
 }
 

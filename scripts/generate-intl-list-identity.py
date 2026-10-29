@@ -123,6 +123,7 @@ def generate(repository):
     paths = {DATA / 'source-inputs.json', Path('scripts/generate-intl-list-identity.py'),
              Path('crates/scriptw-intl/Cargo.toml'), Path('crates/scriptw-intl/src/list_format.rs'),
              Path('crates/scriptw-intl/src/list_protocol.rs'), Path('crates/scriptw-intl/src/lib.rs'),
+             Path('crates/scriptw-intl/src/artifact_identity.rs'),
              Path('crates/scriptw-intl/src/protocol.rs'), Path('crates/scriptw-intl/src/provider.rs'), Path('crates/scriptw-intl/src/provider/conformance.rs'), Path('crates/scriptw-intl/src/selection.rs'), Path('crates/scriptw-intl/src/selection/minimal_admission.rs'),
              Path('crates/scriptw-intl/src/service_selection.rs'),
              Path('crates/scriptw-intl/src/selection/manifest.rs'),

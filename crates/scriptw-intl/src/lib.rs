@@ -5,8 +5,9 @@
 //! transforms and exact IANA time-zone snapshots without access to parser state,
 //! JavaScript IR, Wasmtime, JavaScript objects or observable operations.
 
-use core::{fmt, fmt::Write as _};
+use core::fmt;
 
+mod artifact_identity;
 pub mod collator;
 mod collator_image;
 mod collator_markers;
@@ -867,90 +868,7 @@ impl IntlDataIdentity {
     /// substituting a digest or profile fragment for the complete identity.
     #[must_use]
     pub fn artifact_identity(&self) -> IntlArtifactIdentity {
-        let mut services = self
-            .profile
-            .services()
-            .iter()
-            .map(IntlService::name)
-            .collect::<Vec<_>>();
-        services.sort_unstable();
-        let mut capabilities = self
-            .profile
-            .capabilities()
-            .iter()
-            .map(IntlDataCapability::name)
-            .collect::<Vec<_>>();
-        capabilities.sort_unstable();
-
-        let profile = match self.profile.profile() {
-            IntlDataProfile::Conformance => "conformance".to_string(),
-            IntlDataProfile::Minimal => "minimal".to_string(),
-            IntlDataProfile::Custom(id) => format!("custom:{}", id.as_str()),
-        };
-        let placement = match self.placement {
-            IntlDataPlacement::Embedded => "embedded",
-            IntlDataPlacement::External => "external",
-        };
-        let mut digest = String::with_capacity(64);
-        for byte in self.digest.as_bytes() {
-            write!(digest, "{byte:02x}").expect("writing to a String cannot fail");
-        }
-
-        let versions = self.versions;
-        let mut bytes = format!(
-            concat!(
-                "schema={}\n",
-                "host-call-abi={}\n",
-                "profile={}\n",
-                "services={}\n",
-                "capabilities={}\n",
-                "default-locale={}\n",
-                "placement={}\n",
-                "digest={}\n",
-                "icu4x={}\n",
-                "cldr={}\n",
-                "unicode={}\n",
-                "icu-data-tag={}\n",
-                "segmenter-lstm={}\n",
-                "tzdb={}\n",
-            ),
-            self.schema.get(),
-            INTL_HOST_CALL_ABI_VERSION,
-            profile,
-            services.join(","),
-            capabilities.join(","),
-            self.default_locale.as_str(),
-            placement,
-            digest,
-            versions.icu4x,
-            versions.cldr,
-            versions.unicode,
-            versions.icu_data_tag,
-            versions.segmenter_lstm,
-            versions.tzdb,
-        )
-        .into_bytes();
-        if self.profile.services().contains(IntlService::Locale)
-            || self.profile.services().contains(IntlService::NumberFormat)
-            || self
-                .profile
-                .services()
-                .contains(IntlService::DateTimeFormat)
-            || self
-                .profile
-                .services()
-                .contains(IntlService::RelativeTimeFormat)
-            || self
-                .profile
-                .services()
-                .contains(IntlService::DurationFormat)
-        {
-            bytes.extend_from_slice(b"numbering-supplement=");
-            bytes.extend_from_slice(number_format::NUMBERING_SUPPLEMENT_PROVENANCE.as_bytes());
-            bytes.push(b'\n');
-        }
-
-        IntlArtifactIdentity(bytes.into_boxed_slice())
+        artifact_identity::encode(self)
     }
 }
 
