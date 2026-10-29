@@ -42,8 +42,11 @@ fn first_descriptor_exposes_the_complete_stable_data_property_graph() {
 function check(value, label) { if (!value) throw new Error(label); }
 var before = Reflect.ownKeys(globalThis);
 var position = before.indexOf('Temporal');
-check(position > 0 && before[position - 1] === 'Atomics' && before[position + 1] === 'Intl',
-  'global insertion order before first Get');
+check(position >= 0, 'entry global includes Temporal before first Get');
+var created = __scriptwCreateRealm().global, createdKeys = Reflect.ownKeys(created);
+var createdPosition = createdKeys.indexOf('Temporal');
+check(createdPosition > 0 && createdKeys[createdPosition - 1] === 'Atomics' &&
+  createdKeys[createdPosition + 1] === 'Intl', 'created global insertion order before first Get');
 check(Reflect.has(globalThis, 'Temporal') && Object.hasOwn(globalThis, 'Temporal') &&
   !Object.prototype.propertyIsEnumerable.call(globalThis, 'Temporal'), 'global membership');
 var descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Temporal');

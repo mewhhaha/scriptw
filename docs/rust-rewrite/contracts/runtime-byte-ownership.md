@@ -120,8 +120,15 @@ weak byte lease; concurrent fallback loads can share that transient owner.
 Subsequent mappings reuse the admitted private file without retaining decoded
 storage, an Engine, or a Module.
 
-The packed Cargo array remains part of the executable. On Linux, its pointer
-and length select an exact read-only file-backed VMA in bounded
+The packed Cargo array remains part of the executable. Linux builds place it
+and the raw runtime package in separate read-only payload sections, while
+the seven small receipt/metadata arrays retain ordinary read-only placement.
+Each payload has its own section so unused profiles can still be removed by the
+linker. Exported arrays keep their exact types, bytes and lengths; no padding or
+page-alignment assumption is added. Placement changes neither native authority
+nor the loader's checked file-reader path.
+
+The packed array's pointer and length select an exact read-only file-backed VMA in bounded
 `/proc/self/maps` data. The loader opens only `/proc/self/exe`, requires matching
 device and inode, checks the complete file range and reads exactly that range
 through a bounded reader. Taking the linked array's address does not read its

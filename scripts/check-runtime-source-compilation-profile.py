@@ -26,6 +26,7 @@ FILES = tuple(A + name for name in (
     "embedded_runtime/native_backing.rs",
 )) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs", "native_input.rs", "native_input/elf_origin.rs")) + (
     "crates/scriptw-runtime-image/build/objects.rs",
+    "crates/scriptw-runtime-image/build/data_definitions.rs",
 )
 
 
@@ -225,6 +226,8 @@ def check(root, overrides=None):
             "Module::deserialize_open_file(engine,self.0.try_clone()?)" in backing,
             "native file backing remains private, unlinked, synced, non-tmpfs and owned by Wasmtime")
     image = "crates/scriptw-runtime-image/src/"
+    definitions = c["crates/scriptw-runtime-image/build/data_definitions.rs"]
+    objects = c["crates/scriptw-runtime-image/build/objects.rs"]
     require("modmetadata;pubusemetadata::{metadata,portable_metadata};" in c[image + "lib.rs"] and
             c[image + "lib.rs"].count("#[inline(never)]") == 9 and
             c[image + "metadata.rs"].count("#[inline(never)]") == 2 and
@@ -232,15 +235,17 @@ def check(root, overrides=None):
             "pubfnportable_metadata()->&'static[u8]" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_METADATA}" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}" in c[image + "metadata.rs"] and
-            "constPARTS:[(&str,&str);11]" in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            '#[path="data_definitions.rs"]moddata_definitions;' in objects and
+            "data_definitions::sources(out,lengths)" in objects and
+            "constPARTS:[(&str,&str,Placement);11]" in definitions and
+            '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin"' in definitions and
+            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in definitions and
             "pubfnexecution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
             "pubfnportable_execution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}" in function(source[image + "lib.rs"], "execution_metadata") and
             "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}" in function(source[image + "lib.rs"], "portable_execution_metadata") and
-            '"SCRIPTW_RUNTIME_EXECUTION","scriptw-runtime-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_PORTABLE_EXECUTION","scriptw-runtime-portable-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"],
+            '"SCRIPTW_RUNTIME_EXECUTION","scriptw-runtime-execution.bin"' in definitions and
+            '"SCRIPTW_RUNTIME_PORTABLE_EXECUTION","scriptw-runtime-portable-execution.bin"' in definitions,
             "eleven immutable image definitions use seven original and four receipt accessors")
     lease = c[image + "native_lease.rs"]
     storage = c[image + "native_storage.rs"]

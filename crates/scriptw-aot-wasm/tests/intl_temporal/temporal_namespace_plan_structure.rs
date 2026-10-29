@@ -3,6 +3,8 @@ const SHAPES_SOURCE: &str = include_str!("../../../scriptw-ir/src/lowering/built
 const PLANNING_SOURCE: &str = include_str!("../../src/planning.rs");
 const TEMPORAL_PLAN_SOURCE: &str = include_str!("../../src/planning/temporal_namespace.rs");
 const BOOTSTRAP_SOURCE: &str = include_str!("../../src/builtins/bootstrap.rs");
+const TEMPORAL_INITIALIZATION_SOURCE: &str =
+    include_str!("../../src/builtins/bootstrap/temporal_initialization.rs");
 const ENGINE_TEST_SOURCE: &str = include_str!("../../../scriptw-engine/src/tests/intl.rs");
 
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
@@ -102,13 +104,13 @@ fn temporal_namespace_shapes_and_installers_share_two_ordered_member_lists() {
     assert!(!temporal_shape.contains("StandardBuiltinId::TemporalInstantConstructor"));
 
     assert_eq!(
-        BOOTSTRAP_SOURCE
+        TEMPORAL_INITIALIZATION_SOURCE
             .matches("members.now_members_in_installation_order()")
             .count(),
         1
     );
     assert_eq!(
-        BOOTSTRAP_SOURCE
+        TEMPORAL_INITIALIZATION_SOURCE
             .matches("members.constructors_in_installation_order()")
             .count(),
         1
@@ -202,9 +204,9 @@ fn temporal_namespace_plan_can_publish_members_only_after_complete_rooting() {
 #[test]
 fn temporal_bootstrap_requires_the_witness_and_installs_without_partial_guards() {
     let now_installer = bounded(
-        BOOTSTRAP_SOURCE,
+        TEMPORAL_INITIALIZATION_SOURCE,
         "fn init_temporal_now_object(",
-        "pub(crate) fn init_temporal_object(",
+        "fn init_building_temporal_object(",
     );
     assert!(now_installer.contains("members: TemporalNamespaceMembers,"));
     assert!(now_installer.contains("members.now_members_in_installation_order()"));
@@ -212,29 +214,52 @@ fn temporal_bootstrap_requires_the_witness_and_installs_without_partial_guards()
     assert!(!now_installer.contains("continue;"));
 
     let temporal_installer = bounded(
-        BOOTSTRAP_SOURCE,
-        "pub(crate) fn init_temporal_object(",
-        "pub(crate) fn init_intl_object(",
+        TEMPORAL_INITIALIZATION_SOURCE,
+        "fn init_building_temporal_object(",
+        "\n    }\n}",
     );
+    assert!(temporal_installer.contains("building: &TemporalIntrinsicBuild<'_>,"));
     assert!(temporal_installer.contains("members: TemporalNamespaceMembers,"));
-    assert!(temporal_installer.contains("self.init_temporal_now_object(members,"));
-    assert!(temporal_installer.contains("members.constructors_in_installation_order()"));
+    ordered(
+        temporal_installer,
+        &[
+            "self.init_temporal_now_object(members,",
+            "IntrinsicKey::Name(TEMPORAL_NOW_NAME)",
+            "members.constructors_in_installation_order()",
+            "self.emit_load_building_temporal_intrinsic(building, slot,",
+        ],
+    );
     assert!(!temporal_installer.contains("should_initialize_standard_builtin"));
     assert!(!temporal_installer.contains("continue;"));
 
-    let bootstrap_gate = bounded(
+    let demand_gate = bounded(
+        TEMPORAL_INITIALIZATION_SOURCE,
+        "fn emit_build_temporal_cluster(",
+        "fn init_temporal_now_object(",
+    );
+    ordered(
+        demand_gate,
+        &[
+            ".temporal_namespace_members()",
+            "self.init_building_temporal_object(",
+            "building,",
+            "members,",
+            "&context,",
+            "&object_prototype,",
+        ],
+    );
+    assert!(!demand_gate.contains("runtime_bootstrap_plan.temporal_object"));
+    assert!(!demand_gate.contains("should_initialize_standard_builtin"));
+    assert!(!demand_gate.contains("continue;"));
+
+    let initial_bootstrap = bounded(
         BOOTSTRAP_SOURCE,
         "fn emit_initialize_realm_intrinsics_inner(",
         "pub(crate) fn init_runtime_roots(",
     );
-    ordered(
-        bootstrap_gate,
-        &[
-            ".temporal_namespace_members()",
-            "self.init_temporal_object(members, &context, &object_prototype, function)",
-        ],
-    );
-    assert!(!bootstrap_gate.contains("runtime_bootstrap_plan.temporal_object"));
+    assert!(!initial_bootstrap.contains("temporal_namespace_members()"));
+    assert!(!initial_bootstrap.contains("init_building_temporal_object"));
+    assert!(!initial_bootstrap.contains("RealmEnsureTemporal"));
 
     assert_eq!(
         ENGINE_TEST_SOURCE

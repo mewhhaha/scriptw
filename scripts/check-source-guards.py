@@ -2,8 +2,8 @@
 """Run source-only backend guards before building the compiler dependency graph.
 
 This is an additive diagnostic. The full Cargo structure_builtins,
-structure_language and engine structure targets remain required for native
-acceptance.
+structure_language, intl_temporal and engine structure targets remain required
+for native acceptance.
 """
 import argparse
 import json
@@ -32,6 +32,14 @@ TARGETS = {
         "with_environment_compound_assignment_structure",
         "with_environment_numeric_update_structure",
     }),
+    "intl_temporal": frozenset({
+        "linked_bodies",
+        "intl_dtf_time_zone_name_style_privacy_structure",
+        "intl_host_imports",
+        "locale_information_list_emission",
+        "system_time_zone_imports",
+        "temporal_calendar_shared_size",
+    }),
     # Admit the std-only execution-mode guard before an expensive Engine build.
     # The remaining engine structure modules retain their full Cargo owner.
     "structure": frozenset({
@@ -59,13 +67,24 @@ def run(root, output, target="structure_builtins"):
     crate = root / "crates" / package
     entry = crate / "tests" / target / "main.rs"
     modules = []
+    path_attribute = None
     for line in entry.read_text().splitlines():
         if not line.strip() or line.lstrip().startswith("//"):
+            continue
+        if re.fullmatch(r'#\[path = "[^"\\]+"\]', line):
+            if path_attribute is not None:
+                raise ValueError("multiple path attributes on a guard module")
+            path_attribute = line
             continue
         match = re.fullmatch(r"mod ([a-z_][a-z_0-9]*);", line)
         if not match:
             raise ValueError(f"unclassified structure target declaration: {line}")
+        if path_attribute is not None and match[1] not in cargo_modules:
+            raise ValueError("path attribute requires an explicitly classified Cargo-only module")
+        path_attribute = None
         modules.append(match[1])
+    if path_attribute is not None:
+        raise ValueError("dangling path attribute in structure target")
     if len(modules) != len(set(modules)) or not cargo_modules <= set(modules):
         raise ValueError("duplicate or missing explicitly classified guard module")
     selected = [name for name in modules if name not in cargo_modules]

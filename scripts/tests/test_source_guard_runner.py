@@ -114,6 +114,47 @@ class SourceGuardRunnerTests(unittest.TestCase):
         self.assertEqual(receipt["full_cargo_only_modules"], sorted(RUNNER.TARGETS["structure"]))
         self.assertIn("/scriptw-engine/tests/structure/guard_a.rs", (self.output / "source_guards.rs").read_text())
 
+    def test_intl_temporal_keeps_typed_modules_and_their_path_fixture_in_cargo(self):
+        entry = self.root / "crates/scriptw-aot-wasm/tests/intl_temporal/main.rs"
+        entry.write_text(entry.read_text().replace(
+            "mod linked_bodies;", '#[path = "../fixtures/linked_bodies.rs"]\nmod linked_bodies;'
+        ))
+        self.assertEqual(self.invoke(
+            "guard_a::check: test\nguard_b::check: test\n\n2 tests, 0 benchmarks\n",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n",
+            target="intl_temporal",
+        ), 0)
+        receipt = json.loads((self.output / "receipt.json").read_text())
+        self.assertEqual(receipt["source_modules"], ["guard_a", "guard_b"])
+        self.assertEqual(set(receipt["full_cargo_only_modules"]), {
+            "linked_bodies", "intl_dtf_time_zone_name_style_privacy_structure",
+            "intl_host_imports", "locale_information_list_emission",
+            "system_time_zone_imports", "temporal_calendar_shared_size",
+        })
+        harness = (self.output / "source_guards.rs").read_text()
+        self.assertIn("/intl_temporal/guard_a.rs", harness)
+        for name in receipt["full_cargo_only_modules"]:
+            self.assertNotIn(f"mod {name};", harness)
+
+    def test_guard_attributes_cannot_change_or_hide_source_ownership(self):
+        entry = self.root / "crates/scriptw-aot-wasm/tests/intl_temporal/main.rs"
+        original = entry.read_text()
+        attribute = '#[path = "../fixtures/linked_bodies.rs"]'
+        declarations = {
+            "source-only module": original.replace("mod guard_a;", attribute + "\nmod guard_a;"),
+            "unknown attribute": original.replace("mod linked_bodies;", "#[cfg(test)]\nmod linked_bodies;"),
+            "malformed path": original.replace("mod linked_bodies;", '#[path = ""]\nmod linked_bodies;'),
+            "multiple attributes": original.replace("mod linked_bodies;", (attribute + "\n") * 2 + "mod linked_bodies;"),
+            "dangling attribute": original + attribute + "\n",
+        }
+        with patch.object(RUNNER.subprocess, "run") as native:
+            for name, declaration in declarations.items():
+                with self.subTest(name=name):
+                    entry.write_text(declaration)
+                    with self.assertRaisesRegex(ValueError, "attribute|unclassified"):
+                        RUNNER.run(self.root, self.output, "intl_temporal")
+        native.assert_not_called()
+
     def test_target_set_retains_first_failure_and_runs_remaining_target(self):
         results = [101] + [0] * (len(RUNNER.TARGETS) - 1)
         with patch.object(RUNNER, "run", side_effect=results) as run:

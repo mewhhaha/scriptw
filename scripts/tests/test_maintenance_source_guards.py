@@ -326,8 +326,11 @@ class ImmutableReceiptGuards(unittest.TestCase):
         self.rejected("crates/scriptw-runtime-image/src/metadata.rs",
                       "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}",
                       "returnunsafe{&SCRIPTW_RUNTIME_METADATA}", invariant)
+        self.rejected("crates/scriptw-runtime-image/build/data_definitions.rs",
+                      "constPARTS:[(&str,&str,Placement);11]",
+                      "constPARTS:[(&str,&str,Placement);9]", invariant)
         self.rejected("crates/scriptw-runtime-image/build/objects.rs",
-                      "constPARTS:[(&str,&str);11]", "constPARTS:[(&str,&str);9]", invariant)
+                      "data_definitions::sources(out,lengths)", "other_sources(out,lengths)", invariant)
         self.rejected("crates/scriptw-runtime-image/src/lib.rs",
                       "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}",
                       "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}", invariant)
