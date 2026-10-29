@@ -8,20 +8,19 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Latest verification
 
-The [execution checkpoint](execution-parity-20261029.json) records **5,063 native
-passes across 21 complete targets**, eight default-feature CLI benchmark-host
-tests, 356 source guards and **1,214 selected original pinned Test262 executions**.
-Local production binaries belong to `a5448d285`;
-two test-only corrections at `54a28246e` preserve that production logic. Passing
-unaffected scopes were retained after correcting structural assertions. Checks
-ran sequentially within the local one-CPU, 4-GiB/no-swap limit.
+The [binary-data and scalar-loop checkpoint](binary-scalar-20261029.json) records
+**5,081 native passes across 21 complete targets**, eight CLI benchmark-host
+tests, 359 source guards and **191 selected original pinned Test262 executions**.
+Local production binaries belong to `d0a134cfd`; test corrections at `f19370fcf`
+retain that production logic. Checks ran sequentially within the local one-CPU,
+4-GiB/no-swap limit. Original failed diagnostic attempts remain in the evidence.
 
-Across the 17 original local workloads, geometric means fell **27.4% in execution
-time, 4.3% in post-execution RSS and 5.0% in PSS** against `afe83e312`. Private
-dirty memory was broadly flat. Every Scriptw execution median improved in this
-run; every-case Scriptc parity remains open. Whole-process RSS changes are not
-attributed solely to the compiler changes. These local results remain separate
-from the [CI benchmark cohorts](benchmark-refresh-20261028.md). The
+Across the 17 original local workloads, geometric means fell **8.5% in execution
+time, 3.7% in post-execution RSS and 4.3% in PSS** against `a5448d285`.
+Integer execution fell about 34%; some other controls were flat or slower.
+Whole-process changes are descriptive and are not attributed solely to one
+compiler change. These local results remain separate from the
+[CI benchmark cohorts](benchmark-refresh-20261028.md). The
 [full pinned publication](test262-current.md) remains bound to `b9ecfe64b`.
 
 ## Next work
@@ -29,10 +28,11 @@ from the [CI benchmark cohorts](benchmark-refresh-20261028.md). The
 - Every-case Scriptc time/RSS parity remains open. Continue from the
   [runtime ownership contract](contracts/runtime-byte-ownership.md), current
   checkpoint captures and [performance queue](../performance-hills.md).
-  Next examine integer representation changes inside the existing scalar-loop
-  path and demand initialization of binary-data intrinsics. Preserve negative
-  zero, exact Number values, defining-Realm identities and the shared
-  `Array.prototype.toString` / `%TypedArray%.prototype.toString` callable.
+  Integer-local retention and binary-data demand initialization are implemented.
+  The consumer capability control reduced Scriptw RSS by 8.0% with near-flat
+  execution. Whole-lifecycle join self-samples identify object reads, pooled
+  strings and the packed join kernel as targets; isolate execution-only costs
+  before choosing the next change.
   Host type metadata remains a separate hypothesis: demonstrate at least
   **256 KiB of avoidable retained ownership** before changing its decoding or
   registration. Phase deltas do not prove duplication or fault-around behavior.

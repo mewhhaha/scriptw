@@ -183,29 +183,21 @@ all failures, and compares RSS, PSS, private-dirty memory and execution time.
 Its reports are excluded from canonical scores. Fewer linked entrypoints or
 allocations alone do not establish an RSS reduction.
 
-The [2026-10-28 local result](../memory-consumer-capability-20261028.json) at
-`a5da57330` records 136 successful processes across the original 17 workloads,
-two feature variants, two adapters and two balanced rounds. The variants load
-the same freshly produced native images. Scriptc 0.4.5 raw Wasm comes from the
-published cohort; its frontend was not rerun. Mean Scriptw RSS fell from 22.01
-to 19.74 MiB; Scriptc used 14.92 MiB in the disabled host. Private dirty memory
-fell from 4.53 to 4.13 MiB, while execution time stayed essentially unchanged.
-These means aggregate per-case medians of 14 measured Stores. The enabled and
-disabled executables occupy 202.70 and 133.01 MiB on disk; those are not RAM figures.
-The warmed pre-Store RSS gap is 5.32 MiB and persists after Store drop; endpoint
-data does not identify which host/runtime allocations or mappings cause it.
+The [fresh local checkpoint](../binary-scalar-20261029.json) at `d0a134cfd`
+records 136 successful execution processes and 2,312 exact outputs across the
+original 17 workloads, two variants, two adapters and two balanced rounds.
+Both consumers include the optional `benchmark-module-images` feature; its
+observer is absent during measurement. Scriptc 0.4.5 raw Wasm is preserved from
+the published cohort; its frontend was not rerun.
 
-The combined lazy native-function text and TypedArray sort trial at
-[`11ce8b639`](https://github.com/mewhhaha/scriptw/tree/memory-consumer-experiments-20261028)
-was not promoted: aggregate RSS slightly increased, and the targeted callback
-sort added 1.30 MiB RSS and slowed 1.6%. Its measurements and failures are retained
-separately from the final consumer-only result. Rust-side Realm metadata review
-found no duplicate JavaScript object graph or megabyte-scale allocation to remove.
-
-Final verification passed 46 capability-disabled and six capability-enabled
-engine tests, 280 source-only checks, and all 15 Intl identity checks. Earlier
-full native and selected Test262 passes remain bound to their recorded sources;
-this is not a fresh full-suite publication. The bounded
-[raw archive](../memory-consumer-capability-20261028-inert.tar.xz) retains measurements,
-build transcripts, original inputs and failed attempts, excluding executables
-and serialized native images. The result JSON records its checksum and scope.
+Excluding the capability reduced Scriptw's geometric mean RSS by 8.0%, PSS by
+9.2% and private dirty memory by 12.6%, with essentially unchanged execution time.
+The WASI control moved 1.3% in RSS and 1.5% in PSS. Arithmetic means of per-case
+RSS medians were 17.91 to 16.49 MiB for Scriptw and 14.55 to 14.37 MiB for WASI.
+These endpoints include runtime, code and allocation history; they do not identify
+individual retained owners or establish live-heap savings. The diagnostic remains
+separate from canonical benchmark scores. The checkpoint's inert archive contains
+producer receipts, original inputs, observations and failed attempts as data,
+excluding executables and serialized native images. The
+[earlier result](../memory-consumer-capability-20261028.json) retains its own source
+and rejected trials.

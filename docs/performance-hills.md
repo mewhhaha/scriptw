@@ -8,7 +8,7 @@ traceable in Git and the source-bound benchmark records.
 
 | Area | Question to answer before changing code |
 | --- | --- |
-| Scalar loops | Can proven signed/unsigned 32-bit values and saved completions remain integer locals through the existing scalar-loop path, without losing negative zero or full Number values at nested assignments and exits? |
+| Repeated joins | Whole-lifecycle self-samples in the [current checkpoint](rust-rewrite/binary-scalar-20261029.json) identify object reads, pooled-string lookup and the small-join kernel. What dominates execution alone before adding another specialization? |
 | P146 — resident memory | Which remaining runtime data, native code, stack maps, GC pages and host allocations account for the measured footprint? Continue from [runtime ownership](rust-rewrite/contracts/runtime-byte-ownership.md) and the [section diagnostic](rust-rewrite/memory-module-sections-20261028.md). |
 | P148 — root lifetimes | Can a measured retention cost be reduced after the final semantic use while preserving closures, exceptions, weak reachability, resumptions and host reentry? |
 | P149 — immutable ownership | Are any package/data copies still redundant on compile/load paths after the existing bounded-loading changes? Preserve admission, byte lifetimes and source/native identities. |
