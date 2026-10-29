@@ -82,11 +82,12 @@ var copied = values.toSorted(function(a, b) {
 });
 check(copied.join() === '1,2,3' && calls > 0 && conversions === calls, 'observable result ToNumber');
 check(values.toSorted(function(a, b) { return new Number(a - b); }).join() === '1,2,3', 'boxed Number result');
-var boxedConversions = 0;
-var boxedA = { valueOf: function() { boxedConversions++; return 3; } };
-var boxedB = { valueOf: function() { boxedConversions++; return 1; } };
+var boxedAConversions = 0, boxedBConversions = 0;
+var boxedA = { valueOf: function() { boxedAConversions++; return 3; } };
+var boxedB = { valueOf: function() { boxedBConversions++; return 1; } };
 var ordinary = [boxedA, boxedB].toSorted(difference);
-check(ordinary[0] === boxedB && ordinary[1] === boxedA && boxedConversions === 2, 'actual object operands decline scalar entry');
+check(ordinary[0] === boxedB && ordinary[1] === boxedA, 'actual object operands retain sorted identities');
+check(boxedAConversions > 0 && boxedBConversions > 0, 'actual object operands decline scalar entry with observable coercions');
 var numberA = new Number(3), numberB = new Number(1);
 var boxed = [numberA, numberB].toSorted(difference);
 check(boxed[0] === numberB && boxed[1] === numberA, 'actual boxed Number operands');

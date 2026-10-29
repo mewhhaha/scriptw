@@ -53,7 +53,17 @@ fn actual_typed_array_sort_and_to_sorted_call_binary_entries_before_argv_fallbac
             .unwrap()
     };
     let binary_type = crate::module::StaticSignature::BinaryNumericCallback.type_index();
-    let call = find("helper::function_call");
+    // This caller uses the shared Function-or-Proxy owner. Its non-Proxy tail
+    // then reaches the ordinary function dispatcher with the same saved argv.
+    let call = find("helper::proxy_call");
+    let ordinary = find("helper::function_call");
+    assert!(
+        body(bytes, call).iter().any(|op| matches!(op,
+            Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                if *function_index == ordinary
+        )),
+        "the generic Function-or-Proxy owner retains its actual-function dispatch edge"
+    );
     for builtin in [
         StandardBuiltinId::TypedArrayPrototypeSort,
         StandardBuiltinId::TypedArrayPrototypeToSorted,
@@ -81,7 +91,7 @@ fn actual_typed_array_sort_and_to_sorted_call_binary_entries_before_argv_fallbac
                 matches!(op, Operator::Call { function_index } if *function_index == call)
                     .then_some(i)
             })
-            .expect("the original actual-function fallback remains after scalar dispatch");
+            .expect("the original Function-or-Proxy fallback remains after scalar dispatch");
         assert!(
             operators[typed + 1..generic]
                 .iter()
