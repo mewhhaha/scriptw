@@ -64,7 +64,7 @@ pub(crate) enum IntrinsicKey<'k> {
 }
 
 impl FunctionBuilder<'_> {
-    fn intrinsic_key(
+    pub(crate) fn intrinsic_key(
         &mut self,
         key: IntrinsicKey<'_>,
         function: &mut Function,
