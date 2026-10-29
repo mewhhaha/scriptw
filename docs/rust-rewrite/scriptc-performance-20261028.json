@@ -1,0 +1,2016 @@
+{
+  "schema": "scriptw-local-scriptc-performance-result-v1",
+  "date": "2026-10-29",
+  "source_commit": "e9cec5c80f65b4ff4ca1c70f662c2d784c12e46e",
+  "source_fingerprint": "6cdb57a0555607727f101ee7a34c7a4f58c006b263a6773263ed4a8335883e3a",
+  "runtime_abi": 35,
+  "scope": "Local matched precompiled before/after; excluded from canonical CI graphs. Original17 workloads plus2 separately excluded TypedArray controls.",
+  "baseline_source": "dce404dd1faaa9866294535d34cc6474b843a28a",
+  "changes": [
+    "Sealed intrinsic installation rows and ordered compiled loop.",
+    "Guarded closed Number loops, exact integer range facts and Math.imul identity proof.",
+    "Packed push/join kernels, shared join calls and primitive String length/concat consumers.",
+    "Guarded constant-return source leaves.",
+    "Proof-owned binary Number callback entries plus private packed Array sort snapshots and post-callback writeback validation."
+  ],
+  "resources": {
+    "cpu_affinity": [
+      0
+    ],
+    "before": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "13475840",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    },
+    "after": {
+      "memory.max": "4294967296",
+      "memory.swap.max": "0",
+      "memory.oom.group": "1",
+      "memory.peak": "354512896",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+    }
+  },
+  "corpus": {
+    "original_workloads": 17,
+    "excluded_typed_array_controls": 2,
+    "rounds": 2,
+    "warmups_per_round": 10,
+    "samples_per_round": 7,
+    "passed_processes": 144,
+    "passed_output_checks": 2448,
+    "scriptc": "0.4.5 portable Wasm reused from CI40674504933; native-compiled afresh per local host; frontend not rerun",
+    "suites": [
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "scriptw",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 4.141370852941177,
+          "rss_bytes": 21817223.529411763,
+          "pss_bytes": 19182832.94117647,
+          "private_dirty_bytes": 4756901.647058823,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19692363.29411765,
+              "pss_bytes": 17058304.0,
+              "private_dirty_bytes": 2631439.0588235296
+            },
+            "after_instantiate": {
+              "rss_bytes": 19947640.470588237,
+              "pss_bytes": 17313460.70588235,
+              "private_dirty_bytes": 2886957.1764705884
+            },
+            "after_execution": {
+              "rss_bytes": 21817223.529411763,
+              "pss_bytes": 19182832.94117647,
+              "private_dirty_bytes": 4756901.647058823
+            },
+            "after_store_drop": {
+              "rss_bytes": 19698868.70588235,
+              "pss_bytes": 17064478.11764706,
+              "private_dirty_bytes": 2638546.8235294116
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 1.9672607647058822,
+          "rss_bytes": 19844879.05882353,
+          "pss_bytes": 17211602.82352941,
+          "private_dirty_bytes": 3802774.588235294,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18692698.352941178,
+              "pss_bytes": 16059301.647058824,
+              "private_dirty_bytes": 2649027.7647058824
+            },
+            "after_instantiate": {
+              "rss_bytes": 18956649.411764707,
+              "pss_bytes": 16323493.647058824,
+              "private_dirty_bytes": 2914063.0588235296
+            },
+            "after_execution": {
+              "rss_bytes": 19844879.05882353,
+              "pss_bytes": 17211602.82352941,
+              "private_dirty_bytes": 3802774.588235294
+            },
+            "after_store_drop": {
+              "rss_bytes": 18699926.588235293,
+              "pss_bytes": 16066650.352941176,
+              "private_dirty_bytes": 2657822.117647059
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.40596119921669477,
+          "rss_bytes": 0.9107138079460981,
+          "pss_bytes": 0.8986597114522699,
+          "private_dirty_bytes": 0.8046506108665975
+        }
+      },
+      {
+        "group": "canonical-inputs-17",
+        "adapter": "wasi",
+        "cases": 17,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 1.6493604705882352,
+          "rss_bytes": 15786827.294117646,
+          "pss_bytes": 13209328.94117647,
+          "private_dirty_bytes": 5324077.176470588,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 13132739.764705881,
+              "pss_bytes": 10555241.411764706,
+              "private_dirty_bytes": 2670592.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 13139486.11764706,
+              "pss_bytes": 10561987.764705881,
+              "private_dirty_bytes": 2677338.3529411764
+            },
+            "after_execution": {
+              "rss_bytes": 15786827.294117646,
+              "pss_bytes": 13209328.94117647,
+              "private_dirty_bytes": 5324077.176470588
+            },
+            "after_store_drop": {
+              "rss_bytes": 13141052.235294119,
+              "pss_bytes": 10563553.88235294,
+              "private_dirty_bytes": 2678302.117647059
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 1.6482664411764705,
+          "rss_bytes": 15265430.588235294,
+          "pss_bytes": 12695401.411764706,
+          "private_dirty_bytes": 5332871.529411765,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 12611584.0,
+              "pss_bytes": 10041675.294117646,
+              "private_dirty_bytes": 2679024.9411764704
+            },
+            "after_instantiate": {
+              "rss_bytes": 12618932.705882354,
+              "pss_bytes": 10049024.0,
+              "private_dirty_bytes": 2686012.2352941176
+            },
+            "after_execution": {
+              "rss_bytes": 15265430.588235294,
+              "pss_bytes": 12695401.411764706,
+              "private_dirty_bytes": 5332871.529411765
+            },
+            "after_store_drop": {
+              "rss_bytes": 12619655.529411765,
+              "pss_bytes": 10049626.352941176,
+              "private_dirty_bytes": 2687096.470588235
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 1.0109335047823886,
+          "rss_bytes": 0.9668643295802055,
+          "pss_bytes": 0.9608920456725674,
+          "private_dirty_bytes": 1.0017465604279725
+        }
+      },
+      {
+        "group": "targeted-typed-sort-2",
+        "adapter": "scriptw",
+        "cases": 2,
+        "aggregation": "arithmetic mean of per-case medians; ratios use geometric mean of paired case ratios",
+        "baseline": {
+          "status": "ok",
+          "execution_ms": 172.373387,
+          "rss_bytes": 26212352.0,
+          "pss_bytes": 23572480.0,
+          "private_dirty_bytes": 7416832.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21447680.0,
+              "pss_bytes": 18807808.0,
+              "private_dirty_bytes": 2653184.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 21705728.0,
+              "pss_bytes": 19065856.0,
+              "private_dirty_bytes": 2911232.0
+            },
+            "after_execution": {
+              "rss_bytes": 26212352.0,
+              "pss_bytes": 23572480.0,
+              "private_dirty_bytes": 7416832.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21456896.0,
+              "pss_bytes": 18817024.0,
+              "private_dirty_bytes": 2661376.0
+            }
+          }
+        },
+        "candidate": {
+          "status": "ok",
+          "execution_ms": 124.12325275,
+          "rss_bytes": 25330688.0,
+          "pss_bytes": 22707712.0,
+          "private_dirty_bytes": 7354368.0,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20648960.0,
+              "pss_bytes": 18025984.0,
+              "private_dirty_bytes": 2672640.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20911104.0,
+              "pss_bytes": 18288128.0,
+              "private_dirty_bytes": 2937856.0
+            },
+            "after_execution": {
+              "rss_bytes": 25330688.0,
+              "pss_bytes": 22707712.0,
+              "private_dirty_bytes": 7354368.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20657152.0,
+              "pss_bytes": 18034176.0,
+              "private_dirty_bytes": 2680832.0
+            }
+          }
+        },
+        "geometric_mean_candidate_over_baseline": {
+          "execution_ms": 0.7549683444005684,
+          "rss_bytes": 0.9664609200570558,
+          "pss_bytes": 0.9634391935619472,
+          "private_dirty_bytes": 0.9917020887123768
+        }
+      }
+    ],
+    "rows": [
+      {
+        "file": "sort-reverse-128.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.0968745,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20158464.0,
+              "pss_bytes": 17513472.0,
+              "private_dirty_bytes": 2656256.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20410368.0,
+              "pss_bytes": 17769472.0,
+              "private_dirty_bytes": 2914304.0
+            },
+            "after_execution": {
+              "rss_bytes": 21549056.0,
+              "pss_bytes": 18904064.0,
+              "private_dirty_bytes": 4048896.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20164608.0,
+              "pss_bytes": 17519616.0,
+              "private_dirty_bytes": 2664448.0
+            }
+          },
+          "rss_mib": 20.55078125,
+          "pss_mib": 18.0283203125,
+          "private_dirty_mib": 3.861328125
+        },
+        "candidate": {
+          "execution_ms": 0.5617125,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18868224.0,
+              "pss_bytes": 16260096.0,
+              "private_dirty_bytes": 2674688.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19128320.0,
+              "pss_bytes": 16520192.0,
+              "private_dirty_bytes": 2940928.0
+            },
+            "after_execution": {
+              "rss_bytes": 19613696.0,
+              "pss_bytes": 17005568.0,
+              "private_dirty_bytes": 3426304.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18872320.0,
+              "pss_bytes": 16264192.0,
+              "private_dirty_bytes": 2684928.0
+            }
+          },
+          "rss_mib": 18.705078125,
+          "pss_mib": 16.2177734375,
+          "private_dirty_mib": 3.267578125
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.1068395,
+          "rss_mib": 14.341796875,
+          "pss_mib": 11.8779296875,
+          "private_dirty_mib": 4.96484375
+        }
+      },
+      {
+        "file": "sort-reverse-512.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.399108,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20019200.0,
+              "pss_bytes": 17365504.0,
+              "private_dirty_bytes": 2658304.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20275200.0,
+              "pss_bytes": 17619456.0,
+              "private_dirty_bytes": 2916352.0
+            },
+            "after_execution": {
+              "rss_bytes": 24123392.0,
+              "pss_bytes": 21468160.0,
+              "private_dirty_bytes": 6762496.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20027392.0,
+              "pss_bytes": 17372160.0,
+              "private_dirty_bytes": 2666496.0
+            }
+          },
+          "rss_mib": 23.005859375,
+          "pss_mib": 20.4736328125,
+          "private_dirty_mib": 6.44921875
+        },
+        "candidate": {
+          "execution_ms": 0.93665,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18894848.0,
+              "pss_bytes": 16265216.0,
+              "private_dirty_bytes": 2672640.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19161088.0,
+              "pss_bytes": 16531456.0,
+              "private_dirty_bytes": 2938880.0
+            },
+            "after_execution": {
+              "rss_bytes": 19714048.0,
+              "pss_bytes": 17084416.0,
+              "private_dirty_bytes": 3493888.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18903040.0,
+              "pss_bytes": 16273408.0,
+              "private_dirty_bytes": 2682880.0
+            }
+          },
+          "rss_mib": 18.80078125,
+          "pss_mib": 16.29296875,
+          "private_dirty_mib": 3.33203125
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.246079,
+          "rss_mib": 14.544921875,
+          "pss_mib": 12.134765625,
+          "private_dirty_mib": 5.017578125
+        }
+      },
+      {
+        "file": "sort-sorted-512.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.783951,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20113408.0,
+              "pss_bytes": 17481728.0,
+              "private_dirty_bytes": 2654208.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20369408.0,
+              "pss_bytes": 17737728.0,
+              "private_dirty_bytes": 2912256.0
+            },
+            "after_execution": {
+              "rss_bytes": 21831680.0,
+              "pss_bytes": 19200000.0,
+              "private_dirty_bytes": 4374528.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20119552.0,
+              "pss_bytes": 17487872.0,
+              "private_dirty_bytes": 2662400.0
+            }
+          },
+          "rss_mib": 20.8203125,
+          "pss_mib": 18.310546875,
+          "private_dirty_mib": 4.171875
+        },
+        "candidate": {
+          "execution_ms": 0.860266,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18864128.0,
+              "pss_bytes": 16248320.0,
+              "private_dirty_bytes": 2676736.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19126272.0,
+              "pss_bytes": 16510464.0,
+              "private_dirty_bytes": 2942976.0
+            },
+            "after_execution": {
+              "rss_bytes": 19677184.0,
+              "pss_bytes": 17061376.0,
+              "private_dirty_bytes": 3491840.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18870272.0,
+              "pss_bytes": 16254464.0,
+              "private_dirty_bytes": 2684928.0
+            }
+          },
+          "rss_mib": 18.765625,
+          "pss_mib": 16.27099609375,
+          "private_dirty_mib": 3.330078125
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.2459535,
+          "rss_mib": 14.560546875,
+          "pss_mib": 12.09765625,
+          "private_dirty_mib": 5.017578125
+        }
+      },
+      {
+        "file": "to-sorted-512.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 4.3355335,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20062208.0,
+              "pss_bytes": 17438208.0,
+              "private_dirty_bytes": 2666496.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20318208.0,
+              "pss_bytes": 17694208.0,
+              "private_dirty_bytes": 2920448.0
+            },
+            "after_execution": {
+              "rss_bytes": 24918016.0,
+              "pss_bytes": 22294016.0,
+              "private_dirty_bytes": 7520256.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20068352.0,
+              "pss_bytes": 17444352.0,
+              "private_dirty_bytes": 2670592.0
+            }
+          },
+          "rss_mib": 23.763671875,
+          "pss_mib": 21.26123046875,
+          "private_dirty_mib": 7.171875
+        },
+        "candidate": {
+          "execution_ms": 0.9459705,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18872320.0,
+              "pss_bytes": 16218112.0,
+              "private_dirty_bytes": 2680832.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19136512.0,
+              "pss_bytes": 16482304.0,
+              "private_dirty_bytes": 2947072.0
+            },
+            "after_execution": {
+              "rss_bytes": 19697664.0,
+              "pss_bytes": 17043456.0,
+              "private_dirty_bytes": 3508224.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18878464.0,
+              "pss_bytes": 16224256.0,
+              "private_dirty_bytes": 2689024.0
+            }
+          },
+          "rss_mib": 18.78515625,
+          "pss_mib": 16.25390625,
+          "private_dirty_mib": 3.345703125
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.282959,
+          "rss_mib": 14.478515625,
+          "pss_mib": 12.01953125,
+          "private_dirty_mib": 5.02734375
+        }
+      },
+      {
+        "file": "join-1024.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.939385,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20084736.0,
+              "pss_bytes": 17435136.0,
+              "private_dirty_bytes": 2635776.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20340736.0,
+              "pss_bytes": 17691136.0,
+              "private_dirty_bytes": 2893824.0
+            },
+            "after_execution": {
+              "rss_bytes": 21413888.0,
+              "pss_bytes": 18764288.0,
+              "private_dirty_bytes": 3966976.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20090880.0,
+              "pss_bytes": 17441280.0,
+              "private_dirty_bytes": 2643968.0
+            }
+          },
+          "rss_mib": 20.421875,
+          "pss_mib": 17.89501953125,
+          "private_dirty_mib": 3.783203125
+        },
+        "candidate": {
+          "execution_ms": 1.0706145,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18939904.0,
+              "pss_bytes": 16281600.0,
+              "private_dirty_bytes": 2654208.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19202048.0,
+              "pss_bytes": 16543744.0,
+              "private_dirty_bytes": 2920448.0
+            },
+            "after_execution": {
+              "rss_bytes": 19849216.0,
+              "pss_bytes": 17190912.0,
+              "private_dirty_bytes": 3563520.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18948096.0,
+              "pss_bytes": 16289792.0,
+              "private_dirty_bytes": 2662400.0
+            }
+          },
+          "rss_mib": 18.9296875,
+          "pss_mib": 16.39453125,
+          "private_dirty_mib": 3.3984375
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.323078,
+          "rss_mib": 14.515625,
+          "pss_mib": 12.04296875,
+          "private_dirty_mib": 5.037109375
+        }
+      },
+      {
+        "file": "join-4096.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 6.4661775,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19949568.0,
+              "pss_bytes": 17314304.0,
+              "private_dirty_bytes": 2635776.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20205568.0,
+              "pss_bytes": 17570304.0,
+              "private_dirty_bytes": 2893824.0
+            },
+            "after_execution": {
+              "rss_bytes": 23105536.0,
+              "pss_bytes": 20470272.0,
+              "private_dirty_bytes": 5793792.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19955712.0,
+              "pss_bytes": 17320448.0,
+              "private_dirty_bytes": 2643968.0
+            }
+          },
+          "rss_mib": 22.03515625,
+          "pss_mib": 19.52197265625,
+          "private_dirty_mib": 5.525390625
+        },
+        "candidate": {
+          "execution_ms": 2.869441,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18909184.0,
+              "pss_bytes": 16247808.0,
+              "private_dirty_bytes": 2646016.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19173376.0,
+              "pss_bytes": 16512000.0,
+              "private_dirty_bytes": 2912256.0
+            },
+            "after_execution": {
+              "rss_bytes": 20365312.0,
+              "pss_bytes": 17703936.0,
+              "private_dirty_bytes": 4108288.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18915328.0,
+              "pss_bytes": 16253952.0,
+              "private_dirty_bytes": 2658304.0
+            }
+          },
+          "rss_mib": 19.421875,
+          "pss_mib": 16.8837890625,
+          "private_dirty_mib": 3.91796875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 1.019375,
+          "rss_mib": 14.927734375,
+          "pss_mib": 12.48681640625,
+          "private_dirty_mib": 5.509765625
+        }
+      },
+      {
+        "file": "join-mixed-1024.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.151559,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20121600.0,
+              "pss_bytes": 17497600.0,
+              "private_dirty_bytes": 2646016.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20377600.0,
+              "pss_bytes": 17753600.0,
+              "private_dirty_bytes": 2899968.0
+            },
+            "after_execution": {
+              "rss_bytes": 21415936.0,
+              "pss_bytes": 18791936.0,
+              "private_dirty_bytes": 3944448.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20129792.0,
+              "pss_bytes": 17505792.0,
+              "private_dirty_bytes": 2658304.0
+            }
+          },
+          "rss_mib": 20.423828125,
+          "pss_mib": 17.92138671875,
+          "private_dirty_mib": 3.76171875
+        },
+        "candidate": {
+          "execution_ms": 1.340673,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18640896.0,
+              "pss_bytes": 16020992.0,
+              "private_dirty_bytes": 2656256.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18907136.0,
+              "pss_bytes": 16287232.0,
+              "private_dirty_bytes": 2920448.0
+            },
+            "after_execution": {
+              "rss_bytes": 19537920.0,
+              "pss_bytes": 16918016.0,
+              "private_dirty_bytes": 3555328.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18649088.0,
+              "pss_bytes": 16029184.0,
+              "private_dirty_bytes": 2666496.0
+            }
+          },
+          "rss_mib": 18.6328125,
+          "pss_mib": 16.13427734375,
+          "private_dirty_mib": 3.390625
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.209429,
+          "rss_mib": 14.345703125,
+          "pss_mib": 11.89697265625,
+          "private_dirty_mib": 4.966796875
+        }
+      },
+      {
+        "file": "numeric-loop-10000.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.1364045,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18722816.0,
+              "pss_bytes": 16098816.0,
+              "private_dirty_bytes": 2584576.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18978816.0,
+              "pss_bytes": 16352768.0,
+              "private_dirty_bytes": 2842624.0
+            },
+            "after_execution": {
+              "rss_bytes": 19435520.0,
+              "pss_bytes": 16811520.0,
+              "private_dirty_bytes": 3297280.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18731008.0,
+              "pss_bytes": 16107008.0,
+              "private_dirty_bytes": 2592768.0
+            }
+          },
+          "rss_mib": 18.53515625,
+          "pss_mib": 16.03271484375,
+          "private_dirty_mib": 3.14453125
+        },
+        "candidate": {
+          "execution_ms": 0.4819075,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18245632.0,
+              "pss_bytes": 15629312.0,
+              "private_dirty_bytes": 2605056.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18509824.0,
+              "pss_bytes": 15893504.0,
+              "private_dirty_bytes": 2871296.0
+            },
+            "after_execution": {
+              "rss_bytes": 18964480.0,
+              "pss_bytes": 16348160.0,
+              "private_dirty_bytes": 3325952.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18251776.0,
+              "pss_bytes": 15635456.0,
+              "private_dirty_bytes": 2613248.0
+            }
+          },
+          "rss_mib": 18.0859375,
+          "pss_mib": 15.5908203125,
+          "private_dirty_mib": 3.171875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.082074,
+          "rss_mib": 13.73828125,
+          "pss_mib": 11.31103515625,
+          "private_dirty_mib": 4.298828125
+        }
+      },
+      {
+        "file": "numeric-loop-50000.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 3.9446605,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18536448.0,
+              "pss_bytes": 15889408.0,
+              "private_dirty_bytes": 2586624.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18790400.0,
+              "pss_bytes": 16143360.0,
+              "private_dirty_bytes": 2844672.0
+            },
+            "after_execution": {
+              "rss_bytes": 19247104.0,
+              "pss_bytes": 16600064.0,
+              "private_dirty_bytes": 3299328.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18542592.0,
+              "pss_bytes": 15895552.0,
+              "private_dirty_bytes": 2594816.0
+            }
+          },
+          "rss_mib": 18.35546875,
+          "pss_mib": 15.8310546875,
+          "private_dirty_mib": 3.146484375
+        },
+        "candidate": {
+          "execution_ms": 0.6799265,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18194432.0,
+              "pss_bytes": 15577088.0,
+              "private_dirty_bytes": 2605056.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18456576.0,
+              "pss_bytes": 15841280.0,
+              "private_dirty_bytes": 2871296.0
+            },
+            "after_execution": {
+              "rss_bytes": 18913280.0,
+              "pss_bytes": 16297984.0,
+              "private_dirty_bytes": 3325952.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18200576.0,
+              "pss_bytes": 15585280.0,
+              "private_dirty_bytes": 2613248.0
+            }
+          },
+          "rss_mib": 18.037109375,
+          "pss_mib": 15.54296875,
+          "private_dirty_mib": 3.171875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.1698995,
+          "rss_mib": 13.755859375,
+          "pss_mib": 11.2939453125,
+          "private_dirty_mib": 4.30078125
+        }
+      },
+      {
+        "file": "folded-string-4096.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.5432325,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18980864.0,
+              "pss_bytes": 16345088.0,
+              "private_dirty_bytes": 2619392.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19234816.0,
+              "pss_bytes": 16599040.0,
+              "private_dirty_bytes": 2873344.0
+            },
+            "after_execution": {
+              "rss_bytes": 19820544.0,
+              "pss_bytes": 17184768.0,
+              "private_dirty_bytes": 3459072.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18984960.0,
+              "pss_bytes": 16349184.0,
+              "private_dirty_bytes": 2623488.0
+            }
+          },
+          "rss_mib": 18.90234375,
+          "pss_mib": 16.388671875,
+          "private_dirty_mib": 3.298828125
+        },
+        "candidate": {
+          "execution_ms": 0.8787655,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18354176.0,
+              "pss_bytes": 15709696.0,
+              "private_dirty_bytes": 2633728.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18618368.0,
+              "pss_bytes": 15973888.0,
+              "private_dirty_bytes": 2897920.0
+            },
+            "after_execution": {
+              "rss_bytes": 19073024.0,
+              "pss_bytes": 16428544.0,
+              "private_dirty_bytes": 3354624.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18360320.0,
+              "pss_bytes": 15715840.0,
+              "private_dirty_bytes": 2641920.0
+            }
+          },
+          "rss_mib": 18.189453125,
+          "pss_mib": 15.66748046875,
+          "private_dirty_mib": 3.19921875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.5053425,
+          "rss_mib": 13.8515625,
+          "pss_mib": 11.4013671875,
+          "private_dirty_mib": 4.31640625
+        }
+      },
+      {
+        "file": "dynamic-string-4096.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.849081,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19224576.0,
+              "pss_bytes": 16577536.0,
+              "private_dirty_bytes": 2607104.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19478528.0,
+              "pss_bytes": 16833536.0,
+              "private_dirty_bytes": 2861056.0
+            },
+            "after_execution": {
+              "rss_bytes": 20262912.0,
+              "pss_bytes": 17615872.0,
+              "private_dirty_bytes": 3643392.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19230720.0,
+              "pss_bytes": 16583680.0,
+              "private_dirty_bytes": 2611200.0
+            }
+          },
+          "rss_mib": 19.32421875,
+          "pss_mib": 16.7998046875,
+          "private_dirty_mib": 3.474609375
+        },
+        "candidate": {
+          "execution_ms": 1.553427,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18370560.0,
+              "pss_bytes": 15738880.0,
+              "private_dirty_bytes": 2629632.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18634752.0,
+              "pss_bytes": 16003072.0,
+              "private_dirty_bytes": 2893824.0
+            },
+            "after_execution": {
+              "rss_bytes": 19091456.0,
+              "pss_bytes": 16459776.0,
+              "private_dirty_bytes": 3348480.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18378752.0,
+              "pss_bytes": 15747072.0,
+              "private_dirty_bytes": 2635776.0
+            }
+          },
+          "rss_mib": 18.20703125,
+          "pss_mib": 15.697265625,
+          "private_dirty_mib": 3.193359375
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.200269,
+          "rss_mib": 13.8046875,
+          "pss_mib": 11.357421875,
+          "private_dirty_mib": 4.298828125
+        }
+      },
+      {
+        "file": "integer.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.7079915,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19271680.0,
+              "pss_bytes": 16641536.0,
+              "private_dirty_bytes": 2615296.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19527680.0,
+              "pss_bytes": 16897536.0,
+              "private_dirty_bytes": 2871296.0
+            },
+            "after_execution": {
+              "rss_bytes": 19984384.0,
+              "pss_bytes": 17354240.0,
+              "private_dirty_bytes": 3328000.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19279872.0,
+              "pss_bytes": 16649728.0,
+              "private_dirty_bytes": 2623488.0
+            }
+          },
+          "rss_mib": 19.05859375,
+          "pss_mib": 16.55029296875,
+          "private_dirty_mib": 3.173828125
+        },
+        "candidate": {
+          "execution_ms": 0.576487,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18669568.0,
+              "pss_bytes": 16035840.0,
+              "private_dirty_bytes": 2648064.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18933760.0,
+              "pss_bytes": 16300032.0,
+              "private_dirty_bytes": 2912256.0
+            },
+            "after_execution": {
+              "rss_bytes": 19388416.0,
+              "pss_bytes": 16754688.0,
+              "private_dirty_bytes": 3368960.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18675712.0,
+              "pss_bytes": 16041984.0,
+              "private_dirty_bytes": 2656256.0
+            }
+          },
+          "rss_mib": 18.490234375,
+          "pss_mib": 15.978515625,
+          "private_dirty_mib": 3.212890625
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.060789,
+          "rss_mib": 13.8046875,
+          "pss_mib": 11.357421875,
+          "private_dirty_mib": 4.298828125
+        }
+      },
+      {
+        "file": "objects.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 1.420383,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19828736.0,
+              "pss_bytes": 17178112.0,
+              "private_dirty_bytes": 2668544.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20084736.0,
+              "pss_bytes": 17434112.0,
+              "private_dirty_bytes": 2922496.0
+            },
+            "after_execution": {
+              "rss_bytes": 20867072.0,
+              "pss_bytes": 18216448.0,
+              "private_dirty_bytes": 3704832.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19834880.0,
+              "pss_bytes": 17184256.0,
+              "private_dirty_bytes": 2672640.0
+            }
+          },
+          "rss_mib": 19.900390625,
+          "pss_mib": 17.37255859375,
+          "private_dirty_mib": 3.533203125
+        },
+        "candidate": {
+          "execution_ms": 1.0308095,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19015680.0,
+              "pss_bytes": 16372224.0,
+              "private_dirty_bytes": 2684928.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19277824.0,
+              "pss_bytes": 16638464.0,
+              "private_dirty_bytes": 2947072.0
+            },
+            "after_execution": {
+              "rss_bytes": 19871744.0,
+              "pss_bytes": 17232384.0,
+              "private_dirty_bytes": 3536896.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19023872.0,
+              "pss_bytes": 16384512.0,
+              "private_dirty_bytes": 2689024.0
+            }
+          },
+          "rss_mib": 18.951171875,
+          "pss_mib": 16.43408203125,
+          "private_dirty_mib": 3.373046875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.465173,
+          "rss_mib": 14.587890625,
+          "pss_mib": 12.138671875,
+          "private_dirty_mib": 5.0859375
+        }
+      },
+      {
+        "file": "retained-objects.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 28.1869195,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20508672.0,
+              "pss_bytes": 17901056.0,
+              "private_dirty_bytes": 2674688.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20762624.0,
+              "pss_bytes": 18155008.0,
+              "private_dirty_bytes": 2928640.0
+            },
+            "after_execution": {
+              "rss_bytes": 25780224.0,
+              "pss_bytes": 23172608.0,
+              "private_dirty_bytes": 7950336.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20512768.0,
+              "pss_bytes": 17905152.0,
+              "private_dirty_bytes": 2682880.0
+            }
+          },
+          "rss_mib": 24.5859375,
+          "pss_mib": 22.09912109375,
+          "private_dirty_mib": 7.58203125
+        },
+        "candidate": {
+          "execution_ms": 17.0272205,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18888704.0,
+              "pss_bytes": 16259072.0,
+              "private_dirty_bytes": 2684928.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19150848.0,
+              "pss_bytes": 16521216.0,
+              "private_dirty_bytes": 2947072.0
+            },
+            "after_execution": {
+              "rss_bytes": 25307136.0,
+              "pss_bytes": 22677504.0,
+              "private_dirty_bytes": 9107456.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18892800.0,
+              "pss_bytes": 16263168.0,
+              "private_dirty_bytes": 2693120.0
+            }
+          },
+          "rss_mib": 24.134765625,
+          "pss_mib": 21.626953125,
+          "private_dirty_mib": 8.685546875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 23.6541365,
+          "rss_mib": 20.322265625,
+          "pss_mib": 17.8681640625,
+          "private_dirty_mib": 10.828125
+        }
+      },
+      {
+        "file": "join-empty-1024.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.7401865,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19546112.0,
+              "pss_bytes": 16932352.0,
+              "private_dirty_bytes": 2605056.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19802112.0,
+              "pss_bytes": 17188352.0,
+              "private_dirty_bytes": 2859008.0
+            },
+            "after_execution": {
+              "rss_bytes": 22126592.0,
+              "pss_bytes": 19512832.0,
+              "private_dirty_bytes": 5189632.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19554304.0,
+              "pss_bytes": 16940544.0,
+              "private_dirty_bytes": 2617344.0
+            }
+          },
+          "rss_mib": 21.1015625,
+          "pss_mib": 18.60888671875,
+          "private_dirty_mib": 4.94921875
+        },
+        "candidate": {
+          "execution_ms": 0.796606,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18677760.0,
+              "pss_bytes": 16066560.0,
+              "private_dirty_bytes": 2629632.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18944000.0,
+              "pss_bytes": 16332800.0,
+              "private_dirty_bytes": 2895872.0
+            },
+            "after_execution": {
+              "rss_bytes": 19402752.0,
+              "pss_bytes": 16791552.0,
+              "private_dirty_bytes": 3354624.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18690048.0,
+              "pss_bytes": 16078848.0,
+              "private_dirty_bytes": 2641920.0
+            }
+          },
+          "rss_mib": 18.50390625,
+          "pss_mib": 16.013671875,
+          "private_dirty_mib": 3.19921875
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.209804,
+          "rss_mib": 14.41796875,
+          "pss_mib": 11.9482421875,
+          "private_dirty_mib": 4.884765625
+        }
+      },
+      {
+        "file": "join-singleton-1024.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.7856615,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19777536.0,
+              "pss_bytes": 17147904.0,
+              "private_dirty_bytes": 2607104.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20033536.0,
+              "pss_bytes": 17399808.0,
+              "private_dirty_bytes": 2861056.0
+            },
+            "after_execution": {
+              "rss_bytes": 22454272.0,
+              "pss_bytes": 19820544.0,
+              "private_dirty_bytes": 5283840.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19783680.0,
+              "pss_bytes": 17149952.0,
+              "private_dirty_bytes": 2613248.0
+            }
+          },
+          "rss_mib": 21.4140625,
+          "pss_mib": 18.90234375,
+          "private_dirty_mib": 5.0390625
+        },
+        "candidate": {
+          "execution_ms": 0.843806,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18778112.0,
+              "pss_bytes": 16130560.0,
+              "private_dirty_bytes": 2625536.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 19044352.0,
+              "pss_bytes": 16396800.0,
+              "private_dirty_bytes": 2887680.0
+            },
+            "after_execution": {
+              "rss_bytes": 19499008.0,
+              "pss_bytes": 16851456.0,
+              "private_dirty_bytes": 3346432.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18786304.0,
+              "pss_bytes": 16138752.0,
+              "private_dirty_bytes": 2633728.0
+            }
+          },
+          "rss_mib": 18.595703125,
+          "pss_mib": 16.07080078125,
+          "private_dirty_mib": 3.19140625
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.1033495,
+          "rss_mib": 13.791015625,
+          "pss_mib": 11.33642578125,
+          "private_dirty_mib": 4.298828125
+        }
+      },
+      {
+        "file": "join-small-1024.js",
+        "group": "canonical-inputs-17",
+        "baseline": {
+          "execution_ms": 2.9161955,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 19863552.0,
+              "pss_bytes": 17233408.0,
+              "private_dirty_bytes": 2613248.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20119552.0,
+              "pss_bytes": 17489408.0,
+              "private_dirty_bytes": 2863104.0
+            },
+            "after_execution": {
+              "rss_bytes": 22556672.0,
+              "pss_bytes": 19926528.0,
+              "private_dirty_bytes": 5300224.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 19869696.0,
+              "pss_bytes": 17239552.0,
+              "private_dirty_bytes": 2613248.0
+            }
+          },
+          "rss_mib": 21.51171875,
+          "pss_mib": 19.00341796875,
+          "private_dirty_mib": 5.0546875
+        },
+        "candidate": {
+          "execution_ms": 0.98915,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 18591744.0,
+              "pss_bytes": 15946752.0,
+              "private_dirty_bytes": 2625536.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 18857984.0,
+              "pss_bytes": 16210944.0,
+              "private_dirty_bytes": 2891776.0
+            },
+            "after_execution": {
+              "rss_bytes": 19396608.0,
+              "pss_bytes": 16747520.0,
+              "private_dirty_bytes": 3430400.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 18601984.0,
+              "pss_bytes": 15952896.0,
+              "private_dirty_bytes": 2635776.0
+            }
+          },
+          "rss_mib": 18.498046875,
+          "pss_mib": 15.9716796875,
+          "private_dirty_mib": 3.271484375
+        },
+        "scriptc_same_candidate_host": {
+          "execution_ms": 0.1359795,
+          "rss_mib": 13.701171875,
+          "pss_mib": 11.25439453125,
+          "private_dirty_mib": 4.306640625
+        }
+      },
+      {
+        "file": "typed-sort-callback.js",
+        "group": "targeted-typed-sort-2",
+        "baseline": {
+          "execution_ms": 224.2753805,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21712896.0,
+              "pss_bytes": 19081728.0,
+              "private_dirty_bytes": 2668544.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 21970944.0,
+              "pss_bytes": 19339776.0,
+              "private_dirty_bytes": 2926592.0
+            },
+            "after_execution": {
+              "rss_bytes": 26583040.0,
+              "pss_bytes": 23951872.0,
+              "private_dirty_bytes": 7538688.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21721088.0,
+              "pss_bytes": 19089920.0,
+              "private_dirty_bytes": 2676736.0
+            }
+          },
+          "rss_mib": 25.3515625,
+          "pss_mib": 22.84228515625,
+          "private_dirty_mib": 7.189453125
+        },
+        "candidate": {
+          "execution_ms": 126.6728275,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20613120.0,
+              "pss_bytes": 17998848.0,
+              "private_dirty_bytes": 2686976.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20875264.0,
+              "pss_bytes": 18260992.0,
+              "private_dirty_bytes": 2953216.0
+            },
+            "after_execution": {
+              "rss_bytes": 25311232.0,
+              "pss_bytes": 22696960.0,
+              "private_dirty_bytes": 7387136.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20621312.0,
+              "pss_bytes": 18007040.0,
+              "private_dirty_bytes": 2697216.0
+            }
+          },
+          "rss_mib": 24.138671875,
+          "pss_mib": 21.6455078125,
+          "private_dirty_mib": 7.044921875
+        }
+      },
+      {
+        "file": "typed-sort-default.js",
+        "group": "targeted-typed-sort-2",
+        "baseline": {
+          "execution_ms": 120.4713935,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 21182464.0,
+              "pss_bytes": 18533888.0,
+              "private_dirty_bytes": 2637824.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 21440512.0,
+              "pss_bytes": 18791936.0,
+              "private_dirty_bytes": 2895872.0
+            },
+            "after_execution": {
+              "rss_bytes": 25841664.0,
+              "pss_bytes": 23193088.0,
+              "private_dirty_bytes": 7294976.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 21192704.0,
+              "pss_bytes": 18544128.0,
+              "private_dirty_bytes": 2646016.0
+            }
+          },
+          "rss_mib": 24.64453125,
+          "pss_mib": 22.11865234375,
+          "private_dirty_mib": 6.95703125
+        },
+        "candidate": {
+          "execution_ms": 121.573678,
+          "lifecycle": {
+            "before_store": {
+              "rss_bytes": 20684800.0,
+              "pss_bytes": 18053120.0,
+              "private_dirty_bytes": 2658304.0
+            },
+            "after_instantiate": {
+              "rss_bytes": 20946944.0,
+              "pss_bytes": 18315264.0,
+              "private_dirty_bytes": 2922496.0
+            },
+            "after_execution": {
+              "rss_bytes": 25350144.0,
+              "pss_bytes": 22718464.0,
+              "private_dirty_bytes": 7321600.0
+            },
+            "after_store_drop": {
+              "rss_bytes": 20692992.0,
+              "pss_bytes": 18061312.0,
+              "private_dirty_bytes": 2664448.0
+            }
+          },
+          "rss_mib": 24.17578125,
+          "pss_mib": 21.666015625,
+          "private_dirty_mib": 6.982421875
+        }
+      }
+    ],
+    "raw_report": "target/memory-experiments-20261028/scriptc-complete-comparison-e9cec5c/report.json"
+  },
+  "verification": {
+    "full_workspace": false,
+    "full_pinned_test262": false,
+    "native": {
+      "source_commit": "e9cec5c80f65b4ff4ca1c70f662c2d784c12e46e",
+      "source_tree_equivalent_commit": "4751db4aa29ed56ba20820adeea040e271c60581",
+      "test_only_overlay": "phase3-test-only-overlay.patch",
+      "test_only_overlay_sha256": "c01fd3b6d5fc6a566d521af084aa69989ebabe7eb72972f96784b3b04133e49d",
+      "complete": true,
+      "passed": 4991,
+      "retained_focused_passes": 1747,
+      "corrected_retry_passes": 2,
+      "remaining_complete_targets": 15,
+      "targets": [
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "scriptw_aot_wasm",
+          "passed": 544
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "emission",
+          "passed": 37
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_builtins",
+          "passed": 564
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_gc_entries",
+          "passed": 237
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_language",
+          "passed": 367
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "intl_temporal",
+          "passed": 89
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "modules_realms",
+          "passed": 74
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "runtime_link",
+          "passed": 31
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_async",
+          "passed": 116
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_builtins",
+          "passed": 165
+        },
+        {
+          "package": "scriptw-aot-wasm",
+          "target": "structure_language",
+          "passed": 152
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "scriptw_engine",
+          "passed": 1056
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_async",
+          "passed": 248
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_generators",
+          "passed": 167
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_intl",
+          "passed": 300
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_realm_modules",
+          "passed": 433
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_regexp",
+          "passed": 157
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "aot_temporal",
+          "passed": 203
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "structure",
+          "passed": 37
+        },
+        {
+          "package": "scriptw-engine",
+          "target": "weak_gc_facility",
+          "passed": 14
+        }
+      ],
+      "receipts": [
+        {
+          "path": "phase3-focused/receipt.json",
+          "sha256": "cbf8ed3e44800f9c0c33ecd1df2e7e7f7ab961a9a12858c892e47b312406edcd"
+        },
+        {
+          "path": "phase3-remaining/receipt.json",
+          "sha256": "832bfd8cf60bbc96193d347add61e120848ddbfe22e5d64a8fe262209821deed"
+        }
+      ],
+      "retry_ids": [
+        "tests::typed_array_numeric_callback::actual_typed_array_sort_and_to_sorted_call_binary_entries_before_argv_fallback",
+        "aot_typed_array_numeric_callback::callback_fallback_preserves_coercion_boxed_values_symbols_bigints_bound_and_proxy_calls"
+      ],
+      "scope": "20 complete affected release/default-feature native targets; exact unchanged passing IDs plus2 corrected test-only reruns; not full workspace/all-feature/pinned acceptance."
+    },
+    "selected_original_test262": {
+      "passed": 1432,
+      "scopes": [
+        {
+          "filter": "built-ins/Array/prototype/push/",
+          "passed": 48
+        },
+        {
+          "filter": "built-ins/Array/prototype/join/",
+          "passed": 48
+        },
+        {
+          "filter": "built-ins/Array/prototype/sort/",
+          "passed": 107
+        },
+        {
+          "filter": "built-ins/Array/prototype/toSorted/",
+          "passed": 42
+        },
+        {
+          "filter": "built-ins/Math/imul/",
+          "passed": 10
+        },
+        {
+          "filter": "language/expressions/addition/",
+          "passed": 95
+        },
+        {
+          "filter": "language/statements/for/",
+          "passed": 758
+        },
+        {
+          "filter": "language/types/string/",
+          "passed": 48
+        },
+        {
+          "filter": "built-ins/String/prototype/toString/",
+          "passed": 14
+        },
+        {
+          "filter": "built-ins/Reflect/ownKeys/",
+          "passed": 26
+        },
+        {
+          "filter": "built-ins/Object/getOwnPropertyDescriptors/",
+          "passed": 36
+        },
+        {
+          "filter": "built-ins/Object/freeze/",
+          "passed": 104
+        },
+        {
+          "filter": "built-ins/TypedArray/prototype/sort/",
+          "passed": 72
+        },
+        {
+          "filter": "built-ins/TypedArray/prototype/toSorted/",
+          "passed": 24
+        }
+      ],
+      "receipt": "target/scriptc-performance-20261028/test262-selected/report.json"
+    },
+    "cheap": "280 source guards, ownership, product dependency audit,15 Intl identities and selected changed-file formatting passed."
+  },
+  "excluded_diagnostics": {
+    "startup": {
+      "excluded_diagnostic": true,
+      "complete": true,
+      "source_sha256": "f57efe49578e64b906c0f8cedce05cda1d154d44a72f97023e0ab90e553e89b0",
+      "resources": {
+        "before": {
+          "memory.max": "4294967296",
+          "memory.swap.max": "0",
+          "memory.oom.group": "1",
+          "memory.peak": "18231296",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+        },
+        "after": {
+          "memory.max": "4294967296",
+          "memory.swap.max": "0",
+          "memory.oom.group": "1",
+          "memory.peak": "115589120",
+          "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+        }
+      },
+      "commands": [
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/phase3-candidate/host",
+            "prepare-scriptw",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/startup-probe/fixtures",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/final-startup/images"
+          ],
+          "stdout": "prepare-candidate.stdout",
+          "stderr": "prepare-candidate.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/retained-final-dce404/host",
+            "identity"
+          ],
+          "stdout": "baseline-identity.stdout",
+          "stderr": "baseline-identity.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/phase3-candidate/host",
+            "identity"
+          ],
+          "stdout": "candidate-identity.stdout",
+          "stderr": "candidate-identity.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/retained-final-dce404/host",
+            "execute-scriptw",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/startup-probe/images/startup.js.swpc",
+            "scriptw-startup-ok\n",
+            "7",
+            "10"
+          ],
+          "stdout": "0-baseline.stdout",
+          "stderr": "0-baseline.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/phase3-candidate/host",
+            "execute-scriptw",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/final-startup/images/startup.js.swpc",
+            "scriptw-startup-ok\n",
+            "7",
+            "10"
+          ],
+          "stdout": "0-candidate.stdout",
+          "stderr": "0-candidate.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/phase3-candidate/host",
+            "execute-scriptw",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/final-startup/images/startup.js.swpc",
+            "scriptw-startup-ok\n",
+            "7",
+            "10"
+          ],
+          "stdout": "1-candidate.stdout",
+          "stderr": "1-candidate.stderr"
+        },
+        {
+          "argv": [
+            "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/retained-final-dce404/host",
+            "execute-scriptw",
+            "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/startup-probe/images/startup.js.swpc",
+            "scriptw-startup-ok\n",
+            "7",
+            "10"
+          ],
+          "stdout": "1-baseline.stdout",
+          "stderr": "1-baseline.stderr"
+        }
+      ],
+      "rows": [
+        {
+          "round": 0,
+          "side": "baseline",
+          "execution_ms": 0.424452,
+          "cold_after_transport_drop": {
+            "private_dirty_bytes": 2211840,
+            "pss_bytes": 13218816,
+            "rss_bytes": 15851520,
+            "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"
+          },
+          "warm_before_store_rss_mib": 18.30859375,
+          "output_checks": 17
+        },
+        {
+          "round": 0,
+          "side": "candidate",
+          "execution_ms": 0.433362,
+          "cold_after_transport_drop": {
+            "private_dirty_bytes": 2228224,
+            "pss_bytes": 12469248,
+            "rss_bytes": 15093760,
+            "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"
+          },
+          "warm_before_store_rss_mib": 17.39453125,
+          "output_checks": 17
+        },
+        {
+          "round": 1,
+          "side": "candidate",
+          "execution_ms": 0.429772,
+          "cold_after_transport_drop": {
+            "private_dirty_bytes": 2232320,
+            "pss_bytes": 12271616,
+            "rss_bytes": 14934016,
+            "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"
+          },
+          "warm_before_store_rss_mib": 17.42578125,
+          "output_checks": 17
+        },
+        {
+          "round": 1,
+          "side": "baseline",
+          "execution_ms": 0.428991,
+          "cold_after_transport_drop": {
+            "private_dirty_bytes": 2211840,
+            "pss_bytes": 13075456,
+            "rss_bytes": 15712256,
+            "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"
+          },
+          "warm_before_store_rss_mib": 18.11328125,
+          "output_checks": 17
+        }
+      ],
+      "sides": {
+        "baseline": {
+          "identity": {
+            "adapter": "shared",
+            "comparison_cohort": "scriptw-precompiled-comparison-v1",
+            "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+            "excluded_from_ordinary_cohorts": true,
+            "executable_sha256": "df7004c1e36012f431702287e4d7e909781385ae02ac95cc9fd0b270aa088e5b",
+            "schema": "scriptw-precompiled-shared-host-v1",
+            "scope": "same-executable-precompiled-comparison-identity",
+            "shared_configuration": {
+              "collector": "copying",
+              "consumer_compiler_enabled": false,
+              "epoch_deadline": 9223372036854775807,
+              "gc_initial_bytes": 16777216,
+              "max_wasm_stack_bytes": 33554432,
+              "native_compilation_mode": "size-optimized",
+              "register_allocation": "backtracking",
+              "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+              "store_memory_limit_bytes": 1073741824,
+              "target": "generic",
+              "target_triple": "x86_64-unknown-linux-gnu",
+              "wasm_backtrace_details": "disable",
+              "wasmtime_version": "47.0.0",
+              "worker_stack_bytes": 67108864
+            },
+            "source_commit": "dce404dd1faaa9866294535d34cc6474b843a28a",
+            "source_fingerprint": "6580c84000d0b2fa91a53361c51ca0f30dd2a7497a4f3a9af06bd18b355cbb1f"
+          },
+          "expected": {
+            "source_commit": "dce404dd1faaa9866294535d34cc6474b843a28a",
+            "source_fingerprint": "6580c84000d0b2fa91a53361c51ca0f30dd2a7497a4f3a9af06bd18b355cbb1f",
+            "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+            "shared_configuration": {
+              "collector": "copying",
+              "consumer_compiler_enabled": false,
+              "epoch_deadline": 9223372036854775807,
+              "gc_initial_bytes": 16777216,
+              "max_wasm_stack_bytes": 33554432,
+              "native_compilation_mode": "size-optimized",
+              "register_allocation": "backtracking",
+              "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+              "store_memory_limit_bytes": 1073741824,
+              "target": "generic",
+              "target_triple": "x86_64-unknown-linux-gnu",
+              "wasm_backtrace_details": "disable",
+              "wasmtime_version": "47.0.0",
+              "worker_stack_bytes": 67108864
+            },
+            "tools": {
+              "consumer": {
+                "path": "/home/mewhhaha/src/porffor/target/memory-experiments-20261028/retained-final-dce404/host",
+                "bytes": 212786512,
+                "sha256": "df7004c1e36012f431702287e4d7e909781385ae02ac95cc9fd0b270aa088e5b"
+              }
+            }
+          },
+          "image": {
+            "sha256": "39a88e2c53233087a5d72edccf03d6ffd4a79091c715194f1b57de83e657c19e",
+            "bytes": 345350,
+            "magic": "SCRWEP02",
+            "source_fingerprint": "6580c84000d0b2fa91a53361c51ca0f30dd2a7497a4f3a9af06bd18b355cbb1f",
+            "program_wasm_sha256": "8e9917d3ff51370a5ba9ab5aca4f3c2e871d44c3d5bbbe97ddffd744191104f4",
+            "program_wasm_bytes": 49705,
+            "native_serialized_bytes": 295472,
+            "native_sha256": "5b1e531c937985e4ade2e23c5b53864731141a887fb2cc9b7b6fb7f5375c2de9",
+            "runtime_key": "8d25a4f60a72ebb318b31b2b95ede52b93f7b157f80f1e7408a804ce62542e33",
+            "execution_facts_bytes": 47,
+            "execution_facts_sha256": "159b009327375f25a130e3ad50ef11a5188cd760045dcec1da2c71742c725564",
+            "path": "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/startup-probe/images/startup.js.swpc"
+          }
+        },
+        "candidate": {
+          "identity": {
+            "adapter": "shared",
+            "comparison_cohort": "scriptw-precompiled-comparison-v1",
+            "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+            "excluded_from_ordinary_cohorts": true,
+            "executable_sha256": "edfaf4c5a71fce1aec96d87650befa289bd955fa5f66c75bf7af9c18a07514d8",
+            "schema": "scriptw-precompiled-shared-host-v1",
+            "scope": "same-executable-precompiled-comparison-identity",
+            "shared_configuration": {
+              "collector": "copying",
+              "consumer_compiler_enabled": false,
+              "epoch_deadline": 9223372036854775807,
+              "gc_initial_bytes": 16777216,
+              "max_wasm_stack_bytes": 33554432,
+              "native_compilation_mode": "size-optimized",
+              "register_allocation": "backtracking",
+              "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+              "store_memory_limit_bytes": 1073741824,
+              "target": "generic",
+              "target_triple": "x86_64-unknown-linux-gnu",
+              "wasm_backtrace_details": "disable",
+              "wasmtime_version": "47.0.0",
+              "worker_stack_bytes": 67108864
+            },
+            "source_commit": "e9cec5c80f65b4ff4ca1c70f662c2d784c12e46e",
+            "source_fingerprint": "6cdb57a0555607727f101ee7a34c7a4f58c006b263a6773263ed4a8335883e3a"
+          },
+          "expected": {
+            "source_commit": "e9cec5c80f65b4ff4ca1c70f662c2d784c12e46e",
+            "source_fingerprint": "6cdb57a0555607727f101ee7a34c7a4f58c006b263a6773263ed4a8335883e3a",
+            "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+            "shared_configuration": {
+              "collector": "copying",
+              "consumer_compiler_enabled": false,
+              "epoch_deadline": 9223372036854775807,
+              "gc_initial_bytes": 16777216,
+              "max_wasm_stack_bytes": 33554432,
+              "native_compilation_mode": "size-optimized",
+              "register_allocation": "backtracking",
+              "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+              "store_memory_limit_bytes": 1073741824,
+              "target": "generic",
+              "target_triple": "x86_64-unknown-linux-gnu",
+              "wasm_backtrace_details": "disable",
+              "wasmtime_version": "47.0.0",
+              "worker_stack_bytes": 67108864
+            },
+            "tools": {
+              "consumer": {
+                "path": "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/phase3-candidate/host",
+                "bytes": 213065688,
+                "sha256": "edfaf4c5a71fce1aec96d87650befa289bd955fa5f66c75bf7af9c18a07514d8"
+              }
+            }
+          },
+          "image": {
+            "sha256": "b68e82405967610fb648050194785996bf9b892dbf74133e9f1774c6a38f63c3",
+            "bytes": 345983,
+            "magic": "SCRWEP02",
+            "source_fingerprint": "6cdb57a0555607727f101ee7a34c7a4f58c006b263a6773263ed4a8335883e3a",
+            "program_wasm_sha256": "50ae0cd5de41d6660e18473a44c05a1832deea1771a480f40685119b26913980",
+            "program_wasm_bytes": 49978,
+            "native_serialized_bytes": 295832,
+            "native_sha256": "5cc8859255732f43a2177104ea6ce3c802b4feb09d9f70d720262fb1c621fe67",
+            "runtime_key": "e31752cd31275c025057805430918050d23f96ee1dc0e105a17fd7eb64bcb206",
+            "execution_facts_bytes": 47,
+            "execution_facts_sha256": "159b009327375f25a130e3ad50ef11a5188cd760045dcec1da2c71742c725564",
+            "path": "/home/mewhhaha/src/porffor/target/scriptc-performance-20261028/final-startup/images/startup.js.swpc"
+          }
+        }
+      },
+      "output_checks": 68
+    },
+    "memory_captures": {
+      "source_commit": "e9cec5c80f65b4ff4ca1c70f662c2d784c12e46e",
+      "cases": 4,
+      "host_attribution_only": true,
+      "exact_R_P_section_attribution": false,
+      "receipt": "target/scriptc-performance-20261028/phase3-mappings/report.json"
+    }
+  },
+  "limitations": [
+    "Every-case Scriptc time/RSS parity is not achieved; report all17 rows and both control adapters.",
+    "RSS/PSS/private dirty include host/runtime/code/setup/warmups; none is live JS heap or peak memory.",
+    "Control RSS also moved; do not attribute the entire observed RSS ratio to compiler changes.",
+    "Some non-sort cases were modestly slower in the last incremental batch, while every original case improved over the original baseline.",
+    "Published pinned Test262 status retains its original source; selected scopes do not refresh it."
+  ],
+  "archive": {
+    "file": "scriptc-performance-20261028-inert.tar.xz",
+    "sha256": "9b9ea2e6d6ea658eb8ff13d5ffcf9cc2323ef54e575f210ad9027df804bcc80d",
+    "bytes": 9254192,
+    "member_count": 2103,
+    "expanded_bytes": 235935816
+  }
+}

@@ -1,9 +1,9 @@
-# Benchmark refresh, 2026-10-28
+# Benchmark refresh, 2026-10-29
 
-Both cohorts measure compiler `f02efa8c5458ee62c3158b5d1aac2b5b59c1b560`; input fingerprint `43be01c80460b80f7fb9700a90b14c7a64cfc6d597b2c5c52d0a6f1dfb7e9b4b`.
+Both cohorts measure compiler `4751db4aa29ed56ba20820adeea040e271c60581`; input fingerprint `6e74007417fc8589aecdb228c40d55f7f7d37021c6278d51957930a1325e6c6e`.
 
-- [Precompiled CI 40760954840](https://github.com/mewhhaha/scriptw/actions/runs/40760954840): 68 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
-- [Three-runtime CI 40760950405](https://github.com/mewhhaha/scriptw/actions/runs/40760950405): 102 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Precompiled CI 40794431032](https://github.com/mewhhaha/scriptw/actions/runs/40794431032): 68 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Three-runtime CI 40794428275](https://github.com/mewhhaha/scriptw/actions/runs/40794428275): 102 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
 
 Each cohort uses two balanced rounds, ten checked warmups and seven measurements
 per runtime/workload/round. The shared precompiled host disables compilation and
@@ -18,7 +18,7 @@ or measured-peak claim is inferred. Both existing inert validators readmitted th
 original evidence and all four SVGs were regenerated under a 1-GiB, one-CPU,
 no-swap scope. Downloaded native code was never executed locally.
 
-The [implementation checkpoint](retained-runtime-20261028.json) retains its actual
+The [implementation checkpoint](scriptc-performance-20261028.json) retains its actual
 native/selected-Test262 source identities; this graph refresh does not rerun full
 native acceptance or the pinned Test262 publication.
 

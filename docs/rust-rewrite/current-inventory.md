@@ -8,24 +8,28 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Latest verification
 
-The [retained-object checkpoint](retained-runtime-20261028.json) passed **4,937
-native tests across 20 complete affected targets** and **216 original Test262
-executions** at `65ffec2bf`. Its collector checkpoint passed 17 checks, retaining
-16 unchanged passes after one test-only correction. The final guard short circuit
-at `dce404dd1` passed all 34 emission tests and four strict/sloppy semantic controls;
-the broader checkpoint retains its earlier source identity. The final local
-performance corpus passed 144 processes, with another 52 scaling/control processes.
-All ran serially within the local 4-GiB/no-swap limit. The separate
+The [compiler performance checkpoint](scriptc-performance-20261028.json) passed
+**4,991 native tests across 20 complete affected release/default-feature targets**
+and **1,432 original Test262 executions across 14 subtrees**. Production source is
+`e9cec5c80`; two corrected test assertions are recorded separately and committed
+at `4751db4aa`. Passing checks were retained while only those two cases reran.
+The final matched local corpus passed 144 processes and 2,448 output checks on
+all 17 original workloads plus two excluded TypedArray controls. Verification ran
+serially within the local 4-GiB/no-swap limit. Both published benchmark cohorts
+measure `4751db4aa` and retain their own source fingerprints and settings. The separate
 [full pinned publication](test262-current.md) remains bound to `b9ecfe64b`.
 
 ## Next work
 
-- Continue memory work from the [runtime ownership contract](contracts/runtime-byte-ownership.md)
-  and [performance queue](../performance-hills.md), using current source-bound
-  measurements to choose the next change. The consumer experiment leaves a
-  5.32-MiB RSS gap before Store creation that persists after drop; investigate
-  host/runtime residency next. Retain all benchmark graphs and their
-  evidence. The [8-MiB GC capacity probe](memory-gc-capacity-20261028.md) already
+- Every-case Scriptc time/RSS parity remains open. Continue from the
+  [runtime ownership contract](contracts/runtime-byte-ownership.md), current
+  checkpoint captures and [performance queue](../performance-hills.md).
+  The unchanged excluded startup control remains about 0.43 ms; two cold
+  mapping controls show 3.1–3.75 MiB of RSS excess, mainly host code/data.
+  Investigate residency and demand initialization that preserves reflection,
+  later compiled programs and retained embedding access. Warm before-Store
+  endpoints include earlier executions and must not be called cold floors.
+  The [8-MiB GC capacity probe](memory-gc-capacity-20261028.md) already
   found growth back to 16 MiB and slower retained-object execution; ordinary
   execution remains at 16 MiB.
 - Complete current-source default and optimized release acceptance. Historical
