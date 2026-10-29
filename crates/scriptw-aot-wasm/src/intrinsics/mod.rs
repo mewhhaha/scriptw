@@ -182,7 +182,11 @@ impl FunctionBuilder<'_> {
         value.set_undefined(function);
         let slot = crate::module::standard_builtin_function_realm_slot(builtin);
         if let Some(slot) = slot {
-            self.emit_load_intrinsic_for_installation(realm.realm(), slot, &value, function);
+            if slot.is_temporal() {
+                self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
+            } else {
+                self.emit_load_intrinsic_for_installation(realm.realm(), slot, &value, function);
+            }
             value.tag().load(function);
             function.instruction(&Instruction::I32Const(
                 crate::WasmRuntimeValueTag::Undefined as i32,

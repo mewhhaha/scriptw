@@ -370,6 +370,29 @@ impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
     pub(crate) const TABLE_LENGTH: u32 = 159;
 
+    /// Every externally observable identity owned by the Temporal cluster.
+    pub(crate) const fn is_temporal(self) -> bool {
+        matches!(
+            self,
+            Self::TemporalInstantPrototype
+                | Self::TemporalDurationPrototype
+                | Self::TemporalPlainDatePrototype
+                | Self::TemporalZonedDateTimePrototype
+                | Self::TemporalPlainTimePrototype
+                | Self::TemporalPlainDateTimePrototype
+                | Self::TemporalPlainYearMonthPrototype
+                | Self::TemporalPlainMonthDayPrototype
+                | Self::TemporalInstantConstructor
+                | Self::TemporalPlainDateConstructor
+                | Self::TemporalDurationConstructor
+                | Self::TemporalPlainTimeConstructor
+                | Self::TemporalPlainDateTimeConstructor
+                | Self::TemporalPlainYearMonthConstructor
+                | Self::TemporalPlainMonthDayConstructor
+                | Self::TemporalZonedDateTimeConstructor
+        )
+    }
+
     pub(crate) const fn typed_array_constructor_identity(kind: TypedArrayElementKind) -> Self {
         match kind {
             TypedArrayElementKind::Float64 => Self::Float64ArrayConstructor,
@@ -630,6 +653,8 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(schema),
                 GcOperand::null(schema),
                 GcOperand::reference(&regexp_legacy, schema),
+                GcOperand::constant(crate::heap::TemporalInitializationState::Dormant),
+                GcOperand::null(schema),
             ),
             function,
         );

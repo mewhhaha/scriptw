@@ -15,6 +15,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredIntrinsicValue>()
         .type_index()
         .raw();
+    let temporal_index = schema
+        .struct_type::<DeferredTemporalNamespace>()
+        .type_index()
+        .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
     let reference = |index, nullable| {
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
@@ -45,7 +49,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         })
         .collect::<Vec<_>>();
     alternatives.sort_unstable();
-    let mut expected = vec![stored_index, deferred_index];
+    let mut expected = vec![stored_index, deferred_index, temporal_index];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
     let CompositeInnerType::Struct(stored) = &types[stored_index as usize].composite_type.inner
@@ -90,6 +94,33 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
             (reference(stored_index, true), true),
         ]
     );
+
+    let CompositeInnerType::Struct(temporal) = &types[temporal_index as usize].composite_type.inner
+    else {
+        panic!("DeferredTemporalNamespace must be a registered struct");
+    };
+    assert_eq!(
+        temporal
+            .fields
+            .iter()
+            .map(|field| (field.element_type, field.mutable))
+            .collect::<Vec<_>>(),
+        vec![(reference(realm_index, false), false)],
+        "the recipe retains only its defining Realm, which owns canonical identity"
+    );
+    let CompositeInnerType::Struct(realm) = &types[realm_index as usize].composite_type.inner
+    else {
+        panic!("RealmRecord must be a registered struct");
+    };
+    let state = &realm.fields[RealmRecordSchema::TEMPORAL_STATE.ordinal().raw() as usize];
+    assert!(state.mutable);
+    assert_eq!(
+        state.element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I32)
+    );
+    let namespace = &realm.fields[RealmRecordSchema::TEMPORAL_NAMESPACE.ordinal().raw() as usize];
+    assert!(namespace.mutable);
+    assert_eq!(namespace.element_type, reference(stored_index, true));
 
     let descriptor_index = schema
         .struct_type::<PropertyDescriptor>()

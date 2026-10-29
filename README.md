@@ -20,7 +20,10 @@ An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-c
 can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
-Runtime initialization uses compact intrinsic-installation tables. Guarded
+Runtime initialization uses compact intrinsic-installation tables and defers
+the complete Temporal namespace until its first observable or internal use.
+Each Realm retains its own canonical constructors, prototypes and descriptors.
+Guarded
 Number loops and packed Array push/join kernels avoid repeated conversion,
 dispatch and allocation when their semantic checks pass. Primitive string-length
 reads and guarded constant-return calls eliminate temporary objects and call

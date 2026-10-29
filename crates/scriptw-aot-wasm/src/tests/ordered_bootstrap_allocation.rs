@@ -1,9 +1,9 @@
 //! Inspect actual R callers, GC allocations, ordering and declared helper ABI.
 use super::*;
 use crate::gc_types::{
-    DeferredIntrinsicValue, ExecutableCode, FunctionContext, FunctionObject, GcHeapType,
-    GcNullability, GlobalLedger, OrdinaryObject, PropertyValue, RealmRecord, RuntimeModuleTypes,
-    RuntimeSchema,
+    DeferredIntrinsicValue, Environment, ExecutableCode, FunctionContext, FunctionObject,
+    GcHeapType, GcNullability, GlobalLedger, OrdinaryObject, PropertyValue, RealmRecord,
+    RuntimeModuleTypes, RuntimeSchema, StoredValue,
 };
 
 fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -60,7 +60,9 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
     let key = named("helper::pooled_string_resolve");
     let header = named("helper::object_header_projection");
     let resolve = named("helper::property_value_resolve");
-    let bootstrap = body(bytes, named("helper::realm_initialize_intrinsics"));
+    let ensure_temporal = named("helper::realm_ensure_temporal");
+    let initialize = named("helper::realm_initialize_intrinsics");
+    let bootstrap = body(bytes, initialize);
     let installs = body(bytes, install);
     let constructors = body(bytes, constructor);
     let calls = |ops: &[Operator<'_>], target| {
@@ -224,6 +226,11 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
             ],
             reference(type_index::<PropertyValue>(schema)),
         ),
+        (
+            ensure_temporal,
+            vec![reference(type_index::<RealmRecord>(schema))],
+            reference(type_index::<StoredValue>(schema)),
+        ),
     ] {
         assert!(exports.contains(&helper));
         let wasmparser::CompositeInnerType::Func(signature) = &types
@@ -236,6 +243,35 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
         assert_eq!(signature.params(), parameters);
         assert_eq!(signature.results(), [result]);
     }
+    let nullable_reference = |index| {
+        wasmparser::ValType::Ref(
+            wasmparser::RefType::new(
+                true,
+                wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index)),
+            )
+            .unwrap(),
+        )
+    };
+    assert!(exports.contains(&initialize));
+    let wasmparser::CompositeInnerType::Func(signature) = &types
+        [declarations[initialize as usize] as usize]
+        .composite_type
+        .inner
+    else {
+        panic!("Realm initialization has a real function signature");
+    };
+    assert_eq!(
+        signature.params(),
+        [
+            reference(type_index::<RealmRecord>(schema)),
+            nullable_reference(type_index::<Environment>(schema)),
+        ]
+    );
+    assert_eq!(
+        signature.results(),
+        [nullable_reference(type_index::<OrdinaryObject>(schema)); 5],
+        "eager bootstrap returns only Reflect, Math, JSON, Atomics and Intl"
+    );
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[batch as usize] as usize]
         .composite_type
@@ -274,6 +310,14 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
     let resolve = named("helper::property_value_resolve");
     let bootstrap_index = named("helper::realm_initialize_intrinsics");
     let bootstrap = body(bytes, bootstrap_index);
+    let temporal_index = named("helper::realm_ensure_temporal");
+    let temporal = body(bytes, temporal_index);
+    assert!(
+        !bootstrap.iter().any(|op| matches!(op,
+            Operator::Call { function_index } if *function_index == temporal_index
+        )),
+        "eager Realm initialization never forces the Temporal graph"
+    );
     let loop_body = body(bytes, batch);
     assert_eq!(
         loop_body
@@ -335,19 +379,25 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
         "the real helper returns to the counted loop"
     );
 
-    let spans: Vec<_> = bootstrap.windows(3).filter_map(|ops| match ops {
-        [Operator::I32Const { value: start }, Operator::I32Const { value: count },
-         Operator::Call { function_index }] if *function_index == batch => Some((*start as u32, *count as u32)),
-        _ => None,
-    }).collect();
+    let spans: Vec<_> = [(false, &bootstrap), (true, &temporal)]
+        .into_iter()
+        .flat_map(|(is_temporal, operators)| operators.windows(3).filter_map(move |ops| match ops {
+            [Operator::I32Const { value: start }, Operator::I32Const { value: count },
+             Operator::Call { function_index }] if *function_index == batch => Some((is_temporal, *start as u32, *count as u32)),
+            _ => None,
+        }))
+        .collect();
+    assert!(spans.iter().any(|(is_temporal, _, _)| !is_temporal));
+    assert!(spans.iter().any(|(is_temporal, _, _)| *is_temporal));
     let total_rows = spans
         .iter()
-        .map(|(_, count)| *count as usize)
+        .map(|(_, _, count)| *count as usize)
         .sum::<usize>();
     assert!(spans.len() >= 40 && total_rows > 400,
-        "the actual executed initializer batches methods across builtin families: {} spans, {total_rows} rows", spans.len());
+        "the complete Realm graph batches methods across builtin families: {} spans, {total_rows} rows", spans.len());
     let direct_installs = bootstrap
         .iter()
+        .chain(temporal.iter())
         .filter(|op| {
             matches!(op,
                 Operator::Call { function_index } if *function_index == install
@@ -356,7 +406,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
         .count();
     assert!(
         direct_installs < total_rows / 2,
-        "most per-method operand setup has left the initializer; aliases keep the original path"
+        "most per-method operand setup has left both initializers; aliases keep the original path"
     );
 
     // Inspect actual active R data at the emitted call operands, not the Rust
@@ -394,7 +444,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
     }
     let mut symbols = 0;
     let mut nonwritable = 0;
-    for (start, count) in spans {
+    for (is_temporal, start, count) in spans {
         assert!(count > 0);
         let row_bytes = count.checked_mul(16).unwrap();
         let end = start.checked_add(row_bytes).unwrap();
@@ -412,9 +462,14 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
                 .find(|id| **id as u32 == words[0])
                 .expect("encoded rows retain an actual StandardBuiltinId");
             assert!(!builtin.constructable() && builtin.global_name().is_none());
+            assert_eq!(
+                builtin.debug_name().starts_with("Temporal."),
+                is_temporal,
+                "actual {builtin:?} row must belong to its eager or demand initializer"
+            );
             assert!(
                 crate::module::standard_builtin_function_realm_slot(builtin).is_none(),
-                "canonical identities are eager ordering barriers"
+                "canonical identities are construction ordering barriers"
             );
             assert!(words[1] <= 1 && words[3] & !3 == 0);
             if words[1] == 1 {

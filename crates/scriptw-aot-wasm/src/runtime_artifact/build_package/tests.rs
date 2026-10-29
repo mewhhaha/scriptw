@@ -418,6 +418,11 @@ fn abi34_package_is_replaced_before_typed_numeric_callbacks_are_admitted() {
     assert_previous_build_package_replaced(34);
 }
 
+#[test]
+fn abi35_package_is_replaced_before_temporal_demand_initialization_is_admitted() {
+    assert_previous_build_package_replaced(35);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

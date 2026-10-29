@@ -41,7 +41,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The current private runtime ABI is layout 32. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 36. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate

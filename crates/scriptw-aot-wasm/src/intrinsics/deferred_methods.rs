@@ -1,15 +1,15 @@
-//! Internal data-property values whose native function has not been observed.
+//! Internal data-property values whose native product has not been observed.
 //!
 //! A recipe is shared by an installation's aliases. It captures its defining
 //! Realm, never a public constructor/prototype lookup or the caller's Realm.
-//! Canonical-slot intrinsics and constructors remain eager: their existing
-//! table is the sole identity authority for that bootstrap graph.
+//! Canonical-slot intrinsics use their Realm table as their identity authority;
+//! the Temporal namespace recipe initializes its complete graph together.
 
 use super::*;
 use crate::gc_types::*;
 use crate::runtime_helpers::{
     DeferredIntrinsicInstallArguments, HelperParameters, IntrinsicDataPublishArguments,
-    RuntimeHelperId,
+    RealmEnsureTemporalArguments, RuntimeHelperId,
 };
 
 mod installation;
@@ -120,8 +120,8 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Ordinary stored values keep their direct read. The cold recipe branch
-    /// is the only path that enters the function materialization helper.
+    /// Ordinary stored values keep their direct read. Recipes enter the one
+    /// shared resolver for function materialization or Temporal initialization.
     pub(crate) fn emit_property_value_into(
         &self,
         value: &GcLocal<PropertyValue>,
@@ -158,13 +158,45 @@ impl FunctionBuilder<'_> {
         let parameters = self
             .helper_parameters::<crate::runtime_helpers::PropertyValueResolveParameters>(&mut f);
         let s = self.runtime_schema();
-        // Snapshot readers may call this entry with either variant.
+        // Snapshot readers may call this entry with an already stored value.
         parameters.value.is_subtype::<StoredValue>(s, &mut f);
         self.open_frame(ControlFrameKind::If, &mut f);
         parameters
             .value
             .load(s, &mut f)
             .cast_subtype::<StoredValue>(s, &mut f);
+        f.instruction(&Instruction::Return);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
+            .is_subtype::<DeferredTemporalNamespace>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredTemporalNamespace>(s, &mut f),
+            &mut f,
+        );
+        let realm = s.reserve_gc_local(&mut f).initialize(
+            s.field(DeferredTemporalNamespaceSchema::REALM)
+                .read(&recipe, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let stored = s.reserve_gc_local(&mut f).initialize(
+            s.helper_reference_on_stack(s.call_helper(
+                RealmEnsureTemporalArguments::new(&realm),
+                self.runtime_helper_base()?,
+                &mut f,
+            )),
+            &mut f,
+        );
+        stored.load(s, &mut f);
+        stored.clear(&mut f);
+        realm.clear(&mut f);
+        recipe.clear(&mut f);
         f.instruction(&Instruction::Return);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

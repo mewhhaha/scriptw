@@ -25,7 +25,6 @@ impl FunctionBuilder<'_> {
             plan.full_standard_globals || plan.math_object,
             plan.full_standard_globals || plan.json_object,
             plan.full_standard_globals || plan.atomics_object,
-            plan.temporal_namespace_members().is_some(),
             plan.intl_namespace_members().is_some(),
         ];
         let mut namespace_values = namespaces.into_iter().zip(present).map(|(root, present)| {
@@ -42,8 +41,8 @@ impl FunctionBuilder<'_> {
             root.clear(function);
             value
         });
-        let [reflect, math, json, atomics, temporal, intl] =
-            std::array::from_fn(|_| namespace_values.next().expect("six namespace results"));
+        let [reflect, math, json, atomics, intl] =
+            std::array::from_fn(|_| namespace_values.next().expect("five namespace results"));
         let object_prototype = schema.reserve_value_local(function);
         self.emit_load_non_array_realm_intrinsic(
             realm,
@@ -59,7 +58,6 @@ impl FunctionBuilder<'_> {
             math,
             json,
             atomics,
-            temporal,
             intl,
         })
     }
@@ -81,7 +79,6 @@ impl FunctionBuilder<'_> {
             &bootstrap.math,
             &bootstrap.json,
             &bootstrap.atomics,
-            &bootstrap.temporal,
             &bootstrap.intl,
         ] {
             if let Some(value) = namespace {
@@ -90,7 +87,7 @@ impl FunctionBuilder<'_> {
                 absent.load(schema, &mut function);
             }
         }
-        // The six references are now rooted on the Wasm result stack. Releasing
+        // The five references are now rooted on the Wasm result stack. Releasing
         // local owners cannot make them disappear while the caller binds them.
         absent.clear(&mut function);
         bootstrap.clear(self, &mut function);

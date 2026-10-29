@@ -442,6 +442,7 @@ impl GcI32Constant for crate::heap::AsyncGeneratorRequestCompletionKind {
     }
 }
 enum_i32_codec!(crate::heap::PromiseState; Pending => 0, Fulfilled => 1, Rejected => 2);
+enum_i32_codec!(crate::heap::TemporalInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::PromiseReactionType; Fulfill => 1, Reject => 2);
 enum_i32_codec!(crate::heap::PromiseReactionCallbackKind; Default => 0, AsyncFunction => 1,
     AsyncGeneratorAwaitReturn => 2, AsyncGeneratorAwait => 3, AsyncGeneratorYield => 4,

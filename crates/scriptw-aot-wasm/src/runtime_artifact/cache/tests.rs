@@ -616,6 +616,11 @@ fn abi34_runtime_cache_is_replaced_before_typed_numeric_callbacks_are_admitted()
     assert_previous_runtime_cache_entry_replaced(34);
 }
 
+#[test]
+fn abi35_runtime_cache_is_replaced_before_temporal_demand_initialization_is_admitted() {
+    assert_previous_runtime_cache_entry_replaced(35);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

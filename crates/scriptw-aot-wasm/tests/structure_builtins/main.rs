@@ -58,6 +58,7 @@ mod string_repeat_count_structure;
 mod string_symbol_hook_operation_structure;
 mod string_well_formed_operation_structure;
 mod symbol_receiver_operation_domain_structure;
+mod temporal_demand_initialization_structure;
 mod to_locale_string_receiver_kind_structure;
 mod to_property_descriptor_operation_evidence_structure;
 mod typed_array_constructor_identity_structure;

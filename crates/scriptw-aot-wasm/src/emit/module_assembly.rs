@@ -1433,6 +1433,7 @@ fn emit_script_module_with_factory(
             NativeRegExpLiteralFactory, compile_native_regexp_literal_factory;
             FunctionMetadataPublish, compile_function_metadata_publish_helper;
             RealmInitializeIntrinsics, compile_realm_initialize_intrinsics_helper;
+            RealmEnsureTemporal, compile_realm_ensure_temporal_helper;
             AsyncGeneratorStartBody, compile_async_generator_start_body_helper;
             AsyncGeneratorDrainQueue, compile_async_generator_drain_queue_helper;
             PromiseDrainJobs, compile_promise_drain_jobs_helper;

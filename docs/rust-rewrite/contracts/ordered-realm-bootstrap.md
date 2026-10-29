@@ -38,7 +38,8 @@ It retains home value, Context allocation, source resolution, undefined public
 prototype cache, FunctionObject allocation and ACTIVE_FUNCTION cycle order.
 Metadata publication follows the complete cycle in the caller. Typed-array
 element kinds derive from the immutable executable's builtin identity using the
-existing closed domain. All standard and host constructors remain eager.
+existing closed domain. Standard and host constructors outside the deferred
+Temporal cluster retain their eager initialization.
 
 The ordered Realm graph and property insertion order are unchanged. Bootstrap
 continues to own Error and typed-array constructor inheritance; Proxy's absent
@@ -47,6 +48,24 @@ cache publication; typed-array `BYTES_PER_ELEMENT`; canonical Realm-slot
 publication; and the subsequent exhaustive family installer. Accessors retain
 their eager allocation path. Every Realm owns its existing GC objects and
 mutable descriptors; no completed Realm objects are shared across Stores.
+
+Layout 36 defers the complete Temporal cluster through one per-Realm
+`Dormant`/`Building`/`Ready` owner. The global retains its original data-property
+key, order and attributes, with an internal recipe capturing the defining Realm.
+Reading or exposing its value resolves the canonical namespace; internal Temporal
+intrinsic reads use the same initialization helper. Membership, key enumeration,
+deletion and replacement do not require the value. Deleting or replacing the
+public property cannot resurrect it or remove internal Temporal identities.
+
+Initialization creates all eight prototypes before their constructors, then
+members, `Now` and the namespace in their existing orders. It uses the Realm's
+canonical Object/Function prototypes, never public bindings or
+the calling Realm. Only the private construction capability permits unfinished
+Temporal-slot reads. The helper publishes the namespace and `Ready` after the
+whole graph is complete; reentry during `Building` is an invariant failure.
+Descriptor exposure, retained embedding and rooted snapshots resolve through the
+ordinary property-value owner. Runtime code and data remain available regardless
+of which names appeared in the source program.
 
 Emission regressions inspect the actual R calls, allocation counts, allocation
 and key-resolution order, exports and concrete GC reference ABI. Semantic

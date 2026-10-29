@@ -10,6 +10,8 @@ use crate::objects::{
 use scriptw_ir::StandardBuiltinInstaller;
 
 mod realm_initialization;
+mod temporal_initialization;
+pub(crate) use temporal_initialization::TemporalIntrinsicBuild;
 
 /// Bootstrap holds only actual rooted products until the global object owns
 /// them. It is consumed once; no namespace or Realm address is exported.
@@ -21,7 +23,6 @@ pub(crate) struct BootstrapRealm {
     math: Option<ValueLocals>,
     json: Option<ValueLocals>,
     atomics: Option<ValueLocals>,
-    temporal: Option<ValueLocals>,
     intl: Option<ValueLocals>,
 }
 /// The canonical globals of every Realm the runtime creates. The string pool
@@ -64,16 +65,9 @@ pub(crate) fn created_realm_global_bindings() -> Vec<scriptw_ir::ScriptGlobalBin
 
 impl BootstrapRealm {
     fn clear(self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
-        for value in [
-            self.intl,
-            self.temporal,
-            self.atomics,
-            self.json,
-            self.math,
-            self.reflect,
-        ]
-        .into_iter()
-        .flatten()
+        for value in [self.intl, self.atomics, self.json, self.math, self.reflect]
+            .into_iter()
+            .flatten()
         {
             value.clear(function);
         }
@@ -442,85 +436,6 @@ impl<'a> FunctionBuilder<'a> {
             &object,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
             "Reflect",
-            false,
-            false,
-            true,
-            function,
-        )?;
-        Ok(object)
-    }
-
-    fn init_temporal_now_object(
-        &mut self,
-        members: TemporalNamespaceMembers,
-        realm: &RealmFunctionMaterializationContext,
-        object_prototype: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            "Temporal.Now",
-            false,
-            false,
-            true,
-            function,
-        )?;
-        for (name, builtin) in members.now_members_in_installation_order() {
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        Ok(object)
-    }
-
-    pub(crate) fn init_temporal_object(
-        &mut self,
-        members: TemporalNamespaceMembers,
-        realm: &RealmFunctionMaterializationContext,
-        object_prototype: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        let now = self.init_temporal_now_object(members, realm, object_prototype, function)?;
-        self.emit_install_intrinsic_data(
-            &object,
-            IntrinsicKey::Name(TEMPORAL_NOW_NAME),
-            &now,
-            true,
-            false,
-            true,
-            function,
-        )?;
-        now.clear(function);
-        let value = self.runtime_schema().reserve_value_local(function);
-        for (name, builtin) in members.constructors_in_installation_order() {
-            let slot = standard_builtin_constructor_realm_slot(builtin).ok_or_else(|| {
-                EmitError::unsupported("Temporal constructor has no intrinsic slot")
-            })?;
-            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
-            self.emit_install_intrinsic_data(
-                &object,
-                IntrinsicKey::Name(name),
-                &value,
-                true,
-                false,
-                true,
-                function,
-            )?;
-        }
-        value.clear(function);
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            "Temporal",
             false,
             false,
             true,
@@ -1298,14 +1213,6 @@ impl<'a> FunctionBuilder<'a> {
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
         }
-        for family in crate::intrinsics::temporal::TemporalIntrinsicFamily::ALL {
-            self.emit_bootstrap_plain_prototype(
-                &context,
-                family.prototype_slot(),
-                &object_prototype,
-                function,
-            )?;
-        }
         let primitive = schema.reserve_value_local(function);
         primitive.set_scalar(ScalarValue::NumberBits(0), function);
         self.emit_bootstrap_boxed_prototype(
@@ -1487,38 +1394,6 @@ impl<'a> FunctionBuilder<'a> {
             (
                 StandardBuiltinId::DateConstructor,
                 NonArrayRealmIntrinsicSlot::DatePrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalInstantConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalInstantPrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalPlainDateConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalPlainDatePrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalDurationConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalDurationPrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalPlainTimeConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalPlainTimePrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalPlainDateTimeConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalPlainDateTimePrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalPlainYearMonthConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalPlainYearMonthPrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalPlainMonthDayConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalPlainMonthDayPrototype,
-            ),
-            (
-                StandardBuiltinId::TemporalZonedDateTimeConstructor,
-                NonArrayRealmIntrinsicSlot::TemporalZonedDateTimePrototype,
             ),
             (
                 StandardBuiltinId::IntlLocaleConstructor,
@@ -1737,12 +1612,6 @@ impl<'a> FunctionBuilder<'a> {
         let atomics = (plan.full_standard_globals || plan.atomics_object)
             .then(|| self.init_atomics_object(&context, &object_prototype, function))
             .transpose()?;
-        let temporal = plan
-            .temporal_namespace_members()
-            .map(|members| {
-                self.init_temporal_object(members, &context, &object_prototype, function)
-            })
-            .transpose()?;
         let intl = plan
             .intl_namespace_members()
             .map(|members| self.init_intl_object(members, &context, &object_prototype, function))
@@ -1754,7 +1623,6 @@ impl<'a> FunctionBuilder<'a> {
             math,
             json,
             atomics,
-            temporal,
             intl,
         })
     }
@@ -1917,12 +1785,53 @@ impl<'a> FunctionBuilder<'a> {
                     })?,
                     function,
                 ),
-                GlobalPropertyInitializerIr::TemporalObject => value.copy_from(
-                    bootstrap.temporal.as_ref().ok_or_else(|| {
-                        EmitError::unsupported("planned temporal namespace was not constructed")
-                    })?,
-                    function,
-                ),
+                GlobalPropertyInitializerIr::TemporalObject => {
+                    // Publish at the original global insertion position. The
+                    // descriptor retains a defining-Realm recipe until a read;
+                    // deleting or replacing it cannot recreate the property.
+                    let recipe = schema.reserve_gc_local(function).initialize(
+                        schema.struct_type::<DeferredTemporalNamespace>().construct(
+                            (GcOperand::reference(bootstrap.realm.realm(), schema),),
+                            function,
+                        ),
+                        function,
+                    );
+                    let deferred = schema
+                        .reserve_gc_local(function)
+                        .initialize(recipe.load(schema, function).upcast(), function);
+                    let header = schema.reserve_gc_local(function).initialize(
+                        self.emit_object_header_projection(&object, function),
+                        function,
+                    );
+                    let key = self.intrinsic_key(IntrinsicKey::Name(&binding.name), function)?;
+                    let writable = schema.reserve_i32_local(function);
+                    writable.set_constant(i32::from(binding.initializer.writable()), function);
+                    let enumerable = schema.reserve_i32_local(function);
+                    enumerable.set_constant(i32::from(binding.initializer.enumerable()), function);
+                    let configurable = schema.reserve_i32_local(function);
+                    configurable
+                        .set_constant(i32::from(binding.initializer.configurable()), function);
+                    schema.call_helper(
+                        crate::runtime_helpers::IntrinsicDataPublishArguments::new(
+                            &header,
+                            &key,
+                            &deferred,
+                            writable,
+                            enumerable,
+                            configurable,
+                        ),
+                        self.runtime_helper_base()?,
+                        function,
+                    );
+                    schema.release_i32_local(configurable, function);
+                    schema.release_i32_local(enumerable, function);
+                    schema.release_i32_local(writable, function);
+                    key.clear(function);
+                    header.clear(function);
+                    deferred.clear(function);
+                    recipe.clear(function);
+                    continue;
+                }
                 GlobalPropertyInitializerIr::IntlObject => value.copy_from(
                     bootstrap.intl.as_ref().ok_or_else(|| {
                         EmitError::unsupported("planned intl namespace was not constructed")

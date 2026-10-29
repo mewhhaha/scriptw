@@ -5,6 +5,7 @@
 
 mod aot_temporal_buddhist_calendar;
 mod aot_temporal_created_realm;
+mod aot_temporal_demand_initialization;
 mod aot_temporal_duration_relative;
 mod aot_temporal_duration_wide_fields;
 mod aot_temporal_duration_zoned_relative;

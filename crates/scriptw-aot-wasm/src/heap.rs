@@ -137,6 +137,13 @@ macro_rules! runtime_scalar_domain {
     (@unit $variant:ident) => { () };
 }
 
+// Initialization of one Realm's complete canonical Temporal graph.
+runtime_scalar_domain!(TemporalInitializationState, 0, {
+    Dormant = 0,
+    Building = 1,
+    Ready = 2,
+});
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DisposableStackState {
     Pending,

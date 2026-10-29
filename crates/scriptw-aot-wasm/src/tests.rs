@@ -22,6 +22,7 @@ mod regexp_programs;
 mod runtime_error_for_throw;
 mod scalar_predicates;
 mod scalar_regions;
+mod temporal_demand_initialization;
 mod typed_array_numeric_callback;
 mod unobserved_arguments;
 
