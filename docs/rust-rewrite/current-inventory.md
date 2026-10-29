@@ -8,37 +8,48 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Latest verification
 
-The [Temporal demand-initialization checkpoint](temporal-demand-20261029.json)
-records **5,006 unique native passes across 20 complete affected
-release/default-feature targets** and **884 original pinned Test262 executions
-across 197 filters**. Frozen producer binaries and receipts retain source
-`e8ef6700a`. Final source `c80fd9fbb` corrects four verification-only files;
-its production files are identical. Passing scopes and original failed receipts
-remain recorded. Verification ran serially within the local 4-GiB/no-swap limit.
-These selected scopes do not establish full workspace or pinned-suite acceptance.
-Both refreshed CI benchmark cohorts measure `c80fd9fbb` and retain their own
-settings in the [refresh record](benchmark-refresh-20261028.md). The separate
-[full pinned publication](test262-current.md) remains bound to `b9ecfe64b`.
+The [loader-admission checkpoint](loader-admission-20261029.json) records
+**1,389 native passes at `afe83e312` across four complete executables**: 1,063
+engine, 300 AOT Intl, 18 runtime image and 8 default-feature CLI shared-host
+example tests. The retained **665 Intl passes belong to intermediate `dc827285d`**.
+The batch also passed 356 source guards and 40 inert tooling tests. Verification
+ran serially within the local 4-GiB/no-swap limit; these affected scopes do not
+establish full workspace or pinned-suite acceptance.
 
-Across the 17 original local workloads, geometric means changed by **−9.8% in
-execution time, −3.3% in private dirty memory and +3.6% in RSS**. Separate startup
-and eight-Realm control timings fell **22.1% and 26.6%**. These mixed memory
-endpoints do not establish an overall memory gain. An ELF grouping-only placement
-trial failed the RSS acceptance gate and was reverted.
+Across the 17 original local workloads, geometric means fell **4.7% in
+post-execution RSS and 5.4% in PSS** against accepted `e8ef6700a`; private dirty
+memory and execution were broadly flat. Focused integer timings were 0.2–2.9%
+slower, so there is no universal CPU improvement. Paired WASI control RSS rose
+1.7%. Both raw R profiles retain exact standard/data sections; only the Intl
+identity custom section changes.
+All 19 P modules remain byte-identical to accepted E8. These local results retain
+their frozen producer identity separately from the [fresh CI publication](benchmark-refresh-20261028.md)
+at `afe83e312`.
+
+The historical [Temporal checkpoint](temporal-demand-20261029.json) retains
+5,006 unique native passes across 20 targets and 884 original pinned Test262
+executions across 197 filters at `e8ef6700a`. Verification-only corrections at
+`c80fd9fbb` preserve that production source. Benchmark cohorts keep their own
+recorded identities; the [full pinned publication](test262-current.md) remains
+bound to `b9ecfe64b`.
 
 ## Next work
 
 - Every-case Scriptc time/RSS parity remains open. Continue from the
   [runtime ownership contract](contracts/runtime-byte-ownership.md), current
   checkpoint captures and [performance queue](../performance-hills.md).
+  Trace retained host type metadata from R's `Module::from_parts` through postcard
+  `ModuleTypes` decoding to `Engine::register_and_canonicalize_types`. Earlier
+  phase deltas (~204 KiB private decode, ~300 KiB R registry versus ~92 KiB P
+  registry) do not prove duplication. Demonstrate at least **256 KiB of avoidable
+  retained ownership** before choosing a patch; preserve all required admission
+  and type registration.
   Fresh [CI mappings](benchmark-refresh-20261028.md) bind exact R/P image, text
   and section ranges; local `e8ef6700a` captures retain narrower attribution.
-  Measure individual Wasmtime loading phases to find what makes the extra clean
-  read-only/executable host pages resident. Native-function ownership and execution
-  attribution remain deferred; a fault-around cause remains unproven. Use phase
-  measurements to select a production change. Preserve reflection, later compiled
-  programs and retained embedding access. Warm before-Store endpoints include
-  earlier executions and must not be called cold floors.
+  Native-function ownership and execution attribution remain
+  deferred; a fault-around cause remains unproven. Preserve reflection, later
+  compiled programs and retained embedding access. Warm before-Store endpoints
+  include earlier executions and must not be called cold floors.
   The [8-MiB GC capacity probe](memory-gc-capacity-20261028.md) already
   found growth back to 16 MiB and slower retained-object execution; ordinary
   execution remains at 16 MiB.

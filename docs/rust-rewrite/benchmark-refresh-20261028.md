@@ -1,9 +1,9 @@
 # Benchmark refresh, 2026-10-29
 
-Both CI cohorts measure compiler `c80fd9fbb9b38111b8df0e73ec6d6250ccbf7aee`; input fingerprint `d85bf76ef26b7358dddb15588712ba09167253a58ac7f909f617aaaa92236ace`.
+Both CI cohorts measure compiler `afe83e312b5049bbd6c81edffacb418ba60275e5`; input fingerprint `7f17a9cb49312aa999dc1a6bf4659a2106bd685c84b91b280b8ff3d3419b2052`.
 
-- [Precompiled CI 40855431176](https://github.com/mewhhaha/scriptw/actions/runs/40855431176): completed 2026-10-29T10:38:10.705013+00:00; 68 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
-- [Three-runtime CI 40855427163](https://github.com/mewhhaha/scriptw/actions/runs/40855427163): completed 2026-10-29T10:29:14.701134+00:00; 102 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Precompiled CI 40895619031](https://github.com/mewhhaha/scriptw/actions/runs/40895619031): completed 2026-10-29T15:11:33.955150+00:00; 68 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Three-runtime CI 40895618949](https://github.com/mewhhaha/scriptw/actions/runs/40895618949): completed 2026-10-29T15:06:53.697221+00:00; 102 attempts across all 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
 
 Each cohort uses two balanced rounds, ten checked warmups and seven measurements
 per runtime/workload/round. The shared precompiled host disables compilation and
@@ -20,29 +20,22 @@ raw evidence and published archives, and all four SVGs were reproduced under a
 The refresh metadata retains the actual local validation resource counters.
 
 Separate [unscored CI mapping evidence](benchmark-refresh-20261028-mappings.tar.xz)
-retains 16 snapshots and 12 raw streams at this CI source/fingerprint, using
-consumer SHA-256 prefix `283d2706`. Checks bind phases, modules and host
-attribution, including exact R/P image, text and section ranges. Cold diagnostic
-RSS differences below are Scriptw minus WASI; they do not change the scored charts.
+retains four cases and sixteen snapshots at this CI source and fingerprint.
+Checks bind exact R/P image, text and section ranges and host-page presence;
+they establish neither executed-function ownership nor a causal explanation
+for memory changes. The [refresh metadata](benchmark-refresh-20261028.json)
+records the consumer and archive identities; the archive manifest binds every file.
 
-| Workload | Cold RSS gap (KiB) | Host read-only / read-execute gap (KiB) |
-| --- | ---: | ---: |
-| `integer.js` | +4,568 | +796 / +3,232 |
-| `retained-objects.js` | +4,012 | +832 / +3,264 |
-
-Native-function ownership and execution attribution remain deferred. Measure
-individual Wasmtime loading phases to identify the causal trigger. These mappings
-do not establish a fault-around cause or justify a new production change. Local
-`e8ef6700a` matched captures retain their narrower attribution and do not bind exact
-R/P ranges.
-
-The [implementation checkpoint](temporal-demand-20261029.json) keeps its separate local
-producer `e8ef6700ab5757d06f18366c65bfbc8ef07019a3` and fingerprint
-`46a22285579e3e5a762973849dbcaabff0530873e3386be5238f2be72efb843a`. Local control timings fell about 22%
-for startup and 27% for eight Realms. First Temporal use was approximately
-unchanged; repeated use took about 0.8% longer. RSS was mixed, so these controls
-do not establish an overall performance or memory gain. They supply no bars in
-these CI charts. Native acceptance and selected Test262 results retain their
+The [implementation checkpoint](loader-admission-20261029.json) keeps its separate local
+producer `afe83e312b5049bbd6c81edffacb418ba60275e5` and fingerprint
+`18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767`. The complete local 17-workload
+comparison passed 144 processes and 2,448 output checks. Scriptw's geometric
+mean post-execution RSS fell 4.7% and PSS fell 5.4% against the accepted Temporal
+compiler; private dirty memory was flat and execution was broadly unchanged.
+Focused integer timings retained a 0.2–2.9% slowdown, so this is not a universal
+CPU improvement. The paired WASI control's RSS rose 1.7%; no direct causal
+subtraction is claimed. Local results supply no bars in these
+CI charts. Native acceptance and selected Test262 results retain their
 actual checkpoint scope; this graph refresh does not rerun native acceptance or
 the pinned Test262 publication. Earlier benchmark and optimization checkpoint
 identities remain historical evidence, rather than measurements of this source.

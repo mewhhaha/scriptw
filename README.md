@@ -26,19 +26,21 @@ Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts.
 Precompiled native images use binary execution facts (`SCRWEP03`); regenerate
 older native images. Portable Wasm bundles retain their format.
-Guarded
-Number loops and packed Array push/join kernels avoid repeated conversion,
+Guarded Number loops and packed Array push/join kernels avoid repeated conversion,
 dispatch and allocation when their semantic checks pass. Primitive string-length
 reads and guarded constant-return calls eliminate temporary objects and call
 setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
 and writeback retain ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
 
-The [matched local Temporal checkpoint](docs/rust-rewrite/temporal-demand-20261029.json)
-reduced execution time by 9.8% and private dirty memory by 3.3% across the
-17 original workloads, using geometric means of per-case ratios. Total process
-RSS rose 3.6%; closing the memory gap with Scriptc remains open. These local
-before/after results are separate from the CI comparisons below.
+The [matched local loader-admission checkpoint](docs/rust-rewrite/loader-admission-20261029.json)
+reduced whole-process RSS by 4.7% and PSS by 5.4% across the 17 original
+workloads, using geometric means of per-case ratios against the accepted
+Temporal compiler. Private dirty memory was flat and execution was broadly
+unchanged. Focused integer timings were 0.2–2.9% slower; these results do not
+establish a universal CPU improvement. The paired WASI control's RSS rose 1.7%.
+The local before/after results are separate from the CI comparisons below;
+closing Scriptc parity remains open.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
@@ -48,18 +50,18 @@ build, debug and verification loop.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-29 on one GitHub Actions runner**, compiler `c80fd9fbb`.
+**Measured 2026-10-29 on one GitHub Actions runner**, compiler `afe83e312`.
 The [precompiled workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producers; consumers disable compilation and share native optimization
 and runtime settings. Both passed the original checksums on **17/17 workloads**.
-Across those workloads, Scriptw's median post-execution RSS is **1.383–1.626× Scriptc's**.
+Across those workloads, Scriptw's median post-execution RSS is **1.270–1.515× Scriptc's**.
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 18.7 MiB | 12.2 MiB |
-| Objects | 19.2 MiB | 13.0 MiB |
-| Retained objects | 25.5 MiB | 18.5 MiB |
+| Integer | 17.5 MiB | 12.2 MiB |
+| Objects | 18.0 MiB | 12.9 MiB |
+| Retained objects | 23.4 MiB | 18.4 MiB |
 
 Medians pool fourteen measured fresh Stores after ten checked warmups per round.
 RSS includes host, code, runtime and allocator history; it is neither live JS
@@ -69,7 +71,7 @@ uses its own Fast configuration and includes in-process Scriptw/V8 compilation
 history. Cross-cohort RSS differences do not establish causal savings.
 
 [Execution timing and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40855431176) ·
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40895619031) ·
 [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Benchmarks
@@ -78,7 +80,7 @@ history. Cross-cohort RSS differences do not establish causal savings.
 
 ![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
 
-**Measured 2026-10-29 on GitHub Actions**, compiler `c80fd9fbb`.
+**Measured 2026-10-29 on GitHub Actions**, compiler `afe83e312`.
 **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)** and **Node / V8** were
 measured together. All three passed the original checksums on **17/17 workloads**.
 
@@ -90,7 +92,7 @@ Shared-runner observations are descriptive. The existing pinned Test262 status b
 [Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
 [Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
 
-[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40855427163) · [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
+[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40895618949) · [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Tests
 

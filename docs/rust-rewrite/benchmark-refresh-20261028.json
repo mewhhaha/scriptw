@@ -1,13 +1,13 @@
 {
   "schema": "scriptw-benchmark-refresh-v2",
   "date": "2026-10-29",
-  "source_commit": "c80fd9fbb9b38111b8df0e73ec6d6250ccbf7aee",
-  "source_fingerprint": "d85bf76ef26b7358dddb15588712ba09167253a58ac7f909f617aaaa92236ace",
+  "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+  "source_fingerprint": "7f17a9cb49312aa999dc1a6bf4659a2106bd685c84b91b280b8ff3d3419b2052",
   "paired": {
-    "run": 40855431176,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40855431176",
-    "finished_at": "2026-10-29T10:38:10.705013+00:00",
-    "raw_report_sha256": "abf6facf41e79522c8dcc3195ff2fffbad99d54ec7307b32b302634de6b4de4a",
+    "run": 40895619031,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895619031",
+    "finished_at": "2026-10-29T15:11:33.955150+00:00",
+    "raw_report_sha256": "9cb2610af61052aa719df6521ddb401b4deda7ccd8d05954704ac19c316292b5",
     "attempts": 68,
     "workloads": 17,
     "rust_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
@@ -32,14 +32,14 @@
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "12685312",
+        "memory.peak": "12898304",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "665767936",
+        "memory.peak": "673202176",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "cpu_affinity": [
@@ -48,10 +48,10 @@
     }
   },
   "three": {
-    "run": 40855427163,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40855427163",
-    "finished_at": "2026-10-29T10:29:14.701134+00:00",
-    "raw_report_sha256": "428766ce063c1c53bd04127be10aa063e03e0876467659e7f24f738a8b28242e",
+    "run": 40895618949,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895618949",
+    "finished_at": "2026-10-29T15:06:53.697221+00:00",
+    "raw_report_sha256": "b45b2d942c0d60cb599e44b14a030d18d305aaf19f47c0a12f12a06092449fd0",
     "attempts": 102,
     "workloads": 17,
     "successful_scriptc_workloads": 17,
@@ -95,21 +95,39 @@
     "raw_evidence_readmitted": true,
     "published_archives_readmitted": true,
     "all_four_svgs_reproduced": true,
-    "paired_validator_sha256": "58bf6f6e87aad8126dfb81feac2a8c3f4e09a1c5ffb552f00373d75eef2aa1f8",
+    "pinned_status_bytes_unchanged": true,
+    "staged_files": [
+      "README.md",
+      "docs/rust-rewrite/loader-admission-20261029.json",
+      "docs/rust-rewrite/precompiled-comparison.json",
+      "docs/rust-rewrite/precompiled-comparison.md",
+      "docs/rust-rewrite/precompiled-comparison.tar.gz",
+      "docs/rust-rewrite/compiler-comparison.json",
+      "docs/rust-rewrite/compiler-comparison.md",
+      "docs/rust-rewrite/compiler-comparison.tar.gz",
+      "docs/rust-rewrite/assets/precompiled-execution.svg",
+      "docs/rust-rewrite/assets/precompiled-memory.svg",
+      "docs/rust-rewrite/assets/execution-performance.svg",
+      "docs/rust-rewrite/assets/execution-memory.svg",
+      "docs/rust-rewrite/benchmark-refresh-20261028.json",
+      "docs/rust-rewrite/benchmark-refresh-20261028.md",
+      "docs/rust-rewrite/benchmark-refresh-20261028-mappings.tar.xz"
+    ],
+    "paired_validator_sha256": "8ecff6465de3cb542cd8776db142ddd364446857fb631861f7cd792f49d4032b",
     "three_validator_sha256": "af927a5934937e1b8076ae765a84a68a4fb432f138de82b33aa130ab119c54d0",
     "resources": {
       "before": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "11751424",
+        "memory.peak": "15314944",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "353964032",
+        "memory.peak": "350912512",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "cpu_affinity": [
@@ -117,32 +135,32 @@
       ]
     }
   },
-  "implementation_checkpoint": "temporal-demand-20261029.json",
-  "implementation_checkpoint_sha256": "e7a67fd2bfb6d48ad14cc3931cbc533891728efd98fa9585b7df70790e2b4342",
+  "implementation_checkpoint": "loader-admission-20261029.json",
+  "implementation_checkpoint_sha256": "086039297d869ff7bad1b83c206e4c29adbb33225acac75027715aab4d7704f5",
   "local_producer_identity": {
-    "source_commit": "e8ef6700ab5757d06f18366c65bfbc8ef07019a3",
-    "source_fingerprint": "46a22285579e3e5a762973849dbcaabff0530873e3386be5238f2be72efb843a"
+    "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+    "source_fingerprint": "18bd65b5a90a6be83aeb88b88c7808a0604e87cb1969cef7ed337ec343aae767"
   },
-  "interpretation": "Separately co-measured CI cohorts at the configured source; local controls retain their own producer identity. Policy, frontend placement and toolchains are recorded independently. RSS is not live heap or peak; no overall gain, causal cross-cohort savings, parity or full Test262/native acceptance claim.",
+  "interpretation": "Separately co-measured CI cohorts at the configured source; local admission results retain their own producer identity. Policy, frontend placement and toolchains are recorded independently. Local whole-process RSS/PSS improved, private dirty memory and broad execution were flat, and focused integer timing retained a small cost. No universal CPU gain, causal cross-cohort savings, parity or full Test262/native acceptance claim.",
   "unscored_mapping_diagnostic": {
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40855431176",
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40895619031",
     "artifact_name": "precompiled-mapping-diagnostic-unscored",
-    "artifact_id": 12890736409,
-    "source_commit": "c80fd9fbb9b38111b8df0e73ec6d6250ccbf7aee",
-    "source_fingerprint": "d85bf76ef26b7358dddb15588712ba09167253a58ac7f909f617aaaa92236ace",
-    "executable_sha256": "283d270699d8901775c6b0cd9eb196ac3300ad1f6350666f65bbbe505ae6a1a4",
+    "artifact_id": 12906874627,
+    "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5",
+    "source_fingerprint": "7f17a9cb49312aa999dc1a6bf4659a2106bd685c84b91b280b8ff3d3419b2052",
+    "executable_sha256": "cc2f3a3684b6ae5807a7cb32b8ea57eeaf429db300c5f9c2682fcf176c316783",
     "scored": false,
     "cases": 4,
     "snapshots": 16,
-    "raw_report_sha256": "88cf69910551dd4bce06fa8027457c2cea9ce62a7292d8e06cf0462cf4577dec",
-    "scored_report_sha256": "abf6facf41e79522c8dcc3195ff2fffbad99d54ec7307b32b302634de6b4de4a",
+    "raw_report_sha256": "251417d95f0f10ea5c0c62b5e36f6ea1a81cc5d358d4ee1dd945601283cd39e2",
+    "scored_report_sha256": "9cb2610af61052aa719df6521ddb401b4deda7ccd8d05954704ac19c316292b5",
     "module_function_attribution_status": "deferred: no exact owned native ELF symbol binding is collected",
     "archive": {
       "file": "benchmark-refresh-20261028-mappings.tar.xz",
-      "sha256": "568456948376ad037dd2baa2c0f759e620e0a4918516cfacb158d023b2186fc3",
-      "bytes": 2505228,
+      "sha256": "4269cd12ac899d0b3db8dd7c83b7d6a71a4d485b54749e9e85ddcb4074c9bbfd",
+      "bytes": 2110696,
       "member_count": 35,
-      "expanded_bytes": 47278913
+      "expanded_bytes": 40059726
     },
     "interpretation": "Exact image/text/section range bindings and host-page presence are diagnostic. Neither present bits nor range overlap establishes executed functions or the cause of a before/after performance change."
   }
