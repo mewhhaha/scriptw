@@ -111,7 +111,7 @@ fn every_temporal_family_identity_crosses_the_external_ensure_boundary() {
         &[
             "if slot.is_temporal()",
             "RealmEnsureTemporalArguments::new(realm)",
-            "self.emit_load_realm_intrinsic_at_index",
+            "self.emit_load_realm_intrinsic_stored_at_index",
         ],
     );
     let installation = bounded(

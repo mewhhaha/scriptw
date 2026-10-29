@@ -1,7 +1,7 @@
 //! Intrinsic identities are rooted values from the supplied defining Realm.
 
 use super::*;
-use crate::builtins::{IntlIntrinsicBuild, TemporalIntrinsicBuild};
+use crate::builtins::{BinaryDataIntrinsicBuild, IntlIntrinsicBuild, TemporalIntrinsicBuild};
 use crate::gc_types::{
     ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcStackReference, IntrinsicTable,
     RealmRecord, RealmRecordSchema, StoredValue, ValueLocals,
@@ -67,6 +67,28 @@ impl FunctionBuilder<'_> {
         result: &ValueLocals,
         function: &mut Function,
     ) {
+        let stored = self.emit_load_non_array_realm_intrinsic_stored(realm, slot, function);
+        self.emit_read_completed_intrinsic(&stored, result, function);
+        stored.clear(function);
+    }
+
+    /// Property recipes return this existing immutable record directly. All
+    /// ordinary canonical reads share the same defining-Realm demand gate.
+    pub(crate) fn emit_load_non_array_realm_intrinsic_stored(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        slot: NonArrayRealmIntrinsicSlot,
+        function: &mut Function,
+    ) -> GcLocal<StoredValue> {
+        if slot.is_binary_data() {
+            let schema = self.runtime_schema();
+            schema.call_helper(
+                crate::runtime_helpers::RealmEnsureBinaryDataArguments::new(realm),
+                self.runtime_helper_base()
+                    .expect("binary-data intrinsic reads require registered runtime helpers"),
+                function,
+            );
+        }
         if slot.is_temporal() {
             let schema = self.runtime_schema();
             let namespace = schema
@@ -91,7 +113,27 @@ impl FunctionBuilder<'_> {
                 .bind(schema, schema.reserve_gc_local(function), function);
             namespace.clear(function);
         }
-        self.emit_load_realm_intrinsic_at_index(realm, slot.gc_index(), result, function);
+        self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function)
+    }
+
+    /// Only the binary-data builder may read its completed slots while Building.
+    pub(crate) fn emit_load_building_binary_data_intrinsic(
+        &mut self,
+        building: &BinaryDataIntrinsicBuild<'_>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        assert!(
+            slot.is_binary_data(),
+            "binary-data build capability used for another cluster"
+        );
+        self.emit_load_realm_intrinsic_at_index(
+            building.realm(),
+            slot.gc_index(),
+            result,
+            function,
+        );
     }
 
     /// Only the Temporal cluster builder can obtain this capability. Ordinary
@@ -142,6 +184,17 @@ impl FunctionBuilder<'_> {
         result: &ValueLocals,
         function: &mut Function,
     ) {
+        let stored = self.emit_load_realm_intrinsic_stored_at_index(realm, index, function);
+        self.emit_read_completed_intrinsic(&stored, result, function);
+        stored.clear(function);
+    }
+
+    fn emit_load_realm_intrinsic_stored_at_index(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        index: u32,
+        function: &mut Function,
+    ) -> GcLocal<StoredValue> {
         let schema = self.runtime_schema();
         let intrinsics = schema.reserve_gc_local(function).initialize(
             schema
@@ -161,9 +214,21 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        schema.release_i32_local(slot, function);
+        intrinsics.clear(function);
+        stored
+    }
+
+    fn emit_read_completed_intrinsic(
+        &self,
+        stored: &GcLocal<StoredValue>,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         schema
             .struct_type::<StoredValue>()
-            .read_into(&stored, result, schema, function);
+            .read_into(stored, result, schema, function);
         // The table contains only completed intrinsic objects. An unpopulated
         // bootstrap slot is a compiler invariant failure at this boundary.
         function.instruction(&Instruction::I32Const(0));
@@ -182,9 +247,6 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
         function.instruction(&Instruction::End);
-        stored.clear(function);
-        schema.release_i32_local(slot, function);
-        intrinsics.clear(function);
     }
 
     pub(crate) fn emit_load_realm_array_prototype(

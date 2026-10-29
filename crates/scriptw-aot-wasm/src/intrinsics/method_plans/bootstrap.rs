@@ -116,12 +116,13 @@ pub(super) const TYPED_ARRAY_PROTOTYPE_AFTER_ALIASES: &[IntrinsicMethodSpec] = &
     ),
     IntrinsicMethodSpec::named("toSorted", StandardBuiltinId::TypedArrayPrototypeToSorted),
     IntrinsicMethodSpec::named("with", StandardBuiltinId::TypedArrayPrototypeWith),
-    IntrinsicMethodSpec::named("toString", StandardBuiltinId::TypedArrayPrototypeToString),
-    IntrinsicMethodSpec::named(
+];
+
+pub(super) const TYPED_ARRAY_PROTOTYPE_AFTER_TO_STRING: &[IntrinsicMethodSpec] =
+    &[IntrinsicMethodSpec::named(
         "toLocaleString",
         StandardBuiltinId::TypedArrayPrototypeToLocaleString,
-    ),
-];
+    )];
 
 pub(super) const TYPED_ARRAY_CONSTRUCTOR: &[IntrinsicMethodSpec] = &[
     IntrinsicMethodSpec::named("from", StandardBuiltinId::TypedArrayFrom),

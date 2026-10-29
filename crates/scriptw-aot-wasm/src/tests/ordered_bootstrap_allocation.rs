@@ -335,6 +335,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
     let bootstrap = body(bytes, bootstrap_index);
     let temporal_index = named("helper::realm_ensure_temporal");
     let temporal = body(bytes, temporal_index);
+    let binary_data = body(bytes, named("helper::realm_ensure_binary_data"));
     assert!(
         !bootstrap.iter().any(|op| matches!(op,
             Operator::Call { function_index } if *function_index == temporal_index
@@ -402,7 +403,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
         "the real helper returns to the counted loop"
     );
 
-    let spans: Vec<_> = [(false, &bootstrap), (true, &temporal)]
+    let spans: Vec<_> = [(false, &bootstrap), (true, &temporal), (false, &binary_data)]
         .into_iter()
         .flat_map(|(is_temporal, operators)| operators.windows(3).filter_map(move |ops| match ops {
             [Operator::I32Const { value: start }, Operator::I32Const { value: count },
@@ -421,6 +422,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
     let direct_installs = bootstrap
         .iter()
         .chain(temporal.iter())
+        .chain(binary_data.iter())
         .filter(|op| {
             matches!(op,
                 Operator::Call { function_index } if *function_index == install

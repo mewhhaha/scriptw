@@ -1435,6 +1435,7 @@ fn emit_script_module_with_factory(
             FunctionMetadataPublish, compile_function_metadata_publish_helper;
             RealmInitializeIntrinsics, compile_realm_initialize_intrinsics_helper;
             RealmEnsureTemporal, compile_realm_ensure_temporal_helper;
+            RealmEnsureBinaryData, compile_realm_ensure_binary_data_helper;
             RealmEnsureIntl, compile_realm_ensure_intl_helper;
             AsyncGeneratorStartBody, compile_async_generator_start_body_helper;
             AsyncGeneratorDrainQueue, compile_async_generator_drain_queue_helper;

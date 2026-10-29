@@ -415,3 +415,269 @@ local && evaluated && coerced && abrupt && immutable && effectful() && Math.imul
 "#,
     );
 }
+
+#[test]
+fn scalar_integer_loop_entry_preserves_zero_sign_and_unbounded_number_seeds() {
+    assert_scalar_execution(
+        r#"
+function unsigned(value,count) {
+  var original=0,reciprocal=0;
+  for(var index=0;index<count;index++) {
+    original=value;
+    reciprocal=1/value;
+    value=value>>>0;
+  }
+  return [value,original,reciprocal];
+}
+function signed(value,count) {
+  var original=0;
+  for(var index=0;index<count;index++) {original=value;value=value|0;}
+  return [value,original];
+}
+function literal() {
+  var value=1;
+  for(var index=0;index<1;index++) value=-0;
+  return value;
+}
+var zero=unsigned(-0,0);
+var negativeZero=unsigned(-0,1);
+var negative=signed(-2147483648,1);
+var positive=signed(2147483647,1);
+var signWrap=signed(2147483648,1);
+var unsignedTop=unsigned(4294967295,1);
+var overflow=unsigned(4294967297,1);
+var fraction=unsigned(7.75,1);
+var nan=unsigned(NaN,1);
+var infinite=unsigned(Infinity,1);
+var negativeInfinite=unsigned(-Infinity,1);
+var safeTop=unsigned(9007199254740991,1);
+var rounded=unsigned(9007199254740992,1);
+var roundedUp=unsigned(9007199254740994,1);
+Object.is(zero[0],-0) && Object.is(negativeZero[0],0) &&
+Object.is(negativeZero[1],-0) && negativeZero[2]===-Infinity &&
+negative[0]===-2147483648 && negative[1]===-2147483648 &&
+positive[0]===2147483647 && signWrap[0]===-2147483648 && signWrap[1]===2147483648 &&
+unsignedTop[0]===4294967295 && unsignedTop[1]===4294967295 &&
+overflow[0]===1 && overflow[1]===4294967297 && fraction[0]===7 && fraction[1]===7.75 &&
+nan[0]===0 && Number.isNaN(nan[1]) && infinite[0]===0 && infinite[1]===Infinity &&
+negativeInfinite[0]===0 && negativeInfinite[1]===-Infinity &&
+safeTop[0]===4294967295 && safeTop[1]===9007199254740991 &&
+rounded[0]===0 && rounded[1]===9007199254740992 &&
+roundedUp[0]===2 && roundedUp[1]===9007199254740994 && Object.is(literal(),-0);
+"#,
+    );
+}
+
+#[test]
+fn scalar_integer_residues_keep_nested_full_values_and_left_operand_snapshots() {
+    assert_scalar_execution(
+        r#"
+function fullSum(value) {
+  var full=0;
+  for(var index=0;index<1;index++) value=(full=(value>>>0)+4294967295)>>>0;
+  return value===4294967294 && full===8589934590;
+}
+function ordered() {
+  var value=3,full=0,result=0;
+  for(var index=0;index<1;index++) result=(full=value+(value=4294967295))>>>0;
+  return result===2 && full===4294967298 && value===4294967295;
+}
+function overwritten() {
+  var value=1,full=0,result=0;
+  for(var index=0;index<1;index++) result=((full=(value=value+1)*4294967296)+(value=value+1))>>>0;
+  return full===8589934592 && value===3 && result===3;
+}
+function subtract(value) {
+  for(var index=0;index<1;index++) value=((value>>>0)-4294967295)>>>0;
+  return value;
+}
+function rounded() {
+  var full=0,bits=0;
+  for(var index=0;index<1;index++) bits=(full=9007199254740991+2)>>>0;
+  return full===9007199254740992 && bits===0;
+}
+fullSum(4294967295) && ordered() && overwritten() && subtract(0)===1 && rounded();
+"#,
+    );
+}
+
+#[test]
+fn scalar_integer_loops_keep_update_writes_and_final_test_values_separate() {
+    assert_scalar_execution(
+        r#"
+function increments(value) {
+  var before=0,after=0;
+  for(var index=0;index<1;index++) {value=value>>>0;before=value++;after=++value;value=value|0;}
+  return before===4294967295 && after===4294967297 && value===1;
+}
+function decrements(value) {
+  var before=0,after=0;
+  for(var index=0;index<1;index++) {value=value|0;before=value--;after=--value;}
+  return before===-2147483648 && after===-2147483650 && value===-2147483650;
+}
+function compound(value) {
+  for(var index=0;index<1;index++) {value=value>>>0;value+=0.5;}
+  return value===4294967295.5;
+}
+function finalTest() {
+  var state=4294967293,last=0;
+  for(;(state=((state>>>0)+1)>>>0)<4294967295;) last=state|0;
+  return state===4294967295 && last===-2;
+}
+function falseTest(value) {
+  for(;(value=(value>>>0))<0;) value=1;
+  return value;
+}
+increments(4294967295) && decrements(-2147483648) && compound(4294967295) &&
+finalTest() && Object.is(falseTest(-0),0);
+"#,
+    );
+}
+
+/// Replace one one-byte instruction in the admitted source loop. Keeping all
+/// section/body lengths intact lets the normal embedding compiler validate the
+/// actual artifact; a trap then witnesses selection of this specific branch.
+fn trap_original_scalar_imul_loop(artifact: &mut scriptw_engine::Artifact) {
+    use wasmparser::{KnownCustom, Name, Operator, Parser, Payload, TypeRef};
+    let mut target = None;
+    let mut imported = 0;
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        match payload.expect("instrumented module parses") {
+            Payload::ImportSection(imports) => {
+                for import in imports.into_imports() {
+                    if matches!(
+                        import.expect("import parses").ty,
+                        TypeRef::Func(_) | TypeRef::FuncExact(_)
+                    ) {
+                        imported += 1;
+                    }
+                }
+            }
+            Payload::CustomSection(section) => {
+                if let KnownCustom::Name(subsections) = section.as_known() {
+                    for subsection in subsections {
+                        if let Name::Function(names) = subsection.expect("name subsection parses") {
+                            for naming in names {
+                                let naming = naming.expect("function name parses");
+                                if naming.name.starts_with("js::workload#") {
+                                    assert!(target.replace(naming.index).is_none());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let target = target.expect("the unchanged workload has a named source body");
+    let mut index = imported;
+    let mut traps = Vec::new();
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        let Payload::CodeSectionEntry(body) = payload.expect("code section parses") else {
+            continue;
+        };
+        if index == target {
+            let mut reader = body.get_operators_reader().expect("source body parses");
+            let mut operators = Vec::new();
+            while !reader.eof() {
+                let offset = reader.original_position();
+                operators.push((offset, reader.read().expect("source operator parses")));
+            }
+            let mut frames = Vec::new();
+            for (position, (_, operator)) in operators.iter().enumerate() {
+                match operator {
+                    Operator::Loop { .. } => frames.push(Some(position)),
+                    Operator::Block { .. } | Operator::If { .. } | Operator::TryTable { .. } => {
+                        frames.push(None);
+                    }
+                    Operator::End => {
+                        if let Some(Some(start)) = frames.pop() {
+                            let region = &operators[start + 1..position];
+                            if region.iter().any(|(_, op)| matches!(op, Operator::I32Add))
+                                && region.iter().any(|(_, op)| matches!(op, Operator::F64Lt))
+                                && !region.iter().any(|(_, op)| {
+                                    matches!(
+                                        op,
+                                        Operator::Call { .. }
+                                            | Operator::CallRef { .. }
+                                            | Operator::CallIndirect { .. }
+                                    )
+                                })
+                            {
+                                traps.extend(region.iter().filter_map(|(offset, op)| {
+                                    matches!(op, Operator::I32Mul).then_some(*offset)
+                                }));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        index += 1;
+    }
+    assert_eq!(
+        traps.len(),
+        1,
+        "exactly one primitive recurrence is instrumented"
+    );
+    assert_eq!(artifact.bytes[traps[0]], 0x6c, "i32.mul is one byte");
+    artifact.bytes[traps[0]] = 0x00; // unreachable
+}
+
+#[test]
+fn original_integer_scalar_guard_is_taken_and_live_math_replacement_declines_it() {
+    use scriptw_engine::{EmbeddedEvaluation, EmbeddedRuntime, JsCompletion};
+    scriptw_engine::configure_compilation_jobs(1).expect("one compilation worker");
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let source = format!(
+        "export function run() {{\n{}\n}}\nexport function replace() {{ Math.imul=function(left,right){{return left+right;}}; }}",
+        include_str!("../../../scriptw-cli/tests/fixtures/v8_baseline/integer.js")
+    );
+    let unit = compiler
+        .compile_module(&source, CompileOptions::default())
+        .unwrap();
+    let mut artifact = compiler.emit_wasm(&unit).unwrap();
+    trap_original_scalar_imul_loop(&mut artifact);
+    let mut config = wasmtime::Config::new();
+    scriptw_engine::configure_wasm_runtime(&mut config);
+    let engine = wasmtime::Engine::new(&config).unwrap();
+    let runtime = EmbeddedRuntime::compile(&engine, &artifact)
+        .expect("the one-byte trap artifact remains valid for the required Wasmtime baseline");
+    for rejected in [true, false] {
+        let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();
+        let mut store = wasmtime::Store::new(&engine, state);
+        store.limiter(|state| state.limits_mut());
+        store.set_epoch_deadline(u64::MAX / 2);
+        let mut linker = wasmtime::Linker::new(&engine);
+        runtime.register(&mut store, &mut linker).unwrap();
+        let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+        assert!(matches!(
+            instance.initialize(&mut store).unwrap(),
+            EmbeddedEvaluation::Settled(JsCompletion::Normal(_))
+        ));
+        if rejected {
+            let replacement = instance
+                .get_export(&mut store, "replace")
+                .unwrap()
+                .into_value();
+            assert!(matches!(
+                instance.call(&mut store, &replacement, None, &[]).unwrap(),
+                JsCompletion::Normal(_)
+            ));
+        }
+        let run = instance.get_export(&mut store, "run").unwrap().into_value();
+        let outcome = instance.call(&mut store, &run, None, &[]);
+        if rejected {
+            assert!(
+                matches!(outcome.unwrap(), JsCompletion::Normal(_)),
+                "a runtime replacement must decline the same artifact's instrumented branch"
+            );
+        } else {
+            let error =
+                outcome.expect_err("the original live native guard must select the scalar branch");
+            assert!(error.to_string().contains("unreachable"), "{error}");
+        }
+    }
+}

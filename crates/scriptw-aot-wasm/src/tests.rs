@@ -5,6 +5,7 @@ use wasmparser::{Operator, Parser, Payload, Validator, WasmFeatures};
 
 mod array_data_producers;
 mod array_from_async_shared_tail;
+mod binary_data_demand_initialization;
 mod binary_numeric_callback;
 mod bootstrap_compact_metadata;
 mod bootstrap_undefined;

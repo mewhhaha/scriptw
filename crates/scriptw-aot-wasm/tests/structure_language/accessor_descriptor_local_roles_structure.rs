@@ -177,7 +177,11 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         })
         .collect::<BTreeMap<_, _>>();
     let expected = BTreeMap::from([
-        ("builtins/bootstrap.rs", [3, 1, 0, 0, 0]),
+        ("builtins/bootstrap.rs", [0, 1, 0, 0, 0]),
+        (
+            "builtins/bootstrap/binary_data_initialization.rs",
+            [3, 0, 0, 0, 0],
+        ),
         ("builtins/string/regexp_legacy.rs", [0, 1, 0, 0, 0]),
         ("functions/arguments_object.rs", [0, 0, 1, 0, 0]),
         ("functions/throw_type_error.rs", [0, 0, 1, 0, 0]),

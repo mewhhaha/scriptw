@@ -59,7 +59,8 @@ enum NumberExpression {
 }
 
 /// These expression facts establish exact conversion ranges, independently of
-/// mutable local values. Arithmetic keeps binary64 rounding and returns Number.
+/// mutable local values. Full Number consumers always keep binary64 arithmetic;
+/// residue consumers may wrap exact integral addition and subtraction in i32.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NumberDomain {
     Number,
@@ -82,9 +83,39 @@ struct NumberBinding {
     domain: NumberDomain,
 }
 
-struct LoopLocal {
-    value: F64Local,
-    domain: NumberDomain,
+#[derive(Clone, Copy)]
+enum LoopLocal {
+    Number(F64Local),
+    Signed32(I32Local),
+    Unsigned32(I32Local),
+}
+
+impl LoopLocal {
+    fn load_number(self, function: &mut Function) {
+        match self {
+            Self::Number(value) => value.load(function),
+            Self::Signed32(value) => {
+                value.load(function);
+                function.instruction(&Instruction::F64ConvertI32S);
+            }
+            Self::Unsigned32(value) => {
+                value.load(function);
+                function.instruction(&Instruction::F64ConvertI32U);
+            }
+        }
+    }
+
+    fn store(self, function: &mut Function) {
+        match self {
+            Self::Number(value) => value.store(function),
+            Self::Signed32(value) | Self::Unsigned32(value) => value.store(function),
+        }
+    }
+}
+
+struct LoopLocals<'a> {
+    bindings: &'a [NumberBinding],
+    values: Vec<LoopLocal>,
 }
 
 /// Construction seals the complete operation and binding set before emission.
@@ -205,6 +236,12 @@ impl ScalarNumberLoop {
                 function.instruction(&Instruction::F64ReinterpretI64);
                 function.instruction(&Instruction::F64Trunc);
                 function.instruction(&Instruction::F64Eq);
+                function.instruction(&Instruction::I32And);
+                // Integer locals cannot preserve the sign of zero, including
+                // a written binding in a loop whose first test is false.
+                source.value().scalar().load(function);
+                function.instruction(&Instruction::I64Const(i64::MIN));
+                function.instruction(&Instruction::I64Ne);
                 function.instruction(&Instruction::I32And);
             }
         }
@@ -381,7 +418,11 @@ impl NumberExpression {
         match self {
             Self::Constant(bits) => {
                 let value = f64::from_bits(*bits);
-                if value.fract() == 0.0 && (i32::MIN as f64..=i32::MAX as f64).contains(&value) {
+                if *bits == (-0.0_f64).to_bits() {
+                    NumberDomain::Number
+                } else if value.fract() == 0.0
+                    && (i32::MIN as f64..=i32::MAX as f64).contains(&value)
+                {
                     NumberDomain::Signed32
                 } else if value.fract() == 0.0 && (0.0..=u32::MAX as f64).contains(&value) {
                     NumberDomain::Unsigned32
@@ -410,9 +451,9 @@ impl NumberExpression {
         }
     }
 
-    fn domain(&self, locals: &[LoopLocal]) -> NumberDomain {
+    fn domain(&self, locals: &LoopLocals<'_>) -> NumberDomain {
         match self {
-            Self::Binding(index) => locals[*index].domain,
+            Self::Binding(index) => locals.bindings[*index].domain,
             Self::Assign(_, value) | Self::Comma(_, value) => value.domain(locals),
             Self::Arithmetic(op, lhs, rhs) => {
                 Self::arithmetic_domain(*op, lhs, lhs.domain(locals), rhs, rhs.domain(locals))
@@ -424,7 +465,10 @@ impl NumberExpression {
     fn integer_bounds(&self, domain: NumberDomain) -> Option<(i64, i64)> {
         if let Self::Constant(bits) = self {
             let value = f64::from_bits(*bits);
-            if value.fract() == 0.0 && value.abs() <= MAX_SAFE_INTEGER as f64 {
+            if *bits != (-0.0_f64).to_bits()
+                && value.fract() == 0.0
+                && value.abs() <= MAX_SAFE_INTEGER as f64
+            {
                 let integer = value as i64;
                 return Some((integer, integer));
             }
@@ -460,10 +504,10 @@ impl NumberExpression {
             };
             (lower >= -MAX_SAFE_INTEGER && upper <= MAX_SAFE_INTEGER).then_some(())
         };
-        // Keep the f64 Add/Sub and its evaluation order. This fact changes
-        // only the subsequent ToUint32: no integral result here can round or
-        // overflow a signed i64 conversion. Larger or fractional ranges retain
-        // the arbitrary-Number modulo owner.
+        // Every result in these bounds is an exact integral Number. Its low
+        // bits may be computed with wrapping i32 Add/Sub when only ToUint32
+        // observes the result. Full Number consumers still emit f64 Add/Sub.
+        // Larger or fractional ranges retain the arbitrary-Number modulo owner.
         if bounds().is_some() {
             NumberDomain::SafeInteger
         } else {
@@ -504,10 +548,86 @@ impl NumberExpression {
     fn emit_uint32(
         &self,
         builder: &mut FunctionBuilder<'_>,
-        locals: &[LoopLocal],
+        locals: &LoopLocals<'_>,
         function: &mut Function,
     ) {
-        self.emit(builder, locals, function);
+        match self {
+            Self::Constant(bits) if self.intrinsic_domain() != NumberDomain::Number => {
+                function.instruction(&Instruction::I32Const(f64::from_bits(*bits) as i64 as i32));
+            }
+            Self::Binding(index) => match locals.values[*index] {
+                LoopLocal::Signed32(value) | LoopLocal::Unsigned32(value) => {
+                    value.load(function);
+                }
+                LoopLocal::Number(_) => {
+                    self.emit(builder, locals, function);
+                    self.emit_number_to_uint32(builder, locals, function);
+                }
+            },
+            Self::Bitwise(op, lhs, rhs) => {
+                lhs.emit_uint32(builder, locals, function);
+                rhs.emit_uint32(builder, locals, function);
+                function.instruction(&match op {
+                    BitwiseBinaryOp::And => Instruction::I32And,
+                    BitwiseBinaryOp::Or => Instruction::I32Or,
+                    BitwiseBinaryOp::Xor => Instruction::I32Xor,
+                    BitwiseBinaryOp::Shl => Instruction::I32Shl,
+                    BitwiseBinaryOp::Shr => Instruction::I32ShrS,
+                    BitwiseBinaryOp::UShr => Instruction::I32ShrU,
+                });
+            }
+            Self::Complement(value) => {
+                value.emit_uint32(builder, locals, function);
+                function.instruction(&Instruction::I32Const(-1));
+                function.instruction(&Instruction::I32Xor);
+            }
+            Self::Imul(lhs, rhs) => {
+                lhs.emit_uint32(builder, locals, function);
+                rhs.emit_uint32(builder, locals, function);
+                function.instruction(&Instruction::I32Mul);
+            }
+            Self::Arithmetic(op, lhs, rhs) if self.domain(locals) == NumberDomain::SafeInteger => {
+                lhs.emit_uint32(builder, locals, function);
+                rhs.emit_uint32(builder, locals, function);
+                function.instruction(&match op {
+                    NumberArithmetic::Add => Instruction::I32Add,
+                    NumberArithmetic::Sub => Instruction::I32Sub,
+                    // Only exact integral Add/Sub establish SafeInteger.
+                    NumberArithmetic::Mul | NumberArithmetic::Div => unreachable!(),
+                });
+            }
+            Self::Assign(index, value) => match locals.values[*index] {
+                LoopLocal::Signed32(target) | LoopLocal::Unsigned32(target) => {
+                    value.emit_uint32(builder, locals, function);
+                    target.store(function);
+                    target.load(function);
+                }
+                LoopLocal::Number(target) => {
+                    // This assignment is observable after the enclosing residue
+                    // is consumed. Store its full Number exactly once first.
+                    value.emit(builder, locals, function);
+                    target.store(function);
+                    target.load(function);
+                    self.emit_number_to_uint32(builder, locals, function);
+                }
+            },
+            Self::Comma(lhs, rhs) => {
+                lhs.emit_discard(builder, locals, function);
+                rhs.emit_uint32(builder, locals, function);
+            }
+            _ => {
+                self.emit(builder, locals, function);
+                self.emit_number_to_uint32(builder, locals, function);
+            }
+        }
+    }
+
+    fn emit_number_to_uint32(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        function: &mut Function,
+    ) {
         match self.domain(locals) {
             NumberDomain::Signed32 => {
                 function.instruction(&Instruction::I32TruncSatF64S);
@@ -532,19 +652,52 @@ impl NumberExpression {
         }
     }
 
+    fn emit_into(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        target: LoopLocal,
+        function: &mut Function,
+    ) {
+        match target {
+            LoopLocal::Number(_) => self.emit(builder, locals, function),
+            LoopLocal::Signed32(_) | LoopLocal::Unsigned32(_) => {
+                self.emit_uint32(builder, locals, function);
+            }
+        }
+        target.store(function);
+    }
+
+    fn emit_discard(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        function: &mut Function,
+    ) {
+        match self.domain(locals) {
+            NumberDomain::Signed32 | NumberDomain::Unsigned32 => {
+                self.emit_uint32(builder, locals, function);
+            }
+            NumberDomain::Number | NumberDomain::SafeInteger => {
+                self.emit(builder, locals, function)
+            }
+        }
+        function.instruction(&Instruction::Drop);
+    }
+
     /// The Wasm stack snapshots the complete left Number before evaluating
     /// the right expression, including assignments to any left-hand binding.
     fn emit(
         &self,
         builder: &mut FunctionBuilder<'_>,
-        locals: &[LoopLocal],
+        locals: &LoopLocals<'_>,
         function: &mut Function,
     ) {
         match self {
             Self::Constant(bits) => {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
-            Self::Binding(index) => locals[*index].value.load(function),
+            Self::Binding(index) => locals.values[*index].load_number(function),
             Self::Negate(value) => {
                 value.emit(builder, locals, function);
                 function.instruction(&Instruction::F64Neg);
@@ -554,65 +707,48 @@ impl NumberExpression {
                 rhs.emit(builder, locals, function);
                 op.emit(function);
             }
-            Self::Bitwise(op, lhs, rhs) => {
-                lhs.emit_uint32(builder, locals, function);
-                rhs.emit_uint32(builder, locals, function);
-                function.instruction(&match op {
-                    BitwiseBinaryOp::And => Instruction::I32And,
-                    BitwiseBinaryOp::Or => Instruction::I32Or,
-                    BitwiseBinaryOp::Xor => Instruction::I32Xor,
-                    BitwiseBinaryOp::Shl => Instruction::I32Shl,
-                    BitwiseBinaryOp::Shr => Instruction::I32ShrS,
-                    BitwiseBinaryOp::UShr => Instruction::I32ShrU,
-                });
-                function.instruction(&if *op == BitwiseBinaryOp::UShr {
+            Self::Bitwise(_, _, _) | Self::Complement(_) | Self::Imul(_, _) => {
+                self.emit_uint32(builder, locals, function);
+                function.instruction(&if self.domain(locals) == NumberDomain::Unsigned32 {
                     Instruction::F64ConvertI32U
                 } else {
                     Instruction::F64ConvertI32S
                 });
             }
-            Self::Complement(value) => {
-                value.emit_uint32(builder, locals, function);
-                function.instruction(&Instruction::I32Const(-1));
-                function.instruction(&Instruction::I32Xor);
-                function.instruction(&Instruction::F64ConvertI32S);
-            }
-            Self::Imul(lhs, rhs) => {
-                lhs.emit_uint32(builder, locals, function);
-                rhs.emit_uint32(builder, locals, function);
-                function.instruction(&Instruction::I32Mul);
-                function.instruction(&Instruction::F64ConvertI32S);
-            }
             Self::Assign(index, value) => {
-                value.emit(builder, locals, function);
-                locals[*index].value.store(function);
-                locals[*index].value.load(function);
+                value.emit_into(builder, locals, locals.values[*index], function);
+                locals.values[*index].load_number(function);
             }
             Self::Compound(index, op, value) => {
-                locals[*index].value.load(function);
+                locals.values[*index].load_number(function);
                 value.emit(builder, locals, function);
                 op.emit(function);
-                locals[*index].value.store(function);
-                locals[*index].value.load(function);
+                let LoopLocal::Number(target) = locals.values[*index] else {
+                    unreachable!("compound/update writes require Number locals")
+                };
+                target.store(function);
+                locals.values[*index].load_number(function);
             }
             Self::Update(index, op, mode) => {
                 if *mode == UpdateReturnMode::Postfix {
-                    locals[*index].value.load(function);
+                    locals.values[*index].load_number(function);
                 }
-                locals[*index].value.load(function);
+                locals.values[*index].load_number(function);
                 function.instruction(&Instruction::F64Const(Ieee64::from(1.0)));
                 match op {
                     NumericUpdateOp::Increment => function.instruction(&Instruction::F64Add),
                     NumericUpdateOp::Decrement => function.instruction(&Instruction::F64Sub),
                 };
-                locals[*index].value.store(function);
+                let LoopLocal::Number(target) = locals.values[*index] else {
+                    unreachable!("compound/update writes require Number locals")
+                };
+                target.store(function);
                 if *mode == UpdateReturnMode::Prefix {
-                    locals[*index].value.load(function);
+                    locals.values[*index].load_number(function);
                 }
             }
             Self::Comma(lhs, rhs) => {
-                lhs.emit(builder, locals, function);
-                function.instruction(&Instruction::Drop);
+                lhs.emit_discard(builder, locals, function);
                 rhs.emit(builder, locals, function);
             }
         }
@@ -635,7 +771,7 @@ impl NumberPredicate {
     fn emit(
         &self,
         builder: &mut FunctionBuilder<'_>,
-        locals: &[LoopLocal],
+        locals: &LoopLocals<'_>,
         function: &mut Function,
     ) {
         match self {
@@ -690,24 +826,50 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let locals: Vec<_> = plan
+        let values = plan
             .bindings
             .iter()
             .map(|binding| {
-                let local = schema.reserve_f64_local(function);
                 self.local_binding(binding.id)
                     .value()
                     .scalar()
                     .load(function);
                 function.instruction(&Instruction::F64ReinterpretI64);
+                let local = match binding.domain {
+                    NumberDomain::Number | NumberDomain::SafeInteger => {
+                        LoopLocal::Number(schema.reserve_f64_local(function))
+                    }
+                    NumberDomain::Signed32 => {
+                        function.instruction(&Instruction::I32TruncSatF64S);
+                        LoopLocal::Signed32(schema.reserve_i32_local(function))
+                    }
+                    NumberDomain::Unsigned32 => {
+                        function.instruction(&Instruction::I32TruncSatF64U);
+                        LoopLocal::Unsigned32(schema.reserve_i32_local(function))
+                    }
+                };
                 local.store(function);
-                LoopLocal {
-                    value: local,
-                    domain: binding.domain,
-                }
+                local
             })
             .collect();
-        let value = schema.reserve_f64_local(function);
+        let locals = LoopLocals {
+            bindings: &plan.bindings,
+            values,
+        };
+        // The body's last value is independent of later update/final-test
+        // writes. Keep its proven representation until loop exit, too.
+        let value = plan
+            .body
+            .last()
+            .map(|expression| match expression.domain(&locals) {
+                NumberDomain::Number | NumberDomain::SafeInteger => {
+                    LoopLocal::Number(schema.reserve_f64_local(function))
+                }
+                NumberDomain::Signed32 => LoopLocal::Signed32(schema.reserve_i32_local(function)),
+                NumberDomain::Unsigned32 => {
+                    LoopLocal::Unsigned32(schema.reserve_i32_local(function))
+                }
+            });
         let iterated = schema.reserve_i32_local(function);
         iterated.set_constant(0, function);
         let done = self.open_frame(ControlFrameKind::Block, function);
@@ -715,23 +877,25 @@ impl FunctionBuilder<'_> {
         plan.test.emit(self, &locals, function);
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, function);
-        for expression in &plan.body {
-            expression.emit(self, &locals, function);
-            value.store(function);
+        for (index, expression) in plan.body.iter().enumerate() {
+            if index + 1 == plan.body.len() {
+                expression.emit_into(self, &locals, value.expect("nonempty body"), function);
+            } else {
+                expression.emit_discard(self, &locals, function);
+            }
         }
         iterated.set_constant(1, function);
         if let Some(update) = &plan.update {
-            update.emit(self, &locals, function);
-            function.instruction(&Instruction::Drop);
+            update.emit_discard(self, &locals, function);
         }
         self.emit_branch_to_target(next, function);
         self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        for (binding, local) in plan.bindings.iter().zip(&locals) {
+        for (binding, local) in plan.bindings.iter().zip(&locals.values) {
             if binding.written {
-                local.value.load(function);
+                local.load_number(function);
                 function.instruction(&Instruction::I64ReinterpretF64);
                 self.local_binding(binding.id)
                     .value()
@@ -739,10 +903,10 @@ impl FunctionBuilder<'_> {
                     .store(function);
             }
         }
-        if !plan.body.is_empty() {
+        if let Some(value) = value {
             iterated.load(function);
             self.open_frame(ControlFrameKind::If, function);
-            value.load(function);
+            value.load_number(function);
             function.instruction(&Instruction::I64ReinterpretF64);
             self.completion().value().scalar().store(function);
             self.completion()
@@ -752,9 +916,13 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::End);
         }
         schema.release_i32_local(iterated, function);
-        schema.release_f64_local(value, function);
-        for local in locals.into_iter().rev() {
-            schema.release_f64_local(local.value, function);
+        for local in value.into_iter().chain(locals.values.into_iter().rev()) {
+            match local {
+                LoopLocal::Number(value) => schema.release_f64_local(value, function),
+                LoopLocal::Signed32(value) | LoopLocal::Unsigned32(value) => {
+                    schema.release_i32_local(value, function);
+                }
+            }
         }
     }
 }

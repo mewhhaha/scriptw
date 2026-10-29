@@ -1171,6 +1171,7 @@ runtime_helper_domain! {
     FunctionMetadataPublish / FunctionMetadataPublishArguments / FunctionMetadataPublishParameters / "function_metadata_publish" { callable:(Ref FunctionObject NonNullable),length_bits:I64,name:(Ref StringValue NonNullable),configurable:I32,has_caller:I32,create_prototype:I32,constructor_back_reference:I32,prototype_parent:Value } => Void;
     RealmInitializeIntrinsics / RealmInitializeIntrinsicsArguments / RealmInitializeIntrinsicsParameters / "realm_initialize_intrinsics" { realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => RealmInitializeIntrinsics;
     RealmEnsureTemporal / RealmEnsureTemporalArguments / RealmEnsureTemporalParameters / "realm_ensure_temporal" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
+    RealmEnsureBinaryData / RealmEnsureBinaryDataArguments / RealmEnsureBinaryDataParameters / "realm_ensure_binary_data" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureIntl / RealmEnsureIntlArguments / RealmEnsureIntlParameters / "realm_ensure_intl" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     ArrayIteratorStepValue / ArrayIteratorStepValueArguments / ArrayIteratorStepValueParameters / "array_iterator_step_value" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ArrayIteratorElision / ArrayIteratorElisionArguments / ArrayIteratorElisionParameters / "array_iterator_elision" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1342,6 +1343,7 @@ impl RuntimeHelperId {
             Self::FunctionMetadataPublish => HelperOwner::Runtime,
             Self::RealmInitializeIntrinsics => HelperOwner::Runtime,
             Self::RealmEnsureTemporal => HelperOwner::Runtime,
+            Self::RealmEnsureBinaryData => HelperOwner::Runtime,
             Self::RealmEnsureIntl => HelperOwner::Runtime,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision
@@ -1499,6 +1501,7 @@ impl RuntimeHelperId {
             Self::FunctionMetadataPublish => true,
             Self::RealmInitializeIntrinsics => true,
             Self::RealmEnsureTemporal => true,
+            Self::RealmEnsureBinaryData => true,
             Self::RealmEnsureIntl => true,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision

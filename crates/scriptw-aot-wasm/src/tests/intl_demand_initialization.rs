@@ -216,8 +216,8 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     let realm_index = type_index::<RealmRecord>(schema);
     // ABI 38 appends the state and retained namespace to RealmRecord. Check
     // their physical types below without exposing private encoder ordinals.
-    let state_field = RealmRecord::FIELD_COUNT - 2;
-    let namespace_field = RealmRecord::FIELD_COUNT - 1;
+    let state_field = RealmRecord::FIELD_COUNT - 3;
+    let namespace_field = RealmRecord::FIELD_COUNT - 2;
     assert!(resolve.windows(5).any(|ops| matches!(ops,
         [Operator::StructGet { struct_type_index, field_index }, Operator::LocalSet { local_index: retained_realm },
          Operator::LocalGet { local_index: argument_realm }, Operator::RefAsNonNull, Operator::Call { function_index }]
@@ -562,16 +562,16 @@ fn previous_layout_is_rejected_even_with_a_valid_resigned_runtime_package() {
     let source = [38; 32];
     let package = crate::encode_portable_runtime_package(runtime, &selection, &source).unwrap();
     assert_eq!(&package[..8], b"SCRWRB01");
-    assert_eq!(u32::from_le_bytes(package[8..12].try_into().unwrap()), 38);
+    assert_eq!(u32::from_le_bytes(package[8..12].try_into().unwrap()), 39);
     let admitted = crate::admit_portable_runtime_package(&package, &selection, &source).unwrap();
     assert_eq!(admitted.key(), runtime.key());
     let mut old = package;
-    old[8..12].copy_from_slice(&37u32.to_le_bytes());
+    old[8..12].copy_from_slice(&38u32.to_le_bytes());
     let end = old.len() - 32;
     let digest = Sha256::digest(&old[..end]);
     old[end..].copy_from_slice(&digest);
     assert!(
         crate::admit_portable_runtime_package(&old, &selection, &source).is_err(),
-        "a checksum-valid ABI37 envelope must not grant ABI38 layout authority"
+        "a checksum-valid ABI38 envelope must not grant ABI39 layout authority"
     );
 }

@@ -42,18 +42,6 @@ fn typed_array_intrinsic_has_one_hidden_constructable_builtin_identity() {
 
 #[test]
 fn planning_requires_hidden_typed_array_intrinsic_and_zero_length() {
-    let bootstrap_gate = bounded(
-        PLANNING_SOURCE,
-        "    pub(crate) fn needs_typed_array_intrinsic(&self) -> bool {",
-        "    fn require_foundational_roots(",
-    );
-    assert_eq!(
-        bootstrap_gate
-            .matches("*builtin == StandardBuiltinId::TypedArrayConstructor")
-            .count(),
-        1
-    );
-
     let concrete_constructor_dependencies = bounded(
         PLANNING_SOURCE,
         "        if is_typed_array_constructor(builtin) {",

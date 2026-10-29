@@ -151,6 +151,120 @@ runtime_scalar_domain!(IntlInitializationState, 0, {
     Ready = 2,
 });
 
+// Initialization of one Realm's complete canonical binary-data graph.
+runtime_scalar_domain!(BinaryDataInitializationState, 0, {
+    Dormant = 0,
+    Building = 1,
+    Ready = 2,
+});
+
+// Only public constructors can inhabit a deferred global recipe. The abstract
+// %TypedArray% remains privately rooted in the defining Realm's intrinsic table.
+runtime_scalar_domain!(BinaryDataConstructor, 0, {
+    ArrayBuffer = 0,
+    SharedArrayBuffer = 1,
+    DataView = 2,
+    Float64Array = 3,
+    Float32Array = 4,
+    Float16Array = 5,
+    Int32Array = 6,
+    Int16Array = 7,
+    Int8Array = 8,
+    Uint32Array = 9,
+    Uint16Array = 10,
+    Uint8Array = 11,
+    Uint8ClampedArray = 12,
+    BigInt64Array = 13,
+    BigUint64Array = 14,
+});
+
+impl BinaryDataConstructor {
+    pub(crate) const fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
+        match builtin {
+            scriptw_ir::StandardBuiltinId::ArrayBufferConstructor => Some(Self::ArrayBuffer),
+            scriptw_ir::StandardBuiltinId::SharedArrayBufferConstructor => {
+                Some(Self::SharedArrayBuffer)
+            }
+            scriptw_ir::StandardBuiltinId::DataViewConstructor => Some(Self::DataView),
+            scriptw_ir::StandardBuiltinId::Float64ArrayConstructor => Some(Self::Float64Array),
+            scriptw_ir::StandardBuiltinId::Float32ArrayConstructor => Some(Self::Float32Array),
+            scriptw_ir::StandardBuiltinId::Float16ArrayConstructor => Some(Self::Float16Array),
+            scriptw_ir::StandardBuiltinId::Int32ArrayConstructor => Some(Self::Int32Array),
+            scriptw_ir::StandardBuiltinId::Int16ArrayConstructor => Some(Self::Int16Array),
+            scriptw_ir::StandardBuiltinId::Int8ArrayConstructor => Some(Self::Int8Array),
+            scriptw_ir::StandardBuiltinId::Uint32ArrayConstructor => Some(Self::Uint32Array),
+            scriptw_ir::StandardBuiltinId::Uint16ArrayConstructor => Some(Self::Uint16Array),
+            scriptw_ir::StandardBuiltinId::Uint8ArrayConstructor => Some(Self::Uint8Array),
+            scriptw_ir::StandardBuiltinId::Uint8ClampedArrayConstructor => {
+                Some(Self::Uint8ClampedArray)
+            }
+            scriptw_ir::StandardBuiltinId::BigInt64ArrayConstructor => Some(Self::BigInt64Array),
+            scriptw_ir::StandardBuiltinId::BigUint64ArrayConstructor => Some(Self::BigUint64Array),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn builtin(self) -> scriptw_ir::StandardBuiltinId {
+        match self {
+            Self::ArrayBuffer => scriptw_ir::StandardBuiltinId::ArrayBufferConstructor,
+            Self::SharedArrayBuffer => scriptw_ir::StandardBuiltinId::SharedArrayBufferConstructor,
+            Self::DataView => scriptw_ir::StandardBuiltinId::DataViewConstructor,
+            Self::Float64Array => scriptw_ir::StandardBuiltinId::Float64ArrayConstructor,
+            Self::Float32Array => scriptw_ir::StandardBuiltinId::Float32ArrayConstructor,
+            Self::Float16Array => scriptw_ir::StandardBuiltinId::Float16ArrayConstructor,
+            Self::Int32Array => scriptw_ir::StandardBuiltinId::Int32ArrayConstructor,
+            Self::Int16Array => scriptw_ir::StandardBuiltinId::Int16ArrayConstructor,
+            Self::Int8Array => scriptw_ir::StandardBuiltinId::Int8ArrayConstructor,
+            Self::Uint32Array => scriptw_ir::StandardBuiltinId::Uint32ArrayConstructor,
+            Self::Uint16Array => scriptw_ir::StandardBuiltinId::Uint16ArrayConstructor,
+            Self::Uint8Array => scriptw_ir::StandardBuiltinId::Uint8ArrayConstructor,
+            Self::Uint8ClampedArray => scriptw_ir::StandardBuiltinId::Uint8ClampedArrayConstructor,
+            Self::BigInt64Array => scriptw_ir::StandardBuiltinId::BigInt64ArrayConstructor,
+            Self::BigUint64Array => scriptw_ir::StandardBuiltinId::BigUint64ArrayConstructor,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        match self {
+            Self::ArrayBuffer => {
+                crate::functions::NonArrayRealmIntrinsicSlot::ArrayBufferConstructor
+            }
+            Self::SharedArrayBuffer => {
+                crate::functions::NonArrayRealmIntrinsicSlot::SharedArrayBufferConstructor
+            }
+            Self::DataView => crate::functions::NonArrayRealmIntrinsicSlot::DataViewConstructor,
+            Self::Float64Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Float64ArrayConstructor
+            }
+            Self::Float32Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Float32ArrayConstructor
+            }
+            Self::Float16Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Float16ArrayConstructor
+            }
+            Self::Int32Array => crate::functions::NonArrayRealmIntrinsicSlot::Int32ArrayConstructor,
+            Self::Int16Array => crate::functions::NonArrayRealmIntrinsicSlot::Int16ArrayConstructor,
+            Self::Int8Array => crate::functions::NonArrayRealmIntrinsicSlot::Int8ArrayConstructor,
+            Self::Uint32Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Uint32ArrayConstructor
+            }
+            Self::Uint16Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Uint16ArrayConstructor
+            }
+            Self::Uint8Array => crate::functions::NonArrayRealmIntrinsicSlot::Uint8ArrayConstructor,
+            Self::Uint8ClampedArray => {
+                crate::functions::NonArrayRealmIntrinsicSlot::Uint8ClampedArrayConstructor
+            }
+            Self::BigInt64Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::BigInt64ArrayConstructor
+            }
+            Self::BigUint64Array => {
+                crate::functions::NonArrayRealmIntrinsicSlot::BigUint64ArrayConstructor
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DisposableStackState {
     Pending,

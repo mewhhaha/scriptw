@@ -101,6 +101,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::FunctionMetadataPublish
             | RuntimeHelperId::RealmInitializeIntrinsics
             | RuntimeHelperId::RealmEnsureTemporal
+            | RuntimeHelperId::RealmEnsureBinaryData
             | RuntimeHelperId::RealmEnsureIntl
             | RuntimeHelperId::FunctionCall
             | RuntimeHelperId::ProxyCall

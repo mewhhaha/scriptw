@@ -77,7 +77,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // the conditional JSON helper's runtime ordinal.
 // Version 38 demand-initializes defining-Realm Intl, retains its namespace and
 // state, and returns four eager namespaces from Realm initialization.
-const LAYOUT_VERSION: u32 = 38;
+// Version 39 adds defining-Realm binary-data demand initialization, its state
+// and the closed public-constructor property recipe.
+const LAYOUT_VERSION: u32 = 39;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

@@ -148,6 +148,8 @@ closed_scalar_storage!(
     crate::heap::PromiseReactionCallbackKind,
     crate::heap::TemporalInitializationState,
     crate::heap::IntlInitializationState,
+    crate::heap::BinaryDataInitializationState,
+    crate::heap::BinaryDataConstructor,
     crate::heap::DisposableStackState,
     crate::heap::AsyncDisposableStackState,
     crate::heap::DisposableStackEntryKind,
@@ -866,6 +868,10 @@ gc_layout_registry! {
         struct DeferredIntlNamespace: PropertyValue => DeferredIntlNamespaceSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
         }
+        struct DeferredBinaryDataConstructor: PropertyValue => DeferredBinaryDataConstructorSchema {
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            CONSTRUCTOR: crate::heap::BinaryDataConstructor, Immutable, NonNullable;
+        }
         struct OrdinaryObject: JavaScriptObject => OrdinaryObjectSchema {
             PROTOTYPE: GcRef<JavaScriptObject>, Mutable, Nullable;
             PROPERTIES: GcRef<ObjectPropertyStorage>, Mutable, NonNullable;
@@ -1422,6 +1428,7 @@ gc_layout_registry! {
             TEMPORAL_NAMESPACE: GcRef<StoredValue>, Mutable, Nullable;
             INTL_STATE: crate::heap::IntlInitializationState, Mutable, NonNullable;
             INTL_NAMESPACE: GcRef<StoredValue>, Mutable, Nullable;
+            BINARY_DATA_STATE: crate::heap::BinaryDataInitializationState, Mutable, NonNullable;
         }
         // Opt-in host observations retain actual Realm records without adding
         // a JavaScript property or consulting mutable globals/prototypes.

@@ -83,6 +83,7 @@ intrinsic_method_plans! {
    Json => bootstrap::JSON,
    TypedArrayPrototypeBeforeAliases => bootstrap::TYPED_ARRAY_PROTOTYPE_BEFORE_ALIASES,
    TypedArrayPrototypeAfterAliases => bootstrap::TYPED_ARRAY_PROTOTYPE_AFTER_ALIASES,
+   TypedArrayPrototypeAfterToString => bootstrap::TYPED_ARRAY_PROTOTYPE_AFTER_TO_STRING,
    TypedArrayConstructor => bootstrap::TYPED_ARRAY_CONSTRUCTOR,
 }
 

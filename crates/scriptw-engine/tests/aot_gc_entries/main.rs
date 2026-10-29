@@ -10,6 +10,7 @@ mod aot_gc_array_internal_descriptors;
 mod aot_gc_array_mutation_entries;
 mod aot_gc_array_set_data;
 mod aot_gc_async_iterator_disposal;
+mod aot_gc_binary_data_demand_initialization;
 mod aot_gc_binary_data_entries;
 mod aot_gc_collection_entries;
 mod aot_gc_compact_data_storage;

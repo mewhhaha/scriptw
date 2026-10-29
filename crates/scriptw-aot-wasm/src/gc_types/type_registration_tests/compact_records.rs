@@ -23,6 +23,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredIntlNamespace>()
         .type_index()
         .raw();
+    let binary_index = schema
+        .struct_type::<DeferredBinaryDataConstructor>()
+        .type_index()
+        .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
     let reference = |index, nullable| {
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
@@ -53,7 +57,13 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         })
         .collect::<Vec<_>>();
     alternatives.sort_unstable();
-    let mut expected = vec![stored_index, deferred_index, temporal_index, intl_index];
+    let mut expected = vec![
+        stored_index,
+        deferred_index,
+        temporal_index,
+        intl_index,
+        binary_index,
+    ];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
     let CompositeInnerType::Struct(stored) = &types[stored_index as usize].composite_type.inner
@@ -99,6 +109,25 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         ]
     );
 
+    let CompositeInnerType::Struct(binary) = &types[binary_index as usize].composite_type.inner
+    else {
+        panic!("binary-data constructor recipe must be a registered struct");
+    };
+    assert_eq!(
+        binary
+            .fields
+            .iter()
+            .map(|field| (field.element_type, field.mutable))
+            .collect::<Vec<_>>(),
+        vec![
+            (reference(realm_index, false), false),
+            (
+                wasmparser::StorageType::Val(wasmparser::ValType::I32),
+                false
+            )
+        ]
+    );
+
     for namespace_index in [temporal_index, intl_index] {
         let CompositeInnerType::Struct(namespace) =
             &types[namespace_index as usize].composite_type.inner
@@ -122,6 +151,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
     for field in [
         RealmRecordSchema::TEMPORAL_STATE.ordinal(),
         RealmRecordSchema::INTL_STATE.ordinal(),
+        RealmRecordSchema::BINARY_DATA_STATE.ordinal(),
     ] {
         let state = &realm.fields[field.raw() as usize];
         assert!(state.mutable);

@@ -406,14 +406,6 @@ impl RuntimeBootstrapPlan {
         self.temporal.members(self.full_standard_globals)
     }
 
-    pub(crate) fn needs_typed_array_intrinsic(&self) -> bool {
-        self.full_standard_globals
-            || self.standard_roots.iter().any(|builtin| {
-                *builtin == StandardBuiltinId::TypedArrayConstructor
-                    || is_typed_array_constructor(*builtin)
-            })
-    }
-
     fn require_foundational_roots(&mut self) {
         for builtin in [
             // Every ordinary callable creates an Arguments object whose own

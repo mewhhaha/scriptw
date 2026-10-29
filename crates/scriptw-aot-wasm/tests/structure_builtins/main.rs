@@ -9,6 +9,7 @@ mod array_pop_algorithm_owner_structure;
 mod array_push_algorithm_owner_structure;
 mod array_species_create_operation_evidence_structure;
 mod bigint_number_policy_structure;
+mod binary_data_demand_initialization_structure;
 mod callable_function_prototype_structure;
 mod coercive_number_arithmetic_operation_structure;
 mod ecmascript_trim_mode_structure;

@@ -9,6 +9,8 @@ use crate::objects::{
 };
 use scriptw_ir::StandardBuiltinInstaller;
 
+mod binary_data_initialization;
+pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod intl_initialization;
 mod realm_initialization;
 pub(crate) use intl_initialization::IntlIntrinsicBuild;
@@ -85,8 +87,52 @@ impl<'a> FunctionBuilder<'a> {
         prototype: &crate::gc_types::ValueLocals,
         function: &mut Function,
     ) -> Result<crate::gc_types::GcLocal<crate::gc_types::FunctionObject>, EmitError> {
-        use crate::gc_types::*;
-        use crate::intrinsics::IntrinsicKey;
+        let schema = self.runtime_schema();
+        let parent_slot = if matches!(
+            builtin,
+            StandardBuiltinId::EvalErrorConstructor
+                | StandardBuiltinId::AggregateErrorConstructor
+                | StandardBuiltinId::SuppressedErrorConstructor
+                | StandardBuiltinId::RangeErrorConstructor
+                | StandardBuiltinId::SyntaxErrorConstructor
+                | StandardBuiltinId::TypeErrorConstructor
+                | StandardBuiltinId::URIErrorConstructor
+                | StandardBuiltinId::ReferenceErrorConstructor
+        ) {
+            Some(NonArrayRealmIntrinsicSlot::ErrorConstructor)
+        } else if is_typed_array_constructor(builtin) {
+            Some(NonArrayRealmIntrinsicSlot::TypedArrayConstructor)
+        } else {
+            None
+        };
+        let parent = parent_slot.map(|slot| {
+            let value = schema.reserve_value_local(function);
+            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
+            value
+        });
+        let constructor = self.init_builtin_constructor_object_with_parent(
+            builtin,
+            realm,
+            prototype,
+            parent.as_ref(),
+            function,
+        )?;
+        if let Some(parent) = parent {
+            parent.clear(function);
+        }
+        Ok(constructor)
+    }
+
+    // The binary-data builder passes already-built parents explicitly. Resolving
+    // a typed-array parent through an ordinary read here would reenter Building.
+    fn init_builtin_constructor_object_with_parent(
+        &mut self,
+        builtin: StandardBuiltinId,
+        realm: &RealmFunctionMaterializationContext,
+        prototype: &ValueLocals,
+        parent: Option<&ValueLocals>,
+        function: &mut Function,
+    ) -> Result<GcLocal<FunctionObject>, EmitError> {
         let meta = self
             .functions
             .get(&builtin.function_id())
@@ -112,29 +158,10 @@ impl<'a> FunctionBuilder<'a> {
                 self.emit_object_header_projection(&constructor_value, function),
                 function,
             );
-        let parent_constructor = if matches!(
-            builtin,
-            StandardBuiltinId::EvalErrorConstructor
-                | StandardBuiltinId::AggregateErrorConstructor
-                | StandardBuiltinId::SuppressedErrorConstructor
-                | StandardBuiltinId::RangeErrorConstructor
-                | StandardBuiltinId::SyntaxErrorConstructor
-                | StandardBuiltinId::TypeErrorConstructor
-                | StandardBuiltinId::URIErrorConstructor
-                | StandardBuiltinId::ReferenceErrorConstructor
-        ) {
-            Some(NonArrayRealmIntrinsicSlot::ErrorConstructor)
-        } else if is_typed_array_constructor(builtin) {
-            Some(NonArrayRealmIntrinsicSlot::TypedArrayConstructor)
-        } else {
-            None
-        };
-        if let Some(slot) = parent_constructor {
-            let parent = schema.reserve_value_local(function);
-            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &parent, function);
+        if let Some(parent) = parent {
             let stored = schema
                 .reserve_gc_local(function)
-                .initialize(schema.prototype_reference(&parent, function), function);
+                .initialize(schema.prototype_reference(parent, function), function);
             schema
                 .struct_type::<OrdinaryObject>()
                 .field(OrdinaryObjectSchema::PROTOTYPE)
@@ -145,7 +172,6 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 );
             stored.clear(function);
-            parent.clear(function);
         }
         if builtin != StandardBuiltinId::ProxyConstructor {
             self.emit_install_intrinsic_data(
@@ -540,104 +566,6 @@ impl<'a> FunctionBuilder<'a> {
             )?;
         }
         Ok(object)
-    }
-
-    pub(crate) fn init_typed_array_intrinsic(
-        &mut self,
-        realm: &RealmFunctionMaterializationContext,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let prototype = schema.reserve_value_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            realm.realm(),
-            NonArrayRealmIntrinsicSlot::TypedArrayPrototype,
-            &prototype,
-            function,
-        );
-        let constructor = self.init_builtin_constructor_object(
-            StandardBuiltinId::TypedArrayConstructor,
-            realm,
-            &prototype,
-            function,
-        )?;
-        let constructor_value = schema.reserve_value_local(function);
-        constructor_value.set_reference(&constructor, schema, function);
-        self.emit_install_intrinsic_accessor(
-            &constructor_value,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Species),
-            AccessorDescriptor::Getter(AccessorGetter::new(
-                StandardBuiltinId::TypedArraySpeciesGetter,
-            )),
-            realm,
-            true,
-            function,
-        )?;
-        for (name, builtin) in [
-            ("buffer", StandardBuiltinId::TypedArrayPrototypeBufferGetter),
-            (
-                "byteLength",
-                StandardBuiltinId::TypedArrayPrototypeByteLengthGetter,
-            ),
-            (
-                "byteOffset",
-                StandardBuiltinId::TypedArrayPrototypeByteOffsetGetter,
-            ),
-            ("length", StandardBuiltinId::TypedArrayPrototypeLengthGetter),
-        ] {
-            self.emit_install_intrinsic_accessor(
-                &prototype,
-                IntrinsicKey::Name(name),
-                AccessorDescriptor::Getter(AccessorGetter::new(builtin)),
-                realm,
-                true,
-                function,
-            )?;
-        }
-        self.emit_install_intrinsic_accessor(
-            &prototype,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            AccessorDescriptor::Getter(AccessorGetter::new(
-                StandardBuiltinId::TypedArrayPrototypeToStringTagGetter,
-            )),
-            realm,
-            true,
-            function,
-        )?;
-        self.emit_install_intrinsic_methods(
-            &prototype,
-            crate::intrinsics::IntrinsicMethodPlan::TypedArrayPrototypeBeforeAliases,
-            realm,
-            function,
-        )?;
-        self.emit_install_intrinsic_method_aliases(
-            &prototype,
-            &[
-                IntrinsicKey::Name("values"),
-                IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Iterator),
-            ],
-            StandardBuiltinId::TypedArrayPrototypeValues,
-            realm,
-            true,
-            true,
-            function,
-        )?;
-        self.emit_install_intrinsic_methods(
-            &prototype,
-            crate::intrinsics::IntrinsicMethodPlan::TypedArrayPrototypeAfterAliases,
-            realm,
-            function,
-        )?;
-        self.emit_install_intrinsic_methods(
-            &constructor_value,
-            crate::intrinsics::IntrinsicMethodPlan::TypedArrayConstructor,
-            realm,
-            function,
-        )?;
-        constructor_value.clear(function);
-        constructor.clear(function);
-        prototype.clear(function);
-        Ok(())
     }
 
     fn emit_bootstrap_iterator_prototypes(
@@ -1147,10 +1075,6 @@ impl<'a> FunctionBuilder<'a> {
             NonArrayRealmIntrinsicSlot::SetPrototype,
             NonArrayRealmIntrinsicSlot::SymbolPrototype,
             NonArrayRealmIntrinsicSlot::BigIntPrototype,
-            NonArrayRealmIntrinsicSlot::ArrayBufferPrototype,
-            NonArrayRealmIntrinsicSlot::SharedArrayBufferPrototype,
-            NonArrayRealmIntrinsicSlot::DataViewPrototype,
-            NonArrayRealmIntrinsicSlot::TypedArrayPrototype,
             NonArrayRealmIntrinsicSlot::RegExpPrototype,
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
@@ -1322,18 +1246,6 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_bootstrap_iterator_prototypes(&context, function)?;
         for (builtin, slot) in [
             (
-                StandardBuiltinId::ArrayBufferConstructor,
-                NonArrayRealmIntrinsicSlot::ArrayBufferPrototype,
-            ),
-            (
-                StandardBuiltinId::SharedArrayBufferConstructor,
-                NonArrayRealmIntrinsicSlot::SharedArrayBufferPrototype,
-            ),
-            (
-                StandardBuiltinId::DataViewConstructor,
-                NonArrayRealmIntrinsicSlot::DataViewPrototype,
-            ),
-            (
                 StandardBuiltinId::DateConstructor,
                 NonArrayRealmIntrinsicSlot::DatePrototype,
             ),
@@ -1346,26 +1258,6 @@ impl<'a> FunctionBuilder<'a> {
                 .runtime_bootstrap_plan
                 .should_initialize_standard_builtin(builtin)
             {
-                self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
-            }
-        }
-        if self.runtime_bootstrap_plan.needs_typed_array_intrinsic() {
-            self.init_typed_array_intrinsic(&context, function)?;
-        }
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::TypedArrayPrototype,
-            &parent,
-            function,
-        );
-        for kind in TypedArrayElementKind::ALL {
-            let builtin = kind.constructor();
-            if self
-                .runtime_bootstrap_plan
-                .should_initialize_standard_builtin(builtin)
-            {
-                let slot = NonArrayRealmIntrinsicSlot::prototype_identity(kind);
-                self.emit_bootstrap_plain_prototype(&context, slot, &parent, function)?;
                 self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
             }
         }
@@ -1777,6 +1669,18 @@ impl<'a> FunctionBuilder<'a> {
                     continue;
                 }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
+                    if let Some(constructor) =
+                        crate::heap::BinaryDataConstructor::from_builtin(*builtin)
+                    {
+                        self.emit_install_deferred_binary_data_constructor(
+                            &object,
+                            &binding.name,
+                            constructor,
+                            &bootstrap.realm,
+                            function,
+                        )?;
+                        continue;
+                    }
                     if *builtin == StandardBuiltinId::EvalFunction {
                         self.emit_load_realm_eval_intrinsic_to_local(
                             bootstrap.realm.realm(),

@@ -47,7 +47,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The current private runtime ABI is layout 38. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 39. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate
@@ -68,11 +68,12 @@ Eager Realm constructors allocate their initial dictionary metadata directly,
 then bootstrap adds prototype and family properties. This avoids temporary
 compact-storage conversion. Ordinary native methods retain compact metadata.
 
-Temporal and Intl graphs initialize on their first observable or internal use.
+Temporal, Intl and binary-data graphs initialize on their first observable or internal use.
 Each defining Realm retains the complete canonical graph after initialization,
 independently of public namespace deletion or replacement. Own-key enumeration
 can inspect unresolved property recipes without creating those graphs; reads
 that expose property values resolve them through the defining Realm.
+The callable shared by Array and TypedArray `toString` remains core-owned.
 
 ## Execution stacks
 

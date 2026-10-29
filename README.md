@@ -21,14 +21,16 @@ can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
 Runtime initialization uses compact intrinsic-installation tables and defers
-the complete Temporal and Intl namespaces until their first observable or internal use.
+the Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 38
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 39
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
-other values retain the full coercion path. Guarded Number loops and packed Array
+other values retain the full coercion path. Closed scalar loops retain proven
+32-bit integers in integer locals while preserving Number values at their exits.
+Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
 semantic checks pass. Primitive string-length
 reads and guarded constant-return calls eliminate temporary objects and call

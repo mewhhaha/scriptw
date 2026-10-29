@@ -239,6 +239,29 @@ fn numeric_loop_admission_uses_operations_and_binding_identity() {
     }
 }
 
+fn scalar_integer_loop(operators: &[Operator<'_>]) -> bool {
+    operators.iter().any(|op| matches!(op, Operator::I32Mul))
+        && operators.iter().any(|op| matches!(op, Operator::F64Lt))
+        && operators.iter().all(|op| {
+            matches!(
+                op,
+                Operator::LocalGet { .. }
+                    | Operator::LocalSet { .. }
+                    | Operator::F64Const { .. }
+                    | Operator::I32Const { .. }
+                    | Operator::F64Add
+                    | Operator::F64Lt
+                    | Operator::I32Mul
+                    | Operator::I32Add
+                    | Operator::I32ShrU
+                    | Operator::I32Eqz
+                    | Operator::Br { .. }
+                    | Operator::BrIf { .. }
+                    | Operator::Drop
+            )
+        })
+}
+
 #[test]
 fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard() {
     with_source_operators(
@@ -248,64 +271,69 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
             let loops = loop_regions(operators);
             let primitive_imul = loops
                 .iter()
-                .filter(|region| {
-                    region.iter().any(|op| matches!(op, Operator::I32Mul))
-                        && region.iter().any(|op| matches!(op, Operator::F64Lt))
-                        && region.iter().all(|op| {
-                            matches!(
-                                op,
-                                Operator::LocalGet { .. }
-                                    | Operator::LocalSet { .. }
-                                    | Operator::F64Const { .. }
-                                    | Operator::I32Const { .. }
-                                    | Operator::F64Add
-                                    | Operator::F64Sub
-                                    | Operator::F64Mul
-                                    | Operator::F64Div
-                                    | Operator::F64Floor
-                                    | Operator::F64Trunc
-                                    | Operator::F64Lt
-                                    | Operator::I32Mul
-                                    | Operator::I32ShrU
-                                    | Operator::I32WrapI64
-                                    | Operator::I32Eqz
-                                    | Operator::I32TruncSatF64S
-                                    | Operator::I32TruncSatF64U
-                                    | Operator::I64TruncSatF64U
-                                    | Operator::I64TruncSatF64S
-                                    | Operator::I64ReinterpretF64
-                                    | Operator::F64ReinterpretI64
-                                    | Operator::F64ConvertI32S
-                                    | Operator::F64ConvertI32U
-                                    | Operator::Br { .. }
-                                    | Operator::BrIf { .. }
-                                    | Operator::Drop
-                            )
-                        })
-                })
-                .count();
-            assert_eq!(primitive_imul, 1,
-                "the unchanged integer recurrence needs one loop with no per-iteration property/call/Realm/GC traffic");
-            assert!(
-                loops.iter().any(
-                    |region| region.iter().any(|op| matches!(op, Operator::I32Mul))
-                        && region
-                            .iter()
-                            .any(|op| matches!(op, Operator::I32TruncSatF64U))
-                ),
-                "the uint32 state invariant removes its arbitrary-Number modulo conversion"
+                .filter(|region| scalar_integer_loop(region))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                primitive_imul.len(),
+                1,
+                "the unchanged integer recurrence needs one loop with no per-iteration property/call/Realm/GC traffic or float/integer conversions"
             );
-            assert!(loops.iter().any(|region|
-                region.iter().any(|op| matches!(op, Operator::I32Mul))
-                && region.iter().any(|op| matches!(op, Operator::I64TruncSatF64S))
-                && !region.iter().any(|op| matches!(op, Operator::F64Floor))),
-                "the exact bounded sum keeps f64 addition and converts its residue without floating modulo");
+            assert!(
+                primitive_imul[0].windows(5).any(|ops| matches!(
+                    ops,
+                    [
+                        Operator::I32Mul,
+                        Operator::I32Const { value: 1013904223 },
+                        Operator::I32Add,
+                        Operator::I32Const { value: 0 },
+                        Operator::I32ShrU
+                    ]
+                )),
+                "the exact Number sum is observed only as a residue and must stay in i32"
+            );
             assert!(
                 loops.iter().any(|region| region
                     .iter()
                     .any(|op| matches!(op, Operator::Call { .. }))
                     && region.iter().any(|op| matches!(op, Operator::I32Mul))),
                 "failed invariant/native guards retain the existing ordered call path"
+            );
+        },
+    );
+}
+
+#[test]
+fn integer_residue_consumers_preserve_full_number_assignment_stores() {
+    with_source_operators(
+        "function run(state) { var full=0; for(var i=0;i<2;i++) state=(full=Math.imul(state,1664525)+1013904223)>>>0; return full; } run(123456789);",
+        "run",
+        |operators| {
+            let loops = loop_regions(operators);
+            let scalar = loops
+                .iter()
+                .find(|region| {
+                    region.iter().any(|op| matches!(op, Operator::I32Mul))
+                        && !region.iter().any(|op| matches!(op, Operator::Call { .. }))
+                })
+                .expect("the assignment remains a scalar region");
+            assert!(
+                scalar.windows(5).any(|ops| matches!(
+                    ops,
+                    [
+                        Operator::I32Mul,
+                        Operator::F64ConvertI32S,
+                        Operator::F64Const { .. },
+                        Operator::F64Add,
+                        Operator::LocalSet { .. }
+                    ]
+                )),
+                "an enclosing ToUint32 cannot truncate the nested assignment's full Number"
+            );
+            assert!(
+                scalar
+                    .iter()
+                    .any(|op| matches!(op, Operator::I64TruncSatF64S)),
+                "the stored full exact sum is converted only after its assignment"
             );
         },
     );

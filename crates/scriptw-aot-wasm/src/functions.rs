@@ -370,6 +370,45 @@ impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
     pub(crate) const TABLE_LENGTH: u32 = 159;
 
+    /// The binary-data graph excludes the callable shared with Array.prototype.
+    pub(crate) const fn is_binary_data(self) -> bool {
+        matches!(
+            self,
+            Self::ArrayBufferConstructor
+                | Self::SharedArrayBufferConstructor
+                | Self::DataViewConstructor
+                | Self::Float64ArrayConstructor
+                | Self::Float32ArrayConstructor
+                | Self::Float16ArrayConstructor
+                | Self::Int32ArrayConstructor
+                | Self::Int16ArrayConstructor
+                | Self::Int8ArrayConstructor
+                | Self::Uint32ArrayConstructor
+                | Self::Uint16ArrayConstructor
+                | Self::Uint8ArrayConstructor
+                | Self::Uint8ClampedArrayConstructor
+                | Self::BigInt64ArrayConstructor
+                | Self::BigUint64ArrayConstructor
+                | Self::TypedArrayConstructor
+                | Self::ArrayBufferPrototype
+                | Self::SharedArrayBufferPrototype
+                | Self::DataViewPrototype
+                | Self::Float64ArrayPrototype
+                | Self::Float32ArrayPrototype
+                | Self::Float16ArrayPrototype
+                | Self::Int32ArrayPrototype
+                | Self::Int16ArrayPrototype
+                | Self::Int8ArrayPrototype
+                | Self::Uint32ArrayPrototype
+                | Self::Uint16ArrayPrototype
+                | Self::Uint8ArrayPrototype
+                | Self::Uint8ClampedArrayPrototype
+                | Self::BigInt64ArrayPrototype
+                | Self::BigUint64ArrayPrototype
+                | Self::TypedArrayPrototype
+        )
+    }
+
     /// Every externally observable identity owned by the Temporal cluster.
     pub(crate) const fn is_temporal(self) -> bool {
         matches!(
@@ -686,6 +725,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(schema),
                 GcOperand::constant(crate::heap::IntlInitializationState::Dormant),
                 GcOperand::null(schema),
+                GcOperand::constant(crate::heap::BinaryDataInitializationState::Dormant),
             ),
             function,
         );
