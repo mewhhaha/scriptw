@@ -2,18 +2,48 @@
 //! metadata or incremental caches. The ordinary Cargo target compiler defines
 //! the exact array ABI; cc's target archiver packages the resulting data object.
 
-#[path = "data_definitions.rs"]
-mod data_definitions;
 #[path = "../../scriptw-engine/src/embedded_runtime/output.rs"]
 mod output;
 
-use data_definitions::PARTS;
+use std::fmt::Write;
 use std::path::Path;
 use std::process::Command;
 
+const PARTS: [(&str, &str); 11] = [
+    ("SCRIPTW_RUNTIME_EXECUTION", "scriptw-runtime-execution.bin"),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_EXECUTION",
+        "scriptw-runtime-portable-execution.bin",
+    ),
+    ("SCRIPTW_RUNTIME_METADATA", "scriptw-runtime-metadata.bin"),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_METADATA",
+        "scriptw-runtime-portable-metadata.bin",
+    ),
+    (
+        "SCRIPTW_RUNTIME_INTL_METADATA",
+        "scriptw-runtime-intl-metadata.bin",
+    ),
+    ("SCRIPTW_RUNTIME_PACKAGE", "scriptw-runtime-package.bin"),
+    ("SCRIPTW_RUNTIME_NATIVE", "scriptw-runtime-native.packed"),
+    ("SCRIPTW_RUNTIME_MANIFEST", "scriptw-runtime-manifest.bin"),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_PACKAGE",
+        "scriptw-runtime-portable-package.bin",
+    ),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_NATIVE",
+        "scriptw-runtime-portable-native.packed",
+    ),
+    (
+        "SCRIPTW_RUNTIME_PORTABLE_MANIFEST",
+        "scriptw-runtime-portable-manifest.bin",
+    ),
+];
+
 pub(super) fn embed(out: &Path, target: &str) {
     println!("cargo:rustc-check-cfg=cfg(scriptw_runtime_image)");
-    let lengths = PARTS.map(|(_, name, _)| {
+    let lengths = PARTS.map(|(_, name)| {
         std::fs::metadata(out.join(name))
             .expect("checked runtime producer published every image")
             .len()
@@ -26,7 +56,18 @@ pub(super) fn embed(out: &Path, target: &str) {
         return;
     }
     assert!(lengths.iter().all(|&length| length > 0));
-    let (definitions, declarations) = data_definitions::sources(out, lengths);
+    let mut definitions = "#![no_std]\n".to_owned();
+    let mut declarations = "unsafe extern \"C\" {\n".to_owned();
+    for ((symbol, name), length) in PARTS.into_iter().zip(lengths) {
+        let path = out.join(name);
+        writeln!(
+            definitions,
+            "#[unsafe(no_mangle)]\npub static {symbol}: [u8; {length}] = *include_bytes!({path:?});"
+        )
+        .unwrap();
+        writeln!(declarations, "    static {symbol}: [u8; {length}];").unwrap();
+    }
+    declarations.push_str("}\n");
     let source = out.join("image_data.rs");
     let object = out.join("image_data.o");
     output::write(&source, definitions).expect("image data definitions write completely");

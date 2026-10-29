@@ -522,9 +522,8 @@ runtime_image_build="crates/scriptw-runtime-image/build.rs"
 runtime_image_source="crates/scriptw-runtime-image/src/lib.rs"
 runtime_image_metadata="crates/scriptw-runtime-image/src/metadata.rs"
 runtime_image_objects="crates/scriptw-runtime-image/build/objects.rs"
-runtime_image_definitions="crates/scriptw-runtime-image/build/data_definitions.rs"
 wasm_build_package="crates/scriptw-aot-wasm/src/runtime_artifact/build_package.rs"
-for native_owner in "$engine_native_config" "$engine_embedded_runtime" "$engine_embedded_build" "$engine_embedded_compile" "$engine_native_stencils" "$runtime_image_build" "$runtime_image_source" "$runtime_image_objects" "$runtime_image_definitions" crates/scriptw-runtime-image/Cargo.toml "$wasm_build_package"; do
+for native_owner in "$engine_native_config" "$engine_embedded_runtime" "$engine_embedded_build" "$engine_embedded_compile" "$engine_native_stencils" "$runtime_image_build" "$runtime_image_source" "$runtime_image_objects" crates/scriptw-runtime-image/Cargo.toml "$wasm_build_package"; do
   require_file "$native_owner"
 done
 require_exact_line_count crates/scriptw-engine/src/lib.rs 'mod wasmtime_config;' 1 'shared native configuration owner'
@@ -540,7 +539,7 @@ require_fixed_string_count "$engine_embedded_images" 'use scriptw_runtime_image 
 require_fixed_string_count "$engine_embedded_runtime" 'Images::package_for_profile(source_compilation_profile)' 1 'raw candidate uses its exact source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'self.images.profile == runtime.source_compilation_profile()' 1 'native candidate rejects a foreign source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'include_bytes!' 0 'image bytes do not enter Engine initializers'
-require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 9 'nine non-inline image and Intl metadata accessors'
+require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 7 'seven non-inline image and Intl metadata accessors'
 require_file "$runtime_image_metadata"
 require_module_decl "$runtime_image_source" metadata
 require_exact_line_count "$runtime_image_source" 'pub use metadata::{metadata, portable_metadata};' 1 'the two immutable receipt accessors'
@@ -554,14 +553,14 @@ require_fixed_string_count "$runtime_image_build" 'objects::embed(&out, &target)
 require_fixed_string_count "$runtime_image_objects" '"--emit=obj"' 1 'data compilation emits no Rust metadata'
 require_fixed_string_count "$runtime_image_objects" '"-Cembed-bitcode=no"' 1 'data-only object contains no duplicate bitcode image'
 require_fixed_string_count "$runtime_image_objects" '.compile("scriptw_runtime_images")' 1 'target archiver owns the complete linked image'
-require_exact_line_count "$runtime_image_definitions" 'pub(super) const PARTS: [(&str, &str, Placement); 11] = [' 1 'exact image and receipt definition inventory'
+require_exact_line_count "$runtime_image_objects" 'const PARTS: [(&str, &str); 9] = [' 1 'exact image and receipt definition inventory'
 for image_part in package native manifest metadata; do
   if [ "$image_part" = native ]; then
-    require_fixed_string_count "$runtime_image_definitions" 'scriptw-runtime-native.packed' 1 'one compressed NativeHost native storage definition'
-    require_fixed_string_count "$runtime_image_definitions" 'scriptw-runtime-portable-native.packed' 1 'one compressed Portable native storage definition'
+    require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-native.packed' 1 'one compressed NativeHost native storage definition'
+    require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-portable-native.packed' 1 'one compressed Portable native storage definition'
   else
-    require_fixed_string_count "$runtime_image_definitions" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest/receipt definition'
-    require_fixed_string_count "$runtime_image_definitions" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest/receipt'
+    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest/receipt definition'
+    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest/receipt'
   fi
 done
 require_exact_line_count crates/scriptw-aot-wasm/src/runtime_artifact.rs 'mod build_package;' 1 'private checked build-package owner'
