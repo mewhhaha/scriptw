@@ -305,7 +305,7 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
 #[test]
 fn integer_residue_consumers_preserve_full_number_assignment_stores() {
     with_source_operators(
-        "function run(state) { var full=0; for(var i=0;i<2;i++) state=(full=Math.imul(state,1664525)+1013904223)>>>0; return full; } run(123456789);",
+        "function run(state) { \"use strict\"; var full=0; for(var i=0;i<2;i++) state=(full=Math.imul(state,1664525)+1013904223)>>>0; return full; } run(123456789);",
         "run",
         |operators| {
             let loops = loop_regions(operators);
