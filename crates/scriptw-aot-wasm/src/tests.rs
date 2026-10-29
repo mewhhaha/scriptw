@@ -11,6 +11,8 @@ mod bootstrap_undefined;
 mod call_arity;
 mod constant_leaf;
 mod direct_eval_dispatch;
+mod guarded_number_add;
+mod guarded_number_relational;
 mod intrinsic_accessor_allocation;
 mod numeric_imul;
 mod numeric_leaf;

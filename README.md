@@ -27,8 +27,10 @@ Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
 host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 37
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
-Guarded Number loops and packed Array push/join kernels avoid repeated conversion,
-dispatch and allocation when their semantic checks pass. Primitive string-length
+Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
+other values retain the full coercion path. Guarded Number loops and packed Array
+push/join kernels avoid repeated conversion, dispatch and allocation when their
+semantic checks pass. Primitive string-length
 reads and guarded constant-return calls eliminate temporary objects and call
 setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
 and writeback retain ordinary mutation checks. The benchmark sections below

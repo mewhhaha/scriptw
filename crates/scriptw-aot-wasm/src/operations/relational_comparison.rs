@@ -21,14 +21,14 @@ fn emits_number_result(expression: &TypedExpr, depth: u8) -> bool {
                 | SpecOperationIr::ToIndex,
             ..
         } => true,
-        ExprIr::BinaryNumber { .. } => expression.kind == ValueKind::Number,
-        ExprIr::CoerciveAdd { lhs, rhs }
+        ExprIr::BinaryNumber { lhs, rhs, .. }
+        | ExprIr::CoerciveAdd { lhs, rhs }
         | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
         | ExprIr::BitwiseNumeric { lhs, rhs, .. } => {
-            lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number
+            emits_number_result(lhs, depth) && emits_number_result(rhs, depth)
         }
         ExprIr::UnaryMinusNumeric { expr } | ExprIr::UnaryBitwiseNumeric { expr, .. } => {
-            expr.kind == ValueKind::Number
+            emits_number_result(expr, depth)
         }
         ExprIr::UnaryPlus { expr } => {
             expr.kind != ValueKind::Number || emits_number_result(expr, depth)
@@ -40,8 +40,8 @@ fn emits_number_result(expression: &TypedExpr, depth: u8) -> bool {
 }
 
 impl FunctionBuilder<'_> {
-    /// GetValue remains left-to-right in P. R owns both observable primitive
-    /// conversions and the complete String/BigInt/Number comparison once.
+    /// GetValue remains left-to-right in P. Actual Number pairs need no
+    /// coercion; R retains all other primitive conversions and comparisons.
     pub(crate) fn compile_compare_value_i32(
         &mut self,
         op: RelationalBinaryOp,
@@ -56,8 +56,27 @@ impl FunctionBuilder<'_> {
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
         let pending = schema.reserve_completion(function);
+        let predicate = schema.reserve_i32_local(function);
         self.compile_expr_to_value(lhs, &left, function)?;
         self.compile_expr_to_value(rhs, &right, function)?;
+        self.emit_value_tag_is_i32(&left, WasmRuntimeValueTag::Number, function);
+        self.emit_value_tag_is_i32(&right, WasmRuntimeValueTag::Number, function);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        left.scalar().load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        right.scalar().load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        // Wasm ordered comparisons return false for either NaN operand and
+        // compare the two zero signs as equal, exactly as all four JS operators.
+        function.instruction(&match op {
+            RelationalBinaryOp::LessThan => Instruction::F64Lt,
+            RelationalBinaryOp::LessThanOrEqual => Instruction::F64Le,
+            RelationalBinaryOp::GreaterThan => Instruction::F64Gt,
+            RelationalBinaryOp::GreaterThanOrEqual => Instruction::F64Ge,
+        });
+        predicate.store(function);
+        function.instruction(&Instruction::Else);
         let realm = self.emit_execution_realm(function);
         schema
             .call_helper(
@@ -73,8 +92,10 @@ impl FunctionBuilder<'_> {
             )
             .store(&pending, function);
         realm.clear(function);
-        right.clear(function);
-        left.clear(function);
+        // Keep release ownership until the branches merge, but remove the
+        // saved roots before a Throw can branch to the caller's active handler.
+        right.reference().clear(function);
+        left.reference().clear(function);
         self.finish_to_primitive_operation(
             ToPrimitiveAbruptRoute::ActiveHandler,
             &pending,
@@ -89,7 +110,14 @@ impl FunctionBuilder<'_> {
             RelationalBinaryOp::GreaterThan => function.instruction(&Instruction::F64Gt),
             RelationalBinaryOp::GreaterThanOrEqual => function.instruction(&Instruction::F64Ge),
         };
+        predicate.store(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         pending.clear(function);
+        right.clear(function);
+        left.clear(function);
+        predicate.load(function);
+        schema.release_i32_local(predicate, function);
         Ok(())
     }
 

@@ -584,6 +584,13 @@ impl<'a> FunctionBuilder<'a> {
         match value_kind {
             NumericUpdateValueKind::BigInt => {}
             NumericUpdateValueKind::Dynamic | NumericUpdateValueKind::Number => {
+                // The IR Number kind also admits primitives needing ToNumber.
+                // Only the acquired runtime tag proves that the saved old value
+                // is already numeric; retaining it also preserves postfix -0.
+                old.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+                function.instruction(&Instruction::I32Ne);
+                self.open_frame(ControlFrameKind::If, function);
                 let pending = schema.reserve_completion(function);
                 pending.initialize(function);
                 match value_kind {
@@ -599,6 +606,8 @@ impl<'a> FunctionBuilder<'a> {
                 self.emit_propagate_current_throw_if_needed(function);
                 old.copy_from(pending.value(), function);
                 pending.clear(function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
             }
         }
         Ok(())

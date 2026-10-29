@@ -2,7 +2,7 @@ use super::*;
 use crate::runtime_helpers::{CoerciveAddArguments, CoerciveAddParameters, HelperParameters};
 
 impl FunctionBuilder<'_> {
-    /// Evaluation stays in P; the complete observable addition runs once in R.
+    /// Evaluation stays in P; non-Number pairs retain R's complete coercion owner.
     pub(crate) fn compile_coercive_add_to_locals(
         &mut self,
         lhs: &TypedExpr,
@@ -36,8 +36,8 @@ impl FunctionBuilder<'_> {
     }
 
     /// Borrow once-evaluated rooted operands. The caller releases its roots
-    /// before routing abrupt completion; ToPrimitive/ToString stay in R's
-    /// existing addition owner and cannot be duplicated by a consumer.
+    /// before routing abrupt completion. Actual Number pairs need no coercion;
+    /// all other pairs retain R's existing observable addition owner.
     pub(crate) fn emit_coercive_add_completion_from_values(
         &mut self,
         left: &ValueLocals,
@@ -45,6 +45,24 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        left.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        function.instruction(&Instruction::I32Eq);
+        right.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        left.scalar().load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        right.scalar().load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Add);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        result.value().scalar().store(function);
+        result.value().set_number(result.value().scalar(), function);
+        result.set_normal(result.value(), function);
+        function.instruction(&Instruction::Else);
         let realm = self.emit_execution_realm(function);
         self.runtime_schema()
             .call_helper(
@@ -60,6 +78,8 @@ impl FunctionBuilder<'_> {
             )
             .store(result, function);
         realm.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 

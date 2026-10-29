@@ -10,6 +10,7 @@ mod linked_bodies;
 #[path = "../fixtures/product_programs.rs"]
 mod product_programs;
 
+mod aot_guarded_number_update;
 mod async_generator_scheduling_size;
 mod async_labelled_region_emission;
 mod class_initializer_function_identity;
