@@ -2,8 +2,8 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
-const MAGIC: &[u8; 8] = b"SCRWEP02";
-const MAX_FACTS_BYTES: usize = 1024 * 1024;
+const MAGIC: &[u8; 8] = b"SCRWEP03";
+const MAX_FACTS_BYTES: usize = foreign_facts::MAX_BYTES;
 const FRAME_BYTES: usize = 126;
 const MAX_BYTES: usize = 256 * 1024 * 1024;
 
@@ -31,7 +31,7 @@ pub(super) fn encode(
     facts: &ProgramExecutionFacts,
     mode: WasmNativeCompilationMode,
 ) -> Result<Vec<u8>, EngineError> {
-    let registry = facts.foreign.to_normalized_json();
+    let registry = foreign_facts::encode(&facts.foreign).ok_or_else(invalid)?;
     if registry.len() > MAX_FACTS_BYTES {
         return Err(invalid());
     }
@@ -114,9 +114,8 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
     let registry_start = body.len() - rest.len();
     let execution_facts = registry_start..registry_start + registry_length;
     let registry = take(&mut rest, registry_length)?;
-    // The constructor checks exact canonical bytes as well as declarations,
-    // rejecting duplicate/unsupported fields and alternate whitespace/order.
-    let foreign = ForeignModuleRegistry::from_normalized_json(registry).map_err(|_| invalid())?;
+    // The private codec checks exact tags/order/EOF and validated declarations.
+    let foreign = foreign_facts::decode(registry).ok_or_else(invalid)?;
     let facts = ProgramExecutionFacts {
         foreign,
         runtime: match runtime_key {

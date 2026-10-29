@@ -339,7 +339,7 @@ fn precompiled_execution_facts_are_canonical_bounded_and_product_versioned() {
     // Inert frame parsing grants no native-origin authority.
     let bytes =
         envelope::encode(b"raw", b"native", &facts, WasmNativeCompilationMode::Fast).unwrap();
-    assert_eq!(&bytes[..8], b"SCRWEP02");
+    assert_eq!(&bytes[..8], b"SCRWEP03");
     let frame = envelope::decode(&bytes).unwrap();
     assert!(frame.facts.foreign.is_empty());
     assert!(matches!(
@@ -353,20 +353,26 @@ fn precompiled_execution_facts_are_canonical_bounded_and_product_versioned() {
         let digest = sha2::Sha256::digest(&bytes[..end]);
         bytes[end..].copy_from_slice(&digest);
     };
-    let mut historical = bytes.clone();
-    historical[..8].copy_from_slice(b"SCRWEP01");
-    resign(&mut historical);
-    assert!(envelope::decode(&historical).is_err());
+    for magic in [b"SCRWEP01", b"SCRWEP02"] {
+        let mut historical = bytes.clone();
+        historical[..8].copy_from_slice(magic);
+        resign(&mut historical);
+        assert!(envelope::decode(&historical).is_err());
+    }
     let mut excessive = bytes.clone();
     excessive[90..94].copy_from_slice(&u32::MAX.to_le_bytes());
     resign(&mut excessive);
     assert!(envelope::decode(&excessive).is_err());
     let original_length = u32::from_le_bytes(bytes[90..94].try_into().unwrap()) as usize;
-    let canonical = facts.foreign.to_normalized_json();
+    let canonical = foreign_facts::encode(&facts.foreign).unwrap();
+    assert_eq!(canonical, [2, 0, 0, 0, 0, 0, 0, 0, 0]);
     for registry in [
-        [canonical.as_slice(), b" "].concat(),
-        b"{\"abi_version\":3,\"error_tag\":null,\"modules\":[]}".to_vec(),
-        b"{\"abi_version\":2,\"abi_version\":2,\"error_tag\":null,\"modules\":[]}".to_vec(),
+        [canonical.as_slice(), &[0]].concat(),
+        vec![3, 0, 0, 0, 0, 0, 0, 0, 0],
+        vec![2, 0, 0, 0, 2, 0, 0, 0, 0],
+        vec![2, 0, 0, 0, 0, 255, 255, 255, 255],
+        canonical[..8].to_vec(),
+        facts.foreign.to_normalized_json(),
     ] {
         let mut changed = bytes[..90].to_vec();
         changed.extend_from_slice(&(registry.len() as u32).to_le_bytes());
@@ -422,6 +428,10 @@ fn precompiled_facts_roundtrip_async_foreign_declarations_and_explicit_error_tag
         envelope::encode(b"raw", b"native", &facts, WasmNativeCompilationMode::Fast).unwrap();
     let recovered = envelope::decode(&bytes).unwrap();
     assert_eq!(recovered.facts.foreign, registry);
+    assert_eq!(
+        foreign_facts::decode(&bytes[recovered.execution_facts.clone()]),
+        Some(registry)
+    );
     assert_eq!(recovered.facts.runtime_key().unwrap().as_bytes(), &[7; 32]);
 }
 

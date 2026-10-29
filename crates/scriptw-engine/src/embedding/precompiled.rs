@@ -6,6 +6,7 @@ use std::time::Instant;
 
 mod admission;
 mod envelope;
+mod foreign_facts;
 #[cfg(test)]
 mod tests;
 
@@ -77,7 +78,7 @@ impl PrecompiledEmbeddedProgram {
     pub fn serialized_program_len(&self) -> usize {
         self.native.len()
     }
-    /// Canonical foreign-registry part of the producer-bound execution facts.
+    /// Private binary foreign-registry part of the producer-bound execution facts.
     /// Runtime linkage and mode are in the fixed envelope header. These bytes
     /// describe requirements and grant no native-code authority.
     pub fn serialized_execution_facts(&self) -> &[u8] {

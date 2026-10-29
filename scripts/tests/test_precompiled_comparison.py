@@ -20,6 +20,25 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import precompiled_comparison as comparison
 
 
+def binary_registry(registry):
+    """Independent fixture encoder; never native evidence or product authority."""
+    word = lambda value: value.to_bytes(4, 'little')
+    def text(value):
+        raw = value.encode('utf-8')
+        return word(len(raw)) + raw
+    raw = word(registry['abi_version']) + bytes([registry['error_tag'] is not None])
+    raw += word(len(registry['modules']))
+    for module in registry['modules']:
+        raw += text(module['specifier']) + word(len(module['functions']))
+        for function in module['functions']:
+            raw += b''.join(text(function[key]) for key in ('export', 'module', 'name'))
+            raw += bytes([('sync', 'async').index(function['mode'])])
+            raw += word(len(function['parameters']))
+            raw += bytes(('number', 'utf16', 'bytes').index(value) for value in function['parameters'])
+            raw += bytes([('number', 'utf16', 'bytes', 'void').index(function['result'])])
+    return raw
+
+
 class PrecompiledComparisonTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -75,12 +94,12 @@ class PrecompiledComparisonTests(unittest.TestCase):
                 native = b'INERT UNIT TEST BYTES; NEVER DESERIALIZE'
                 fingerprint = bytes.fromhex(self.report['source_fingerprint'])
                 if runtime == 'scriptw':
-                    body = b'SCRWEP02' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
+                    body = b'SCRWEP03' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
                 else:
                     body = b'SCRWWA01' + fingerprint
                 body += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
                 if runtime == 'scriptw':
-                    registry = b'{"abi_version":2,"error_tag":null,"modules":[]}'
+                    registry = binary_registry(dict(abi_version=2, error_tag=None, modules=[]))
                     body += len(registry).to_bytes(4, 'little') + registry
                 body += wasm + native
                 image = comparison.image_metadata(body + hashlib.sha256(body).digest(), runtime,
@@ -177,7 +196,7 @@ class PrecompiledComparisonTests(unittest.TestCase):
             samples=7, warmups=10, image_sha256=image['sha256'], image_bytes=image['bytes'],
             program_wasm_sha256=image['program_wasm_sha256'], wasm_sha256=image['program_wasm_sha256'],
             **({key: image[key] for key in ('execution_facts_bytes', 'execution_facts_sha256')}
-               if image.get('magic') == 'SCRWEP02' else {}),
+               if image.get('magic') in ('SCRWEP02', 'SCRWEP03') else {}),
             runtime_key=image['runtime_key'], load_phases_ns=dict(engine=100, image_read_and_envelope_admission=200,
                 native_admission_and_deserialization=300, process_total=1000),
             native_serialized_bytes=image['native_serialized_bytes'],
@@ -357,12 +376,12 @@ class PrecompiledComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'producer/image'):
             comparison.load_report(self.save())
 
-    def test_sw02_facts_cannot_be_relabelled_independently_of_the_producer(self):
+    def test_sw03_facts_cannot_be_relabelled_independently_of_the_producer(self):
         self.report['attempts'][0]['image']['execution_facts_sha256'] = 'f' * 64
         with self.assertRaisesRegex(ValueError, 'producer execution facts'):
             comparison.load_report(self.save())
 
-    def test_sw02_consumer_must_echo_exact_execution_facts(self):
+    def test_sw03_consumer_must_echo_exact_execution_facts(self):
         self.mutate_raw(lambda raw: raw.update(execution_facts_sha256='f' * 64))
         with self.assertRaisesRegex(ValueError, 'consumer execution facts'):
             comparison.load_report(self.save())
@@ -491,6 +510,71 @@ class PrecompiledComparisonTests(unittest.TestCase):
         invalid['modules'][0]['functions'][0]['mode'] = 'unsupported'
         with self.assertRaises(ValueError):
             comparison._execution_registry(encoded(invalid))
+
+    def test_sw03_binary_facts_preserve_every_type_mode_result_and_error_tag(self):
+        registry = dict(abi_version=2, error_tag=dict(module='scriptw_foreign', name='error_v1', payload=['i32']),
+            modules=[dict(specifier='fixture:é', functions=[dict(export=export, module='fixture', name=export,
+                mode=mode, parameters=['number', 'utf16', 'bytes'], result=result)
+                for export, mode, result in [('a', 'sync', 'number'), ('b', 'async', 'utf16'),
+                    ('c', 'sync', 'bytes'), ('d', 'async', 'void')]])])
+        self.assertEqual(comparison._binary_execution_registry(binary_registry(registry)), registry)
+
+    def test_sw03_resigned_frames_reject_malformed_binary_facts(self):
+        registry = dict(abi_version=2, error_tag=None, modules=[dict(specifier='m', functions=[
+            dict(export='f', module='h', name='n', mode='sync', parameters=['number', 'utf16', 'bytes'], result='void')])])
+        canonical = binary_registry(registry)
+        wasm, native = b'\0asm\x01\0\0\0', b'INERT; NEVER DESERIALIZE'
+        prefix = b'SCRWEP03' + b'\x02' * 32 + b'\x00' + bytes(32) + b'\x01'
+        prefix += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
+        def frame(facts):
+            body = prefix + len(facts).to_bytes(4, 'little') + facts + wasm + native
+            return body + hashlib.sha256(body).digest()
+        admitted = comparison.image_metadata(frame(canonical), 'scriptw', '02' * 32)
+        self.assertEqual(admitted['magic'], 'SCRWEP03')
+        self.assertEqual(admitted['execution_facts_sha256'], hashlib.sha256(canonical).hexdigest())
+        invalid = [canonical[:end] for end in range(len(canonical))]
+        invalid += [canonical + b'\0', b'{"abi_version":2,"error_tag":null,"modules":[]}', bytes(1024**2 + 1)]
+        for offset, value in [(0, b'\x03'), (4, b'\x02'), (5, b'\xff' * 4), (9, b'\xff' * 4),
+                (13, b'\xff'), (13, b'\0'), (14, b'\xff' * 4), (33, b'\x02'),
+                (34, b'\xff' * 4), (38, b'\x03'), (41, b'\x04')]:
+            changed = bytearray(canonical)
+            changed[offset:offset + len(value)] = value
+            invalid.append(bytes(changed))
+        for facts in invalid:
+            with self.subTest(facts=facts[:48], length=len(facts)):
+                with self.assertRaises(ValueError):
+                    comparison.image_metadata(frame(facts), 'scriptw', '02' * 32)
+
+    def test_sw03_binary_facts_reject_noncanonical_owners_and_import_conflicts(self):
+        import copy
+        function = dict(export='a', module='fixture', name='call', mode='async', parameters=[], result='void')
+        original = dict(abi_version=2, error_tag=None,
+            modules=[dict(specifier='a', functions=[function]),
+                     dict(specifier='b', functions=[dict(function, name='other')])])
+        comparison._binary_execution_registry(binary_registry(original))
+        invalid = []
+        for namespace in ('scriptw_host', 'scriptw_runtime', 'scriptw_foreign'):
+            registry = copy.deepcopy(original)
+            registry['modules'][0]['functions'][0]['module'] = namespace
+            invalid.append(registry)
+        registry = copy.deepcopy(original)
+        registry['modules'].reverse()
+        invalid.append(registry)
+        registry = copy.deepcopy(original)
+        registry['modules'][1]['specifier'] = 'a'
+        invalid.append(registry)
+        registry = copy.deepcopy(original)
+        registry['modules'][1]['functions'][0]['name'] = 'call'
+        invalid.append(registry)
+        for exports in (['a', 'a'], ['b', 'a']):
+            registry = copy.deepcopy(original)
+            registry['modules'][0]['functions'] = [dict(function, export=name, name=str(index))
+                for index, name in enumerate(exports)]
+            invalid.append(registry)
+        for registry in invalid:
+            with self.subTest(registry=registry):
+                with self.assertRaises(ValueError):
+                    comparison._binary_execution_registry(binary_registry(registry))
 
 
 if __name__ == '__main__':

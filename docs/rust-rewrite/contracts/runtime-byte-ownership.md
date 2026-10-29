@@ -34,9 +34,10 @@ pointer/length retained by the admitted owner; source, target, configuration,
 runtime key and decoded native-image digest checks still precede deserialization.
 
 Canonical Intl identity bytes use compile-time name order and direct byte
-emission. Fixed-width receipt and manifest readers establish unique encodings
-while parsing; the foreign-registry constructor owns its JSON canonicality
-check. Consumers do not re-serialize those validated values to check them again.
+emission. Fixed-width receipt, manifest and private binary execution-facts readers
+establish unique encodings while parsing. Precompiled consumers use the existing
+validated foreign-declaration constructors; public JSON declarations retain
+their canonicality check. Consumers do not re-serialize validated values.
 
 This removes a second raw runtime allocation when the identical bytes already
 exist in the executable. It changes Rust byte ownership, without changing the

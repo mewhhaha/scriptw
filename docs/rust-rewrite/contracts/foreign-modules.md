@@ -62,7 +62,7 @@ artifact requirements; it is not a permissive JSON configuration loader.
 
 This is a pre-1.0 breaking change: foreign ABI v1 declarations and Portable
 bundles using the previous private runtime ABI must be recompiled. Foreign ABI
-v2 and private runtime ABI 21 are checked at artifact admission. The stored-value
+v2 and private runtime ABI 36 are checked at artifact admission. The stored-value
 field layout changes; the foreign call argument order remains unchanged.
 
 ## Precompiled execution
@@ -329,17 +329,22 @@ ID set and native snapshot, including timeouts. Full affected native commands
 and all selected IDs are retained in the JSON rather than a permissive filter
 or expected-failure suppression.
 
-Precompiled native program frames use `SCRWEP02`. Their private execution facts
+Precompiled native program frames use `SCRWEP03`. Their private binary execution facts
 are minted after successful Portable compilation, including inert initialization,
 foreign declarations and the exact Cargo Minimal Portable runtime requirement.
-Consumers decode canonical bounded facts without parsing raw P again or
+Facts carry the foreign ABI, optional error tag, ordered modules/functions,
+explicit value/mode tags and length-prefixed UTF-8 names. Counts are bounded
+before allocation, and existing declaration constructors validate each entry.
+Strict ordering and exact EOF establish canonical encoding. Public foreign JSON
+and Wasm metadata retain their format.
+Consumers decode these bounded facts without parsing raw P again or
 reconstructing compiler planning data for R. Actual deserialized foreign function
 types, exception Tag identity, Engine/Store ownership and lifecycle checks remain.
 The unsafe recovery contract requires the whole unchanged producer envelope,
 including execution facts and raw/native correspondence. Checksums and decoded
 facts grant no authority to deserialize caller-supplied native code. Rebuild
 older native frames; the read-only benchmark evidence reader retains historical
-SW01 support independently of the product loader.
+SW01/SW02 support independently of the product loader.
 
 Canonical foreign execution facts are bounded at 1 MiB, and the complete native
 program envelope at 256 MiB. Oversized or noncanonical facts are rejected.

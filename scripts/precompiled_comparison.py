@@ -149,7 +149,12 @@ def _execution_registry(raw):
                                separators=(',', ':'), allow_nan=False).encode('utf-8')
     except (ValueError, UnicodeError) as error:
         raise ValueError('invalid execution registry') from error
-    require(canonical == raw and isinstance(registry, dict)
+    require(canonical == raw, 'execution registry is unsupported or noncanonical')
+    return _checked_execution_registry(registry)
+
+
+def _checked_execution_registry(registry):
+    require(isinstance(registry, dict)
             and set(registry) == {'abi_version', 'error_tag', 'modules'}
             and type(registry['abi_version']) is int and registry['abi_version'] == 2,
             'execution registry is unsupported or noncanonical')
@@ -183,18 +188,63 @@ def _execution_registry(raw):
             require(identity not in imports, 'duplicate execution foreign import')
             imports.add(identity)
             previous_export = function['export']
+    return registry
+
+
+def _binary_execution_registry(raw):
+    """Read SW03's private fixed-width facts; never load native code."""
+    require(9 <= len(raw) <= 1024**2, 'binary execution registry exceeds its bound')
+    offset = 0
+    def take(length):
+        nonlocal offset
+        require(0 <= length <= len(raw) - offset, 'truncated binary execution registry')
+        value = raw[offset:offset + length]
+        offset += length
+        return value
+    def word():
+        return int.from_bytes(take(4), 'little')
+    def text():
+        try:
+            return take(word()).decode('utf-8', errors='strict')
+        except UnicodeError as error:
+            raise ValueError('invalid binary execution registry UTF-8') from error
+    def tag(values):
+        value = take(1)[0]
+        require(value < len(values), 'unknown binary execution registry tag')
+        return values[value]
+    abi = word()
+    error_tag = tag((None, {'module': 'scriptw_foreign', 'name': 'error_v1', 'payload': ['i32']}))
+    count = word()
+    require(count <= (len(raw) - offset) // 8, 'binary execution module count exceeds remaining bytes')
+    modules = []
+    for _ in range(count):
+        specifier, functions = text(), []
+        count = word()
+        require(count <= (len(raw) - offset) // 18, 'binary execution function count exceeds remaining bytes')
+        for _ in range(count):
+            export, module, name = text(), text(), text()
+            mode = tag(('sync', 'async'))
+            count = word()
+            require(count < len(raw) - offset, 'binary execution parameter count exceeds remaining bytes')
+            parameters = [tag(('number', 'utf16', 'bytes')) for _ in range(count)]
+            result = tag(('number', 'utf16', 'bytes', 'void'))
+            functions.append(dict(export=export, module=module, name=name,
+                                  mode=mode, parameters=parameters, result=result))
+        modules.append(dict(specifier=specifier, functions=functions))
+    require(offset == len(raw), 'binary execution registry has trailing bytes')
+    return _checked_execution_registry(dict(abi_version=abi, error_tag=error_tag, modules=modules))
 
 
 def image_metadata(raw, runtime, source_fingerprint):
     """Inspect inert framing only; never load or execute its native payload.
 
-    Archived SW01 remains readable evidence; product recovery accepts SW02 only.
+    Archived SW01/SW02 remain readable evidence; product recovery accepts SW03 only.
     """
     require(runtime in RUNTIMES and _hex(source_fingerprint), 'unknown image runtime/source')
     magic = raw[:8]
-    require(magic in ((b'SCRWEP01', b'SCRWEP02') if runtime == 'scriptw' else (b'SCRWWA01',)),
+    require(magic in ((b'SCRWEP01', b'SCRWEP02', b'SCRWEP03') if runtime == 'scriptw' else (b'SCRWWA01',)),
             'image framing/source/checksum differs')
-    minimum = (126 if magic == b'SCRWEP02' else 122) if runtime == 'scriptw' else 88
+    minimum = (126 if magic in (b'SCRWEP02', b'SCRWEP03') else 122) if runtime == 'scriptw' else 88
     require(minimum < len(raw) <= MAX_EXPANDED
             and raw[8:40].hex() == source_fingerprint
             and _sha(raw[:-32]) == raw[-32:].hex(), 'image framing/source/checksum differs')
@@ -205,12 +255,12 @@ def image_metadata(raw, runtime, source_fingerprint):
                 'Scriptw image runtime key/common native policy differs')
         key = key_bytes.hex() if linked else None
         size_offset, start = 74, 90
-        if magic == b'SCRWEP02':
+        if magic in (b'SCRWEP02', b'SCRWEP03'):
             registry_length = int.from_bytes(raw[90:94], 'little')
             require(0 < registry_length <= 1024**2 and 126 + registry_length < len(raw),
                     'execution registry length differs')
             registry = raw[94:94 + registry_length]
-            _execution_registry(registry)
+            (_execution_registry if magic == b'SCRWEP02' else _binary_execution_registry)(registry)
             facts = dict(execution_facts_bytes=registry_length, execution_facts_sha256=_sha(registry))
             start, minimum = 94 + registry_length, 126 + registry_length
     else:
@@ -265,7 +315,7 @@ def _retained(report_path, report, archive):
     for name, raw in retained.items():
         require(len(raw) == files[name]['bytes'] and _sha(raw) == files[name]['sha256'],
                 'retained evidence changed: ' + name)
-        require(not raw.startswith((b'\x7fELF', b'MZ', b'SCRWEP01', b'SCRWEP02', b'SCRWWA01')),
+        require(not raw.startswith((b'\x7fELF', b'MZ', b'SCRWEP01', b'SCRWEP02', b'SCRWEP03', b'SCRWWA01')),
                 'native binary/image payload cannot enter the evidence archive')
     return retained
 
@@ -305,7 +355,7 @@ def _consumer(raw, report, image, case, runtime):
             and (runtime != 'scriptc' or raw.get('wasm_sha256') == image['program_wasm_sha256']
                  and raw.get('native_serialized_bytes') == image['native_serialized_bytes']),
             'consumer image/raw Wasm correspondence differs')
-    if image.get('magic') == 'SCRWEP02':
+    if image.get('magic') in ('SCRWEP02', 'SCRWEP03'):
         require(all(raw.get(key) == image[key] for key in
                     ('execution_facts_bytes', 'execution_facts_sha256')),
                 'consumer execution facts identity differs')
@@ -545,7 +595,7 @@ def load_report(path, archive=None):
         image = attempt['image']
         image_file = safe_name(image['file'])
         require(image_file.startswith('images/') and image_file not in retained, 'native image transport was retained/misplaced')
-        if image.get('magic') == 'SCRWEP02':
+        if image.get('magic') in ('SCRWEP02', 'SCRWEP03'):
             require(runtime == 'scriptw' and _uint(image.get('execution_facts_bytes'))
                     and 0 < image['execution_facts_bytes'] <= 1024**2
                     and _hex(image.get('execution_facts_sha256')),
@@ -555,7 +605,7 @@ def load_report(path, archive=None):
             frame_overhead = 122 if runtime == 'scriptw' else 88
         require(_hex(image.get('sha256')) and _hex(image.get('native_sha256'))
                 and image.get('source_fingerprint') == report['source_fingerprint']
-                and image.get('magic') in (('SCRWEP01', 'SCRWEP02') if runtime == 'scriptw' else ('SCRWWA01',))
+                and image.get('magic') in (('SCRWEP01', 'SCRWEP02', 'SCRWEP03') if runtime == 'scriptw' else ('SCRWWA01',))
                 and all(_uint(image.get(key)) and image[key] > 0 for key in ('bytes', 'program_wasm_bytes', 'native_serialized_bytes'))
                 and image['bytes'] <= MAX_EXPANDED
                 and image['bytes'] == image['program_wasm_bytes'] + image['native_serialized_bytes'] + frame_overhead
@@ -584,7 +634,7 @@ def load_report(path, archive=None):
                 and produced.get('image') == Path(image_file).name
                 and (runtime != 'scriptw' or produced.get('runtime_key') == image['runtime_key']),
                 'producer/image hashes or framing differ')
-        if image.get('magic') == 'SCRWEP02':
+        if image.get('magic') in ('SCRWEP02', 'SCRWEP03'):
             require(all(produced.get(key) == image[key] for key in
                         ('execution_facts_bytes', 'execution_facts_sha256')),
                     'producer execution facts identity differs')
