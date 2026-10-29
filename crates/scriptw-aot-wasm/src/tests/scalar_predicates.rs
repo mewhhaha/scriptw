@@ -31,19 +31,26 @@ fn number_loop_comparison_reaches_control_without_boolean_materialization() {
                     matches!(operator, Operator::F64Lt).then_some(offset)
                 })
                 .collect::<Vec<_>>();
-            assert_eq!(comparisons.len(), 1, "the runtime loop comparison survives");
-            let next = &operators[comparisons[0] + 1..];
-            let edge = next
-                .windows(2)
-                .position(|pair| matches!(pair, [Operator::I32Eqz, Operator::BrIf { .. }]))
-                .expect("the Number predicate reaches the loop edge");
             assert!(
-                !next[..edge]
-                    .iter()
-                    .any(|operator| { matches!(operator, Operator::I64ExtendI32U) }),
-                "a predicate must not materialize a tagged Boolean before its loop edge: {:?}",
-                &next[..edge]
+                !comparisons.is_empty(),
+                "the runtime loop comparison survives"
             );
+            // A runtime Number guard and its coercive fallback may each encode
+            // a comparison. Every path must feed control without boxing it.
+            for comparison in comparisons {
+                let next = &operators[comparison + 1..];
+                let edge = next
+                    .windows(2)
+                    .position(|pair| matches!(pair, [Operator::I32Eqz, Operator::BrIf { .. }]))
+                    .expect("the Number predicate reaches the loop edge");
+                assert!(
+                    !next[..edge]
+                        .iter()
+                        .any(|operator| { matches!(operator, Operator::I64ExtendI32U) }),
+                    "a predicate must not materialize a tagged Boolean before its loop edge: {:?}",
+                    &next[..edge]
+                );
+            }
             return;
         }
         index += 1;

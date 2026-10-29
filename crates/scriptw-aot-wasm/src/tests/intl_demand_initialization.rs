@@ -2,9 +2,9 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredIntlNamespace, DeferredIntlNamespaceSchema, GcHeapType, GcNullability, GlobalLedger,
-    IntrinsicTable, OrdinaryObject, PropertyValue, RealmRecord, RealmRecordSchema,
-    RuntimeModuleTypes, RuntimeSchema, StoredValue,
+    DeferredIntlNamespace, GcHeapType, GcNullability, GcSnapshotField, GcStructHeapType,
+    GlobalLedger, IntrinsicTable, OrdinaryObject, PropertyValue, RealmRecord, RuntimeModuleTypes,
+    RuntimeSchema, StoredValue,
 };
 use crate::heap::IntlInitializationState;
 
@@ -214,13 +214,15 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
-    let state_field = RealmRecordSchema::INTL_STATE.ordinal().raw();
-    let namespace_field = RealmRecordSchema::INTL_NAMESPACE.ordinal().raw();
+    // ABI 38 appends the state and retained namespace to RealmRecord. Check
+    // their physical types below without exposing private encoder ordinals.
+    let state_field = RealmRecord::FIELD_COUNT - 2;
+    let namespace_field = RealmRecord::FIELD_COUNT - 1;
     assert!(resolve.windows(5).any(|ops| matches!(ops,
         [Operator::StructGet { struct_type_index, field_index }, Operator::LocalSet { local_index: retained_realm },
          Operator::LocalGet { local_index: argument_realm }, Operator::RefAsNonNull, Operator::Call { function_index }]
         if *struct_type_index == type_index::<DeferredIntlNamespace>(schema)
-            && *field_index == DeferredIntlNamespaceSchema::REALM.ordinal().raw()
+            && *field_index == 0
             && retained_realm == argument_realm && *function_index == ensure_index)),
         "property resolution passes the recipe's retained defining Realm directly to ensure");
     let (types, declarations, exports) = inventory(bytes);
@@ -411,7 +413,7 @@ fn physical_canonical_intl_reads_ensure_the_same_realm_before_table_access() {
     let schema = registered.globals().schema();
     let table = type_index::<IntrinsicTable>(schema);
     let realm = type_index::<RealmRecord>(schema);
-    let field = RealmRecordSchema::INTRINSICS.ordinal().raw();
+    let field = GcSnapshotField::RealmIntrinsics.index();
     let slots: BTreeSet<_> = INTL_SLOTS.into_iter().map(Slot::gc_index).collect();
     let export = Parser::new(0)
         .parse_all(runtime)
