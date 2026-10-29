@@ -31,6 +31,12 @@ setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
 and writeback retain ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
 
+The [matched local Temporal checkpoint](docs/rust-rewrite/temporal-demand-20261029.json)
+reduced execution time by 9.8% and private dirty memory by 3.3% across the
+17 original workloads, using geometric means of per-case ratios. Total process
+RSS rose 3.6%; closing the memory gap with Scriptc remains open. These local
+before/after results are separate from the CI comparisons below.
+
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals
 and the latest verification. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 build, debug and verification loop.
@@ -39,18 +45,18 @@ build, debug and verification loop.
 
 ![Precompiled process RSS: Scriptw and Scriptc across all 17 workloads](docs/rust-rewrite/assets/precompiled-memory.svg)
 
-**Measured 2026-10-29 on one GitHub Actions runner**, compiler `4751db4aa`.
+**Measured 2026-10-29 on one GitHub Actions runner**, compiler `c80fd9fbb`.
 The [precompiled workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable. Compilation runs
 in separate producers; consumers disable compilation and share native optimization
 and runtime settings. Both passed the original checksums on **17/17 workloads**.
-Scriptw's median post-execution RSS is **1.359–1.661× Scriptc's**.
+Across those workloads, Scriptw's median post-execution RSS is **1.383–1.626× Scriptc's**.
 
 | Workload | Scriptw RSS | Scriptc RSS |
 | --- | ---: | ---: |
-| Integer | 19.0 MiB | 12.3 MiB |
-| Objects | 20.2 MiB | 13.0 MiB |
-| Retained objects | 25.5 MiB | 18.8 MiB |
+| Integer | 18.7 MiB | 12.2 MiB |
+| Objects | 19.2 MiB | 13.0 MiB |
+| Retained objects | 25.5 MiB | 18.5 MiB |
 
 Medians pool fourteen measured fresh Stores after ten checked warmups per round.
 RSS includes host, code, runtime and allocator history; it is neither live JS
@@ -60,7 +66,7 @@ uses its own Fast configuration and includes in-process Scriptw/V8 compilation
 history. Cross-cohort RSS differences do not establish causal savings.
 
 [Execution timing and complete evidence](docs/rust-rewrite/precompiled-comparison.md) ·
-[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40794431032) ·
+[CI run](https://github.com/mewhhaha/scriptw/actions/runs/40855431176) ·
 [Refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Benchmarks
@@ -69,10 +75,9 @@ history. Cross-cohort RSS differences do not establish causal savings.
 
 ![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
 
-**Measured 2026-10-29 on GitHub Actions**, compiler `4751db4aa`.
-All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
-and **Node / V8**. Scriptc passed the original checksums on **17/17 workloads**;
-the remaining cases retain explicit failure labels and diagnostics.
+**Measured 2026-10-29 on GitHub Actions**, compiler `c80fd9fbb`.
+**Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)** and **Node / V8** were
+measured together. All three passed the original checksums on **17/17 workloads**.
 
 Bars show median execution time and post-execution process RSS, with compilation
 and instance/context setup outside the execution timer. RSS includes the host/runtime,
@@ -82,7 +87,7 @@ Shared-runner observations are descriptive. The existing pinned Test262 status b
 [Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
 [Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
 
-[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40794428275) · [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
+[Three-runtime CI run](https://github.com/mewhhaha/scriptw/actions/runs/40855427163) · [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 ## Tests
 
