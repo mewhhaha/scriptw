@@ -16,6 +16,8 @@ import statistics
 import tarfile
 import tempfile
 
+from benchmark_charts import gallery, render as render_card
+
 SCHEMA = 'scriptw-precompiled-comparison-v1'
 RUNTIMES = ('scriptw', 'scriptc')
 PHASE_BARRIER_ENV = ('SCRIPTW_PRECOMPILED_PHASE_FD',
@@ -25,14 +27,6 @@ SAMPLES, WARMUPS, ROUNDS = 7, 10, 2
 FIXTURES = 'crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths'
 ADAPTER = 'function print(value) { console.log(String(value)); }\n'
 STEM = 'precompiled-comparison'
-LABELS = {'scriptw': 'Scriptw / Wasmtime', 'scriptc': 'Scriptc / Wasmtime (WASI)'}
-COLORS = {'scriptw': '#3378b5', 'scriptc': '#36835b'}
-CHARTS = {
-    'execution': dict(field='ms', title='Precompiled execution time', unit='ms', decimals=3,
-                      filename='precompiled-execution.svg'),
-    'memory': dict(field='rss_mib', title='Precompiled process memory after execution', unit='MiB', decimals=1,
-                   filename='precompiled-memory.svg'),
-}
 MAX_REPORT, MAX_ARCHIVE = 16 * 1024**2, 32 * 1024**2
 MAX_MEMBER, MAX_EXPANDED, MAX_MEMBERS = 64 * 1024**2, 256 * 1024**2, 32768
 MEMORY_FIELDS = ('rss_bytes', 'pss_bytes', 'private_dirty_bytes')
@@ -697,60 +691,12 @@ def load_report(path, archive=None):
     return report, table
 
 
-def render(report, rows, metric, preview=None):
-    """Paired absolute bars on one linear zero scale; failed cases have no bar."""
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Patch
-    chart = CHARTS[metric]
-    with plt.rc_context({'font.family': 'DejaVu Sans', 'svg.fonttype': 'none',
-                         'svg.hashsalt': 'scriptw-precompiled-comparison-' + metric + '-v1'}):
-        fig, ax = plt.subplots(figsize=(15, 11.5))
-        try:
-            fig.subplots_adjust(left=.24, right=.96, top=.86, bottom=.18)
-            fig.suptitle(chart['title'], fontsize=23, x=.04, ha='left', y=.975)
-            fig.text(.04, .925, f"Measured {report['finished_at'][:10]} · source {report['source_commit'][:9]} · "
-                     '14 samples · 10 warmups per round', color='#57606a')
-            fig.legend(handles=[Patch(color=COLORS[runtime], label=LABELS[runtime]) for runtime in RUNTIMES],
-                       loc='upper right', bbox_to_anchor=(.97, .987), frameon=False)
-            ax.set_title('Compiler disabled in both consumers · lower is better · median', loc='left', pad=16)
-            maximum = max([row['runtimes'][runtime][chart['field']] or 0 for row in rows for runtime in RUNTIMES] + [1e-9])
-            ax.set_xlim(0, maximum * 1.32)
-            ax.set_ylim(len(rows) - .5, -.5)
-            ax.set_yticks(range(len(rows)), [row['file'] for row in rows])
-            ax.set_axisbelow(True)
-            ax.grid(axis='x', color='#eaeef2')
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-            for index, row in enumerate(rows):
-                for ordinal, runtime in enumerate(RUNTIMES):
-                    item, y = row['runtimes'][runtime], index + (ordinal - .5) * .32
-                    if item['status'] == 'ok':
-                        value = item[chart['field']]
-                        ax.barh(y, value, height=.27, color=COLORS[runtime])
-                        ax.annotate(f"{value:.{chart['decimals']}f}", (value, y), xytext=(4, 0),
-                                    textcoords='offset points', va='center', fontsize=8, color=COLORS[runtime])
-                    else:
-                        ax.text(maximum * .02, y, item['status'], color='#b42318', fontsize=8, va='center')
-            ax.set_xlabel(chart['unit'])
-            notes = ['Same consumer executable and Wasmtime configuration; fresh Store per invocation.',
-                     'Source and Wasm compilation run in separate producer processes; loading/setup costs are recorded separately.',
-                     'Post-execution process RSS includes resident code/setup/warmup history, not live JS bytes or peak RSS.',
-                     'All 17 cases retained; failures have labels without bars. Shared-host observations are descriptive.']
-            for y, note in zip((.105, .08, .055, .03), notes):
-                fig.text(.04, y, note, fontsize=10)
-            output = io.BytesIO()
-            fig.savefig(output, format='svg', metadata={'Date': None,
-                'Title': 'Compiler-free Scriptw versus Scriptc: ' + chart['title'],
-                'Description': json.dumps(dict(source_commit=report['source_commit'], compiler_enabled=False,
-                    executable_sha256=report['tools']['consumer']['sha256'], metric=metric, rows=rows), sort_keys=True)})
-            if preview:
-                Path(preview).parent.mkdir(parents=True, exist_ok=True)
-                fig.savefig(preview, dpi=90)
-            return b'\n'.join(line.rstrip() for line in output.getvalue().splitlines()) + b'\n'
-        finally:
-            plt.close(fig)
+def chart_files(rows):
+    return [(Path('precompiled') / (Path(row['file']).stem + '.svg'), row) for row in rows]
+
+
+def render(report, row):
+    return render_card(report, row, RUNTIMES)
 
 
 def markdown(report, rows):
@@ -771,6 +717,7 @@ def markdown(report, rows):
         'Store remains alive. They include native code, host/setup and retained warmup history; they are not live '
         'JavaScript bytes, synchronized physical ownership measurements or whole-child high-water memory. Loading has '
         'its own 10 ms sampled RSS maximum, which can miss shorter transients. No direct causal subtraction is claimed.', '',
+        gallery(rows, 'precompiled', prefix='assets'), '',
         '| Workload | Scriptw ms | Scriptc ms | Scriptw RSS / PSS / private dirty MiB | Scriptc RSS / PSS / private dirty MiB |',
         '| --- | ---: | ---: | ---: | ---: |']
     for row in rows:
@@ -785,7 +732,6 @@ def markdown(report, rows):
         'Checksums, warmup order, shared executable/configuration, raw Wasm and producer/consumer image identities are '
         'readmitted before rendering. Checksums do not grant native-code trust: externally supplied native images retain '
         'the Rust API’s explicit unsafe provenance requirement.', '',
-        '[Execution time](assets/precompiled-execution.svg) · [Process memory](assets/precompiled-memory.svg)', '',
         '[Checked report](precompiled-comparison.json) · [Raw evidence](precompiled-comparison.tar.gz). '
         'The archive excludes executables, serialized native images and caches, retaining their identities, inert '
         'framing metadata, sources, raw Wasm, complete command streams, tool versions and Cargo producer log.', '',
@@ -800,9 +746,9 @@ def publish(report_path, root, *, replace=False):
     report_path, root = Path(report_path), Path(root)
     report, rows = load_report(report_path)
     destination = root / 'docs/rust-rewrite'
-    targets = [destination / (STEM + suffix) for suffix in ('.json', '.md', '.tar.gz')]
-    targets += [destination / 'assets' / chart['filename'] for chart in CHARTS.values()]
-    require(replace or not any(path.exists() for path in targets), 'publication already exists; explicit replacement required')
+    targets = [Path(STEM + suffix) for suffix in ('.json', '.md', '.tar.gz')]
+    targets += [Path('assets') / path for path, _ in chart_files(rows)]
+    require(replace or not any((destination / path).exists() for path in targets), 'publication already exists; explicit replacement required')
     destination.mkdir(parents=True, exist_ok=True)
     (destination / 'assets').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.precompiled-comparison-', dir=destination) as temporary:
@@ -824,10 +770,14 @@ def publish(report_path, root, *, replace=False):
         candidate.write_text(json.dumps(report, indent=2) + '\n')
         load_report(candidate, bundle)
         (temporary / (STEM + '.md')).write_text(markdown(report, rows))
-        for metric, chart in CHARTS.items():
-            (temporary / chart['filename']).write_bytes(render(report, rows, metric))
-        for target in targets:
-            (temporary / target.name).replace(target)
+        for path, row in chart_files(rows):
+            target = temporary / 'assets' / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(render(report, row))
+        for path in targets:
+            target = destination / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            (temporary / path).replace(target)
     return report, rows
 
 
@@ -844,12 +794,13 @@ def main():
         archive = args.report.with_suffix('.tar.gz') if args.command in ('render', 'check') else None
         report, rows = load_report(args.report, archive)
         if args.command in ('render', 'check'):
-            for metric, chart in CHARTS.items():
-                target = args.root / 'docs/rust-rewrite/assets' / chart['filename']
-                content = render(report, rows, metric)
+            for path, row in chart_files(rows):
+                target = args.root / 'docs/rust-rewrite/assets' / path
+                content = render(report, row)
                 if args.command == 'check':
-                    require(target.read_bytes() == content, metric + ' image is stale')
+                    require(target.read_bytes() == content, row['file'] + ' image is stale')
                 else:
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(content)
     print(json.dumps(dict(validated=True, workloads=len(rows), runtimes=list(RUNTIMES),
         source_commit=report['source_commit'], compiler_enabled=False)))

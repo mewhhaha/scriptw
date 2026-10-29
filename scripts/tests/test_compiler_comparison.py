@@ -123,17 +123,17 @@ class ComparisonAdmissionTests(unittest.TestCase):
         self.save()
         # This control owns archive admission and README publication. The real
         # workflow installs matplotlib and separately verifies the actual SVG.
-        with patch('compiler_comparison.render', side_effect=lambda report, rows, metric: metric.encode()):
+        with patch('compiler_comparison.render', side_effect=lambda report, row: row['file'].encode()):
             publish(self.path, destination)
         path = destination / 'docs/rust-rewrite/compiler-comparison.json'
         _, rows = load_report(path, path.with_suffix('.tar.gz'))
         self.assertEqual(len(rows), 17)
         self.assertIn('keep me', (destination / 'README.md').read_text())
         self.assertIn('17/17', (destination / 'README.md').read_text())
-        self.assertEqual((destination / 'docs/rust-rewrite/assets/execution-performance.svg').read_bytes(), b'execution')
-        self.assertEqual((destination / 'docs/rust-rewrite/assets/execution-memory.svg').read_bytes(), b'memory')
-        self.assertIn('assets/execution-performance.svg', (destination / 'README.md').read_text())
-        self.assertIn('assets/execution-memory.svg', (destination / 'README.md').read_text())
+        for row in rows:
+            relative = 'assets/benchmarks/' + Path(row['file']).stem + '.svg'
+            self.assertEqual((destination / 'docs/rust-rewrite' / relative).read_bytes(), row['file'].encode())
+            self.assertIn(relative, (destination / 'README.md').read_text())
 
 
 if __name__ == '__main__':

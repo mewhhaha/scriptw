@@ -78,6 +78,9 @@ excludes executables, serialized native images and caches. Native checksums
 detect corruption and bind evidence; they do not authorize executing external
 machine code. The Rust loader retains its explicit trusted-producer contract.
 
+The published grid has one image per benchmark, with separate zero-based
+execution-time and process-RSS panels. It uses the original measurements.
+
 The ordinary Scriptw/Scriptc/V8 comparison remains a separate cohort. Results
 from different machines or execution boundaries are not combined. These are
 descriptive measurements of this corpus, not a conformance or significance claim.

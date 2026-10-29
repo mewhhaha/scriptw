@@ -8,6 +8,45 @@ Each of two rounds has ten checked warmups and seven measured fresh-Store invoca
 
 RSS, PSS and private-dirty values below are pooled medians of 14 post-execution process endpoints while each Store remains alive. They include native code, host/setup and retained warmup history; they are not live JavaScript bytes, synchronized physical ownership measurements or whole-child high-water memory. Loading has its own 10 ms sampled RSS maximum, which can miss shorter transients. No direct causal subtraction is claimed.
 
+<table>
+<tr>
+<td><img src="assets/precompiled/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.467 ms, 17.9 MiB RSS; Scriptc: 0.086 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.799 ms, 17.9 MiB RSS; Scriptc: 0.214 ms, 12.8 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.760 ms, 17.4 MiB RSS; Scriptc: 0.210 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.784 ms, 17.9 MiB RSS; Scriptc: 0.229 ms, 13.0 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.964 ms, 18.3 MiB RSS; Scriptc: 0.299 ms, 12.7 MiB RSS"></td>
+<td><img src="assets/precompiled/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 2.821 ms, 18.8 MiB RSS; Scriptc: 0.945 ms, 13.3 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 1.169 ms, 18.0 MiB RSS; Scriptc: 0.176 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.400 ms, 17.1 MiB RSS; Scriptc: 0.061 ms, 12.2 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.514 ms, 17.2 MiB RSS; Scriptc: 0.148 ms, 12.2 MiB RSS"></td>
+<td><img src="assets/precompiled/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.731 ms, 17.3 MiB RSS; Scriptc: 0.408 ms, 12.1 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 1.293 ms, 17.4 MiB RSS; Scriptc: 0.159 ms, 12.2 MiB RSS"></td>
+<td><img src="assets/precompiled/integer.svg" width="440" alt="integer.js; Scriptw: 0.481 ms, 17.5 MiB RSS; Scriptc: 0.042 ms, 12.2 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/objects.svg" width="440" alt="objects.js; Scriptw: 0.886 ms, 18.0 MiB RSS; Scriptc: 0.404 ms, 12.9 MiB RSS"></td>
+<td><img src="assets/precompiled/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 15.669 ms, 23.4 MiB RSS; Scriptc: 22.241 ms, 18.4 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.640 ms, 17.1 MiB RSS; Scriptc: 0.152 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.647 ms, 17.7 MiB RSS; Scriptc: 0.076 ms, 11.7 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="assets/precompiled/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.802 ms, 17.6 MiB RSS; Scriptc: 0.108 ms, 12.3 MiB RSS"></td>
+<td></td>
+</tr>
+</table>
+
 | Workload | Scriptw ms | Scriptc ms | Scriptw RSS / PSS / private dirty MiB | Scriptc RSS / PSS / private dirty MiB |
 | --- | ---: | ---: | ---: | ---: |
 | sort-reverse-128.js | 0.467 | 0.086 | 17.932 / 15.792 / 7.104 | 12.850 / 10.661 / 5.914 |
@@ -29,8 +68,6 @@ RSS, PSS and private-dirty values below are pooled medians of 14 post-execution 
 | join-small-1024.js | 0.802 | 0.108 | 17.646 / 15.505 / 3.109 | 12.266 / 10.072 / 2.293 |
 
 A failure in either round removes that runtime’s bars for the case; all original failure streams remain. Checksums, warmup order, shared executable/configuration, raw Wasm and producer/consumer image identities are readmitted before rendering. Checksums do not grant native-code trust: externally supplied native images retain the Rust API’s explicit unsafe provenance requirement.
-
-[Execution time](assets/precompiled-execution.svg) · [Process memory](assets/precompiled-memory.svg)
 
 [Checked report](precompiled-comparison.json) · [Raw evidence](precompiled-comparison.tar.gz). The archive excludes executables, serialized native images and caches, retaining their identities, inert framing metadata, sources, raw Wasm, complete command streams, tool versions and Cargo producer log.
 

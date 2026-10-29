@@ -114,6 +114,6 @@ jobs:
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md docs/rust-rewrite/assets/execution-performance.svg docs/rust-rewrite/assets/execution-memory.svg docs/rust-rewrite/compiler-comparison.json docs/rust-rewrite/compiler-comparison.tar.gz docs/rust-rewrite/compiler-comparison.md
+          git add README.md docs/rust-rewrite/assets/benchmarks docs/rust-rewrite/compiler-comparison.json docs/rust-rewrite/compiler-comparison.tar.gz docs/rust-rewrite/compiler-comparison.md
           git commit -m "Publish co-measured Scriptw, Scriptc WASI and V8 benchmarks"
           git push origin HEAD:main

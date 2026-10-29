@@ -94,7 +94,6 @@
   "validation": {
     "raw_evidence_readmitted": true,
     "published_archives_readmitted": true,
-    "all_four_svgs_reproduced": true,
     "pinned_status_bytes_unchanged": true,
     "staged_files": [
       "README.md",
@@ -105,35 +104,65 @@
       "docs/rust-rewrite/compiler-comparison.json",
       "docs/rust-rewrite/compiler-comparison.md",
       "docs/rust-rewrite/compiler-comparison.tar.gz",
-      "docs/rust-rewrite/assets/precompiled-execution.svg",
-      "docs/rust-rewrite/assets/precompiled-memory.svg",
-      "docs/rust-rewrite/assets/execution-performance.svg",
-      "docs/rust-rewrite/assets/execution-memory.svg",
       "docs/rust-rewrite/benchmark-refresh-20261028.json",
       "docs/rust-rewrite/benchmark-refresh-20261028.md",
-      "docs/rust-rewrite/benchmark-refresh-20261028-mappings.tar.xz"
+      "docs/rust-rewrite/benchmark-refresh-20261028-mappings.tar.xz",
+      "docs/rust-rewrite/assets/benchmarks/sort-reverse-128.svg",
+      "docs/rust-rewrite/assets/benchmarks/sort-reverse-512.svg",
+      "docs/rust-rewrite/assets/benchmarks/sort-sorted-512.svg",
+      "docs/rust-rewrite/assets/benchmarks/to-sorted-512.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-1024.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-4096.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-mixed-1024.svg",
+      "docs/rust-rewrite/assets/benchmarks/numeric-loop-10000.svg",
+      "docs/rust-rewrite/assets/benchmarks/numeric-loop-50000.svg",
+      "docs/rust-rewrite/assets/benchmarks/folded-string-4096.svg",
+      "docs/rust-rewrite/assets/benchmarks/dynamic-string-4096.svg",
+      "docs/rust-rewrite/assets/benchmarks/integer.svg",
+      "docs/rust-rewrite/assets/benchmarks/objects.svg",
+      "docs/rust-rewrite/assets/benchmarks/retained-objects.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-empty-1024.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-singleton-1024.svg",
+      "docs/rust-rewrite/assets/benchmarks/join-small-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/sort-reverse-128.svg",
+      "docs/rust-rewrite/assets/precompiled/sort-reverse-512.svg",
+      "docs/rust-rewrite/assets/precompiled/sort-sorted-512.svg",
+      "docs/rust-rewrite/assets/precompiled/to-sorted-512.svg",
+      "docs/rust-rewrite/assets/precompiled/join-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/join-mixed-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/numeric-loop-10000.svg",
+      "docs/rust-rewrite/assets/precompiled/numeric-loop-50000.svg",
+      "docs/rust-rewrite/assets/precompiled/folded-string-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/dynamic-string-4096.svg",
+      "docs/rust-rewrite/assets/precompiled/integer.svg",
+      "docs/rust-rewrite/assets/precompiled/objects.svg",
+      "docs/rust-rewrite/assets/precompiled/retained-objects.svg",
+      "docs/rust-rewrite/assets/precompiled/join-empty-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-singleton-1024.svg",
+      "docs/rust-rewrite/assets/precompiled/join-small-1024.svg"
     ],
-    "paired_validator_sha256": "8ecff6465de3cb542cd8776db142ddd364446857fb631861f7cd792f49d4032b",
-    "three_validator_sha256": "af927a5934937e1b8076ae765a84a68a4fb432f138de82b33aa130ab119c54d0",
+    "paired_validator_sha256": "605224d6ec93b9635f5bf6005f2527a9e6f92afefb3bf651a9727a805511e5be",
+    "three_validator_sha256": "343254a32fa2d8b84acc83801196b9d9c065274a2dc0ef529b8406068f81a2b6",
     "resources": {
       "before": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "15314944",
+        "memory.peak": "14581760",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "350912512",
+        "memory.peak": "253263872",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-      },
-      "cpu_affinity": [
-        0
-      ]
-    }
+      }
+    },
+    "all_workload_svgs_reproduced": true,
+    "workload_svg_count": 34,
+    "chart_renderer_sha256": "b0dde44199ee37d424368c6f8cac61de1c743c54dfbf18022c403d7881cfc024"
   },
   "implementation_checkpoint": "loader-admission-20261029.json",
   "implementation_checkpoint_sha256": "086039297d869ff7bad1b83c206e4c29adbb33225acac75027715aab4d7704f5",

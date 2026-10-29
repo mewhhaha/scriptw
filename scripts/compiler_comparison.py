@@ -1,6 +1,5 @@
 """Admission and publication of co-measured Scriptw, Scriptc/WASI and V8 evidence."""
 import hashlib
-import io
 import json
 import math
 from pathlib import Path, PurePosixPath
@@ -8,16 +7,10 @@ import re
 import statistics
 import tarfile
 
+from benchmark_charts import gallery, render as render_card
+
 SCHEMA = 'scriptw-three-compiler-benchmark-v1'
 RUNTIMES = ('v8', 'scriptw', 'scriptc')
-LABELS = {'v8': 'Node / V8', 'scriptw': 'Scriptw / Wasmtime', 'scriptc': 'Scriptc / Wasmtime (WASI)'}
-COLORS = {'v8': '#de8b36', 'scriptw': '#3378b5', 'scriptc': '#36835b'}
-CHARTS = {
-    'execution': dict(field='ms', title='Execution time', unit='ms', decimals=3,
-                      filename='execution-performance.svg'),
-    'memory': dict(field='rss_mib', title='Process memory after execution', unit='MiB', decimals=1,
-                   filename='execution-memory.svg'),
-}
 FIXTURES = 'crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths'
 ADAPTER = 'function print(value) { console.log(String(value)); }\n'
 
@@ -170,69 +163,12 @@ def load_report(path, archive=None):
     return report, rows
 
 
-def render(report, rows, metric, preview=None):
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Patch
-    chart = CHARTS[metric]
-    field = chart['field']
-    with plt.rc_context({'font.family': 'DejaVu Sans', 'svg.fonttype': 'none',
-                         'svg.hashsalt': 'scriptw-three-compilers-' + metric + '-v1'}):
-        fig, ax = plt.subplots(figsize=(15, 11.5))
-        try:
-            fig.subplots_adjust(left=.24, right=.96, top=.86, bottom=.16)
-            fig.suptitle(chart['title'], fontsize=23, x=.04, ha='left', y=.975)
-            fig.text(.04, .925, f"Measured {report['finished_at'][:10]} · compiler {report['source_commit'][:9]} · "
-                     f"{report['samples'] * 2} samples · {report['warmups']} warmups per round", color='#57606a')
-            fig.legend(handles=[Patch(color=COLORS[runtime], label=LABELS[runtime]) for runtime in RUNTIMES],
-                       loc='upper right', bbox_to_anchor=(.97, .987), frameon=False)
-            ax.set_title('Lower is better · median', loc='left', pad=16)
-            maximum = max(row['runtimes'][runtime][field] or 0 for row in rows for runtime in RUNTIMES)
-            ax.set_xlim(0, maximum * 1.32)
-            ax.set_ylim(len(rows) - .5, -.5)
-            ax.set_yticks(range(len(rows)), [row['file'] for row in rows])
-            ax.set_axisbelow(True)
-            ax.grid(axis='x', color='#eaeef2')
-            for spine in ax.spines.values(): spine.set_visible(False)
-            for index, row in enumerate(rows):
-                for runtime_index, runtime in enumerate(RUNTIMES):
-                    item = row['runtimes'][runtime]
-                    y = index + (runtime_index - 1) * .23
-                    if item['status'] == 'ok':
-                        value = item[field]
-                        ax.barh(y, value, height=.20, color=COLORS[runtime])
-                        ax.annotate(f"{value:.{chart['decimals']}f}",
-                                    (value, y), xytext=(4, 0), textcoords='offset points',
-                                    va='center', fontsize=8, color=COLORS[runtime])
-                    else:
-                        ax.text(maximum * .02, y, item['status'], color='#b42318', fontsize=8, va='center')
-            ax.set_xlabel(chart['unit'])
-            if metric == 'execution':
-                footnotes = [
-                    'Fresh Store / V8 context per invocation; program construction, output and completion included.',
-                    'Source and Wasm compilation and instance/context setup are excluded from the execution timer.',
-                ]
-            else:
-                footnotes = [
-                    'Post-execution whole-process RSS with Store/context alive; includes runtime and retained warmup effects.',
-                    'Scriptw/V8 compile JS in-process; Scriptc compiles JS separately. RSS is not live heap or peak memory.',
-                ]
-            footnotes.append('All 17 workloads retained. Failed cases have labels instead of bars. Shared-host results are descriptive.')
-            for y, line in zip((.085, .06, .035), footnotes):
-                fig.text(.04, y, line, fontsize=10)
-            output = io.BytesIO()
-            fig.savefig(output, format='svg', metadata={'Date': None,
-                'Title': 'Scriptw, Scriptc WASI and V8: ' + chart['title'],
-                'Description': json.dumps([dict(file=row['file'], runtimes={runtime: {
-                    'status': row['runtimes'][runtime]['status'], field: row['runtimes'][runtime][field]}
-                    for runtime in RUNTIMES}) for row in rows], sort_keys=True)})
-            if preview:
-                Path(preview).parent.mkdir(parents=True, exist_ok=True)
-                fig.savefig(preview, dpi=90)
-            return b'\n'.join(line.rstrip() for line in output.getvalue().splitlines()) + b'\n'
-        finally:
-            plt.close(fig)
+def chart_files(rows):
+    return [(Path('benchmarks') / (Path(row['file']).stem + '.svg'), row) for row in rows]
+
+
+def render(report, row, preview=None):
+    return render_card(report, row, RUNTIMES, preview=preview)
 
 
 def publish(report_path, root):
@@ -249,8 +185,18 @@ def publish(report_path, root):
     target.write_text(json.dumps(report, indent=2) + '\n')
     temporary.replace(archive_path)
     load_report(target, archive_path)
-    for metric, chart in CHARTS.items():
-        (destination / 'assets' / chart['filename']).write_bytes(render(report, rows, metric))
+    for relative, row in chart_files(rows):
+        target = destination / 'assets' / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(render(report, row))
+    (destination / 'compiler-comparison.md').write_text(markdown(report, rows))
+    readme_path = root / 'README.md'
+    readme = readme_path.read_text()
+    start, end = readme.index('## Benchmarks'), readme.index('## Tests')
+    readme_path.write_text(readme[:start] + readme_section(report, rows) + readme[end:])
+
+
+def markdown(report, rows):
     lines = ['# GitHub compiler comparison', '',
              f"Measured {report['finished_at']}; Scriptw source `{report['source_commit']}`.", '',
              f"Scriptc `{report['tools']['scriptc']['version']}`, Zig `{report['tools']['zig']['version']}`; "
@@ -271,33 +217,27 @@ def publish(report_path, root):
         values = row['runtimes']
         scriptc = f"{values['scriptc']['ms']:.3f}" if values['scriptc']['status'] == 'ok' else values['scriptc']['status']
         lines.append(f"| {row['file']} | {values['scriptw']['ms']:.3f} | {values['v8']['ms']:.3f} | {scriptc} |")
-    lines += ['', '[Execution time](assets/execution-performance.svg) · [Process memory](assets/execution-memory.svg)', '',
+    lines += ['', '## Benchmark charts', '', gallery(rows, 'benchmarks'), '',
               '[Checked report](compiler-comparison.json) · [Raw evidence](compiler-comparison.tar.gz) · '
               '[Workflow and reproduction](contracts/compiler-comparison.md).', '']
-    (destination / 'compiler-comparison.md').write_text('\n'.join(lines))
-    readme_path = root / 'README.md'
-    readme = readme_path.read_text()
-    start = readme.index('## Benchmarks')
-    end = readme.index('## Tests', start)
+    return '\n'.join(lines)
+
+
+def readme_section(report, rows):
     count = sum(row['runtimes']['scriptc']['status'] == 'ok' for row in rows)
-    section = f'''## Benchmarks
+    return f'''## Benchmarks
 
-![Execution time: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-performance.svg)
+**Measured {report['finished_at'][:10]}**, compiler `{report['source_commit'][:9]}`.
+Scriptw / Wasmtime, Scriptc / Wasmtime (WASI), and Node / V8; **{count}/17 Scriptc checksums passed**.
 
-![Process memory after execution: Scriptw, Scriptc WASI and V8 across all 17 workloads](docs/rust-rewrite/assets/execution-memory.svg)
+Each image has its own zero-based scales. Bars show median execution time and
+post-execution process RSS. Compilation and instance/context setup are outside
+the timer; RSS includes compilation and warmup history, not live heap or peak memory.
 
-**Measured {report['finished_at'][:10]} on GitHub Actions**, compiler `{report['source_commit'][:9]}`.
-All three runtimes were measured together: **Scriptw / Wasmtime**, **Scriptc / Wasmtime (WASI)**
-and **Node / V8**. Scriptc passed the original checksums on **{count}/17 workloads**;
-the remaining cases retain explicit failure labels and diagnostics.
-
-Bars show median execution time and post-execution process RSS, with compilation
-and instance/context setup outside the execution timer. RSS includes the host/runtime,
-compilation and retained warmup effects; it is neither live JavaScript heap nor peak memory.
-Shared-runner observations are descriptive. The existing pinned Test262 status below is separate.
+{gallery(rows, 'benchmarks', prefix='docs/rust-rewrite/assets')}
 
 [Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
-[Run or verify the benchmark workflow](docs/rust-rewrite/contracts/compiler-comparison.md).
+[Workflow and reproduction](docs/rust-rewrite/contracts/compiler-comparison.md) ·
+[Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
 '''
-    readme_path.write_text(readme[:start] + section + readme[end:])

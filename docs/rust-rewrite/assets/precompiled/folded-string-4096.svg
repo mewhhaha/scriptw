@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="439.2pt" height="230.4pt" viewBox="0 0 439.2 230.4" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>folded-string-4096.js</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>folded-string-4096.js</dc:title>
+    <dc:description>{"finished_at": "2026-10-29T15:11:33.955150+00:00", "measured_date": "2026-10-29", "policy": {"consumer_compiler_enabled": false, "execution": "fresh Store/Realm; instance setup excluded; guest/runtime startup and output/completion included", "limitations": "same-host descriptive comparison, not live JS heap, peak RSS, statistical significance or conformance", "memory": "post-execution RSS/PSS/private-dirty endpoints with Store alive; load maximum sampled separately", "producers_outside_consumers": true}, "row": {"file": "folded-string-4096.js", "runtimes": {"scriptc": {"after_transport_drop": [{"private_dirty_bytes": 2117632, "pss_bytes": 9063424, "rss_bytes": 11264000, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2117632, "pss_bytes": 9103360, "rss_bytes": 11350016, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "exported_linear_memory_after_bytes": 17891328, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 679963, "instantiate": 87431, "register": 108934, "state_linker": 32099, "total": 1385776}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2285568, "pss_bytes": 10216448, "rss_bytes": 12480512, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2154496, "pss_bytes": 9690112, "rss_bytes": 11890688, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2179072, "pss_bytes": 10109952, "rss_bytes": 12374016, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2117632, "pss_bytes": 9063424, "rss_bytes": 11264000, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "24576\n", "warmup": true}, {"completion": "normal", "exported_linear_memory_after_bytes": 17891328, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 647564, "instantiate": 96896, "register": 111498, "state_linker": 36335, "total": 1433988}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2281472, "pss_bytes": 10240000, "rss_bytes": 12550144, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2154496, "pss_bytes": 9795584, "rss_bytes": 12042240, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2174976, "pss_bytes": 10133504, "rss_bytes": 12443648, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2117632, "pss_bytes": 9103360, "rss_bytes": 11350016, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "24576\n", "warmup": true}], "load_phases_ns": {"engine": [18017, 20130], "image_read_and_envelope_admission": [1059634, 1074247], "native_admission_and_deserialization": [2179039, 2225419], "process_total": [5206556, 5462812]}, "load_sampled_max_rss_bytes": [12197888, 12165120], "measured_samples": 14, "ms": 0.408079, "private_dirty_mib": 2.298828125, "process_medians": {"after_execution": {"private_dirty_bytes": 2410496.0, "pss_bytes": 10353664.0, "rss_bytes": 12640256.0}, "after_instantiate": {"private_dirty_bytes": 2304000.0, "pss_bytes": 10246656.0, "rss_bytes": 12533760.0}, "after_store_drop": {"private_dirty_bytes": 2304000.0, "pss_bytes": 10247168.0, "rss_bytes": 12533760.0}, "before_store": {"private_dirty_bytes": 2295808.0, "pss_bytes": 10240000.0, "rss_bytes": 12525568.0}}, "pss_mib": 9.8740234375, "rounds": ["ok", "ok"], "rss_mib": 12.0546875, "status": "ok"}, "scriptw": {"after_transport_drop": [{"private_dirty_bytes": 2293760, "pss_bytes": 12116992, "rss_bytes": 14348288, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2293760, "pss_bytes": 12193792, "rss_bytes": 14438400, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 937051, "instantiate": 394644, "register": 152179, "state_linker": 40271, "total": 2289997}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 3076096, "pss_bytes": 15795200, "rss_bytes": 18026496, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2695168, "pss_bytes": 13579264, "rss_bytes": 15810560, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2465792, "pss_bytes": 15184896, "rss_bytes": 17416192, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2293760, "pss_bytes": 12116992, "rss_bytes": 14348288, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "24576\n", "warmup": true}, {"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 925403, "instantiate": 408966, "register": 149955, "state_linker": 39690, "total": 2238859}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 3076096, "pss_bytes": 15798272, "rss_bytes": 18042880, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2695168, "pss_bytes": 13582336, "rss_bytes": 15826944, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2465792, "pss_bytes": 15187968, "rss_bytes": 17432576, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2293760, "pss_bytes": 12193792, "rss_bytes": 14438400, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "24576\n", "warmup": true}], "load_phases_ns": {"engine": [17766, 17687], "image_read_and_envelope_admission": [620243, 603408], "native_admission_and_deserialization": [402750786, 318111882], "process_total": [405028935, 320357021]}, "load_sampled_max_rss_bytes": [14917632, 15073280], "measured_samples": 14, "ms": 0.730559, "private_dirty_mib": 3.05078125, "process_medians": {"after_execution": {"private_dirty_bytes": 3198976.0, "pss_bytes": 15919616.0, "rss_bytes": 18155520.0}, "after_instantiate": {"private_dirty_bytes": 2846720.0, "pss_bytes": 15567360.0, "rss_bytes": 17803264.0}, "after_store_drop": {"private_dirty_bytes": 2588672.0, "pss_bytes": 15309312.0, "rss_bytes": 17545216.0}, "before_store": {"private_dirty_bytes": 2580480.0, "pss_bytes": 15301120.0, "rss_bytes": 17539072.0}}, "pss_mib": 15.18212890625, "rounds": ["ok", "ok"], "rss_mib": 17.314453125, "status": "ok"}}}, "runtimes": ["scriptw", "scriptc"], "schema": "scriptw-precompiled-comparison-v1", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "afe83e312b5049bbd6c81edffacb418ba60275e5", "started_at": "2026-10-29T15:10:22.063718+00:00"}</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Scriptw benchmark charts</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 230.4
+L 439.2 230.4
+L 439.2 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 39.528 191.232
+L 199.237091 191.232
+L 199.237091 52.992
+L 39.528 52.992
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1"/>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="83.085025" y="206.830437" transform="rotate(-0 83.085025 206.830437)">Scriptw</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2"/>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="155.680066" y="206.830437" transform="rotate(-0 155.680066 206.830437)">Scriptc</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_3">
+      <path d="M 39.528 191.232
+L 199.237091 191.232
+" clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_3">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="194.271062" transform="rotate(-0 36.028 194.271062)">0</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_5">
+      <path d="M 39.528 133.008934
+L 199.237091 133.008934
+" clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_4">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="136.047997" transform="rotate(-0 36.028 136.047997)">0.4</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_7">
+      <path d="M 39.528 74.785869
+L 199.237091 74.785869
+" clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_5">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="77.824931" transform="rotate(-0 36.028 77.824931)">0.8</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 58.402711 191.232
+L 107.767339 191.232
+L 107.767339 84.893538
+L 58.402711 84.893538
+z
+" clip-path="url(#p648741f3fb)" style="fill: #3378b5"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 130.997752 191.232
+L 180.36238 191.232
+L 180.36238 131.832974
+L 130.997752 131.832974
+z
+" clip-path="url(#p648741f3fb)" style="fill: #36835b"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 39.528 191.232
+L 199.237091 191.232
+" style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="83.085025" y="77.25096" transform="rotate(-0 83.085025 77.25096)">0.731</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="155.680066" y="124.190396" transform="rotate(-0 155.680066 124.190396)">0.408</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="39.528" y="41.992" transform="rotate(-0 39.528 41.992)">Time · ms</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_6">
+    <path d="M 266.314909 191.232
+L 426.024 191.232
+L 426.024 52.992
+L 266.314909 52.992
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_3">
+    <g id="xtick_3">
+     <g id="line2d_9"/>
+     <g id="text_9">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="309.871934" y="206.830437" transform="rotate(-0 309.871934 206.830437)">Scriptw</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_10"/>
+     <g id="text_10">
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="382.466975" y="206.830437" transform="rotate(-0 382.466975 206.830437)">Scriptc</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_4">
+    <g id="ytick_4">
+     <g id="line2d_11">
+      <path d="M 266.314909 191.232
+L 426.024 191.232
+" clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12"/>
+     <g id="text_11">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="194.271062" transform="rotate(-0 262.814909 194.271062)">0</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_13">
+      <path d="M 266.314909 142.099193
+L 426.024 142.099193
+" clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_14"/>
+     <g id="text_12">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="145.138255" transform="rotate(-0 262.814909 145.138255)">8</text>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_15">
+      <path d="M 266.314909 92.966385
+L 426.024 92.966385
+" clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_16"/>
+     <g id="text_13">
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="96.005448" transform="rotate(-0 262.814909 96.005448)">16</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_7">
+    <path d="M 285.18962 191.232
+L 334.554248 191.232
+L 334.554248 84.893538
+L 285.18962 84.893538
+z
+" clip-path="url(#pf3a1462166)" style="fill: #3378b5"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 357.784661 191.232
+L 407.149289 191.232
+L 407.149289 117.19692
+L 357.784661 117.19692
+z
+" clip-path="url(#pf3a1462166)" style="fill: #36835b"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 266.314909 191.232
+L 426.024 191.232
+" style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="309.871934" y="77.25096" transform="rotate(-0 309.871934 77.25096)">17.3</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="382.466975" y="109.554342" transform="rotate(-0 382.466975 109.554342)">12.1</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="266.314909" y="41.992" transform="rotate(-0 266.314909 41.992)">RSS · MiB</text>
+   </g>
+  </g>
+  <g id="text_17">
+   <text style="font-weight: 700; font-size: 15px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="24.156" y="22.917656" transform="rotate(-0 24.156 22.917656)">folded-string-4096.js</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p648741f3fb">
+   <rect x="39.528" y="52.992" width="159.709091" height="138.24"/>
+  </clipPath>
+  <clipPath id="pf3a1462166">
+   <rect x="266.314909" y="52.992" width="159.709091" height="138.24"/>
+  </clipPath>
+ </defs>
+</svg>

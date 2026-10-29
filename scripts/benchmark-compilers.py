@@ -10,7 +10,7 @@ import signal
 import subprocess
 import sys
 
-from compiler_comparison import ADAPTER, CHARTS, FIXTURES, RUNTIMES, SCHEMA, digest, load_report, publish, require, render
+from compiler_comparison import ADAPTER, FIXTURES, RUNTIMES, SCHEMA, chart_files, digest, load_report, publish, require, render
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -168,9 +168,9 @@ def main():
     elif args.command == 'publish': publish(args.report, args.root)
     else:
         report, rows = load_report(args.report, args.report.with_suffix('.tar.gz'))
-        for metric, chart in CHARTS.items():
-            require((args.root / 'docs/rust-rewrite/assets' / chart['filename']).read_bytes()
-                    == render(report, rows, metric), metric + ' graph is stale')
+        for relative, row in chart_files(rows):
+            require((args.root / 'docs/rust-rewrite/assets' / relative).read_bytes()
+                    == render(report, row), str(relative) + ' graph is stale')
         print(f"Verified {len(rows)} workloads, three compilers, source {report['source_commit']}")
 
 

@@ -428,16 +428,21 @@ class PrecompiledComparisonTests(unittest.TestCase):
         assets = destination / 'docs/rust-rewrite/assets'
         assets.mkdir(parents=True)
         (destination / 'README.md').write_text('unchanged ordinary comparison')
-        (assets / 'execution-performance.svg').write_bytes(b'ordinary graph')
+        (assets / 'unrelated.svg').write_bytes(b'ordinary graph')
         self.save()
-        with patch('precompiled_comparison.render', side_effect=lambda report, rows, metric: metric.encode()):
+        with patch('precompiled_comparison.render', side_effect=lambda report, row: row['file'].encode()) as renderer:
             comparison.publish(self.path, destination)
         target = destination / 'docs/rust-rewrite/precompiled-comparison.json'
         _, rows = comparison.load_report(target, target.with_suffix('.tar.gz'))
         self.assertEqual(len(rows), 17)
         self.assertEqual((destination / 'README.md').read_text(), 'unchanged ordinary comparison')
-        self.assertEqual((assets / 'execution-performance.svg').read_bytes(), b'ordinary graph')
-        self.assertEqual((assets / 'precompiled-execution.svg').read_bytes(), b'execution')
+        self.assertEqual((assets / 'unrelated.svg').read_bytes(), b'ordinary graph')
+        self.assertEqual(renderer.call_count, 17)
+        cards = comparison.chart_files(rows)
+        self.assertEqual({path.relative_to(assets) for path in (assets / 'precompiled').glob('*.svg')},
+                         {path for path, _ in cards})
+        for path, row in cards:
+            self.assertEqual((assets / path).read_bytes(), row['file'].encode())
         with self.assertRaisesRegex(ValueError, 'already exists'):
             comparison.publish(self.path, destination)
         # The published raw evidence remains independently admissible after

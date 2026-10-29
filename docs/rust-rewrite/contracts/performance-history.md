@@ -1,11 +1,10 @@
 # README performance graphic and retained measurements
 
-The README shows two images from the [compiler benchmark workflow](compiler-comparison.md):
-[execution time](../assets/execution-performance.svg) and
-[post-execution process memory](../assets/execution-memory.svg), comparing
-Scriptw, Scriptc/WASI and V8. Both use the checked `compiler-comparison.json`
-report and preserve its measured compiler identity and date. The renderer's
-default and `--check` commands process both images.
+The README shows one image per benchmark from the
+[compiler benchmark workflow](compiler-comparison.md), comparing Scriptw,
+Scriptc/WASI and V8. Each image has vertical execution-time and process-RSS bars
+on separate zero-based scales. The checked `compiler-comparison.json` owns the
+measured source and date. Default rendering and `--check` process every image.
 
 The dated two-runtime checkpoint below remains historical evidence. Use its
 explicit `--report` and a separate `--output` path to render it without changing

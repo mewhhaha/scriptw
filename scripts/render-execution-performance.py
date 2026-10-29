@@ -12,14 +12,14 @@ from pathlib import Path
 import sys
 
 from execution_chart_data import load_chart_data
-from compiler_comparison import CHARTS, SCHEMA, load_report, render as render_comparison
+from compiler_comparison import SCHEMA, chart_files, load_report, render as render_comparison
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / 'docs/rust-rewrite/execution-memory-packed-records-20261026.json'
 COMPARISON = ROOT / 'docs/rust-rewrite/compiler-comparison.json'
 if COMPARISON.is_file():
     REPORT = COMPARISON
-OUTPUT = ROOT / 'docs/rust-rewrite/assets/execution-performance.svg'
+ASSETS = ROOT / 'docs/rust-rewrite/assets'
 CURRENT = '#0969da'
 V8 = '#d97706'
 INK = '#24292f'
@@ -133,25 +133,31 @@ def render(data, preview=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, default=REPORT)
-    parser.add_argument('--output', type=Path, help='override one image output; requires --metric for the three-compiler report')
-    parser.add_argument('--metric', choices=tuple(CHARTS), help='render one three-compiler metric; otherwise render both')
+    parser.add_argument('--output', type=Path, help='override one image output; requires --case for the current report')
+    parser.add_argument('--case', help='render one benchmark filename; otherwise render every benchmark')
     parser.add_argument('--preview', type=Path, help='optional local PNG for visual inspection')
     parser.add_argument('--check', action='store_true', help='validate data and reject a stale SVG')
     args = parser.parse_args()
     try:
         if json.loads(args.report.read_text()).get('schema') == SCHEMA:
-            if (args.output or args.preview) and not args.metric:
-                parser.error('--output and --preview require --metric execution or memory')
+            if (args.output or args.preview) and not args.case:
+                parser.error('--output and --preview require --case')
             report, rows = load_report(args.report, args.report.with_suffix('.tar.gz'))
+            if args.case:
+                rows = [row for row in rows if row['file'] == args.case]
+                if not rows:
+                    parser.error('unknown benchmark filename: ' + args.case)
             data = {'source_commit': report['source_commit'], 'rows': rows}
-            outputs = [(args.output or OUTPUT.parent / chart['filename'],
-                        render_comparison(report, rows, metric, None if args.check else args.preview))
-                       for metric, chart in CHARTS.items() if args.metric is None or metric == args.metric]
+            outputs = [(args.output or ASSETS / relative,
+                        render_comparison(report, row, None if args.check else args.preview))
+                       for relative, row in chart_files(rows)]
         else:
-            if args.metric:
-                parser.error('--metric requires a three-compiler comparison report')
+            if args.case:
+                parser.error('--case requires a three-compiler comparison report')
+            if not args.output:
+                parser.error('historical reports require an explicit --output')
             data = load_chart_data(args.report)
-            outputs = [(args.output or OUTPUT, render(data, None if args.check else args.preview))]
+            outputs = [(args.output, render(data, None if args.check else args.preview))]
         for output, svg in outputs:
             if args.check:
                 if not output.is_file() or output.read_bytes() != svg:

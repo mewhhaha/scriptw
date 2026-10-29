@@ -15,7 +15,7 @@ setup and warmup history, and is neither live heap nor peak memory.
 The precompiled report retains before/after resource counters. The ordinary
 schema records startup cap/swap/affinity facts without end counters; no zero-OOM
 or measured-peak claim is inferred. Both existing inert validators readmitted the
-raw evidence and published archives, and all four SVGs were reproduced under a
+raw evidence and published archives, and all 34 per-benchmark SVGs were reproduced under a
 1-GiB, one-CPU, no-swap scope. Downloaded native code was never executed locally.
 The refresh metadata retains the actual local validation resource counters.
 

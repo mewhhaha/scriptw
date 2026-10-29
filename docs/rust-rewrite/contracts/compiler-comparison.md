@@ -47,25 +47,25 @@ includes Wasm native compilation, but excludes its JavaScript frontend process.
 The graph compares complete host-process footprints under these recorded paths.
 
 A smoke program must build and run successfully before per-case failures become
-data. Every original case stays in both images. A Scriptc compile failure, runtime
+data. Every original case keeps its own image. A Scriptc compile failure, runtime
 failure or changed checksum has a visible label and no performance bar. Inputs
 with lone UTF-16 surrogates keep their original contents and expected output.
 Failures and timeouts retain commands, exit statuses, stdout and stderr. A failed
 Scriptw or V8 reference run aborts publication. Incomplete evidence remains an
 Actions artifact and cannot replace the graph.
 
-The README shows separate images for [execution time](../assets/execution-performance.svg)
-and [post-execution process RSS](../assets/execution-memory.svg). Both retain the
-same runtime legend, complete workload inventory, measured source and date.
+The README shows one image per benchmark, with thick vertical bars for execution
+time and post-execution RSS. Each panel starts at zero and scales to that case;
+values and units make comparisons explicit. Source, date and timing boundaries
+appear once above the grid, with complete observations in the evidence.
 
-After successful publication, verify or regenerate both images offline:
+Verify or regenerate the images offline:
 
 ```sh
 python3 -B scripts/benchmark-compilers.py check docs/rust-rewrite/compiler-comparison.json
 python3 -B scripts/render-execution-performance.py --check
 python3 -B scripts/render-execution-performance.py
-python3 -B scripts/render-execution-performance.py --metric execution --preview /tmp/execution-time.png
-python3 -B scripts/render-execution-performance.py --metric memory --preview /tmp/process-memory.png
+python3 -B scripts/render-execution-performance.py --case retained-objects.js --preview /tmp/retained-objects.png
 ```
 
 The workflow pins matplotlib 3.11.2 for byte-stable SVG verification. Historical
