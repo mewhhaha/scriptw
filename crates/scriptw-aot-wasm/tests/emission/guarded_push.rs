@@ -72,16 +72,26 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
             let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
             let code = runtime.witness_type(GcSnapshotLayout::Code);
             let context = runtime.witness_type(GcSnapshotLayout::Context);
-            let argv = runtime.types.iter().enumerate().filter_map(|(index, ty)| {
-                let CompositeInnerType::Array(array) = &ty.composite_type.inner else { return None; };
-                let StorageType::Val(ValType::Ref(element)) = array.0.element_type else { return None; };
-                (!element.is_nullable()
-                    && element.heap_type() == HeapType::Concrete(UnpackedIndex::Module(stored)))
-                    .then_some(index as u32)
-            }).collect::<Vec<_>>();
-            assert_eq!(argv.len(), 1, "the canonical non-null StoredValue List has one GC type");
-            let argv = argv[0];
             let (dispatch, _) = runtime.named("helper::proxy_call");
+            // Nominal GC arrays can share an element layout. Bind the actual
+            // JS dispatch operand, rather than guessing its type by shape.
+            let signature = runtime.function_type(dispatch);
+            let ValType::Ref(arguments) = signature.params()[6] else {
+                panic!("two value triples precede the actual dispatch argument List");
+            };
+            assert!(!arguments.is_nullable(), "dispatch requires an actual argument List");
+            let HeapType::Concrete(UnpackedIndex::Module(argv)) = arguments.heap_type() else {
+                panic!("dispatch arguments retain their nominal GC array type");
+            };
+            let CompositeInnerType::Array(slots) = &runtime.types[argv as usize].composite_type.inner else {
+                panic!("the actual dispatch argument operand is a GC array");
+            };
+            let StorageType::Val(ValType::Ref(element)) = slots.0.element_type else {
+                panic!("the actual argument List contains typed GC references");
+            };
+            assert!(slots.0.mutable && !element.is_nullable()
+                && element.heap_type() == HeapType::Concrete(UnpackedIndex::Module(stored)),
+                "the actual dispatch List owns non-null canonical StoredValue entries");
             let dispatch = program.imported_runtime_function(&runtime, dispatch);
             let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
             let (descriptor, _) = runtime.named("helper::ordinary_own_descriptor");

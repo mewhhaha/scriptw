@@ -195,7 +195,7 @@ fn static_and_canonical_get_v_length_read_actual_strings_and_arrays_before_looku
     for (source, generic) in [
         (
             "function read(value) { return value.length; } read(globalThis.value);",
-            "helper::value_to_object",
+            "helper::cached_property_read",
         ),
         (
             "function read() { var value='a\\0\\ud800'; return value.length; } read();",

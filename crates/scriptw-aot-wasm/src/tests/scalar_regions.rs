@@ -316,9 +316,11 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
 
 #[test]
 fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coefficients() {
+    // Strict parameters use private locals; sloppy mapped arguments correctly
+    // retain environment storage and cannot enter this scalar region.
     for (source, signed) in [
-        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,19);", false),
-        ("function run(state,stop){for(var i=20;i>=stop;i--)state=(Math.imul(state,5)-7)|0;return state;} run(1,2);", true),
+        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,19);", false),
+        ("function run(state,stop){ \"use strict\";for(var i=20;i>=stop;i--)state=(Math.imul(state,5)-7)|0;return state;} run(1,2);", true),
     ] {
         with_source_operators(source, "run", |operators| {
             let loops = loop_regions(operators);
@@ -333,7 +335,7 @@ fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coeff
         });
     }
     with_source_operators(
-        "function run(total,stop){for(var i=0;i<stop;i++)total=(total+i*0.1)*1.0000000000000002-i/7;return total;} run(0,19);",
+        "function run(total,stop){ \"use strict\";for(var i=0;i<stop;i++)total=(total+i*0.1)*1.0000000000000002-i/7;return total;} run(0,19);",
         "run", |operators| {
             let loops = loop_regions(operators);
             let chunk = loops.iter().find(|region| scalar_arithmetic_loop(region)
@@ -351,12 +353,12 @@ fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coeff
 #[test]
 fn scalar_chunk_proofs_keep_written_tests_counters_and_full_values_on_their_owners() {
     for (source, expected_multiplications) in [
-        ("function run(state,stop){for(var i=0;i<stop;i++){stop--;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){for(var i=0;i<stop;i++){i++;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){var i=0;for(;(i=i+1)<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,state)+1)>>>0;return state;} run(1,20);", vec![1,5]),
-        ("function run(state,stop){var full=0;for(var i=0;i<stop;i++)state=(full=Math.imul(state,3)+1)>>>0;return full;} run(1,20);", vec![1,5]),
-        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,3)+i)>>>0;return state;} run(1,20);", vec![1,5]),
+        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++){stop--;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++){i++;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){ \"use strict\";var i=0;for(;(i=i+1)<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,state)+1)>>>0;return state;} run(1,20);", vec![1,5]),
+        ("function run(state,stop){ \"use strict\";var full=0;for(var i=0;i<stop;i++)state=(full=Math.imul(state,3)+1)>>>0;return full;} run(1,20);", vec![1,5]),
+        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,3)+i)>>>0;return state;} run(1,20);", vec![1,5]),
     ] {
         with_source_operators(source, "run", |operators| {
             let mut actual = loop_regions(operators).into_iter()

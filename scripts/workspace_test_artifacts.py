@@ -134,7 +134,7 @@ def doc_cohorts(inventory, packages=None, isolated_packages=()):
     return cohorts
 
 
-def test_artifacts(messages, expected):
+def test_artifacts(messages, expected, *, profile_root=None):
     """Reject missing, ambiguous and unexpected executables in one selector.
 
     `expected` contains exact (Cargo package ID, target name, target kind) keys.
@@ -159,6 +159,12 @@ def test_artifacts(messages, expected):
             raise ValueError(f"unexpected test artifact: {keys}")
         key = matches[0]
         path = Path(message["executable"])
+        if profile_root is not None:
+            directory = "examples" if key[2] == "example" else "deps"
+            if path.parent.resolve() != (Path(profile_root) / directory).resolve():
+                raise AssertionError(
+                    "Cargo-selected native output belongs to another profile or target directory"
+                )
         if key in found:
             raise ValueError(f"duplicate test artifact: {key}")
         found[key] = path

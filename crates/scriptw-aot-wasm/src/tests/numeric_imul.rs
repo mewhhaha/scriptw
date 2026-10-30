@@ -26,13 +26,26 @@ fn numeric_imul_specialization_reaches_real_indirect_call_forms() {
         for payload in Parser::new(0).parse_all(&artifact.bytes) {
             if let Payload::CodeSectionEntry(body) = payload.expect("module parses") {
                 if index == main {
-                    has_numeric_multiply = body
+                    let operators = body
                         .get_operators_reader()
                         .expect("function operators parse")
                         .into_iter()
-                        .any(|operator| {
-                            matches!(operator.expect("operator parses"), Operator::I32Mul)
-                        });
+                        .map(|operator| operator.expect("operator parses"))
+                        .collect::<Vec<_>>();
+                    has_numeric_multiply = operators.windows(7).any(|ops| {
+                        matches!(
+                            ops,
+                            [
+                                Operator::LocalGet { .. },
+                                Operator::I32WrapI64,
+                                Operator::LocalGet { .. },
+                                Operator::I32WrapI64,
+                                Operator::I32Mul,
+                                Operator::F64ConvertI32S,
+                                Operator::I64ReinterpretF64
+                            ]
+                        )
+                    });
                 }
                 index += 1;
             }

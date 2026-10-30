@@ -726,17 +726,7 @@ def run(args, root):
         )
 
     def profile_test_artifacts(messages, expected):
-        outputs = test_artifacts(messages, expected)
-        if not (
-            all(
-                path.parent.resolve() == (profile_root / "deps").resolve()
-                for path in outputs.values()
-            )
-        ):
-            raise AssertionError(
-                "Cargo-selected native output belongs to another profile or target directory"
-            )
-        return outputs
+        return test_artifacts(messages, expected, profile_root=profile_root)
 
     if args.plan_only:
         if not (not args.reuse_library_build_from):
@@ -1105,9 +1095,10 @@ def run(args, root):
         for key, path in artifacts.items():
             if key in wanted:
                 continue
-            if not (path.parent.resolve() == (profile_root / "deps").resolve()):
+            directory = "examples" if key[2] == "example" else "deps"
+            if path.parent.resolve() != (profile_root / directory).resolve():
                 raise AssertionError(
-                    "Verification condition failed: path.parent.resolve() == (profile_root / 'deps').resolve()"
+                    "Unselected native artifact belongs to another profile or target directory"
                 )
             row = {
                 "package_id": key[0],
@@ -1234,9 +1225,10 @@ def run(args, root):
                         )
         executable = entry.get("executable")
         if executable is not None:
-            if not (executable.parent.resolve() == (profile_root / "deps").resolve()):
+            directory = "examples" if case["kind"] == "example" else "deps"
+            if executable.parent.resolve() != (profile_root / directory).resolve():
                 raise AssertionError(
-                    "Verification condition failed: executable.parent.resolve() == (profile_root / 'deps').resolve()"
+                    "Executed native artifact belongs to another profile or target directory"
                 )
             if not (
                 hashlib.sha256(executable.read_bytes()).hexdigest()

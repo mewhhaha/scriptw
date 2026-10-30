@@ -22,7 +22,7 @@ class ArtifactRetentionTests(unittest.TestCase):
         self.watch.write_text('test result: ok. 2 passed; 0 failed; 0 ignored;\n')
 
     def functions(self,preserve,*,native_status=0):
-        case={'inventoried_tests':2,'executable_sha256':hashlib.sha256(self.binary.read_bytes()).hexdigest(),'package':'fixture','target':'fixture'}
+        case={'inventoried_tests':2,'executable_sha256':hashlib.sha256(self.binary.read_bytes()).hexdigest(),'package':'fixture','target':'fixture','kind':'test'}
         active={0:{'run':SimpleNamespace(poll=lambda:native_status),
                    'stream':SimpleNamespace(close=lambda:None),'case':case,
                    'watch':self.watch,'log':self.watch,'start':0,
@@ -54,6 +54,29 @@ class ArtifactRetentionTests(unittest.TestCase):
         self.assertTrue(namespace['complete'](0))
         self.assertFalse(self.binary.exists())
         self.assertTrue(case['executable_released'])
+
+    def test_example_completion_retains_the_same_hash_and_verdict_checks(self):
+        examples=self.profile/'examples';examples.mkdir()
+        self.binary=self.binary.rename(examples/self.binary.name)
+        namespace,case,cleanup=self.functions(True)
+        case['kind']='example'
+        self.assertTrue(namespace['complete'](0))
+        self.assertEqual(case['state'],'passed')
+        self.assertTrue(self.binary.exists())
+        self.assertEqual(len(cleanup),1)
+        namespace,case,_=self.functions(True)
+        with self.assertRaisesRegex(AssertionError,'another profile or target directory'):
+            namespace['complete'](0)
+
+    def test_unselected_example_has_its_own_directory_and_no_verdict(self):
+        examples=self.profile/'examples';examples.mkdir()
+        self.binary=self.binary.rename(examples/self.binary.name)
+        namespace,_,_=self.functions(True)
+        _,kept=namespace['finish_unselected_artifacts']({('id','fixture','example'):self.binary},set())
+        self.assertEqual(len(kept),1)
+        self.assertNotIn('state',kept[0])
+        with self.assertRaisesRegex(AssertionError,'another profile or target directory'):
+            namespace['finish_unselected_artifacts']({('id','fixture','test'):self.binary},set())
 
     def test_preserving_an_output_never_changes_a_failed_native_verdict(self):
         self.watch.write_text('test result: FAILED. 1 passed; 1 failed; 0 ignored;\n')

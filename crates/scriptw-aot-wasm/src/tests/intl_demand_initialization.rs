@@ -214,14 +214,16 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
-    // ABI 38 appends the state and retained namespace to RealmRecord. Check
-    // their physical types below without exposing private encoder ordinals.
-    let state_field = crate::gc_types::RealmRecordSchema::INTL_STATE
-        .ordinal()
-        .raw();
-    let namespace_field = crate::gc_types::RealmRecordSchema::INTL_NAMESPACE
-        .ordinal()
-        .raw();
+    let (types, declarations, exports) = inventory(bytes);
+    let wasmparser::CompositeInnerType::Struct(realm) =
+        &types[realm_index as usize].composite_type.inner
+    else {
+        panic!("Realm is a physical struct");
+    };
+    // The physical tail is Intl state/namespace, binary-data state, Error state.
+    // Check its ABI-40 types without exposing private encoder ordinals.
+    let state_field = realm.fields.len() as u32 - 4;
+    let namespace_field = realm.fields.len() as u32 - 3;
     assert!(resolve.windows(5).any(|ops| matches!(ops,
         [Operator::StructGet { struct_type_index, field_index }, Operator::LocalSet { local_index: retained_realm },
          Operator::LocalGet { local_index: argument_realm }, Operator::RefAsNonNull, Operator::Call { function_index }]
@@ -229,7 +231,6 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
             && *field_index == 0
             && retained_realm == argument_realm && *function_index == ensure_index)),
         "property resolution passes the recipe's retained defining Realm directly to ensure");
-    let (types, declarations, exports) = inventory(bytes);
     assert!(exports.contains(&ensure_index));
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[ensure_index as usize] as usize]
@@ -566,16 +567,16 @@ fn previous_layout_is_rejected_even_with_a_valid_resigned_runtime_package() {
     let source = [38; 32];
     let package = crate::encode_portable_runtime_package(runtime, &selection, &source).unwrap();
     assert_eq!(&package[..8], b"SCRWRB01");
-    assert_eq!(u32::from_le_bytes(package[8..12].try_into().unwrap()), 39);
+    assert_eq!(u32::from_le_bytes(package[8..12].try_into().unwrap()), 40);
     let admitted = crate::admit_portable_runtime_package(&package, &selection, &source).unwrap();
     assert_eq!(admitted.key(), runtime.key());
     let mut old = package;
-    old[8..12].copy_from_slice(&38u32.to_le_bytes());
+    old[8..12].copy_from_slice(&39u32.to_le_bytes());
     let end = old.len() - 32;
     let digest = Sha256::digest(&old[..end]);
     old[end..].copy_from_slice(&digest);
     assert!(
         crate::admit_portable_runtime_package(&old, &selection, &source).is_err(),
-        "a checksum-valid ABI38 envelope must not grant ABI39 layout authority"
+        "a checksum-valid ABI39 envelope must not grant ABI40 layout authority"
     );
 }

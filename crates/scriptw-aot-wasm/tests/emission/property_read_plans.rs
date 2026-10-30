@@ -16,6 +16,7 @@ pub(super) struct Module<'a> {
     pub(super) types: Vec<wasmparser::SubType>,
     names: BTreeMap<u32, String>,
     imports: BTreeMap<u32, (String, String)>,
+    function_types: BTreeMap<u32, u32>,
     exports: BTreeMap<String, u32>,
     bodies: BTreeMap<u32, Vec<Operator<'a>>>,
     globals: Vec<wasmparser::GlobalType>,
@@ -36,7 +37,8 @@ impl<'a> Module<'a> {
                 Payload::ImportSection(reader) => {
                     for import in reader.into_imports() {
                         let import = import.expect("property-read import decodes");
-                        if matches!(import.ty, TypeRef::Func(_) | TypeRef::FuncExact(_)) {
+                        if let TypeRef::Func(ty) | TypeRef::FuncExact(ty) = import.ty {
+                            module.function_types.insert(next_function, ty);
                             module.imports.insert(
                                 next_function,
                                 (import.module.to_owned(), import.name.to_owned()),
@@ -45,6 +47,14 @@ impl<'a> Module<'a> {
                         } else if let TypeRef::Global(ty) = import.ty {
                             module.globals.push(ty);
                         }
+                    }
+                }
+                Payload::FunctionSection(reader) => {
+                    for (offset, ty) in reader.into_iter().enumerate() {
+                        module.function_types.insert(
+                            next_function + offset as u32,
+                            ty.expect("property-read function type decodes"),
+                        );
                     }
                 }
                 Payload::ExportSection(reader) => {
@@ -155,6 +165,15 @@ impl<'a> Module<'a> {
             panic!("snapshot witness retains a concrete GC type");
         };
         index
+    }
+
+    pub(super) fn function_type(&self, index: u32) -> &wasmparser::FuncType {
+        let ty = self.function_types[&index];
+        let CompositeInnerType::Func(signature) = &self.types[ty as usize].composite_type.inner
+        else {
+            panic!("the actual function index resolves to a function signature");
+        };
+        signature
     }
 }
 
@@ -521,18 +540,22 @@ function repeatedRead(record, count, callback) {
                     )),
                     "{name} keeps numeric index classification in R"
                 );
-                assert_eq!(
-                    count(read, |operator| matches!(
-                        operator,
-                        Operator::RefTestNonNull { .. }
-                    )),
-                    count(array_control, |operator| matches!(
-                        operator,
-                        Operator::RefTestNonNull { .. }
-                    )),
-                    "{name} adds no P-side array representation guard"
-                );
             }
+            assert_eq!(
+                count(indexed, |op| matches!(op, Operator::RefTestNonNull { .. })),
+                count(array_control, |op| matches!(op, Operator::RefTestNonNull { .. })),
+                "a static numeric index retains its representation guard in R"
+            );
+            let array = runtime.witness_type(GcSnapshotLayout::Array);
+            let live_length = length.iter().position(|op| matches!(op,
+                Operator::StructGet { struct_type_index, field_index }
+                    if *struct_type_index == array && *field_index == GcSnapshotField::ArrayLength.index()))
+                .expect("the exact length consumer loads the actual Array's live intrinsic field");
+            assert!(length[..live_length].iter().any(|op| matches!(op,
+                Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                    if *index == array)), "the actual Array type dominates the intrinsic field load");
+            assert!(calls(&length[live_length..], fallback),
+                "other actual receivers still reach the complete saved-value Get fallback");
         })
         .expect("compiler worker starts")
         .join()

@@ -176,6 +176,24 @@ class WorkspaceTestArtifactTests(unittest.TestCase):
             artifacts.test_artifacts([message("cli-id", kind="bin")],
                                     [("cli-id", "differential_corpus", "test")])
 
+    def test_native_artifact_directory_is_bound_to_profile_and_target_kind(self):
+        root = Path("/tmp/workspace-artifact-profile/release")
+        for kind, directory in [("lib", "deps"), ("test", "deps"),
+                                ("bin", "deps"), ("example", "examples")]:
+            key = ("cli-id", "native", kind)
+            row = message(*key)
+            row["executable"] = str(root / directory / "native-hash")
+            self.assertEqual(artifacts.test_artifacts(
+                [row], [key], profile_root=root)[key], Path(row["executable"]))
+            for wrong in [root / ("deps" if kind == "example" else "examples"),
+                          root.parent / "debug" / directory,
+                          root / directory / "nested",
+                          root.parent.parent / "other-target" / "release" / directory]:
+                row["executable"] = str(wrong / "native-hash")
+                with self.subTest(kind=kind, wrong=wrong), self.assertRaisesRegex(
+                        AssertionError, "another profile or target directory"):
+                    artifacts.test_artifacts([row], [key], profile_root=root)
+
     def test_package_selection_is_stable_for_every_selector(self):
         self.assertEqual(artifacts.package_selection(), ["--workspace"])
         self.assertEqual(artifacts.package_selection(["scriptw-cli", "scriptw-test262"]),

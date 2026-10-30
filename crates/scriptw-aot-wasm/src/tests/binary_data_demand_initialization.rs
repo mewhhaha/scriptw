@@ -240,11 +240,17 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
         );
     }
     let batched = named(&names, "helper::deferred_intrinsic_install_run");
-    let rows: usize = ensure.windows(3).filter_map(|ops| match ops {
-        [Operator::I32Const { .. }, Operator::I32Const { value: count }, Operator::Call { function_index }]
-            if *function_index == batched => Some(*count as usize),
-        _ => None,
-    }).sum();
+    let rows: usize = ensure
+        .windows(3)
+        .filter_map(|ops| match ops {
+            [
+                Operator::I32Const { .. },
+                Operator::I32Const { value: count },
+                Operator::Call { function_index },
+            ] if *function_index == batched => Some(*count as usize),
+            _ => None,
+        })
+        .sum();
     assert_eq!(
         rows + calls(&ensure, named(&names, "helper::deferred_intrinsic_install")),
         69,
@@ -256,10 +262,15 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
-    let state_field = crate::gc_types::RealmRecordSchema::BINARY_DATA_STATE
-        .ordinal()
-        .raw();
     let (types, declarations, exports) = inventory(bytes);
+    let wasmparser::CompositeInnerType::Struct(realm) =
+        &types[realm_index as usize].composite_type.inner
+    else {
+        panic!("Realm is a physical struct");
+    };
+    // ABI 40 appends Error state after the existing binary-data state.
+    // Observe the physical tail without exposing encoder field ordinals.
+    let state_field = realm.fields.len() as u32 - 2;
     assert!(exports.contains(&ensure_index));
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[ensure_index as usize] as usize]
@@ -319,10 +330,13 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
         .windows(2)
         .enumerate()
         .filter_map(|(index, ops)| match ops {
-            [Operator::I32Const { value }, Operator::StructSet {
-                struct_type_index,
-                field_index,
-            }] if *struct_type_index == realm_index && *field_index == state_field => {
+            [
+                Operator::I32Const { value },
+                Operator::StructSet {
+                    struct_type_index,
+                    field_index,
+                },
+            ] if *struct_type_index == realm_index && *field_index == state_field => {
                 Some((index + 1, *value))
             }
             _ => None,
@@ -516,15 +530,21 @@ fn physical_canonical_binary_data_reads_ensure_the_same_realm_before_table_acces
                 let projection = ops[call + 1..position].iter().position(|op| matches!(op,
                     Operator::StructGet { struct_type_index, field_index } if *struct_type_index == realm && *field_index == field))
                     .map(|offset| call + 1 + offset).expect("read the ensured Realm's table");
-                let [Operator::LocalGet {
-                    local_index: ensured_realm,
-                }, Operator::RefAsNonNull] = &ops[call - 2..call]
+                let [
+                    Operator::LocalGet {
+                        local_index: ensured_realm,
+                    },
+                    Operator::RefAsNonNull,
+                ] = &ops[call - 2..call]
                 else {
                     panic!("ensure receives its actual defining Realm");
                 };
-                let [Operator::LocalGet {
-                    local_index: read_realm,
-                }, Operator::RefAsNonNull] = &ops[projection - 2..projection]
+                let [
+                    Operator::LocalGet {
+                        local_index: read_realm,
+                    },
+                    Operator::RefAsNonNull,
+                ] = &ops[projection - 2..projection]
                 else {
                     panic!("table projection receives its actual defining Realm");
                 };
