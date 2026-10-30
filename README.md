@@ -133,6 +133,13 @@ RSS includes compilation and warmup history, not live heap or peak memory.
 [CI run](https://github.com/mewhhaha/scriptw/actions/runs/41058270647) ·
 [Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
 
+The [module-local diagnostic](docs/rust-rewrite/module-local-performance-20261030.json)
+records 24–99.6% lower retained-call medians for derived strict module workloads.
+A later [packed-join experiment](docs/rust-rewrite/join-dense-values-20261030.json)
+failed its repeatability gate and was reverted: ordinary small joins slowed
+7–9% in both balanced orders. These local diagnostics retain their own compiler
+identities and measurement boundaries.
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /

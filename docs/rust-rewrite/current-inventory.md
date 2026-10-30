@@ -12,8 +12,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   [runtime ownership contract](contracts/runtime-byte-ownership.md) and
   [performance queue](../performance-hills.md). Re-profile current-source
   execution after the push, own-data cache, sort and scalar-loop batch before
-  choosing another optimization. Check append prototype probes and storage checks
-  across packed join's two passes. Any change needs concrete receiver/backing
+  choosing another optimization. Check append prototype probes and String
+  allocation/copying. The [dense packed-join borrow](join-dense-values-20261030.json)
+  was rejected: retained small-join changes disagreed between balanced orders,
+  while ordinary small joins slowed in both. Require a different measured
+  hypothesis before repeating it. Any change needs concrete receiver/backing
   proofs and must preserve holes, accessors, proxies and user-code ordering.
   The earlier ordinary retained-object time regression remains unresolved; the
   module-local diagnostic does not refresh that published comparison.
@@ -41,6 +44,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   local-storage invariant on the unchanged performance baseline and candidate.
   Keep both failures in selected replay totals; the module-local change does not
   repair this existing hoisted-function/`var` case.
+  Ordinary function-body hoisting emits lexical `let` initialization for backend
+  `HoistedVar` storage without a checked initialization flag. Distinguish this
+  hoisting boundary from true lexical initialization; preserve module/block
+  lexicals, parameter collisions, captures and TDZ rather than weakening the
+  backend's uninitialized-storage invariant.
 - Finish retention, real serial/shard/resume checks, debug/release differential
   and robustness campaigns, supported-host reproducibility and calibrated
   performance acceptance. Preserve original IDs, budgets and failed receipts.
