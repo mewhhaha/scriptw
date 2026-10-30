@@ -39,6 +39,52 @@ fn argv_allocation(op: &Operator<'_>, array: u32) -> bool {
         if *array_type_index == array)
 }
 
+fn incoming_empty_argv_allocation(
+    body: &[Operator<'_>],
+    signature: &wasmparser::FuncType,
+    argv: u32,
+) -> usize {
+    let vectors = signature
+        .params()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, ty)| {
+            matches!(ty, ValType::Ref(reference) if reference.is_nullable()
+            && reference.heap_type() == HeapType::Concrete(UnpackedIndex::Module(argv)))
+            .then_some(index as u32)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vectors.len(),
+        1,
+        "the source entry owns one nullable incoming argument List"
+    );
+    let vector = vectors[0];
+    let count = vector
+        .checked_sub(1)
+        .expect("the incoming count precedes its vector");
+    assert_eq!(signature.params()[count as usize], ValType::I64);
+    let allocations = body
+        .windows(14)
+        .enumerate()
+        .filter_map(|(start, ops)| {
+            matches!(ops,
+            [Operator::LocalGet { local_index: parameter }, Operator::LocalSet { local_index: saved },
+             Operator::LocalGet { local_index: supplied }, Operator::RefIsNull, Operator::If { .. },
+             Operator::LocalGet { local_index: supplied_count }, Operator::I64Eqz, Operator::I32Eqz,
+             Operator::If { .. }, Operator::Unreachable, Operator::End,
+             Operator::ArrayNewFixed { array_type_index, array_size: 0 },
+             Operator::LocalSet { local_index: normalized }, Operator::Else]
+                if *parameter == vector && saved == supplied && supplied == normalized
+                    && *supplied_count == count && *array_type_index == argv)
+            .then_some(start + 11)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(allocations.len(), 1,
+        "only a null incoming vector with zero declared arguments constructs the entry's empty List");
+    allocations[0]
+}
+
 #[test]
 fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback() {
     std::thread::Builder::new()
@@ -103,7 +149,7 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                 let (definition, kernel) = runtime.named(&format!("helper::array_packed_push{arity}"));
                 let imported = program.imported_runtime_function(&runtime, definition);
                 kernels.push(imported);
-                let (_, body) = program.named(&format!("js::{name}#"));
+                let (source, body) = program.named(&format!("js::{name}#"));
                 let direct = body.iter().position(|op| matches!(op,
                     Operator::Call { function_index } if *function_index == imported))
                     .expect("the source call reaches its fixed-arity native entry");
@@ -118,8 +164,12 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                     "the actual execution Realm is compared with the caller Realm");
                 assert_eq!(source_allocations(&body[..direct]), source_allocations(control),
                     "successful fixed push allocates no per-argument StoredValue snapshots");
-                assert!(!body[..direct].iter().any(|op| argv_allocation(op, argv)),
-                    "successful fixed push creates no argument List");
+                let entry_argv = incoming_empty_argv_allocation(body, program.function_type(source), argv);
+                let before_push = body[..direct].iter().enumerate()
+                    .filter_map(|(index, op)| argv_allocation(op, argv).then_some(index))
+                    .collect::<Vec<_>>();
+                assert_eq!(before_push, [entry_argv],
+                    "the source entry alone normalizes incoming null argv; successful fixed push creates no argument List");
                 let fallback = body.windows(3).enumerate().find_map(|(start, ops)| {
                     let [Operator::LocalGet { .. }, Operator::I32Eqz, Operator::If { .. }] = ops else { return None; };
                     let end = frame_end(body, start + 2);

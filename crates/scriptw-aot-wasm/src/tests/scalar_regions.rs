@@ -318,9 +318,11 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
 fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coefficients() {
     // Strict parameters use private locals; sloppy mapped arguments correctly
     // retain environment storage and cannot enter this scalar region.
+    // Numeric local bounds retain native-method facts in the generic body;
+    // the floating control below separately covers dynamic Number bounds.
     for (source, signed) in [
-        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,19);", false),
-        ("function run(state,stop){ \"use strict\";for(var i=20;i>=stop;i--)state=(Math.imul(state,5)-7)|0;return state;} run(1,2);", true),
+        ("function run(state){\"use strict\";var stop=19;for(var i=0;i<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1);", false),
+        ("function run(state){\"use strict\";var stop=2;for(var i=20;i>=stop;i--)state=(Math.imul(state,5)-7)|0;return state;} run(1);", true),
     ] {
         with_source_operators(source, "run", |operators| {
             let loops = loop_regions(operators);
@@ -353,12 +355,12 @@ fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coeff
 #[test]
 fn scalar_chunk_proofs_keep_written_tests_counters_and_full_values_on_their_owners() {
     for (source, expected_multiplications) in [
-        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++){stop--;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++){i++;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){ \"use strict\";var i=0;for(;(i=i+1)<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,20);", vec![1]),
-        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,state)+1)>>>0;return state;} run(1,20);", vec![1,5]),
-        ("function run(state,stop){ \"use strict\";var full=0;for(var i=0;i<stop;i++)state=(full=Math.imul(state,3)+1)>>>0;return full;} run(1,20);", vec![1,5]),
-        ("function run(state,stop){ \"use strict\";for(var i=0;i<stop;i++)state=(Math.imul(state,3)+i)>>>0;return state;} run(1,20);", vec![1,5]),
+        ("function run(state){\"use strict\";var stop=20;for(var i=0;i<stop;i++){stop--;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1);", vec![1]),
+        ("function run(state){\"use strict\";var stop=20;for(var i=0;i<stop;i++){i++;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1);", vec![1]),
+        ("function run(state){\"use strict\";var stop=20;var i=0;for(;(i=i+1)<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1);", vec![1]),
+        ("function run(state){\"use strict\";var stop=20;for(var i=0;i<stop;i++)state=(Math.imul(state,state)+1)>>>0;return state;} run(1);", vec![1,5]),
+        ("function run(state){\"use strict\";var stop=20;var full=0;for(var i=0;i<stop;i++)state=(full=Math.imul(state,3)+1)>>>0;return full;} run(1);", vec![1,5]),
+        ("function run(state){\"use strict\";var stop=20;for(var i=0;i<stop;i++)state=(Math.imul(state,3)+i)>>>0;return state;} run(1);", vec![1,5]),
     ] {
         with_source_operators(source, "run", |operators| {
             let mut actual = loop_regions(operators).into_iter()
