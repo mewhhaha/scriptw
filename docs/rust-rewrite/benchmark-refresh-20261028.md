@@ -1,9 +1,9 @@
-# Benchmark refresh, 2026-10-29
+# Benchmark refresh, 2026-10-30
 
-Both CI cohorts measure compiler `f19370fcf91018a7153cf9d8a4b38fdcf3f5f3df`; input fingerprint `c67902f8c4b5b9a4aeae7bdc2e6a87a7dac742ce55e508cab356ddb808b66882`.
+Both CI cohorts measure compiler `64cf187d62a3322b781c910d5fd033c5bad10777`; input fingerprint `d1579a87fafb4b3fe7b3f6cc1bdb91fa8a4b01f76b17c7c26421680b2272f09a`.
 
-- [Precompiled CI 40968350650](https://github.com/mewhhaha/scriptw/actions/runs/40968350650): completed 2026-10-29T23:15:06.482739+00:00; 68 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
-- [Three-runtime CI 40968346853](https://github.com/mewhhaha/scriptw/actions/runs/40968346853): completed 2026-10-29T23:02:16.626216+00:00; 102 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Precompiled CI 41032186356](https://github.com/mewhhaha/scriptw/actions/runs/41032186356): completed 2026-10-30T09:40:05.715817+00:00; 68 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Three-runtime CI 41032182998](https://github.com/mewhhaha/scriptw/actions/runs/41032182998): completed 2026-10-30T09:32:19.641197+00:00; 102 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
 
 Both cohorts use two balanced rounds, ten checked warmups and seven measurements
 per runtime/workload/round. The precompiled host disables compilation and uses
@@ -18,19 +18,26 @@ All 34 per-benchmark SVG cards were byte-reproduced with PNG previews under a
 retains validation resource counters; ordinary evidence has no end counters,
 so no zero-OOM or measured-peak claim is inferred for that cohort.
 
-The [local implementation checkpoint](binary-scalar-20261029.json) retains source
-`d0a134cfd9b96c743590c14e3acc6186f913dfb7` and fingerprint `b5acdef537cdb73aeb51f5f62eb981b8d040fd0e8f9de60e62e264e20771c0b6`.
+The [local implementation checkpoint](join-hotpaths-20261030.json) retains source
+`64cf187d62a3322b781c910d5fd033c5bad10777` and fingerprint `d6f09d2d953874e4ac29bd5373dd71c5d7d9b1bf9e36644caf84f7dc59f1a0e3`.
 Its local before/after results and actual native verification scope remain
 separate from these CI bars. This refresh does not rerun native acceptance or
 the pinned Test262 publication. Earlier checkpoint and mapping identities remain
 historical evidence; they are not relabeled as measurements of this CI source.
 
-The local checkpoint accepts 21 explicitly selected native scopes
-with 5081 unique package/target/test identifiers and 191 selected
-original pinned Test262 executions across six scopes. This is a scoped result,
-not full workspace or full Test262 acceptance. Lean-consumer control status:
-`complete`; join PC profile status:
-`complete`. Unrun work carries no passing result.
+The local checkpoint accepts 4 explicitly selected native scopes
+with 825 unique package/target/test identifiers and 156 selected
+original pinned Test262 executions across four scopes. This is a scoped result,
+not full workspace, ABI-wide or full Test262 acceptance. Baseline execution-only
+PC profile status: `complete`; candidate
+profile status: `complete`. Profiles retain
+their own source identities and are self-sample diagnostics, not inclusive costs.
+Unrun work carries no passing result.
+
+The first-candidate profile status is
+`complete`. Its full
+comparison and repeat controls remain historical non-promoted diagnostics;
+their rows do not enter the final local ratios or these CI bars.
 
 [Precompiled charts and evidence](precompiled-comparison.md) ·
 [Three-runtime charts and evidence](compiler-comparison.md) ·

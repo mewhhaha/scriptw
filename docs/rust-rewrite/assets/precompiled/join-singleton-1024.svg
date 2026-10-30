@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>join-singleton-1024.js</dc:title>
-    <dc:description>{"finished_at": "2026-10-29T23:15:06.482739+00:00", "measured_date": "2026-10-29", "policy": {"consumer_compiler_enabled": false, "execution": "fresh Store/Realm; instance setup excluded; guest/runtime startup and output/completion included", "limitations": "same-host descriptive comparison, not live JS heap, peak RSS, statistical significance or conformance", "memory": "post-execution RSS/PSS/private-dirty endpoints with Store alive; load maximum sampled separately", "producers_outside_consumers": true}, "row": {"file": "join-singleton-1024.js", "runtimes": {"scriptc": {"after_transport_drop": [{"private_dirty_bytes": 2117632, "pss_bytes": 9238528, "rss_bytes": 11362304, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2117632, "pss_bytes": 9354240, "rss_bytes": 11431936, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "exported_linear_memory_after_bytes": 17760256, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 289982, "instantiate": 81021, "register": 119804, "state_linker": 23854, "total": 1109667}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2265088, "pss_bytes": 10502144, "rss_bytes": 12689408, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2154496, "pss_bytes": 9799680, "rss_bytes": 11923456, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2174976, "pss_bytes": 10412032, "rss_bytes": 12599296, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2117632, "pss_bytes": 9238528, "rss_bytes": 11362304, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}, {"completion": "normal", "exported_linear_memory_after_bytes": 17760256, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 287848, "instantiate": 88395, "register": 118151, "state_linker": 41007, "total": 1126769}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2265088, "pss_bytes": 10487808, "rss_bytes": 12627968, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2154496, "pss_bytes": 9915392, "rss_bytes": 11993088, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2174976, "pss_bytes": 10397696, "rss_bytes": 12537856, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2117632, "pss_bytes": 9354240, "rss_bytes": 11431936, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}], "load_phases_ns": {"engine": [16150, 16391], "image_read_and_envelope_admission": [1735288, 1745246], "native_admission_and_deserialization": [3016706, 3012628], "process_total": [7031420, 7026882]}, "load_sampled_max_rss_bytes": [12161024, 12296192], "measured_samples": 14, "ms": 0.129362, "private_dirty_mib": 2.287109375, "process_medians": {"after_execution": {"private_dirty_bytes": 2398208.0, "pss_bytes": 10626048.0, "rss_bytes": 12791808.0}, "after_instantiate": {"private_dirty_bytes": 2301952.0, "pss_bytes": 10531840.0, "rss_bytes": 12697600.0}, "after_store_drop": {"private_dirty_bytes": 2304000.0, "pss_bytes": 10531840.0, "rss_bytes": 12697600.0}, "before_store": {"private_dirty_bytes": 2293760.0, "pss_bytes": 10523648.0, "rss_bytes": 12687360.0}}, "pss_mib": 10.1337890625, "rounds": ["ok", "ok"], "rss_mib": 12.19921875, "status": "ok"}, "scriptw": {"after_transport_drop": [{"private_dirty_bytes": 2277376, "pss_bytes": 12205056, "rss_bytes": 14282752, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2277376, "pss_bytes": 12034048, "rss_bytes": 14110720, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 872092, "instantiate": 448469, "register": 170910, "state_linker": 31890, "total": 2369114}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2990080, "pss_bytes": 16222208, "rss_bytes": 18362368, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2715648, "pss_bytes": 13850624, "rss_bytes": 15990784, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2478080, "pss_bytes": 15710208, "rss_bytes": 17850368, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2277376, "pss_bytes": 12205056, "rss_bytes": 14282752, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}, {"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 903351, "instantiate": 491590, "register": 173164, "state_linker": 30407, "total": 2437492}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2990080, "pss_bytes": 16115712, "rss_bytes": 18255872, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2715648, "pss_bytes": 13678592, "rss_bytes": 15818752, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2478080, "pss_bytes": 15603712, "rss_bytes": 17743872, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2277376, "pss_bytes": 12034048, "rss_bytes": 14110720, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}], "load_phases_ns": {"engine": [15750, 18975], "image_read_and_envelope_admission": [970056, 1016583], "native_admission_and_deserialization": [143387998, 146258902], "process_total": [146157241, 149051408]}, "load_sampled_max_rss_bytes": [14860288, 14688256], "measured_samples": 14, "ms": 0.7707775, "private_dirty_mib": 2.98046875, "process_medians": {"after_execution": {"private_dirty_bytes": 3125248.0, "pss_bytes": 16302080.0, "rss_bytes": 18442240.0}, "after_instantiate": {"private_dirty_bytes": 2871296.0, "pss_bytes": 16048128.0, "rss_bytes": 18188288.0}, "after_store_drop": {"private_dirty_bytes": 2613248.0, "pss_bytes": 15790080.0, "rss_bytes": 17930240.0}, "before_store": {"private_dirty_bytes": 2609152.0, "pss_bytes": 15783936.0, "rss_bytes": 17924096.0}}, "pss_mib": 15.546875, "rounds": ["ok", "ok"], "rss_mib": 17.587890625, "status": "ok"}}}, "runtimes": ["scriptw", "scriptc"], "schema": "scriptw-precompiled-comparison-v1", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "f19370fcf91018a7153cf9d8a4b38fdcf3f5f3df", "started_at": "2026-10-29T23:13:41.625735+00:00"}</dc:description>
+    <dc:description>{"finished_at": "2026-10-30T09:40:05.715817+00:00", "measured_date": "2026-10-30", "policy": {"consumer_compiler_enabled": false, "execution": "fresh Store/Realm; instance setup excluded; guest/runtime startup and output/completion included", "limitations": "same-host descriptive comparison, not live JS heap, peak RSS, statistical significance or conformance", "memory": "post-execution RSS/PSS/private-dirty endpoints with Store alive; load maximum sampled separately", "producers_outside_consumers": true}, "row": {"file": "join-singleton-1024.js", "runtimes": {"scriptc": {"after_transport_drop": [{"private_dirty_bytes": 2121728, "pss_bytes": 9398272, "rss_bytes": 11603968, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2121728, "pss_bytes": 9257984, "rss_bytes": 11501568, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "exported_linear_memory_after_bytes": 17760256, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 280292, "instantiate": 93400, "register": 113862, "state_linker": 31948, "total": 1032384}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2269184, "pss_bytes": 10530816, "rss_bytes": 12800000, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2158592, "pss_bytes": 9959424, "rss_bytes": 12165120, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2179072, "pss_bytes": 10440704, "rss_bytes": 12709888, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2121728, "pss_bytes": 9398272, "rss_bytes": 11603968, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}, {"completion": "normal", "exported_linear_memory_after_bytes": 17760256, "exported_linear_memory_before_bytes": 17498112, "gc_capacity_after_bytes": 0, "gc_capacity_before_bytes": 0, "index": 0, "matched": true, "phases_ns": {"execution": 300412, "instantiate": 97136, "register": 109795, "state_linker": 29875, "total": 1072063}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2269184, "pss_bytes": 10407936, "rss_bytes": 12713984, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2158592, "pss_bytes": 9835520, "rss_bytes": 12079104, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2179072, "pss_bytes": 10317824, "rss_bytes": 12623872, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2121728, "pss_bytes": 9257984, "rss_bytes": 11501568, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}], "load_phases_ns": {"engine": [17767, 20841], "image_read_and_envelope_admission": [1085354, 1095058], "native_admission_and_deserialization": [2294354, 2305350], "process_total": [5431035, 5515322]}, "load_sampled_max_rss_bytes": [12533760, 12431360], "measured_samples": 14, "ms": 0.0804905, "private_dirty_mib": 2.2890625, "process_medians": {"after_execution": {"private_dirty_bytes": 2400256.0, "pss_bytes": 10602496.0, "rss_bytes": 12890112.0}, "after_instantiate": {"private_dirty_bytes": 2306048.0, "pss_bytes": 10508288.0, "rss_bytes": 12795904.0}, "after_store_drop": {"private_dirty_bytes": 2306048.0, "pss_bytes": 10508288.0, "rss_bytes": 12795904.0}, "before_store": {"private_dirty_bytes": 2297856.0, "pss_bytes": 10500096.0, "rss_bytes": 12787712.0}}, "pss_mib": 10.111328125, "rounds": ["ok", "ok"], "rss_mib": 12.29296875, "status": "ok"}, "scriptw": {"after_transport_drop": [{"private_dirty_bytes": 2285568, "pss_bytes": 11981824, "rss_bytes": 14241792, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, {"private_dirty_bytes": 2285568, "pss_bytes": 12188672, "rss_bytes": 14438400, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}], "first_warmups": [{"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 604990, "instantiate": 399552, "register": 161393, "state_linker": 34762, "total": 1993771}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2998272, "pss_bytes": 15933440, "rss_bytes": 18255872, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2723840, "pss_bytes": 13561856, "rss_bytes": 15884288, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2486272, "pss_bytes": 15421440, "rss_bytes": 17743872, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2285568, "pss_bytes": 11981824, "rss_bytes": 14241792, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}, {"completion": "normal", "gc_capacity_after_bytes": 16777216, "gc_capacity_before_bytes": 16777216, "index": 0, "matched": true, "phases_ns": {"execution": 652302, "instantiate": 393272, "register": 170757, "state_linker": 32349, "total": 2023306}, "process_snapshots": {"after_execution": {"private_dirty_bytes": 2998272, "pss_bytes": 16129024, "rss_bytes": 18378752, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_instantiate": {"private_dirty_bytes": 2723840, "pss_bytes": 13691904, "rss_bytes": 15941632, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "after_store_drop": {"private_dirty_bytes": 2486272, "pss_bytes": 15617024, "rss_bytes": 17866752, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}, "before_store": {"private_dirty_bytes": 2285568, "pss_bytes": 12188672, "rss_bytes": 14438400, "scope": "linux-process-smaps-rollup-endpoint-not-peak-or-live-js"}}, "stderr": "", "stdout": "4096\n", "warmup": true}], "load_phases_ns": {"engine": [20752, 20641], "image_read_and_envelope_admission": [573343, 569637], "native_admission_and_deserialization": [323343301, 397567608], "process_total": [325565756, 399830294]}, "load_sampled_max_rss_bytes": [14819328, 15015936], "measured_samples": 14, "ms": 0.407634, "private_dirty_mib": 2.98828125, "process_medians": {"after_execution": {"private_dirty_bytes": 3133440.0, "pss_bytes": 16165376.0, "rss_bytes": 18483200.0}, "after_instantiate": {"private_dirty_bytes": 2879488.0, "pss_bytes": 15911424.0, "rss_bytes": 18229248.0}, "after_store_drop": {"private_dirty_bytes": 2621440.0, "pss_bytes": 15653376.0, "rss_bytes": 17971200.0}, "before_store": {"private_dirty_bytes": 2617344.0, "pss_bytes": 15647232.0, "rss_bytes": 17965056.0}}, "pss_mib": 15.41650390625, "rounds": ["ok", "ok"], "rss_mib": 17.626953125, "status": "ok"}}}, "runtimes": ["scriptw", "scriptc"], "schema": "scriptw-precompiled-comparison-v1", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "64cf187d62a3322b781c910d5fd033c5bad10777", "started_at": "2026-10-30T09:38:53.819086+00:00"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -67,24 +67,24 @@ L 199.237091 191.232
     </g>
     <g id="ytick_2">
      <g id="line2d_5">
-      <path d="M 39.528 136.046963
-L 199.237091 136.046963
+      <path d="M 39.528 139.0585
+L 199.237091 139.0585
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_4">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="139.086026" transform="rotate(-0 36.028 139.086026)">0.4</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="142.097563" transform="rotate(-0 36.028 142.097563)">0.2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_7">
-      <path d="M 39.528 80.861927
-L 199.237091 80.861927
+      <path d="M 39.528 86.885001
+L 199.237091 86.885001
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_5">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="83.900989" transform="rotate(-0 36.028 83.900989)">0.8</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="89.924063" transform="rotate(-0 36.028 89.924063)">0.4</text>
      </g>
     </g>
    </g>
@@ -99,8 +99,8 @@ z
    <g id="patch_4">
     <path d="M 130.997752 191.232
 L 180.36238 191.232
-L 180.36238 173.384883
-L 130.997752 173.384883
+L 180.36238 170.234645
+L 130.997752 170.234645
 z
 " clip-path="url(#p648741f3fb)" style="fill: #36835b"/>
    </g>
@@ -110,10 +110,10 @@ L 199.237091 191.232
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_6">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="83.085025" y="77.25096" transform="rotate(-0 83.085025 77.25096)">0.771</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="83.085025" y="77.25096" transform="rotate(-0 83.085025 77.25096)">0.408</text>
    </g>
    <g id="text_7">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="155.680066" y="165.742305" transform="rotate(-0 155.680066 165.742305)">0.129</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="155.680066" y="162.592067" transform="rotate(-0 155.680066 162.592067)">0.080</text>
    </g>
    <g id="text_8">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="39.528" y="41.992" transform="rotate(-0 39.528 41.992)">Time · ms</text>
@@ -156,24 +156,24 @@ L 426.024 191.232
     </g>
     <g id="ytick_5">
      <g id="line2d_13">
-      <path d="M 266.314909 142.863056
-L 426.024 142.863056
+      <path d="M 266.314909 142.970245
+L 426.024 142.970245
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_14"/>
      <g id="text_12">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="145.902119" transform="rotate(-0 262.814909 145.902119)">8</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="146.009308" transform="rotate(-0 262.814909 146.009308)">8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_15">
-      <path d="M 266.314909 94.494113
-L 426.024 94.494113
+      <path d="M 266.314909 94.70849
+L 426.024 94.70849
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_13">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="97.533175" transform="rotate(-0 262.814909 97.533175)">16</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="97.747553" transform="rotate(-0 262.814909 97.747553)">16</text>
      </g>
     </g>
    </g>
@@ -188,8 +188,8 @@ z
    <g id="patch_8">
     <path d="M 357.784661 191.232
 L 407.149289 191.232
-L 407.149289 117.474084
-L 357.784661 117.474084
+L 407.149289 117.071969
+L 357.784661 117.071969
 z
 " clip-path="url(#pf3a1462166)" style="fill: #36835b"/>
    </g>
@@ -202,7 +202,7 @@ L 426.024 191.232
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="309.871934" y="77.25096" transform="rotate(-0 309.871934 77.25096)">17.6</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="382.466975" y="109.831506" transform="rotate(-0 382.466975 109.831506)">12.2</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="382.466975" y="109.429391" transform="rotate(-0 382.466975 109.429391)">12.3</text>
    </g>
    <g id="text_16">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="266.314909" y="41.992" transform="rotate(-0 266.314909 41.992)">RSS · MiB</text>

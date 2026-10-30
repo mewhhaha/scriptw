@@ -1,9 +1,9 @@
 {
   "schema": "scriptw-three-compiler-benchmark-v1",
   "complete": true,
-  "source_commit": "f19370fcf91018a7153cf9d8a4b38fdcf3f5f3df",
-  "started_at": "2026-10-29T23:01:37.731429+00:00",
-  "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/40968346853",
+  "source_commit": "64cf187d62a3322b781c910d5fd033c5bad10777",
+  "started_at": "2026-10-30T09:31:41.260544+00:00",
+  "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/41032182998",
   "machine": {
     "system": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
     "architecture": "x86_64",
@@ -50,10 +50,10 @@
       "sha256": "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4"
     },
     "runtime_baseline": {
-      "sha256": "5eb85bd33893c9dc529c50af0bf4a85545124bdbe862a65729f8f76790e95673"
+      "sha256": "7cf9e89d360ded9fd92ba8c33d1a462da8343eda7c8286b178ce017a868f12a2"
     },
     "wasi_baseline": {
-      "sha256": "af55bbb85ab82f6570d2b98b3dd24c6c2f8194c02d79658cc937182a1e81d6c4"
+      "sha256": "16769becea29afbe67ab851af7a36d69764b0dcff419bef7ede009b95a10272c"
     }
   },
   "samples": 7,
@@ -1413,11 +1413,11 @@
         "node",
         "--version"
       ],
-      "started_at": "2026-10-29T23:01:21.283722+00:00",
+      "started_at": "2026-10-30T09:31:24.551765+00:00",
       "stdout": "logs/version-node.stdout",
       "stderr": "logs/version-node.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:21.288288+00:00"
+      "finished_at": "2026-10-30T09:31:24.556442+00:00"
     },
     {
       "label": "version-zig",
@@ -1425,11 +1425,11 @@
         "zig",
         "version"
       ],
-      "started_at": "2026-10-29T23:01:21.348269+00:00",
+      "started_at": "2026-10-30T09:31:24.616292+00:00",
       "stdout": "logs/version-zig.stdout",
       "stderr": "logs/version-zig.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:21.353285+00:00"
+      "finished_at": "2026-10-30T09:31:24.621434+00:00"
     },
     {
       "label": "version-scriptc",
@@ -1437,11 +1437,11 @@
         "/home/runner/work/_temp/scriptc/node_modules/.bin/scriptc",
         "--version"
       ],
-      "started_at": "2026-10-29T23:01:21.438018+00:00",
+      "started_at": "2026-10-30T09:31:24.706104+00:00",
       "stdout": "logs/version-scriptc.stdout",
       "stderr": "logs/version-scriptc.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:21.443285+00:00"
+      "finished_at": "2026-10-30T09:31:24.711701+00:00"
     },
     {
       "label": "version-rustc",
@@ -1449,11 +1449,11 @@
         "rustc",
         "--version"
       ],
-      "started_at": "2026-10-29T23:01:21.482969+00:00",
+      "started_at": "2026-10-30T09:31:24.752255+00:00",
       "stdout": "logs/version-rustc.stdout",
       "stderr": "logs/version-rustc.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:21.516282+00:00"
+      "finished_at": "2026-10-30T09:31:24.785650+00:00"
     },
     {
       "label": "version-v8",
@@ -1462,11 +1462,11 @@
         "-p",
         "process.versions.v8"
       ],
-      "started_at": "2026-10-29T23:01:21.661502+00:00",
+      "started_at": "2026-10-30T09:31:25.217599+00:00",
       "stdout": "logs/version-v8.stdout",
       "stderr": "logs/version-v8.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:21.678427+00:00"
+      "finished_at": "2026-10-30T09:31:25.234583+00:00"
     },
     {
       "label": "smoke-compile",
@@ -1477,11 +1477,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/smoke.wasm"
       ],
-      "started_at": "2026-10-29T23:01:21.718243+00:00",
+      "started_at": "2026-10-30T09:31:25.449193+00:00",
       "stdout": "logs/smoke-compile.stdout",
       "stderr": "logs/smoke-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:37.651789+00:00"
+      "finished_at": "2026-10-30T09:31:41.180925+00:00"
     },
     {
       "label": "smoke-run",
@@ -1492,11 +1492,11 @@
         "3",
         "1"
       ],
-      "started_at": "2026-10-29T23:01:37.651884+00:00",
+      "started_at": "2026-10-30T09:31:41.181015+00:00",
       "stdout": "logs/smoke-run.stdout",
       "stderr": "logs/smoke-run.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:37.718619+00:00"
+      "finished_at": "2026-10-30T09:31:41.247753+00:00"
     },
     {
       "label": "round-0-v8-sort-reverse-128.js",
@@ -1508,11 +1508,11 @@
         "10",
         "sort-reverse-128.js"
       ],
-      "started_at": "2026-10-29T23:01:37.732719+00:00",
+      "started_at": "2026-10-30T09:31:41.261786+00:00",
       "stdout": "logs/round-0-v8-sort-reverse-128.js.stdout",
       "stderr": "logs/round-0-v8-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:37.765477+00:00"
+      "finished_at": "2026-10-30T09:31:41.294632+00:00"
     },
     {
       "label": "round-0-scriptw-sort-reverse-128.js",
@@ -1524,11 +1524,11 @@
         "sort-reverse-128.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-sort-reverse-128.js"
       ],
-      "started_at": "2026-10-29T23:01:37.765812+00:00",
+      "started_at": "2026-10-30T09:31:41.294953+00:00",
       "stdout": "logs/round-0-scriptw-sort-reverse-128.js.stdout",
       "stderr": "logs/round-0-scriptw-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:38.534392+00:00"
+      "finished_at": "2026-10-30T09:31:42.113532+00:00"
     },
     {
       "label": "round-0-scriptc-sort-reverse-128.js-compile",
@@ -1539,11 +1539,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-sort-reverse-128.js/sort-reverse-128.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:38.535027+00:00",
+      "started_at": "2026-10-30T09:31:42.114157+00:00",
       "stdout": "logs/round-0-scriptc-sort-reverse-128.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-sort-reverse-128.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:38.751049+00:00"
+      "finished_at": "2026-10-30T09:31:42.330050+00:00"
     },
     {
       "label": "round-0-scriptc-sort-reverse-128.js",
@@ -1554,11 +1554,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:38.751149+00:00",
+      "started_at": "2026-10-30T09:31:42.330131+00:00",
       "stdout": "logs/round-0-scriptc-sort-reverse-128.js.stdout",
       "stderr": "logs/round-0-scriptc-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:38.967818+00:00"
+      "finished_at": "2026-10-30T09:31:42.546954+00:00"
     },
     {
       "label": "round-0-scriptw-sort-reverse-512.js",
@@ -1570,11 +1570,11 @@
         "sort-reverse-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-sort-reverse-512.js"
       ],
-      "started_at": "2026-10-29T23:01:38.968579+00:00",
+      "started_at": "2026-10-30T09:31:42.547647+00:00",
       "stdout": "logs/round-0-scriptw-sort-reverse-512.js.stdout",
       "stderr": "logs/round-0-scriptw-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:39.686461+00:00"
+      "finished_at": "2026-10-30T09:31:43.215189+00:00"
     },
     {
       "label": "round-0-scriptc-sort-reverse-512.js-compile",
@@ -1585,11 +1585,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-sort-reverse-512.js/sort-reverse-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:39.693052+00:00",
+      "started_at": "2026-10-30T09:31:43.216011+00:00",
       "stdout": "logs/round-0-scriptc-sort-reverse-512.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-sort-reverse-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:39.910662+00:00"
+      "finished_at": "2026-10-30T09:31:43.432420+00:00"
     },
     {
       "label": "round-0-scriptc-sort-reverse-512.js",
@@ -1600,11 +1600,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:39.910743+00:00",
+      "started_at": "2026-10-30T09:31:43.432500+00:00",
       "stdout": "logs/round-0-scriptc-sort-reverse-512.js.stdout",
       "stderr": "logs/round-0-scriptc-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:40.126823+00:00"
+      "finished_at": "2026-10-30T09:31:43.648951+00:00"
     },
     {
       "label": "round-0-v8-sort-reverse-512.js",
@@ -1616,11 +1616,11 @@
         "10",
         "sort-reverse-512.js"
       ],
-      "started_at": "2026-10-29T23:01:40.181255+00:00",
+      "started_at": "2026-10-30T09:31:43.649687+00:00",
       "stdout": "logs/round-0-v8-sort-reverse-512.js.stdout",
       "stderr": "logs/round-0-v8-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:40.214494+00:00"
+      "finished_at": "2026-10-30T09:31:43.682640+00:00"
     },
     {
       "label": "round-0-scriptc-sort-sorted-512.js-compile",
@@ -1631,11 +1631,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-sort-sorted-512.js/sort-sorted-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:40.271291+00:00",
+      "started_at": "2026-10-30T09:31:43.683211+00:00",
       "stdout": "logs/round-0-scriptc-sort-sorted-512.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-sort-sorted-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:40.486890+00:00"
+      "finished_at": "2026-10-30T09:31:43.899041+00:00"
     },
     {
       "label": "round-0-scriptc-sort-sorted-512.js",
@@ -1646,11 +1646,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:40.486971+00:00",
+      "started_at": "2026-10-30T09:31:43.899121+00:00",
       "stdout": "logs/round-0-scriptc-sort-sorted-512.js.stdout",
       "stderr": "logs/round-0-scriptc-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:40.703833+00:00"
+      "finished_at": "2026-10-30T09:31:44.115966+00:00"
     },
     {
       "label": "round-0-v8-sort-sorted-512.js",
@@ -1662,11 +1662,11 @@
         "10",
         "sort-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:01:40.704691+00:00",
+      "started_at": "2026-10-30T09:31:44.116779+00:00",
       "stdout": "logs/round-0-v8-sort-sorted-512.js.stdout",
       "stderr": "logs/round-0-v8-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:40.737508+00:00"
+      "finished_at": "2026-10-30T09:31:44.149648+00:00"
     },
     {
       "label": "round-0-scriptw-sort-sorted-512.js",
@@ -1678,11 +1678,11 @@
         "sort-sorted-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-sort-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:01:40.738278+00:00",
+      "started_at": "2026-10-30T09:31:44.150312+00:00",
       "stdout": "logs/round-0-scriptw-sort-sorted-512.js.stdout",
       "stderr": "logs/round-0-scriptw-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:41.407339+00:00"
+      "finished_at": "2026-10-30T09:31:44.818352+00:00"
     },
     {
       "label": "round-0-v8-to-sorted-512.js",
@@ -1694,11 +1694,11 @@
         "10",
         "to-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:01:41.408256+00:00",
+      "started_at": "2026-10-30T09:31:44.821429+00:00",
       "stdout": "logs/round-0-v8-to-sorted-512.js.stdout",
       "stderr": "logs/round-0-v8-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:41.441488+00:00"
+      "finished_at": "2026-10-30T09:31:44.854644+00:00"
     },
     {
       "label": "round-0-scriptw-to-sorted-512.js",
@@ -1710,11 +1710,11 @@
         "to-sorted-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-to-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:01:41.442105+00:00",
+      "started_at": "2026-10-30T09:31:44.855276+00:00",
       "stdout": "logs/round-0-scriptw-to-sorted-512.js.stdout",
       "stderr": "logs/round-0-scriptw-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:42.210419+00:00"
+      "finished_at": "2026-10-30T09:31:45.524433+00:00"
     },
     {
       "label": "round-0-scriptc-to-sorted-512.js-compile",
@@ -1725,11 +1725,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-to-sorted-512.js/to-sorted-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:42.211450+00:00",
+      "started_at": "2026-10-30T09:31:45.525455+00:00",
       "stdout": "logs/round-0-scriptc-to-sorted-512.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-to-sorted-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:42.426908+00:00"
+      "finished_at": "2026-10-30T09:31:45.741040+00:00"
     },
     {
       "label": "round-0-scriptc-to-sorted-512.js",
@@ -1740,11 +1740,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:42.426990+00:00",
+      "started_at": "2026-10-30T09:31:45.741120+00:00",
       "stdout": "logs/round-0-scriptc-to-sorted-512.js.stdout",
       "stderr": "logs/round-0-scriptc-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:42.643802+00:00"
+      "finished_at": "2026-10-30T09:31:45.957969+00:00"
     },
     {
       "label": "round-0-scriptw-join-1024.js",
@@ -1756,11 +1756,11 @@
         "join-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:42.644696+00:00",
+      "started_at": "2026-10-30T09:31:45.958833+00:00",
       "stdout": "logs/round-0-scriptw-join-1024.js.stdout",
       "stderr": "logs/round-0-scriptw-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:43.312341+00:00"
+      "finished_at": "2026-10-30T09:31:47.076679+00:00"
     },
     {
       "label": "round-0-scriptc-join-1024.js-compile",
@@ -1771,11 +1771,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-1024.js/join-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:43.313253+00:00",
+      "started_at": "2026-10-30T09:31:47.178193+00:00",
       "stdout": "logs/round-0-scriptc-join-1024.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:43.478799+00:00"
+      "finished_at": "2026-10-30T09:31:47.343936+00:00"
     },
     {
       "label": "round-0-scriptc-join-1024.js",
@@ -1786,11 +1786,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:43.478881+00:00",
+      "started_at": "2026-10-30T09:31:47.344014+00:00",
       "stdout": "logs/round-0-scriptc-join-1024.js.stdout",
       "stderr": "logs/round-0-scriptc-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:43.694831+00:00"
+      "finished_at": "2026-10-30T09:31:47.559957+00:00"
     },
     {
       "label": "round-0-v8-join-1024.js",
@@ -1802,11 +1802,11 @@
         "10",
         "join-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:43.695749+00:00",
+      "started_at": "2026-10-30T09:31:47.560816+00:00",
       "stdout": "logs/round-0-v8-join-1024.js.stdout",
       "stderr": "logs/round-0-v8-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:43.728506+00:00"
+      "finished_at": "2026-10-30T09:31:47.593641+00:00"
     },
     {
       "label": "round-0-scriptc-join-4096.js-compile",
@@ -1817,11 +1817,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-4096.js/join-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:43.729238+00:00",
+      "started_at": "2026-10-30T09:31:47.594447+00:00",
       "stdout": "logs/round-0-scriptc-join-4096.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:43.894795+00:00"
+      "finished_at": "2026-10-30T09:31:47.759937+00:00"
     },
     {
       "label": "round-0-scriptc-join-4096.js",
@@ -1832,11 +1832,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:43.894877+00:00",
+      "started_at": "2026-10-30T09:31:47.760017+00:00",
       "stdout": "logs/round-0-scriptc-join-4096.js.stdout",
       "stderr": "logs/round-0-scriptc-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:44.110864+00:00"
+      "finished_at": "2026-10-30T09:31:47.975979+00:00"
     },
     {
       "label": "round-0-v8-join-4096.js",
@@ -1848,11 +1848,11 @@
         "10",
         "join-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:44.111811+00:00",
+      "started_at": "2026-10-30T09:31:47.976885+00:00",
       "stdout": "logs/round-0-v8-join-4096.js.stdout",
       "stderr": "logs/round-0-v8-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:44.177148+00:00"
+      "finished_at": "2026-10-30T09:31:48.041736+00:00"
     },
     {
       "label": "round-0-scriptw-join-4096.js",
@@ -1864,11 +1864,11 @@
         "join-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:44.177981+00:00",
+      "started_at": "2026-10-30T09:31:48.042503+00:00",
       "stdout": "logs/round-0-scriptw-join-4096.js.stdout",
       "stderr": "logs/round-0-scriptw-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:44.946397+00:00"
+      "finished_at": "2026-10-30T09:31:48.812475+00:00"
     },
     {
       "label": "round-0-v8-join-mixed-1024.js",
@@ -1880,11 +1880,11 @@
         "10",
         "join-mixed-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:44.947493+00:00",
+      "started_at": "2026-10-30T09:31:48.813463+00:00",
       "stdout": "logs/round-0-v8-join-mixed-1024.js.stdout",
       "stderr": "logs/round-0-v8-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:44.980538+00:00"
+      "finished_at": "2026-10-30T09:31:48.846658+00:00"
     },
     {
       "label": "round-0-scriptw-join-mixed-1024.js",
@@ -1896,11 +1896,11 @@
         "join-mixed-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-mixed-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:44.981375+00:00",
+      "started_at": "2026-10-30T09:31:48.847368+00:00",
       "stdout": "logs/round-0-scriptw-join-mixed-1024.js.stdout",
       "stderr": "logs/round-0-scriptw-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:45.699445+00:00"
+      "finished_at": "2026-10-30T09:31:49.566403+00:00"
     },
     {
       "label": "round-0-scriptc-join-mixed-1024.js-compile",
@@ -1911,11 +1911,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-mixed-1024.js/join-mixed-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:45.700509+00:00",
+      "started_at": "2026-10-30T09:31:49.567425+00:00",
       "stdout": "logs/round-0-scriptc-join-mixed-1024.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-mixed-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:45.866174+00:00"
+      "finished_at": "2026-10-30T09:31:49.733020+00:00"
     },
     {
       "label": "round-0-scriptc-join-mixed-1024.js",
@@ -1926,11 +1926,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:45.866255+00:00",
+      "started_at": "2026-10-30T09:31:49.733102+00:00",
       "stdout": "logs/round-0-scriptc-join-mixed-1024.js.stdout",
       "stderr": "logs/round-0-scriptc-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:46.082838+00:00"
+      "finished_at": "2026-10-30T09:31:49.949951+00:00"
     },
     {
       "label": "round-0-scriptw-numeric-loop-10000.js",
@@ -1942,11 +1942,11 @@
         "numeric-loop-10000.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-numeric-loop-10000.js"
       ],
-      "started_at": "2026-10-29T23:01:46.083860+00:00",
+      "started_at": "2026-10-30T09:31:49.950895+00:00",
       "stdout": "logs/round-0-scriptw-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-0-scriptw-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:46.751338+00:00"
+      "finished_at": "2026-10-30T09:31:50.619072+00:00"
     },
     {
       "label": "round-0-scriptc-numeric-loop-10000.js-compile",
@@ -1957,11 +1957,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-numeric-loop-10000.js/numeric-loop-10000.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:46.752471+00:00",
+      "started_at": "2026-10-30T09:31:50.620154+00:00",
       "stdout": "logs/round-0-scriptc-numeric-loop-10000.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-numeric-loop-10000.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:46.917798+00:00"
+      "finished_at": "2026-10-30T09:31:50.786060+00:00"
     },
     {
       "label": "round-0-scriptc-numeric-loop-10000.js",
@@ -1972,11 +1972,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:46.917878+00:00",
+      "started_at": "2026-10-30T09:31:50.786140+00:00",
       "stdout": "logs/round-0-scriptc-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-0-scriptc-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:47.083799+00:00"
+      "finished_at": "2026-10-30T09:31:50.952896+00:00"
     },
     {
       "label": "round-0-v8-numeric-loop-10000.js",
@@ -1988,11 +1988,11 @@
         "10",
         "numeric-loop-10000.js"
       ],
-      "started_at": "2026-10-29T23:01:47.084848+00:00",
+      "started_at": "2026-10-30T09:31:50.953902+00:00",
       "stdout": "logs/round-0-v8-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-0-v8-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:47.150600+00:00"
+      "finished_at": "2026-10-30T09:31:51.019476+00:00"
     },
     {
       "label": "round-0-scriptc-numeric-loop-50000.js-compile",
@@ -2003,11 +2003,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-numeric-loop-50000.js/numeric-loop-50000.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:47.151513+00:00",
+      "started_at": "2026-10-30T09:31:51.020439+00:00",
       "stdout": "logs/round-0-scriptc-numeric-loop-50000.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-numeric-loop-50000.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:47.316785+00:00"
+      "finished_at": "2026-10-30T09:31:51.185943+00:00"
     },
     {
       "label": "round-0-scriptc-numeric-loop-50000.js",
@@ -2018,11 +2018,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:47.316866+00:00",
+      "started_at": "2026-10-30T09:31:51.186023+00:00",
       "stdout": "logs/round-0-scriptc-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-0-scriptc-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:47.482737+00:00"
+      "finished_at": "2026-10-30T09:31:51.351883+00:00"
     },
     {
       "label": "round-0-v8-numeric-loop-50000.js",
@@ -2034,11 +2034,11 @@
         "10",
         "numeric-loop-50000.js"
       ],
-      "started_at": "2026-10-29T23:01:47.483771+00:00",
+      "started_at": "2026-10-30T09:31:51.352880+00:00",
       "stdout": "logs/round-0-v8-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-0-v8-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:47.548582+00:00"
+      "finished_at": "2026-10-30T09:31:51.417728+00:00"
     },
     {
       "label": "round-0-scriptw-numeric-loop-50000.js",
@@ -2050,11 +2050,11 @@
         "numeric-loop-50000.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-numeric-loop-50000.js"
       ],
-      "started_at": "2026-10-29T23:01:47.549522+00:00",
+      "started_at": "2026-10-30T09:31:51.418583+00:00",
       "stdout": "logs/round-0-scriptw-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-0-scriptw-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:48.217651+00:00"
+      "finished_at": "2026-10-30T09:31:52.085580+00:00"
     },
     {
       "label": "round-0-v8-folded-string-4096.js",
@@ -2066,11 +2066,11 @@
         "10",
         "folded-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:48.218851+00:00",
+      "started_at": "2026-10-30T09:31:52.086694+00:00",
       "stdout": "logs/round-0-v8-folded-string-4096.js.stdout",
       "stderr": "logs/round-0-v8-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:48.284619+00:00"
+      "finished_at": "2026-10-30T09:31:52.152110+00:00"
     },
     {
       "label": "round-0-scriptw-folded-string-4096.js",
@@ -2082,11 +2082,11 @@
         "folded-string-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-folded-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:48.285629+00:00",
+      "started_at": "2026-10-30T09:31:52.152943+00:00",
       "stdout": "logs/round-0-scriptw-folded-string-4096.js.stdout",
       "stderr": "logs/round-0-scriptw-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:49.006256+00:00"
+      "finished_at": "2026-10-30T09:31:52.821214+00:00"
     },
     {
       "label": "round-0-scriptc-folded-string-4096.js-compile",
@@ -2097,11 +2097,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-folded-string-4096.js/folded-string-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:49.007391+00:00",
+      "started_at": "2026-10-30T09:31:52.822384+00:00",
       "stdout": "logs/round-0-scriptc-folded-string-4096.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-folded-string-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:49.172825+00:00"
+      "finished_at": "2026-10-30T09:31:52.987945+00:00"
     },
     {
       "label": "round-0-scriptc-folded-string-4096.js",
@@ -2112,11 +2112,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:49.172908+00:00",
+      "started_at": "2026-10-30T09:31:52.988024+00:00",
       "stdout": "logs/round-0-scriptc-folded-string-4096.js.stdout",
       "stderr": "logs/round-0-scriptc-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:49.339769+00:00"
+      "finished_at": "2026-10-30T09:31:53.153879+00:00"
     },
     {
       "label": "round-0-scriptw-dynamic-string-4096.js",
@@ -2128,11 +2128,11 @@
         "dynamic-string-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-dynamic-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:49.601967+00:00",
+      "started_at": "2026-10-30T09:31:53.154980+00:00",
       "stdout": "logs/round-0-scriptw-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-0-scriptw-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:50.320395+00:00"
+      "finished_at": "2026-10-30T09:31:53.872537+00:00"
     },
     {
       "label": "round-0-scriptc-dynamic-string-4096.js-compile",
@@ -2143,11 +2143,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-dynamic-string-4096.js/dynamic-string-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:50.321643+00:00",
+      "started_at": "2026-10-30T09:31:53.873693+00:00",
       "stdout": "logs/round-0-scriptc-dynamic-string-4096.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-dynamic-string-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:50.486802+00:00"
+      "finished_at": "2026-10-30T09:31:54.039012+00:00"
     },
     {
       "label": "round-0-scriptc-dynamic-string-4096.js",
@@ -2158,11 +2158,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:50.486887+00:00",
+      "started_at": "2026-10-30T09:31:54.039090+00:00",
       "stdout": "logs/round-0-scriptc-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-0-scriptc-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:50.652732+00:00"
+      "finished_at": "2026-10-30T09:31:54.205884+00:00"
     },
     {
       "label": "round-0-v8-dynamic-string-4096.js",
@@ -2174,11 +2174,11 @@
         "10",
         "dynamic-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:01:50.653852+00:00",
+      "started_at": "2026-10-30T09:31:54.206987+00:00",
       "stdout": "logs/round-0-v8-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-0-v8-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:50.718687+00:00"
+      "finished_at": "2026-10-30T09:31:54.272725+00:00"
     },
     {
       "label": "round-0-scriptc-integer.js-compile",
@@ -2189,11 +2189,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-integer.js/integer.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:50.719695+00:00",
+      "started_at": "2026-10-30T09:31:54.273826+00:00",
       "stdout": "logs/round-0-scriptc-integer.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-integer.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:50.884805+00:00"
+      "finished_at": "2026-10-30T09:31:54.438944+00:00"
     },
     {
       "label": "round-0-scriptc-integer.js",
@@ -2204,11 +2204,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:50.884890+00:00",
+      "started_at": "2026-10-30T09:31:54.439024+00:00",
       "stdout": "logs/round-0-scriptc-integer.js.stdout",
       "stderr": "logs/round-0-scriptc-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:51.051769+00:00"
+      "finished_at": "2026-10-30T09:31:54.604870+00:00"
     },
     {
       "label": "round-0-v8-integer.js",
@@ -2220,11 +2220,11 @@
         "10",
         "integer.js"
       ],
-      "started_at": "2026-10-29T23:01:51.052972+00:00",
+      "started_at": "2026-10-30T09:31:54.605957+00:00",
       "stdout": "logs/round-0-v8-integer.js.stdout",
       "stderr": "logs/round-0-v8-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:51.118588+00:00"
+      "finished_at": "2026-10-30T09:31:54.670734+00:00"
     },
     {
       "label": "round-0-scriptw-integer.js",
@@ -2236,11 +2236,11 @@
         "integer.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-integer.js"
       ],
-      "started_at": "2026-10-29T23:01:51.119639+00:00",
+      "started_at": "2026-10-30T09:31:54.671787+00:00",
       "stdout": "logs/round-0-scriptw-integer.js.stdout",
       "stderr": "logs/round-0-scriptw-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:51.787644+00:00"
+      "finished_at": "2026-10-30T09:31:55.340534+00:00"
     },
     {
       "label": "round-0-v8-objects.js",
@@ -2252,11 +2252,11 @@
         "10",
         "objects.js"
       ],
-      "started_at": "2026-10-29T23:01:51.788886+00:00",
+      "started_at": "2026-10-30T09:31:55.341773+00:00",
       "stdout": "logs/round-0-v8-objects.js.stdout",
       "stderr": "logs/round-0-v8-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:51.822516+00:00"
+      "finished_at": "2026-10-30T09:31:55.374728+00:00"
     },
     {
       "label": "round-0-scriptw-objects.js",
@@ -2268,11 +2268,11 @@
         "objects.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-objects.js"
       ],
-      "started_at": "2026-10-29T23:01:51.823512+00:00",
+      "started_at": "2026-10-30T09:31:55.433715+00:00",
       "stdout": "logs/round-0-scriptw-objects.js.stdout",
       "stderr": "logs/round-0-scriptw-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:52.542382+00:00"
+      "finished_at": "2026-10-30T09:31:56.101101+00:00"
     },
     {
       "label": "round-0-scriptc-objects.js-compile",
@@ -2283,11 +2283,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-objects.js/objects.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:52.543704+00:00",
+      "started_at": "2026-10-30T09:31:56.102380+00:00",
       "stdout": "logs/round-0-scriptc-objects.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-objects.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:52.759674+00:00"
+      "finished_at": "2026-10-30T09:31:56.318196+00:00"
     },
     {
       "label": "round-0-scriptc-objects.js",
@@ -2298,11 +2298,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:52.759756+00:00",
+      "started_at": "2026-10-30T09:31:56.318284+00:00",
       "stdout": "logs/round-0-scriptc-objects.js.stdout",
       "stderr": "logs/round-0-scriptc-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:52.975818+00:00"
+      "finished_at": "2026-10-30T09:31:56.534953+00:00"
     },
     {
       "label": "round-0-scriptw-retained-objects.js",
@@ -2314,11 +2314,11 @@
         "retained-objects.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-retained-objects.js"
       ],
-      "started_at": "2026-10-29T23:01:52.977031+00:00",
+      "started_at": "2026-10-30T09:31:56.536118+00:00",
       "stdout": "logs/round-0-scriptw-retained-objects.js.stdout",
       "stderr": "logs/round-0-scriptw-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:53.945852+00:00"
+      "finished_at": "2026-10-30T09:31:57.504055+00:00"
     },
     {
       "label": "round-0-scriptc-retained-objects.js-compile",
@@ -2329,11 +2329,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-retained-objects.js/retained-objects.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:53.947163+00:00",
+      "started_at": "2026-10-30T09:31:57.505334+00:00",
       "stdout": "logs/round-0-scriptc-retained-objects.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-retained-objects.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:54.163342+00:00"
+      "finished_at": "2026-10-30T09:31:57.721035+00:00"
     },
     {
       "label": "round-0-scriptc-retained-objects.js",
@@ -2344,11 +2344,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:54.163424+00:00",
+      "started_at": "2026-10-30T09:31:57.721117+00:00",
       "stdout": "logs/round-0-scriptc-retained-objects.js.stdout",
       "stderr": "logs/round-0-scriptc-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:54.980670+00:00"
+      "finished_at": "2026-10-30T09:31:58.538739+00:00"
     },
     {
       "label": "round-0-v8-retained-objects.js",
@@ -2360,11 +2360,11 @@
         "10",
         "retained-objects.js"
       ],
-      "started_at": "2026-10-29T23:01:54.981914+00:00",
+      "started_at": "2026-10-30T09:31:58.539975+00:00",
       "stdout": "logs/round-0-v8-retained-objects.js.stdout",
       "stderr": "logs/round-0-v8-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:55.097741+00:00"
+      "finished_at": "2026-10-30T09:31:58.656825+00:00"
     },
     {
       "label": "round-0-scriptc-join-empty-1024.js-compile",
@@ -2375,11 +2375,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-empty-1024.js/join-empty-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:55.098951+00:00",
+      "started_at": "2026-10-30T09:31:58.657985+00:00",
       "stdout": "logs/round-0-scriptc-join-empty-1024.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-empty-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:55.264830+00:00"
+      "finished_at": "2026-10-30T09:31:58.823133+00:00"
     },
     {
       "label": "round-0-scriptc-join-empty-1024.js",
@@ -2390,11 +2390,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:55.264910+00:00",
+      "started_at": "2026-10-30T09:31:58.823215+00:00",
       "stdout": "logs/round-0-scriptc-join-empty-1024.js.stdout",
       "stderr": "logs/round-0-scriptc-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:55.481808+00:00"
+      "finished_at": "2026-10-30T09:31:59.039971+00:00"
     },
     {
       "label": "round-0-v8-join-empty-1024.js",
@@ -2406,11 +2406,11 @@
         "10",
         "join-empty-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:55.483074+00:00",
+      "started_at": "2026-10-30T09:31:59.041215+00:00",
       "stdout": "logs/round-0-v8-join-empty-1024.js.stdout",
       "stderr": "logs/round-0-v8-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:55.516498+00:00"
+      "finished_at": "2026-10-30T09:31:59.074655+00:00"
     },
     {
       "label": "round-0-scriptw-join-empty-1024.js",
@@ -2422,11 +2422,11 @@
         "join-empty-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-empty-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:55.517615+00:00",
+      "started_at": "2026-10-30T09:31:59.075792+00:00",
       "stdout": "logs/round-0-scriptw-join-empty-1024.js.stdout",
       "stderr": "logs/round-0-scriptw-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:56.185343+00:00"
+      "finished_at": "2026-10-30T09:31:59.742256+00:00"
     },
     {
       "label": "round-0-v8-join-singleton-1024.js",
@@ -2438,11 +2438,11 @@
         "10",
         "join-singleton-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:56.186774+00:00",
+      "started_at": "2026-10-30T09:31:59.743609+00:00",
       "stdout": "logs/round-0-v8-join-singleton-1024.js.stdout",
       "stderr": "logs/round-0-v8-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:56.219512+00:00"
+      "finished_at": "2026-10-30T09:31:59.776641+00:00"
     },
     {
       "label": "round-0-scriptw-join-singleton-1024.js",
@@ -2454,11 +2454,11 @@
         "join-singleton-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-singleton-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:56.220625+00:00",
+      "started_at": "2026-10-30T09:31:59.777677+00:00",
       "stdout": "logs/round-0-scriptw-join-singleton-1024.js.stdout",
       "stderr": "logs/round-0-scriptw-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:56.888265+00:00"
+      "finished_at": "2026-10-30T09:32:00.446565+00:00"
     },
     {
       "label": "round-0-scriptc-join-singleton-1024.js-compile",
@@ -2469,11 +2469,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-singleton-1024.js/join-singleton-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:56.889624+00:00",
+      "started_at": "2026-10-30T09:32:00.447932+00:00",
       "stdout": "logs/round-0-scriptc-join-singleton-1024.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-singleton-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:57.054818+00:00"
+      "finished_at": "2026-10-30T09:32:00.612948+00:00"
     },
     {
       "label": "round-0-scriptc-join-singleton-1024.js",
@@ -2484,11 +2484,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:57.054900+00:00",
+      "started_at": "2026-10-30T09:32:00.613029+00:00",
       "stdout": "logs/round-0-scriptc-join-singleton-1024.js.stdout",
       "stderr": "logs/round-0-scriptc-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:57.221733+00:00"
+      "finished_at": "2026-10-30T09:32:00.778887+00:00"
     },
     {
       "label": "round-0-scriptw-join-small-1024.js",
@@ -2500,11 +2500,11 @@
         "join-small-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptw-join-small-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:57.223036+00:00",
+      "started_at": "2026-10-30T09:32:00.780146+00:00",
       "stdout": "logs/round-0-scriptw-join-small-1024.js.stdout",
       "stderr": "logs/round-0-scriptw-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:57.941181+00:00"
+      "finished_at": "2026-10-30T09:32:01.448402+00:00"
     },
     {
       "label": "round-0-scriptc-join-small-1024.js-compile",
@@ -2515,11 +2515,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-0-scriptc-join-small-1024.js/join-small-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:57.942599+00:00",
+      "started_at": "2026-10-30T09:32:01.449811+00:00",
       "stdout": "logs/round-0-scriptc-join-small-1024.js-compile.stdout",
       "stderr": "logs/round-0-scriptc-join-small-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:58.107903+00:00"
+      "finished_at": "2026-10-30T09:32:01.614967+00:00"
     },
     {
       "label": "round-0-scriptc-join-small-1024.js",
@@ -2530,11 +2530,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:58.107986+00:00",
+      "started_at": "2026-10-30T09:32:01.615048+00:00",
       "stdout": "logs/round-0-scriptc-join-small-1024.js.stdout",
       "stderr": "logs/round-0-scriptc-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:58.274747+00:00"
+      "finished_at": "2026-10-30T09:32:01.780876+00:00"
     },
     {
       "label": "round-0-v8-join-small-1024.js",
@@ -2546,11 +2546,11 @@
         "10",
         "join-small-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:58.276208+00:00",
+      "started_at": "2026-10-30T09:32:01.782312+00:00",
       "stdout": "logs/round-0-v8-join-small-1024.js.stdout",
       "stderr": "logs/round-0-v8-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:58.309496+00:00"
+      "finished_at": "2026-10-30T09:32:01.815645+00:00"
     },
     {
       "label": "round-1-scriptw-join-small-1024.js",
@@ -2562,11 +2562,11 @@
         "join-small-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-small-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:58.310773+00:00",
+      "started_at": "2026-10-30T09:32:01.816803+00:00",
       "stdout": "logs/round-1-scriptw-join-small-1024.js.stdout",
       "stderr": "logs/round-1-scriptw-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:58.927837+00:00"
+      "finished_at": "2026-10-30T09:32:02.433511+00:00"
     },
     {
       "label": "round-1-scriptc-join-small-1024.js-compile",
@@ -2577,11 +2577,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-small-1024.js/join-small-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:58.929291+00:00",
+      "started_at": "2026-10-30T09:32:02.434911+00:00",
       "stdout": "logs/round-1-scriptc-join-small-1024.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-small-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.044718+00:00"
+      "finished_at": "2026-10-30T09:32:02.549887+00:00"
     },
     {
       "label": "round-1-scriptc-join-small-1024.js",
@@ -2592,11 +2592,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:59.044800+00:00",
+      "started_at": "2026-10-30T09:32:02.549967+00:00",
       "stdout": "logs/round-1-scriptc-join-small-1024.js.stdout",
       "stderr": "logs/round-1-scriptc-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.210893+00:00"
+      "finished_at": "2026-10-30T09:32:02.715933+00:00"
     },
     {
       "label": "round-1-v8-join-small-1024.js",
@@ -2608,11 +2608,11 @@
         "10",
         "join-small-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:59.212368+00:00",
+      "started_at": "2026-10-30T09:32:02.717293+00:00",
       "stdout": "logs/round-1-v8-join-small-1024.js.stdout",
       "stderr": "logs/round-1-v8-join-small-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.245641+00:00"
+      "finished_at": "2026-10-30T09:32:02.750643+00:00"
     },
     {
       "label": "round-1-scriptc-join-singleton-1024.js-compile",
@@ -2623,11 +2623,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-singleton-1024.js/join-singleton-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:01:59.626887+00:00",
+      "started_at": "2026-10-30T09:32:02.751842+00:00",
       "stdout": "logs/round-1-scriptc-join-singleton-1024.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-singleton-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.742756+00:00"
+      "finished_at": "2026-10-30T09:32:02.866844+00:00"
     },
     {
       "label": "round-1-scriptc-join-singleton-1024.js",
@@ -2638,11 +2638,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:01:59.742835+00:00",
+      "started_at": "2026-10-30T09:32:02.866922+00:00",
       "stdout": "logs/round-1-scriptc-join-singleton-1024.js.stdout",
       "stderr": "logs/round-1-scriptc-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.908763+00:00"
+      "finished_at": "2026-10-30T09:32:03.032880+00:00"
     },
     {
       "label": "round-1-v8-join-singleton-1024.js",
@@ -2654,11 +2654,11 @@
         "10",
         "join-singleton-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:59.910170+00:00",
+      "started_at": "2026-10-30T09:32:03.034230+00:00",
       "stdout": "logs/round-1-v8-join-singleton-1024.js.stdout",
       "stderr": "logs/round-1-v8-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:01:59.943498+00:00"
+      "finished_at": "2026-10-30T09:32:03.067643+00:00"
     },
     {
       "label": "round-1-scriptw-join-singleton-1024.js",
@@ -2670,11 +2670,11 @@
         "join-singleton-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-singleton-1024.js"
       ],
-      "started_at": "2026-10-29T23:01:59.944798+00:00",
+      "started_at": "2026-10-30T09:32:03.068869+00:00",
       "stdout": "logs/round-1-scriptw-join-singleton-1024.js.stdout",
       "stderr": "logs/round-1-scriptw-join-singleton-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:00.562308+00:00"
+      "finished_at": "2026-10-30T09:32:03.686587+00:00"
     },
     {
       "label": "round-1-v8-join-empty-1024.js",
@@ -2686,11 +2686,11 @@
         "10",
         "join-empty-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:00.563826+00:00",
+      "started_at": "2026-10-30T09:32:03.688081+00:00",
       "stdout": "logs/round-1-v8-join-empty-1024.js.stdout",
       "stderr": "logs/round-1-v8-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:00.596491+00:00"
+      "finished_at": "2026-10-30T09:32:03.721643+00:00"
     },
     {
       "label": "round-1-scriptw-join-empty-1024.js",
@@ -2702,11 +2702,11 @@
         "join-empty-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-empty-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:00.597661+00:00",
+      "started_at": "2026-10-30T09:32:03.722789+00:00",
       "stdout": "logs/round-1-scriptw-join-empty-1024.js.stdout",
       "stderr": "logs/round-1-scriptw-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:01.215295+00:00"
+      "finished_at": "2026-10-30T09:32:04.340010+00:00"
     },
     {
       "label": "round-1-scriptc-join-empty-1024.js-compile",
@@ -2717,11 +2717,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-empty-1024.js/join-empty-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:01.216847+00:00",
+      "started_at": "2026-10-30T09:32:04.341559+00:00",
       "stdout": "logs/round-1-scriptc-join-empty-1024.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-empty-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:01.332701+00:00"
+      "finished_at": "2026-10-30T09:32:04.456850+00:00"
     },
     {
       "label": "round-1-scriptc-join-empty-1024.js",
@@ -2732,11 +2732,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:01.332784+00:00",
+      "started_at": "2026-10-30T09:32:04.456931+00:00",
       "stdout": "logs/round-1-scriptc-join-empty-1024.js.stdout",
       "stderr": "logs/round-1-scriptc-join-empty-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:01.548818+00:00"
+      "finished_at": "2026-10-30T09:32:04.673037+00:00"
     },
     {
       "label": "round-1-scriptw-retained-objects.js",
@@ -2748,11 +2748,11 @@
         "retained-objects.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-retained-objects.js"
       ],
-      "started_at": "2026-10-29T23:02:01.550360+00:00",
+      "started_at": "2026-10-30T09:32:04.674513+00:00",
       "stdout": "logs/round-1-scriptw-retained-objects.js.stdout",
       "stderr": "logs/round-1-scriptw-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:02.469498+00:00"
+      "finished_at": "2026-10-30T09:32:05.592727+00:00"
     },
     {
       "label": "round-1-scriptc-retained-objects.js-compile",
@@ -2763,11 +2763,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-retained-objects.js/retained-objects.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:02.471117+00:00",
+      "started_at": "2026-10-30T09:32:05.594291+00:00",
       "stdout": "logs/round-1-scriptc-retained-objects.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-retained-objects.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:02.586709+00:00"
+      "finished_at": "2026-10-30T09:32:05.709855+00:00"
     },
     {
       "label": "round-1-scriptc-retained-objects.js",
@@ -2778,11 +2778,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:02.586789+00:00",
+      "started_at": "2026-10-30T09:32:05.709932+00:00",
       "stdout": "logs/round-1-scriptc-retained-objects.js.stdout",
       "stderr": "logs/round-1-scriptc-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:03.403625+00:00"
+      "finished_at": "2026-10-30T09:32:06.526680+00:00"
     },
     {
       "label": "round-1-v8-retained-objects.js",
@@ -2794,11 +2794,11 @@
         "10",
         "retained-objects.js"
       ],
-      "started_at": "2026-10-29T23:02:03.405188+00:00",
+      "started_at": "2026-10-30T09:32:06.528143+00:00",
       "stdout": "logs/round-1-v8-retained-objects.js.stdout",
       "stderr": "logs/round-1-v8-retained-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:03.520917+00:00"
+      "finished_at": "2026-10-30T09:32:06.643972+00:00"
     },
     {
       "label": "round-1-scriptc-objects.js-compile",
@@ -2809,11 +2809,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-objects.js/objects.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:03.522396+00:00",
+      "started_at": "2026-10-30T09:32:06.645437+00:00",
       "stdout": "logs/round-1-scriptc-objects.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-objects.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:03.637694+00:00"
+      "finished_at": "2026-10-30T09:32:06.760880+00:00"
     },
     {
       "label": "round-1-scriptc-objects.js",
@@ -2824,11 +2824,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:03.637775+00:00",
+      "started_at": "2026-10-30T09:32:06.760959+00:00",
       "stdout": "logs/round-1-scriptc-objects.js.stdout",
       "stderr": "logs/round-1-scriptc-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:03.853823+00:00"
+      "finished_at": "2026-10-30T09:32:06.976965+00:00"
     },
     {
       "label": "round-1-v8-objects.js",
@@ -2840,11 +2840,11 @@
         "10",
         "objects.js"
       ],
-      "started_at": "2026-10-29T23:02:03.855354+00:00",
+      "started_at": "2026-10-30T09:32:06.979699+00:00",
       "stdout": "logs/round-1-v8-objects.js.stdout",
       "stderr": "logs/round-1-v8-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:03.888494+00:00"
+      "finished_at": "2026-10-30T09:32:07.012635+00:00"
     },
     {
       "label": "round-1-scriptw-objects.js",
@@ -2856,11 +2856,11 @@
         "objects.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-objects.js"
       ],
-      "started_at": "2026-10-29T23:02:03.889812+00:00",
+      "started_at": "2026-10-30T09:32:07.013959+00:00",
       "stdout": "logs/round-1-scriptw-objects.js.stdout",
       "stderr": "logs/round-1-scriptw-objects.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:04.507271+00:00"
+      "finished_at": "2026-10-30T09:32:07.631918+00:00"
     },
     {
       "label": "round-1-v8-integer.js",
@@ -2872,11 +2872,11 @@
         "10",
         "integer.js"
       ],
-      "started_at": "2026-10-29T23:02:04.508895+00:00",
+      "started_at": "2026-10-30T09:32:07.633523+00:00",
       "stdout": "logs/round-1-v8-integer.js.stdout",
       "stderr": "logs/round-1-v8-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:04.574563+00:00"
+      "finished_at": "2026-10-30T09:32:07.698715+00:00"
     },
     {
       "label": "round-1-scriptw-integer.js",
@@ -2888,11 +2888,11 @@
         "integer.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-integer.js"
       ],
-      "started_at": "2026-10-29T23:02:04.575904+00:00",
+      "started_at": "2026-10-30T09:32:07.700008+00:00",
       "stdout": "logs/round-1-scriptw-integer.js.stdout",
       "stderr": "logs/round-1-scriptw-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:05.193710+00:00"
+      "finished_at": "2026-10-30T09:32:08.318226+00:00"
     },
     {
       "label": "round-1-scriptc-integer.js-compile",
@@ -2903,11 +2903,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-integer.js/integer.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:05.195367+00:00",
+      "started_at": "2026-10-30T09:32:08.319829+00:00",
       "stdout": "logs/round-1-scriptc-integer.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-integer.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:05.310698+00:00"
+      "finished_at": "2026-10-30T09:32:08.434990+00:00"
     },
     {
       "label": "round-1-scriptc-integer.js",
@@ -2918,11 +2918,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:05.310778+00:00",
+      "started_at": "2026-10-30T09:32:08.435069+00:00",
       "stdout": "logs/round-1-scriptc-integer.js.stdout",
       "stderr": "logs/round-1-scriptc-integer.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:05.476731+00:00"
+      "finished_at": "2026-10-30T09:32:08.601879+00:00"
     },
     {
       "label": "round-1-scriptw-dynamic-string-4096.js",
@@ -2934,11 +2934,11 @@
         "dynamic-string-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-dynamic-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:05.478291+00:00",
+      "started_at": "2026-10-30T09:32:08.603432+00:00",
       "stdout": "logs/round-1-scriptw-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-1-scriptw-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.145892+00:00"
+      "finished_at": "2026-10-30T09:32:09.274406+00:00"
     },
     {
       "label": "round-1-scriptc-dynamic-string-4096.js-compile",
@@ -2949,11 +2949,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-dynamic-string-4096.js/dynamic-string-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:06.148559+00:00",
+      "started_at": "2026-10-30T09:32:09.276737+00:00",
       "stdout": "logs/round-1-scriptc-dynamic-string-4096.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-dynamic-string-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.263719+00:00"
+      "finished_at": "2026-10-30T09:32:09.391845+00:00"
     },
     {
       "label": "round-1-scriptc-dynamic-string-4096.js",
@@ -2964,11 +2964,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:06.263802+00:00",
+      "started_at": "2026-10-30T09:32:09.391923+00:00",
       "stdout": "logs/round-1-scriptc-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-1-scriptc-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.429784+00:00"
+      "finished_at": "2026-10-30T09:32:09.557917+00:00"
     },
     {
       "label": "round-1-v8-dynamic-string-4096.js",
@@ -2980,11 +2980,11 @@
         "10",
         "dynamic-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:06.431402+00:00",
+      "started_at": "2026-10-30T09:32:09.559487+00:00",
       "stdout": "logs/round-1-v8-dynamic-string-4096.js.stdout",
       "stderr": "logs/round-1-v8-dynamic-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.496576+00:00"
+      "finished_at": "2026-10-30T09:32:09.624717+00:00"
     },
     {
       "label": "round-1-scriptc-folded-string-4096.js-compile",
@@ -2995,11 +2995,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-folded-string-4096.js/folded-string-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:06.500959+00:00",
+      "started_at": "2026-10-30T09:32:09.626169+00:00",
       "stdout": "logs/round-1-scriptc-folded-string-4096.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-folded-string-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.616705+00:00"
+      "finished_at": "2026-10-30T09:32:09.741856+00:00"
     },
     {
       "label": "round-1-scriptc-folded-string-4096.js",
@@ -3010,11 +3010,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:06.616786+00:00",
+      "started_at": "2026-10-30T09:32:09.741940+00:00",
       "stdout": "logs/round-1-scriptc-folded-string-4096.js.stdout",
       "stderr": "logs/round-1-scriptc-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.782752+00:00"
+      "finished_at": "2026-10-30T09:32:09.907899+00:00"
     },
     {
       "label": "round-1-v8-folded-string-4096.js",
@@ -3026,11 +3026,11 @@
         "10",
         "folded-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:06.784440+00:00",
+      "started_at": "2026-10-30T09:32:09.909479+00:00",
       "stdout": "logs/round-1-v8-folded-string-4096.js.stdout",
       "stderr": "logs/round-1-v8-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:06.849970+00:00"
+      "finished_at": "2026-10-30T09:32:09.974736+00:00"
     },
     {
       "label": "round-1-scriptw-folded-string-4096.js",
@@ -3042,11 +3042,11 @@
         "folded-string-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-folded-string-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:06.851449+00:00",
+      "started_at": "2026-10-30T09:32:09.976211+00:00",
       "stdout": "logs/round-1-scriptw-folded-string-4096.js.stdout",
       "stderr": "logs/round-1-scriptw-folded-string-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:07.519246+00:00"
+      "finished_at": "2026-10-30T09:32:10.644767+00:00"
     },
     {
       "label": "round-1-v8-numeric-loop-50000.js",
@@ -3058,11 +3058,11 @@
         "10",
         "numeric-loop-50000.js"
       ],
-      "started_at": "2026-10-29T23:02:07.521011+00:00",
+      "started_at": "2026-10-30T09:32:10.646603+00:00",
       "stdout": "logs/round-1-v8-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-1-v8-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:07.586621+00:00"
+      "finished_at": "2026-10-30T09:32:10.711732+00:00"
     },
     {
       "label": "round-1-scriptw-numeric-loop-50000.js",
@@ -3074,11 +3074,11 @@
         "numeric-loop-50000.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-numeric-loop-50000.js"
       ],
-      "started_at": "2026-10-29T23:02:07.588198+00:00",
+      "started_at": "2026-10-30T09:32:10.713290+00:00",
       "stdout": "logs/round-1-scriptw-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-1-scriptw-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:08.206284+00:00"
+      "finished_at": "2026-10-30T09:32:11.332165+00:00"
     },
     {
       "label": "round-1-scriptc-numeric-loop-50000.js-compile",
@@ -3089,11 +3089,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-numeric-loop-50000.js/numeric-loop-50000.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:08.208133+00:00",
+      "started_at": "2026-10-30T09:32:11.333907+00:00",
       "stdout": "logs/round-1-scriptc-numeric-loop-50000.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-numeric-loop-50000.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:08.323714+00:00"
+      "finished_at": "2026-10-30T09:32:11.448846+00:00"
     },
     {
       "label": "round-1-scriptc-numeric-loop-50000.js",
@@ -3104,11 +3104,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:08.323794+00:00",
+      "started_at": "2026-10-30T09:32:11.448924+00:00",
       "stdout": "logs/round-1-scriptc-numeric-loop-50000.js.stdout",
       "stderr": "logs/round-1-scriptc-numeric-loop-50000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:08.489731+00:00"
+      "finished_at": "2026-10-30T09:32:11.614877+00:00"
     },
     {
       "label": "round-1-scriptw-numeric-loop-10000.js",
@@ -3120,11 +3120,11 @@
         "numeric-loop-10000.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-numeric-loop-10000.js"
       ],
-      "started_at": "2026-10-29T23:02:08.494915+00:00",
+      "started_at": "2026-10-30T09:32:11.616527+00:00",
       "stdout": "logs/round-1-scriptw-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-1-scriptw-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.112604+00:00"
+      "finished_at": "2026-10-30T09:32:12.235415+00:00"
     },
     {
       "label": "round-1-scriptc-numeric-loop-10000.js-compile",
@@ -3135,11 +3135,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-numeric-loop-10000.js/numeric-loop-10000.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:09.114490+00:00",
+      "started_at": "2026-10-30T09:32:12.237181+00:00",
       "stdout": "logs/round-1-scriptc-numeric-loop-10000.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-numeric-loop-10000.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.229709+00:00"
+      "finished_at": "2026-10-30T09:32:12.352875+00:00"
     },
     {
       "label": "round-1-scriptc-numeric-loop-10000.js",
@@ -3150,11 +3150,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:09.229791+00:00",
+      "started_at": "2026-10-30T09:32:12.352955+00:00",
       "stdout": "logs/round-1-scriptc-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-1-scriptc-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.395743+00:00"
+      "finished_at": "2026-10-30T09:32:12.518891+00:00"
     },
     {
       "label": "round-1-v8-numeric-loop-10000.js",
@@ -3166,11 +3166,11 @@
         "10",
         "numeric-loop-10000.js"
       ],
-      "started_at": "2026-10-29T23:02:09.397500+00:00",
+      "started_at": "2026-10-30T09:32:12.520600+00:00",
       "stdout": "logs/round-1-v8-numeric-loop-10000.js.stdout",
       "stderr": "logs/round-1-v8-numeric-loop-10000.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.462568+00:00"
+      "finished_at": "2026-10-30T09:32:12.585713+00:00"
     },
     {
       "label": "round-1-scriptc-join-mixed-1024.js-compile",
@@ -3181,11 +3181,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-mixed-1024.js/join-mixed-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:09.464182+00:00",
+      "started_at": "2026-10-30T09:32:12.587316+00:00",
       "stdout": "logs/round-1-scriptc-join-mixed-1024.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-mixed-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.579706+00:00"
+      "finished_at": "2026-10-30T09:32:12.702857+00:00"
     },
     {
       "label": "round-1-scriptc-join-mixed-1024.js",
@@ -3196,11 +3196,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:09.579787+00:00",
+      "started_at": "2026-10-30T09:32:12.702937+00:00",
       "stdout": "logs/round-1-scriptc-join-mixed-1024.js.stdout",
       "stderr": "logs/round-1-scriptc-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.795803+00:00"
+      "finished_at": "2026-10-30T09:32:12.918978+00:00"
     },
     {
       "label": "round-1-v8-join-mixed-1024.js",
@@ -3212,11 +3212,11 @@
         "10",
         "join-mixed-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:09.797563+00:00",
+      "started_at": "2026-10-30T09:32:12.920749+00:00",
       "stdout": "logs/round-1-v8-join-mixed-1024.js.stdout",
       "stderr": "logs/round-1-v8-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:09.830491+00:00"
+      "finished_at": "2026-10-30T09:32:12.953747+00:00"
     },
     {
       "label": "round-1-scriptw-join-mixed-1024.js",
@@ -3228,11 +3228,11 @@
         "join-mixed-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-mixed-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:09.832056+00:00",
+      "started_at": "2026-10-30T09:32:12.955282+00:00",
       "stdout": "logs/round-1-scriptw-join-mixed-1024.js.stdout",
       "stderr": "logs/round-1-scriptw-join-mixed-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:10.450524+00:00"
+      "finished_at": "2026-10-30T09:32:13.574116+00:00"
     },
     {
       "label": "round-1-v8-join-4096.js",
@@ -3244,11 +3244,11 @@
         "10",
         "join-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:10.452382+00:00",
+      "started_at": "2026-10-30T09:32:13.575949+00:00",
       "stdout": "logs/round-1-v8-join-4096.js.stdout",
       "stderr": "logs/round-1-v8-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:10.517969+00:00"
+      "finished_at": "2026-10-30T09:32:13.640738+00:00"
     },
     {
       "label": "round-1-scriptw-join-4096.js",
@@ -3260,11 +3260,11 @@
         "join-4096.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-4096.js"
       ],
-      "started_at": "2026-10-29T23:02:10.519622+00:00",
+      "started_at": "2026-10-30T09:32:13.642293+00:00",
       "stdout": "logs/round-1-scriptw-join-4096.js.stdout",
       "stderr": "logs/round-1-scriptw-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:11.187322+00:00"
+      "finished_at": "2026-10-30T09:32:14.311518+00:00"
     },
     {
       "label": "round-1-scriptc-join-4096.js-compile",
@@ -3275,11 +3275,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-4096.js/join-4096.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:11.189270+00:00",
+      "started_at": "2026-10-30T09:32:14.313361+00:00",
       "stdout": "logs/round-1-scriptc-join-4096.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-4096.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:11.355788+00:00"
+      "finished_at": "2026-10-30T09:32:14.430858+00:00"
     },
     {
       "label": "round-1-scriptc-join-4096.js",
@@ -3290,11 +3290,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:11.355870+00:00",
+      "started_at": "2026-10-30T09:32:14.430937+00:00",
       "stdout": "logs/round-1-scriptc-join-4096.js.stdout",
       "stderr": "logs/round-1-scriptc-join-4096.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:11.572804+00:00"
+      "finished_at": "2026-10-30T09:32:14.647038+00:00"
     },
     {
       "label": "round-1-scriptw-join-1024.js",
@@ -3306,11 +3306,11 @@
         "join-1024.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-join-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:11.574648+00:00",
+      "started_at": "2026-10-30T09:32:14.648848+00:00",
       "stdout": "logs/round-1-scriptw-join-1024.js.stdout",
       "stderr": "logs/round-1-scriptw-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.192732+00:00"
+      "finished_at": "2026-10-30T09:32:15.268425+00:00"
     },
     {
       "label": "round-1-scriptc-join-1024.js-compile",
@@ -3321,11 +3321,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-join-1024.js/join-1024.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:12.194611+00:00",
+      "started_at": "2026-10-30T09:32:15.270287+00:00",
       "stdout": "logs/round-1-scriptc-join-1024.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-join-1024.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.309771+00:00"
+      "finished_at": "2026-10-30T09:32:15.385847+00:00"
     },
     {
       "label": "round-1-scriptc-join-1024.js",
@@ -3336,11 +3336,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:12.309855+00:00",
+      "started_at": "2026-10-30T09:32:15.385928+00:00",
       "stdout": "logs/round-1-scriptc-join-1024.js.stdout",
       "stderr": "logs/round-1-scriptc-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.525878+00:00"
+      "finished_at": "2026-10-30T09:32:15.601016+00:00"
     },
     {
       "label": "round-1-v8-join-1024.js",
@@ -3352,11 +3352,11 @@
         "10",
         "join-1024.js"
       ],
-      "started_at": "2026-10-29T23:02:12.527775+00:00",
+      "started_at": "2026-10-30T09:32:15.602936+00:00",
       "stdout": "logs/round-1-v8-join-1024.js.stdout",
       "stderr": "logs/round-1-v8-join-1024.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.560508+00:00"
+      "finished_at": "2026-10-30T09:32:15.635656+00:00"
     },
     {
       "label": "round-1-scriptc-to-sorted-512.js-compile",
@@ -3367,11 +3367,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-to-sorted-512.js/to-sorted-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:12.562306+00:00",
+      "started_at": "2026-10-30T09:32:15.637403+00:00",
       "stdout": "logs/round-1-scriptc-to-sorted-512.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-to-sorted-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.677712+00:00"
+      "finished_at": "2026-10-30T09:32:15.802974+00:00"
     },
     {
       "label": "round-1-scriptc-to-sorted-512.js",
@@ -3382,11 +3382,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:12.677795+00:00",
+      "started_at": "2026-10-30T09:32:15.803055+00:00",
       "stdout": "logs/round-1-scriptc-to-sorted-512.js.stdout",
       "stderr": "logs/round-1-scriptc-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.893894+00:00"
+      "finished_at": "2026-10-30T09:32:16.019963+00:00"
     },
     {
       "label": "round-1-v8-to-sorted-512.js",
@@ -3398,11 +3398,11 @@
         "10",
         "to-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:02:12.895858+00:00",
+      "started_at": "2026-10-30T09:32:16.021930+00:00",
       "stdout": "logs/round-1-v8-to-sorted-512.js.stdout",
       "stderr": "logs/round-1-v8-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:12.929499+00:00"
+      "finished_at": "2026-10-30T09:32:16.054657+00:00"
     },
     {
       "label": "round-1-scriptw-to-sorted-512.js",
@@ -3414,11 +3414,11 @@
         "to-sorted-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-to-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:02:12.931216+00:00",
+      "started_at": "2026-10-30T09:32:16.056346+00:00",
       "stdout": "logs/round-1-scriptw-to-sorted-512.js.stdout",
       "stderr": "logs/round-1-scriptw-to-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:13.548929+00:00"
+      "finished_at": "2026-10-30T09:32:16.675167+00:00"
     },
     {
       "label": "round-1-v8-sort-sorted-512.js",
@@ -3430,11 +3430,11 @@
         "10",
         "sort-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:02:13.550867+00:00",
+      "started_at": "2026-10-30T09:32:16.677099+00:00",
       "stdout": "logs/round-1-v8-sort-sorted-512.js.stdout",
       "stderr": "logs/round-1-v8-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:13.584484+00:00"
+      "finished_at": "2026-10-30T09:32:16.710694+00:00"
     },
     {
       "label": "round-1-scriptw-sort-sorted-512.js",
@@ -3446,11 +3446,11 @@
         "sort-sorted-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-sort-sorted-512.js"
       ],
-      "started_at": "2026-10-29T23:02:13.586034+00:00",
+      "started_at": "2026-10-30T09:32:16.712208+00:00",
       "stdout": "logs/round-1-scriptw-sort-sorted-512.js.stdout",
       "stderr": "logs/round-1-scriptw-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:14.204412+00:00"
+      "finished_at": "2026-10-30T09:32:17.330425+00:00"
     },
     {
       "label": "round-1-scriptc-sort-sorted-512.js-compile",
@@ -3461,11 +3461,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-sort-sorted-512.js/sort-sorted-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:14.206359+00:00",
+      "started_at": "2026-10-30T09:32:17.332398+00:00",
       "stdout": "logs/round-1-scriptc-sort-sorted-512.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-sort-sorted-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:14.321714+00:00"
+      "finished_at": "2026-10-30T09:32:17.447849+00:00"
     },
     {
       "label": "round-1-scriptc-sort-sorted-512.js",
@@ -3476,11 +3476,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:14.321795+00:00",
+      "started_at": "2026-10-30T09:32:17.447932+00:00",
       "stdout": "logs/round-1-scriptc-sort-sorted-512.js.stdout",
       "stderr": "logs/round-1-scriptc-sort-sorted-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:14.537805+00:00"
+      "finished_at": "2026-10-30T09:32:17.663956+00:00"
     },
     {
       "label": "round-1-scriptw-sort-reverse-512.js",
@@ -3492,11 +3492,11 @@
         "sort-reverse-512.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-sort-reverse-512.js"
       ],
-      "started_at": "2026-10-29T23:02:14.642871+00:00",
+      "started_at": "2026-10-30T09:32:17.665855+00:00",
       "stdout": "logs/round-1-scriptw-sort-reverse-512.js.stdout",
       "stderr": "logs/round-1-scriptw-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.263085+00:00"
+      "finished_at": "2026-10-30T09:32:18.283416+00:00"
     },
     {
       "label": "round-1-scriptc-sort-reverse-512.js-compile",
@@ -3507,11 +3507,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-sort-reverse-512.js/sort-reverse-512.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:15.265111+00:00",
+      "started_at": "2026-10-30T09:32:18.285407+00:00",
       "stdout": "logs/round-1-scriptc-sort-reverse-512.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-sort-reverse-512.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.380816+00:00"
+      "finished_at": "2026-10-30T09:32:18.400855+00:00"
     },
     {
       "label": "round-1-scriptc-sort-reverse-512.js",
@@ -3522,11 +3522,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:15.380897+00:00",
+      "started_at": "2026-10-30T09:32:18.400933+00:00",
       "stdout": "logs/round-1-scriptc-sort-reverse-512.js.stdout",
       "stderr": "logs/round-1-scriptc-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.597846+00:00"
+      "finished_at": "2026-10-30T09:32:18.616955+00:00"
     },
     {
       "label": "round-1-v8-sort-reverse-512.js",
@@ -3538,11 +3538,11 @@
         "10",
         "sort-reverse-512.js"
       ],
-      "started_at": "2026-10-29T23:02:15.599829+00:00",
+      "started_at": "2026-10-30T09:32:18.618899+00:00",
       "stdout": "logs/round-1-v8-sort-reverse-512.js.stdout",
       "stderr": "logs/round-1-v8-sort-reverse-512.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.633500+00:00"
+      "finished_at": "2026-10-30T09:32:18.651646+00:00"
     },
     {
       "label": "round-1-scriptc-sort-reverse-128.js-compile",
@@ -3553,11 +3553,11 @@
         "-o",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptc-sort-reverse-128.js/sort-reverse-128.js.wasm"
       ],
-      "started_at": "2026-10-29T23:02:15.635270+00:00",
+      "started_at": "2026-10-30T09:32:18.653314+00:00",
       "stdout": "logs/round-1-scriptc-sort-reverse-128.js-compile.stdout",
       "stderr": "logs/round-1-scriptc-sort-reverse-128.js-compile.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.750713+00:00"
+      "finished_at": "2026-10-30T09:32:18.768979+00:00"
     },
     {
       "label": "round-1-scriptc-sort-reverse-128.js",
@@ -3568,11 +3568,11 @@
         "7",
         "10"
       ],
-      "started_at": "2026-10-29T23:02:15.750797+00:00",
+      "started_at": "2026-10-30T09:32:18.769059+00:00",
       "stdout": "logs/round-1-scriptc-sort-reverse-128.js.stdout",
       "stderr": "logs/round-1-scriptc-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:15.966857+00:00"
+      "finished_at": "2026-10-30T09:32:18.984990+00:00"
     },
     {
       "label": "round-1-v8-sort-reverse-128.js",
@@ -3584,11 +3584,11 @@
         "10",
         "sort-reverse-128.js"
       ],
-      "started_at": "2026-10-29T23:02:15.968870+00:00",
+      "started_at": "2026-10-30T09:32:18.986911+00:00",
       "stdout": "logs/round-1-v8-sort-reverse-128.js.stdout",
       "stderr": "logs/round-1-v8-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:16.002557+00:00"
+      "finished_at": "2026-10-30T09:32:19.019692+00:00"
     },
     {
       "label": "round-1-scriptw-sort-reverse-128.js",
@@ -3600,11 +3600,11 @@
         "sort-reverse-128.js",
         "/home/runner/work/_temp/compiler-measurements/wasm/round-1-scriptw-sort-reverse-128.js"
       ],
-      "started_at": "2026-10-29T23:02:16.004448+00:00",
+      "started_at": "2026-10-30T09:32:19.021424+00:00",
       "stdout": "logs/round-1-scriptw-sort-reverse-128.js.stdout",
       "stderr": "logs/round-1-scriptw-sort-reverse-128.js.stderr",
       "returncode": 0,
-      "finished_at": "2026-10-29T23:02:16.621917+00:00"
+      "finished_at": "2026-10-30T09:32:19.639237+00:00"
     }
   ],
   "policy": {
@@ -3614,9 +3614,9 @@
     "order": "rotate first runtime by workload and round; second round reverses case order",
     "limitations": "GitHub shared host; descriptive observations; no statistical-significance or conformance claim"
   },
-  "scriptw_source_fingerprint": "c67902f8c4b5b9a4aeae7bdc2e6a87a7dac742ce55e508cab356ddb808b66882",
+  "scriptw_source_fingerprint": "d1579a87fafb4b3fe7b3f6cc1bdb91fa8a4b01f76b17c7c26421680b2272f09a",
   "scriptw_runtime_policy": "reference-types=required function-references=required gc=required exceptions=required threads=required shared-memory=required collector=copying cycle-collection=available js-semantic-heap=wasm-gc weak-references=copying-collector ephemerons=owner-key-fixed-point",
-  "finished_at": "2026-10-29T23:02:16.626216+00:00",
+  "finished_at": "2026-10-30T09:32:19.641197+00:00",
   "retained_files": [
     {
       "path": "adapted/dynamic-string-4096.js",
@@ -3711,7 +3711,7 @@
     {
       "path": "cargo-build.jsonl",
       "bytes": 41169396,
-      "sha256": "580b145fc49878718032ceac6aef022077ddb8540dc59ece187bf5fc288c368f"
+      "sha256": "e0916ea9dd9f320aa9f528e079bf8ac240c2195ff42280b71b89a97ed1a93e35"
     },
     {
       "path": "expected/dynamic-string-4096.js",
@@ -3821,7 +3821,7 @@
     {
       "path": "logs/round-0-scriptc-dynamic-string-4096.js.stdout",
       "bytes": 2774,
-      "sha256": "cfc8712d1e0afb8742cc31df5e06ab1beba712a59353cf281f75cc63349fb2e7"
+      "sha256": "8fe3b4d73b84b7059643c9b8bd5a3dda47b6ab120da5a80d65b6ff8ae1a9edbc"
     },
     {
       "path": "logs/round-0-scriptc-folded-string-4096.js-compile.stderr",
@@ -3840,8 +3840,8 @@
     },
     {
       "path": "logs/round-0-scriptc-folded-string-4096.js.stdout",
-      "bytes": 2775,
-      "sha256": "6f7af181cc3335cfe44a54d2ca78ca237c32c4dfd3d7d22836f480223f89970c"
+      "bytes": 2774,
+      "sha256": "1aa3f405c89c2b75f48de9f0167822f6a1d10fd4088bac4c75c0f60b3c367f09"
     },
     {
       "path": "logs/round-0-scriptc-integer.js-compile.stderr",
@@ -3861,7 +3861,7 @@
     {
       "path": "logs/round-0-scriptc-integer.js.stdout",
       "bytes": 2826,
-      "sha256": "591bd664faed5daf3ba6ac6817c50dddbc7366ee51586508f74e66b81a984cac"
+      "sha256": "22d1feabe4e718ba012d39a0835b73e58c826b0da5c137771cd62c5c35cdc100"
     },
     {
       "path": "logs/round-0-scriptc-join-1024.js-compile.stderr",
@@ -3881,7 +3881,7 @@
     {
       "path": "logs/round-0-scriptc-join-1024.js.stdout",
       "bytes": 2774,
-      "sha256": "285576b8586372499fab524a724f281756141cd2695b9fe0014c18519f10d352"
+      "sha256": "7a36a52246c587d0df2eb33af3bbbecd2bb3e62bfc1545707db3feb32950dad7"
     },
     {
       "path": "logs/round-0-scriptc-join-4096.js-compile.stderr",
@@ -3901,7 +3901,7 @@
     {
       "path": "logs/round-0-scriptc-join-4096.js.stdout",
       "bytes": 2791,
-      "sha256": "6221f8c4bc8fd31a3d4225c1a2a639284e29c5bb1d9a57c5aea8c0a05960840e"
+      "sha256": "30939e9af602d20d127df76a6403243acf4d590f9d581eb4e1c27eb472be3c52"
     },
     {
       "path": "logs/round-0-scriptc-join-empty-1024.js-compile.stderr",
@@ -3921,7 +3921,7 @@
     {
       "path": "logs/round-0-scriptc-join-empty-1024.js.stdout",
       "bytes": 2706,
-      "sha256": "61d95f68aac8a9fddf2b1f5b44953c0762a7275cf000bf1a6a1547bd2e6c9825"
+      "sha256": "7f127ac50fdc6a2e41a2a250194b2bdec2644b2cc1718bfa84e6c7efb31f9d0a"
     },
     {
       "path": "logs/round-0-scriptc-join-mixed-1024.js-compile.stderr",
@@ -3941,7 +3941,7 @@
     {
       "path": "logs/round-0-scriptc-join-mixed-1024.js.stdout",
       "bytes": 2757,
-      "sha256": "033754ee7d0b944d3fea563737c68d7c48aad28054961cc34bcd77864a2e467c"
+      "sha256": "93bb3c485463051349662d433e7977c0d9598e5169037829cf011dc793a9ede1"
     },
     {
       "path": "logs/round-0-scriptc-join-singleton-1024.js-compile.stderr",
@@ -3960,8 +3960,8 @@
     },
     {
       "path": "logs/round-0-scriptc-join-singleton-1024.js.stdout",
-      "bytes": 2746,
-      "sha256": "53c871836c4be6cbf5aa5a011c60cebe0a10b4fc8eadd606ef7688b5e1340180"
+      "bytes": 2752,
+      "sha256": "6011514b391672442e48adbd48a248cf49d7e4c7ce6ea557ec7595687cd8ed91"
     },
     {
       "path": "logs/round-0-scriptc-join-small-1024.js-compile.stderr",
@@ -3981,7 +3981,7 @@
     {
       "path": "logs/round-0-scriptc-join-small-1024.js.stdout",
       "bytes": 2757,
-      "sha256": "ede7b0d1f6c661c941cbb7024f90dc79dfba83b1608a38b9817709d4d5dc442c"
+      "sha256": "92629257ea9e637a29131a593e056be0ff75e484f0a8c35ab7938feaba467a48"
     },
     {
       "path": "logs/round-0-scriptc-numeric-loop-10000.js-compile.stderr",
@@ -4000,8 +4000,8 @@
     },
     {
       "path": "logs/round-0-scriptc-numeric-loop-10000.js.stdout",
-      "bytes": 2827,
-      "sha256": "e486098a0e794aff811c4a52aa371a6c6a31ed901444ee91641acec641f6a081"
+      "bytes": 2826,
+      "sha256": "2a48dce8fa22082f9e0818956d07b846f588de53df66d28e2f6dcb2e39f6625c"
     },
     {
       "path": "logs/round-0-scriptc-numeric-loop-50000.js-compile.stderr",
@@ -4021,7 +4021,7 @@
     {
       "path": "logs/round-0-scriptc-numeric-loop-50000.js.stdout",
       "bytes": 2858,
-      "sha256": "32af5b64ac8d10ff976f39b99f925674d179e340fa7e5608ecdc9ddd71704634"
+      "sha256": "dc9c79956e0a27ee83c4539f5956708ce75e279aba75319063b2bb1916442de3"
     },
     {
       "path": "logs/round-0-scriptc-objects.js-compile.stderr",
@@ -4041,7 +4041,7 @@
     {
       "path": "logs/round-0-scriptc-objects.js.stdout",
       "bytes": 2791,
-      "sha256": "da2f25f262ad954d8dd462b2424d1bdccaef8fd42f2739d31fc8f2fb4051d073"
+      "sha256": "905f2b9c4a032be4830c99ea64ac492ef75c2bc1bab69dcbb3b54699b5eb4cf6"
     },
     {
       "path": "logs/round-0-scriptc-retained-objects.js-compile.stderr",
@@ -4061,7 +4061,7 @@
     {
       "path": "logs/round-0-scriptc-retained-objects.js.stdout",
       "bytes": 2876,
-      "sha256": "7cffba447e22bcbb7fb0cecea1038e2686d216bdf65c378182f53a2d10f27ba6"
+      "sha256": "2fcbcfb1801552d9627c7e7ccc81d356b091c2e7dbf19ec6a7831951e4a95d4a"
     },
     {
       "path": "logs/round-0-scriptc-sort-reverse-128.js-compile.stderr",
@@ -4080,8 +4080,8 @@
     },
     {
       "path": "logs/round-0-scriptc-sort-reverse-128.js.stdout",
-      "bytes": 2779,
-      "sha256": "42ea08051498014175ae7d45ddfe43a237be1c51e981e61524618f6f96209fa9"
+      "bytes": 2789,
+      "sha256": "55a799815fe74ef9c287f8081c20e649199509f77b680185f44e40d8ca38ef50"
     },
     {
       "path": "logs/round-0-scriptc-sort-reverse-512.js-compile.stderr",
@@ -4101,7 +4101,7 @@
     {
       "path": "logs/round-0-scriptc-sort-reverse-512.js.stdout",
       "bytes": 2825,
-      "sha256": "d6e4e77949b83394198f7428cc38cdaf78cdefb47561104f6fc4617efdca9fa9"
+      "sha256": "bbc596d8c3bc34f79d2658a2deaa54b6bba05212795aa7a52b1f6006613162c1"
     },
     {
       "path": "logs/round-0-scriptc-sort-sorted-512.js-compile.stderr",
@@ -4120,8 +4120,8 @@
     },
     {
       "path": "logs/round-0-scriptc-sort-sorted-512.js.stdout",
-      "bytes": 2826,
-      "sha256": "506a746bf0d137a28077a58da53fb113ae6ff8f3179d757a964c879aac9a9c12"
+      "bytes": 2825,
+      "sha256": "0a18687c59404e0bd1b17ade5b154c1aa1c6140d14accf58bec30f2d13fd2eeb"
     },
     {
       "path": "logs/round-0-scriptc-to-sorted-512.js-compile.stderr",
@@ -4140,8 +4140,8 @@
     },
     {
       "path": "logs/round-0-scriptc-to-sorted-512.js.stdout",
-      "bytes": 2825,
-      "sha256": "94bc8a808fdd7701ebe677e00adb4bb8b990566339673f9097d6f93cb4b67fc8"
+      "bytes": 2826,
+      "sha256": "f4cc17c409f10439be8f82741cfcd58af5b8d44ab79fba3277cab97e7be3214b"
     },
     {
       "path": "logs/round-0-scriptw-dynamic-string-4096.js.stderr",
@@ -4150,8 +4150,8 @@
     },
     {
       "path": "logs/round-0-scriptw-dynamic-string-4096.js.stdout",
-      "bytes": 53076,
-      "sha256": "dae21ee46653975c5f857cadd809ac6bcf1a4f45f7b4987a8e5e37811d81a2bf"
+      "bytes": 53069,
+      "sha256": "69179706cd12720700c4d9453a552987266dc3079b222c3a704db1e17497e73e"
     },
     {
       "path": "logs/round-0-scriptw-folded-string-4096.js.stderr",
@@ -4160,8 +4160,8 @@
     },
     {
       "path": "logs/round-0-scriptw-folded-string-4096.js.stdout",
-      "bytes": 53072,
-      "sha256": "16b8c240d56e29b636064f082e95493ae0baef6fea79e154d8f738a1dbe306d2"
+      "bytes": 53075,
+      "sha256": "3517d109dfc5499bf276b8af78b8d1771e3fed36c11b72b556abd6b1a74febe4"
     },
     {
       "path": "logs/round-0-scriptw-integer.js.stderr",
@@ -4170,8 +4170,8 @@
     },
     {
       "path": "logs/round-0-scriptw-integer.js.stdout",
-      "bytes": 53130,
-      "sha256": "a8e56421c9576d70598afe8f0b84685beabd33c438e26d11f89573fb105408ac"
+      "bytes": 53132,
+      "sha256": "077a94e341bdcc0183acf1b29527b1810ef5772346684738967db5b4cba4a328"
     },
     {
       "path": "logs/round-0-scriptw-join-1024.js.stderr",
@@ -4180,8 +4180,8 @@
     },
     {
       "path": "logs/round-0-scriptw-join-1024.js.stdout",
-      "bytes": 53093,
-      "sha256": "6010c22af68ff04a239a9f8895c2774ea0e106fd56c6b25480dccc53bee17a7e"
+      "bytes": 53092,
+      "sha256": "f06e09020a04a998bb169e27285e1507ea4b76c4dc4d5ed2746179dde4160ac7"
     },
     {
       "path": "logs/round-0-scriptw-join-4096.js.stderr",
@@ -4190,8 +4190,8 @@
     },
     {
       "path": "logs/round-0-scriptw-join-4096.js.stdout",
-      "bytes": 53110,
-      "sha256": "376eedcb9a2b49af23c2f2f57bb75617b7636b668a7f32ead7283ff0e0d4eb71"
+      "bytes": 53109,
+      "sha256": "1145542d61b6f24c1eff0158cee2df6d8412fcc165b09f29681fd0f7b842726b"
     },
     {
       "path": "logs/round-0-scriptw-join-empty-1024.js.stderr",
@@ -4201,7 +4201,7 @@
     {
       "path": "logs/round-0-scriptw-join-empty-1024.js.stdout",
       "bytes": 53029,
-      "sha256": "d6d7ae423cab9cde1e635e7b2fa9a7bbaa64250546f6bcc7bf9eba77a5299c0a"
+      "sha256": "e404e120a097f0407cd5e3ba8f2811f2f2ee8e28f079f1f28fa00e762cba65e5"
     },
     {
       "path": "logs/round-0-scriptw-join-mixed-1024.js.stderr",
@@ -4210,8 +4210,8 @@
     },
     {
       "path": "logs/round-0-scriptw-join-mixed-1024.js.stdout",
-      "bytes": 53099,
-      "sha256": "73b547905f780f5eb4e6fefe0f8fd7dfeff6e47f5e32edb11e6d39ae8b1f23af"
+      "bytes": 53097,
+      "sha256": "bb8b620cd411b93c4d89227f86149cb621585a3447db324e59410cfab1a375fb"
     },
     {
       "path": "logs/round-0-scriptw-join-singleton-1024.js.stderr",
@@ -4220,8 +4220,8 @@
     },
     {
       "path": "logs/round-0-scriptw-join-singleton-1024.js.stdout",
-      "bytes": 53080,
-      "sha256": "54ce6f31f8234d81692e1bf70b9ca858d55958bdbca2098bcb4d97cb97c5eaf2"
+      "bytes": 53084,
+      "sha256": "ad0ed5f7848cbd8eec70928964ec9c735bba4873af5c44e7566bce4676eb67a0"
     },
     {
       "path": "logs/round-0-scriptw-join-small-1024.js.stderr",
@@ -4231,7 +4231,7 @@
     {
       "path": "logs/round-0-scriptw-join-small-1024.js.stdout",
       "bytes": 53081,
-      "sha256": "4142c208ff21bbef6a658fd318ca9f0d1b4beff66e282f2f2b89471e0309ffe5"
+      "sha256": "8e20b5e20ea36e927bc1e82ad23ac300a23de8c3e141482f725acdb7dd38dbd5"
     },
     {
       "path": "logs/round-0-scriptw-numeric-loop-10000.js.stderr",
@@ -4241,7 +4241,7 @@
     {
       "path": "logs/round-0-scriptw-numeric-loop-10000.js.stdout",
       "bytes": 53142,
-      "sha256": "e68e3e9bd6141bce7d284e208e23c96b5ec74707669d1ae09f044d69e8d6f1af"
+      "sha256": "5234effeec0a9ef07e03408d9571a66b4f0211d08eaf768511bd085a4c673774"
     },
     {
       "path": "logs/round-0-scriptw-numeric-loop-50000.js.stderr",
@@ -4250,8 +4250,8 @@
     },
     {
       "path": "logs/round-0-scriptw-numeric-loop-50000.js.stdout",
-      "bytes": 53157,
-      "sha256": "8b716b57720d4a085f8cdfe299b9f3fc04445f6fb1f50dfa905b8f29a73ad8dc"
+      "bytes": 53153,
+      "sha256": "38d5a85ae7fb9629e24b9ee963940b63015117510c270b7b14725741a1cc34b3"
     },
     {
       "path": "logs/round-0-scriptw-objects.js.stderr",
@@ -4260,8 +4260,8 @@
     },
     {
       "path": "logs/round-0-scriptw-objects.js.stdout",
-      "bytes": 53107,
-      "sha256": "50d1aaa6a74c1fb3af04b769d2be7170d458167f1a537a18228a63bc19813edd"
+      "bytes": 53108,
+      "sha256": "78872b3133a69419ee912c1526f6ad1e8a374e0b72cd0d9b90f75c80ee204462"
     },
     {
       "path": "logs/round-0-scriptw-retained-objects.js.stderr",
@@ -4270,8 +4270,8 @@
     },
     {
       "path": "logs/round-0-scriptw-retained-objects.js.stdout",
-      "bytes": 53234,
-      "sha256": "8f278ccd3b21b62589a56ea39252621b474a7d3109726219943711d892e81975"
+      "bytes": 53228,
+      "sha256": "faee808e4dc1ed931d2fcd8aa5735c2c958bf7c79a8137768ebbdb8f6ed7da84"
     },
     {
       "path": "logs/round-0-scriptw-sort-reverse-128.js.stderr",
@@ -4280,8 +4280,8 @@
     },
     {
       "path": "logs/round-0-scriptw-sort-reverse-128.js.stdout",
-      "bytes": 53116,
-      "sha256": "59012d70b4d4e5c97134eb0b41135f1110bfbd3071a73fb48352209bf9b3400d"
+      "bytes": 53117,
+      "sha256": "9c0bab652195b96013f6c27cc72aadbf2ee47c8026a9eff3ee1fdf9e191abcff"
     },
     {
       "path": "logs/round-0-scriptw-sort-reverse-512.js.stderr",
@@ -4291,7 +4291,7 @@
     {
       "path": "logs/round-0-scriptw-sort-reverse-512.js.stdout",
       "bytes": 53149,
-      "sha256": "77b74ba994a9ecfbb4342cd523bbce356b3cf42fb7287fe62948380108b53fba"
+      "sha256": "3c3b7284d4f1d343e62d571226fc797f6b3ab95442c61b8512dc13e19a9cf376"
     },
     {
       "path": "logs/round-0-scriptw-sort-sorted-512.js.stderr",
@@ -4300,8 +4300,8 @@
     },
     {
       "path": "logs/round-0-scriptw-sort-sorted-512.js.stdout",
-      "bytes": 53147,
-      "sha256": "75cd6b95b85bd48663374a17da5017772994848fbf58f7b5fbd287a100576fff"
+      "bytes": 53140,
+      "sha256": "972a9a30288995ba9a0528c188c345e879df7ab4a76e7b07e9ebf7c226790e0c"
     },
     {
       "path": "logs/round-0-scriptw-to-sorted-512.js.stderr",
@@ -4310,8 +4310,8 @@
     },
     {
       "path": "logs/round-0-scriptw-to-sorted-512.js.stdout",
-      "bytes": 53147,
-      "sha256": "c464c344ddcdf00ba41d71f6bc81cc02681e5b8e672d9f290221f1eaf5588bda"
+      "bytes": 53146,
+      "sha256": "7586ed2817965261c5943bdc32ef37a3a01df8369f7fdc89038e7955f4beada7"
     },
     {
       "path": "logs/round-0-v8-dynamic-string-4096.js.stderr",
@@ -4320,8 +4320,8 @@
     },
     {
       "path": "logs/round-0-v8-dynamic-string-4096.js.stdout",
-      "bytes": 8543,
-      "sha256": "f4864c4f8e377606ac1c2809e2a9c6b156ab2424c367aa0a754c91c704d22f06"
+      "bytes": 8545,
+      "sha256": "cbcfdf860860e361e4f2be4d8c952403ffd7e2c34e718a0bd9c3f16822e09b46"
     },
     {
       "path": "logs/round-0-v8-folded-string-4096.js.stderr",
@@ -4331,7 +4331,7 @@
     {
       "path": "logs/round-0-v8-folded-string-4096.js.stdout",
       "bytes": 8541,
-      "sha256": "58261c42701a2e7d669f8352616b21d4d94c2bf6faf9112d7a38267dfd32363b"
+      "sha256": "c9bf2b3298337f3ddb971481eae55fe14cfdb5f674fc9f355b5bb2431f074353"
     },
     {
       "path": "logs/round-0-v8-integer.js.stderr",
@@ -4340,8 +4340,8 @@
     },
     {
       "path": "logs/round-0-v8-integer.js.stdout",
-      "bytes": 8616,
-      "sha256": "841a4adfe5777d572a07176e45dec78bb3a7ae06b8c6b702d2c129d41fce64b4"
+      "bytes": 8617,
+      "sha256": "0365f18d3fc96b8bb845a41952cd8d99b6d3be48aa290ca0a628f19addbc7084"
     },
     {
       "path": "logs/round-0-v8-join-1024.js.stderr",
@@ -4351,7 +4351,7 @@
     {
       "path": "logs/round-0-v8-join-1024.js.stdout",
       "bytes": 8520,
-      "sha256": "c95c2c6140bcbcc301ce49ada4facf5e40153ea6d514f846517db4da20564f9b"
+      "sha256": "d2bd366a07a421fa3b77696b92afae5aff0a101b740b665516ad17cef061b2c7"
     },
     {
       "path": "logs/round-0-v8-join-4096.js.stderr",
@@ -4360,8 +4360,8 @@
     },
     {
       "path": "logs/round-0-v8-join-4096.js.stdout",
-      "bytes": 8538,
-      "sha256": "99c812de2f74816afcf2ce334d93ebc515a2d862fb6d16255cec64dc1fda9542"
+      "bytes": 8544,
+      "sha256": "5742063bdd80d3a9e27cfe8fd5677016e40596be2c2c722c0b6394f1b9014d58"
     },
     {
       "path": "logs/round-0-v8-join-empty-1024.js.stderr",
@@ -4371,7 +4371,7 @@
     {
       "path": "logs/round-0-v8-join-empty-1024.js.stdout",
       "bytes": 8471,
-      "sha256": "b25add14c3777aba044b227c248a3b7c598d5e26ebdee67d210de8e98a19ada9"
+      "sha256": "526599524f9add364ca5da04d8d298769e317ac90953add47d02ef29a3ef8d85"
     },
     {
       "path": "logs/round-0-v8-join-mixed-1024.js.stderr",
@@ -4381,7 +4381,7 @@
     {
       "path": "logs/round-0-v8-join-mixed-1024.js.stdout",
       "bytes": 8520,
-      "sha256": "ef821f457aa9c60f29efd83daaf0b4c1528a8dfa11f1914bb7cfc14285c749a4"
+      "sha256": "f31748ac91ef22dae1b2b2cf3f901f33846d1733cbdd28c610c2eb996fd6befd"
     },
     {
       "path": "logs/round-0-v8-join-singleton-1024.js.stderr",
@@ -4391,7 +4391,7 @@
     {
       "path": "logs/round-0-v8-join-singleton-1024.js.stdout",
       "bytes": 8526,
-      "sha256": "85f6158b92670d84ee3e350d5e64ad4b1c72f0309fabc18c0e558abf28a5ca10"
+      "sha256": "8dd5a5560692292cae7548500b984a867689f025c65e80da61717fca75d583fd"
     },
     {
       "path": "logs/round-0-v8-join-small-1024.js.stderr",
@@ -4400,8 +4400,8 @@
     },
     {
       "path": "logs/round-0-v8-join-small-1024.js.stdout",
-      "bytes": 8525,
-      "sha256": "c52a430fc3d497e0a07a699cf28ac92d3194e5babcb8159e850777788c0a89cc"
+      "bytes": 8527,
+      "sha256": "aeea62d2dcbf5dc6297ab5170c60281d9ff67b9fc80a387056a0e71814692dc0"
     },
     {
       "path": "logs/round-0-v8-numeric-loop-10000.js.stderr",
@@ -4410,8 +4410,8 @@
     },
     {
       "path": "logs/round-0-v8-numeric-loop-10000.js.stdout",
-      "bytes": 8611,
-      "sha256": "347b6b41238f352f2f31eaf808fd15296a8df42ed83bdc58bc6c595e9a71464a"
+      "bytes": 8612,
+      "sha256": "17ecdf3856665e3c88b9441e1e123c3841c7c8990a69bd335343cd522c02edf9"
     },
     {
       "path": "logs/round-0-v8-numeric-loop-50000.js.stderr",
@@ -4420,8 +4420,8 @@
     },
     {
       "path": "logs/round-0-v8-numeric-loop-50000.js.stdout",
-      "bytes": 8638,
-      "sha256": "53195015ca33d6c923efc1dab6c0a311870d5706304349eee92625eb5dc453fe"
+      "bytes": 8642,
+      "sha256": "f8a7954a8106691360c70aba1b38e9bdeeb5bc8e4233a02640f31cca9b2c9eee"
     },
     {
       "path": "logs/round-0-v8-objects.js.stderr",
@@ -4431,7 +4431,7 @@
     {
       "path": "logs/round-0-v8-objects.js.stdout",
       "bytes": 8534,
-      "sha256": "8220a9ea8f53caaad70c3d5dab03eccd88d5da0fd36628e1d9023e9e068e0461"
+      "sha256": "5ed0f1c35e44c2c89a69609a611ce0409a2486071f07afe953af6a96509db6c5"
     },
     {
       "path": "logs/round-0-v8-retained-objects.js.stderr",
@@ -4441,7 +4441,7 @@
     {
       "path": "logs/round-0-v8-retained-objects.js.stdout",
       "bytes": 8705,
-      "sha256": "8d348bb82ec59e3101c4ac035cefba913b749dd24d8483b8372efe930eeee3fe"
+      "sha256": "b68bbb8e3c4b44bdfbb89a98f98c534efc829ed799df88553aa8d8710de11ed6"
     },
     {
       "path": "logs/round-0-v8-sort-reverse-128.js.stderr",
@@ -4451,7 +4451,7 @@
     {
       "path": "logs/round-0-v8-sort-reverse-128.js.stdout",
       "bytes": 8541,
-      "sha256": "aba2ae70c72cf673ce5f5ede46171944e64e80586598797f786ea3830a775d68"
+      "sha256": "80e6d8de89923f2cfc3ae76e01a82d3e44e1a9457132c6288797316b5226cc5c"
     },
     {
       "path": "logs/round-0-v8-sort-reverse-512.js.stderr",
@@ -4461,7 +4461,7 @@
     {
       "path": "logs/round-0-v8-sort-reverse-512.js.stdout",
       "bytes": 8580,
-      "sha256": "2a0daaf1c4316820db4f083dbdf9decbf59844ddcc17000e9d0314bf0ca37502"
+      "sha256": "02dfdc8f6b6d48b368069d1f3a24d789877eef99bc4f0f6d50a2bb7a8fbc1ab4"
     },
     {
       "path": "logs/round-0-v8-sort-sorted-512.js.stderr",
@@ -4470,8 +4470,8 @@
     },
     {
       "path": "logs/round-0-v8-sort-sorted-512.js.stdout",
-      "bytes": 8581,
-      "sha256": "965ad0b7a3ba8e1187f7a7967a7b52b2485ebaaf81b36400b3b5fe82df0d27c5"
+      "bytes": 8578,
+      "sha256": "a67e5e90627c50e8b7f42c846b16297267d323b0990b43325a34e0d7300a3de8"
     },
     {
       "path": "logs/round-0-v8-to-sorted-512.js.stderr",
@@ -4480,8 +4480,8 @@
     },
     {
       "path": "logs/round-0-v8-to-sorted-512.js.stdout",
-      "bytes": 8578,
-      "sha256": "3ee3463d8079f55cf00327f8eea28c516eb9eb3b6755f3cea44d2dc36ead8de9"
+      "bytes": 8576,
+      "sha256": "3f1c4fe483ba13361f2a5bddcdd729ea1198ccd27a1d4687d085d51bb2b69fe7"
     },
     {
       "path": "logs/round-1-scriptc-dynamic-string-4096.js-compile.stderr",
@@ -4501,7 +4501,7 @@
     {
       "path": "logs/round-1-scriptc-dynamic-string-4096.js.stdout",
       "bytes": 2774,
-      "sha256": "e5b65bdb9c5d71fa80807250e1e26ece812de37876816a9879b3a111b5a0740a"
+      "sha256": "2ca7df39e0c6e88a4bd4a94e486e5ecc6c2f03c9f1c3bce9b232cf16411d59e6"
     },
     {
       "path": "logs/round-1-scriptc-folded-string-4096.js-compile.stderr",
@@ -4521,7 +4521,7 @@
     {
       "path": "logs/round-1-scriptc-folded-string-4096.js.stdout",
       "bytes": 2774,
-      "sha256": "c29dc7f5ce91cfa3443860987c67d3513e9e473630cc908614ad11623b6ad6e6"
+      "sha256": "eb4613052643ab6d6fae5db49d972109cc72aeb0e999b5f37b1b965b1ba6da06"
     },
     {
       "path": "logs/round-1-scriptc-integer.js-compile.stderr",
@@ -4540,8 +4540,8 @@
     },
     {
       "path": "logs/round-1-scriptc-integer.js.stdout",
-      "bytes": 2827,
-      "sha256": "0d852f5ce708060b04594682ed1e1e06291556587c5c132d2df187f58f0f3c83"
+      "bytes": 2826,
+      "sha256": "3b8f97ec85db51b78bbc0ef4828f160326fe0acef8550414d4b31ea04c2206f1"
     },
     {
       "path": "logs/round-1-scriptc-join-1024.js-compile.stderr",
@@ -4560,8 +4560,8 @@
     },
     {
       "path": "logs/round-1-scriptc-join-1024.js.stdout",
-      "bytes": 2775,
-      "sha256": "7e972280e2649d80014d8bb7ab762a2a259b22a3f7ef462071311c755e012cbd"
+      "bytes": 2774,
+      "sha256": "3c4c855efab8d4c6f1076c874ae681a31c65a3f8e2e02ca9a3691439676c3361"
     },
     {
       "path": "logs/round-1-scriptc-join-4096.js-compile.stderr",
@@ -4581,7 +4581,7 @@
     {
       "path": "logs/round-1-scriptc-join-4096.js.stdout",
       "bytes": 2791,
-      "sha256": "fc918274f7d7a4e9eb02dd4c88a230551269f08d8f81b97e3ed964cc06584971"
+      "sha256": "3bab021d4af0f82895635d64c7383bc01b915ca1e97d2de47020e760b1853a26"
     },
     {
       "path": "logs/round-1-scriptc-join-empty-1024.js-compile.stderr",
@@ -4601,7 +4601,7 @@
     {
       "path": "logs/round-1-scriptc-join-empty-1024.js.stdout",
       "bytes": 2706,
-      "sha256": "99bdcc5150c3dca066c37c4bd45a0080856c6d027a12536babf13dd4d538ef0e"
+      "sha256": "e0291949a9d1460c9bfaa869ffdef155cc42485935f82dd39dcc071a6cfc9655"
     },
     {
       "path": "logs/round-1-scriptc-join-mixed-1024.js-compile.stderr",
@@ -4621,7 +4621,7 @@
     {
       "path": "logs/round-1-scriptc-join-mixed-1024.js.stdout",
       "bytes": 2757,
-      "sha256": "6ac48f6e5bf4b4e6783e423eee0752209f721dc7889b271492a0231967248295"
+      "sha256": "96f37a2464bbf567d379647a95787c66e73b974f2b4efe3e9996e64feda77664"
     },
     {
       "path": "logs/round-1-scriptc-join-singleton-1024.js-compile.stderr",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "logs/round-1-scriptc-join-singleton-1024.js.stdout",
-      "bytes": 2757,
-      "sha256": "8419df7ca9b7350666b89c87fe42cf9c2b4ed0b866add2a5d09ed1294a95c3be"
+      "bytes": 2746,
+      "sha256": "1e2aff72a73e722e7365dac92447b0c354192b28bf3edf6230408069a28ea868"
     },
     {
       "path": "logs/round-1-scriptc-join-small-1024.js-compile.stderr",
@@ -4661,7 +4661,7 @@
     {
       "path": "logs/round-1-scriptc-join-small-1024.js.stdout",
       "bytes": 2757,
-      "sha256": "4f9ff04cc6f1b4b9473cca461c7a8c547366d6112e151b2cad14ae49b13002cd"
+      "sha256": "1888d8c86711a489383f8337e57276dd3a761f21b76e9a812b21457a899c27bf"
     },
     {
       "path": "logs/round-1-scriptc-numeric-loop-10000.js-compile.stderr",
@@ -4680,8 +4680,8 @@
     },
     {
       "path": "logs/round-1-scriptc-numeric-loop-10000.js.stdout",
-      "bytes": 2827,
-      "sha256": "1141e5b08264248f37de14670707305ba487396a3bbb51e98e13f8ec91672d3d"
+      "bytes": 2826,
+      "sha256": "e61d393fa26cf0d02ecdefaf3f0d7e2dcd8c4013808eb81fb170db102eb00df3"
     },
     {
       "path": "logs/round-1-scriptc-numeric-loop-50000.js-compile.stderr",
@@ -4700,8 +4700,8 @@
     },
     {
       "path": "logs/round-1-scriptc-numeric-loop-50000.js.stdout",
-      "bytes": 2859,
-      "sha256": "97d2e37321809a6ebdbe0d4b8362fe7e55611f092700286f1af14fc4620f12f1"
+      "bytes": 2857,
+      "sha256": "18bf06aab3e24e95d1dc85e3d7cf080cd045a94d9390df510d94e67f8be2076d"
     },
     {
       "path": "logs/round-1-scriptc-objects.js-compile.stderr",
@@ -4721,7 +4721,7 @@
     {
       "path": "logs/round-1-scriptc-objects.js.stdout",
       "bytes": 2791,
-      "sha256": "37fd6b71f6d2090f5f115da717194258b86d224c8e126e4d4112035e3e3977d1"
+      "sha256": "a466c44a365d2ae20334a39f8df38c1878496c43d80b253c98b3ac1c3283916b"
     },
     {
       "path": "logs/round-1-scriptc-retained-objects.js-compile.stderr",
@@ -4740,8 +4740,8 @@
     },
     {
       "path": "logs/round-1-scriptc-retained-objects.js.stdout",
-      "bytes": 2878,
-      "sha256": "db723523b77c637dde2a5e69ec7fdd75c55b6bd32a2c24c824d6196f4aadddbf"
+      "bytes": 2876,
+      "sha256": "f6f7e46a0910f0217051167774c22a720088dc2f2226674dca55973d0bf40bd1"
     },
     {
       "path": "logs/round-1-scriptc-sort-reverse-128.js-compile.stderr",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "logs/round-1-scriptc-sort-reverse-128.js.stdout",
-      "bytes": 2789,
-      "sha256": "2fddd6badba0413a6616adf744d3042ef09c10e76f9c840cbccfee5c5b32594a"
+      "bytes": 2777,
+      "sha256": "f47300b0d105c54b16db5df280527de3d38b63802fe1323d7f2cf2f0ae2fddf9"
     },
     {
       "path": "logs/round-1-scriptc-sort-reverse-512.js-compile.stderr",
@@ -4780,8 +4780,8 @@
     },
     {
       "path": "logs/round-1-scriptc-sort-reverse-512.js.stdout",
-      "bytes": 2826,
-      "sha256": "d62f9d98f0b59e9b40be077002207c64674d6940b577a4b2c82d6aa4abd17e92"
+      "bytes": 2825,
+      "sha256": "30fe826ff2a2cb3bbed787b14ea48cc364225b2b01460d73863005947f3f1404"
     },
     {
       "path": "logs/round-1-scriptc-sort-sorted-512.js-compile.stderr",
@@ -4801,7 +4801,7 @@
     {
       "path": "logs/round-1-scriptc-sort-sorted-512.js.stdout",
       "bytes": 2825,
-      "sha256": "aadb0e3740365599d3312b9aab362ab4a4025678014ff3812fa0a3dc30cf0fb5"
+      "sha256": "dc39634284522a772a641c71f4b24937903ed343f113a7d9480f81f00cdff3a3"
     },
     {
       "path": "logs/round-1-scriptc-to-sorted-512.js-compile.stderr",
@@ -4821,7 +4821,7 @@
     {
       "path": "logs/round-1-scriptc-to-sorted-512.js.stdout",
       "bytes": 2825,
-      "sha256": "4e3930d13be82adf94c0768c05114a76403cb1ce6d29125b2b055528cbfea137"
+      "sha256": "b2aad0138bcbce138f0a85368403fb745892a3ae65a81a7e6d3dd1b1c49795b2"
     },
     {
       "path": "logs/round-1-scriptw-dynamic-string-4096.js.stderr",
@@ -4831,7 +4831,7 @@
     {
       "path": "logs/round-1-scriptw-dynamic-string-4096.js.stdout",
       "bytes": 53076,
-      "sha256": "3d46dc809300996540d593e6b465f0303af9cef196dfc1c46e72fe77d14532d9"
+      "sha256": "55b9de9cbfaa78462c98725814ed436530ec5bab20c62ec06b1bb6bd1ab35192"
     },
     {
       "path": "logs/round-1-scriptw-folded-string-4096.js.stderr",
@@ -4840,8 +4840,8 @@
     },
     {
       "path": "logs/round-1-scriptw-folded-string-4096.js.stdout",
-      "bytes": 53071,
-      "sha256": "985cc8bca12042b00e5626c7a4629bf420aa5568614fac62633f8ab45f7cc705"
+      "bytes": 53068,
+      "sha256": "1fcc55e24a0fd4b45f3625edcd4906ecf5cb38cbee2bfe67fbbf8061c9d1862a"
     },
     {
       "path": "logs/round-1-scriptw-integer.js.stderr",
@@ -4851,7 +4851,7 @@
     {
       "path": "logs/round-1-scriptw-integer.js.stdout",
       "bytes": 53132,
-      "sha256": "a063bfb3b05b9b20a604bf9b98cd47a33aae3217b7c6ef3b0ad4436af0cd7018"
+      "sha256": "880cf79c2d456be3d244c9e9ccfd2f119c7e2e102236be55b670fe18b5bace8a"
     },
     {
       "path": "logs/round-1-scriptw-join-1024.js.stderr",
@@ -4860,8 +4860,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-1024.js.stdout",
-      "bytes": 53089,
-      "sha256": "6740915bf87b305e02c0e3073fc599cb3c54eef8c5fb51b6508e795d572cbf68"
+      "bytes": 53085,
+      "sha256": "249df2aadc3d383740a5badc06b3266bb4c3e76043436915c8a161088fdbf3c3"
     },
     {
       "path": "logs/round-1-scriptw-join-4096.js.stderr",
@@ -4870,8 +4870,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-4096.js.stdout",
-      "bytes": 53110,
-      "sha256": "de6dae3032753a330b4f593c5c74ac584f71635c050922fd0179cc1cbb7220e3"
+      "bytes": 53109,
+      "sha256": "e15dbb21c346a83001120835f276eb54c1a1cf3515eb6d1d4538b693f030d6f7"
     },
     {
       "path": "logs/round-1-scriptw-join-empty-1024.js.stderr",
@@ -4880,8 +4880,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-empty-1024.js.stdout",
-      "bytes": 53029,
-      "sha256": "2548384e685bf9bc98670f89c9949442a5f3eb171cb2849681a7aa28ee890735"
+      "bytes": 53018,
+      "sha256": "260420ef7e2e2459d07eb301118b1278cdcce8a03a330d1154a2d818f60ed56c"
     },
     {
       "path": "logs/round-1-scriptw-join-mixed-1024.js.stderr",
@@ -4890,8 +4890,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-mixed-1024.js.stdout",
-      "bytes": 53097,
-      "sha256": "28ce42c5c73ecf46c94265d1463935bb76cdfa5c3bfbbe7f1aa69318f5e5d6b8"
+      "bytes": 53095,
+      "sha256": "180ef9f600269cc8229bd112061b491d0ea5629ea74df11d4b10fcb56dc58714"
     },
     {
       "path": "logs/round-1-scriptw-join-singleton-1024.js.stderr",
@@ -4900,8 +4900,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-singleton-1024.js.stdout",
-      "bytes": 53082,
-      "sha256": "edafc93b2ec53836aa69418dd6df9e0666e6392a9f90538ca411145dc98f14d0"
+      "bytes": 53084,
+      "sha256": "9e8e322b2b33ae38054355624bde56d72ef2135ead734469f1cc03a6e49b2631"
     },
     {
       "path": "logs/round-1-scriptw-join-small-1024.js.stderr",
@@ -4910,8 +4910,8 @@
     },
     {
       "path": "logs/round-1-scriptw-join-small-1024.js.stdout",
-      "bytes": 53072,
-      "sha256": "61c28654e21abf2520a82c4f6f2e4211f1a6d13944759d845c98f87d451a4603"
+      "bytes": 53081,
+      "sha256": "af0c992badc7098b0f42bb0af1ba5af9fb097ca36bb3b65add4a8221f7583330"
     },
     {
       "path": "logs/round-1-scriptw-numeric-loop-10000.js.stderr",
@@ -4920,8 +4920,8 @@
     },
     {
       "path": "logs/round-1-scriptw-numeric-loop-10000.js.stdout",
-      "bytes": 53139,
-      "sha256": "a71a36d143d795e1958626ee96220de80ab275c26ca55b824496b4d3933b0d78"
+      "bytes": 53143,
+      "sha256": "c8a798247e7352d96d1562e2dfc9b7100ab804e0a9825616c23f2976fca0145c"
     },
     {
       "path": "logs/round-1-scriptw-numeric-loop-50000.js.stderr",
@@ -4930,8 +4930,8 @@
     },
     {
       "path": "logs/round-1-scriptw-numeric-loop-50000.js.stdout",
-      "bytes": 53162,
-      "sha256": "3e19abfcb8b83d8e9c17623cf298a622703c55bcc72d9951d5108843f5769694"
+      "bytes": 53159,
+      "sha256": "04e9443233f582f9338c4368f1e1f73596fc03244c746d1d46b4c0932e23a2ec"
     },
     {
       "path": "logs/round-1-scriptw-objects.js.stderr",
@@ -4940,8 +4940,8 @@
     },
     {
       "path": "logs/round-1-scriptw-objects.js.stdout",
-      "bytes": 53106,
-      "sha256": "0e21c67afe556d52aa3b1431d324fa5d9f35002f81132ff3af263de506dd4b62"
+      "bytes": 53108,
+      "sha256": "d65f50af544235076cef56dfaea52fb7255660a26a396f25d874a1882c59b7ca"
     },
     {
       "path": "logs/round-1-scriptw-retained-objects.js.stderr",
@@ -4950,8 +4950,8 @@
     },
     {
       "path": "logs/round-1-scriptw-retained-objects.js.stdout",
-      "bytes": 53225,
-      "sha256": "e1b4c5af6221e80bc7bcef7ab87db8efdbe1271fa56863b0acc35f7ec21d7db4"
+      "bytes": 53234,
+      "sha256": "da95debc06a9ed4d968cba6d8a126851b79fcc131b69d86ea6a8f62c6c57549c"
     },
     {
       "path": "logs/round-1-scriptw-sort-reverse-128.js.stderr",
@@ -4960,8 +4960,8 @@
     },
     {
       "path": "logs/round-1-scriptw-sort-reverse-128.js.stdout",
-      "bytes": 53114,
-      "sha256": "c3b854fe40ecc53140b6043222f84cdde7ae6586c3960eedf70bc8604a8a5e3d"
+      "bytes": 53115,
+      "sha256": "86d590bcf982eac52fa98a03686b17e541009d26a1fc54062285ebb7560a161a"
     },
     {
       "path": "logs/round-1-scriptw-sort-reverse-512.js.stderr",
@@ -4970,8 +4970,8 @@
     },
     {
       "path": "logs/round-1-scriptw-sort-reverse-512.js.stdout",
-      "bytes": 53145,
-      "sha256": "278e5d3a658a8efb7e4c783c20c9d380fe5bf5ef5fffaf44f2534ec1abf36090"
+      "bytes": 53150,
+      "sha256": "c24b2b5c97797ce3f7f29cc4367c5c8b2418e9d18663c366393601cf61b4545c"
     },
     {
       "path": "logs/round-1-scriptw-sort-sorted-512.js.stderr",
@@ -4980,8 +4980,8 @@
     },
     {
       "path": "logs/round-1-scriptw-sort-sorted-512.js.stdout",
-      "bytes": 53146,
-      "sha256": "6e2f16fd25a5cf805f3d0a98eb06ecb1960f7dc3314a8edb8bca4c4a074327b5"
+      "bytes": 53150,
+      "sha256": "a028df7735230ab58920ee0fe47831b17be7b7a8673b5b634b170884e6874cdc"
     },
     {
       "path": "logs/round-1-scriptw-to-sorted-512.js.stderr",
@@ -4990,8 +4990,8 @@
     },
     {
       "path": "logs/round-1-scriptw-to-sorted-512.js.stdout",
-      "bytes": 53147,
-      "sha256": "5e26e84f1ab0a6d36748fff8949991a4a56c7a89de2e62b76cc6be72bf829bdf"
+      "bytes": 53144,
+      "sha256": "2e91020390cb7f28f5d6984372df0ca98896e0ef7ee9b71a5253fe64c55d7909"
     },
     {
       "path": "logs/round-1-v8-dynamic-string-4096.js.stderr",
@@ -5000,8 +5000,8 @@
     },
     {
       "path": "logs/round-1-v8-dynamic-string-4096.js.stdout",
-      "bytes": 8551,
-      "sha256": "c968ed9452a492e5447bc843152244a14091d6d47a997d4cc30c3fd0b599305c"
+      "bytes": 8548,
+      "sha256": "40352163c0ff5ccedf4134ee1a57af5525bf7f87363132ed2c6c93e8279233b9"
     },
     {
       "path": "logs/round-1-v8-folded-string-4096.js.stderr",
@@ -5010,8 +5010,8 @@
     },
     {
       "path": "logs/round-1-v8-folded-string-4096.js.stdout",
-      "bytes": 8543,
-      "sha256": "13f73c1aa053ca1909c67be7420b181928c36bee4e16649ccd207945384759a5"
+      "bytes": 8537,
+      "sha256": "044c5f74dac12e400daf50a1083d0fce54ceab29d7e50d1fadacd46a3f8cfe92"
     },
     {
       "path": "logs/round-1-v8-integer.js.stderr",
@@ -5021,7 +5021,7 @@
     {
       "path": "logs/round-1-v8-integer.js.stdout",
       "bytes": 8616,
-      "sha256": "8304cccb2669176cc65a34ad2b1626906bd888b83cedaa0f57063ae17294212b"
+      "sha256": "98a74a07771f2beacde72ebfba109b7c61d817bcada345454168e9ffdccbe7d3"
     },
     {
       "path": "logs/round-1-v8-join-1024.js.stderr",
@@ -5031,7 +5031,7 @@
     {
       "path": "logs/round-1-v8-join-1024.js.stdout",
       "bytes": 8520,
-      "sha256": "2282ae01b60f63cd9b7bff31433c9b48d2c7e87d6757fd7984bce5b2ec2ac629"
+      "sha256": "f1e3e9aaf05aece5c81387e562fe5649c42e651d731f9726f1524bd49340678a"
     },
     {
       "path": "logs/round-1-v8-join-4096.js.stderr",
@@ -5040,8 +5040,8 @@
     },
     {
       "path": "logs/round-1-v8-join-4096.js.stdout",
-      "bytes": 8542,
-      "sha256": "db221e2989cd6ec7f75cb9607cab96df6c3fdba78c16560de85f24f66a94c65f"
+      "bytes": 8538,
+      "sha256": "591524909a6da64380f069236aa58bf20229b6018def7aaa839812bed9863ca0"
     },
     {
       "path": "logs/round-1-v8-join-empty-1024.js.stderr",
@@ -5050,8 +5050,8 @@
     },
     {
       "path": "logs/round-1-v8-join-empty-1024.js.stdout",
-      "bytes": 8472,
-      "sha256": "1374beab131cfaa2d2fd7445758f870eff501a78a565c96a33c7744617dc7727"
+      "bytes": 8471,
+      "sha256": "2b012e9f959855fdf88f7f43aabd8596d8c680d4ba73938b1ce05bfd7bbc0905"
     },
     {
       "path": "logs/round-1-v8-join-mixed-1024.js.stderr",
@@ -5061,7 +5061,7 @@
     {
       "path": "logs/round-1-v8-join-mixed-1024.js.stdout",
       "bytes": 8522,
-      "sha256": "34a0e236989b0d6dbe72f6c6c82b302e1293116e370bb3bc8c355fb160c596fb"
+      "sha256": "f5d3cea93c5392e7f86e9b15aa1173950002817196bc4805e107bea54cf60508"
     },
     {
       "path": "logs/round-1-v8-join-singleton-1024.js.stderr",
@@ -5070,8 +5070,8 @@
     },
     {
       "path": "logs/round-1-v8-join-singleton-1024.js.stdout",
-      "bytes": 8527,
-      "sha256": "e3965769dbce406bfb401443a6aeac40f41a94873675c010ae1d76135101b480"
+      "bytes": 8526,
+      "sha256": "d404516e26094ff4ca408fd9a1097343c24f65bdb9459a5d544762fba3234579"
     },
     {
       "path": "logs/round-1-v8-join-small-1024.js.stderr",
@@ -5080,8 +5080,8 @@
     },
     {
       "path": "logs/round-1-v8-join-small-1024.js.stdout",
-      "bytes": 8527,
-      "sha256": "3dfca3d74fe636e060eff8a6a259a367bb59ea4e06cdc5d0f7a2790ce0295477"
+      "bytes": 8530,
+      "sha256": "bf9a3d7a34a5b52e88923851ace505139e0341cd146605a1ec9a3653c422a373"
     },
     {
       "path": "logs/round-1-v8-numeric-loop-10000.js.stderr",
@@ -5090,8 +5090,8 @@
     },
     {
       "path": "logs/round-1-v8-numeric-loop-10000.js.stdout",
-      "bytes": 8610,
-      "sha256": "5bbd125f98bca43f84b808523a650f07fe5b703cb26ccc0f3d8ec1cead5a493f"
+      "bytes": 8614,
+      "sha256": "cde72298ebca8499c11f85b2fbca6b417e6a6ec25c063ed932f09059bf62a306"
     },
     {
       "path": "logs/round-1-v8-numeric-loop-50000.js.stderr",
@@ -5100,8 +5100,8 @@
     },
     {
       "path": "logs/round-1-v8-numeric-loop-50000.js.stdout",
-      "bytes": 8643,
-      "sha256": "3acf11ad70878125bb50067e02695645b329905a7725e6314b6aa03bc05df9e3"
+      "bytes": 8642,
+      "sha256": "304fe544409e6c4ce6e02258ee5b17532b0000b9ea31c8a5f1f1bdce29ae8024"
     },
     {
       "path": "logs/round-1-v8-objects.js.stderr",
@@ -5110,8 +5110,8 @@
     },
     {
       "path": "logs/round-1-v8-objects.js.stdout",
-      "bytes": 8533,
-      "sha256": "ef89d4b1c36727dd9dd4c96b081052cbe59409d62334302ab6cf40a6822ee34b"
+      "bytes": 8534,
+      "sha256": "a267871a98e6209e2687cae00b1b012e23a29abef66569dffb027b1a9fa85a06"
     },
     {
       "path": "logs/round-1-v8-retained-objects.js.stderr",
@@ -5120,8 +5120,8 @@
     },
     {
       "path": "logs/round-1-v8-retained-objects.js.stdout",
-      "bytes": 8703,
-      "sha256": "8425ee42d55a7a0842977975ed0b3f01668aef6ced79abb0b229bf9a590c23d1"
+      "bytes": 8702,
+      "sha256": "094f4775d41f5543697c5286cc3d6477b785a35bdc2412b01b3fbe6b92a8e114"
     },
     {
       "path": "logs/round-1-v8-sort-reverse-128.js.stderr",
@@ -5130,8 +5130,8 @@
     },
     {
       "path": "logs/round-1-v8-sort-reverse-128.js.stdout",
-      "bytes": 8542,
-      "sha256": "59445a6e93fe3032708e7eb7e3b05ee542d8aa32593c92d7cb8035b63b32536c"
+      "bytes": 8541,
+      "sha256": "3a425e25f5f4e0377caebf7255f6f30cf011058746f98e8457e451c98e977f64"
     },
     {
       "path": "logs/round-1-v8-sort-reverse-512.js.stderr",
@@ -5140,8 +5140,8 @@
     },
     {
       "path": "logs/round-1-v8-sort-reverse-512.js.stdout",
-      "bytes": 8583,
-      "sha256": "9c271546f10800758368e93188e4c3aa9723c7a691c9311c49c86edf914982b3"
+      "bytes": 8581,
+      "sha256": "f07ed4e367936b224e685dee446d95f60627a22f17235c507122b62e7543dfce"
     },
     {
       "path": "logs/round-1-v8-sort-sorted-512.js.stderr",
@@ -5151,7 +5151,7 @@
     {
       "path": "logs/round-1-v8-sort-sorted-512.js.stdout",
       "bytes": 8580,
-      "sha256": "ac66b644b12957886dcf42c34d9843e021ba10c87b1fff7b409f92fd492481c3"
+      "sha256": "39229628f8029ffc43f97d4162962b3534d60e884e7497861c5ed48fd53991a6"
     },
     {
       "path": "logs/round-1-v8-to-sorted-512.js.stderr",
@@ -5160,8 +5160,8 @@
     },
     {
       "path": "logs/round-1-v8-to-sorted-512.js.stdout",
-      "bytes": 8576,
-      "sha256": "1e3869c24cd94b9752abdc302ceb09f9131ff153e699a1d0b37b7ff30a4eaec4"
+      "bytes": 8579,
+      "sha256": "4d8c8c2e07ae064aaeebec4d142a7994054d55aeb5a3287dc57ca925af532de2"
     },
     {
       "path": "logs/smoke-compile.stderr",
@@ -5180,8 +5180,8 @@
     },
     {
       "path": "logs/smoke-run.stdout",
-      "bytes": 856,
-      "sha256": "c011ddd3dd926ed22e59a36eb5c012c59909d3eab515793ea30d99d8decbdd1f"
+      "bytes": 855,
+      "sha256": "9a12545b5e6fd7a9b4e4853326d883f5de2baca30f296fb5e186e31b855d4fd1"
     },
     {
       "path": "logs/version-node.stderr",
@@ -5500,13 +5500,13 @@
     },
     {
       "path": "wasm/round-0-scriptw-dynamic-string-4096.js/dynamic-string-4096.js.wasm",
-      "bytes": 65384,
-      "sha256": "1555d9a74cc42209cccb88ac81198c64deeeb6351466d5bc849045d4722ba27d"
+      "bytes": 65510,
+      "sha256": "bafed0f7251f6fccc32682c6ab5e510b4aad440fa2563b78858cc39c7a53c030"
     },
     {
       "path": "wasm/round-0-scriptw-folded-string-4096.js/folded-string-4096.js.wasm",
-      "bytes": 67108,
-      "sha256": "f31179307a311a6f3e6545329656fc1ecf7c5d0123cc2197a73686d65d751b02"
+      "bytes": 67236,
+      "sha256": "140b93ecf7ec09a31c32891ac53f2cc5ff7440c6009707886a605136450c3e18"
     },
     {
       "path": "wasm/round-0-scriptw-integer.js/integer.js.wasm",
@@ -5515,33 +5515,33 @@
     },
     {
       "path": "wasm/round-0-scriptw-join-1024.js/join-1024.js.wasm",
-      "bytes": 71700,
-      "sha256": "0dad4a5a5568c83fd797fb78035c7236cf54dfa005ae36accf5edf112fd8b6b5"
+      "bytes": 72066,
+      "sha256": "29fdb70f627bd61f90a337a8f5a589cfa21216a923e1e138d91bd4ea9a338c23"
     },
     {
       "path": "wasm/round-0-scriptw-join-4096.js/join-4096.js.wasm",
-      "bytes": 71700,
-      "sha256": "3fb2481178942c7a28ba5418d852af4cfc7144d13c40331757fec07424155cdf"
+      "bytes": 72066,
+      "sha256": "1f12e4669df0628c6d5a27a69bc1267bc6289fbc2306939a1d09c30f034d8d94"
     },
     {
       "path": "wasm/round-0-scriptw-join-empty-1024.js/join-empty-1024.js.wasm",
-      "bytes": 63255,
-      "sha256": "bf0193b831161f4650f0caee189b403d4a4ccd6d52ec5cec2918a076105e37f5"
+      "bytes": 63423,
+      "sha256": "46b4931979a7c81e74e68cd84ec54d5036b47bb80a3b2fd27ed4e880d63925bc"
     },
     {
       "path": "wasm/round-0-scriptw-join-mixed-1024.js/join-mixed-1024.js.wasm",
-      "bytes": 72385,
-      "sha256": "5315a92c7426ea12c2717ffb6b3695fd73aa69770e180c166da4725ab9016039"
+      "bytes": 72553,
+      "sha256": "7bf5fc2a1269c549f0e1c819614dbb219892b212453457f8194a0319804529b4"
     },
     {
       "path": "wasm/round-0-scriptw-join-singleton-1024.js/join-singleton-1024.js.wasm",
-      "bytes": 63711,
-      "sha256": "80f02bf2ce43ea1a008e41030eedcf9bad48ca71a57f863995add7d642e2035a"
+      "bytes": 63879,
+      "sha256": "265831633fe2d449bd1c8a7f09c8183391374560321deacb86871d4e9d7aa4b7"
     },
     {
       "path": "wasm/round-0-scriptw-join-small-1024.js/join-small-1024.js.wasm",
-      "bytes": 64089,
-      "sha256": "a9a73c9bb3857df0ba16a80cc209ed91a5d65dbc79c9962712324d1a75e4d7f0"
+      "bytes": 64257,
+      "sha256": "dbfc328c23245f04f2f55f65a974322e1231f96ea9a08f9c43762ab1fc7cb014"
     },
     {
       "path": "wasm/round-0-scriptw-numeric-loop-10000.js/numeric-loop-10000.js.wasm",
@@ -5555,33 +5555,33 @@
     },
     {
       "path": "wasm/round-0-scriptw-objects.js/objects.js.wasm",
-      "bytes": 72357,
-      "sha256": "6057723163b936896028f655cd019646e6d0773b288db76147bfe0a8aebad5bd"
+      "bytes": 72475,
+      "sha256": "bcd570e9ba74ffaf189ea7167f372ec0ae1cd729fb874caf2441e330687615da"
     },
     {
       "path": "wasm/round-0-scriptw-retained-objects.js/retained-objects.js.wasm",
-      "bytes": 74307,
-      "sha256": "02742963bf5632b3bdff395386adaac2bd74b2710a926af0ee96fa51056ebbc6"
+      "bytes": 74429,
+      "sha256": "5da17406a5c81c77456dc49261d6996dc4dc1328eea32a3e0940e4610e71437b"
     },
     {
       "path": "wasm/round-0-scriptw-sort-reverse-128.js/sort-reverse-128.js.wasm",
-      "bytes": 74676,
-      "sha256": "9c0161240969fa723cff00f7da89aef82838f8a825a4b7a6d913e048dba930fb"
+      "bytes": 74782,
+      "sha256": "4bb86a1b1c7e2ba167c9988b9372e0d835dc10a452ac254a0a82d0c53549a083"
     },
     {
       "path": "wasm/round-0-scriptw-sort-reverse-512.js/sort-reverse-512.js.wasm",
-      "bytes": 74676,
-      "sha256": "0337973d83a98da2adaa0222e982d1603e1d7a2acb44f1a63482bae71edb0a55"
+      "bytes": 74782,
+      "sha256": "8a537d1e5a1bd9e3b0e7caf2cd7f8306003691731f16460e6330d7e0a62c3a68"
     },
     {
       "path": "wasm/round-0-scriptw-sort-sorted-512.js/sort-sorted-512.js.wasm",
-      "bytes": 74695,
-      "sha256": "1a58ef334546e9e9e2d72181b067e4242020b8481297b416cc2b5e4345c7a1f6"
+      "bytes": 74801,
+      "sha256": "5c4dc63733705ed2c4cacec137518a3ecf38b288aa2f6d510a2f9ad1e382489c"
     },
     {
       "path": "wasm/round-0-scriptw-to-sorted-512.js/to-sorted-512.js.wasm",
-      "bytes": 75427,
-      "sha256": "a371d5f1ad52b7db827d6bc6f5f9c41fbecfa56f7249603108cc89f77ddbd142"
+      "bytes": 75597,
+      "sha256": "36171e41bb307db492ff0ec07e68f8484098a605725ed65af984bd0b68ee746d"
     },
     {
       "path": "wasm/round-1-scriptc-dynamic-string-4096.js/dynamic-string-4096.js.wasm",
@@ -5755,13 +5755,13 @@
     },
     {
       "path": "wasm/round-1-scriptw-dynamic-string-4096.js/dynamic-string-4096.js.wasm",
-      "bytes": 65384,
-      "sha256": "1555d9a74cc42209cccb88ac81198c64deeeb6351466d5bc849045d4722ba27d"
+      "bytes": 65510,
+      "sha256": "bafed0f7251f6fccc32682c6ab5e510b4aad440fa2563b78858cc39c7a53c030"
     },
     {
       "path": "wasm/round-1-scriptw-folded-string-4096.js/folded-string-4096.js.wasm",
-      "bytes": 67108,
-      "sha256": "f31179307a311a6f3e6545329656fc1ecf7c5d0123cc2197a73686d65d751b02"
+      "bytes": 67236,
+      "sha256": "140b93ecf7ec09a31c32891ac53f2cc5ff7440c6009707886a605136450c3e18"
     },
     {
       "path": "wasm/round-1-scriptw-integer.js/integer.js.wasm",
@@ -5770,33 +5770,33 @@
     },
     {
       "path": "wasm/round-1-scriptw-join-1024.js/join-1024.js.wasm",
-      "bytes": 71700,
-      "sha256": "0dad4a5a5568c83fd797fb78035c7236cf54dfa005ae36accf5edf112fd8b6b5"
+      "bytes": 72066,
+      "sha256": "29fdb70f627bd61f90a337a8f5a589cfa21216a923e1e138d91bd4ea9a338c23"
     },
     {
       "path": "wasm/round-1-scriptw-join-4096.js/join-4096.js.wasm",
-      "bytes": 71700,
-      "sha256": "3fb2481178942c7a28ba5418d852af4cfc7144d13c40331757fec07424155cdf"
+      "bytes": 72066,
+      "sha256": "1f12e4669df0628c6d5a27a69bc1267bc6289fbc2306939a1d09c30f034d8d94"
     },
     {
       "path": "wasm/round-1-scriptw-join-empty-1024.js/join-empty-1024.js.wasm",
-      "bytes": 63255,
-      "sha256": "bf0193b831161f4650f0caee189b403d4a4ccd6d52ec5cec2918a076105e37f5"
+      "bytes": 63423,
+      "sha256": "46b4931979a7c81e74e68cd84ec54d5036b47bb80a3b2fd27ed4e880d63925bc"
     },
     {
       "path": "wasm/round-1-scriptw-join-mixed-1024.js/join-mixed-1024.js.wasm",
-      "bytes": 72385,
-      "sha256": "5315a92c7426ea12c2717ffb6b3695fd73aa69770e180c166da4725ab9016039"
+      "bytes": 72553,
+      "sha256": "7bf5fc2a1269c549f0e1c819614dbb219892b212453457f8194a0319804529b4"
     },
     {
       "path": "wasm/round-1-scriptw-join-singleton-1024.js/join-singleton-1024.js.wasm",
-      "bytes": 63711,
-      "sha256": "80f02bf2ce43ea1a008e41030eedcf9bad48ca71a57f863995add7d642e2035a"
+      "bytes": 63879,
+      "sha256": "265831633fe2d449bd1c8a7f09c8183391374560321deacb86871d4e9d7aa4b7"
     },
     {
       "path": "wasm/round-1-scriptw-join-small-1024.js/join-small-1024.js.wasm",
-      "bytes": 64089,
-      "sha256": "a9a73c9bb3857df0ba16a80cc209ed91a5d65dbc79c9962712324d1a75e4d7f0"
+      "bytes": 64257,
+      "sha256": "dbfc328c23245f04f2f55f65a974322e1231f96ea9a08f9c43762ab1fc7cb014"
     },
     {
       "path": "wasm/round-1-scriptw-numeric-loop-10000.js/numeric-loop-10000.js.wasm",
@@ -5810,33 +5810,33 @@
     },
     {
       "path": "wasm/round-1-scriptw-objects.js/objects.js.wasm",
-      "bytes": 72357,
-      "sha256": "6057723163b936896028f655cd019646e6d0773b288db76147bfe0a8aebad5bd"
+      "bytes": 72475,
+      "sha256": "bcd570e9ba74ffaf189ea7167f372ec0ae1cd729fb874caf2441e330687615da"
     },
     {
       "path": "wasm/round-1-scriptw-retained-objects.js/retained-objects.js.wasm",
-      "bytes": 74307,
-      "sha256": "02742963bf5632b3bdff395386adaac2bd74b2710a926af0ee96fa51056ebbc6"
+      "bytes": 74429,
+      "sha256": "5da17406a5c81c77456dc49261d6996dc4dc1328eea32a3e0940e4610e71437b"
     },
     {
       "path": "wasm/round-1-scriptw-sort-reverse-128.js/sort-reverse-128.js.wasm",
-      "bytes": 74676,
-      "sha256": "9c0161240969fa723cff00f7da89aef82838f8a825a4b7a6d913e048dba930fb"
+      "bytes": 74782,
+      "sha256": "4bb86a1b1c7e2ba167c9988b9372e0d835dc10a452ac254a0a82d0c53549a083"
     },
     {
       "path": "wasm/round-1-scriptw-sort-reverse-512.js/sort-reverse-512.js.wasm",
-      "bytes": 74676,
-      "sha256": "0337973d83a98da2adaa0222e982d1603e1d7a2acb44f1a63482bae71edb0a55"
+      "bytes": 74782,
+      "sha256": "8a537d1e5a1bd9e3b0e7caf2cd7f8306003691731f16460e6330d7e0a62c3a68"
     },
     {
       "path": "wasm/round-1-scriptw-sort-sorted-512.js/sort-sorted-512.js.wasm",
-      "bytes": 74695,
-      "sha256": "1a58ef334546e9e9e2d72181b067e4242020b8481297b416cc2b5e4345c7a1f6"
+      "bytes": 74801,
+      "sha256": "5c4dc63733705ed2c4cacec137518a3ecf38b288aa2f6d510a2f9ad1e382489c"
     },
     {
       "path": "wasm/round-1-scriptw-to-sorted-512.js/to-sorted-512.js.wasm",
-      "bytes": 75427,
-      "sha256": "a371d5f1ad52b7db827d6bc6f5f9c41fbecfa56f7249603108cc89f77ddbd142"
+      "bytes": 75597,
+      "sha256": "36171e41bb307db492ff0ec07e68f8484098a605725ed65af984bd0b68ee746d"
     },
     {
       "path": "wasm/smoke.ll",
@@ -5849,5 +5849,5 @@
       "sha256": "b4409a387e3ceecabbcc08793abd6d3f47b2f6959ba85925a9d78421d5a1baf5"
     }
   ],
-  "archive_sha256": "258f4b26363d0cfc17b087d0f33f2f580467948077821a800ae01e7c45a2e2b0"
+  "archive_sha256": "31d632d407ad6b4f7aca9ecf078242f53c6c4ff7c2c6dbe994f91ed1a2fb82b4"
 }

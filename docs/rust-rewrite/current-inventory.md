@@ -6,41 +6,23 @@ changes do not refresh it. [Contributing](../../CONTRIBUTING.md) owns developmen
 commands and resource policy. [Acceptance](conformance-acceptance.md) and
 [ownership](conformance-ownership.md) define durable completion requirements.
 
-## Latest verification
-
-The [binary-data and scalar-loop checkpoint](binary-scalar-20261029.json) records
-**5,081 native passes across 21 complete targets**, eight CLI benchmark-host
-tests, 359 source guards and **191 selected original pinned Test262 executions**.
-Local production binaries belong to `d0a134cfd`; test corrections at `f19370fcf`
-retain that production logic. Checks ran sequentially within the local one-CPU,
-4-GiB/no-swap limit. Original failed diagnostic attempts remain in the evidence.
-
-Across the 17 original local workloads, geometric means fell **8.5% in execution
-time, 3.7% in post-execution RSS and 4.3% in PSS** against `a5448d285`.
-Integer execution fell about 34%; some other controls were flat or slower.
-Whole-process changes are descriptive and are not attributed solely to one
-compiler change. These local results remain separate from the
-[CI benchmark cohorts](benchmark-refresh-20261028.md). The
-[full pinned publication](test262-current.md) remains bound to `b9ecfe64b`.
-
 ## Next work
 
 - Every-case Scriptc time/RSS parity remains open. Continue from the
-  [runtime ownership contract](contracts/runtime-byte-ownership.md), current
-  checkpoint captures and [performance queue](../performance-hills.md).
-  Integer-local retention and binary-data demand initialization are implemented.
-  The consumer capability control reduced Scriptw RSS by 8.0% with near-flat
-  execution. Whole-lifecycle join self-samples identify object reads, pooled
-  strings and the packed join kernel as targets; isolate execution-only costs
-  before choosing the next change.
-  Host type metadata remains a separate hypothesis: demonstrate at least
+  [runtime ownership contract](contracts/runtime-byte-ownership.md) and
+  [performance queue](../performance-hills.md). Re-profile current-source
+  execution before choosing another optimization. Check whether inherited Array
+  reads repeat own-property probes and whether packed join repeats storage checks
+  across its two passes. Any change needs concrete receiver/backing proofs and
+  must preserve holes, accessors, proxies and user-code ordering.
+- Host type metadata remains a separate hypothesis: demonstrate at least
   **256 KiB of avoidable retained ownership** before changing its decoding or
   registration. Phase deltas do not prove duplication or fault-around behavior.
   Preserve reflection, later programs and retained embedding access. Warm
   before-Store endpoints include prior executions and are not cold floors.
-  The [8-MiB GC capacity probe](memory-gc-capacity-20261028.md) already
-  found growth back to 16 MiB and slower retained-object execution; ordinary
-  execution remains at 16 MiB.
+  Require a different measured hypothesis before revisiting the
+  [8-MiB GC capacity probe](memory-gc-capacity-20261028.md); ordinary execution
+  remains at 16 MiB.
 - Complete current-source default and optimized release acceptance. Historical
   complete all-feature coverage and later affected-target checkpoints establish
   only their recorded scopes and sources.
