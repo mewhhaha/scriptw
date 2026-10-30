@@ -92,6 +92,14 @@ class ConsumerCapabilityTests(unittest.TestCase):
                 raw = execution(); raw[key] = value
                 with self.assertRaises(ValueError): self.check(raw)
 
+    def test_observer_reports_cannot_be_used_as_memory_controls(self):
+        for key in ('phase_barriers', 'execution_windows',
+                    'diagnostic_total_timings_include_barrier_waits'):
+            for value in (None, False, {}):
+                with self.subTest(key=key, value=value):
+                    raw = execution(); raw[key] = value
+                    with self.assertRaises(ValueError): self.check(raw)
+
     def test_memory_and_time_endpoints_require_valid_complete_records(self):
         raw = execution(); del raw['observations'][12]['process_snapshots']['after_store_drop']
         with self.assertRaises(ValueError): self.check(raw)

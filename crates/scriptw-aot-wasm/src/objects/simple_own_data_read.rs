@@ -3,7 +3,8 @@
 //! lookup can be bypassed by these concrete representation guards.
 use super::*;
 use crate::gc_types::{
-    CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability, StringValue,
+    CodeUnitArray, CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability,
+    StringValue, StringValueSchema,
 };
 
 impl FunctionBuilder<'_> {
@@ -73,6 +74,56 @@ impl FunctionBuilder<'_> {
         result
     }
 
+    /// The completed key is String or Symbol. Only an actual six-unit String
+    /// can equal "length"; reject other keys before resolving the pooled name.
+    /// Retain full SameValue for computed strings with the right length.
+    pub(super) fn emit_length_property_key_match(
+        &mut self,
+        key: &PropertyKeyLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let matches = schema.reserve_i32_local(function);
+        matches.set_constant(0, function);
+        key.value().tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        let text = schema.reserve_gc_local(function).initialize(
+            key.value().cast_reference::<StringValue>(schema, function),
+            function,
+        );
+        let units = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(StringValueSchema::CODE_UNITS)
+                .read(&text, schema, function)
+                .reference(),
+            function,
+        );
+        schema
+            .array_type::<CodeUnitArray>()
+            .length(&units, schema, function);
+        function.instruction(&Instruction::I32Const(6));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        let name = schema.reserve_gc_local(function).initialize(
+            self.emit_interned_string_reference("length", function)?,
+            function,
+        );
+        let length_key = PropertyKeyLocals::from_string(schema, &name, function);
+        self.emit_tagged_payload_same_value_i32(key.value(), length_key.value(), function)?;
+        matches.store(function);
+        length_key.clear(function);
+        name.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        units.clear(function);
+        text.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(matches)
+    }
+
     pub(super) fn emit_primitive_string_length_read(
         &mut self,
         target: &ValueLocals,
@@ -88,12 +139,8 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
-        let name = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference("length", function)?,
-            function,
-        );
-        let length_key = PropertyKeyLocals::from_string(schema, &name, function);
-        self.emit_tagged_payload_same_value_i32(key.value(), length_key.value(), function)?;
+        let length_key = self.emit_length_property_key_match(key, function)?;
+        length_key.load(function);
         self.open_frame(ControlFrameKind::If, function);
         let string = schema.reserve_gc_local(function).initialize(
             target.cast_reference::<StringValue>(schema, function),
@@ -115,8 +162,7 @@ impl FunctionBuilder<'_> {
         string.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        length_key.clear(function);
-        name.clear(function);
+        schema.release_i32_local(length_key, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(handled)

@@ -113,14 +113,17 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
+        // Both admitted arms retain a completed String root. Resolving the
+        // default comma belongs only to Undefined, including omitted arguments.
+        separator_value.tag().load(function);
+        function.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
         let separator = s.reserve_gc_local(function).initialize(
             self.emit_interned_string_reference(",", function)?,
             function,
         );
-        separator_value.tag().load(function);
-        function.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
+        function.instruction(&Instruction::Else);
         separator.replace(
             separator_value.cast_reference::<StringValue>(s, function),
             function,

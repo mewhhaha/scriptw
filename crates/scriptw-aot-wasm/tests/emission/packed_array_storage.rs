@@ -308,6 +308,90 @@ fn source_join_calls_reach_shared_kernel_only_after_actual_code_realm_and_array_
 }
 
 #[test]
+fn source_packed_join_resolves_the_default_comma_only_in_the_undefined_separator_arm() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let lowered = lower(&parse(
+                "function joinChoice(separator){var a=['left','right'];var text=a.join(separator);return text;} [joinChoice];",
+                ParseOptions::script(),
+            ).unwrap());
+            let artifact = emit_with_rooted_snapshot(
+                &lowered, PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal,
+            ).unwrap();
+            let runtime_bytes = artifact.runtime().unwrap().bytes();
+            for bytes in [&artifact.bytes[..], runtime_bytes] {
+                Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+            }
+            let runtime = Module::read(runtime_bytes);
+            let program = Module::read(&artifact.bytes);
+            let (resolver, _) = runtime.named("helper::pooled_string_resolve");
+            let resolver = program.imported_runtime(&runtime, resolver);
+            let (kernel, _) = runtime.named("helper::array_packed_join");
+            let kernel = program.imported_runtime(&runtime, kernel);
+            let string = runtime.witness_type(GcSnapshotLayout::String);
+            let (_, body) = program.named("js::joinChoice#");
+            let direct = body.iter().position(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == kernel))
+                .expect("the dynamic separator candidate reaches the shared join kernel");
+            let mut selected = Vec::new();
+            for (start, ops) in body[..direct].windows(4).enumerate() {
+                let [Operator::LocalGet { local_index: tag }, Operator::I32Const { value },
+                     Operator::I32Eq, Operator::If { .. }] = ops else { continue; };
+                if *value != scriptw_aot_wasm::WasmRuntimeValueTag::Undefined.tag() { continue; }
+                let mut depth = 1;
+                let mut otherwise = None;
+                let mut end = None;
+                for (offset, op) in body[start + 4..direct].iter().enumerate() {
+                    let index = start + 4 + offset;
+                    match op {
+                        Operator::If { .. } | Operator::Block { .. } | Operator::Loop { .. }
+                            | Operator::TryTable { .. } | Operator::Try { .. } => depth += 1,
+                        Operator::Else if depth == 1 => otherwise = Some(index),
+                        Operator::End => {
+                            depth -= 1;
+                            if depth == 0 { end = Some(index); break; }
+                        }
+                        _ => {},
+                    }
+                }
+                let (Some(otherwise), Some(end)) = (otherwise, end) else { continue; };
+                let undefined_arm = &body[start + 4..otherwise];
+                let string_arm = &body[otherwise + 1..end];
+                if !calls(undefined_arm, resolver) || !string_arm.iter().any(|op| matches!(op,
+                    Operator::RefCastNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                        if *index == string)) { continue; }
+                selected.push((*tag, start, otherwise, end));
+            }
+            assert_eq!(selected.len(), 1, "the actual Undefined guard owns one comma/string selection");
+            let (separator_tag, start, otherwise, end) = selected[0];
+            assert!(body[..start].windows(3).any(|ops| matches!(ops,
+                [Operator::LocalGet { local_index }, Operator::I32Const { value }, Operator::I32Eq]
+                    if *local_index == separator_tag && *value == scriptw_aot_wasm::WasmRuntimeValueTag::String.tag())),
+                "the direct route first admits the same saved separator as String or Undefined");
+            let undefined_arm = &body[start + 4..otherwise];
+            let string_arm = &body[otherwise + 1..end];
+            assert_eq!(undefined_arm.iter().filter(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == resolver)).count(), 1,
+                "only the Undefined arm resolves the canonical comma");
+            assert!(!string_arm.iter().any(|op| matches!(op,
+                Operator::Call { .. } | Operator::ReturnCall { .. } | Operator::CallRef { .. }
+                    | Operator::CallIndirect { .. })), "an explicit String reuses its root without any resolver/call");
+            let (Some(Operator::LocalSet { local_index: default_root }),
+                 Some(Operator::LocalSet { local_index: explicit_root })) =
+                (undefined_arm.last(), string_arm.last()) else {
+                    panic!("both selection arms publish their completed String root");
+                };
+            assert_eq!(default_root, explicit_root, "both arms initialize the same rooted separator local");
+            assert!(matches!(&body[direct - 2..direct],
+                [Operator::LocalGet { local_index }, Operator::RefAsNonNull]
+                    if local_index == default_root),
+                "the guarded kernel receives that exact completed String root after selection");
+        }).unwrap().join().unwrap();
+}
+
+#[test]
 fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons() {
     std::thread::Builder::new()
         .stack_size(64 * 1024 * 1024)

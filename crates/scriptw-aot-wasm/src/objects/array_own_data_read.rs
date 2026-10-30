@@ -32,12 +32,8 @@ impl FunctionBuilder<'_> {
         // into the ordinary header, so resolve it before named-property probes.
         // This arm admits concrete Arrays only; proxies retain their own path.
         let value = schema.reserve_value_local(function);
-        let name = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference("length", function)?,
-            function,
-        );
-        let length_key = PropertyKeyLocals::from_string(schema, &name, function);
-        self.emit_tagged_payload_same_value_i32(key.value(), length_key.value(), function)?;
+        let length_key = self.emit_length_property_key_match(key, function)?;
+        length_key.load(function);
         self.open_frame(ControlFrameKind::If, function);
         schema
             .struct_type::<ArrayObject>()
@@ -135,8 +131,7 @@ impl FunctionBuilder<'_> {
         descriptor.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        length_key.clear(function);
-        name.clear(function);
+        schema.release_i32_local(length_key, function);
         value.clear(function);
         array.clear(function);
         self.pop_control(ControlFrameKind::If);

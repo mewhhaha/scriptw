@@ -32,7 +32,9 @@ other values retain the full coercion path. Closed scalar loops retain proven
 32-bit integers in integer locals while preserving Number values at their exits.
 Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
-semantic checks pass. Primitive string-length
+semantic checks pass. Property reads reject impossible length keys before
+resolving the canonical name; guarded join calls reuse explicit String separators.
+Primitive string-length
 reads and guarded constant-return calls eliminate temporary objects and call
 setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
 and writeback retain ordinary mutation checks. The benchmark sections below

@@ -145,8 +145,8 @@ Missing proc capabilities, invalid phase order, incomplete captures and failed
 commands are explicit in the separate report, which the workflow retains even
 on failure. Diagnostics never prevent retention of valid scored evidence.
 
-Ordinary measurement processes strip all three barrier variables. The canonical
-comparison reader also rejects any `phase_barriers` marker or diagnostic timing
+Ordinary measurement processes strip the phase and execution-window variables. The canonical
+comparison reader also rejects any `phase_barriers` or `execution_windows` marker or diagnostic timing
 label, even if its explicit unscored flag was removed. Diagnostic validation keeps original raw stdout and
 uses a separately checked copy solely to validate identities and checksums.
 `SCRIPTW_WASM_TRACE` remains confined to unscored consumers, recording the packed
@@ -159,6 +159,13 @@ after ACK4; host ELF symbol metadata is inspected after child exit. See the
 [ownership contract](benchmark-module-images.md). This feature does not alter
 scored values or grant native-image admission authority, and shared symbol pages
 are nonexclusive overlaps rather than function RSS or execution evidence.
+
+For execution-only CPU sampling, `SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS=1`
+requests 100 ordered `CLOCK_MONOTONIC` windows around the existing evaluation
+timer. It requires that feature, 64-bit Linux and the nonce-bound phase protocol
+selecting the final Store. Windows are published after all timers and captures;
+the ordinary loop has no window clocks or record allocation. These windows
+include Realm startup inside evaluation and exclude Store setup/drop and observers.
 
 ## Consumer capability experiment
 

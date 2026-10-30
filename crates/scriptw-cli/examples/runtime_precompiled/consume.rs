@@ -30,6 +30,9 @@ pub(super) fn run_with_config(
         return Err("samples must be 3..100 and warmups 1..100".into());
     }
     let mut barriers = phase_barriers::Barriers::from_environment(samples, warmups)?;
+    #[cfg(feature = "benchmark-module-images")]
+    let mut execution_windows =
+        phase_barriers::ExecutionWindows::from_environment(&barriers, samples, warmups)?;
     let startup = residency::snapshot()?;
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
@@ -72,73 +75,39 @@ pub(super) fn run_with_config(
     let after_transport_drop = residency::snapshot()?;
     let load_total_ns = total_started.elapsed().as_nanos();
     barriers.after_transport_drop()?;
-    let mut observations = Vec::new();
-    for index in 0..samples + warmups {
-        let before_store = residency::snapshot()?;
-        let observation_started = Instant::now();
-        let started = Instant::now();
-        let state = runtime
-            .new_state(RealmBuilder::new().build(), ())
-            .map_err(|e| e.to_string())?;
-        let mut store = wasmtime::Store::new(&engine, state);
-        store.limiter(|state| state.limits_mut());
-        // The outer driver enforces a process deadline. This example retains
-        // the required epoch checks and leaves epoch ticking to its owner.
-        store.set_epoch_deadline(u64::MAX / 2);
-        let mut linker = wasmtime::Linker::new(&engine);
-        let state_linker_ns = started.elapsed().as_nanos();
-        let started = Instant::now();
-        runtime
-            .register(&mut store, &mut linker)
-            .map_err(|e| e.to_string())?;
-        let register_ns = started.elapsed().as_nanos();
-        let started = Instant::now();
-        let instance = runtime
-            .instantiate(&mut store, &mut linker)
-            .map_err(|e| e.to_string())?;
-        let instantiate_ns = started.elapsed().as_nanos();
-        let after_instantiate = residency::snapshot()?;
-        barriers.after_instantiate(index)?;
-        let gc_before = store.gc_heap_capacity();
-        let started = Instant::now();
-        let outcome = instance.evaluate(&mut store).map_err(|e| e.to_string())?;
-        let execution_ns = started.elapsed().as_nanos();
-        let gc_after = store.gc_heap_capacity();
-        let after_execution = residency::snapshot()?;
-        let total_ns = observation_started.elapsed().as_nanos();
-        barriers.after_execution(index)?;
-        let mut stdout = String::new();
-        for event in &outcome.output_events {
-            match event {
-                HostOutputEvent::PrintLine(line) => {
-                    stdout.push_str(line);
-                    stdout.push('\n');
-                }
-                HostOutputEvent::ReportedException(line) => {
-                    return Err(format!("reported exception: {line}"))
-                }
-            }
-        }
-        if outcome.backend_used != ExecutionBackend::WasmAot
-            || !matches!(outcome.completion, ObservedCompletion::Normal(_))
-            || stdout != expected
-        {
-            return Err(format!(
-                "unexpected precompiled execution: {outcome:?}; stdout{stdout:?}"
-            ));
-        }
-        drop(linker);
-        drop(store);
-        let after_store_drop = residency::snapshot()?;
-        barriers.after_store_drop(index)?;
-        observations.push(json!({"index": index, "warmup": index < warmups,
-            "completion": "normal", "stdout": stdout,
-            "phases_ns": {"state_linker": state_linker_ns, "register": register_ns,
-                "instantiate": instantiate_ns, "execution": execution_ns, "total": total_ns},
-            "gc_capacity_before_bytes": gc_before, "gc_capacity_after_bytes": gc_after,
-            "process_snapshots": {"before_store": before_store, "after_instantiate": after_instantiate,
-                "after_execution": after_execution, "after_store_drop": after_store_drop}}));
-    }
+    // Select once outside the Store loop. The ordinary monomorphization has no
+    // execution-window clocks, record allocation, or per-Store observer branch.
+    #[cfg(feature = "benchmark-module-images")]
+    let observations = if let Some(windows) = execution_windows.as_mut() {
+        collect_observations::<true>(
+            &runtime,
+            &engine,
+            expected,
+            samples,
+            warmups,
+            &mut barriers,
+            Some(windows),
+        )?
+    } else {
+        collect_observations::<false>(
+            &runtime,
+            &engine,
+            expected,
+            samples,
+            warmups,
+            &mut barriers,
+            None,
+        )?
+    };
+    #[cfg(not(feature = "benchmark-module-images"))]
+    let observations = collect_observations::<false>(
+        &runtime,
+        &engine,
+        expected,
+        samples,
+        warmups,
+        &mut barriers,
+    )?;
     let mut report = identity()?;
     report["schema"] = json!("scriptw-precompiled-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
@@ -175,5 +144,106 @@ pub(super) fn run_with_config(
     })?;
     #[cfg(not(feature = "benchmark-module-images"))]
     barriers.finish(&mut report)?;
+    #[cfg(feature = "benchmark-module-images")]
+    if let Some(windows) = execution_windows {
+        windows.finish(&mut report)?;
+    }
     Ok(report)
+}
+
+fn collect_observations<const WINDOWS: bool>(
+    runtime: &EmbeddedRuntime,
+    engine: &wasmtime::Engine,
+    expected: &str,
+    samples: usize,
+    warmups: usize,
+    barriers: &mut phase_barriers::Barriers,
+    #[cfg(feature = "benchmark-module-images")] mut windows: Option<
+        &mut phase_barriers::ExecutionWindows,
+    >,
+) -> Result<Vec<Value>, String> {
+    let mut observations = Vec::new();
+    for index in 0..samples + warmups {
+        let before_store = residency::snapshot()?;
+        let observation_started = Instant::now();
+        let started = Instant::now();
+        let state = runtime
+            .new_state(RealmBuilder::new().build(), ())
+            .map_err(|e| e.to_string())?;
+        let mut store = wasmtime::Store::new(engine, state);
+        store.limiter(|state| state.limits_mut());
+        // The outer driver enforces a process deadline. This example retains
+        // the required epoch checks and leaves epoch ticking to its owner.
+        store.set_epoch_deadline(u64::MAX / 2);
+        let mut linker = wasmtime::Linker::new(engine);
+        let state_linker_ns = started.elapsed().as_nanos();
+        let started = Instant::now();
+        runtime
+            .register(&mut store, &mut linker)
+            .map_err(|e| e.to_string())?;
+        let register_ns = started.elapsed().as_nanos();
+        let started = Instant::now();
+        let instance = runtime
+            .instantiate(&mut store, &mut linker)
+            .map_err(|e| e.to_string())?;
+        let instantiate_ns = started.elapsed().as_nanos();
+        let after_instantiate = residency::snapshot()?;
+        barriers.after_instantiate(index)?;
+        let gc_before = store.gc_heap_capacity();
+        #[cfg(feature = "benchmark-module-images")]
+        let window_start = if WINDOWS {
+            Some(phase_barriers::ExecutionWindowStart::now()?)
+        } else {
+            None
+        };
+        let started = Instant::now();
+        let outcome = instance.evaluate(&mut store).map_err(|e| e.to_string())?;
+        let execution_ns = started.elapsed().as_nanos();
+        #[cfg(feature = "benchmark-module-images")]
+        if WINDOWS {
+            let window = window_start
+                .expect("the instrumented loop starts every execution window")
+                .finish(execution_ns)?;
+            windows
+                .as_deref_mut()
+                .expect("only an admitted collector selects the instrumented loop")
+                .record(index, window)?;
+        }
+        let gc_after = store.gc_heap_capacity();
+        let after_execution = residency::snapshot()?;
+        let total_ns = observation_started.elapsed().as_nanos();
+        barriers.after_execution(index)?;
+        let mut stdout = String::new();
+        for event in &outcome.output_events {
+            match event {
+                HostOutputEvent::PrintLine(line) => {
+                    stdout.push_str(line);
+                    stdout.push('\n');
+                }
+                HostOutputEvent::ReportedException(line) => {
+                    return Err(format!("reported exception: {line}"))
+                }
+            }
+        }
+        if outcome.backend_used != ExecutionBackend::WasmAot
+            || !matches!(outcome.completion, ObservedCompletion::Normal(_))
+            || stdout != expected
+        {
+            return Err(format!(
+                "unexpected precompiled execution: {outcome:?}; stdout{stdout:?}"
+            ));
+        }
+        drop(linker);
+        drop(store);
+        let after_store_drop = residency::snapshot()?;
+        barriers.after_store_drop(index)?;
+        observations.push(json!({"index": index, "warmup": index < warmups,
+            "completion": "normal", "stdout": stdout,
+            "phases_ns": {"state_linker": state_linker_ns, "register": register_ns,
+                "instantiate": instantiate_ns, "execution": execution_ns, "total": total_ns},
+            "gc_capacity_before_bytes": gc_before, "gc_capacity_after_bytes": gc_after,
+            "process_snapshots": {"before_store": before_store, "after_instantiate": after_instantiate,
+                "after_execution": after_execution, "after_store_drop": after_store_drop}}));
+    }
+    Ok(observations)
 }

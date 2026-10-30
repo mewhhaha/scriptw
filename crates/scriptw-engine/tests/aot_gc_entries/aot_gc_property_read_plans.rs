@@ -210,3 +210,65 @@ try { read(original, abrupt); throw 1; } catch (error) { assert(error === token,
 "#,
     );
 }
+
+#[test]
+fn length_key_prefilter_preserves_computed_names_symbols_and_index_fallbacks() {
+    assert_reads(
+        r#"
+function read(value, key) { return value[key]; }
+var lengthKey = ['le', 'ng', 'th'].join('');
+var nulKey = ['len', '\u0000', 'th'].join('');
+var surrogateKey = ['len', '\ud800', 'th'].join('');
+var symbol = Symbol('length'), otherSymbol = Symbol('length');
+var array = [undefined, 2, 3], text = 'a\u0000\ud800', reads = 0;
+assert(read(array, lengthKey) === 3 && read(text, lengthKey) === 3,
+  'allocated six-unit length keys keep full content equality');
+array.longer = 19;
+Object.defineProperty(array, nulKey, {get: function() {
+  reads++; assert(this === array, 'NUL getter receiver'); return 23;
+}, configurable: true});
+var proto = Object.create(Array.prototype);
+Object.defineProperty(proto, surrogateKey, {get: function() {
+  reads++; assert(this === array, 'surrogate getter receiver'); return 29;
+}, configurable: true});
+Object.defineProperty(proto, '1', {get: function() {
+  reads++; assert(this === array, 'hole getter receiver'); return 31;
+}, configurable: true});
+Object.setPrototypeOf(array, proto);
+delete array[1];
+assert(read(array, 'longer') === 19 && read(array, nulKey) === 23 &&
+  read(array, surrogateKey) === 29 && reads === 2,
+  'six-unit misses retain ordinary own and prototype getters');
+var primitiveReads = 0;
+Object.defineProperty(String.prototype, nulKey, {get: function() {
+  'use strict'; primitiveReads++; assert(this === text, 'primitive NUL receiver'); return 43;
+}, configurable: true});
+Object.defineProperty(String.prototype, surrogateKey, {get: function() {
+  'use strict'; primitiveReads++; assert(this === text, 'primitive surrogate receiver'); return 47;
+}, configurable: true});
+assert(read(text, nulKey) === 43 && read(text, surrogateKey) === 47 && primitiveReads === 2,
+  'six-unit primitive String misses retain ordinary prototype getters');
+array[symbol] = 37;
+Object.defineProperty(String.prototype, symbol, {get: function() {
+  'use strict'; reads++; assert(this === text, 'primitive Symbol getter receiver'); return 41;
+}, configurable: true});
+assert(read(array, symbol) === 37 && read(text, symbol) === 41 &&
+  read(array, otherSymbol) === undefined && read(text, otherSymbol) === undefined && reads === 3,
+  'Symbol descriptions are not String keys');
+assert(read(array, '0') === undefined && read(array, '1') === 31 && reads === 4,
+  'non-six-unit index keys keep presence and hole lookup');
+var coercions = 0, key = {};
+key[Symbol.toPrimitive] = function(hint) {
+  coercions++; assert(hint === 'string', 'key hint'); array.length = 4; return lengthKey;
+};
+assert(read(array, key) === 4 && coercions === 1,
+  'key conversion runs once before intrinsic length is read');
+var traps = 0, proxy;
+proxy = new Proxy(array, {get: function(target, name, receiver) {
+  traps++; assert(name === 'length' && receiver === proxy, 'Proxy keeps its key and receiver');
+  return Reflect.get(target, name, receiver);
+}});
+assert(read(proxy, lengthKey) === 4 && traps === 1, 'Proxy does not enter the concrete Array path');
+"#,
+    );
+}

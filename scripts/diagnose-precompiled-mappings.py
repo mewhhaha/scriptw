@@ -299,7 +299,8 @@ def capture(host, argv, destination, remaining, present_bits, observation_index)
             environment = dict(os.environ, SCRIPTW_WASM_TRACE='1')
             for key in ('SCRIPTW_WASM_TRACE_DUMP', 'SCRIPTW_PERF_MAP_DIR', 'SCRIPTW_BOUNDARY_READY_FD',
                         'SCRIPTW_BOUNDARY_READY_NONCE', 'SCRIPTW_ROW_PERF_CONTROL', 'SCRIPTW_ROW_PERF_ACK',
-                        'SCRIPTW_ROW_PERF_REGION', 'SCRIPTW_EMIT_SIZE_REPORT'):
+                        'SCRIPTW_ROW_PERF_REGION', 'SCRIPTW_EMIT_SIZE_REPORT',
+                        'SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS'):
                 environment.pop(key, None)
             environment.update(SCRIPTW_PRECOMPILED_PHASE_FD=str(child_socket.fileno()),
                                SCRIPTW_PRECOMPILED_PHASE_NONCE=nonce,

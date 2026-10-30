@@ -8,6 +8,18 @@ function throws(action, expected) {
 const empty = [], singleton = ['\0\ud800'], mixed = ['a', null, undefined, '\udfff'];
 check(empty.join() === '' && singleton.join() === '\0\ud800' && mixed.join(':') === 'a:::\udfff',
   'real empty singleton and mixed results');
+const separatorKinds = ['left', 'right'];
+check(separatorKinds.join() === 'left,right' && separatorKinds.join(undefined) === 'left,right' &&
+  separatorKinds.join('') === 'leftright' && separatorKinds.join(null) === 'leftnullright',
+  'only omitted and undefined separators select the default comma');
+let separatorArgumentCalls = 0;
+function evaluatedSeparator(value) { separatorArgumentCalls++; gc(); return value; }
+check(separatorKinds.join(evaluatedSeparator('|')) === 'left|right' && separatorArgumentCalls === 1,
+  'explicit String separator argument is evaluated once before direct selection');
+check(separatorKinds.join(evaluatedSeparator(undefined)) === 'left,right' && separatorArgumentCalls === 2,
+  'undefined separator argument is evaluated once before default selection');
+check(separatorKinds.join(evaluatedSeparator(null)) === 'leftnullright' && separatorArgumentCalls === 3,
+  'null separator argument is preserved once for ordinary coercion');
 const retained = mixed.join('\ud83d\ude00');
 mixed[0] = 'changed';
 gc();

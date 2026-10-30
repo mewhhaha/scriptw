@@ -318,6 +318,15 @@ class PrecompiledComparisonTests(unittest.TestCase):
                         comparison.load_report(self.save())
             self.write(event['stdout'], self.raw_json(original))
 
+            for marker in (None, False, {'schema': 'scriptw-precompiled-execution-windows-v1'}):
+                with self.subTest(runtime=runtime, execution_windows=marker):
+                    raw = dict(original, execution_windows=marker)
+                    raw.pop('excluded_from_scored_cohorts', None)
+                    self.write(event['stdout'], self.raw_json(raw))
+                    with self.assertRaisesRegex(ValueError, 'phase-barrier diagnostics'):
+                        comparison.load_report(self.save())
+            self.write(event['stdout'], self.raw_json(original))
+
             for flag in (None, False, True):
                 with self.subTest(runtime=runtime, timing_label=flag):
                     raw = dict(original, diagnostic_total_timings_include_barrier_waits=flag)

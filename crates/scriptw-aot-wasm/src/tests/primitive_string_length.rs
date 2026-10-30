@@ -258,3 +258,105 @@ fn original_string_and_join_shapes_reach_real_primitive_consumers() {
         );
     }
 }
+
+#[test]
+fn object_read_length_key_rejects_symbols_and_other_extents_before_pool_resolution() {
+    let artifact = emit_script(
+        "function read(value,key) { return value[key]; } read(globalThis.value,globalThis.key);",
+    )
+    .unwrap();
+    validate_program(&artifact);
+    let bytes = artifact.runtime().expect("computed reads retain R").bytes();
+    Validator::new_with_features(crate::runtime_artifact::program_validation_features())
+        .validate_all(bytes)
+        .expect("the guarded runtime String casts and key branches validate");
+    let names = function_names_in_bytes(bytes);
+    let named = |name| {
+        names
+            .iter()
+            .find_map(|(index, actual)| (actual == name).then_some(*index))
+            .expect("the real runtime helper is named")
+    };
+    let target = named("helper::object_read");
+    let resolver = named("helper::pooled_string_resolve");
+    let string_equal = named("helper::string_equality");
+    let mut index = imported_function_count_in_bytes(bytes);
+    let mut checked = 0;
+    for payload in Parser::new(0).parse_all(bytes) {
+        let Payload::CodeSectionEntry(body) = payload.unwrap() else {
+            continue;
+        };
+        if index == target {
+            let operators = body
+                .get_operators_reader()
+                .unwrap()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            for (start, window) in operators.windows(4).enumerate() {
+                if !matches!(window,
+                    [Operator::LocalGet { .. }, Operator::I32Const { value },
+                     Operator::I32Eq, Operator::If { .. }]
+                    if *value == WasmRuntimeValueTag::String as i32)
+                {
+                    continue;
+                }
+                let string_branch = then_branch(&operators, start + 4);
+                let Some(extent) = string_branch.windows(4).position(|ops| {
+                    matches!(
+                        ops,
+                        [
+                            Operator::ArrayLen,
+                            Operator::I32Const { value: 6 },
+                            Operator::I32Eq,
+                            Operator::If { .. }
+                        ]
+                    )
+                }) else {
+                    continue;
+                };
+                // Ignore a receiver guard enclosing the actual key guard.
+                // This direct String-key arm reaches ArrayLen without another If.
+                let prefix = &string_branch[..extent + 3];
+                if prefix.iter().any(|op| matches!(op, Operator::If { .. })) {
+                    continue;
+                }
+                assert!(
+                    !prefix.iter().any(|op| matches!(op, Operator::Call { .. })),
+                    "Symbol and non-six-unit keys bypass the pooled-name call"
+                );
+                let matching_extent = then_branch(string_branch, extent + 4);
+                let end = extent + 4 + matching_extent.len();
+                assert!(
+                    matches!(string_branch[end], Operator::End),
+                    "a non-six-unit key has no comparison else arm"
+                );
+                assert!(
+                    !string_branch[end + 1..]
+                        .iter()
+                        .any(|op| matches!(op, Operator::Call { .. })),
+                    "the false extent branch cannot resolve the name after the comparison"
+                );
+                assert!(
+                    matching_extent.iter().any(|op| matches!(op,
+                    Operator::Call { function_index } if *function_index == resolver)),
+                    "only the six-unit true branch resolves the comparison name"
+                );
+                assert!(
+                    matching_extent
+                        .iter()
+                        .any(|op| matches!(op, Operator::RefEq))
+                        && matching_extent.iter().any(|op| matches!(op,
+                        Operator::Call { function_index } if *function_index == string_equal)),
+                    "six-unit candidates retain reference and complete content equality"
+                );
+                checked += 1;
+            }
+        }
+        index += 1;
+    }
+    assert_eq!(
+        checked, 2,
+        "both primitive String and concrete Array reads guard the length-name comparison"
+    );
+}

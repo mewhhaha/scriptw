@@ -84,6 +84,14 @@ fn configuration(
     }
 }
 
+#[cfg(not(feature = "benchmark-module-images"))]
+fn require_execution_windows_feature(requested: bool) -> Result<(), String> {
+    if requested {
+        return Err("SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS requires the benchmark-module-images Cargo feature".into());
+    }
+    Ok(())
+}
+
 pub(super) struct Barriers {
     active: Option<Active>,
 }
@@ -165,6 +173,10 @@ impl ModuleImages {
 
 impl Barriers {
     pub(super) fn from_environment(samples: usize, warmups: usize) -> Result<Self, String> {
+        #[cfg(not(feature = "benchmark-module-images"))]
+        require_execution_windows_feature(
+            std::env::var_os("SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS").is_some(),
+        )?;
         let mut values = [None, None, None];
         for (slot, name) in values.iter_mut().zip([
             "SCRIPTW_PRECOMPILED_PHASE_FD",
@@ -295,6 +307,211 @@ impl Barriers {
             report["diagnostic_total_timings_include_barrier_waits"] = json!(true);
         }
         Ok(())
+    }
+}
+
+/// The optional execution-only profiler uses the same admitted phase nonce.
+/// Its fixed collection is serialized only after every Store and phase capture.
+#[cfg(feature = "benchmark-module-images")]
+const EXECUTION_WINDOW_COUNT: usize = 100;
+
+#[cfg(feature = "benchmark-module-images")]
+pub(super) struct ExecutionWindows {
+    nonce: String,
+    samples: usize,
+    warmups: usize,
+    windows: Vec<ExecutionWindow>,
+}
+
+#[cfg(feature = "benchmark-module-images")]
+pub(super) struct ExecutionWindowStart(u64);
+
+#[cfg(feature = "benchmark-module-images")]
+pub(super) struct ExecutionWindow {
+    start_ns: u64,
+    end_ns: u64,
+    execution_ns: u64,
+}
+
+#[cfg(feature = "benchmark-module-images")]
+impl ExecutionWindowStart {
+    pub(super) fn now() -> Result<Self, String> {
+        monotonic_nanoseconds().map(Self)
+    }
+
+    pub(super) fn finish(self, execution_ns: u128) -> Result<ExecutionWindow, String> {
+        // Capture the end before validating or allocating any output record.
+        ExecutionWindow::checked(self.0, monotonic_nanoseconds()?, execution_ns)
+    }
+}
+
+#[cfg(feature = "benchmark-module-images")]
+impl ExecutionWindow {
+    fn checked(start_ns: u64, end_ns: u64, execution_ns: u128) -> Result<Self, String> {
+        let span = end_ns
+            .checked_sub(start_ns)
+            .filter(|span| *span > 0)
+            .ok_or("execution window must have increasing monotonic endpoints")?;
+        let execution_ns = u64::try_from(execution_ns)
+            .map_err(|_| "execution timing exceeds the execution-window clock domain")?;
+        if execution_ns > span {
+            return Err(
+                "execution-window span is shorter than its existing evaluation timer".into(),
+            );
+        }
+        Ok(Self {
+            start_ns,
+            end_ns,
+            execution_ns,
+        })
+    }
+}
+
+#[cfg(feature = "benchmark-module-images")]
+impl ExecutionWindows {
+    pub(super) fn from_environment(
+        barriers: &Barriers,
+        samples: usize,
+        warmups: usize,
+    ) -> Result<Option<Self>, String> {
+        let requested = match std::env::var("SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS") {
+            Ok(value) => Some(value),
+            Err(std::env::VarError::NotPresent) => None,
+            Err(_) => return Err("non-Unicode execution-window configuration".into()),
+        };
+        Self::requested(requested.as_deref(), barriers, samples, warmups)
+    }
+
+    fn requested(
+        requested: Option<&str>,
+        barriers: &Barriers,
+        samples: usize,
+        warmups: usize,
+    ) -> Result<Option<Self>, String> {
+        match requested {
+            None => return Ok(None),
+            Some("1") => {}
+            Some(_) => {
+                return Err(
+                    "SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS must be exactly 1 when requested".into(),
+                )
+            }
+        }
+        if !cfg!(all(target_os = "linux", target_pointer_width = "64")) {
+            return Err(
+                "execution-window profiling requires a 64-bit Linux CLOCK_MONOTONIC ABI".into(),
+            );
+        }
+        let active = barriers
+            .active
+            .as_ref()
+            .ok_or("execution windows require the admitted phase protocol and nonce")?;
+        if !(3..=100).contains(&samples)
+            || !(1..=100).contains(&warmups)
+            || samples.checked_add(warmups) != Some(EXECUTION_WINDOW_COUNT)
+            || active.config.index != EXECUTION_WINDOW_COUNT - 1
+            || active.completed != 0
+        {
+            return Err("execution windows require 100 Stores and the final phase observation, before capture starts".into());
+        }
+        Ok(Some(Self {
+            nonce: active.config.nonce.clone(),
+            samples,
+            warmups,
+            windows: Vec::with_capacity(EXECUTION_WINDOW_COUNT),
+        }))
+    }
+
+    pub(super) fn record(&mut self, index: usize, window: ExecutionWindow) -> Result<(), String> {
+        if index != self.windows.len() || index >= EXECUTION_WINDOW_COUNT {
+            return Err(
+                "execution windows require exactly ordered Store indices 0 through 99".into(),
+            );
+        }
+        if self
+            .windows
+            .last()
+            .is_some_and(|previous| previous.end_ns > window.start_ns)
+        {
+            return Err(
+                "execution windows overlap or their monotonic clock moved backwards".into(),
+            );
+        }
+        self.windows.push(window);
+        Ok(())
+    }
+
+    pub(super) fn finish(self, report: &mut Value) -> Result<(), String> {
+        if self.windows.len() != EXECUTION_WINDOW_COUNT {
+            return Err("execution-window collection is incomplete".into());
+        }
+        let phase = &report["phase_barriers"];
+        if phase["nonce"] != self.nonce
+            || phase["observation_index"] != EXECUTION_WINDOW_COUNT - 1
+            || phase["completed_phases"] != json!(PHASES)
+        {
+            return Err("execution windows require the completed matching phase protocol".into());
+        }
+        let windows = self.windows.into_iter().enumerate().map(|(index, window)| json!({
+            "index":index, "warmup":index < self.warmups,
+            "start_ns":window.start_ns, "end_ns":window.end_ns, "execution_ns":window.execution_ns,
+        })).collect::<Vec<_>>();
+        report["execution_windows"] = json!({
+            "schema":"scriptw-precompiled-execution-windows-v1", "nonce":self.nonce,
+            "clock":"CLOCK_MONOTONIC", "samples":self.samples, "warmups":self.warmups,
+            "total_stores":EXECUTION_WINDOW_COUNT,
+            "scope":"instance.evaluate entry API bracket including its existing Instant timer; excludes Store setup/drop, output checks and window publication",
+            "windows":windows,
+        });
+        Ok(())
+    }
+}
+
+#[cfg(feature = "benchmark-module-images")]
+fn clock_nanoseconds(seconds: i128, nanoseconds: i128) -> Result<u64, String> {
+    let seconds = u64::try_from(seconds).map_err(|_| "invalid monotonic clock seconds")?;
+    let nanoseconds = u64::try_from(nanoseconds)
+        .ok()
+        .filter(|value| *value < 1_000_000_000)
+        .ok_or("invalid monotonic clock nanoseconds")?;
+    seconds
+        .checked_mul(1_000_000_000)
+        .and_then(|value| value.checked_add(nanoseconds))
+        .ok_or_else(|| "monotonic nanosecond timestamp overflow".into())
+}
+
+#[cfg(feature = "benchmark-module-images")]
+fn monotonic_nanoseconds() -> Result<u64, String> {
+    #[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+    {
+        // Linux's 64-bit timespec/time_t ABI uses two signed C longs. Keep the
+        // clock ID explicit so timestamps share the perf sampler's clock domain.
+        use std::ffi::{c_int, c_long};
+        #[repr(C)]
+        struct Timespec {
+            seconds: c_long,
+            nanoseconds: c_long,
+        }
+        unsafe extern "C" {
+            fn clock_gettime(clock: c_int, result: *mut Timespec) -> c_int;
+        }
+        let mut time = Timespec {
+            seconds: 0,
+            nanoseconds: 0,
+        };
+        // SAFETY: CLOCK_MONOTONIC=1 is a Linux ABI constant. The pointer names
+        // a writable, correctly laid out Linux64 timespec for this call.
+        if unsafe { clock_gettime(1, &mut time) } != 0 {
+            return Err(format!(
+                "CLOCK_MONOTONIC read failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        clock_nanoseconds(time.seconds.into(), time.nanoseconds.into())
+    }
+    #[cfg(not(all(target_os = "linux", target_pointer_width = "64")))]
+    {
+        Err("execution-window profiling requires a 64-bit Linux CLOCK_MONOTONIC ABI".into())
     }
 }
 
@@ -458,6 +675,220 @@ mod tests {
             assert!(configuration(v, 7, 10).is_err());
         }
     }
+    #[cfg(not(feature = "benchmark-module-images"))]
+    #[test]
+    fn execution_window_requests_report_the_missing_cargo_feature() {
+        assert!(require_execution_windows_feature(false).is_ok());
+        let error = require_execution_windows_feature(true).unwrap_err();
+        assert!(error.contains("SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS"));
+        assert!(error.contains("benchmark-module-images Cargo feature"));
+    }
+
+    #[cfg(feature = "benchmark-module-images")]
+    #[test]
+    fn unrequested_execution_windows_skip_clock_and_protocol_requirements() {
+        let inactive = Barriers { active: None };
+        assert!(
+            ExecutionWindows::requested(None, &inactive, usize::MAX, usize::MAX)
+                .unwrap()
+                .is_none()
+        );
+        for value in ["", "0", "01", "true", "1\n"] {
+            assert!(ExecutionWindows::requested(Some(value), &inactive, 90, 10).is_err());
+        }
+        assert!(ExecutionWindows::requested(Some("1"), &inactive, 90, 10).is_err());
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    fn execution_barriers(index: usize, completed: usize) -> Barriers {
+        let (socket, _peer) = std::os::unix::net::UnixStream::pair().unwrap();
+        let config = configuration(values("3", NONCE, &index.to_string()), 90, 10)
+            .unwrap()
+            .unwrap();
+        Barriers {
+            active: Some(Active {
+                config,
+                completed,
+                socket,
+            }),
+        }
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    fn execution_windows_fixture(count: usize) -> ExecutionWindows {
+        let mut windows =
+            ExecutionWindows::requested(Some("1"), &execution_barriers(99, 0), 90, 10)
+                .unwrap()
+                .unwrap();
+        for index in 0..count {
+            let start = index as u64 * 10 + 1;
+            windows
+                .record(
+                    index,
+                    ExecutionWindow::checked(start, start + 5, 4).unwrap(),
+                )
+                .unwrap();
+        }
+        windows
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn execution_windows_require_the_final_nonce_bound_capture_and_exact_store_count() {
+        let active = execution_barriers(99, 0);
+        for (samples, warmups) in [(89, 10), (91, 10), (100, 0), (usize::MAX, 10)] {
+            assert!(ExecutionWindows::requested(Some("1"), &active, samples, warmups).is_err());
+        }
+        assert!(
+            ExecutionWindows::requested(Some("1"), &execution_barriers(98, 0), 90, 10).is_err()
+        );
+        assert!(
+            ExecutionWindows::requested(Some("1"), &execution_barriers(99, 1), 90, 10).is_err()
+        );
+        let requested = ExecutionWindows::requested(Some("1"), &active, 90, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(requested.nonce, NONCE);
+        assert!(requested.windows.is_empty());
+        assert!(requested.windows.capacity() >= EXECUTION_WINDOW_COUNT);
+    }
+
+    #[cfg(feature = "benchmark-module-images")]
+    #[test]
+    fn execution_clock_and_window_domains_reject_malformed_or_overflowed_times() {
+        assert_eq!(clock_nanoseconds(1, 2).unwrap(), 1_000_000_002);
+        for (seconds, nanoseconds) in [
+            (-1, 0),
+            (0, -1),
+            (0, 1_000_000_000),
+            (u64::MAX as i128, 0),
+            (i128::MAX, 0),
+        ] {
+            assert!(clock_nanoseconds(seconds, nanoseconds).is_err());
+        }
+        for (start, end, elapsed) in [(10, 9, 0), (10, 10, 0), (10, 20, 11), (10, 20, u128::MAX)] {
+            assert!(ExecutionWindow::checked(start, end, elapsed).is_err());
+        }
+        assert_eq!(
+            ExecutionWindow::checked(10, 20, 10).unwrap().execution_ns,
+            10
+        );
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn actual_monotonic_window_encloses_the_existing_instant_timer() {
+        let start = ExecutionWindowStart::now().unwrap();
+        let timer = Instant::now();
+        let mut sum = 0u64;
+        for value in 0..256 {
+            sum = std::hint::black_box(sum.wrapping_add(value));
+        }
+        std::hint::black_box(sum);
+        let elapsed = timer.elapsed().as_nanos();
+        let window = start.finish(elapsed).unwrap();
+        assert!(window.start_ns > 0 && window.end_ns > window.start_ns);
+        assert!(window.end_ns - window.start_ns >= window.execution_ns);
+        assert!(monotonic_nanoseconds().unwrap() >= window.end_ns);
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn execution_windows_reject_reordering_overlap_and_overrun_before_publication() {
+        let mut windows = execution_windows_fixture(1);
+        assert!(windows
+            .record(0, ExecutionWindow::checked(20, 25, 4).unwrap())
+            .is_err());
+        assert!(windows
+            .record(2, ExecutionWindow::checked(20, 25, 4).unwrap())
+            .is_err());
+        assert!(windows
+            .record(1, ExecutionWindow::checked(5, 10, 4).unwrap())
+            .is_err());
+        assert_eq!(windows.windows.len(), 1);
+        windows
+            .record(1, ExecutionWindow::checked(6, 11, 4).unwrap())
+            .unwrap();
+        assert_eq!(windows.windows.len(), 2);
+        let mut full = execution_windows_fixture(EXECUTION_WINDOW_COUNT);
+        assert!(full
+            .record(100, ExecutionWindow::checked(1001, 1006, 4).unwrap())
+            .is_err());
+        assert_eq!(full.windows.len(), EXECUTION_WINDOW_COUNT);
+        let mut report = json!({"existing":true});
+        assert!(execution_windows_fixture(99).finish(&mut report).is_err());
+        assert_eq!(report, json!({"existing":true}));
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        target_os = "linux",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn execution_window_wire_requires_completed_matching_phase_acknowledgements() {
+        for phase in [
+            json!({}),
+            json!({"nonce":"different","observation_index":99,"completed_phases":PHASES}),
+            json!({"nonce":NONCE,"observation_index":98,"completed_phases":PHASES}),
+            json!({"nonce":NONCE,"observation_index":99,"completed_phases":["after_transport_drop"]}),
+        ] {
+            let mut report = json!({"phase_barriers":phase});
+            assert!(execution_windows_fixture(100).finish(&mut report).is_err());
+            assert!(report.get("execution_windows").is_none());
+        }
+        let mut report = json!({"phase_barriers":{"nonce":NONCE,"observation_index":99,"completed_phases":PHASES}});
+        execution_windows_fixture(100).finish(&mut report).unwrap();
+        let wire = &report["execution_windows"];
+        assert_eq!(wire["schema"], "scriptw-precompiled-execution-windows-v1");
+        assert_eq!(wire["clock"], "CLOCK_MONOTONIC");
+        assert_eq!(wire["nonce"], NONCE);
+        assert_eq!(wire["total_stores"], 100);
+        let rows = wire["windows"].as_array().unwrap();
+        assert_eq!(rows.len(), 100);
+        for (index, row) in rows.iter().enumerate() {
+            assert_eq!(row["index"], index);
+            assert_eq!(row["warmup"], index < 10);
+            assert_eq!(row["execution_ns"], 4);
+            assert!(
+                row["end_ns"].as_u64().unwrap() - row["start_ns"].as_u64().unwrap()
+                    >= row["execution_ns"].as_u64().unwrap()
+            );
+        }
+    }
+
+    #[cfg(all(
+        feature = "benchmark-module-images",
+        not(all(target_os = "linux", target_pointer_width = "64"))
+    ))]
+    #[test]
+    fn requested_execution_windows_report_the_unsupported_clock_abi() {
+        let error = ExecutionWindows::requested(Some("1"), &Barriers { active: None }, 90, 10)
+            .err()
+            .unwrap();
+        assert!(error.contains("64-bit Linux CLOCK_MONOTONIC"));
+    }
+
     #[cfg(feature = "benchmark-module-images")]
     #[test]
     fn module_addresses_are_not_collected_without_barriers() {

@@ -109,7 +109,9 @@ def admit_images(directory, cases, manifest_digest, reference, adapter):
 def check_execution(raw, variant, host, reference, image, case, adapter):
     check_identity(raw, variant, host['sha256'], reference)
     require(raw.get('compiler_enabled') is False and raw.get('samples') == 7
-            and raw.get('warmups') == 10 and 'phase_barriers' not in raw,
+            and raw.get('warmups') == 10 and 'phase_barriers' not in raw
+            and 'execution_windows' not in raw
+            and 'diagnostic_total_timings_include_barrier_waits' not in raw,
             'consumer compilation, samples or diagnostic barriers differ')
     schema = 'scriptw-precompiled-execution-v1' if adapter == 'scriptw' else 'scriptw-precompiled-wasi-execution-v1'
     require(raw.get('schema') == schema, 'wrong execution adapter')
