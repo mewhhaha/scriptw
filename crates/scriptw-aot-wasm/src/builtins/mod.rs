@@ -9,8 +9,8 @@ mod binary_data;
 mod boolean;
 mod bootstrap;
 pub(crate) use bootstrap::{
-    created_realm_global_bindings, BinaryDataIntrinsicBuild, BootstrapRealm, IntlIntrinsicBuild,
-    TemporalIntrinsicBuild,
+    created_realm_global_bindings, BinaryDataIntrinsicBuild, BootstrapRealm, ErrorIntrinsicBuild,
+    IntlIntrinsicBuild, TemporalIntrinsicBuild,
 };
 mod collections;
 mod data_view_access;

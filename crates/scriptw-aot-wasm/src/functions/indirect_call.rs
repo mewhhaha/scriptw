@@ -132,6 +132,23 @@ impl FunctionBuilder<'_> {
                 return Ok(());
             }
         }
+        let packed_push_candidate = targets.iter().any(|id| {
+            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::ArrayPrototypePush)
+        });
+        if packed_push_candidate
+            && self.try_emit_packed_array_push_call(
+                &callee,
+                &receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )?
+        {
+            receiver.clear(function);
+            callee.clear(function);
+            return Ok(());
+        }
         let packed_join_candidate = targets.iter().any(|id| {
             StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::ArrayPrototypeJoin)
         });

@@ -170,6 +170,47 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         parameters
             .value
+            .is_subtype::<DeferredErrorConstructor>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredErrorConstructor>(s, &mut f),
+            &mut f,
+        );
+        let realm = s.reserve_gc_local(&mut f).initialize(
+            s.field(DeferredErrorConstructorSchema::REALM)
+                .read(&recipe, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let constructor = s.reserve_i32_local(&mut f);
+        s.field(DeferredErrorConstructorSchema::CONSTRUCTOR)
+            .read(&recipe, s, &mut f)
+            .store(constructor, &mut f);
+        for identity in crate::heap::ErrorIntrinsicConstructor::ALL {
+            constructor.load(&mut f);
+            f.instruction(&Instruction::I32Const(identity.word() as i32));
+            f.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut f);
+            let stored =
+                self.emit_load_non_array_realm_intrinsic_stored(&realm, identity.slot(), &mut f);
+            stored.load(s, &mut f);
+            stored.clear(&mut f);
+            f.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        // The recipe discriminator is a closed compiler-owned domain.
+        f.instruction(&Instruction::Unreachable);
+        s.release_i32_local(constructor, &mut f);
+        realm.clear(&mut f);
+        recipe.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
             .is_subtype::<DeferredBinaryDataConstructor>(s, &mut f);
         self.open_frame(ControlFrameKind::If, &mut f);
         let recipe = s.reserve_gc_local(&mut f).initialize(

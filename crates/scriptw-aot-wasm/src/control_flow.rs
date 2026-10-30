@@ -1131,6 +1131,9 @@ impl<'a> FunctionBuilder<'a> {
         if !resumable_root_body {
             self.initialize_direct_lexical_bindings(&block.statements, function);
         }
+        if self.try_compile_local_concat_length_return(block, function)? {
+            return Ok(());
+        }
         // Ordinary source bodies keep their activation, locals and completion
         // while sharing one code row for long runs of inert numeric arguments.
         // Resumable and runtime-owned bodies retain their existing control path.

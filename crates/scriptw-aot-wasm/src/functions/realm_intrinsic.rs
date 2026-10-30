@@ -1,7 +1,9 @@
 //! Intrinsic identities are rooted values from the supplied defining Realm.
 
 use super::*;
-use crate::builtins::{BinaryDataIntrinsicBuild, IntlIntrinsicBuild, TemporalIntrinsicBuild};
+use crate::builtins::{
+    BinaryDataIntrinsicBuild, ErrorIntrinsicBuild, IntlIntrinsicBuild, TemporalIntrinsicBuild,
+};
 use crate::gc_types::{
     ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcStackReference, IntrinsicTable,
     RealmRecord, RealmRecordSchema, StoredValue, ValueLocals,
@@ -80,6 +82,15 @@ impl FunctionBuilder<'_> {
         slot: NonArrayRealmIntrinsicSlot,
         function: &mut Function,
     ) -> GcLocal<StoredValue> {
+        if slot.is_error() {
+            let schema = self.runtime_schema();
+            schema.call_helper(
+                crate::runtime_helpers::RealmEnsureErrorsArguments::new(realm),
+                self.runtime_helper_base()
+                    .expect("Error intrinsic reads require registered runtime helpers"),
+                function,
+            );
+        }
         if slot.is_binary_data() {
             let schema = self.runtime_schema();
             schema.call_helper(
@@ -114,6 +125,26 @@ impl FunctionBuilder<'_> {
             namespace.clear(function);
         }
         self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function)
+    }
+
+    /// Only the Error builder may read completed Error slots while Building.
+    pub(crate) fn emit_load_building_error_intrinsic(
+        &mut self,
+        building: &ErrorIntrinsicBuild<'_>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        assert!(
+            slot.is_error(),
+            "Error build capability used for another family"
+        );
+        self.emit_load_realm_intrinsic_at_index(
+            building.realm(),
+            slot.gc_index(),
+            result,
+            function,
+        );
     }
 
     /// Only the binary-data builder may read its completed slots while Building.

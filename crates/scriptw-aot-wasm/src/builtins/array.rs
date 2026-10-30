@@ -12,6 +12,7 @@ mod copy_within;
 mod find_via_predicate;
 mod flat;
 mod literal;
+mod numeric_sort;
 mod packed_join;
 mod sort;
 mod string_buffer;
@@ -3050,6 +3051,19 @@ impl FunctionBuilder<'_> {
             ArraySortOutput::Receiver => target.copy_from(&receiver, f),
             ArraySortOutput::Copy => self.emit_array_native_create(length, &target, f)?,
         }
+        let completed = self.open_frame(ControlFrameKind::Block, f);
+        let numbers_sorted = self.emit_try_array_private_number_sort(
+            &receiver,
+            &target,
+            length,
+            &comparator,
+            &pending,
+            output,
+            f,
+        )?;
+        numbers_sorted.load(f);
+        s.release_i32_local(numbers_sorted, f);
+        self.emit_branch_if_to_target(completed, f);
         let snapshot = self.emit_try_packed_array_sort_snapshot(&receiver, length, f)?;
         snapshot.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
@@ -3174,8 +3188,10 @@ impl FunctionBuilder<'_> {
         }
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        self.completion().set_normal(&target, f);
         list.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.completion().set_normal(&target, f);
         s.release_i32_local(present, f);
         s.release_i32_local(slot, f);
         s.release_i64_local(count, f);

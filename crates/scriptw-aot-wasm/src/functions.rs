@@ -45,7 +45,9 @@ mod numeric_leaf_call;
 pub(crate) use numeric_leaf_call::BinaryNumericLeafPlan;
 pub(crate) use numeric_leaf_call::NumericLeafPlan;
 mod binary_numeric_callback;
+mod native_call_guard;
 mod packed_join_call;
+mod packed_push_call;
 mod source_callable_factories;
 use function_object_allocation::FunctionAllocationInputs;
 mod function_realm;
@@ -369,6 +371,30 @@ error_message_constructor_kinds! {
 impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
     pub(crate) const TABLE_LENGTH: u32 = 159;
+
+    pub(crate) const fn is_error(self) -> bool {
+        matches!(
+            self,
+            Self::ErrorConstructor
+                | Self::ErrorPrototype
+                | Self::EvalErrorConstructor
+                | Self::EvalErrorPrototype
+                | Self::AggregateErrorConstructor
+                | Self::AggregateErrorPrototype
+                | Self::SuppressedErrorConstructor
+                | Self::SuppressedErrorPrototype
+                | Self::RangeErrorConstructor
+                | Self::RangeErrorPrototype
+                | Self::SyntaxErrorConstructor
+                | Self::SyntaxErrorPrototype
+                | Self::TypeErrorConstructor
+                | Self::TypeErrorPrototype
+                | Self::URIErrorConstructor
+                | Self::URIErrorPrototype
+                | Self::ReferenceErrorConstructor
+                | Self::ReferenceErrorPrototype
+        )
+    }
 
     /// The binary-data graph excludes the callable shared with Array.prototype.
     pub(crate) const fn is_binary_data(self) -> bool {
@@ -726,6 +752,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::constant(crate::heap::IntlInitializationState::Dormant),
                 GcOperand::null(schema),
                 GcOperand::constant(crate::heap::BinaryDataInitializationState::Dormant),
+                GcOperand::constant(crate::heap::ErrorInitializationState::Dormant),
             ),
             function,
         );

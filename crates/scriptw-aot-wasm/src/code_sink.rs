@@ -240,6 +240,16 @@ impl Function {
         }) {
             return self.free_locals.swap_remove(position);
         }
+        self.reserve_fresh_typed_local(ty)
+    }
+
+    /// A frame cache must start at the Wasm default on every invocation and
+    /// retain its identity through loop backedges. Never take a released slot.
+    pub(crate) fn reserve_fresh_typed_local(&mut self, ty: ValType) -> u32 {
+        assert!(
+            !self.frames.is_empty(),
+            "cannot reserve a local after function publication"
+        );
         let index = u32::try_from(self.parameters.len())
             .expect("parameter count overflow")
             .checked_add(self.locals.count())

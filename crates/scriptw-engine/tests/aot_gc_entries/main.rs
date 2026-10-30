@@ -15,6 +15,7 @@ mod aot_gc_binary_data_entries;
 mod aot_gc_collection_entries;
 mod aot_gc_compact_data_storage;
 mod aot_gc_disposable_stack_entries;
+mod aot_gc_error_demand_initialization;
 mod aot_gc_generator_entries;
 mod aot_gc_intrinsic_publication;
 mod aot_gc_iterator_chunking;

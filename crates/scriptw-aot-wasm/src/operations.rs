@@ -583,7 +583,6 @@ impl<'a> FunctionBuilder<'a> {
             | SpecOperationIr::Set
             | SpecOperationIr::CreateDataPropertyOrThrow => {
                 let lookup = schema.reserve_value_local(function);
-                let key_value = schema.reserve_value_local(function);
                 let key_result = schema.reserve_completion(function);
                 let property_exit = self.open_frame(ControlFrameKind::Block, function);
                 if operation == SpecOperationIr::GetV {
@@ -595,19 +594,41 @@ impl<'a> FunctionBuilder<'a> {
                         self.emit_branch_if_to_target(property_exit, function);
                     }
                 }
-                match operation {
-                    SpecOperationIr::GetV | SpecOperationIr::GetMethod => {
-                        self.emit_value_to_object_locals(&inputs[0], &pending, function)?;
-                        self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
-                        lookup.copy_from(pending.value(), function);
+                // Source operands already completed in order. A static String
+                // key needs no observable coercion, and the guarded own-data
+                // arm proves an actual object. Its complete miss kernel owns
+                // primitive boxing, nullish errors and getter receiver rules.
+                let planned_get_v = if operation == SpecOperationIr::GetV {
+                    if let ExprIr::String(name) = &operands[1].expr {
+                        self.emit_planned_property_read(
+                            &operands[0],
+                            &PropertyKeyIr::StaticString(name.clone()),
+                            &inputs[0],
+                            &inputs[0],
+                            &inputs[1],
+                            &pending,
+                            function,
+                        )?
+                    } else {
+                        false
                     }
-                    SpecOperationIr::Get
-                    | SpecOperationIr::HasProperty
-                    | SpecOperationIr::HasOwnProperty
-                    | SpecOperationIr::DeletePropertyOrThrow
-                    | SpecOperationIr::Set
-                    | SpecOperationIr::CreateDataPropertyOrThrow => {
-                        let message = match operation {
+                } else {
+                    false
+                };
+                let key = if !planned_get_v {
+                    match operation {
+                        SpecOperationIr::GetV | SpecOperationIr::GetMethod => {
+                            self.emit_value_to_object_locals(&inputs[0], &pending, function)?;
+                            self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
+                            lookup.copy_from(pending.value(), function);
+                        }
+                        SpecOperationIr::Get
+                        | SpecOperationIr::HasProperty
+                        | SpecOperationIr::HasOwnProperty
+                        | SpecOperationIr::DeletePropertyOrThrow
+                        | SpecOperationIr::Set
+                        | SpecOperationIr::CreateDataPropertyOrThrow => {
+                            let message = match operation {
                             SpecOperationIr::Get => RuntimeErrorMessage::GET_TARGET_IS_NOT_AN_OBJECT,
                             SpecOperationIr::HasProperty | SpecOperationIr::HasOwnProperty => RuntimeErrorMessage::RIGHT_HAND_SIDE_OF_IN_IS_NOT_AN_OBJECT,
                             SpecOperationIr::DeletePropertyOrThrow => RuntimeErrorMessage::DELETEPROPERTYORTHROW_TARGET_IS_NOT_AN_OBJECT,
@@ -615,167 +636,155 @@ impl<'a> FunctionBuilder<'a> {
                             SpecOperationIr::CreateDataPropertyOrThrow => RuntimeErrorMessage::CREATEDATAPROPERTYORTHROW_TARGET_IS_NOT_AN_OBJECT,
                             _ => unreachable!("closed Object target group"),
                         };
-                        self.emit_is_heap_object_like_tag_i32(inputs[0].tag(), function);
-                        function.instruction(&Instruction::I32Eqz);
-                        self.open_frame(ControlFrameKind::If, function);
-                        self.emit_throw_runtime_error(
-                            NativeErrorKind::TypeError,
-                            message,
-                            &pending,
-                            function,
-                        )?;
-                        self.emit_branch_to_target(property_exit, function);
-                        self.pop_control(ControlFrameKind::If);
-                        function.instruction(&Instruction::End);
-                        lookup.copy_from(&inputs[0], function);
-                    }
-                    _ => unreachable!("closed property group"),
-                }
-                if operation == SpecOperationIr::GetV
-                    && operands[1].possible_kinds.contains(ValueKind::Number)
-                {
-                    // Source computed reads commonly lower to GetV. Both
-                    // operands and ToObject have completed; a primitive Number
-                    // key has no observable conversion before an own data read.
-                    let found = self.emit_raw_numeric_array_own_data_read(
-                        &lookup, &inputs[1], &pending, function,
-                    );
-                    found.load(function);
-                    schema.release_i32_local(found, function);
-                    self.emit_branch_if_to_target(property_exit, function);
-                }
-                self.emit_value_to_property_key_completion(&inputs[1], &key_result, function)?;
-                key_result.kind().load(function);
-                function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-                function.instruction(&Instruction::I32Eq);
-                self.open_frame(ControlFrameKind::If, function);
-                pending.copy_from(&key_result, function);
-                self.emit_branch_to_target(property_exit, function);
-                self.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                key_value.copy_from(key_result.value(), function);
-                let key = PropertyKeyLocals::from_converted_value(key_value);
-                match operation {
-                    SpecOperationIr::Get | SpecOperationIr::GetV | SpecOperationIr::GetMethod => {
-                        // GetV boxes only the lookup target. Getter this is the
-                        // original value, including a primitive receiver.
-                        // Unknown static source reads lower to canonical GetV,
-                        // so admit the same cache after the existing operand,
-                        // ToObject and ToPropertyKey steps have completed.
-                        let cached = if operation == SpecOperationIr::GetV {
-                            if let ExprIr::String(name) = &operands[1].expr {
-                                self.emit_planned_property_read(
-                                    &operands[0],
-                                    &PropertyKeyIr::StaticString(name.clone()),
-                                    &lookup,
-                                    &inputs[0],
-                                    key.value(),
-                                    &pending,
-                                    function,
-                                )?
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        };
-                        if !cached {
-                            self.emit_dynamic_property_read_with_key_locals(
-                                &lookup, &inputs[0], &key, &pending, function,
-                            )?;
-                        }
-                        self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
-                        if operation == SpecOperationIr::GetMethod {
-                            self.compile_nullish_tagged_i32(pending.value().tag(), function)?;
-                            self.open_frame(ControlFrameKind::If, function);
-                            pending.value().set_undefined(function);
-                            pending.set_normal(pending.value(), function);
-                            function.instruction(&Instruction::Else);
-                            self.emit_is_callable_i32(pending.value(), function)?;
+                            self.emit_is_heap_object_like_tag_i32(inputs[0].tag(), function);
                             function.instruction(&Instruction::I32Eqz);
                             self.open_frame(ControlFrameKind::If, function);
                             self.emit_throw_runtime_error(
                                 NativeErrorKind::TypeError,
-                                RuntimeErrorMessage::GETMETHOD_TARGET_IS_NOT_CALLABLE,
+                                message,
+                                &pending,
+                                function,
+                            )?;
+                            self.emit_branch_to_target(property_exit, function);
+                            self.pop_control(ControlFrameKind::If);
+                            function.instruction(&Instruction::End);
+                            lookup.copy_from(&inputs[0], function);
+                        }
+                        _ => unreachable!("closed property group"),
+                    }
+                    if operation == SpecOperationIr::GetV
+                        && operands[1].possible_kinds.contains(ValueKind::Number)
+                    {
+                        // Source computed reads commonly lower to GetV. Both
+                        // operands and ToObject have completed; a primitive Number
+                        // key has no observable conversion before an own data read.
+                        let found = self.emit_raw_numeric_array_own_data_read(
+                            &lookup, &inputs[1], &pending, function,
+                        );
+                        found.load(function);
+                        schema.release_i32_local(found, function);
+                        self.emit_branch_if_to_target(property_exit, function);
+                    }
+                    self.emit_value_to_property_key_completion(&inputs[1], &key_result, function)?;
+                    key_result.kind().load(function);
+                    function
+                        .instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
+                    function.instruction(&Instruction::I32Eq);
+                    self.open_frame(ControlFrameKind::If, function);
+                    pending.copy_from(&key_result, function);
+                    self.emit_branch_to_target(property_exit, function);
+                    self.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                    let key_value = schema.reserve_value_local(function);
+                    key_value.copy_from(key_result.value(), function);
+                    let key = PropertyKeyLocals::from_converted_value(key_value);
+                    match operation {
+                        SpecOperationIr::Get
+                        | SpecOperationIr::GetV
+                        | SpecOperationIr::GetMethod => {
+                            // GetV boxes only the lookup target; getter this remains
+                            // the original value, including primitive receivers.
+                            self.emit_dynamic_property_read_with_key_locals(
+                                &lookup, &inputs[0], &key, &pending, function,
+                            )?;
+                            self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
+                            if operation == SpecOperationIr::GetMethod {
+                                self.compile_nullish_tagged_i32(pending.value().tag(), function)?;
+                                self.open_frame(ControlFrameKind::If, function);
+                                pending.value().set_undefined(function);
+                                pending.set_normal(pending.value(), function);
+                                function.instruction(&Instruction::Else);
+                                self.emit_is_callable_i32(pending.value(), function)?;
+                                function.instruction(&Instruction::I32Eqz);
+                                self.open_frame(ControlFrameKind::If, function);
+                                self.emit_throw_runtime_error(
+                                    NativeErrorKind::TypeError,
+                                    RuntimeErrorMessage::GETMETHOD_TARGET_IS_NOT_CALLABLE,
+                                    &pending,
+                                    function,
+                                )?;
+                                self.pop_control(ControlFrameKind::If);
+                                function.instruction(&Instruction::End);
+                                self.pop_control(ControlFrameKind::If);
+                                function.instruction(&Instruction::End);
+                            }
+                        }
+                        SpecOperationIr::HasProperty => {
+                            schema
+                                .call_helper(
+                                    crate::runtime_helpers::ObjectHasPropertyArguments::new(
+                                        &lookup,
+                                        &key,
+                                        self.current_environment(),
+                                        self.current_program(),
+                                    ),
+                                    self.runtime_helper_base()?,
+                                    function,
+                                )
+                                .store(&pending, function);
+                        }
+                        SpecOperationIr::HasOwnProperty => {
+                            let descriptor =
+                                self.emit_direct_own_descriptor_fact(&lookup, &key, function)?;
+                            descriptor.load(schema, function);
+                            function.instruction(&Instruction::RefIsNull);
+                            function.instruction(&Instruction::I32Eqz);
+                            boolean.store(function);
+                            pending.value().set_boolean(boolean, function);
+                            pending.set_normal(pending.value(), function);
+                            descriptor.clear(function);
+                        }
+                        SpecOperationIr::DeletePropertyOrThrow => {
+                            self.emit_object_delete(&lookup, &key, &pending, function)?;
+                            self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
+                            self.compile_truthy_tagged_i32(pending.value(), function)?;
+                            function.instruction(&Instruction::I32Eqz);
+                            self.open_frame(ControlFrameKind::If, function);
+                            self.emit_throw_runtime_error(
+                                NativeErrorKind::TypeError,
+                                RuntimeErrorMessage::CANNOT_DELETE_PROPERTY,
                                 &pending,
                                 function,
                             )?;
                             self.pop_control(ControlFrameKind::If);
                             function.instruction(&Instruction::End);
-                            self.pop_control(ControlFrameKind::If);
-                            function.instruction(&Instruction::End);
                         }
+                        SpecOperationIr::Set => {
+                            schema
+                                .call_helper(
+                                    crate::runtime_helpers::OrdinarySetArguments::new(
+                                        &lookup,
+                                        &inputs[0],
+                                        &key,
+                                        &inputs[2],
+                                        self.current_environment(),
+                                        self.current_program(),
+                                    ),
+                                    self.runtime_helper_base()?,
+                                    function,
+                                )
+                                .store(&pending, function);
+                        }
+                        SpecOperationIr::CreateDataPropertyOrThrow => {
+                            self.emit_create_data_property_or_throw(
+                                &lookup, &key, &inputs[2], &pending, function,
+                            )?;
+                            self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
+                            pending.value().set_undefined(function);
+                            pending.set_normal(pending.value(), function);
+                        }
+                        _ => unreachable!("closed property group"),
                     }
-                    SpecOperationIr::HasProperty => {
-                        schema
-                            .call_helper(
-                                crate::runtime_helpers::ObjectHasPropertyArguments::new(
-                                    &lookup,
-                                    &key,
-                                    self.current_environment(),
-                                    self.current_program(),
-                                ),
-                                self.runtime_helper_base()?,
-                                function,
-                            )
-                            .store(&pending, function);
-                    }
-                    SpecOperationIr::HasOwnProperty => {
-                        let descriptor =
-                            self.emit_direct_own_descriptor_fact(&lookup, &key, function)?;
-                        descriptor.load(schema, function);
-                        function.instruction(&Instruction::RefIsNull);
-                        function.instruction(&Instruction::I32Eqz);
-                        boolean.store(function);
-                        pending.value().set_boolean(boolean, function);
-                        pending.set_normal(pending.value(), function);
-                        descriptor.clear(function);
-                    }
-                    SpecOperationIr::DeletePropertyOrThrow => {
-                        self.emit_object_delete(&lookup, &key, &pending, function)?;
-                        self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
-                        self.compile_truthy_tagged_i32(pending.value(), function)?;
-                        function.instruction(&Instruction::I32Eqz);
-                        self.open_frame(ControlFrameKind::If, function);
-                        self.emit_throw_runtime_error(
-                            NativeErrorKind::TypeError,
-                            RuntimeErrorMessage::CANNOT_DELETE_PROPERTY,
-                            &pending,
-                            function,
-                        )?;
-                        self.pop_control(ControlFrameKind::If);
-                        function.instruction(&Instruction::End);
-                    }
-                    SpecOperationIr::Set => {
-                        schema
-                            .call_helper(
-                                crate::runtime_helpers::OrdinarySetArguments::new(
-                                    &lookup,
-                                    &inputs[0],
-                                    &key,
-                                    &inputs[2],
-                                    self.current_environment(),
-                                    self.current_program(),
-                                ),
-                                self.runtime_helper_base()?,
-                                function,
-                            )
-                            .store(&pending, function);
-                    }
-                    SpecOperationIr::CreateDataPropertyOrThrow => {
-                        self.emit_create_data_property_or_throw(
-                            &lookup, &key, &inputs[2], &pending, function,
-                        )?;
-                        self.emit_spec_operation_abrupt_exit(&pending, property_exit, function);
-                        pending.value().set_undefined(function);
-                        pending.set_normal(pending.value(), function);
-                    }
-                    _ => unreachable!("closed property group"),
-                }
+                    Some(key)
+                } else {
+                    None
+                };
                 self.pop_control(ControlFrameKind::Block);
                 function.instruction(&Instruction::End);
                 key_result.clear(function);
-                key.clear(function);
+                if let Some(key) = key {
+                    key.clear(function);
+                }
                 lookup.clear(function);
             }
             SpecOperationIr::CopyDataProperties => {

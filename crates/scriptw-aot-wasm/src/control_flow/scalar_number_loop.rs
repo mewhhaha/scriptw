@@ -9,6 +9,8 @@ use crate::emit::LocalBindingId;
 
 mod invariant_imul;
 use invariant_imul::InvariantImul;
+mod chunked;
+use chunked::ChunkedLoop;
 
 const MAX_NODES: usize = 256;
 const MAX_DEPTH: usize = 64;
@@ -135,6 +137,22 @@ struct LoopProof<'a, 'b> {
 }
 
 impl ScalarNumberLoop {
+    fn emit_body(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        value: Option<LoopLocal>,
+        function: &mut Function,
+    ) {
+        for (index, expression) in self.body.iter().enumerate() {
+            if let Some(value) = value.filter(|_| index + 1 == self.body.len()) {
+                expression.emit_into(builder, locals, value, function);
+            } else {
+                expression.emit_discard(builder, locals, function);
+            }
+        }
+    }
+
     pub(super) fn new(
         builder: &FunctionBuilder<'_>,
         test: Option<&TypedExpr>,
@@ -452,12 +470,20 @@ impl NumberExpression {
     }
 
     fn domain(&self, locals: &LoopLocals<'_>) -> NumberDomain {
+        self.binding_domain(locals.bindings)
+    }
+
+    fn binding_domain(&self, bindings: &[NumberBinding]) -> NumberDomain {
         match self {
-            Self::Binding(index) => locals.bindings[*index].domain,
-            Self::Assign(_, value) | Self::Comma(_, value) => value.domain(locals),
-            Self::Arithmetic(op, lhs, rhs) => {
-                Self::arithmetic_domain(*op, lhs, lhs.domain(locals), rhs, rhs.domain(locals))
-            }
+            Self::Binding(index) => bindings[*index].domain,
+            Self::Assign(_, value) | Self::Comma(_, value) => value.binding_domain(bindings),
+            Self::Arithmetic(op, lhs, rhs) => Self::arithmetic_domain(
+                *op,
+                lhs,
+                lhs.binding_domain(bindings),
+                rhs,
+                rhs.binding_domain(bindings),
+            ),
             _ => self.intrinsic_domain(),
         }
     }
@@ -872,18 +898,15 @@ impl FunctionBuilder<'_> {
             });
         let iterated = schema.reserve_i32_local(function);
         iterated.set_constant(0, function);
+        if let Some(chunked) = ChunkedLoop::new(plan) {
+            chunked.emit(self, plan, &locals, value, iterated, function);
+        }
         let done = self.open_frame(ControlFrameKind::Block, function);
         let next = self.open_frame(ControlFrameKind::Loop, function);
         plan.test.emit(self, &locals, function);
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, function);
-        for (index, expression) in plan.body.iter().enumerate() {
-            if index + 1 == plan.body.len() {
-                expression.emit_into(self, &locals, value.expect("nonempty body"), function);
-            } else {
-                expression.emit_discard(self, &locals, function);
-            }
-        }
+        plan.emit_body(self, &locals, value, function);
         iterated.set_constant(1, function);
         if let Some(update) = &plan.update {
             update.emit_discard(self, &locals, function);

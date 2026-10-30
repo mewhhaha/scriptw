@@ -158,6 +158,115 @@ runtime_scalar_domain!(BinaryDataInitializationState, 0, {
     Ready = 2,
 });
 
+// Initialization of one Realm's complete canonical Error graph.
+runtime_scalar_domain!(ErrorInitializationState, 0, {
+    Dormant = 0,
+    Building = 1,
+    Ready = 2,
+});
+
+// Public Error recipes select only one of the nine canonical constructors.
+runtime_scalar_domain!(ErrorIntrinsicConstructor, 0, {
+    Error = 0,
+    EvalError = 1,
+    AggregateError = 2,
+    SuppressedError = 3,
+    RangeError = 4,
+    SyntaxError = 5,
+    TypeError = 6,
+    URIError = 7,
+    ReferenceError = 8,
+});
+
+impl ErrorIntrinsicConstructor {
+    pub(crate) const fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
+        match builtin {
+            scriptw_ir::StandardBuiltinId::ErrorConstructor => Some(Self::Error),
+            scriptw_ir::StandardBuiltinId::EvalErrorConstructor => Some(Self::EvalError),
+            scriptw_ir::StandardBuiltinId::AggregateErrorConstructor => Some(Self::AggregateError),
+            scriptw_ir::StandardBuiltinId::SuppressedErrorConstructor => {
+                Some(Self::SuppressedError)
+            }
+            scriptw_ir::StandardBuiltinId::RangeErrorConstructor => Some(Self::RangeError),
+            scriptw_ir::StandardBuiltinId::SyntaxErrorConstructor => Some(Self::SyntaxError),
+            scriptw_ir::StandardBuiltinId::TypeErrorConstructor => Some(Self::TypeError),
+            scriptw_ir::StandardBuiltinId::URIErrorConstructor => Some(Self::URIError),
+            scriptw_ir::StandardBuiltinId::ReferenceErrorConstructor => Some(Self::ReferenceError),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn builtin(self) -> scriptw_ir::StandardBuiltinId {
+        match self {
+            Self::Error => scriptw_ir::StandardBuiltinId::ErrorConstructor,
+            Self::EvalError => scriptw_ir::StandardBuiltinId::EvalErrorConstructor,
+            Self::AggregateError => scriptw_ir::StandardBuiltinId::AggregateErrorConstructor,
+            Self::SuppressedError => scriptw_ir::StandardBuiltinId::SuppressedErrorConstructor,
+            Self::RangeError => scriptw_ir::StandardBuiltinId::RangeErrorConstructor,
+            Self::SyntaxError => scriptw_ir::StandardBuiltinId::SyntaxErrorConstructor,
+            Self::TypeError => scriptw_ir::StandardBuiltinId::TypeErrorConstructor,
+            Self::URIError => scriptw_ir::StandardBuiltinId::URIErrorConstructor,
+            Self::ReferenceError => scriptw_ir::StandardBuiltinId::ReferenceErrorConstructor,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        match self {
+            Self::Error => crate::functions::NonArrayRealmIntrinsicSlot::ErrorConstructor,
+            Self::EvalError => crate::functions::NonArrayRealmIntrinsicSlot::EvalErrorConstructor,
+            Self::AggregateError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::AggregateErrorConstructor
+            }
+            Self::SuppressedError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::SuppressedErrorConstructor
+            }
+            Self::RangeError => crate::functions::NonArrayRealmIntrinsicSlot::RangeErrorConstructor,
+            Self::SyntaxError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::SyntaxErrorConstructor
+            }
+            Self::TypeError => crate::functions::NonArrayRealmIntrinsicSlot::TypeErrorConstructor,
+            Self::URIError => crate::functions::NonArrayRealmIntrinsicSlot::URIErrorConstructor,
+            Self::ReferenceError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::ReferenceErrorConstructor
+            }
+        }
+    }
+
+    pub(crate) const fn prototype_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        match self {
+            Self::Error => crate::functions::NonArrayRealmIntrinsicSlot::ErrorPrototype,
+            Self::EvalError => crate::functions::NonArrayRealmIntrinsicSlot::EvalErrorPrototype,
+            Self::AggregateError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::AggregateErrorPrototype
+            }
+            Self::SuppressedError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::SuppressedErrorPrototype
+            }
+            Self::RangeError => crate::functions::NonArrayRealmIntrinsicSlot::RangeErrorPrototype,
+            Self::SyntaxError => crate::functions::NonArrayRealmIntrinsicSlot::SyntaxErrorPrototype,
+            Self::TypeError => crate::functions::NonArrayRealmIntrinsicSlot::TypeErrorPrototype,
+            Self::URIError => crate::functions::NonArrayRealmIntrinsicSlot::URIErrorPrototype,
+            Self::ReferenceError => {
+                crate::functions::NonArrayRealmIntrinsicSlot::ReferenceErrorPrototype
+            }
+        }
+    }
+
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Error => "Error",
+            Self::EvalError => "EvalError",
+            Self::AggregateError => "AggregateError",
+            Self::SuppressedError => "SuppressedError",
+            Self::RangeError => "RangeError",
+            Self::SyntaxError => "SyntaxError",
+            Self::TypeError => "TypeError",
+            Self::URIError => "URIError",
+            Self::ReferenceError => "ReferenceError",
+        }
+    }
+}
+
 // Only public constructors can inhabit a deferred global recipe. The abstract
 // %TypedArray% remains privately rooted in the defining Realm's intrinsic table.
 runtime_scalar_domain!(BinaryDataConstructor, 0, {

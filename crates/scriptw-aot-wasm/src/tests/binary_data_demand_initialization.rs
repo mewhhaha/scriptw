@@ -2,8 +2,8 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredBinaryDataConstructor, GcHeapType, GcNullability, GcSnapshotField, GcStructHeapType,
-    GlobalLedger, IntrinsicTable, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
+    DeferredBinaryDataConstructor, GcHeapType, GcNullability, GcSnapshotField, GlobalLedger,
+    IntrinsicTable, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
 };
 use crate::heap::BinaryDataInitializationState;
 
@@ -256,7 +256,9 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
-    let state_field = RealmRecord::FIELD_COUNT - 1;
+    let state_field = crate::gc_types::RealmRecordSchema::BINARY_DATA_STATE
+        .ordinal()
+        .raw();
     let (types, declarations, exports) = inventory(bytes);
     assert!(exports.contains(&ensure_index));
     let wasmparser::CompositeInnerType::Func(signature) = &types

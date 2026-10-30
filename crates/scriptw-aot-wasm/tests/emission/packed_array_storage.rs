@@ -1,9 +1,9 @@
 //! P calls shared R publication, physical Number/bitmap and descriptor owners.
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
+    GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, ExprIr, SpecOperationIr, StatementIr};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{ExprIr, SpecOperationIr, StatementIr, lower};
 use std::collections::BTreeMap;
 use wasmparser::{
     ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload, TypeRef, UnpackedIndex,
@@ -499,13 +499,6 @@ fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons
                         if *struct_type_index == code && *field_index == callback_field)),
                     "the typed call uses the actual callable's immutable optional entry"
                 );
-                for backing in [values, numbers] {
-                    assert!(
-                        body[..first_comparison].iter().any(|op| matches!(op,
-                        Operator::ArrayGet { array_type_index } if *array_type_index == backing)),
-                        "packed data enters a private snapshot before comparisons"
-                    );
-                }
                 let last_comparison = body
                     .iter()
                     .rposition(|op| {
@@ -515,9 +508,20 @@ fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons
                         if callback_helpers.contains(function_index))
                     })
                     .unwrap();
+                for backing in [values, numbers] {
+                    assert!(
+                        body[..last_comparison].iter().any(|op| matches!(op,
+                        Operator::ArrayGet { array_type_index } if *array_type_index == backing)),
+                        "the generic private-snapshot path retains each packed source representation"
+                    );
+                }
+                assert!(body[..first_comparison].iter().any(|op| matches!(op,
+                    Operator::ArrayCopy { array_type_index_dst, array_type_index_src }
+                        if *array_type_index_dst == numbers && *array_type_index_src == numbers)),
+                    "the earlier pure numeric branch copies its unboxed snapshot before comparison");
                 let publication = body
                     .iter()
-                    .position(|op| {
+                    .rposition(|op| {
                         matches!(op,
                     Operator::Call { function_index } if *function_index == publish)
                     })
@@ -576,6 +580,58 @@ fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons
         .unwrap()
         .join()
         .unwrap();
+}
+
+#[test]
+fn numeric_sort_keeps_bits_unboxed_and_admits_the_actual_callback_once() {
+    std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(|| {
+        let lowered = lower(&parse(
+            "function compare(a,b){return a-b;} [Array.prototype.sort,compare];",
+            ParseOptions::script(),
+        ).unwrap());
+        let artifact = emit_with_rooted_snapshot(&lowered, PromiseRejectionPolicy::Ignore,
+            &scriptw_intl::IntlCompilationProfile::Minimal).unwrap();
+        for bytes in [&artifact.bytes[..], artifact.runtime().unwrap().bytes()] {
+            Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+        }
+        let runtime = Module::read(artifact.runtime().unwrap().bytes());
+        let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
+        let stored = runtime.witness_type(GcSnapshotLayout::Stored);
+        let code = runtime.witness_type(GcSnapshotLayout::Code);
+        let (_, body) = runtime.named("builtin::Array.prototype.sort");
+        let copies = body.iter().enumerate().filter_map(|(i,op)| matches!(op,
+            Operator::ArrayCopy { array_type_index_dst, array_type_index_src }
+                if *array_type_index_dst == numbers && *array_type_index_src == numbers).then_some(i)).collect::<Vec<_>>();
+        assert_eq!(copies.len(), 2, "one private Number snapshot and one guarded live writeback");
+        let binary = runtime.types.iter().enumerate().find_map(|(i,t)| {
+            let wasmparser::CompositeInnerType::Func(signature) = &t.composite_type.inner else {return None;};
+            (signature.params() == [ValType::F64,ValType::F64] && signature.results() == [ValType::I32,ValType::F64]).then_some(i as u32)
+        }).unwrap();
+        let typed = body.iter().enumerate().filter_map(|(i,op)| matches!(op,
+            Operator::CallRef { type_index } if *type_index == binary).then_some(i)).filter(|i| copies[0] < *i && *i < copies[1]).collect::<Vec<_>>();
+        assert_eq!(typed.len(), 2, "the numeric scan and merge use the admitted typed entry");
+        assert!(!body[copies[0]+1..typed[0]].iter().any(|op| matches!(op,
+            Operator::StructNew { struct_type_index } if *struct_type_index == stored)),
+            "collecting and loading Numbers requires no per-element value boxes");
+        assert!(!body[copies[0]+1..copies[1]].iter().any(|op| matches!(op,
+            Operator::StructGet { struct_type_index, .. } if *struct_type_index == code)),
+            "the private kernel never re-reads callable code metadata");
+        let mut frames = Vec::<(usize,bool)>::new();
+        for (i,op) in body.iter().enumerate() {
+            match op {
+                Operator::Block {..} | Operator::Loop {..} | Operator::If {..} | Operator::TryTable {..} => frames.push((i,false)),
+                Operator::Else => frames.last_mut().unwrap().1 = true,
+                Operator::End => {frames.pop();},
+                Operator::StructNew { struct_type_index } if *struct_type_index == stored && copies[0] < i && i < copies[1] => {
+                    assert!(frames.iter().any(|&(at,otherwise)| otherwise && at >= 4 &&
+                        matches!(&body[at-4],Operator::CallRef { type_index } if *type_index == binary) &&
+                        matches!((&body[at-2],&body[at-1]),(Operator::LocalSet {local_index:a},Operator::LocalGet {local_index:b}) if a==b)),
+                        "only scalar-thunk refusal may allocate ordinary callback arguments");
+                }
+                _ => {}
+            }
+        }
+    }).unwrap().join().unwrap();
 }
 
 #[test]

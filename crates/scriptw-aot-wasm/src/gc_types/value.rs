@@ -207,6 +207,28 @@ pub(crate) struct GcLocal<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     heap_type: HeapType,
     shape: PhantomData<fn() -> (T, N)>,
 }
+
+/// Invocation-local immutable metadata cache. Its fresh nullable local starts
+/// at the Wasm default and is never released for reuse or reset on a backedge.
+/// Keeping this separate from GcLocal prevents clearing a live frame cache.
+#[derive(Debug)]
+pub(crate) struct GcFrameCache<T: GcHeapType> {
+    root: GcLocal<T, Nullable>,
+}
+
+impl<T: GcHeapType> GcFrameCache<T> {
+    pub(crate) fn load(
+        &self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<T, Nullable> {
+        self.root.load(schema, function)
+    }
+
+    pub(crate) fn replace(&self, value: GcStackReference<T>, function: &mut Function) {
+        self.root.replace(value.nullable(), function);
+    }
+}
 impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     pub(crate) fn load(
         &self,
@@ -444,6 +466,8 @@ impl GcI32Constant for crate::heap::AsyncGeneratorRequestCompletionKind {
 enum_i32_codec!(crate::heap::PromiseState; Pending => 0, Fulfilled => 1, Rejected => 2);
 enum_i32_codec!(crate::heap::TemporalInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::IntlInitializationState; Dormant => 0, Building => 1, Ready => 2);
+enum_i32_codec!(crate::heap::ErrorInitializationState; Dormant => 0, Building => 1, Ready => 2);
+enum_i32_codec!(crate::heap::ErrorIntrinsicConstructor; Error => 0, EvalError => 1, AggregateError => 2, SuppressedError => 3, RangeError => 4, SyntaxError => 5, TypeError => 6, URIError => 7, ReferenceError => 8);
 enum_i32_codec!(crate::heap::BinaryDataInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::BinaryDataConstructor; ArrayBuffer => 0, SharedArrayBuffer => 1, DataView => 2, Float64Array => 3, Float32Array => 4, Float16Array => 5, Int32Array => 6, Int16Array => 7, Int8Array => 8, Uint32Array => 9, Uint16Array => 10, Uint8Array => 11, Uint8ClampedArray => 12, BigInt64Array => 13, BigUint64Array => 14);
 enum_i32_codec!(crate::heap::PromiseReactionType; Fulfill => 1, Reject => 2);
@@ -673,6 +697,10 @@ impl<R: GcFunctionRole, N: GcFieldNullability> FunctionLocal<R, N> {
         function.instruction(&Instruction::LocalGet(self.index));
         FunctionStackReference { shape: PhantomData }
     }
+    pub(crate) fn replace(&self, value: FunctionStackReference<R, N>, function: &mut Function) {
+        let FunctionStackReference { .. } = value;
+        function.instruction(&Instruction::LocalSet(self.index));
+    }
     pub(crate) fn clear(self, function: &mut Function) {
         function.instruction(&Instruction::RefNull(HeapType::Concrete(
             R::SIGNATURE.type_index(),
@@ -693,6 +721,14 @@ impl<R: GcFunctionRole, N: GcFieldNullability> FunctionLocalSlot<R, N> {
             index: self.index,
             shape: PhantomData,
         }
+    }
+}
+impl<R: GcFunctionRole> FunctionLocalSlot<R, Nullable> {
+    pub(crate) fn initialize_null(self, function: &mut Function) -> FunctionLocal<R, Nullable> {
+        function.instruction(&Instruction::RefNull(HeapType::Concrete(
+            R::SIGNATURE.type_index(),
+        )));
+        self.initialize(FunctionStackReference { shape: PhantomData }, function)
     }
 }
 impl<R: GcFunctionRole> FunctionStackReference<R, Nullable> {
@@ -2120,6 +2156,20 @@ impl RuntimeSchema {
             index: function.reserve_typed_local(ValType::Ref(reference_type)),
             heap_type: reference_type.heap_type,
             shape: PhantomData,
+        }
+    }
+
+    pub(crate) fn reserve_gc_frame_cache<T: GcHeapType>(
+        &self,
+        function: &mut Function,
+    ) -> GcFrameCache<T> {
+        let reference_type = self.reference_type::<T>(GcNullability::Nullable);
+        GcFrameCache {
+            root: GcLocal {
+                index: function.reserve_fresh_typed_local(ValType::Ref(reference_type)),
+                heap_type: reference_type.heap_type,
+                shape: PhantomData,
+            },
         }
     }
     pub(crate) fn parameter_i32(&self, index: u32, function: &Function) -> I32Local {

@@ -2,9 +2,9 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredIntlNamespace, GcHeapType, GcNullability, GcSnapshotField, GcStructHeapType,
-    GlobalLedger, IntrinsicTable, OrdinaryObject, PropertyValue, RealmRecord, RuntimeModuleTypes,
-    RuntimeSchema, StoredValue,
+    DeferredIntlNamespace, GcHeapType, GcNullability, GcSnapshotField, GlobalLedger,
+    IntrinsicTable, OrdinaryObject, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
+    StoredValue,
 };
 use crate::heap::IntlInitializationState;
 
@@ -216,8 +216,12 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     let realm_index = type_index::<RealmRecord>(schema);
     // ABI 38 appends the state and retained namespace to RealmRecord. Check
     // their physical types below without exposing private encoder ordinals.
-    let state_field = RealmRecord::FIELD_COUNT - 3;
-    let namespace_field = RealmRecord::FIELD_COUNT - 2;
+    let state_field = crate::gc_types::RealmRecordSchema::INTL_STATE
+        .ordinal()
+        .raw();
+    let namespace_field = crate::gc_types::RealmRecordSchema::INTL_NAMESPACE
+        .ordinal()
+        .raw();
     assert!(resolve.windows(5).any(|ops| matches!(ops,
         [Operator::StructGet { struct_type_index, field_index }, Operator::LocalSet { local_index: retained_realm },
          Operator::LocalGet { local_index: argument_realm }, Operator::RefAsNonNull, Operator::Call { function_index }]

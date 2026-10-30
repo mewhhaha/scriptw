@@ -1,7 +1,7 @@
 //! Scalar source regions retain JavaScript values and abrupt evaluation order.
 use scriptw_engine::{
     CompileOptions, Engine, ExecutionBackend, ObservedCompletion, ObservedJsValue, RealmBuilder,
-    RunOptions,
+    RunOptions, WasmExecutionFailureKind,
 };
 
 fn assert_scalar_execution(source: &str) {
@@ -21,6 +21,200 @@ fn assert_scalar_execution(source: &str) {
         outcome.completion,
         ObservedCompletion::Normal(ObservedJsValue::Boolean(true)),
         "{source}"
+    );
+}
+
+fn assert_scalar_execution_modes(source: &str) {
+    for directive in ["", "\"use strict\";\n"] {
+        assert_scalar_execution(&format!("{directive}{source}"));
+    }
+}
+
+#[test]
+fn scalar_chunks_keep_epoch_deadlines_between_bounded_groups() {
+    scriptw_engine::configure_compilation_jobs(1).expect("one compilation worker");
+    for directive in ["", "\"use strict\";\n"] {
+        for body in [
+            "value=value*1.0000000000000002+index/7;",
+            "value=(Math.imul(value,3)+1)>>>0;",
+        ] {
+            let source = format!("{directive}(function run(){{var value=1;for(var index=0;index<1000000000000;index++){{{body}}}return value;}})();");
+            let error = Engine::new(RealmBuilder::new().build())
+                .observe_script(
+                    &source,
+                    CompileOptions::default(),
+                    RunOptions {
+                        timeout_ms: Some(100),
+                        ..RunOptions::default()
+                    },
+                )
+                .expect_err("bounded groups must retain interruptible loop backedges");
+            assert_eq!(
+                error.wasm_execution_failure_kind(),
+                Some(WasmExecutionFailureKind::Timeout),
+                "{source}: {error}"
+            );
+        }
+    }
+}
+
+#[test]
+fn scalar_unrolled_iterations_preserve_rounding_tails_and_counter_boundaries() {
+    assert_scalar_execution_modes(
+        r#"
+function up(value,start,stop) {
+  var index=start;
+  for(; (index+0)<stop; index++) value=(value+index*0.1)*1.0000000000000002-index/7;
+  return [value,index];
+}
+function referenceUp(value,index,stop) {
+  while((index+0)<stop) {value=(value+index*0.1)*1.0000000000000002-index/7;index++;}
+  return [value,index];
+}
+function down(value,start,stop) {
+  var index=start;
+  for(; stop<index; index=index-1) value=(value+index*0.1)*1.0000000000000002-index/7;
+  return [value,index];
+}
+function referenceDown(value,index,stop) {
+  while(stop<index) {value=(value+index*0.1)*1.0000000000000002-index/7;index--;}
+  return [value,index];
+}
+function inclusive(value,start,stop) {
+  var index=start;
+  for(; stop<=index; index-=1) value=(value+index*0.1)*1.0000000000000002-index/7;
+  return [value,index];
+}
+function referenceInclusive(value,index,stop) {
+  while(stop<=index) {value=(value+index*0.1)*1.0000000000000002-index/7;index--;}
+  return [value,index];
+}
+function same(left,right) {return Object.is(left[0],right[0]) && Object.is(left[1],right[1]);}
+var seeds=[0,-0,0.1,Number.MIN_VALUE,9007199254740992,1e308,NaN,Infinity,-Infinity];
+var okay=true;
+for(var seed=0;seed<seeds.length;seed++) {
+  for(var count=0;count<19;count++) {
+    if(!same(up(seeds[seed],0,count),referenceUp(seeds[seed],0,count))) okay=false;
+    if(!same(down(seeds[seed],count,0),referenceDown(seeds[seed],count,0))) okay=false;
+    if(!same(inclusive(seeds[seed],count,0),referenceInclusive(seeds[seed],count,0))) okay=false;
+  }
+}
+var starts=[-0,0.5,-3.25,NaN,Infinity,9007199254740988,9007199254740991,9007199254740992];
+var stops=[13.5,14.25,2,10,10,9007199254740991,9007199254740992,9007199254740992];
+for(var caseIndex=0;caseIndex<starts.length;caseIndex++) {
+  if(!same(up(-0,starts[caseIndex],stops[caseIndex]),referenceUp(-0,starts[caseIndex],stops[caseIndex]))) okay=false;
+}
+if(!same(down(1,-9007199254740991,-9007199254740992),referenceDown(1,-9007199254740991,-9007199254740992))) okay=false;
+if(!same(up(-0,0,NaN),referenceUp(-0,0,NaN))) okay=false;
+if(!same(up(-0,0,-Infinity),referenceUp(-0,0,-Infinity))) okay=false;
+if(!same(up(-0,Infinity,Infinity),referenceUp(-0,Infinity,Infinity))) okay=false;
+function zeroSign() {
+  var total=0;
+  for(var index=-0;index<13;index++) total+=1/index;
+  return total===-Infinity && index===13;
+}
+okay && zeroSign();
+"#,
+    );
+}
+
+#[test]
+fn scalar_affine_chunks_preserve_unsigned_signed_and_observable_intermediates() {
+    assert_scalar_execution_modes(
+        r#"
+function unsigned(value,count) {
+  for(var index=0;index<count;index++) value=(Math.imul(value,3)+1)>>>0;
+  return [value,index];
+}
+function referenceUnsigned(value,count) {
+  var index=0;
+  while(index<count) {value=(Math.imul(value,3)+1)>>>0;index++;}
+  return [value,index];
+}
+function signed(value,count) {
+  for(var index=count;index>0;index--) value=(Math.imul(value,5)-7)|0;
+  return [value,index];
+}
+function referenceSigned(value,count) {
+  var index=count;
+  while(index>0) {value=(Math.imul(value,5)-7)|0;index--;}
+  return [value,index];
+}
+function additive(value,count) {
+  for(var index=0;index<count;index+=1) value=((value>>>0)+4294967295)>>>0;
+  return [value,index];
+}
+function referenceAdditive(value,count) {
+  var index=0;
+  while(index<count) {value=((value>>>0)+4294967295)>>>0;index++;}
+  return [value,index];
+}
+function same(left,right) {return Object.is(left[0],right[0]) && Object.is(left[1],right[1]);}
+var seeds=[-0,0,1,-1,2147483647,2147483648,4294967295,4294967297,7.75,NaN,Infinity,-Infinity,9007199254740991,9007199254740992];
+var okay=true;
+for(var seed=0;seed<seeds.length;seed++) {
+  for(var count=0;count<27;count++) {
+    if(!same(unsigned(seeds[seed],count),referenceUnsigned(seeds[seed],count))) okay=false;
+    if(!same(signed(seeds[seed],count),referenceSigned(seeds[seed],count))) okay=false;
+    if(!same(additive(seeds[seed],count),referenceAdditive(seeds[seed],count))) okay=false;
+  }
+}
+function nested(value,count) {
+  var full=0;
+  for(var index=0;index<count;index++) value=(full=Math.imul(value,3)+4294967295)>>>0;
+  return [value,full];
+}
+function referenceNested(value,count) {
+  var full=0,index=0;
+  while(index<count) {value=(full=Math.imul(value,3)+4294967295)>>>0;index++;}
+  return [value,full];
+}
+function nonlinear(value,count) {
+  for(var index=0;index<count;index++) value=(Math.imul(value,value)+index)>>>0;
+  return value;
+}
+function referenceNonlinear(value,count) {
+  var index=0;
+  while(index<count) {value=(Math.imul(value,value)+index)>>>0;index++;}
+  return value;
+}
+var nestedActual=nested(2147483647,19),nestedExpected=referenceNested(2147483647,19);
+okay && same(nestedActual,nestedExpected) && nonlinear(123456789,19)===referenceNonlinear(123456789,19);
+"#,
+    );
+}
+
+#[test]
+fn scalar_chunks_keep_live_imul_fallback_and_written_loop_control() {
+    assert_scalar_execution_modes(
+        r#"
+function run(value,count) {
+  for(var index=0;index<count;index++) value=(Math.imul(value,3)+1)>>>0;
+  return value;
+}
+var original=Math.imul,calls=0;
+Math.imul=function(left,right){calls++;return left+right;};
+var replaced=run(1,19)===77 && calls===19;
+var descriptor=Object.getOwnPropertyDescriptor(Math,'imul'),gets=0;
+Object.defineProperty(Math,'imul',{configurable:true,get(){gets++;return original;}});
+var expected=1,index=0;
+while(index<19){expected=(original(expected,3)+1)>>>0;index++;}
+var accessor=run(1,19)===expected && gets===19;
+Object.defineProperty(Math,'imul',descriptor);
+Math.imul=original;
+function changingLimit(value,count) {
+  for(var index=0;index<count;index++){count--;value=(Math.imul(value,3)+1)>>>0;}
+  return [value,index,count];
+}
+function changingCounter(value,count) {
+  for(var index=0;index<count;index++){index++;value=(Math.imul(value,3)+1)>>>0;}
+  return [value,index];
+}
+var limit=changingLimit(1,19),counter=changingCounter(1,19),reference=1,step=0;
+while(step<10){reference=(Math.imul(reference,3)+1)>>>0;step++;}
+replaced && accessor && limit[0]===reference && limit[1]===10 && limit[2]===9 &&
+counter[0]===reference && counter[1]===20;
+"#,
     );
 }
 

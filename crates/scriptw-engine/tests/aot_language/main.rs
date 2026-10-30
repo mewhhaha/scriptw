@@ -34,6 +34,7 @@ mod aot_guarded_number_add;
 mod aot_guarded_number_relational;
 mod aot_guarded_number_update;
 mod aot_in_operand_order;
+mod aot_local_concat_length;
 mod aot_numeric_call_rows;
 mod aot_object_binding_single_get;
 mod aot_optional_private_calls;

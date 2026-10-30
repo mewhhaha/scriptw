@@ -79,7 +79,7 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // state, and returns four eager namespaces from Realm initialization.
 // Version 39 adds defining-Realm binary-data demand initialization, its state
 // and the closed public-constructor property recipe.
-const LAYOUT_VERSION: u32 = 39;
+const LAYOUT_VERSION: u32 = 40;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

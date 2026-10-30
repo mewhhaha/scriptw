@@ -60,6 +60,14 @@ fn packed_sort_revalidates_comparator_effects_and_preserves_exact_partial_writeb
 }
 
 #[test]
+fn unboxed_numeric_sort_keeps_stable_bits_and_complete_generic_fallbacks() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/numeric_sort.js"),
+        "array-unboxed-numeric-sort:ok",
+    );
+}
+
+#[test]
 fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/packed_push.js"),

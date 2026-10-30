@@ -203,7 +203,8 @@ def markdown(report, rows):
              f"{report['tools']['node']['version']}. Wasmtime 47.0.0 with the product Fast/copying-GC configuration.", '',
              'All runtimes ran together on one GitHub-hosted runner, pinned to one CPU. '
              'Each case has two rounds, each with ten warmups and seven measured invocations. '
-             'Source/Wasm compilation and instance/context setup are excluded from execution time. '
+             'Initial source/Wasm compilation and instance/context setup are excluded from execution time. '
+             "Scriptw's JavaScript Realm bootstrap and V8 tiering remain inside the timed entry. "
              'RSS is the post-execution process endpoint with the instance alive; it includes the host, '
              'compilation and retained warmup effects, and is neither live heap nor peak RSS.', '',
              'Scriptw and V8 compile JavaScript in their measured processes; Scriptc compiles JavaScript '
@@ -231,8 +232,9 @@ def readme_section(report, rows):
 Scriptw / Wasmtime, Scriptc / Wasmtime (WASI), and Node / V8; **{count}/17 Scriptc checksums passed**.
 
 Each image has its own zero-based scales. Bars show median execution time and
-post-execution process RSS. Compilation and instance/context setup are outside
-the timer; RSS includes compilation and warmup history, not live heap or peak memory.
+post-execution process RSS. Initial compilation and instance/context setup are outside
+the timer; Scriptw's JavaScript Realm bootstrap and V8 tiering remain inside.
+RSS includes compilation and warmup history, not live heap or peak memory.
 
 {gallery(rows, 'benchmarks', prefix='docs/rust-rewrite/assets')}
 

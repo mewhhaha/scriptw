@@ -9,6 +9,8 @@ use crate::objects::{
 };
 use scriptw_ir::StandardBuiltinInstaller;
 
+mod error_initialization;
+pub(crate) use error_initialization::ErrorIntrinsicBuild;
 mod binary_data_initialization;
 pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod intl_initialization;
@@ -123,8 +125,8 @@ impl<'a> FunctionBuilder<'a> {
         Ok(constructor)
     }
 
-    // The binary-data builder passes already-built parents explicitly. Resolving
-    // a typed-array parent through an ordinary read here would reenter Building.
+    // Lazy-family builders pass completed parents explicitly. An ordinary
+    // canonical parent read here would reenter their Building state.
     fn init_builtin_constructor_object_with_parent(
         &mut self,
         builtin: StandardBuiltinId,
@@ -1115,65 +1117,6 @@ impl<'a> FunctionBuilder<'a> {
             &object_prototype,
             function,
         )?;
-        for (slot, name) in [
-            (NonArrayRealmIntrinsicSlot::ErrorPrototype, "Error"),
-            (NonArrayRealmIntrinsicSlot::TypeErrorPrototype, "TypeError"),
-            (
-                NonArrayRealmIntrinsicSlot::ReferenceErrorPrototype,
-                "ReferenceError",
-            ),
-            (NonArrayRealmIntrinsicSlot::EvalErrorPrototype, "EvalError"),
-            (
-                NonArrayRealmIntrinsicSlot::AggregateErrorPrototype,
-                "AggregateError",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::SuppressedErrorPrototype,
-                "SuppressedError",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::RangeErrorPrototype,
-                "RangeError",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::SyntaxErrorPrototype,
-                "SyntaxError",
-            ),
-            (NonArrayRealmIntrinsicSlot::URIErrorPrototype, "URIError"),
-        ] {
-            if slot.gc_index() == NonArrayRealmIntrinsicSlot::ErrorPrototype.gc_index() {
-                parent.copy_from(&object_prototype, function);
-            } else {
-                self.emit_load_non_array_realm_intrinsic(
-                    realm,
-                    NonArrayRealmIntrinsicSlot::ErrorPrototype,
-                    &parent,
-                    function,
-                );
-            }
-            // Error prototype objects have no [[ErrorData]] marker.
-            let prototype = self.emit_bootstrap_namespace(&parent, function)?;
-            self.emit_install_intrinsic_string(
-                &prototype,
-                IntrinsicKey::Name("name"),
-                name,
-                true,
-                false,
-                true,
-                function,
-            )?;
-            self.emit_install_intrinsic_string(
-                &prototype,
-                IntrinsicKey::Name("message"),
-                "",
-                true,
-                false,
-                true,
-                function,
-            )?;
-            self.emit_store_non_array_realm_intrinsic(realm, slot, &prototype, function);
-            prototype.clear(function);
-        }
         self.emit_bootstrap_constructor_from_slot(
             StandardBuiltinId::FunctionConstructor,
             &context,
@@ -1350,46 +1293,6 @@ impl<'a> FunctionBuilder<'a> {
                     constructor.clear(function);
                 }
             }
-        }
-        for (builtin, slot) in [
-            (
-                StandardBuiltinId::ErrorConstructor,
-                NonArrayRealmIntrinsicSlot::ErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::EvalErrorConstructor,
-                NonArrayRealmIntrinsicSlot::EvalErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::AggregateErrorConstructor,
-                NonArrayRealmIntrinsicSlot::AggregateErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::SuppressedErrorConstructor,
-                NonArrayRealmIntrinsicSlot::SuppressedErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::RangeErrorConstructor,
-                NonArrayRealmIntrinsicSlot::RangeErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::SyntaxErrorConstructor,
-                NonArrayRealmIntrinsicSlot::SyntaxErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::TypeErrorConstructor,
-                NonArrayRealmIntrinsicSlot::TypeErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::URIErrorConstructor,
-                NonArrayRealmIntrinsicSlot::URIErrorPrototype,
-            ),
-            (
-                StandardBuiltinId::ReferenceErrorConstructor,
-                NonArrayRealmIntrinsicSlot::ReferenceErrorPrototype,
-            ),
-        ] {
-            self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
         }
         parent.clear(function);
         function_prototype.clear(function);
@@ -1669,6 +1572,18 @@ impl<'a> FunctionBuilder<'a> {
                     continue;
                 }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
+                    if let Some(constructor) =
+                        crate::heap::ErrorIntrinsicConstructor::from_builtin(*builtin)
+                    {
+                        self.emit_install_deferred_error_constructor(
+                            &object,
+                            &binding.name,
+                            constructor,
+                            &bootstrap.realm,
+                            function,
+                        )?;
+                        continue;
+                    }
                     if let Some(constructor) =
                         crate::heap::BinaryDataConstructor::from_builtin(*builtin)
                     {

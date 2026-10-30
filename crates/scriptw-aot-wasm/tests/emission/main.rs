@@ -18,6 +18,7 @@ mod constant_number_condition_emission;
 mod embedding;
 mod emit_golden;
 mod foreign_functions;
+mod guarded_push;
 mod host_html_dda_structure;
 mod iterator_helper_dispatch;
 mod numeric_bitwise_emission;

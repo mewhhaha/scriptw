@@ -150,6 +150,8 @@ closed_scalar_storage!(
     crate::heap::IntlInitializationState,
     crate::heap::BinaryDataInitializationState,
     crate::heap::BinaryDataConstructor,
+    crate::heap::ErrorInitializationState,
+    crate::heap::ErrorIntrinsicConstructor,
     crate::heap::DisposableStackState,
     crate::heap::AsyncDisposableStackState,
     crate::heap::DisposableStackEntryKind,
@@ -868,6 +870,10 @@ gc_layout_registry! {
         struct DeferredIntlNamespace: PropertyValue => DeferredIntlNamespaceSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
         }
+        struct DeferredErrorConstructor: PropertyValue => DeferredErrorConstructorSchema {
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            CONSTRUCTOR: crate::heap::ErrorIntrinsicConstructor, Immutable, NonNullable;
+        }
         struct DeferredBinaryDataConstructor: PropertyValue => DeferredBinaryDataConstructorSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             CONSTRUCTOR: crate::heap::BinaryDataConstructor, Immutable, NonNullable;
@@ -1429,6 +1435,7 @@ gc_layout_registry! {
             INTL_STATE: crate::heap::IntlInitializationState, Mutable, NonNullable;
             INTL_NAMESPACE: GcRef<StoredValue>, Mutable, Nullable;
             BINARY_DATA_STATE: crate::heap::BinaryDataInitializationState, Mutable, NonNullable;
+            ERROR_STATE: crate::heap::ErrorInitializationState, Mutable, NonNullable;
         }
         // Opt-in host observations retain actual Realm records without adding
         // a JavaScript property or consulting mutable globals/prototypes.

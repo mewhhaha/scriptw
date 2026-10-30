@@ -12,6 +12,7 @@ mod bootstrap_undefined;
 mod call_arity;
 mod constant_leaf;
 mod direct_eval_dispatch;
+mod error_demand_initialization;
 mod guarded_number_add;
 mod guarded_number_relational;
 mod intl_demand_initialization;

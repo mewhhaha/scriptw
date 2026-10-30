@@ -2,6 +2,8 @@
 use super::*;
 use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcNullability, StringValue};
 
+mod local_binding;
+
 /// An effect-free, exact `length` key. Computed expressions cannot mint this
 /// proof merely because their inferred kind or eventual value is String.
 struct StaticLengthKey;
@@ -26,6 +28,7 @@ struct ConcatLengthConsumer<'a> {
     target: &'a TypedExpr,
     left: &'a TypedExpr,
     right: &'a TypedExpr,
+    fallback_binding: Option<crate::emit::LocalBindingId>,
 }
 impl<'a> ConcatLengthConsumer<'a> {
     fn new(target: &'a TypedExpr, _key: StaticLengthKey) -> Option<Self> {
@@ -37,6 +40,7 @@ impl<'a> ConcatLengthConsumer<'a> {
             target,
             left: lhs,
             right: rhs,
+            fallback_binding: None,
         })
     }
 }
@@ -287,6 +291,12 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         self.finish_coercive_add_completion(&added, function)?;
+        if let Some(binding) = plan.fallback_binding {
+            // The sole-use local consumer may elide its unobserved String,
+            // but the fallback still initializes the real full JavaScript
+            // value before ordinary property access or a getter can run.
+            self.write_binding_from_locals(BindingStorage::Local(binding), added.value(), function);
+        }
         self.compile_property_read_from_locals(
             plan.target,
             &PropertyKeyIr::ArrayLength,

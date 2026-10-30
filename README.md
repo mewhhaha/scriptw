@@ -21,23 +21,27 @@ can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
 Runtime initialization uses compact intrinsic-installation tables and defers
-the Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
+the Error, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 39
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 40
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
 other values retain the full coercion path. Closed scalar loops retain proven
-32-bit integers in integer locals while preserving Number values at their exits.
+32-bit integers in integer locals, with bounded unrolling and exact integer
+recurrence reduction while preserving Number values at their exits.
 Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
-semantic checks pass. Property reads reject impossible length keys before
+semantic checks pass. Guarded fixed-arity push calls avoid temporary argument
+lists; own-data reads retain immutable lookup metadata within an invocation and
+check live storage and shape before loading a slot. Property reads reject impossible length keys before
 resolving the canonical name; guarded join calls reuse explicit String separators.
 Exact static `.length` reads use actual String or Array storage; computed keys
 and other receivers retain ordinary lookup. Guarded constant-return
-calls eliminate temporary objects and call setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
-and writeback retain ordinary mutation checks. The benchmark sections below
+calls eliminate temporary objects and call setup. Pure numeric sort callbacks
+have typed entries; packed Number sort snapshots stay unboxed, admit the callback
+once and recognize ordered runs. Writeback retains ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
 
 The [matched local join/property checkpoint](docs/rust-rewrite/join-hotpaths-20261030.json)
@@ -84,8 +88,9 @@ history. Cross-cohort RSS differences do not establish causal savings.
 Scriptw / Wasmtime, Scriptc / Wasmtime (WASI), and Node / V8; **17/17 Scriptc checksums passed**.
 
 Each image has its own zero-based scales. Bars show median execution time and
-post-execution process RSS. Compilation and instance/context setup are outside
-the timer; RSS includes compilation and warmup history, not live heap or peak memory.
+post-execution process RSS. Initial compilation and instance/context setup are outside
+the timer; Scriptw's JavaScript Realm bootstrap and V8 tiering remain inside.
+RSS includes compilation and warmup history, not live heap or peak memory.
 
 <table>
 <tr>

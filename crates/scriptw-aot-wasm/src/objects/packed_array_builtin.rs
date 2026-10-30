@@ -6,6 +6,9 @@ use crate::gc_types::{
     ArrayObjectSchema, JavaScriptObject, NumberBitsI64Array, PackedValueTable, ValueArray,
 };
 
+mod fixed_push;
+mod numeric_sort;
+
 /// Available only inside the concrete-Array, captured-length and packed-mode
 /// guard. Packed modes contain default writable/enumerable/configurable data.
 pub(crate) struct PackedArraySnapshot {
@@ -406,14 +409,19 @@ impl FunctionBuilder<'_> {
         Ok(permitted)
     }
 
-    pub(crate) fn emit_try_packed_array_push(
+    fn emit_try_packed_array_append(
         &mut self,
         receiver: &ValueLocals,
         captured_length: I64Local,
-        arguments: &GcLocal<ValueArray>,
         count: I32Local,
         length: I64Local,
         f: &mut Function,
+        publish: impl FnOnce(
+            &mut Self,
+            &PackedArraySnapshot,
+            I64Local,
+            &mut Function,
+        ) -> Result<(), EmitError>,
     ) -> Result<I32Local, EmitError> {
         let s = self.runtime_schema();
         let handled = s.reserve_i32_local(f);
@@ -467,8 +475,32 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::I32Eqz);
                 s.release_i32_local(permitted, f);
                 builder.emit_branch_if_to_target(decline, f);
-                // All semantic guards have completed before the first publication.
-                // This is the existing sole indexed growth/publication authority.
+                // No user code runs after admission and before publication.
+                publish(builder, packed, captured_length, f)?;
+                handled.set_constant(1, f);
+                Ok(())
+            },
+        )?;
+        Ok(handled)
+    }
+
+    pub(crate) fn emit_try_packed_array_push(
+        &mut self,
+        receiver: &ValueLocals,
+        captured_length: I64Local,
+        arguments: &GcLocal<ValueArray>,
+        count: I32Local,
+        length: I64Local,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let s = self.runtime_schema();
+        self.emit_try_packed_array_append(
+            receiver,
+            captured_length,
+            count,
+            length,
+            f,
+            |builder, packed, captured_length, f| {
                 let position = s.reserve_i32_local(f);
                 position.set_constant(0, f);
                 let index = s.reserve_i64_local(f);
@@ -502,10 +534,8 @@ impl FunctionBuilder<'_> {
                 value.clear(f);
                 s.release_i64_local(index, f);
                 s.release_i32_local(position, f);
-                handled.set_constant(1, f);
                 Ok(())
             },
-        )?;
-        Ok(handled)
+        )
     }
 }

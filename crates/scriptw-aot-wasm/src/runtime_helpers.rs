@@ -1136,6 +1136,9 @@ runtime_helper_domain! {
     TransientByteAlloc / TransientByteAllocArguments / TransientByteAllocParameters / "transient_byte_alloc" { size:I64 } => I64;
     ArrayIndexedPublishDefaultData / ArrayIndexedPublishDefaultDataArguments / ArrayIndexedPublishDefaultDataParameters / "array_indexed_publish_default_data" { array:(Ref ArrayObject NonNullable),index:I64,value:Value } => Void;
     ArrayPackedJoin / ArrayPackedJoinArguments / ArrayPackedJoinParameters / "array_packed_join" { receiver:Value,length:I64,separator:(Ref StringValue NonNullable) } => (Ref StringValue Nullable);
+    ArrayPackedPush1 / ArrayPackedPush1Arguments / ArrayPackedPush1Parameters / "array_packed_push1" { receiver:Value,first:Value } => Completion;
+    ArrayPackedPush2 / ArrayPackedPush2Arguments / ArrayPackedPush2Parameters / "array_packed_push2" { receiver:Value,first:Value,second:Value } => Completion;
+    ArrayPackedPush3 / ArrayPackedPush3Arguments / ArrayPackedPush3Parameters / "array_packed_push3" { receiver:Value,first:Value,second:Value,third:Value } => Completion;
     ArrayIndexedPublish / ArrayIndexedPublishArguments / ArrayIndexedPublishParameters / "array_indexed_publish" { storage:(Ref ArrayIndexStorage NonNullable),index:I64,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
     ArrayIndexedDelete / ArrayIndexedDeleteArguments / ArrayIndexedDeleteParameters / "array_indexed_delete" { storage:(Ref ArrayIndexStorage NonNullable),index:I64 } => Void;
     ObjectRead / ObjectReadArguments / ObjectReadParameters / "object_read" { target:Value,receiver:Value,key:Key,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1172,6 +1175,7 @@ runtime_helper_domain! {
     RealmInitializeIntrinsics / RealmInitializeIntrinsicsArguments / RealmInitializeIntrinsicsParameters / "realm_initialize_intrinsics" { realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => RealmInitializeIntrinsics;
     RealmEnsureTemporal / RealmEnsureTemporalArguments / RealmEnsureTemporalParameters / "realm_ensure_temporal" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     RealmEnsureBinaryData / RealmEnsureBinaryDataArguments / RealmEnsureBinaryDataParameters / "realm_ensure_binary_data" { realm:(Ref RealmRecord NonNullable) } => Void;
+    RealmEnsureErrors / RealmEnsureErrorsArguments / RealmEnsureErrorsParameters / "realm_ensure_errors" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureIntl / RealmEnsureIntlArguments / RealmEnsureIntlParameters / "realm_ensure_intl" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     ArrayIteratorStepValue / ArrayIteratorStepValueArguments / ArrayIteratorStepValueParameters / "array_iterator_step_value" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ArrayIteratorElision / ArrayIteratorElisionArguments / ArrayIteratorElisionParameters / "array_iterator_elision" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1307,6 +1311,9 @@ impl RuntimeHelperId {
             Self::TransientByteAlloc => HelperOwner::Runtime,
             Self::ArrayIndexedPublishDefaultData => HelperOwner::Runtime,
             Self::ArrayPackedJoin => HelperOwner::Runtime,
+            Self::ArrayPackedPush1 | Self::ArrayPackedPush2 | Self::ArrayPackedPush3 => {
+                HelperOwner::Runtime
+            }
             Self::ArrayIndexedPublish => HelperOwner::Runtime,
             Self::ArrayIndexedDelete => HelperOwner::Runtime,
             Self::ObjectRead => HelperOwner::Runtime,
@@ -1344,6 +1351,7 @@ impl RuntimeHelperId {
             Self::RealmInitializeIntrinsics => HelperOwner::Runtime,
             Self::RealmEnsureTemporal => HelperOwner::Runtime,
             Self::RealmEnsureBinaryData => HelperOwner::Runtime,
+            Self::RealmEnsureErrors => HelperOwner::Runtime,
             Self::RealmEnsureIntl => HelperOwner::Runtime,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision
@@ -1465,6 +1473,7 @@ impl RuntimeHelperId {
             Self::TransientByteAlloc => true,
             Self::ArrayIndexedPublishDefaultData => true,
             Self::ArrayPackedJoin => true,
+            Self::ArrayPackedPush1 | Self::ArrayPackedPush2 | Self::ArrayPackedPush3 => true,
             Self::ArrayIndexedPublish => true,
             Self::ArrayIndexedDelete => true,
             Self::ObjectRead => true,
@@ -1502,6 +1511,7 @@ impl RuntimeHelperId {
             Self::RealmInitializeIntrinsics => true,
             Self::RealmEnsureTemporal => true,
             Self::RealmEnsureBinaryData => true,
+            Self::RealmEnsureErrors => true,
             Self::RealmEnsureIntl => true,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision

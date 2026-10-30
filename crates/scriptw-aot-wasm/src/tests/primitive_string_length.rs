@@ -144,6 +144,53 @@ fn validate_program(artifact: &WasmArtifact) {
 }
 
 #[test]
+fn whole_function_local_concat_length_elides_only_the_single_unobserved_value() {
+    for declaration in ["const joined=left+right;", "let joined=left+right;"] {
+        let source = format!("function read(left,right){{{declaration}return joined.length;}} read(globalThis.left,globalThis.right);");
+        let artifact = emit_script(&source).unwrap();
+        validate_program(&artifact);
+        let operators = source_body(&artifact, "read");
+        let branch = concat_length_branch(&operators).expect(
+            "the complete local definition and sole return use reach the real fused consumer",
+        );
+        assert!(
+            branch.iter().all(|op| !matches!(
+                op,
+                Operator::Call { .. }
+                    | Operator::CallRef { .. }
+                    | Operator::StructNew { .. }
+                    | Operator::ArrayNew { .. }
+                    | Operator::ArrayNewFixed { .. }
+                    | Operator::ArrayNewDefault { .. }
+            )),
+            "actual Strings produce their length without allocating the local concatenation"
+        );
+        assert!(
+            operators
+                .iter()
+                .any(|op| matches!(op, Operator::Call { .. })),
+            "the complete coercion/property fallback remains in the same source body"
+        );
+    }
+    for source in [
+        "function read(left,right){const joined=left+right;return [joined,joined.length];} read(globalThis.left,globalThis.right);",
+        "function read(left,right){let joined=left+right;joined='changed';return joined.length;} read(globalThis.left,globalThis.right);",
+        "function read(left,right,key){const joined=left+right;return joined[key];} read(globalThis.left,globalThis.right,globalThis.key);",
+        "function read(left,right){const joined=left()+right;return joined.length;} read(globalThis.left,globalThis.right);",
+        "function read(left,right){const joined=left+right;return (()=>joined.length)();} read(globalThis.left,globalThis.right);",
+        "function read(left,right){let joined=joined+right;return joined.length;} read(globalThis.left,globalThis.right);",
+        "function read(left,right){const joined=left+right;return eval('joined.length');} read(globalThis.left,globalThis.right);",
+        "async function read(left,right){const joined=left+right;return joined.length;} read(globalThis.left,globalThis.right);",
+        "function* read(left,right){const joined=left+right;return joined.length;} read(globalThis.left,globalThis.right);",
+    ] {
+        let artifact = emit_script(source).unwrap();
+        validate_program(&artifact);
+        assert!(concat_length_branch(&source_body(&artifact, "read")).is_none(),
+            "another reference, capture, eval, TDZ, effectful operand or resumable body retains the original local: {source}");
+    }
+}
+
+#[test]
 fn static_and_canonical_get_v_length_read_actual_strings_and_arrays_before_lookup() {
     for (source, generic) in [
         (

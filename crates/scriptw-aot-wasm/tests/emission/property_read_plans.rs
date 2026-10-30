@@ -1,24 +1,38 @@
 //! Source read plans retain guarded own-data loads and complete Get fallbacks.
-use scriptw_aot_wasm::{emit, RUNTIME_IMPORT_NAMESPACE};
+use scriptw_aot_wasm::{
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    RUNTIME_IMPORT_NAMESPACE,
+};
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower, ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind};
 use std::collections::BTreeMap;
-use wasmparser::{ExternalKind, KnownCustom, Name, Operator, Parser, Payload, TypeRef};
+use wasmparser::{
+    CompositeInnerType, ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload,
+    StorageType, TypeRef, UnpackedIndex, ValType, Validator, WasmFeatures,
+};
 
 #[derive(Default)]
-struct Module<'a> {
+pub(super) struct Module<'a> {
+    pub(super) types: Vec<wasmparser::SubType>,
     names: BTreeMap<u32, String>,
     imports: BTreeMap<u32, (String, String)>,
     exports: BTreeMap<String, u32>,
     bodies: BTreeMap<u32, Vec<Operator<'a>>>,
+    globals: Vec<wasmparser::GlobalType>,
+    global_exports: BTreeMap<String, u32>,
 }
 
 impl<'a> Module<'a> {
-    fn read(bytes: &'a [u8], operators: bool) -> Self {
+    pub(super) fn read(bytes: &'a [u8], operators: bool) -> Self {
         let mut module = Self::default();
         let mut next_function = 0;
         for payload in Parser::new(0).parse_all(bytes) {
             match payload.expect("property-read module decodes") {
+                Payload::TypeSection(reader) => {
+                    for group in reader {
+                        module.types.extend(group.unwrap().types().cloned());
+                    }
+                }
                 Payload::ImportSection(reader) => {
                     for import in reader.into_imports() {
                         let import = import.expect("property-read import decodes");
@@ -28,17 +42,30 @@ impl<'a> Module<'a> {
                                 (import.module.to_owned(), import.name.to_owned()),
                             );
                             next_function += 1;
+                        } else if let TypeRef::Global(ty) = import.ty {
+                            module.globals.push(ty);
                         }
                     }
                 }
                 Payload::ExportSection(reader) => {
                     for export in reader {
                         let export = export.expect("property-read export decodes");
-                        if export.kind == ExternalKind::Func {
-                            module.exports.insert(export.name.to_owned(), export.index);
+                        match export.kind {
+                            ExternalKind::Func => {
+                                module.exports.insert(export.name.to_owned(), export.index);
+                            }
+                            ExternalKind::Global => {
+                                module
+                                    .global_exports
+                                    .insert(export.name.to_owned(), export.index);
+                            }
+                            _ => {}
                         }
                     }
                 }
+                Payload::GlobalSection(reader) => module
+                    .globals
+                    .extend(reader.into_iter().map(|global| global.unwrap().ty)),
                 Payload::CodeSectionEntry(body) => {
                     let body = if operators {
                         body.get_operators_reader()
@@ -75,7 +102,7 @@ impl<'a> Module<'a> {
         module
     }
 
-    fn named(&self, prefix: &str) -> (u32, &[Operator<'a>]) {
+    pub(super) fn named(&self, prefix: &str) -> (u32, &[Operator<'a>]) {
         let matches = self
             .names
             .iter()
@@ -105,7 +132,7 @@ impl<'a> Module<'a> {
         )
     }
 
-    fn imported_runtime_function(&self, runtime: &Self, definition: u32) -> u32 {
+    pub(super) fn imported_runtime_function(&self, runtime: &Self, definition: u32) -> u32 {
         let matches = self
             .imports
             .iter()
@@ -118,13 +145,24 @@ impl<'a> Module<'a> {
         assert_eq!(matches.len(), 1, "P imports the actual runtime definition");
         matches[0]
     }
+
+    pub(super) fn witness_type(&self, layout: GcSnapshotLayout) -> u32 {
+        let index = self.global_exports[layout.witness_export()];
+        let ValType::Ref(reference) = self.globals[index as usize].content_type else {
+            panic!("snapshot witness retains a GC reference");
+        };
+        let HeapType::Concrete(UnpackedIndex::Module(index)) = reference.heap_type() else {
+            panic!("snapshot witness retains a concrete GC type");
+        };
+        index
+    }
 }
 
 fn count(body: &[Operator<'_>], predicate: impl Fn(&Operator<'_>) -> bool) -> usize {
     body.iter().filter(|operator| predicate(operator)).count()
 }
 
-fn calls(body: &[Operator<'_>], target: u32) -> bool {
+pub(super) fn calls(body: &[Operator<'_>], target: u32) -> bool {
     body.iter().any(|operator| {
         matches!(operator,
             Operator::Call { function_index } | Operator::ReturnCall { function_index }
@@ -195,6 +233,87 @@ fn assert_numeric_probe_before_conversion(body: &[Operator<'_>], conversion: u32
     );
 }
 
+fn frame_end(body: &[Operator<'_>], start: usize) -> usize {
+    let mut depth = 1;
+    for (offset, op) in body[start + 1..].iter().enumerate() {
+        match op {
+            Operator::If { .. }
+            | Operator::Block { .. }
+            | Operator::Loop { .. }
+            | Operator::TryTable { .. }
+            | Operator::Try { .. } => depth += 1,
+            Operator::End => {
+                depth -= 1;
+                if depth == 0 {
+                    return start + offset + 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("encoded control frame is balanced");
+}
+
+fn assert_inline_cache_hit_bypasses_runtime(body: &[Operator<'_>], cache: u32) {
+    let call = body
+        .iter()
+        .position(|op| {
+            matches!(op,
+        Operator::Call { function_index } if *function_index == cache)
+        })
+        .unwrap();
+    let (miss, found) = body
+        .windows(3)
+        .enumerate()
+        .filter_map(|(start, ops)| {
+            let [Operator::LocalGet { local_index }, Operator::I32Eqz, Operator::If { .. }] = ops
+            else {
+                return None;
+            };
+            let end = frame_end(body, start + 2);
+            (start < call && call < end).then_some((start, *local_index))
+        })
+        .last()
+        .expect("the runtime cache call is dominated by the inline hit flag's miss branch");
+    let publication = body[..miss]
+        .windows(2)
+        .rposition(|ops| {
+            matches!(ops,
+        [Operator::I32Const { value: 1 }, Operator::LocalSet { local_index }]
+            if *local_index == found)
+        })
+        .expect("the direct typed load publishes its hit flag");
+    let proof = body[..publication]
+        .windows(3)
+        .rposition(|ops| {
+            matches!(
+                ops,
+                [Operator::RefEq, Operator::I32And, Operator::If { .. }]
+            )
+        })
+        .expect("actual shape and static key identity admit the typed slot load");
+    let hit = &body[proof + 3..publication];
+    assert!(
+        hit.iter()
+            .any(|op| matches!(op, Operator::StructGet { .. }))
+            && hit.iter().any(|op| matches!(op, Operator::ArrayGet { .. })),
+        "P directly loads live inline and array-backed compact slots"
+    );
+    assert!(
+        !hit.iter().any(|op| matches!(
+            op,
+            Operator::Call { .. }
+                | Operator::ReturnCall { .. }
+                | Operator::CallRef { .. }
+                | Operator::StructNew { .. }
+                | Operator::ArrayNew { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::ArrayNewFixed { .. }
+        )),
+        "the admitted own-data region calls no runtime/user code and creates no snapshot"
+    );
+}
+
 #[test]
 fn own_data_cache_and_numeric_array_reads_keep_guarded_loads_and_get_fallbacks() {
     std::thread::Builder::new()
@@ -212,7 +331,12 @@ function arrayControl(value) { var array = [value]; return array; }
 function lengthRead(value) { var array = [value]; return array.length; }
 function unresolvedRead(record) { return record.x; }
 function computedRead(record, key) { return record[key]; }
-[ownCandidate, ownControl, indexRead, arrayControl, lengthRead, unresolvedRead, computedRead];
+function repeatedRead(record, count, callback) {
+  var sum = 0;
+  for (var i = 0; i < count; i++) { callback(record, i); sum += record.x; }
+  return sum;
+}
+[ownCandidate, ownControl, indexRead, arrayControl, lengthRead, unresolvedRead, computedRead, repeatedRead];
 "#;
             let parsed = parse(source, ParseOptions::script()).expect("property fixtures parse");
             let lowered = lower(&parsed);
@@ -258,7 +382,13 @@ function computedRead(record, key) { return record[key]; }
                     && operands[1].possible_kinds.contains(ValueKind::Number)),
                 "the indexed-read control exercises canonical GetV, not only PropertyRead"
             );
-            let artifact = emit(&lowered).expect("property fixtures emit compiled Wasm");
+            let artifact = emit_with_rooted_snapshot(
+                &lowered, PromiseRejectionPolicy::Ignore,
+                &scriptw_intl::IntlCompilationProfile::Minimal,
+            ).expect("property fixtures emit compiled Wasm");
+            for bytes in [&artifact.bytes[..], artifact.runtime().unwrap().bytes()] {
+                Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+            }
             let program = Module::read(&artifact.bytes, true);
             let runtime = Module::read(
                 artifact
@@ -275,6 +405,7 @@ function computedRead(record, key) { return record[key]; }
             let cache = program.imported_runtime_function(&runtime, cached_definition);
             let (_, own) = program.named("js::ownCandidate#");
             let (_, unresolved) = program.named("js::unresolvedRead#");
+            let (_, repeated) = program.named("js::repeatedRead#");
             let (_, computed) = program.named("js::computedRead#");
             let (_, own_control) = program.named("js::ownControl#");
             let (_, indexed) = program.named("js::indexRead#");
@@ -302,6 +433,12 @@ function computedRead(record, key) { return record[key]; }
                 calls(unresolved, cache),
                 "unresolved literal-key GetV reaches the actual cache kernel"
             );
+            for body in [own, unresolved, repeated] {
+                assert_inline_cache_hit_bypasses_runtime(body, cache);
+            }
+            let (boxing, _) = runtime.named("helper::value_to_object");
+            assert!(!calls(unresolved, program.imported_runtime_function(&runtime, boxing)),
+                "static GetV keeps primitive boxing entirely inside the complete miss kernel");
             assert!(
                 !calls(own_control, cache),
                 "construction alone does not request a read cache"
@@ -311,6 +448,8 @@ function computedRead(record, key) { return record[key]; }
                 "computed GetV retains the complete canonical operation for guarded misses"
             );
             let (key_conversion, _) = runtime.named("helper::value_to_property_key");
+            assert!(!calls(unresolved, program.imported_runtime_function(&runtime, key_conversion)),
+                "a compiler-owned primitive static key needs no general property-key conversion");
             assert_numeric_probe_before_conversion(
                 computed,
                 program.imported_runtime_function(&runtime, key_conversion),
@@ -338,6 +477,42 @@ function computedRead(record, key) { return record[key]; }
                 )) >= 2,
                 "R loads current scalar/reference values directly from guarded storage"
             );
+            let shape = runtime.witness_type(GcSnapshotLayout::CompactShape);
+            let string = runtime.witness_type(GcSnapshotLayout::String);
+            let cache_types = runtime.types.iter().enumerate().filter_map(|(index, ty)| {
+                let CompositeInnerType::Struct(fields) = &ty.composite_type.inner else { return None; };
+                if fields.fields.len() != 3 { return None; }
+                let reference = |field: usize, target, nullable| matches!(fields.fields[field].element_type,
+                    StorageType::Val(ValType::Ref(r)) if r.is_nullable() == nullable
+                        && r.heap_type() == HeapType::Concrete(UnpackedIndex::Module(target)));
+                (reference(0, string, false) && reference(1, shape, true)
+                    && fields.fields[2].element_type == StorageType::Val(ValType::I32))
+                    .then_some(index as u32)
+            }).collect::<Vec<_>>();
+            assert_eq!(cache_types.len(), 1, "one canonical primitive key/shape/slot cache layout");
+            let (initialize, retained) = repeated.windows(3).enumerate().find_map(|(start, ops)| {
+                let [Operator::LocalGet { local_index }, Operator::RefIsNull, Operator::If { .. }] = ops else { return None; };
+                let end = frame_end(repeated, start + 2);
+                repeated[start + 3..end].iter().any(|op| matches!(op,
+                    Operator::StructNew { struct_type_index } if *struct_type_index == cache_types[0]))
+                    .then_some((start, *local_index))
+            }).expect("an invocation-local metadata root initializes lazily at the source site");
+            assert_eq!(repeated.iter().filter(|op| matches!(op,
+                Operator::LocalSet { local_index } if *local_index == retained)).count(), 1,
+                "the retained proof root is never cleared or reinitialized on a loop backedge");
+            let loop_start = repeated.iter().enumerate().find_map(|(start, op)| {
+                (matches!(op, Operator::Loop { .. }) && start < initialize
+                    && initialize < frame_end(repeated, start)).then_some(start)
+            }).expect("the cache proof is retained within the actual emitted source loop");
+            let (call, _) = runtime.named("helper::proxy_call");
+            let call = program.imported_runtime_function(&runtime, call);
+            let object = runtime.witness_type(GcSnapshotLayout::Object);
+            let live_storage = repeated[loop_start..initialize].iter().rposition(|op| matches!(op,
+                Operator::StructGet { struct_type_index, field_index }
+                    if *struct_type_index == object && *field_index == GcSnapshotField::ObjectProperties.index()))
+                .map(|offset| loop_start + offset).expect("the loop reloads actual current storage");
+            assert!(calls(&repeated[loop_start..live_storage], call),
+                "current storage admission remains after the observable source callback");
             for (name, read) in [("numeric index", indexed), ("array length", length)] {
                 assert!(
                     !read.iter().any(|operator| matches!(

@@ -1,7 +1,10 @@
-//! Static source read sites call a bounded cache kernel in optimized R. The
-//! cache retains only primitive key/immutable shape metadata; live storage and
-//! shape checks precede every direct value load, including reads after calls.
+//! Static reads retain immutable key/shape/slot proofs across operations and
+//! loop iterations. P reloads actual storage and its shape before each typed
+//! load; only a miss enters the complete cached Get kernel in R.
 use super::*;
+use crate::gc_types::{
+    CompactDataStorage, CompactDataStorageSchema, OwnDataReadCache, OwnDataReadCacheSchema,
+};
 use scriptw_ir::{HeapShape, HeapShapeProvenance, ObjectShapeProperty};
 
 enum PropertyReadPlan {
@@ -68,6 +71,11 @@ impl FunctionBuilder<'_> {
                 );
                 let canonical_key = PropertyKeyLocals::from_string(schema, &name, f);
                 name.clear(f);
+                let found =
+                    self.emit_guarded_cached_own_data_read(lookup, &canonical_key, id, result, f);
+                found.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, f);
                 schema
                     .call_helper(
                         crate::runtime_helpers::CachedPropertyReadArguments::new(
@@ -82,10 +90,118 @@ impl FunctionBuilder<'_> {
                         f,
                     )
                     .store(result, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                schema.release_i32_local(found, f);
                 canonical_key.clear(f);
                 schema.release_i32_local(id, f);
                 Ok(true)
             }
         }
+    }
+
+    fn emit_guarded_cached_own_data_read(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        site: I32Local,
+        result: &CompletionLocals,
+        f: &mut Function,
+    ) -> I32Local {
+        let schema = self.runtime_schema();
+        // This root belongs to this emitted source site for the entire Wasm
+        // invocation. It retains metadata only, never a receiver or its values.
+        let retained = schema.reserve_gc_frame_cache::<OwnDataReadCache>(f);
+        let found = schema.reserve_i32_local(f);
+        found.set_constant(0, f);
+        let header = self.emit_simple_data_header(target, f);
+        header.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let object = schema
+            .reserve_gc_local(f)
+            .initialize(header.load(schema, f).require_non_null(f), f);
+        let base = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, schema, f)
+                .reference(),
+            f,
+        );
+        base.is_subtype::<CompactDataStorage>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let storage = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<CompactDataStorage>(schema, f),
+            f,
+        );
+        retained.load(schema, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let registered = self.emit_own_data_cache_site(site, key.value(), f);
+        retained.replace(registered.load(schema, f), f);
+        registered.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let cache = schema
+            .reserve_gc_local(f)
+            .initialize(retained.load(schema, f).require_non_null(f), f);
+        let shape = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(CompactDataStorageSchema::SHAPE)
+                .read(&storage, schema, f)
+                .reference(),
+            f,
+        );
+        let cached_shape = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(OwnDataReadCacheSchema::SHAPE)
+                .read(&cache, schema, f)
+                .reference(),
+            f,
+        );
+        let cached_key = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(OwnDataReadCacheSchema::KEY)
+                .read(&cache, schema, f)
+                .reference(),
+            f,
+        );
+        shape.load(schema, f);
+        cached_shape.load(schema, f);
+        f.instruction(&Instruction::RefEq);
+        cached_key.load(schema, f);
+        key.value().reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        // The immutable shape proves an own data slot. Load this object's live
+        // scalar/reference value; a callback, promotion or other object can
+        // never reuse a previously loaded value or storage reference.
+        let slot = schema.reserve_i32_local(f);
+        schema
+            .field(OwnDataReadCacheSchema::SLOT)
+            .read(&cache, schema, f)
+            .store(slot, f);
+        let value = schema.reserve_value_local(f);
+        self.emit_compact_value_at(&storage, slot, &value, f);
+        result.set_normal(&value, f);
+        found.set_constant(1, f);
+        value.clear(f);
+        schema.release_i32_local(slot, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        cached_key.clear(f);
+        cached_shape.clear(f);
+        shape.clear(f);
+        cache.clear(f);
+        storage.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        base.clear(f);
+        object.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        header.clear(f);
+        found
     }
 }

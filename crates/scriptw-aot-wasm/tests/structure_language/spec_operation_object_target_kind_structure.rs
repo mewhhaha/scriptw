@@ -109,6 +109,29 @@ fn property_operations_keep_completed_key_and_original_receiver_authorities() {
     );
     assert!(body.contains("key_result.kind().load(function);"));
     assert!(body.contains("pending.copy_from(&key_result, function);"));
+    let convert = body
+        .find("self.emit_value_to_property_key_completion(")
+        .unwrap();
+    let reject = body
+        .find("pending.copy_from(&key_result, function);")
+        .unwrap();
+    let proof = body
+        .find("let key = PropertyKeyLocals::from_converted_value(key_value);")
+        .unwrap();
+    let dispatch = body
+        .find("self.emit_dynamic_property_read_with_key_locals(")
+        .unwrap();
+    assert!(convert < reject && reject < proof && proof < dispatch);
+    assert!(body[reject..proof].contains("self.emit_branch_to_target(property_exit, function);"));
+    assert!(body.contains("Some(key)"));
+    let cleanup = body.find("if let Some(key) = key {").unwrap();
+    let close_exit = body
+        .rfind("self.pop_control(ControlFrameKind::Block);")
+        .unwrap();
+    assert!(
+        close_exit < cleanup,
+        "all abrupt exits share the key root cleanup"
+    );
     assert!(body.contains("&lookup, &inputs[0], &key, &pending, function,"));
     assert!(body.contains("crate::runtime_helpers::OrdinarySetArguments::new("));
     assert!(body.contains("self.emit_create_data_property_or_throw("));

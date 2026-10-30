@@ -79,6 +79,9 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeHelperId::TransientByteAlloc
             | RuntimeHelperId::ArrayIndexedPublishDefaultData
             | RuntimeHelperId::ArrayPackedJoin
+            | RuntimeHelperId::ArrayPackedPush1
+            | RuntimeHelperId::ArrayPackedPush2
+            | RuntimeHelperId::ArrayPackedPush3
             | RuntimeHelperId::ArrayIndexedPublish
             | RuntimeHelperId::ArrayIndexedDelete
             | RuntimeHelperId::ObjectRead
@@ -102,6 +105,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RealmInitializeIntrinsics
             | RuntimeHelperId::RealmEnsureTemporal
             | RuntimeHelperId::RealmEnsureBinaryData
+            | RuntimeHelperId::RealmEnsureErrors
             | RuntimeHelperId::RealmEnsureIntl
             | RuntimeHelperId::FunctionCall
             | RuntimeHelperId::ProxyCall

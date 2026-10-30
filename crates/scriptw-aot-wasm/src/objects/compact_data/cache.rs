@@ -3,7 +3,7 @@
 use super::*;
 
 impl FunctionBuilder<'_> {
-    fn emit_own_data_cache_site(
+    pub(in crate::objects) fn emit_own_data_cache_site(
         &mut self,
         site: I32Local,
         key: &ValueLocals,

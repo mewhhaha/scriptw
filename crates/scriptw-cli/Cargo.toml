@@ -32,6 +32,10 @@ path = "src/bin/scriptw.rs"
 [lib]
 path = "src/lib.rs"
 
+[[example]]
+name = "compiler_precompiled_baseline"
+test = true
+
 [dev-dependencies]
 wasmtime = { version = "=47.0.0", default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "=47.0.0", default-features = false, features = ["p1"] }

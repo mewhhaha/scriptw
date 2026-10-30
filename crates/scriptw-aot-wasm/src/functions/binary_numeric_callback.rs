@@ -1,4 +1,6 @@
 //! Invoke only the actual callable's published scalar Number callback entry.
+mod sort_entry;
+
 use super::*;
 use crate::gc_types::{
     BinaryNumericCallback, ExecutableCodeKind, ExecutableCodeSchema, F64Local, FunctionObject,

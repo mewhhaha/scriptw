@@ -3,6 +3,23 @@
 use crate::*;
 
 #[test]
+fn guarded_object_paths_preserve_saved_inputs_and_live_storage_after_callbacks() {
+    let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
+        .args(["run", "--execution-backend", "wasm-aot"])
+        .arg(fixture_path("wasm_guarded_object_paths.js"))
+        .output()
+        .expect("guarded object path controls should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("backend_used: WasmAot"), "{stdout}");
+    assert!(stdout.contains("guarded-object-paths:ok"), "{stdout}");
+}
+
+#[test]
 fn numeric_array_reads_preserve_own_data_and_generic_get_semantics() {
     let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
         .args(["run", "--execution-backend", "wasm-aot"])

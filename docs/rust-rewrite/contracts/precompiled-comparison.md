@@ -51,6 +51,21 @@ presented as an uninstrumented latency measurement. Initialization performed by
 the entry API remains inside execution; registration and instance setup remain
 outside it. No cost is subtracted from either result.
 
+The example also provides an unscored existing-Realm diagnostic:
+
+```sh
+HOST prepare-retained crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths NEW_DIRECTORY
+HOST execute-retained IMAGE EXPECTED_STDOUT 7 10
+```
+
+`HOST` is a locally built `compiler_precompiled_baseline` example. Its producer
+wraps each original workload inside an exported function in a strict Module,
+recording both sources and their hashes. The consumer disables compilation,
+initializes once, retains that export, and reports initialization separately from
+repeated public calls. Every warmup and measured call drains and checks output.
+These derived-module observations have distinct, explicitly excluded schemas;
+they never replace the original Script/WASI entry measurements or their bars.
+
 The native-image transport buffers are dropped before the first Store. Both
 native modules are deserialized from bytes into the same configured engine.
 Scriptw additionally admits its matching Cargo runtime and host bindings;

@@ -1109,6 +1109,23 @@ fn emit_script_module_with_factory(
             RuntimeHelperId::ArrayPackedJoin,
             joiner.compile_array_packed_join_helper()?,
         );
+        macro_rules! register_fixed_push {
+            ($id:ident, $compile:ident) => {
+                let mut builder = FunctionBuilder::new_runtime_operation_helper(
+                    module_package.schema(),
+                    RuntimeHelperId::$id,
+                    &string_pool,
+                    &function_metas,
+                    uses_heap,
+                    runtime_bootstrap_plan.clone(),
+                    runtime_helper_base,
+                );
+                array_indexed_helper_functions.insert(RuntimeHelperId::$id, builder.$compile()?);
+            };
+        }
+        register_fixed_push!(ArrayPackedPush1, compile_array_packed_push1_helper);
+        register_fixed_push!(ArrayPackedPush2, compile_array_packed_push2_helper);
+        register_fixed_push!(ArrayPackedPush3, compile_array_packed_push3_helper);
         let mut publisher = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayIndexedPublish,
@@ -1436,6 +1453,7 @@ fn emit_script_module_with_factory(
             RealmInitializeIntrinsics, compile_realm_initialize_intrinsics_helper;
             RealmEnsureTemporal, compile_realm_ensure_temporal_helper;
             RealmEnsureBinaryData, compile_realm_ensure_binary_data_helper;
+            RealmEnsureErrors, compile_realm_ensure_errors_helper;
             RealmEnsureIntl, compile_realm_ensure_intl_helper;
             AsyncGeneratorStartBody, compile_async_generator_start_body_helper;
             AsyncGeneratorDrainQueue, compile_async_generator_drain_queue_helper;

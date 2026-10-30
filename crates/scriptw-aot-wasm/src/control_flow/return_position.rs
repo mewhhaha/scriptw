@@ -40,7 +40,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_return_position_value(
+    pub(crate) fn emit_return_position_value(
         &mut self,
         value: &ValueLocals,
         function: &mut Function,

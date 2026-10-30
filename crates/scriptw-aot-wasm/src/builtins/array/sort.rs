@@ -236,7 +236,12 @@ impl FunctionBuilder<'_> {
         Ok(list)
     }
 
-    fn emit_array_sort_min_count(&self, value: I64Local, count: I64Local, f: &mut Function) {
+    pub(super) fn emit_array_sort_min_count(
+        &self,
+        value: I64Local,
+        count: I64Local,
+        f: &mut Function,
+    ) {
         value.load(f);
         count.load(f);
         value.load(f);

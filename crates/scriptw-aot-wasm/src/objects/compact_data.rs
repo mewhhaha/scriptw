@@ -305,7 +305,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_compact_value_at(
+    pub(in crate::objects) fn emit_compact_value_at(
         &self,
         storage: &GcLocal<CompactDataStorage>,
         slot: I32Local,

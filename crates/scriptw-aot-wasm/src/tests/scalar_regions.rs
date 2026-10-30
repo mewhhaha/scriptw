@@ -176,14 +176,19 @@ fn original_numeric_workloads_contain_a_primitive_loop_and_the_generic_fallback(
     ] {
         with_source_operators(source, "workload", |operators| {
             let loops = loop_regions(operators);
-            assert_eq!(
-                loops
-                    .iter()
-                    .filter(|region| scalar_arithmetic_loop(region))
-                    .count(),
-                1,
-                "the original recurrence needs one scalar loop, without calls, references, tags or completion copies"
-            );
+            let mut multiplications = loops
+                .iter()
+                .filter(|region| scalar_arithmetic_loop(region))
+                .map(|region| {
+                    region
+                        .iter()
+                        .filter(|op| matches!(op, Operator::F64Mul))
+                        .count()
+                })
+                .collect::<Vec<_>>();
+            multiplications.sort_unstable();
+            assert_eq!(multiplications, [1, 5],
+                "the original recurrence needs an ordered five-step chunk and one-step tail, without calls, references, tags or completion copies");
             assert!(
                 loops.iter().any(
                     |region| region.iter().any(|op| matches!(op, Operator::F64Mul))
@@ -275,22 +280,29 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
                 .collect::<Vec<_>>();
             assert_eq!(
                 primitive_imul.len(),
-                1,
-                "the unchanged integer recurrence needs one loop with no per-iteration property/call/Realm/GC traffic or float/integer conversions"
+                2,
+                "the unchanged integer recurrence needs a composed chunk and original tail with no property/call/Realm/GC traffic or float/integer conversions"
             );
             assert!(
-                primitive_imul[0].windows(5).any(|ops| matches!(
-                    ops,
-                    [
-                        Operator::I32Mul,
-                        Operator::I32Const { value: 1013904223 },
-                        Operator::I32Add,
-                        Operator::I32Const { value: 0 },
-                        Operator::I32ShrU
-                    ]
-                )),
+                primitive_imul
+                    .iter()
+                    .any(|region| region.windows(5).any(|ops| matches!(
+                        ops,
+                        [
+                            Operator::I32Mul,
+                            Operator::I32Const { value: 1013904223 },
+                            Operator::I32Add,
+                            Operator::I32Const { value: 0 },
+                            Operator::I32ShrU
+                        ]
+                    ))),
                 "the exact Number sum is observed only as a residue and must stay in i32"
             );
+            assert!(primitive_imul.iter().any(|region| {
+                region.iter().any(|op| matches!(op, Operator::F64Const { value } if value.bits() == 8.0_f64.to_bits()))
+                    && region.iter().filter(|op| matches!(op, Operator::I32Mul)).count() == 1
+                    && !region.iter().any(|op| matches!(op, Operator::I32ShrU))
+            }), "eight exact residue steps collapse to one multiply/add and an exact counter advance");
             assert!(
                 loops.iter().any(|region| region
                     .iter()
@@ -300,6 +312,62 @@ fn original_integer_workload_contains_a_scalar_loop_with_invariant_native_guard(
             );
         },
     );
+}
+
+#[test]
+fn scalar_chunks_keep_floating_operations_ordered_and_compose_other_affine_coefficients() {
+    for (source, signed) in [
+        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,19);", false),
+        ("function run(state,stop){for(var i=20;i>=stop;i--)state=(Math.imul(state,5)-7)|0;return state;} run(1,2);", true),
+    ] {
+        with_source_operators(source, "run", |operators| {
+            let loops = loop_regions(operators);
+            let chunk = loops.iter().find(|region| {
+                region.iter().any(|op| matches!(op, Operator::I32Const { value } if *value == if signed {390625} else {6561}))
+                    && !region.iter().any(|op| matches!(op, Operator::Call { .. }))
+            }).expect("another affine map uses its mathematically composed eight-step coefficient");
+            assert_eq!(chunk.iter().filter(|op| matches!(op, Operator::I32Mul)).count(), 1);
+            assert!(chunk.iter().any(|op| matches!(op, Operator::I32Const { value } if *value == if signed {-683592} else {3280})));
+            assert_eq!(chunk.iter().filter(|op| matches!(op, Operator::F64Lt | Operator::F64Ge)).count(), 1,
+                "the chunk has one monotone last-position test");
+        });
+    }
+    with_source_operators(
+        "function run(total,stop){for(var i=0;i<stop;i++)total=(total+i*0.1)*1.0000000000000002-i/7;return total;} run(0,19);",
+        "run", |operators| {
+            let loops = loop_regions(operators);
+            let chunk = loops.iter().find(|region| scalar_arithmetic_loop(region)
+                && region.iter().filter(|op| matches!(op, Operator::F64Div)).count() == 5)
+                .expect("five ordered floating iterations have one backedge");
+            let arithmetic = chunk.iter().filter_map(|op| match op {
+                Operator::F64Mul => Some('m'), Operator::F64Add => Some('a'),
+                Operator::F64Div => Some('d'), Operator::F64Sub => Some('s'), _ => None,
+            }).collect::<String>();
+            assert_eq!(arithmetic, format!("a{}", "mam dsa".replace(' ', "").repeat(5)),
+                "last-position lookahead precedes each unchanged multiply/add/multiply/divide/subtract and unit advance");
+        });
+}
+
+#[test]
+fn scalar_chunk_proofs_keep_written_tests_counters_and_full_values_on_their_owners() {
+    for (source, expected_multiplications) in [
+        ("function run(state,stop){for(var i=0;i<stop;i++){stop--;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){for(var i=0;i<stop;i++){i++;state=(Math.imul(state,3)+1)>>>0;}return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){var i=0;for(;(i=i+1)<stop;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(1,20);", vec![1]),
+        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,state)+1)>>>0;return state;} run(1,20);", vec![1,5]),
+        ("function run(state,stop){var full=0;for(var i=0;i<stop;i++)state=(full=Math.imul(state,3)+1)>>>0;return full;} run(1,20);", vec![1,5]),
+        ("function run(state,stop){for(var i=0;i<stop;i++)state=(Math.imul(state,3)+i)>>>0;return state;} run(1,20);", vec![1,5]),
+    ] {
+        with_source_operators(source, "run", |operators| {
+            let mut actual = loop_regions(operators).into_iter()
+                .filter(|region| region.iter().any(|op| matches!(op, Operator::I32Mul))
+                    && !region.iter().any(|op| matches!(op, Operator::Call { .. })))
+                .map(|region| region.iter().filter(|op| matches!(op, Operator::I32Mul)).count())
+                .collect::<Vec<_>>();
+            actual.sort_unstable();
+            assert_eq!(actual, expected_multiplications, "{source}");
+        });
+    }
 }
 
 #[test]
