@@ -11,10 +11,15 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 - Every-case Scriptc time/RSS parity remains open. Continue from the
   [runtime ownership contract](contracts/runtime-byte-ownership.md) and
   [performance queue](../performance-hills.md). Re-profile current-source
-  execution before choosing another optimization. Check whether inherited Array
-  reads repeat own-property probes and whether packed join repeats storage checks
-  across its two passes. Any change needs concrete receiver/backing proofs and
-  must preserve holes, accessors, proxies and user-code ordering.
+  execution after the push, own-data cache, sort and scalar-loop batch before
+  choosing another optimization. Check append prototype probes and storage checks
+  across packed join's two passes. Any change needs concrete receiver/backing
+  proofs and must preserve holes, accessors, proxies and user-code ordering.
+  The retained-object time regression persists in balanced repeats.
+- Investigate ordinary module function storage: reusable-module analysis marks
+  every environment eval-visible, forcing locals into cells and disabling scalar
+  loops. The retained-export diagnostic exposes this existing boundary. Preserve
+  live exports, Realm-relative lookup, actual captures and direct eval.
 - Host type metadata remains a separate hypothesis: demonstrate at least
   **256 KiB of avoidable retained ownership** before changing its decoding or
   registration. Phase deltas do not prove duplication or fault-around behavior.

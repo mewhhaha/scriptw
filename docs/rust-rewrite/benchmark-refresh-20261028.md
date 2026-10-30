@@ -1,44 +1,27 @@
 # Benchmark refresh, 2026-10-30
 
-Both CI cohorts measure compiler `64cf187d62a3322b781c910d5fd033c5bad10777`; input fingerprint `d1579a87fafb4b3fe7b3f6cc1bdb91fa8a4b01f76b17c7c26421680b2272f09a`.
+Both CI cohorts measure compiler `aedaa6e4e0981462b4e31ade261ea4589a6644cf` with input fingerprint
+`b5f22f4c755154275c6bcb711017ed34ab4dccc318ff8937318fe622e98b1d9f`.
 
-- [Precompiled CI 41032186356](https://github.com/mewhhaha/scriptw/actions/runs/41032186356): completed 2026-10-30T09:40:05.715817+00:00; 68 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
-- [Three-runtime CI 41032182998](https://github.com/mewhhaha/scriptw/actions/runs/41032182998): completed 2026-10-30T09:32:19.641197+00:00; 102 attempts across 17 workloads; Rust `rustc 1.99.1 (58cf8f9c3 2026-10-13)`.
+- [Precompiled CI 41058273234](https://github.com/mewhhaha/scriptw/actions/runs/41058273234): completed 2026-10-30T13:15:53.493002+00:00; 68 attempts across 17 workloads.
+- [Three-runtime CI 41058270647](https://github.com/mewhhaha/scriptw/actions/runs/41058270647): completed 2026-10-30T13:09:41.679869+00:00; 102 attempts across 17 workloads.
 
-Both cohorts use two balanced rounds, ten checked warmups and seven measurements
-per runtime/workload/round. The precompiled host disables compilation and uses
-size-optimized/backtracking native code. Ordinary execution uses Fast mode and
-includes in-process Scriptw/V8 compilation history; Scriptc's frontend is separate.
-Process RSS includes setup, code, runtime and warmup history, rather than live
-heap or peak memory. Interpret the two cohorts independently.
+Both cohorts use two balanced rounds, ten checked warmups and seven measurements.
+The precompiled host disables compilation and uses size-optimized/backtracking
+native code. Ordinary execution uses Fast mode and includes Scriptw/V8 compilation
+history. Process RSS includes setup, code and warmups; it is neither live JS heap
+nor peak memory. Interpret the cohorts independently.
 
-The existing inert validators readmitted raw evidence and published archives.
-All 34 per-benchmark SVG cards were byte-reproduced with PNG previews under a
-1-GiB, one-CPU, no-swap scope. No downloaded native code ran locally. Metadata
-retains validation resource counters; ordinary evidence has no end counters,
-so no zero-OOM or measured-peak claim is inferred for that cohort.
+Existing inert validators readmitted raw evidence and published archives. All 34
+SVG cards were byte-reproduced with PNG previews under a 1-GiB, one-CPU scope.
+No downloaded native code ran locally. Resource counters are retained in metadata;
+missing CI counters do not support a zero-OOM or measured-peak claim.
 
-The [local implementation checkpoint](join-hotpaths-20261030.json) retains source
-`64cf187d62a3322b781c910d5fd033c5bad10777` and fingerprint `d6f09d2d953874e4ac29bd5373dd71c5d7d9b1bf9e36644caf84f7dc59f1a0e3`.
-Its local before/after results and actual native verification scope remain
-separate from these CI bars. This refresh does not rerun native acceptance or
-the pinned Test262 publication. Earlier checkpoint and mapping identities remain
-historical evidence; they are not relabeled as measurements of this CI source.
+The [local implementation checkpoint](typed-regions-20261030.json) retains its own source
+`6f70fffc4df3da19e000a993b7097ffa293c2ad8` and fingerprint `30cc450f603131fb913a7ebaae56ad9aca4aeba0eda60a83ca6dca761b2303fe`.
+It covers 23 native scopes with 5,118 unique tests,
+359 source-only guards and 679 original pinned Test262 executions
+across 8 selected scopes. Full receipts remain in that checkpoint and its inert archive.
+The published full Test262 matrix is unchanged.
 
-The local checkpoint accepts 4 explicitly selected native scopes
-with 825 unique package/target/test identifiers and 156 selected
-original pinned Test262 executions across four scopes. This is a scoped result,
-not full workspace, ABI-wide or full Test262 acceptance. Baseline execution-only
-PC profile status: `complete`; candidate
-profile status: `complete`. Profiles retain
-their own source identities and are self-sample diagnostics, not inclusive costs.
-Unrun work carries no passing result.
-
-The first-candidate profile status is
-`complete`. Its full
-comparison and repeat controls remain historical non-promoted diagnostics;
-their rows do not enter the final local ratios or these CI bars.
-
-[Precompiled charts and evidence](precompiled-comparison.md) ·
-[Three-runtime charts and evidence](compiler-comparison.md) ·
-[Refresh metadata](benchmark-refresh-20261028.json).
+[Precompiled evidence](precompiled-comparison.md) · [Three-runtime evidence](compiler-comparison.md).

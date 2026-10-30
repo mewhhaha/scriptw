@@ -1,16 +1,75 @@
 {
   "schema": "scriptw-benchmark-refresh-v2",
   "date": "2026-10-30",
-  "source_commit": "64cf187d62a3322b781c910d5fd033c5bad10777",
-  "source_fingerprint": "d1579a87fafb4b3fe7b3f6cc1bdb91fa8a4b01f76b17c7c26421680b2272f09a",
+  "source_commit": "aedaa6e4e0981462b4e31ade261ea4589a6644cf",
+  "source_fingerprint": "b5f22f4c755154275c6bcb711017ed34ab4dccc318ff8937318fe622e98b1d9f",
   "paired": {
-    "run": 41032186356,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/41032186356",
-    "finished_at": "2026-10-30T09:40:05.715817+00:00",
-    "raw_report_sha256": "16f87ebccdd1199a45a5b2eeeb028fc730c7ce0bc157a761760a87b17bc35d7b",
+    "run": 41058273234,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/41058273234",
+    "finished_at": "2026-10-30T13:15:53.493002+00:00",
+    "raw_report_sha256": "94262719d257e786513f21d1e7f0bb852485dd9506d34077d5b5c940d15189b6",
     "attempts": 68,
     "workloads": 17,
-    "rust_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "tools": {
+      "consumer": {
+        "path": "/home/runner/work/_temp/precompiled-measurements/bin/consumer",
+        "sha256": "2654862f2922858e8ba93cdb98a54e93df35f0ded9c9c284009de6f2a1e97600",
+        "cargo_log": "build/cargo.jsonl",
+        "cargo_producer": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///home/runner/work/scriptw/scriptw/crates/scriptw-cli#0.1.0",
+          "manifest_path": "/home/runner/work/scriptw/scriptw/crates/scriptw-cli/Cargo.toml",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "compiler_precompiled_baseline",
+            "src_path": "/home/runner/work/scriptw/scriptw/crates/scriptw-cli/examples/compiler_precompiled_baseline.rs",
+            "edition": "2021",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "3",
+            "debuginfo": "line-tables-only",
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          },
+          "features": [
+            "benchmark-module-images"
+          ],
+          "filenames": [
+            "/home/runner/work/scriptw/scriptw/target/release/examples/compiler_precompiled_baseline"
+          ],
+          "executable": "/home/runner/work/scriptw/scriptw/target/release/examples/compiler_precompiled_baseline",
+          "fresh": false
+        },
+        "identity_command": "host-identity"
+      },
+      "scriptc": {
+        "path": "/home/runner/work/_temp/scriptc/node_modules/.bin/scriptc",
+        "sha256": "63938af518633dedf12b3bcc7adb184e4a3cbdb41b994f188adcd5884c639190",
+        "version": "0.4.5",
+        "version_command": "version-scriptc"
+      },
+      "zig": {
+        "path": "zig",
+        "sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c",
+        "version": "0.16.0",
+        "version_command": "version-zig"
+      },
+      "rustc": {
+        "path": "rustc",
+        "sha256": "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4",
+        "version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "version_command": "version-rustc"
+      }
+    },
     "shared_configuration": {
       "collector": "copying",
       "consumer_compiler_enabled": false,
@@ -32,14 +91,14 @@
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "13230080",
+        "memory.peak": "13000704",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "4294967296",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "650579968",
+        "memory.peak": "655278080",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "cpu_affinity": [
@@ -48,18 +107,41 @@
     }
   },
   "three": {
-    "run": 41032182998,
-    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/41032182998",
-    "finished_at": "2026-10-30T09:32:19.641197+00:00",
-    "raw_report_sha256": "af7d1ff04798dae7b0c74b9829f0836e7eb259c32e5c2f528fa158214101ca61",
+    "run": 41058270647,
+    "github_run_url": "https://github.com/mewhhaha/scriptw/actions/runs/41058270647",
+    "finished_at": "2026-10-30T13:09:41.679869+00:00",
+    "raw_report_sha256": "24d3060c0a4c246d93ae3b1e22e5f98b7a508e7f7baa6689427be1729efab542",
     "attempts": 102,
     "workloads": 17,
-    "successful_scriptc_workloads": 17,
-    "rust_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "tools": {
+      "node": {
+        "version": "v24.12.0",
+        "sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+        "v8": "13.6.233.17-node.37"
+      },
+      "zig": {
+        "version": "0.16.0",
+        "sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c"
+      },
+      "scriptc": {
+        "version": "0.4.5",
+        "sha256": "63938af518633dedf12b3bcc7adb184e4a3cbdb41b994f188adcd5884c639190"
+      },
+      "rustc": {
+        "version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "sha256": "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4"
+      },
+      "runtime_baseline": {
+        "sha256": "5f288d3b91364f88e439f1743d4dedb835fffb1551233ff0c0815d1aae5e575d"
+      },
+      "wasi_baseline": {
+        "sha256": "5550851bbae80c552725e2149ce90445b364e652d01c581ea5422425a5869278"
+      }
+    },
     "machine": {
       "system": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
       "architecture": "x86_64",
-      "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+      "cpu_model": "AMD EPYC 9V74 80-Core Processor",
       "host_logical_cpus": 4,
       "affinity_before_pin": [
         0
@@ -91,6 +173,23 @@
       "limitations": "GitHub shared host; descriptive observations; no statistical-significance or conformance claim"
     }
   },
+  "implementation_checkpoint": "typed-regions-20261030.json",
+  "implementation_checkpoint_sha256": "ef6b67bbe6ade1f9a0b010c5c103a7bddca7e6b3738fb8fa60893a5b8a539c32",
+  "local_producer_identity": {
+    "source_commit": "6f70fffc4df3da19e000a993b7097ffa293c2ad8",
+    "source_fingerprint": "30cc450f603131fb913a7ebaae56ad9aca4aeba0eda60a83ca6dca761b2303fe"
+  },
+  "local_acceptance_summary": {
+    "native_scope_count": 23,
+    "native_unique_test_ids": 5118,
+    "source_only_guard_unique_ids": 359,
+    "selected_original_test262": 679,
+    "selected_original_scopes": 8,
+    "checkpoint": "typed-regions-20261030.json",
+    "checkpoint_sha256": "ef6b67bbe6ade1f9a0b010c5c103a7bddca7e6b3738fb8fa60893a5b8a539c32",
+    "full_workspace": false,
+    "full_pinned_test262": false
+  },
   "validation": {
     "raw_evidence_readmitted": true,
     "published_archives_readmitted": true,
@@ -99,214 +198,257 @@
     "cards": [
       {
         "path": "docs/rust-rewrite/assets/precompiled/sort-reverse-128.svg",
-        "sha256": "363787bf9a7a7c90b64933a75d58eb996a7b5fad15f058acef86150229dbfacb",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/sort-reverse-128.png",
-        "preview_sha256": "90d04c64f314c6d86353302afc3fd7877b85fdcccfbbc9428b50d8316368a6c1"
+        "sha256": "8b00caf169c2adecee0a1160b6aaa0e39602e335510d87613a7568abf56db9b1",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/sort-reverse-128.png",
+        "preview_sha256": "efe10afc5ebe6edec4c5b952f14c0c11f2d8f81e514267c154de37027acacdc5"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/sort-reverse-512.svg",
-        "sha256": "83047c9a553572611b4199925481a5b5068ffd882a042034fb1d732e502a4ab2",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/sort-reverse-512.png",
-        "preview_sha256": "f4039771012fb0f359ff539d26288369fd69347cdf0d398e829e625a60f4046a"
+        "sha256": "e69f7bd05d5228d80f4d459b636317fec13035b73c556085fd350673d589a689",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/sort-reverse-512.png",
+        "preview_sha256": "cd564819b2b2cc4671e447d66f602992f3260c0bab6c3bd9eb68b951a014ccdd"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/sort-sorted-512.svg",
-        "sha256": "5f2123e23a472c512d26dae5eef6c709d4dcdcb071568f196cea1b0764707842",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/sort-sorted-512.png",
-        "preview_sha256": "6740c763b511072fd4d18145bb681a727fa2ca7e3674aaadec36211850b0efe3"
+        "sha256": "0f9156c4155e7bd429066425e2f910af926387fe3150fe6be8aea5ebb2e7a289",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/sort-sorted-512.png",
+        "preview_sha256": "1fe71d7a371bee8e55feb127733f256763c72e6c65f3e33ec29cc801ee15b2ad"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/to-sorted-512.svg",
-        "sha256": "74f6315a40b16116cd2d360c8e079fb1a3b4913c73236a393a50612b3cd70487",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/to-sorted-512.png",
-        "preview_sha256": "b5de6d2a95d435c528cfe9b9bb4b8796a8cbaea4b0d6d9d0f52108788e82336c"
+        "sha256": "0069b7d4c90f65f9543fc698104ccfdf89a4fad0335eeeb2dbc5c271f3e83b60",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/to-sorted-512.png",
+        "preview_sha256": "d0b21e5a1b693641968e4600fd81701c3588348890da8ad7043957ab3fcdcede"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-1024.svg",
-        "sha256": "28368e80dca1b5218144867a015825941b1e3d98e3200fa347d40fcdd09d47fc",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-1024.png",
-        "preview_sha256": "f320bbc146933d33cbe204a79a628d80df4032856aa887ff1354841464972378"
+        "sha256": "9ec72c6f19ff902240522abc334eed2026f3ba213039a0207eae21c043f8ee1e",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-1024.png",
+        "preview_sha256": "0e340e51740324f6bd741f7891fd886e12d95be49ab6a4d0bd08be1d701120bf"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-4096.svg",
-        "sha256": "a8fae46c37fc29ed7e46e0a1258da79054f46e96da607cb56c575789fb063df1",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-4096.png",
-        "preview_sha256": "124188ba0a2008aa1e930bb54b17c615da2141af69f131b1c7b3bc0594dee9f7"
+        "sha256": "597eb622bc865893755d327f9017df9c4de960ddeedb3e3fd6f29723e976ff56",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-4096.png",
+        "preview_sha256": "99ccc9068b0bbeb7bb8feefdc11eb8038cc20778c65634c806e64fddc14387d8"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-mixed-1024.svg",
-        "sha256": "5c206be4200baf7f6714dd7ea887807c6cc70ffa6912c0d766be18398a3d52b1",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-mixed-1024.png",
-        "preview_sha256": "0b6ecaa84c2abc87d4f58007814ffaac78c82f3c56cb281b90049d7ead41a39b"
+        "sha256": "4291d861dd43a20e7de603d4f2eaa3366a0541a3f3166fbab9fdb4986aaf792f",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-mixed-1024.png",
+        "preview_sha256": "4399ec55260fcdbf302bcd58a6003403d4393afe2f659731d3a0f8e7a3db003e"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/numeric-loop-10000.svg",
-        "sha256": "1450e9e4257b3e0efda98900f195e1052920bc007a2a793df9e94c36daed30f5",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/numeric-loop-10000.png",
-        "preview_sha256": "efd78e4a1669b3fd23aa28eefdb877902b2dda39eafef16b58c619d342848663"
+        "sha256": "acb4a7de0cb7633891294bd2ebc45a04fa35c9d9711f6f5217e6917873e0903f",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/numeric-loop-10000.png",
+        "preview_sha256": "3ab4a748deda0f42618cf093a9cd48c79ee5a437213dd43d21c40db1d7035b82"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/numeric-loop-50000.svg",
-        "sha256": "f3e20d1d63cc11d10aba5b6f6fb41035b0ede866f7e6861fbde5ed6b6f8795e6",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/numeric-loop-50000.png",
-        "preview_sha256": "73b7429e268784a65758be7e23f7f37688aa33c8d15b76cdaab3d94f04a54532"
+        "sha256": "86518c4156ed307a3941eb491db2c32b78ba89d9c372a98f0325d903b4a7fa81",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/numeric-loop-50000.png",
+        "preview_sha256": "019eaa48f98f09026ae86ce2850418525a385fe57acb330453dc52080635fa44"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/folded-string-4096.svg",
-        "sha256": "20408ca6a3c3502aa3e856296b6fce3bd767487e24380f53e6e82ad3fe427e4b",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/folded-string-4096.png",
-        "preview_sha256": "106a4770f498efcc449d822c6fa0f76315ad41ad587af100272c240dd1d0fbfb"
+        "sha256": "4001d8b57b6f4180dc5c49c53685c76bd6aff97299db26b88e5bd3326aa35688",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/folded-string-4096.png",
+        "preview_sha256": "4ca64684f653f3357a381e742c9d223ccafb98be31aab780df87ef5c0adceb0f"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/dynamic-string-4096.svg",
-        "sha256": "965abbe4ddacbef75e97f6cba8200ba920a5733bdd284d81f1c1feb1cf990d1a",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/dynamic-string-4096.png",
-        "preview_sha256": "d99812ed86bc6cdefbd75fd37e91964bf9c3923dec6443a6fe108938c8098841"
+        "sha256": "91e5db2439319f2940ea2e596a43a128c21099eda1c9845375a6a224e588ad42",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/dynamic-string-4096.png",
+        "preview_sha256": "b228d6d2c5d4d738f54dbeb51be5f15be6dcdbcd03ffa0be082999dcd36dd800"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/integer.svg",
-        "sha256": "1edaa8e0846b9ae8f25ad3850bbda5c012c4c5493d913e66d0979b132f715b5a",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/integer.png",
-        "preview_sha256": "c32bede4f3498c246f6f1567b31d4a950fd0b402c9bc97084b9b7a67d9738919"
+        "sha256": "b3b369260766eb2b76788fb0e2772331141707122808069c0e87b11c28aa3a46",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/integer.png",
+        "preview_sha256": "39d3d8159a31df1a461636299d528b80e2e224f2a760b00489865b5a9bc9bba5"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/objects.svg",
-        "sha256": "b864311009e8ffe404954361b241f34cf64a471eca0f6b68900e4ef9c774e469",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/objects.png",
-        "preview_sha256": "5f5030cb695efcdf1f122f2fc0e94a337937d5be123ce74f2bd6595a65d8b717"
+        "sha256": "b5b1f5b67741b63087f92aa8c843e8942718883acce3428f6587c034e84b69ae",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/objects.png",
+        "preview_sha256": "58ce8467f5b4994bdba86c1e67eaeef57406d8fb9a9b47e627373af740f8f3bf"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/retained-objects.svg",
-        "sha256": "3486ae7bd668f3a65da07bb2ee1d47ce75856a48fab51e2a9a0042bdc47423e2",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/retained-objects.png",
-        "preview_sha256": "ca106ce6f49936422a81f8bef42d927176b9955550170f3849099267f149be6b"
+        "sha256": "e3401876cd8cbb54d7db1349d6010335924fa409a024a2e902265be1897d65cf",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/retained-objects.png",
+        "preview_sha256": "3b8efc102fc2b5d7997b6fc3e5d7e406420bd4c15a9d944a99cc5037bb6b1cfd"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-empty-1024.svg",
-        "sha256": "0ebe8ff7969b3fb32d4626a6a24f690e6ace43d1884bd75c5c439eea0aae4665",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-empty-1024.png",
-        "preview_sha256": "a156791ee08bf79aee806b0993d614c69d45721b17a492cd58dff16e5193eb00"
+        "sha256": "31dc40581bbfa4970feccb96dcb733eb95ea9958fb4a8326782f098df2455c01",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-empty-1024.png",
+        "preview_sha256": "cae6e6e5dbfafe9af4632ee99dfc1adf6af15e1ab51a9838d37fd28186cee905"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-singleton-1024.svg",
-        "sha256": "da7c720b7cbc0d3c7b3c0f87a6f8b90082b99823d597f343ebf41fe644462cc1",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-singleton-1024.png",
-        "preview_sha256": "55c85d72f097878835784c7451c3e74a540c656f418ec623a04c0a8c6f6f8765"
+        "sha256": "670369cb6863da274376dae44904ee4fcbc89c0a7f2cf06d9312be76927d6a44",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-singleton-1024.png",
+        "preview_sha256": "bfef8e87d42369ffb5b3d4f8cb69c0732f5a87ce5b04033798c57539a57d8a0e"
       },
       {
         "path": "docs/rust-rewrite/assets/precompiled/join-small-1024.svg",
-        "sha256": "ec71818b548ebc1c923aacefc82e8f5843d01cbe427e6636fed4d536ec1b328f",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/precompiled/join-small-1024.png",
-        "preview_sha256": "8c6e528daab91770a247477e7a62f1734e627b59226a38eaaf0d369f4c80f21b"
+        "sha256": "1f4ea877ea5d4a2e40b89c1a97022e73eca99d3c931111b6e676c03be8e4a555",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/precompiled/join-small-1024.png",
+        "preview_sha256": "fb9b4ccdceecbef494246411ec3f030f11e1f0bef1cab3a6f56bb81c30f4ad46"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/sort-reverse-128.svg",
-        "sha256": "33385faa3d251053d280772cb7be6b4bc2830cabb998193258cc39dc72005650",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/sort-reverse-128.png",
-        "preview_sha256": "341da87c7216aac29568de00cd84ebd98d443ebdff3268135daf175ed1263446"
+        "sha256": "babf110dd03437f17ea8c5a54cca87f6ab0aa36d06973ddd95e9f57abb9730f4",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/sort-reverse-128.png",
+        "preview_sha256": "b6ee546c498a1272aba41a121e0727017a85e0d3a3218c6010c27dc30f2d0782"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/sort-reverse-512.svg",
-        "sha256": "66cbfdb619d1192c767681e410a4a5b13234ef2732abe66bae8108afd32e7d4d",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/sort-reverse-512.png",
-        "preview_sha256": "37c313a79ab139191ff214dea245efd1915efb3a8de4c8f3f0022a3887b635ef"
+        "sha256": "40ac5e9e1f6395d64461f7b2d479717501b35977c68cead5b722992eddf93ec0",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/sort-reverse-512.png",
+        "preview_sha256": "74c24a069686444ff00fb6d2965edcd2b0f5a20001c9d0be6e66dfcdafebb674"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/sort-sorted-512.svg",
-        "sha256": "0802eec56f077bd59c9ebb5fdcfab14451a6630575528991090a494b015f60ed",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/sort-sorted-512.png",
-        "preview_sha256": "d72a1c40e5988a7adc80ca625eb1625689abfc28a1708445a999fd048e1482ec"
+        "sha256": "2965a8ba435d1033c4bc13a8cc9d8325d1d652747a1080dbb2c27f76a992ad9a",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/sort-sorted-512.png",
+        "preview_sha256": "9c8ebef0e3b722636478d00dec8a75051e1c2181ebc248bb7ff35fe9de0b5e06"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/to-sorted-512.svg",
-        "sha256": "91ef818f002d8d749ecc93f2c094afb151128cf8092102bf5905c227dfdccf50",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/to-sorted-512.png",
-        "preview_sha256": "dd794029a9eeb2e4985f3268da9554fca41791eb529ca8c496cd0327ec323e06"
+        "sha256": "76bd4d535adf56deb733a5e8eec89e75c2bc158bd47517a1a2b0ec1d05e20642",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/to-sorted-512.png",
+        "preview_sha256": "82d5a42ce7b8d7c8a6e48aa5129a92fdb3ed95ec42ddb6aba48b04d3addd6797"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-1024.svg",
-        "sha256": "f94f807fecb3dd6c4d7820841aa2f56110301254a4f15afb20667dd3b9aab3ac",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-1024.png",
-        "preview_sha256": "c1362c649dc86ac89f7801246a8314187302b72caf67a0ba279bd7e324c574b5"
+        "sha256": "bf42befdbd31ac309fb0be5ecf6cbf0e0510871dcf39a45b2a47aecd0729da6c",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-1024.png",
+        "preview_sha256": "32a9dfc763786c5bc8eae11698393b8dcc6b34c83355b8fdaaf9c35ad9e6f763"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-4096.svg",
-        "sha256": "b381488b2a7d5bf7e5221a4d2eb18cb048a40df088f473d3d4893dd2b9636d00",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-4096.png",
-        "preview_sha256": "5ce59f973c9508b94b91661d4d22aa569771cabffe2d7ebfd1a759a31e73e944"
+        "sha256": "421672b4191a779289a21a2f0d5e48d8303c7e6b8e7b7ac6c5293f331eaf3541",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-4096.png",
+        "preview_sha256": "2af07af8c7490fa300f8c31c71bc87549454c03ee36cf5092124567f510f9187"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-mixed-1024.svg",
-        "sha256": "01456f7ff24d03537a15d77dd3def4a0709d0bdb2f37f75dc405c7fdea75e008",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-mixed-1024.png",
-        "preview_sha256": "b30e836135cddbf903d46abb508e0891ceeb7671906610ebbcaa6aa9afc7a2ed"
+        "sha256": "57bb7ec14cf7653af31650c0a6da888a58f4d347595a152f3f6c47d73256459b",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-mixed-1024.png",
+        "preview_sha256": "ae0dd814f621267632c031f17d6992ff10fa0b213062f57254e08bb35ace02df"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/numeric-loop-10000.svg",
-        "sha256": "05fbddf25a063d70107c28e2c0cca38da9327eee515881aec611b03e30e1e765",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/numeric-loop-10000.png",
-        "preview_sha256": "49473eaec3445bd2c764900072be29d67f6316c8e3adcbed3b4821fa544e2f8d"
+        "sha256": "c2c5863f3ac33c8a402ff21662e3571da061289b4c3975b0a237f07e5683ef3d",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/numeric-loop-10000.png",
+        "preview_sha256": "a3ee70002a4237f5fe79f3660def82c21a9cc332db47ceb343937c934ffb166b"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/numeric-loop-50000.svg",
-        "sha256": "382d86207a8cc55db7e95fb65be7615631300f0795736404251a804185393de5",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/numeric-loop-50000.png",
-        "preview_sha256": "c659c44869e758a2acd44404555ea89ef61bc189f560d6b036e02251eb797086"
+        "sha256": "dedf9cef19096a5049622f7a1bb26002194000929c18a527dd5b94b1c11a6555",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/numeric-loop-50000.png",
+        "preview_sha256": "6d20ba0ace0106fd3d6b48893893db13566ca15ffd7fddf8b26e53abbc14db6f"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/folded-string-4096.svg",
-        "sha256": "e23f9c2c7488e93b2eb8b28f3e4fd83dd5dac519d302705830c4c193331f6395",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/folded-string-4096.png",
-        "preview_sha256": "11a01d61e6da9e0e3e0d7fa4c38ddb556ce16c2002b371a950caafeb72714edb"
+        "sha256": "131f0445f788536769408a2588f68a0adb74c43227eb86697017933e5f2f52a4",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/folded-string-4096.png",
+        "preview_sha256": "d735b97f42366f17ad94abbd7ab18b660a8cfcd7e1aeadaf2e8bed6731a14777"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/dynamic-string-4096.svg",
-        "sha256": "f8b216713ec121181354f83ebaec32af14c5bc3ebf10df3ef090cafb57780a0c",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/dynamic-string-4096.png",
-        "preview_sha256": "aeb87ada490191f968ffd37006a3568e0e3815b294b3829ac9fe74be18fe9d46"
+        "sha256": "7e2c1ee640bfab8731093a75062bf725c2da2e5ebb95e3d04aa5a9a7907e0d80",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/dynamic-string-4096.png",
+        "preview_sha256": "4aeba5c027feb16f6857573cf8992be601762a3a702fd6df945449bb9172f735"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/integer.svg",
-        "sha256": "24acefe72396829c59c28dedfa72bc0ba73e2c8e074ebc4a1d7ba3b3ba303958",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/integer.png",
-        "preview_sha256": "12e409bd1d7ac984bc9af45e37da4fd0de90d7783809a5a4bbdd4e8d82c95aa9"
+        "sha256": "3e354b9f7ce27b533c4b3d289b640280fcdb3d389d82205ae0b1c5f684d76955",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/integer.png",
+        "preview_sha256": "d7408d8a9d84b59b70e665373d5ba3318bb2ecb9a7f51a600bf7e71870c9eda5"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/objects.svg",
-        "sha256": "8e5079d674eccc896661ffbed13c9e694d91d7918d98cc7da12f6241cdbd070d",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/objects.png",
-        "preview_sha256": "e6521fb88b7a6fff4bf4cc1ffdf6ba75b1258a29d82553b4b526c1ec03d3784a"
+        "sha256": "889d1fb9bb4203434e9602ad72daa19a3a175dcab2193decfd5d1cfe1a1a85ec",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/objects.png",
+        "preview_sha256": "56c14f7d40747567ace0b1e88c8110912121f1fe82782157db649ad74d0411ba"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/retained-objects.svg",
-        "sha256": "a4b84a8efa91c62add513bdb3898f101cf0a70ab016f1963ca419da8a7724ed3",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/retained-objects.png",
-        "preview_sha256": "593ce4ef0ca090d5495eb1aae515f5623436f43b5acbba889b93eb1231d8ddc6"
+        "sha256": "a52ef213ced56da55199425f0913275900b8ec5a2e728fb0aa9fc11d782a1ee3",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/retained-objects.png",
+        "preview_sha256": "a657cb2525ea72410090c19daead48c2ac77dd70cca8631de7a08623c3527415"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-empty-1024.svg",
-        "sha256": "ec88e0b1cb70ef0b63609748900b4a8137bd3b4002b3ee6f84d7f77d2e3e0d1d",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-empty-1024.png",
-        "preview_sha256": "531f6424a1e0be9568a6cf5f684bb9aa7dbce0706eb93cc90fbf2f5623abf99b"
+        "sha256": "3f82b0e7ba92a8a73cc571358d03e07002f6211a9d7c8c3c99909d506c57307b",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-empty-1024.png",
+        "preview_sha256": "478e9b0e042298b23d94fefe4fec90e8e4749680db589a9565adc9739598af05"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-singleton-1024.svg",
-        "sha256": "df4999a8fdb1d80432c45c70eb251a6e883e72a64a0886a038d9c7d03552f3ec",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-singleton-1024.png",
-        "preview_sha256": "814cc1903ef12b0880ebb1d662542d3a107568546b2d9a9b3ac6632c7fff6476"
+        "sha256": "d7d30182a7a4054e3b46db4309dcfd3b1a74073780e2e1bfde99770722395798",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-singleton-1024.png",
+        "preview_sha256": "3c0aa2ad7a9a5da2b7941963ae3969e0a1f388d5ee7228d789ca8ddb1a001ad3"
       },
       {
         "path": "docs/rust-rewrite/assets/benchmarks/join-small-1024.svg",
-        "sha256": "93cac72c7d93b5680767b03443a7db99196f1ce1a37c310f114fca24b6811394",
-        "preview": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/previews/benchmarks/join-small-1024.png",
-        "preview_sha256": "1119c4dab95d1d360408423c8fcad193139fac3731a522796fa0663b2bf7b8eb"
+        "sha256": "4785f3ba87fb617a5f4ff00d31aa10550a4d424111159691c221f930dc2047e5",
+        "preview": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/previews/benchmarks/join-small-1024.png",
+        "preview_sha256": "e3698e63a2bdb052eb1a4dcea6819a74eb969fa5c7c2a80db4eae51a6586c91b"
+      }
+    ],
+    "inputs": [
+      {
+        "path": "target/typed-regions-20261030/ci-refresh/config.json",
+        "sha256": "44021f083549227286fd6d32dfef72a6e5c588b90512357ee417eed1b5462263"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/checkpoint-stage/typed-regions-20261030.json",
+        "sha256": "ef6b67bbe6ade1f9a0b010c5c103a7bddca7e6b3738fb8fa60893a5b8a539c32"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/paired/precompiled-evidence/report.json",
+        "sha256": "94262719d257e786513f21d1e7f0bb852485dd9506d34077d5b5c940d15189b6"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/ordinary/compiler-measurements/report.json",
+        "sha256": "24d3060c0a4c246d93ae3b1e22e5f98b7a508e7f7baa6689427be1729efab542"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/README.md",
+        "sha256": "5d65b3d2c4271ff18e8b076e9ecdb88c22fbb6167ef1988afea56cc321f9a410"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/target/typed-regions-20261030/ci-refresh/publish.py",
+        "sha256": "5bb83518b508c070645f5372c90a42ffb64d723fb3eb6a22ee306ae6546211cf"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/compiler_comparison.py",
+        "sha256": "f8742967b89a10c12cc97e40d4e16f896cb2f44ff7bb795e1cec072fbea58b1b"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/precompiled_comparison.py",
+        "sha256": "117dbc02ac621cb66710a6f92d89ad82b01b1590c0da3e3ba6bc885e6728ec74"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/benchmark_charts.py",
+        "sha256": "b0dde44199ee37d424368c6f8cac61de1c743c54dfbf18022c403d7881cfc024"
+      },
+      {
+        "path": "/home/mewhhaha/src/porffor/scripts/limited_verification.py",
+        "sha256": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57"
       }
     ],
     "pinned_status_bytes_unchanged": true,
     "pinned_status_sha256": "b7360d7186b305e1f5c91c7b654d7d71d65a7e0bc0a1810fbd6ed6bf77dd8260",
+    "product_and_local_paragraphs_unchanged": true,
     "staged_files": [
       "README.md",
-      "docs/rust-rewrite/join-hotpaths-20261030.json",
+      "docs/rust-rewrite/typed-regions-20261030.json",
       "docs/rust-rewrite/precompiled-comparison.json",
       "docs/rust-rewrite/precompiled-comparison.md",
       "docs/rust-rewrite/precompiled-comparison.tar.gz",
@@ -350,57 +492,19 @@
       "docs/rust-rewrite/benchmark-refresh-20261028.json",
       "docs/rust-rewrite/benchmark-refresh-20261028.md"
     ],
-    "inputs": [
-      {
-        "path": "target/join-hotpaths-20261030/ci-refresh/config-h2.json",
-        "sha256": "f120d57b541176e31144ddf761c6c142ae6c7a9100f6ec039553f8de11e26e1e"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/export-stage/join-hotpaths-20261030.json",
-        "sha256": "7d149bd2fd3e50b6e0ffd6a9cc2712448449e73250f5da3d35cc2e6885dc55e6"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/paired/precompiled-evidence/report.json",
-        "sha256": "16f87ebccdd1199a45a5b2eeeb028fc730c7ce0bc157a761760a87b17bc35d7b"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/ordinary/compiler-measurements/report.json",
-        "sha256": "af7d1ff04798dae7b0c74b9829f0836e7eb259c32e5c2f528fa158214101ca61"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/README.md",
-        "sha256": "e62b503a94791cf1010f5e254ce177b3577d625295f02e4a9270579bc930fcbc"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/target/join-hotpaths-20261030/ci-refresh/publish.py",
-        "sha256": "35372a3783c107e60d327ac52fc15eb3a01a280c9af2d94d55acfedaedabe878"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/scripts/precompiled_comparison.py",
-        "sha256": "117dbc02ac621cb66710a6f92d89ad82b01b1590c0da3e3ba6bc885e6728ec74"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/scripts/compiler_comparison.py",
-        "sha256": "343254a32fa2d8b84acc83801196b9d9c065274a2dc0ef529b8406068f81a2b6"
-      },
-      {
-        "path": "/home/mewhhaha/src/porffor/scripts/benchmark_charts.py",
-        "sha256": "b0dde44199ee37d424368c6f8cac61de1c743c54dfbf18022c403d7881cfc024"
-      }
-    ],
     "resources": {
       "before": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "16056320",
+        "memory.peak": "16125952",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "after": {
         "memory.max": "1073741824",
         "memory.swap.max": "0",
         "memory.oom.group": "1",
-        "memory.peak": "304435200",
+        "memory.peak": "318517248",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
       },
       "cpu_affinity": [
@@ -408,49 +512,5 @@
       ]
     }
   },
-  "implementation_checkpoint": "join-hotpaths-20261030.json",
-  "implementation_checkpoint_sha256": "7d149bd2fd3e50b6e0ffd6a9cc2712448449e73250f5da3d35cc2e6885dc55e6",
-  "local_producer_identity": {
-    "source_commit": "64cf187d62a3322b781c910d5fd033c5bad10777",
-    "source_fingerprint": "d6f09d2d953874e4ac29bd5373dd71c5d7d9b1bf9e36644caf84f7dc59f1a0e3"
-  },
-  "local_acceptance_summary": {
-    "accepted_native_scopes": 4,
-    "unique_native_test_identifiers": 825,
-    "original_pinned_subset_passed": 156,
-    "profiles": {
-      "baseline_execution_pc_profile": "complete",
-      "first_candidate_execution_pc_profile": "complete",
-      "candidate_execution_pc_profile": "complete"
-    },
-    "historical_diagnostics": [
-      {
-        "label": "first-candidate-full-comparison",
-        "receipt": {
-          "path": "target/memory-experiments-20261028/join-hotpaths-comparison-07c70d227/report.json",
-          "bytes": 1999440,
-          "sha256": "4d221c13e4c55d5b26563f792f146729f81c002ba8379fa28076dd19450ef6f3"
-        },
-        "processes": 144,
-        "output_checks": 2448,
-        "source_commit": "07c70d2275e5030b87aa5d7c8ef232d2279d8eb3",
-        "disposition": "not-promoted",
-        "final_performance": false
-      },
-      {
-        "label": "first-candidate-repeat-controls",
-        "receipt": {
-          "path": "target/join-hotpaths-20261030/repeat-controls/report.json",
-          "bytes": 1687285,
-          "sha256": "ecb612a7af942ac9c2d9ed0a6195c9ba1c3ed00df6b5d8093df9925bf3105791"
-        },
-        "processes": 128,
-        "output_checks": 2176,
-        "source_commit": "07c70d2275e5030b87aa5d7c8ef232d2279d8eb3",
-        "disposition": "not-promoted",
-        "final_performance": false
-      }
-    ]
-  },
-  "interpretation": "Separate co-measured CI cohorts retain their actual source/configuration/toolchains. The local checkpoint retains its own producer identity and acceptance scope. No cross-cohort causal subtraction, full Test262 rerun, universal CPU gain or achieved Scriptc parity is inferred."
+  "interpretation": "Separate CI cohorts retain their own source, configuration and toolchains. The completed local checkpoint retains its independent identity and actual verification scope. No local gain, cross-cohort causal subtraction, full Test262 rerun or achieved Scriptc parity is inferred."
 }

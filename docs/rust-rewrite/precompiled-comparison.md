@@ -1,6 +1,6 @@
 # Compiler-free Scriptw / Scriptc comparison
 
-Measured 2026-10-30T09:38:53.819086+00:00 through 2026-10-30T09:40:05.715817+00:00; source `64cf187d62a3322b781c910d5fd033c5bad10777`.
+Measured 2026-10-30T13:14:29.780341+00:00 through 2026-10-30T13:15:53.493002+00:00; source `aedaa6e4e0981462b4e31ade261ea4589a6644cf`.
 
 Both runtimes use the same executable and shared Wasmtime configuration with its compiler disabled. Both application modules use size-optimized native compilation with backtracking register allocation and the same generic target/backtrace policy. Separate producer processes compile the original JavaScript to Wasm and serialize native images. Scriptc receives only the recorded print adapter; the original checksums and every workload remain unchanged.
 
@@ -10,62 +10,62 @@ RSS, PSS and private-dirty values below are pooled medians of 14 post-execution 
 
 <table>
 <tr>
-<td><img src="assets/precompiled/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.306 ms, 17.8 MiB RSS; Scriptc: 0.087 ms, 13.0 MiB RSS"></td>
-<td><img src="assets/precompiled/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.569 ms, 17.8 MiB RSS; Scriptc: 0.211 ms, 13.0 MiB RSS"></td>
+<td><img src="assets/precompiled/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.388 ms, 17.7 MiB RSS; Scriptc: 0.138 ms, 12.9 MiB RSS"></td>
+<td><img src="assets/precompiled/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.668 ms, 17.7 MiB RSS; Scriptc: 0.372 ms, 12.9 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.517 ms, 17.3 MiB RSS; Scriptc: 0.213 ms, 12.7 MiB RSS"></td>
-<td><img src="assets/precompiled/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.576 ms, 18.1 MiB RSS; Scriptc: 0.232 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.660 ms, 17.4 MiB RSS; Scriptc: 0.365 ms, 12.9 MiB RSS"></td>
+<td><img src="assets/precompiled/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.694 ms, 17.2 MiB RSS; Scriptc: 0.402 ms, 12.9 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.769 ms, 18.4 MiB RSS; Scriptc: 0.291 ms, 13.0 MiB RSS"></td>
-<td><img src="assets/precompiled/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 2.447 ms, 18.8 MiB RSS; Scriptc: 0.939 ms, 13.4 MiB RSS"></td>
+<td><img src="assets/precompiled/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.982 ms, 17.5 MiB RSS; Scriptc: 0.515 ms, 13.0 MiB RSS"></td>
+<td><img src="assets/precompiled/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 2.957 ms, 18.4 MiB RSS; Scriptc: 1.736 ms, 13.5 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 0.878 ms, 17.9 MiB RSS; Scriptc: 0.181 ms, 12.9 MiB RSS"></td>
-<td><img src="assets/precompiled/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.255 ms, 16.7 MiB RSS; Scriptc: 0.064 ms, 12.3 MiB RSS"></td>
+<td><img src="assets/precompiled/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 1.121 ms, 17.7 MiB RSS; Scriptc: 0.316 ms, 12.9 MiB RSS"></td>
+<td><img src="assets/precompiled/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.311 ms, 17.1 MiB RSS; Scriptc: 0.091 ms, 12.2 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.391 ms, 17.1 MiB RSS; Scriptc: 0.152 ms, 12.2 MiB RSS"></td>
-<td><img src="assets/precompiled/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.288 ms, 17.3 MiB RSS; Scriptc: 0.421 ms, 12.3 MiB RSS"></td>
+<td><img src="assets/precompiled/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.382 ms, 16.4 MiB RSS; Scriptc: 0.210 ms, 12.4 MiB RSS"></td>
+<td><img src="assets/precompiled/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.402 ms, 17.0 MiB RSS; Scriptc: 0.752 ms, 12.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.347 ms, 17.0 MiB RSS; Scriptc: 0.161 ms, 12.3 MiB RSS"></td>
-<td><img src="assets/precompiled/integer.svg" width="440" alt="integer.js; Scriptw: 0.249 ms, 17.6 MiB RSS; Scriptc: 0.042 ms, 12.4 MiB RSS"></td>
+<td><img src="assets/precompiled/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.541 ms, 16.5 MiB RSS; Scriptc: 0.272 ms, 12.3 MiB RSS"></td>
+<td><img src="assets/precompiled/integer.svg" width="440" alt="integer.js; Scriptw: 0.311 ms, 17.3 MiB RSS; Scriptc: 0.066 ms, 12.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/objects.svg" width="440" alt="objects.js; Scriptw: 0.644 ms, 17.9 MiB RSS; Scriptc: 0.413 ms, 13.0 MiB RSS"></td>
-<td><img src="assets/precompiled/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 12.131 ms, 23.4 MiB RSS; Scriptc: 22.758 ms, 18.5 MiB RSS"></td>
+<td><img src="assets/precompiled/objects.svg" width="440" alt="objects.js; Scriptw: 0.851 ms, 17.6 MiB RSS; Scriptc: 0.755 ms, 13.0 MiB RSS"></td>
+<td><img src="assets/precompiled/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 18.848 ms, 22.6 MiB RSS; Scriptc: 39.414 ms, 18.8 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.406 ms, 17.7 MiB RSS; Scriptc: 0.157 ms, 12.9 MiB RSS"></td>
-<td><img src="assets/precompiled/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.408 ms, 17.6 MiB RSS; Scriptc: 0.080 ms, 12.3 MiB RSS"></td>
+<td><img src="assets/precompiled/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.687 ms, 17.4 MiB RSS; Scriptc: 0.278 ms, 12.8 MiB RSS"></td>
+<td><img src="assets/precompiled/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.744 ms, 17.4 MiB RSS; Scriptc: 0.129 ms, 12.1 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/precompiled/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.570 ms, 17.7 MiB RSS; Scriptc: 0.110 ms, 12.2 MiB RSS"></td>
+<td><img src="assets/precompiled/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.953 ms, 17.5 MiB RSS; Scriptc: 0.192 ms, 12.3 MiB RSS"></td>
 <td></td>
 </tr>
 </table>
 
 | Workload | Scriptw ms | Scriptc ms | Scriptw RSS / PSS / private dirty MiB | Scriptc RSS / PSS / private dirty MiB |
 | --- | ---: | ---: | ---: | ---: |
-| sort-reverse-128.js | 0.306 | 0.087 | 17.797 / 15.605 / 7.094 | 12.975 / 10.766 / 5.926 |
-| sort-reverse-512.js | 0.569 | 0.211 | 17.826 / 15.621 / 7.070 | 12.998 / 10.806 / 5.990 |
-| sort-sorted-512.js | 0.517 | 0.213 | 17.252 / 15.042 / 7.045 | 12.725 / 10.513 / 5.736 |
-| to-sorted-512.js | 0.576 | 0.232 | 18.086 / 15.871 / 7.188 | 12.750 / 10.562 / 5.975 |
-| join-1024.js | 0.769 | 0.291 | 18.357 / 16.148 / 7.152 | 12.963 / 10.754 / 5.945 |
-| join-4096.js | 2.447 | 0.939 | 18.795 / 16.607 / 7.672 | 13.430 / 11.229 / 6.484 |
-| join-mixed-1024.js | 0.878 | 0.181 | 17.889 / 15.701 / 7.160 | 12.889 / 10.702 / 5.908 |
-| numeric-loop-10000.js | 0.255 | 0.064 | 16.660 / 14.468 / 7.039 | 12.258 / 10.070 / 5.250 |
-| numeric-loop-50000.js | 0.391 | 0.152 | 17.127 / 14.943 / 6.979 | 12.248 / 10.037 / 5.219 |
-| folded-string-4096.js | 0.288 | 0.421 | 17.277 / 15.072 / 6.990 | 12.312 / 10.101 / 5.289 |
-| dynamic-string-4096.js | 0.347 | 0.161 | 16.961 / 14.779 / 6.943 | 12.299 / 10.115 / 5.248 |
-| integer.js | 0.249 | 0.042 | 17.646 / 15.435 / 6.975 | 12.365 / 10.149 / 5.340 |
-| objects.js | 0.644 | 0.413 | 17.900 / 15.691 / 6.812 | 13.039 / 10.835 / 3.250 |
-| retained-objects.js | 12.131 | 22.758 | 23.404 / 21.229 / 8.490 | 18.543 / 16.361 / 8.822 |
-| join-empty-1024.js | 0.406 | 0.157 | 17.688 / 15.492 / 2.984 | 12.898 / 10.717 / 2.869 |
-| join-singleton-1024.js | 0.408 | 0.080 | 17.627 / 15.417 / 2.988 | 12.293 / 10.111 / 2.289 |
-| join-small-1024.js | 0.570 | 0.110 | 17.732 / 15.553 / 3.070 | 12.166 / 9.952 / 2.297 |
+| sort-reverse-128.js | 0.388 | 0.138 | 17.711 / 15.626 / 7.105 | 12.930 / 10.844 / 2.947 |
+| sort-reverse-512.js | 0.668 | 0.372 | 17.682 / 15.623 / 3.068 | 12.922 / 10.860 / 2.998 |
+| sort-sorted-512.js | 0.660 | 0.365 | 17.426 / 15.339 / 3.066 | 12.867 / 10.805 / 2.998 |
+| to-sorted-512.js | 0.694 | 0.402 | 17.242 / 15.166 / 3.113 | 12.896 / 10.813 / 3.012 |
+| join-1024.js | 0.982 | 0.515 | 17.529 / 15.445 / 3.225 | 13.004 / 10.922 / 3.020 |
+| join-4096.js | 2.957 | 1.736 | 18.432 / 16.352 / 3.557 | 13.523 / 11.458 / 3.494 |
+| join-mixed-1024.js | 1.121 | 0.316 | 17.742 / 15.685 / 3.152 | 12.949 / 10.865 / 2.951 |
+| numeric-loop-10000.js | 0.311 | 0.091 | 17.111 / 15.021 / 2.957 | 12.197 / 10.107 / 2.291 |
+| numeric-loop-50000.js | 0.382 | 0.210 | 16.422 / 14.335 / 2.957 | 12.379 / 10.289 / 2.287 |
+| folded-string-4096.js | 0.402 | 0.752 | 17.004 / 14.914 / 2.994 | 12.258 / 10.168 / 2.307 |
+| dynamic-string-4096.js | 0.541 | 0.272 | 16.500 / 14.438 / 2.990 | 12.340 / 10.279 / 2.287 |
+| integer.js | 0.311 | 0.066 | 17.293 / 15.208 / 3.035 | 12.293 / 10.254 / 2.287 |
+| objects.js | 0.851 | 0.755 | 17.629 / 15.563 / 3.184 | 13.000 / 10.938 / 3.072 |
+| retained-objects.js | 18.848 | 39.414 | 22.566 / 20.485 / 8.014 | 18.820 / 16.767 / 8.816 |
+| join-empty-1024.js | 0.687 | 0.278 | 17.402 / 15.318 / 3.004 | 12.756 / 10.694 / 2.865 |
+| join-singleton-1024.js | 0.744 | 0.129 | 17.398 / 15.309 / 3.010 | 12.094 / 10.042 / 2.289 |
+| join-small-1024.js | 0.953 | 0.192 | 17.459 / 15.371 / 3.080 | 12.266 / 10.181 / 2.297 |
 
 A failure in either round removes that runtime’s bars for the case; all original failure streams remain. Checksums, warmup order, shared executable/configuration, raw Wasm and producer/consumer image identities are readmitted before rendering. Checksums do not grant native-code trust: externally supplied native images retain the Rust API’s explicit unsafe provenance requirement.
 

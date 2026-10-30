@@ -8,7 +8,8 @@ traceable in Git and the source-bound benchmark records.
 
 | Area | Question to answer before changing code |
 | --- | --- |
-| Repeated joins | Execution-window self-samples in the [current checkpoint](rust-rewrite/join-hotpaths-20261030.json) still identify generic property reads and the packed join kernel. Can guarded static Array prototype reads or a single completed own-property probe remove lookup work while preserving mutation and user-code order? |
+| Array operations | Re-profile after fixed-arity push and retained own-data caching. Do prototype probes on each append or repeated storage checks across join's two passes dominate now? |
+| Module locals | Can reusable-module analysis retain ordinary uncaptured locals while preserving live exports, Realm-relative lookup, direct eval and captures? Current environment cells block scalar loops and allocate values on updates. |
 | Dense numeric arrays | Can a dense-prefix storage mode avoid a private presence bitmap and its read checks, creating a bitmap only when holes require it? Numbers are already unboxed; [numeric literals](../crates/scriptw-aot-wasm/src/builtins/array/literal/numeric.rs) still allocate 8,192 small presence arrays in retained objects. |
 | P146 — resident memory | Which remaining runtime data, native code, stack maps, GC pages and host allocations account for the measured footprint? Continue from [runtime ownership](rust-rewrite/contracts/runtime-byte-ownership.md) and the [section diagnostic](rust-rewrite/memory-module-sections-20261028.md). |
 | P148 — root lifetimes | Can a measured retention cost be reduced after the final semantic use while preserving closures, exceptions, weak reachability, resumptions and host reentry? |
