@@ -91,6 +91,39 @@ fn primitive_length_branches<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Oper
     }).collect()
 }
 
+fn array_length_branches<'a>(
+    artifact: &WasmArtifact,
+    operators: &'a [Operator<'a>],
+) -> Vec<(usize, &'a [Operator<'a>])> {
+    use crate::gc_types::{ArrayObject, GcNullability, GlobalLedger, RuntimeModuleTypes};
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Program(
+        artifact.runtime().expect("actual Array consumers retain R"),
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(array) = registered
+        .globals()
+        .schema()
+        .reference_type::<ArrayObject>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("the actual Array guard uses its registered concrete type");
+    };
+    let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(array));
+    let length = crate::GcSnapshotField::ArrayLength.index();
+    operators.windows(2).enumerate().filter_map(|(index, window)| {
+        if !matches!(window, [Operator::RefTestNonNull { hty }, Operator::If { .. }] if *hty == heap) {
+            return None;
+        }
+        let branch = then_branch(operators, index + 2);
+        branch.windows(4).any(|ops| matches!(ops,
+            [Operator::StructGet { struct_type_index, field_index },
+             Operator::LocalSet { local_index: stored }, Operator::LocalGet { local_index: loaded },
+             Operator::F64ConvertI64U]
+            if *struct_type_index == array && *field_index == length && stored == loaded
+        )).then_some((index + 2, branch))
+    }).collect()
+}
+
 fn concat_length_branch<'a>(operators: &'a [Operator<'a>]) -> Option<&'a [Operator<'a>]> {
     operators.windows(8).enumerate().find_map(|(i, window)| match window {
         [Operator::LocalGet { .. }, Operator::I32Const { value: left }, Operator::I32Eq,
@@ -111,7 +144,7 @@ fn validate_program(artifact: &WasmArtifact) {
 }
 
 #[test]
-fn static_and_canonical_get_v_length_read_actual_strings_before_lookup_or_boxing() {
+fn static_and_canonical_get_v_length_read_actual_strings_and_arrays_before_lookup() {
     for (source, generic) in [
         (
             "function read(value) { return value.length; } read(globalThis.value);",
@@ -119,6 +152,10 @@ fn static_and_canonical_get_v_length_read_actual_strings_before_lookup_or_boxing
         ),
         (
             "function read() { var value='a\\0\\ud800'; return value.length; } read();",
+            "helper::dynamic_property_read",
+        ),
+        (
+            "function read() { var value=[1,2,3]; return value.length; } read();",
             "helper::dynamic_property_read",
         ),
     ] {
@@ -136,6 +173,25 @@ fn static_and_canonical_get_v_length_read_actual_strings_before_lookup_or_boxing
                 .any(|op| matches!(op, Operator::Call { .. } | Operator::CallRef { .. }))),
             "a primitive length branch reads rooted code units without helper calls"
         );
+        let arrays = array_length_branches(&artifact, &operators);
+        assert!(
+            !arrays.is_empty(),
+            "both PropertyRead and literal GetV test the actual Array type"
+        );
+        assert!(
+            arrays
+                .iter()
+                .any(|(_, branch)| !branch.iter().any(|op| matches!(
+                    op,
+                    Operator::Call { .. }
+                        | Operator::CallRef { .. }
+                        | Operator::StructNew { .. }
+                        | Operator::ArrayNew { .. }
+                        | Operator::ArrayNewDefault { .. }
+                        | Operator::ArrayNewFixed { .. }
+                ))),
+            "a concrete Array reads its live length without a lookup or allocation"
+        );
         let fallback =
             imported_helper(&artifact, generic).expect("ordinary fallback remains imported");
         let first_length = operators
@@ -152,6 +208,10 @@ fn static_and_canonical_get_v_length_read_actual_strings_before_lookup_or_boxing
             first_length < generic_call,
             "actual String length precedes boxing/lookup"
         );
+        assert!(
+            arrays.iter().any(|(start, _)| *start < generic_call),
+            "the guarded concrete Array read precedes boxing/lookup"
+        );
     }
     for source in [
         "function read(value,key) { return value[key]; } read(globalThis.value,globalThis.key);",
@@ -159,8 +219,10 @@ fn static_and_canonical_get_v_length_read_actual_strings_before_lookup_or_boxing
     ] {
         let artifact = emit_script(source).unwrap();
         validate_program(&artifact);
+        let operators = source_body(&artifact, "read");
         assert!(
-            primitive_length_branches(&source_body(&artifact, "read")).is_empty(),
+            primitive_length_branches(&operators).is_empty()
+                && array_length_branches(&artifact, &operators).is_empty(),
             "computed or other keys cannot acquire a static length proof"
         );
     }
@@ -358,5 +420,50 @@ fn object_read_length_key_rejects_symbols_and_other_extents_before_pool_resoluti
     assert_eq!(
         checked, 2,
         "both primitive String and concrete Array reads guard the length-name comparison"
+    );
+}
+
+#[test]
+fn original_retained_rows_read_current_array_length_inside_the_source_loop() {
+    let artifact = emit_script(include_str!(
+        "../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/retained-objects.js"
+    ))
+    .unwrap();
+    validate_program(&artifact);
+    let operators = source_body(&artifact, "workload");
+    let branches = array_length_branches(&artifact, &operators);
+    let starts = branches
+        .iter()
+        .filter_map(|(start, branch)| {
+            (!branch
+                .iter()
+                .any(|op| matches!(op, Operator::Call { .. } | Operator::CallRef { .. })))
+            .then_some(*start)
+        })
+        .collect::<BTreeSet<_>>();
+    assert!(
+        !starts.is_empty(),
+        "the unchanged retained predicate uses its actual Array field"
+    );
+    let mut frames = Vec::new();
+    let mut loop_reads = 0;
+    for (index, operator) in operators.iter().enumerate() {
+        match operator {
+            Operator::Loop { .. } => frames.push(true),
+            Operator::If { .. } | Operator::Block { .. } | Operator::TryTable { .. } => {
+                frames.push(false)
+            }
+            Operator::End => {
+                frames.pop();
+            }
+            _ => {}
+        }
+        if starts.contains(&index) && frames.contains(&true) {
+            loop_reads += 1;
+        }
+    }
+    assert!(
+        loop_reads > 0,
+        "the guarded live length read remains inside the loop, not hoisted over body effects"
     );
 }

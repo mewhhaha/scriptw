@@ -587,12 +587,8 @@ impl<'a> FunctionBuilder<'a> {
                 let key_result = schema.reserve_completion(function);
                 let property_exit = self.open_frame(ControlFrameKind::Block, function);
                 if operation == SpecOperationIr::GetV {
-                    let found = self.emit_get_v_primitive_string_length(
-                        &operands[1],
-                        &inputs[0],
-                        &pending,
-                        function,
-                    );
+                    let found =
+                        self.emit_get_v_static_length(&operands[1], &inputs[0], &pending, function);
                     if let Some(found) = found {
                         found.load(function);
                         schema.release_i32_local(found, function);

@@ -1,6 +1,6 @@
-//! Actual primitive String consumers bypass boxing without trusting IR kinds.
+//! Exact static length consumers inspect actual Strings and Arrays before Get.
 use super::*;
-use crate::gc_types::StringValue;
+use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcNullability, StringValue};
 
 /// An effect-free, exact `length` key. Computed expressions cannot mint this
 /// proof merely because their inferred kind or eventual value is String.
@@ -60,7 +60,30 @@ impl FunctionBuilder<'_> {
         schema.release_i64_local(length, function);
     }
 
-    pub(super) fn try_compile_primitive_string_static_length(
+    /// Concrete Arrays own a nonconfigurable uint32 length in this I64 field.
+    /// The exact-key proof and actual Array root exclude getters and exotics.
+    fn emit_array_length_value(
+        &self,
+        _key: StaticLengthKey,
+        array: &GcLocal<ArrayObject>,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let length = schema.reserve_i64_local(function);
+        schema
+            .field(ArrayObjectSchema::LENGTH)
+            .read(array, schema, function)
+            .store_i64(length, function);
+        length.load(function);
+        function.instruction(&Instruction::F64ConvertI64U);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        length.store(function);
+        output.set_number(length, function);
+        schema.release_i64_local(length, function);
+    }
+
+    pub(super) fn try_compile_static_length(
         &mut self,
         target: &TypedExpr,
         key: &PropertyKeyIr,
@@ -68,7 +91,7 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        let Some(_key) = StaticLengthKey::for_property_key(key) else {
+        let Some(key_proof) = StaticLengthKey::for_property_key(key) else {
             return Ok(false);
         };
         let schema = self.runtime_schema();
@@ -83,22 +106,38 @@ impl FunctionBuilder<'_> {
         self.emit_primitive_string_length_value(&string, output, function);
         string.clear(function);
         function.instruction(&Instruction::Else);
+        receiver.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let array = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<ArrayObject>(schema, function),
+            function,
+        );
+        self.emit_array_length_value(key_proof, &array, output, function);
+        array.clear(function);
+        function.instruction(&Instruction::Else);
         self.compile_ordinary_property_read_from_locals(target, key, receiver, output, function)?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(true)
     }
 
     /// Canonical GetV still owns operand evaluation. For a literal length key,
-    /// inspect its original receiver before ToObject can box an actual String.
-    pub(crate) fn emit_get_v_primitive_string_length(
+    /// inspect its original receiver before boxing or ordinary property lookup.
+    pub(crate) fn emit_get_v_static_length(
         &mut self,
         key: &TypedExpr,
         receiver: &ValueLocals,
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Option<I32Local> {
-        let _key = StaticLengthKey::for_get_v_operand(key)?;
+        let key_proof = StaticLengthKey::for_get_v_operand(key)?;
         let schema = self.runtime_schema();
         let handled = schema.reserve_i32_local(function);
         handled.set_constant(0, function);
@@ -114,6 +153,24 @@ impl FunctionBuilder<'_> {
         result.set_normal(result.value(), function);
         handled.set_constant(1, function);
         string.clear(function);
+        function.instruction(&Instruction::Else);
+        receiver.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let array = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<ArrayObject>(schema, function),
+            function,
+        );
+        self.emit_array_length_value(key_proof, &array, result.value(), function);
+        result.set_normal(result.value(), function);
+        handled.set_constant(1, function);
+        array.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Some(handled)

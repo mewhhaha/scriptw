@@ -34,9 +34,8 @@ Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
 semantic checks pass. Property reads reject impossible length keys before
 resolving the canonical name; guarded join calls reuse explicit String separators.
-Primitive string-length
-reads and guarded constant-return calls eliminate temporary objects and call
-setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
+Literal length reads use guarded String and Array fields; guarded constant-return
+calls eliminate temporary objects and call setup. Pure numeric sort callbacks have typed entries; packed sort snapshots
 and writeback retain ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
 

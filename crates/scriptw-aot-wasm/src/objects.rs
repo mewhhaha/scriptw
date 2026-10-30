@@ -1055,9 +1055,7 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        if self
-            .try_compile_primitive_string_static_length(target, key, receiver, output, function)?
-        {
+        if self.try_compile_static_length(target, key, receiver, output, function)? {
             return Ok(());
         }
         self.compile_ordinary_property_read_from_locals(target, key, receiver, output, function)

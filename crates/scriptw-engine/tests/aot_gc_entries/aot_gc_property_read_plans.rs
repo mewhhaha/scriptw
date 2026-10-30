@@ -1,8 +1,13 @@
 use scriptw_engine::{
-    CompileOptions, Engine, ExecutionBackend, ObservedCompletion, RealmBuilder, RunOptions,
+    CompileOptions, Engine, ExecutionBackend, HostSurfacePolicy, ObservedCompletion, RealmBuilder,
+    RunOptions,
 };
 
 fn assert_reads(source: &str) {
+    assert_reads_with_options(source, CompileOptions::default());
+}
+
+fn assert_reads_with_options(source: &str, options: CompileOptions) {
     scriptw_engine::configure_compilation_jobs(1).expect("one compiler worker");
     for strict in [false, true] {
         let source = format!(
@@ -12,7 +17,7 @@ fn assert_reads(source: &str) {
         let outcome = Engine::new(RealmBuilder::new().build())
             .observe_script(
                 &source,
-                CompileOptions::default(),
+                options.clone(),
                 RunOptions {
                     backend: ExecutionBackend::WasmAot,
                     timeout_ms: Some(30_000),
@@ -270,5 +275,87 @@ proxy = new Proxy(array, {get: function(target, name, receiver) {
 }});
 assert(read(proxy, lengthKey) === 4 && traps === 1, 'Proxy does not enter the concrete Array path');
 "#,
+    );
+}
+
+#[test]
+fn static_length_reads_current_concrete_arrays_and_preserves_other_receivers() {
+    assert_reads_with_options(
+        r#"
+function lengthOf(value) { return value.length; }
+function localLength() { var value=[1,2,3]; return value.length; }
+var array = [], evaluations = 0;
+function receiver() { evaluations++; return array; }
+assert(receiver().length === 0 && evaluations === 1, 'receiver evaluated once');
+array.push(1,2);
+assert(lengthOf(array) === 2 && localLength() === 3, 'literal and GetV Array reads');
+array.length = 7;
+assert(lengthOf(array) === 7, 'grown current length');
+array.length = 1;
+assert(lengthOf(array) === 1, 'shrunk current length');
+var visits = 0, changing = [1,2,3];
+for (var index=0; index<changing.length; index++) { visits++; changing.length=1; }
+assert(visits === 1, 'length is not hoisted over loop body effects');
+var edge = [];
+edge.length = 2147483648;
+assert(lengthOf(edge) === 2147483648, 'length is not signed i32');
+edge.length = 4294967295;
+assert(lengthOf(edge) === 4294967295, 'maximum uint32 length is exact');
+Object.defineProperty(edge, 'length', {writable: false});
+assert(lengthOf(edge) === 4294967295 && lengthOf(Object.freeze(array)) === 1,
+  'nonwritable length remains a live intrinsic field');
+var prototypeReads = 0;
+class Derived extends Array {}
+Object.defineProperty(Derived.prototype, 'length', {get: function() {
+  prototypeReads++; return 99;
+}, configurable: true});
+var derived = new Derived(4);
+assert(lengthOf(derived) === 4 && prototypeReads === 0, 'subclass own length shadows prototype');
+var foreignGlobal = __scriptwCreateRealm().global, foreign = new foreignGlobal.Array(6);
+assert(lengthOf(foreign) === 6, 'foreign Realm uses the canonical Array type');
+foreign.length = 2;
+assert(lengthOf(foreign) === 2, 'foreign current length');
+assert(lengthOf(Object.create(derived)) === 4, 'ordinary inheritor retains prototype lookup');
+var traps = 0, proxy;
+proxy = new Proxy(derived, {get: function(target, key, original) {
+  traps++; assert(key === 'length' && original === proxy, 'Proxy key and receiver'); return 17;
+}});
+assert(lengthOf(proxy) === 17 && traps === 1, 'Proxy does not pass the concrete Array guard');
+var getters = 0, object = {get length() { getters++; assert(this === object, 'plain receiver'); return 19; }};
+assert(lengthOf(object) === 19 && getters === 1, 'plain getter remains observable');
+var typed = new Uint8Array(3);
+assert(lengthOf(typed) === 3, 'TypedArray retains its ordinary getter');
+Object.defineProperty(typed, 'length', {get: function() { getters++; return 23; }, configurable: true});
+assert(lengthOf(typed) === 23 && getters === 2, 'TypedArray own getter is not an Array field');
+function argumentsLength(first, second) {
+  assert(lengthOf(arguments) === 2, 'Arguments length');
+  Object.defineProperty(arguments, 'length', {get: function() { getters++; return 29; }, configurable: true});
+  return lengthOf(arguments);
+}
+assert(argumentsLength(1,2) === 29 && getters === 3, 'Arguments getter retains its semantics');
+var nullish = 0;
+try { lengthOf(null); } catch (error) { assert(error instanceof TypeError, 'null error'); nullish++; }
+try { lengthOf(undefined); } catch (error) { assert(error instanceof TypeError, 'undefined error'); nullish++; }
+assert(nullish === 2 && lengthOf('a\u0000\ud800') === 3, 'nullish errors and primitive String branch');
+var mutable = [1], coercions = 0, events = '';
+function computedReceiver() { events += 'receiver;'; return mutable; }
+var key = {};
+key[Symbol.toPrimitive] = function(hint) {
+  coercions++; events += 'key;'; assert(hint === 'string', 'computed key hint'); mutable.length=8; return 'length';
+};
+assert(computedReceiver()[key] === 8 && coercions === 1 && events === 'receiver;key;',
+  'computed conversion happens once before lookup and keeps the evaluated receiver');
+var keyCalls = 0;
+function computedKey() { keyCalls++; mutable.length=4; return 'length'; }
+assert(mutable[computedKey()] === 4 && keyCalls === 1, 'a computed String result is not an effect-free key proof');
+var marker = {}, abrupt = {}, caught = false;
+abrupt[Symbol.toPrimitive] = function() { throw marker; };
+try { object[abrupt]; } catch (error) { caught = error === marker; }
+assert(caught && getters === 3, 'abrupt key conversion precedes any getter');
+"#,
+        CompileOptions {
+            host_surface_policy: HostSurfacePolicy::Test262,
+            ..CompileOptions::default()
+        },
     );
 }
