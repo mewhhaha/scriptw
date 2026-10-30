@@ -949,3 +949,158 @@ import.source('./value.js').then(() => { throw 'source fulfilled'; }, error => {
         None,
     );
 }
+
+#[test]
+fn private_module_var_references_preserve_write_call_and_iteration_semantics() {
+    assert_modules(
+        &[(
+            "entry.js",
+            r#"
+export function exercise(input) {
+  var input = input + 1;
+  if (input !== 3) throw 'parameter var redeclaration';
+  {
+    let input = 17;
+    input = 19;
+    if (input !== 19) throw 'nested lexical assignment';
+  }
+  if (input !== 3) throw 'lexical shadow replaced parameter';
+  var shadow = 1;
+  try { throw 3; } catch (shadow) {
+    var shadow = 5;
+    if (shadow !== 5) throw 'var initializer skipped catch binding';
+  }
+  if (shadow !== 1) throw 'catch initializer replaced activation var';
+  var calls = 0, value = 0;
+  value ||= (++calls, 3);
+  value &&= (++calls, 4);
+  value ??= (++calls, 5);
+  value = undefined;
+  value ??= (++calls, 6);
+  var old = value++;
+  --value;
+  value += 2;
+  value *= 2;
+  value -= 4;
+  value /= 2;
+  if (value !== 6) throw 'compound local write';
+  [value] = [8];
+  if (value !== 8) throw 'array target';
+  ({ value } = { value: 9 });
+  if (value !== 9) throw 'object target';
+  for (value of [10, 11]) {}
+  if (value !== 11) throw 'for-of target';
+  var keys = '';
+  for (value in { a: 1, b: 2 }) keys += value;
+  var { field: extracted } = { field: 12 };
+  var [arrayValue] = [13];
+  for (var iteration of [14]) {}
+  for (var property in { key: 1 }) {}
+  function local(input) { if (this !== undefined) throw 'local call receiver'; return input + 1; }
+  var invoke = local;
+  var recurse = function self(count) { var subtotal = count; return count ? subtotal + self(count - 1) : subtotal; };
+  if (recurse(3) !== 6) throw 'named expression self binding';
+  var tdz = false;
+  try { typeof late; let late = 1; } catch (error) { tdz = error instanceof ReferenceError; }
+  return old + ':' + value + ':' + keys + ':' + calls + ':' + invoke(4) + ':' + typeof value + ':' +
+    extracted + ':' + arrayValue + ':' + iteration + ':' + property + ':' + tdz;
+}
+if (exercise(2) !== '6:b:ab:3:5:string:12:13:14:key:true') throw 'private local references';
+print('private module var references');
+"#,
+        )],
+        &["private module var references"],
+        None,
+    );
+}
+
+#[test]
+fn private_module_vars_preserve_live_exports_and_escaping_captures() {
+    assert_modules(
+        &[
+            (
+                "entry.js",
+                r#"
+import { advance, counter, make } from './state.js';
+import * as namespace from './state.js';
+if (advance(10) !== 96 || counter !== 96 || namespace.counter !== 96) throw 'first live counter';
+if (advance(4) !== 110 || counter !== 110 || namespace.counter !== 110) throw 'second live counter';
+const first = make(7), second = make(2);
+if (first(1) !== 8 || first(3) !== 11 || second(1) !== 3 || first(0) !== 11) throw 'escaping captured var';
+print('live exports and captured vars');
+"#,
+            ),
+            (
+                "state.js",
+                r#"
+export let counter = 1;
+export function advance(stop) {
+  var total = 0;
+  for (var index = 0; index < stop; index++) total += index * 2 + 0.5;
+  counter += total;
+  return counter;
+}
+export function make(seed) {
+  var state = seed;
+  return function update(delta) { state += delta; return state; };
+}
+"#,
+            ),
+        ],
+        &["live exports and captured vars"],
+        None,
+    );
+}
+
+#[test]
+fn direct_eval_still_observes_and_updates_module_function_vars() {
+    assert_modules(
+        &[(
+            "entry.js",
+            r#"
+export function make(seed) {
+  var state = seed;
+  eval('state += 2');
+  return function next() { return eval('++state'); };
+}
+const next = make(7);
+if (next() !== 10 || next() !== 11) throw 'eval lost captured var';
+print('module eval var cells');
+"#,
+        )],
+        &["module eval var cells"],
+        None,
+    );
+}
+
+#[test]
+fn reusable_module_graph_preserves_strict_function_capture_of_sloppy_with() {
+    assert_modules(
+        &[
+            (
+                "entry.js",
+                r#"
+import { value } from './dependency.js';
+if (value !== 1 || selected(5) !== '6:73') throw 'with shadowed function locals';
+view.external = 79;
+if (selected(9) !== '10:79') throw 'lost captured with object';
+print('strict locals inside captured with');
+"#,
+            ),
+            ("dependency.js", "export const value = 1;"),
+        ],
+        &["strict locals inside captured with"],
+        Some(
+            r#"
+var selected, view = { input: 71, local: 72, external: 73 };
+with (view) {
+  selected = function read(input) {
+    'use strict';
+    var local = input + 1;
+    return local + ':' + external;
+  };
+}
+"#,
+        ),
+    );
+}

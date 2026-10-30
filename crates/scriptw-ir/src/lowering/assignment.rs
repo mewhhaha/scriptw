@@ -36,7 +36,7 @@ impl<'a> ScriptLowerer<'a> {
         source_name: String,
         value: TypedExpr,
     ) -> PreparedIdentifierWrite {
-        if self.uses_runtime_identifier_environment() {
+        if self.uses_runtime_identifier_environment_for(&source_name) {
             return PreparedIdentifierWrite::performed(self.environment_identifier(
                 source_name,
                 EnvironmentIdentifierOperationIr::Assign {
@@ -142,7 +142,9 @@ impl<'a> ScriptLowerer<'a> {
         if self.uses_runtime_identifier_environment() {
             if let AssignTarget::Identifier(identifier) = lhs {
                 let name = self.interner.resolve_expect(identifier.sym()).to_string();
-                return self.lower_environment_identifier_assignment(name, op, rhs);
+                if self.uses_runtime_identifier_environment_for(&name) {
+                    return self.lower_environment_identifier_assignment(name, op, rhs);
+                }
             }
         }
         match op {

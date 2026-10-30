@@ -161,7 +161,7 @@ impl ScriptLowerer<'_> {
                     ),
                 );
             }
-            if self.uses_runtime_identifier_environment() {
+            if self.uses_runtime_identifier_environment_for(&source_name) {
                 return DestructuringTargetIr::ResolvedVarBinding {
                     name: storage_name,
                     reference: IdentifierWriteReferenceIr::environment(
@@ -192,7 +192,53 @@ impl ScriptLowerer<'_> {
 
     pub(super) fn uses_runtime_identifier_environment(&self) -> bool {
         let owner = &self.analysis.owner_plans[&self.current_owner_id];
-        self.analysis.environment_plans[&owner.activation_environment_id].eval_visible
+        self.analysis
+            .module_local_candidates
+            .contains_key(&self.current_owner_id)
+            || self.analysis.environment_plans[&owner.activation_environment_id].eval_visible
+    }
+
+    /// Only a resolved current-owner activation local with no physical cell
+    /// may bypass named lookup. Captures, module cells and Realm globals retain
+    /// their live Reference even when the current activation has no storage.
+    pub(super) fn uses_runtime_identifier_environment_for(&self, name: &str) -> bool {
+        if !self.uses_runtime_identifier_environment() {
+            return false;
+        }
+        let Some(locals) = self
+            .analysis
+            .module_local_candidates
+            .get(&self.current_owner_id)
+        else {
+            return true;
+        };
+        let Some(binding) = self.lookup_binding(name) else {
+            return true;
+        };
+        if !locals.contains(&binding.storage_name)
+            || self
+                .captured_binding_positions
+                .contains_key(&binding.storage_name)
+            || !self.with_environment_chain.is_empty()
+        {
+            return true;
+        }
+        let Some(environments) = self
+            .analysis
+            .physical_binding_environments
+            .get(&binding.storage_name)
+        else {
+            return true;
+        };
+        let owner = &self.analysis.owner_plans[&self.current_owner_id];
+        !environments.contains(&owner.activation_environment_id)
+            || environments.iter().any(|id| {
+                let environment = &self.analysis.environment_plans[id];
+                environment.owner_id == self.current_owner_id
+                    && environment
+                        .owned_env_slots
+                        .contains_key(&binding.storage_name)
+            })
     }
 
     pub(super) fn environment_identifier(
@@ -223,13 +269,13 @@ impl ScriptLowerer<'_> {
         callee: &Expression,
         arguments: &[Expression],
     ) -> Option<TypedExpr> {
-        if !self.uses_runtime_identifier_environment() {
-            return None;
-        }
         let Expression::Identifier(identifier) = Self::unwrap_parenthesized_expr(callee) else {
             return None;
         };
         let name = self.interner.resolve_expect(identifier.sym()).to_string();
+        if !self.uses_runtime_identifier_environment_for(&name) {
+            return None;
+        }
         if self
             .analysis
             .module_execution

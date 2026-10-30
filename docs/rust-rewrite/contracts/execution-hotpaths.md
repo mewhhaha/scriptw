@@ -54,6 +54,24 @@ keeps its source initialization state. Captured environments, dynamic names,
 lexical `this`, coercive Number/BigInt cases and generic value boundaries retain
 their existing paths.
 
+Reusable module lookup does not by itself require cells for every ordinary
+function local. Strict ordinary functions with simple identifier parameters can
+keep activation `var` bindings and parameters private when capture analysis
+finds no physical cell. Lexical, function, self and synthetic bindings retain
+their existing storage. Named function expressions keep their immutable self
+environment, including recursive calls. Functions defined within a surrounding
+`with` scope and graphs with actual direct eval or arguments use retain the
+complete conservative plan.
+
+Occurrence lowering resolves the binding's current owner and storage before
+bypassing named lookup. Captured variables, module exports/imports and globals
+keep their live References, including lookup in the defining Realm. Empty local
+records are removed before capture hops are fixed; retained cells keep their
+named environment roles. Reads, calls, assignments, numeric updates, `typeof`,
+destructuring and iteration targets use the same storage decision. This exposes
+ordinary module numeric loops to the existing guarded scalar emitter without
+changing its coercion or generic fallback.
+
 ## String addition and folding
 
 Exact literal String operands fold by decoding their semantic UTF-16 units,

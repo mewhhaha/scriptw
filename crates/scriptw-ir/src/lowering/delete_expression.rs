@@ -6,7 +6,10 @@ impl<'a> ScriptLowerer<'a> {
         if self.uses_runtime_identifier_environment() {
             if let Expression::Identifier(identifier) = target {
                 let name = self.interner.resolve_expect(identifier.sym()).to_string();
-                return self.environment_identifier(name, EnvironmentIdentifierOperationIr::Delete);
+                if self.uses_runtime_identifier_environment_for(&name) {
+                    return self
+                        .environment_identifier(name, EnvironmentIdentifierOperationIr::Delete);
+                }
             }
         }
         match target {

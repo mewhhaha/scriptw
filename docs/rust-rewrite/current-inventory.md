@@ -15,11 +15,16 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   choosing another optimization. Check append prototype probes and storage checks
   across packed join's two passes. Any change needs concrete receiver/backing
   proofs and must preserve holes, accessors, proxies and user-code ordering.
-  The retained-object time regression persists in balanced repeats.
-- Investigate ordinary module function storage: reusable-module analysis marks
-  every environment eval-visible, forcing locals into cells and disabling scalar
-  loops. The retained-export diagnostic exposes this existing boundary. Preserve
-  live exports, Realm-relative lookup, actual captures and direct eval.
+  The earlier ordinary retained-object time regression remains unresolved; the
+  module-local diagnostic does not refresh that published comparison.
+- Continue measuring module function storage after private activation `var`
+  bindings and simple parameters in strict ordinary functions. Lexical locals,
+  arrows and other protocols retain their existing cells. Preserve live exports,
+  Realm-relative lookup, actual captures and the conservative direct-eval,
+  arguments and surrounding-`with` boundaries before expanding admission.
+  The [local diagnostic](module-local-performance-20261030.json) preserves all
+  17 retained-call results and the ordinary controls, including reverse-sort-512
+  and join-4096 slowdowns in both balanced orders despite identical emitted Wasm.
 - Host type metadata remains a separate hypothesis: demonstrate at least
   **256 KiB of avoidable retained ownership** before changing its decoding or
   registration. Phase deltas do not prove duplication or fault-around behavior.
@@ -31,6 +36,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 - Complete current-source default and optimized release acceptance. Historical
   complete all-feature coverage and later affected-target checkpoints establish
   only their recorded scopes and sources.
+- Repair the checked-initialization panic for
+  `language/function-code/S10.2.1_A4_T2.js`: both modes crash at the Wasm backend's
+  local-storage invariant on the unchanged performance baseline and candidate.
+  Keep both failures in selected replay totals; the module-local change does not
+  repair this existing hoisted-function/`var` case.
 - Finish retention, real serial/shard/resume checks, debug/release differential
   and robustness campaigns, supported-host reproducibility and calibrated
   performance acceptance. Preserve original IDs, budgets and failed receipts.

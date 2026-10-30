@@ -119,7 +119,7 @@ fn bare_identifier_prefix_uses_the_checked_reference_write_path() {
         "pub(super) fn lower_assign(",
     );
     let order = [
-        "self.uses_runtime_identifier_environment()",
+        "self.uses_runtime_identifier_environment_for(&source_name)",
         "EnvironmentIdentifierOperationIr::Assign",
         "self.locate_identifier_reference(&source_name)",
         ".select_preceding(reference.declarative_position())",

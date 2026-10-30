@@ -884,3 +884,132 @@ fn original_request_phases_survive_linking_without_a_static_evaluation_schedule(
         scriptw_ir::ModuleEntryEvaluationKindIr::Promise
     );
 }
+
+#[test]
+fn ordinary_module_var_locals_and_simple_parameters_do_not_allocate_cells() {
+    let program = module_program(&[(
+        "entry.js",
+        "export function sum(input) { var total = 0; for (var index = 0; index < input; index++) total += index * 2 + 0.5; return total; }",
+    )]);
+    let script = program.script.as_ref().unwrap();
+    let sum = script
+        .functions
+        .iter()
+        .find(|function| function.name == "sum")
+        .unwrap();
+    for name in ["input", "total", "index"] {
+        assert!(
+            !sum.owned_env_bindings
+                .iter()
+                .any(|binding| binding.name == name),
+            "uncaptured {name} needs private activation storage: {:?}",
+            sum.owned_env_bindings
+        );
+    }
+    assert!(sum.body.statements.iter().any(|statement| matches!(statement,
+        StatementIr::Return(value) if matches!(&value.expr, ExprIr::Identifier(name) if name == "total")
+    )), "the local result must bypass named environment resolution");
+}
+
+#[test]
+fn ordinary_module_captured_vars_keep_their_original_owner_and_cell() {
+    let program = module_program(&[(
+        "entry.js",
+        "export function make(seed) { var state = seed; return function update(delta) { state += delta; return state; }; }",
+    )]);
+    let script = program.script.as_ref().unwrap();
+    let make = script
+        .functions
+        .iter()
+        .find(|function| function.name == "make")
+        .unwrap();
+    let update = script
+        .functions
+        .iter()
+        .find(|function| function.name == "update")
+        .unwrap();
+    let state = make
+        .owned_env_bindings
+        .iter()
+        .find(|binding| binding.name == "state")
+        .expect("a live closure keeps the source var cell");
+    let captured = update
+        .captured_bindings
+        .iter()
+        .find(|binding| binding.source_name == "state")
+        .expect("the nested callable retains its original state binding");
+    assert_eq!(captured.slot, state.slot);
+    assert!(!make
+        .owned_env_bindings
+        .iter()
+        .any(|binding| binding.name == "seed"));
+    assert!(!update
+        .owned_env_bindings
+        .iter()
+        .any(|binding| binding.name == "delta"));
+}
+
+#[test]
+fn module_exports_keep_canonical_cells_when_function_vars_are_private() {
+    let program = module_program(&[(
+        "entry.js",
+        "export let counter = 1; export function advance(input) { var total = input * 2; counter += total; return counter; }",
+    )]);
+    let script = program.script.as_ref().unwrap();
+    let graph = activation_graph(script).unwrap();
+    let owner = script
+        .functions
+        .iter()
+        .find(|function| &function.id == graph.activations()[0].function())
+        .unwrap();
+    assert!(
+        owner
+            .owned_env_bindings
+            .iter()
+            .any(|binding| binding.name == "counter"),
+        "the exported binding still owns the module's canonical cell"
+    );
+    let advance = script
+        .functions
+        .iter()
+        .find(|function| function.name == "advance")
+        .unwrap();
+    assert!(!advance
+        .owned_env_bindings
+        .iter()
+        .any(|binding| matches!(binding.name.as_str(), "input" | "total")));
+}
+
+#[test]
+fn real_direct_eval_conservatively_retains_module_function_var_cells() {
+    let program = module_program(&[(
+        "entry.js",
+        "export function sum(input) { var total = input; return total; } export function evaluate() { var value = 7; return eval('value'); }",
+    )]);
+    let script = program.script.as_ref().unwrap();
+    for (function, names) in [
+        ("sum", &["input", "total"][..]),
+        ("evaluate", &["value"][..]),
+    ] {
+        let function = script
+            .functions
+            .iter()
+            .find(|candidate| candidate.name == function)
+            .unwrap();
+        let Some(scriptw_ir::EvalEnvironmentRoleIr::Declarative { bindings, .. }) =
+            &function.eval_environment
+        else {
+            panic!("real eval retains named environment visibility");
+        };
+        for name in names {
+            let binding = bindings
+                .iter()
+                .find(|binding| binding.source_name == *name)
+                .expect("eval-visible source name keeps its binding");
+            assert!(function
+                .owned_env_bindings
+                .iter()
+                .any(|owned| owned.slot == binding.slot));
+        }
+    }
+}

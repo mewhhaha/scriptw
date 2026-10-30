@@ -31,6 +31,10 @@ Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
 other values retain the full coercion path. Closed scalar loops retain proven
 32-bit integers in integer locals, with bounded unrolling and exact integer
 recurrence reduction while preserving Number values at their exits.
+Strict ordinary module functions keep proven uncaptured `var` bindings and simple
+parameters in local storage; exports, captures and Realm-relative names retain
+their live environment lookup. Actual eval/arguments use keeps the conservative
+environment plan.
 Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
 semantic checks pass. Guarded fixed-arity push calls avoid temporary argument

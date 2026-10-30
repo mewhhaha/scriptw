@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
+
 use scriptw_front::{parse, ParseGoal, ParseOptions, ParsedSource};
 use scriptw_ir::{
     lower, lower_module_graph, lower_script_graph, ExprIr, ModuleGraphSources, ModuleKey,
-    ModuleNamespaceModeIr, ModuleSourceIr, ScriptIr, StatementIr, TypedExpr, ValueKind,
+    ModuleNamespaceModeIr, ModuleSourceIr, ModuleUnitId, ScriptIr, StatementIr, TypedExpr,
+    ValueKind,
 };
 
 fn graph(files: &[(&str, &str)], entry_goal: ParseGoal) -> ScriptIr {
@@ -54,10 +57,12 @@ fn binding_initializers<'a>(
     for statement in statements {
         match statement {
             StatementIr::Lexical { name, init, .. } => out.push((name, init)),
-            StatementIr::Expression(TypedExpr {
-                expr: ExprIr::ModuleNamespacePublish { namespace, .. },
-                ..
-            }) => out.push(("", namespace)),
+            StatementIr::Expression(
+                expression @ TypedExpr {
+                    expr: ExprIr::ModuleNamespacePublish { .. },
+                    ..
+                },
+            ) => out.push(("", expression)),
             StatementIr::Var(declarations) => {
                 for declaration in declarations {
                     if let Some(init) = &declaration.init {
@@ -86,30 +91,61 @@ fn initializers(script: &ScriptIr) -> Vec<(&str, &TypedExpr)> {
     out
 }
 
-fn namespace_tables(script: &ScriptIr) -> Vec<(ModuleNamespaceModeIr, &[TypedExpr])> {
-    initializers(script)
-        .into_iter()
-        .filter_map(|(_, init)| {
-            let ExprIr::ModuleNamespace { mode, exports } = &init.expr else {
-                return None;
+fn namespace_tables(
+    script: &ScriptIr,
+) -> BTreeMap<(ModuleUnitId, ModuleNamespaceModeIr), &[TypedExpr]> {
+    let mut tables = BTreeMap::new();
+    for (_, init) in initializers(script) {
+        let ExprIr::ModuleNamespacePublish {
+            module,
+            mode,
+            namespace,
+        } = &init.expr
+        else {
+            continue;
+        };
+        let ExprIr::ModuleNamespace {
+            mode: construction_mode,
+            exports,
+        } = &namespace.expr
+        else {
+            panic!("namespace publication owns its canonical construction");
+        };
+        assert_eq!(mode, construction_mode);
+        assert_eq!(namespace.kind, ValueKind::Object);
+        assert!(
+            namespace.heap_shape.is_none(),
+            "namespace is not an ordinary shaped object"
+        );
+        let ExprIr::ArrayLiteral(elements) = &exports.expr else {
+            panic!("private export table");
+        };
+        for reader in elements.iter().skip(2).step_by(2) {
+            let ExprIr::FunctionValue(id) = &reader.expr else {
+                panic!("export retains a live reader: {reader:?}");
             };
-            assert_eq!(init.kind, ValueKind::Object);
-            assert!(
-                init.heap_shape.is_none(),
-                "namespace is not an ordinary shaped object"
-            );
-            let ExprIr::ArrayLiteral(elements) = &exports.expr else {
-                panic!("private export table");
-            };
-            for reader in elements.iter().skip(2).step_by(2) {
-                let ExprIr::FunctionValue(id) = &reader.expr else {
-                    panic!("export retains a live reader: {reader:?}");
-                };
-                assert!(script.functions.iter().any(|function| function.id == *id));
-            }
-            Some((*mode, elements.as_slice()))
-        })
-        .collect()
+            assert!(script.functions.iter().any(|function| function.id == *id));
+        }
+        assert!(
+            tables
+                .insert((*module, *mode), elements.as_slice())
+                .is_none(),
+            "each module/mode publishes exactly one canonical namespace"
+        );
+    }
+    tables
+}
+
+fn assert_empty_entry_namespace(
+    tables: &BTreeMap<(ModuleUnitId, ModuleNamespaceModeIr), &[TypedExpr]>,
+) {
+    let entry = tables[&(0, ModuleNamespaceModeIr::Eager)];
+    assert_eq!(
+        entry.len(),
+        1,
+        "the host retains the entry's empty export table"
+    );
+    assert_eq!(entry[0].kind, ValueKind::Undefined);
 }
 
 #[test]
@@ -122,11 +158,14 @@ fn repeated_self_imports_construct_one_namespace_with_live_readers() {
         ParseGoal::Module,
     );
     let tables = namespace_tables(&script);
-    assert_eq!(tables.len(), 1);
-    assert_eq!(tables[0].0, ModuleNamespaceModeIr::Eager);
-    assert_eq!(tables[0].1.len(), 3);
-    assert_eq!(tables[0].1[0].kind, ValueKind::Undefined);
-    assert_eq!(tables[0].1[1].expr, ExprIr::String("value".into()));
+    assert_eq!(
+        tables.keys().copied().collect::<Vec<_>>(),
+        [(0, ModuleNamespaceModeIr::Eager)]
+    );
+    let table = tables[&(0, ModuleNamespaceModeIr::Eager)];
+    assert_eq!(table.len(), 3);
+    assert_eq!(table[0].kind, ValueKind::Undefined);
+    assert_eq!(table[1].expr, ExprIr::String("value".into()));
 }
 
 #[test]
@@ -157,7 +196,16 @@ fn ordinary_arrays_with_namespace_spelling_keep_array_semantics() {
         ],
         ParseGoal::Module,
     );
-    assert_eq!(namespace_tables(&linked).len(), 1);
+    let tables = namespace_tables(&linked);
+    assert_eq!(
+        tables.keys().copied().collect::<Vec<_>>(),
+        [
+            (0, ModuleNamespaceModeIr::Eager),
+            (1, ModuleNamespaceModeIr::Eager),
+        ]
+    );
+    assert_empty_entry_namespace(&tables);
+    assert_eq!(tables[&(1, ModuleNamespaceModeIr::Eager)].len(), 3);
     let ordinary = initializers(&linked)
         .into_iter()
         .find(|(name, _)| *name == "ordinary")
@@ -182,9 +230,15 @@ fn export_tables_keep_utf16_order_including_numeric_strings() {
         ParseGoal::Module,
     );
     let tables = namespace_tables(&script);
-    assert_eq!(tables.len(), 1);
-    let keys = tables[0]
-        .1
+    assert_eq!(
+        tables.keys().copied().collect::<Vec<_>>(),
+        [
+            (0, ModuleNamespaceModeIr::Eager),
+            (1, ModuleNamespaceModeIr::Eager),
+        ]
+    );
+    assert_empty_entry_namespace(&tables);
+    let keys = tables[&(1, ModuleNamespaceModeIr::Eager)]
         .iter()
         .skip(1)
         .step_by(2)
@@ -211,16 +265,24 @@ fn deferred_namespaces_retain_an_evaluator_separate_from_export_readers() {
         ParseGoal::Module,
     );
     let tables = namespace_tables(&script);
-    assert_eq!(tables.len(), 1);
-    assert_eq!(tables[0].0, ModuleNamespaceModeIr::Deferred);
-    let ExprIr::FunctionValue(evaluator) = &tables[0].1[0].expr else {
+    assert_eq!(
+        tables.keys().copied().collect::<Vec<_>>(),
+        [
+            (0, ModuleNamespaceModeIr::Eager),
+            (1, ModuleNamespaceModeIr::Deferred),
+        ]
+    );
+    assert_empty_entry_namespace(&tables);
+    let table = tables[&(1, ModuleNamespaceModeIr::Deferred)];
+    assert_eq!(table.len(), 3);
+    let ExprIr::FunctionValue(evaluator) = &table[0].expr else {
         panic!("deferred evaluator")
     };
     assert!(script
         .functions
         .iter()
         .any(|function| function.id == *evaluator));
-    assert_ne!(tables[0].1[0].expr, tables[0].1[2].expr);
+    assert_ne!(table[0].expr, table[2].expr);
 }
 
 #[test]
@@ -243,12 +305,24 @@ fn async_and_dynamic_import_wrappers_retain_trusted_namespace_spans() {
             entry_goal,
         );
         let tables = namespace_tables(&script);
-        assert!(!tables.is_empty(), "{entry_goal:?}");
-        for (mode, table) in tables {
-            assert_eq!(mode, ModuleNamespaceModeIr::Eager);
-            assert_eq!(table.len(), 3);
-            assert_eq!(table[1].expr, ExprIr::String("value".into()));
-        }
+        let expected = match entry_goal {
+            ParseGoal::Script => vec![(1, ModuleNamespaceModeIr::Eager)],
+            ParseGoal::Module => {
+                assert_empty_entry_namespace(&tables);
+                vec![
+                    (0, ModuleNamespaceModeIr::Eager),
+                    (1, ModuleNamespaceModeIr::Eager),
+                ]
+            }
+        };
+        assert_eq!(
+            tables.keys().copied().collect::<Vec<_>>(),
+            expected,
+            "{entry_goal:?}"
+        );
+        let table = tables[&(1, ModuleNamespaceModeIr::Eager)];
+        assert_eq!(table.len(), 3);
+        assert_eq!(table[1].expr, ExprIr::String("value".into()));
     }
 }
 
@@ -265,10 +339,20 @@ fn eager_and_deferred_requests_construct_separate_namespace_identities() {
         ParseGoal::Module,
     );
     let tables = namespace_tables(&script);
-    assert_eq!(tables.len(), 2);
-    assert_eq!(tables[0].0, ModuleNamespaceModeIr::Eager);
-    assert_eq!(tables[1].0, ModuleNamespaceModeIr::Deferred);
-    assert_eq!(tables[0].1[0].kind, ValueKind::Undefined);
-    assert_eq!(tables[1].1[0].kind, ValueKind::Function);
-    assert_eq!(tables[0].1[1], tables[1].1[1]);
+    assert_eq!(
+        tables.keys().copied().collect::<Vec<_>>(),
+        [
+            (0, ModuleNamespaceModeIr::Eager),
+            (1, ModuleNamespaceModeIr::Eager),
+            (1, ModuleNamespaceModeIr::Deferred),
+        ]
+    );
+    assert_empty_entry_namespace(&tables);
+    let eager = tables[&(1, ModuleNamespaceModeIr::Eager)];
+    let deferred = tables[&(1, ModuleNamespaceModeIr::Deferred)];
+    assert_eq!(eager.len(), 3);
+    assert_eq!(deferred.len(), 3);
+    assert_eq!(eager[0].kind, ValueKind::Undefined);
+    assert_eq!(deferred[0].kind, ValueKind::Function);
+    assert_eq!(eager[1], deferred[1]);
 }

@@ -5,6 +5,7 @@ mod direct_eval_capture;
 mod environment_binding;
 mod eval_environment;
 mod function_environment;
+mod module_locals;
 use boa_ast::pattern::{ArrayPattern, ObjectPattern};
 pub(crate) use eval_environment::{
     CompleteResumableForInOwner, CompleteResumableForOfOwner, MixedAsyncGeneratorWithOwner,
@@ -285,6 +286,7 @@ impl AnalysisAllocationState {
 #[derive(Debug, Clone)]
 pub(crate) struct Analysis<'a> {
     pub(crate) binding_inference: OwnerBindingInference<'a>,
+    pub(crate) module_local_candidates: BTreeMap<FunctionId, BTreeSet<String>>,
     pub(crate) template_source: Option<TemplateSourceIr>,
     pub(crate) function_global_hints: crate::prepared_source_cache::FunctionGlobalConstructorHints,
     pub(crate) source_function_global_hypotheses:
@@ -400,6 +402,8 @@ pub(crate) struct AnalysisBuilder<'a> {
     template_source: Option<TemplateSourceIr>,
     script_instantiation: ScriptInstantiation,
     eval_visible: bool,
+    realm_reusable_module_environments: bool,
+    module_local_candidates: BTreeMap<FunctionId, BTreeSet<String>>,
     source_names_by_storage: BTreeMap<String, String>,
     source_identifiers: BTreeSet<String>,
     owner_plans: BTreeMap<String, OwnerPlan>,
@@ -442,7 +446,7 @@ impl<'a> AnalysisBuilder<'a> {
     /// from the entry Script's. Named environment lookup keeps those bindings
     /// attached to that Realm instead of capturing entry-script slot indices.
     pub(crate) fn with_realm_reusable_module_environments(mut self, enabled: bool) -> Self {
-        self.eval_visible |= enabled;
+        self.realm_reusable_module_environments = enabled;
         self
     }
 
@@ -486,6 +490,11 @@ impl<'a> AnalysisBuilder<'a> {
             || eval_environment::contains_direct_eval_call(script)
             || eval_environment::contains_annex_b_arguments_candidate(script)
             || eval_environment::contains_arguments_reference(script);
+        // Reusable Realm lookup needs named nonlocals, but does not expose
+        // uncaptured function locals to eval. Actual eval/arguments syntax
+        // conservatively retains the complete existing environment plan.
+        let module_local_candidates = self.realm_reusable_module_environments && !self.eval_visible;
+        self.eval_visible |= self.realm_reusable_module_environments;
         self.source_identifiers = eval_environment::source_identifiers(script, interner);
         let direct_context = match &self.script_instantiation {
             ScriptInstantiation::Prepared(PreparedScriptKind::DirectEval(context)) => {
@@ -625,6 +634,9 @@ impl<'a> AnalysisBuilder<'a> {
             );
         }
         self.finalize_with_continuation_owners();
+        if module_local_candidates {
+            self.plan_module_local_candidates();
+        }
         self.finalize_capture_plans(interner);
         let planned_source_function_ids = Arc::new(
             self.function_plans
@@ -640,6 +652,7 @@ impl<'a> AnalysisBuilder<'a> {
         );
         Analysis {
             binding_inference,
+            module_local_candidates: self.module_local_candidates,
             function_global_hints: Default::default(),
             source_function_global_hypotheses: Default::default(),
             template_source: self.template_source,
@@ -6641,10 +6654,18 @@ impl<'a> AnalysisBuilder<'a> {
                             | WithContinuationOwner::MixedAsyncGeneratorWhole(_)
                     ))
         }) {
-            owned_names
-                .entry(environment.id)
-                .or_default()
-                .extend(environment.binding_storage_names.iter().cloned());
+            owned_names.entry(environment.id).or_default().extend(
+                environment
+                    .binding_storage_names
+                    .iter()
+                    .filter(|name| {
+                        !self
+                            .module_local_candidates
+                            .get(&environment.owner_id)
+                            .is_some_and(|locals| locals.contains(*name))
+                    })
+                    .cloned(),
+            );
         }
 
         for owner in self.owner_plans.values() {
@@ -6968,6 +6989,18 @@ impl<'a> AnalysisBuilder<'a> {
             }
         }
 
+        // Capture discovery has now retained every actual cell. Remove empty
+        // local records before named roles and capture hops are finalized.
+        // Nonempty records keep their named bindings for nested closures.
+        for environment in self.environment_plans.values_mut() {
+            if self
+                .module_local_candidates
+                .contains_key(&environment.owner_id)
+                && environment.owned_env_slots.is_empty()
+            {
+                environment.eval_visible = false;
+            }
+        }
         self.finalize_eval_environment_roles(interner);
 
         for owner in self.owner_plans.values_mut() {

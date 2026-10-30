@@ -95,6 +95,14 @@ fn fixed_argument_count_does_not_grow_evaluation_tag_or_eqref_scratch() {
 
 fn with_source_operators(source: &str, name: &str, check: impl FnOnce(&[Operator<'_>])) {
     let artifact = emit_script(source).expect("loop control emits");
+    with_source_artifact_operators(artifact, name, check);
+}
+
+fn with_source_artifact_operators(
+    artifact: WasmArtifact,
+    name: &str,
+    check: impl FnOnce(&[Operator<'_>]),
+) {
     expect_valid_module(&artifact, 1);
     let target = function_names(&artifact)
         .into_iter()
@@ -409,4 +417,38 @@ fn integer_residue_consumers_preserve_full_number_assignment_stores() {
             );
         },
     );
+}
+
+#[test]
+fn module_var_loops_use_scalars_only_when_activation_storage_is_private() {
+    for (source, expected) in [
+        (
+            "export function varied(total, stop) { for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; } return total; }",
+            true,
+        ),
+        (
+            "export const run = function varied(total, stop) { for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; } return total; };",
+            true,
+        ),
+        (
+            "export function varied(total, stop) { function capture(){return total;} for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; } return capture(); }",
+            false,
+        ),
+        (
+            "export function varied(total, stop) { for(var step=0;(step+0)<stop;step++) { total+=step*2+0.5; } return total; } export function evaluate(){ return eval('0'); }",
+            false,
+        ),
+    ] {
+        let parsed = parse(source, ParseOptions::module()).expect("module loop parses");
+        let program = lower(&parsed);
+        assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+        let artifact = emit(&program).expect("module loop emits actual compiled Wasm");
+        with_source_artifact_operators(artifact, "varied", |operators| {
+            assert_eq!(
+                loop_regions(operators).iter().any(|region| scalar_arithmetic_loop(region)),
+                expected,
+                "{source}"
+            );
+        });
+    }
 }

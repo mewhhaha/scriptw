@@ -5947,7 +5947,7 @@ impl<'a> ScriptLowerer<'a> {
         match expression {
             Expression::Identifier(identifier) => {
                 let name = self.interner.resolve_expect(identifier.sym()).to_string();
-                if self.uses_runtime_identifier_environment()
+                if self.uses_runtime_identifier_environment_for(&name)
                     && !self
                         .analysis
                         .module_execution
@@ -11362,7 +11362,7 @@ impl<'a> ScriptLowerer<'a> {
         ident: boa_ast::expression::Identifier,
     ) -> Option<DestructuringTargetIr> {
         let source_name = self.interner.resolve_expect(ident.sym()).to_string();
-        if self.uses_runtime_identifier_environment() {
+        if self.uses_runtime_identifier_environment_for(&source_name) {
             return Some(DestructuringTargetIr::AssignmentIdentifier(
                 IdentifierWriteReferenceIr::environment(source_name, self.reference_strictness()),
             ));
@@ -12202,7 +12202,7 @@ impl<'a> ScriptLowerer<'a> {
         };
 
         let name = self.interner.resolve_expect(identifier.sym()).to_string();
-        if self.uses_runtime_identifier_environment() {
+        if self.uses_runtime_identifier_environment_for(&name) {
             let (operation, return_mode) = match op {
                 UpdateOp::IncrementPost => (NumericUpdateOp::Increment, UpdateReturnMode::Postfix),
                 UpdateOp::IncrementPre => (NumericUpdateOp::Increment, UpdateReturnMode::Prefix),
@@ -12403,7 +12403,7 @@ impl<'a> ScriptLowerer<'a> {
         if matches!(op, UnaryOp::TypeOf) {
             if let Expression::Identifier(identifier) = Self::unwrap_parenthesized_expr(target) {
                 let name = self.interner.resolve_expect(identifier.sym()).to_string();
-                if self.uses_runtime_identifier_environment() {
+                if self.uses_runtime_identifier_environment_for(&name) {
                     return self
                         .environment_identifier(name, EnvironmentIdentifierOperationIr::Typeof);
                 }

@@ -515,3 +515,41 @@ true;
         &["embedded Realm TLA imports"],
     );
 }
+
+#[test]
+fn private_module_vars_keep_nonlocal_reads_and_writes_relative_to_the_defining_realm() {
+    assert_files(
+        EmbeddedModuleGoal::Script,
+        r#"
+let offset = 7;
+const realm = new ShadowRealm();
+realm.evaluate('globalThis.offset = 11;');
+Promise.all([
+  import('./locals.js'),
+  realm.importValue('./locals.js', 'sum'),
+  realm.importValue('./locals.js', 'replace')
+]).then(values => {
+  const root = values[0], sum = values[1], replace = values[2];
+  assert(root.sum(4) === 13 && sum(4) === 17, 'nonlocal read uses defining Realm');
+  assert(replace(23) === 23 && sum(4) === 29, 'retained function observes a live nonlocal write');
+  assert(root.sum(4) === 13 && offset === 7, 'foreign writes preserve entry lexical');
+  realm.evaluate('offset = 31;');
+  assert(sum(4) === 37 && root.sum(4) === 13, 'retained function resolves current defining-Realm binding');
+  print('private locals with Realm globals');
+});
+true;
+"#,
+        &[(
+            "locals.js",
+            r#"
+export function sum(stop) {
+  var total = 0;
+  for (var index = 0; index < stop; index++) total += index;
+  return total + offset;
+}
+export function replace(next) { offset = next; return offset; }
+"#,
+        )],
+        &["private locals with Realm globals"],
+    );
+}
