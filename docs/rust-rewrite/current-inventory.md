@@ -47,10 +47,14 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   [lazy](append-key-lazy-summary-20261031.json) dictionary summaries are rejected
   and reverted despite target gains. Lazy ordinary small joins repeat +8.00%
   median / +13.25% mean, and retained empty joins repeat +4.67% / +6.86%; its
-  Date ordinary and numeric-original concerns cleared. Next validate a sealed
-  i31/heap-bitmap numeric-presence field independently: preserve holes,
-  owner-bound writes, growth, P/R read fallbacks and exact host snapshots.
-  The 8,192-record / 256-KiB bound is conditional, not an RSS prediction.
+  Date ordinary and numeric-original concerns cleared. The separate
+  [i31 presence experiment](numeric-presence-i31-20261031.json) is also rejected
+  and reverted: ordinary toSorted repeated +7.16% median / +6.99% mean and
+  retained empty joins +3.83% / +5.58%, despite retained-object gains and 660
+  passing native checks. RSS stayed flat; the 8,192-record / 256-KiB bound did
+  not predict a process saving. Review a closed scalar-count encoding that
+  retains nominal bitmap references before repeating the abstract GC field.
+  Every count read/write, growth, hole and snapshot path needs an owner.
   Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,

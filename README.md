@@ -202,6 +202,14 @@ control still slowed 8.00% median / 13.25% mean, and retained empty joins slowed
 4.67% / 6.86%. Its 680 native checks, 72 selected original Test262 variants and
 both balanced cohorts remain available. Neither candidate changes production.
 
+The [i31 presence experiment](docs/rust-rewrite/numeric-presence-i31-20261031.json)
+also failed its control gate and is reverted. It removed the small numeric
+bitmap allocation and improved retained-object calls by 8.8% in the full cohort
+and 19.2% in the separate follow-up, with effectively unchanged RSS. Ordinary
+`toSorted` repeated a 7.16% median / 6.99% mean slowdown; retained empty joins
+repeated 3.83% / 5.58%. All 660 selected native checks and 48 original Test262
+variants passed. Production retains nominal bitmap storage and ABI 42.
+
 In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
 RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was
 7.69 MiB versus 8.89 MiB. These process counters do not measure live JavaScript
