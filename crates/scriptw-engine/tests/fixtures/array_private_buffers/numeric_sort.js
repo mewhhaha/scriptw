@@ -29,6 +29,47 @@ for (const size of [0, 1, 2, 3, 5, 16, 65, 257]) {
   same(backward.toSorted(ascending), forward, 'strict descending natural run');
   same(forward.toSorted(descending), backward, 'descending callback');
 }
+for (const size of [0, 1, 2, 3, 63, 64, 65, 127, 128, 129, 513]) {
+  const source = [];
+  for (let i = size; i > 0; i--) source.push(i);
+  const original = source.slice();
+  const copy = source.toSorted(ascending);
+  const expected = [];
+  for (let i = 1; i <= size; i++) expected.push(i);
+  same(copy, expected, 'fresh numeric target at packed-word boundary');
+  same(source, original, 'fresh numeric target leaves source unchanged');
+  check(Reflect.ownKeys(copy).length === size + 1,
+    'fresh numeric target exposes no padded own indices');
+
+  if (size > 0) {
+    source[0] = -1;
+    check(copy[0] === 1, 'fresh numeric target is independent from later source writes');
+  }
+  const marker = -1000;
+  copy.push(marker);
+  check(copy.length === size + 1 && copy[size] === marker,
+    'append grows a fresh numeric target without losing its contents');
+  if (size > 0) {
+    check(delete copy[size - 1] && !Object.hasOwn(copy, size - 1),
+      'fresh numeric target tail deletion clears presence');
+  }
+  copy.length = size + 2;
+  check(copy.length === size + 2 && copy[size] === marker &&
+    !Object.hasOwn(copy, size + 1), 'length regrowth does not expose spare presence');
+  if (size > 0) {
+    check(!Object.hasOwn(copy, size - 1), 'length regrowth does not resurrect deleted tail');
+  }
+  const secondMarker = -2000;
+  copy.push(secondMarker);
+  check(copy.length === size + 3 && copy[size + 2] === secondMarker &&
+    copy[size] === marker && !Object.hasOwn(copy, size + 1),
+    'append after transferred-buffer regrowth preserves holes');
+  if (size === 65) {
+    const descriptor = Object.getOwnPropertyDescriptor(copy, '0');
+    check(descriptor.value === 1 && descriptor.writable && descriptor.enumerable &&
+      descriptor.configurable, 'fresh numeric target has ordinary writable elements');
+  }
+}
 const zeros = [3, -0, 0, -0, 0, -2, 1];
 same(zeros.toSorted(ascending), reference(zeros), 'stable signed-zero equality');
 const special = [NaN, 3, -0, 0, Infinity, -Infinity, NaN];

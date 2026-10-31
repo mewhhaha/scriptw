@@ -235,6 +235,104 @@ fn graph_snapshot_reads_packed_numbers_and_empty_sparse_mode_without_mutation() 
 }
 
 #[test]
+fn graph_snapshot_fresh_numeric_to_sorted_keeps_exact_capacity_occupancy_and_bits() {
+    const SIZES: [usize; 11] = [0, 1, 2, 3, 63, 64, 65, 127, 128, 129, 513];
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let sizes = SIZES
+        .iter()
+        .map(|size| size.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let source = format!(
+        r#"
+var outputs=[],sizes=[{sizes}];
+function ascending(a,b){{return a-b;}}
+for(var sizeIndex=0;sizeIndex<sizes.length;sizeIndex++){{
+  var size=sizes[sizeIndex],source=[];
+  for(var value=size;value>0;value--)source.push(value);
+  outputs.push(source.toSorted(ascending));
+}}
+gc();outputs;
+"#
+    );
+    let observed = Engine::new(RealmBuilder::new().build())
+        .observe_script_graph(
+            &source,
+            CompileOptions {
+                host_surface_policy: HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                timeout_ms: Some(30_000),
+                ..RunOptions::default()
+            },
+            SnapshotLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(observed.backend_used, ExecutionBackend::WasmAot);
+    let SnapshotOutcome::Captured { graph } = observed.completion.outcome else {
+        panic!("fresh numeric toSorted arrays must be snapshotable");
+    };
+    assert_eq!(graph.root(), &SnapshotValue::Object { id: 0 });
+    let root = &graph.nodes()[0];
+    assert_eq!(root.properties.len(), SIZES.len() + 1);
+
+    let key_text = |key: &SnapshotKey| match key {
+        SnapshotKey::String { units } => String::from_utf16(units.units()).unwrap(),
+        _ => panic!("unexpected Symbol"),
+    };
+    for (index, size) in SIZES.into_iter().enumerate() {
+        let root_entry = &root.properties[index];
+        assert_eq!(key_text(&root_entry.key), index.to_string());
+        let SnapshotDescriptor::Data {
+            value: SnapshotValue::Object { id },
+            writable: true,
+            enumerable: true,
+            configurable: true,
+        } = &root_entry.descriptor
+        else {
+            panic!("result list contains an ordinary dense array");
+        };
+        let array = &graph.nodes()[*id as usize];
+        assert_eq!(
+            array.properties.len(),
+            size + 1,
+            "size {size}: own-key count"
+        );
+        for (element_index, property) in array.properties[..size].iter().enumerate() {
+            assert_eq!(key_text(&property.key), element_index.to_string());
+            assert_eq!(
+                property.descriptor,
+                SnapshotDescriptor::Data {
+                    value: SnapshotValue::Number {
+                        bits: ((element_index + 1) as f64).to_bits(),
+                    },
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                },
+                "size {size}: transferred Number at {element_index}"
+            );
+        }
+        let length = &array.properties[size];
+        assert_eq!(key_text(&length.key), "length");
+        assert_eq!(
+            length.descriptor,
+            SnapshotDescriptor::Data {
+                value: SnapshotValue::Number {
+                    bits: (size as f64).to_bits(),
+                },
+                writable: true,
+                enumerable: false,
+                configurable: false,
+            },
+            "size {size}: canonical Array length descriptor"
+        );
+    }
+}
+
+#[test]
 fn graph_snapshot_dense_prefix_ignores_spare_capacity_and_large_logical_length() {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     // A huge logical length must not size or scan the snapshot's indexed work.

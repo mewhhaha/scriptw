@@ -58,8 +58,12 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   Its original/retained target gains coexist with slower ordinary target
   execution, slightly higher RSS, larger native R and a 112-byte ObjectRead
   frame increase. Preserve its source-bound 1,043 native passes and structural
-  witness repair history. Next inspect fresh toSorted numeric-buffer ownership
-  before changing read-side representation again.
+  witness repair history. Both [fresh sorted-buffer experiments](fresh-sorted-buffer-20261031.json)
+  are rejected and reverted. Inline transfer failed retained empty-join controls;
+  outlining restored the caller frame but failed fresh precompiled retained-object
+  controls. Production remains at ABI 42; retained regression fixtures do not
+  imply a production speedup. Continue with the separate architecture questions
+  in the performance queue.
   Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,

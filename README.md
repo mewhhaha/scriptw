@@ -218,6 +218,13 @@ pooled medians rose 11.13% and 17.99%. Native R grew 133,368 bytes and its
 ObjectRead frame grew from 800 to 912 bytes. The report preserves 1,043
 source-bound native passes, test-witness repairs and their evidence limits.
 
+The [fresh sorted-buffer experiments](docs/rust-rewrite/fresh-sorted-buffer-20261031.json)
+are also rejected. Inline transfer improved sorting but slowed retained empty
+joins about 5%; outlining restored the caller frame but slowed fresh precompiled
+execution of the retained-object workload about 7%. Production retains
+per-element publication and ABI 42.
+The evidence separates both products, their checks and all slower controls.
+
 In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
 RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was
 7.69 MiB versus 8.89 MiB. These process counters do not measure live JavaScript
