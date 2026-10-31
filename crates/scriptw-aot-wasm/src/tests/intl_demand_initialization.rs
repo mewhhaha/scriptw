@@ -567,16 +567,20 @@ fn previous_layout_is_rejected_even_with_a_valid_resigned_runtime_package() {
     let source = [38; 32];
     let package = crate::encode_portable_runtime_package(runtime, &selection, &source).unwrap();
     assert_eq!(&package[..8], b"SCRWRB01");
-    assert_eq!(u32::from_le_bytes(package[8..12].try_into().unwrap()), 40);
+    let current = crate::RuntimeBuildArtifact::execution_layout_version();
+    assert_eq!(
+        u32::from_le_bytes(package[8..12].try_into().unwrap()),
+        current
+    );
     let admitted = crate::admit_portable_runtime_package(&package, &selection, &source).unwrap();
     assert_eq!(admitted.key(), runtime.key());
     let mut old = package;
-    old[8..12].copy_from_slice(&39u32.to_le_bytes());
+    old[8..12].copy_from_slice(&current.checked_sub(1).unwrap().to_le_bytes());
     let end = old.len() - 32;
     let digest = Sha256::digest(&old[..end]);
     old[end..].copy_from_slice(&digest);
     assert!(
         crate::admit_portable_runtime_package(&old, &selection, &source).is_err(),
-        "a checksum-valid ABI39 envelope must not grant ABI40 layout authority"
+        "a checksum-valid previous-layout envelope must not grant current layout authority"
     );
 }

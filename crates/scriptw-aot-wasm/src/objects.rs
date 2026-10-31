@@ -768,24 +768,9 @@ impl<'a> FunctionBuilder<'a> {
             self.emit_alloc_plain_object_with_prototype(Some(prototype), function)?,
             function,
         );
-        let elements = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<crate::gc_types::ArrayIndexStorage>()
-                .empty(schema, function),
-            function,
-        );
         let array = schema
             .struct_type::<crate::gc_types::ArrayObject>()
-            .construct(
-                (
-                    GcOperand::reference(&header, schema),
-                    GcOperand::reference(&elements, schema),
-                    GcOperand::i64_local(length),
-                    GcOperand::boolean(true),
-                ),
-                function,
-            );
-        elements.clear(function);
+            .with_empty_index_storage(&header, length, true, schema, function);
         header.clear(function);
         Ok(array)
     }

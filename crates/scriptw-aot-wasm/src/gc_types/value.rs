@@ -1575,19 +1575,19 @@ pub(crate) enum RuntimeQueueEnd {
 impl RuntimeSchema {
     pub(crate) fn array_storage_mode_is(
         &self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         mode: ArrayIndexedStorageMode,
         function: &mut Function,
     ) {
         storage.load(self, function);
-        self.field(ArrayIndexStorageSchema::MODE).emit_get(function);
+        self.field(ArrayObjectSchema::MODE).emit_get(function);
         function.instruction(&Instruction::I32Const(mode.encode()));
         function.instruction(&Instruction::I32Eq);
     }
 
     pub(crate) fn array_storage_is_packed(
         &self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         function: &mut Function,
     ) {
         self.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, function);
@@ -1597,11 +1597,11 @@ impl RuntimeSchema {
 
     pub(crate) fn set_array_storage_mode(
         &self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         mode: ArrayIndexedStorageMode,
         function: &mut Function,
     ) {
-        self.field(ArrayIndexStorageSchema::MODE).write(
+        self.field(ArrayObjectSchema::MODE).write(
             storage,
             GcOperand::constant(mode),
             self,
@@ -3423,15 +3423,18 @@ iterator_entry_construction!(
     IteratorZipEntry
 );
 
-/// A fresh ordinary Array starts in packed Number mode with every backing
-/// empty. The registered indexed mutation owners alone publish closed modes;
-/// logical Array length never determines a backing allocation size.
-impl GcStructType<ArrayIndexStorage> {
-    pub(crate) fn empty(
+/// Construct the actual Array with its indexed state inline. Registered
+/// mutation owners alone publish closed backing modes; logical Array length
+/// never determines a backing allocation size.
+impl GcStructType<ArrayObject> {
+    pub(crate) fn with_empty_index_storage(
         self,
+        header: &GcLocal<OrdinaryObject>,
+        length: I64Local,
+        length_writable: bool,
         schema: &RuntimeSchema,
         function: &mut Function,
-    ) -> GcStackReference<ArrayIndexStorage> {
+    ) -> GcStackReference<ArrayObject> {
         let buckets = schema
             .reserve_gc_local(function)
             .initialize(schema.empty_arrays.array_buckets.load(function), function);
@@ -3446,8 +3449,11 @@ impl GcStructType<ArrayIndexStorage> {
             .initialize(schema.empty_number_presence(function), function);
         let result = self.construct(
             (
-                GcOperand::reference(&buckets, schema),
+                GcOperand::reference(header, schema),
+                GcOperand::boolean(length_writable),
+                GcOperand::i64_local(length),
                 GcOperand::i64(0),
+                GcOperand::reference(&buckets, schema),
                 GcOperand::reference(&dense, schema),
                 GcOperand::constant(ArrayIndexedStorageMode::PackedNumbers),
                 GcOperand::reference(&numbers, schema),

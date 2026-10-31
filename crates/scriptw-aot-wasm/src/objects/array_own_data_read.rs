@@ -49,7 +49,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(1));
         handled.store(function);
         function.instruction(&Instruction::Else);
-        // Canonical indices live exclusively in ArrayIndexStorage. Classify
+        // Canonical indices live exclusively in ArrayObject. Classify
         // the already-converted key before probing the named-property header.
         // Holes and accessors still leave `handled` false for generic [[Get]].
         let descriptor = schema

@@ -636,7 +636,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             if !(0..=u32::MAX as i64).contains(&length) {
                 return Err(invariant("invalid Array length"));
             }
-            let storage = self.required_reference(array_object, F::ArrayStorage)?;
+            let storage = array_object;
             let count = self.integer(storage, F::ArrayCount)?;
             if count < 0 || count as usize >= remaining {
                 return Err(cap(SnapshotBudgetDimension::Properties));

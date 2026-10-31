@@ -20,13 +20,13 @@ impl FunctionBuilder<'_> {
                 s.array_storage_mode_is(&packed.storage, ArrayIndexedStorageMode::PackedNumbers, f);
                 f.instruction(&Instruction::I32Eqz);
                 builder.emit_branch_if_to_target(decline, f);
-                s.field(ArrayIndexStorageSchema::COUNT)
+                s.field(ArrayObjectSchema::COUNT)
                     .read(&packed.storage, s, f);
                 length.load(f);
                 f.instruction(&Instruction::I64Ne);
                 builder.emit_branch_if_to_target(decline, f);
                 let numbers = s.reserve_gc_local(f).initialize(
-                    s.field(ArrayIndexStorageSchema::NUMBERS)
+                    s.field(ArrayObjectSchema::NUMBERS)
                         .read(&packed.storage, s, f)
                         .reference(),
                     f,
@@ -78,13 +78,13 @@ impl FunctionBuilder<'_> {
                 s.array_storage_mode_is(&packed.storage, ArrayIndexedStorageMode::PackedNumbers, f);
                 f.instruction(&Instruction::I32Eqz);
                 builder.emit_branch_if_to_target(decline, f);
-                s.field(ArrayIndexStorageSchema::COUNT)
+                s.field(ArrayObjectSchema::COUNT)
                     .read(&packed.storage, s, f);
                 length.load(f);
                 f.instruction(&Instruction::I64Ne);
                 builder.emit_branch_if_to_target(decline, f);
                 let numbers = s.reserve_gc_local(f).initialize(
-                    s.field(ArrayIndexStorageSchema::NUMBERS)
+                    s.field(ArrayObjectSchema::NUMBERS)
                         .read(&packed.storage, s, f)
                         .reference(),
                     f,

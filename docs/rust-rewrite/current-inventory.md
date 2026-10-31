@@ -25,6 +25,16 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   shift is observed, not established as the cause.
   The earlier ordinary retained-object time regression remains unresolved; the
   module-local diagnostic does not refresh that published comparison.
+  [Array/index fusion](array-owner-fusion-20261031.json) now removes one GC
+  allocation and 48 bytes per Array. Two local balanced cohorts show 10–17% lower
+  retained-object execution and 0.58–0.77 MiB lower RSS across ordinary/precompiled
+  boundaries; the published comparison still belongs to its earlier source.
+  Next measure moving the existing canonical numeric `GetV` packed probe before
+  `ToObject`: original objects/retained-objects execute 1,000/65,536 avoidable
+  calls. Preserve its complete fallback and the separate retained-call controls.
+  Shared empty Array named storage is another measured-ownership candidate;
+  compact own-key shortcuts and rooted snapshots must still recognize Array
+  indices and virtual length.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

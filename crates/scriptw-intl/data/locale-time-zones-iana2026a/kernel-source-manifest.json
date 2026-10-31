@@ -17,12 +17,12 @@
     }
   ],
   "domain": "scriptw-locale-time-zones-native-v1",
-  "kernel_sha256": "875cf3c913fa67bd88b6dd6ed1dbf89198edb556c6284c4747e73bbf2a3819d6",
+  "kernel_sha256": "cc0e400cd5b4e4dfdd70faaac32204247fbbc70ce6994948b786b8b83481bae0",
   "production_sources": [
     {
-      "bytes": 93323,
+      "bytes": 93344,
       "path": "Cargo.lock",
-      "sha256": "0b43566e0294f61b012958d96a88143844564c28814461306b216e036d9b175e"
+      "sha256": "6c6ca7d5228d6648073e179045333368b7fb43a80c8cb67cd586eccd4de9db30"
     },
     {
       "bytes": 6341,
@@ -187,7 +187,7 @@
     {
       "bytes": 565,
       "path": "crates/scriptw-intl/src/provider/named_time_zones/identity.rs",
-      "sha256": "7ba0843be44010b7b0ab26e9d7c962172cb57904eb524a9e99dbbdb5001e6c02"
+      "sha256": "ac24912c9349cc9a9e8e7c15961ab494d994a798ce622e029e52e25f4913b2f8"
     },
     {
       "bytes": 3624,

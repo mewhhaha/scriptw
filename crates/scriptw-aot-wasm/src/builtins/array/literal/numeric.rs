@@ -1,6 +1,6 @@
 //! Bounded fresh literals can install one complete packed Number backing.
 use super::*;
-use crate::gc_types::{ArrayIndexStorageSchema, NumberBitsI64Array, NumberPresenceU64Array};
+use crate::gc_types::{ArrayObjectSchema, NumberBitsI64Array, NumberPresenceU64Array};
 
 /// Bounds both retained element roots and the additional source-body code.
 /// Elisions keep their existing path and explicit absent-slot semantics.
@@ -74,28 +74,25 @@ impl FunctionBuilder<'_> {
                 .fixed([GcOperand::i64((1_i64 << source.length()) - 1)], f),
             f,
         );
-        let storage = s.reserve_gc_local(f).initialize(
-            s.field(ArrayObjectSchema::ELEMENTS)
-                .read(&literal.array, s, f)
-                .reference(),
-            f,
-        );
+        let storage = s
+            .reserve_gc_local(f)
+            .initialize(literal.array.load(s, f), f);
         // FreshArrayLiteral alone owns this initially empty PackedNumbers
         // store. Both complete backings are rooted before any field changes;
         // these writes allocate nothing and cannot expose partial state.
-        s.field(ArrayIndexStorageSchema::NUMBERS).write(
+        s.field(ArrayObjectSchema::NUMBERS).write(
             &storage,
             GcOperand::reference(&numbers, s),
             s,
             f,
         );
-        s.field(ArrayIndexStorageSchema::NUMBER_PRESENT).write(
+        s.field(ArrayObjectSchema::NUMBER_PRESENT).write(
             &storage,
             GcOperand::reference(&presence, s),
             s,
             f,
         );
-        s.field(ArrayIndexStorageSchema::COUNT).write(
+        s.field(ArrayObjectSchema::COUNT).write(
             &storage,
             GcOperand::i64(i64::from(source.length())),
             s,

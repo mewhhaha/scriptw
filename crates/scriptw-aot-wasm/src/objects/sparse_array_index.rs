@@ -4,8 +4,7 @@
 use super::*;
 use crate::gc_types::{
     ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexEntrySchema, ArrayIndexKeyConstruction,
-    ArrayIndexKeyTable, ArrayIndexStorage, ArrayIndexStorageSchema, ArrayIndexedStorageMode,
-    ArrayObject, ArrayObjectSchema, I64Local,
+    ArrayIndexKeyTable, ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, I64Local,
 };
 use crate::runtime_helpers::{
     ArrayIndexedDeleteArguments, ArrayIndexedDeleteParameters, ArrayIndexedPublishArguments,
@@ -17,16 +16,11 @@ impl FunctionBuilder<'_> {
         &self,
         array: &GcLocal<ArrayObject>,
         f: &mut Function,
-    ) -> GcLocal<ArrayIndexStorage> {
+    ) -> GcLocal<ArrayObject> {
         let schema = self.runtime_schema();
-        schema.reserve_gc_local(f).initialize(
-            schema
-                .struct_type::<ArrayObject>()
-                .field(ArrayObjectSchema::ELEMENTS)
-                .read(array, schema, f)
-                .reference(),
-            f,
-        )
+        schema
+            .reserve_gc_local(f)
+            .initialize(array.load(schema, f), f)
     }
 
     /// Missing occupied entries return null independently of Array.length.
@@ -55,8 +49,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         let buckets = schema.reserve_gc_local(f).initialize(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&storage, schema, f)
                 .reference(),
             f,
@@ -215,15 +209,15 @@ impl FunctionBuilder<'_> {
     /// table. Capturing NEXT before each insertion retains all old chains.
     fn emit_array_index_rehash(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         capacity: I32Local,
         f: &mut Function,
     ) {
         let schema = self.runtime_schema();
         let old = schema.reserve_gc_local(f).initialize(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(storage, schema, f)
                 .reference(),
             f,
@@ -320,8 +314,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::BUCKETS)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::BUCKETS)
             .write(
                 storage,
                 GcOperand::reference(&replacement, schema),
@@ -370,8 +364,8 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, &mut f);
         let buckets = schema.reserve_gc_local(&mut f).initialize(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&p.storage, schema, &mut f)
                 .reference(),
             &mut f,
@@ -388,7 +382,7 @@ impl FunctionBuilder<'_> {
         self.emit_array_index_rehash(&p.storage, capacity, &mut f);
         buckets.replace(
             schema
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&p.storage, schema, &mut f)
                 .reference(),
             &mut f,
@@ -446,8 +440,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::COUNT)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::COUNT)
             .read(&p.storage, schema, &mut f)
             .store_i64(count, &mut f);
         // Allocate at 75% load. Capacity overflow is a physical GC resource
@@ -477,8 +471,8 @@ impl FunctionBuilder<'_> {
         self.emit_array_index_rehash(&p.storage, capacity, &mut f);
         buckets.replace(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&p.storage, schema, &mut f)
                 .reference(),
             &mut f,
@@ -517,8 +511,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Add);
         count.store(&mut f);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::COUNT)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::COUNT)
             .write(&p.storage, GcOperand::i64_local(count), schema, &mut f);
         node.clear(&mut f);
         self.pop_control(ControlFrameKind::Block);
@@ -557,8 +551,8 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, &mut f);
         let buckets = schema.reserve_gc_local(&mut f).initialize(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&p.storage, schema, &mut f)
                 .reference(),
             &mut f,
@@ -630,8 +624,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::COUNT)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::COUNT)
             .read(&p.storage, schema, &mut f)
             .store_i64(count, &mut f);
         count.load(&mut f);
@@ -639,8 +633,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Sub);
         count.store(&mut f);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::COUNT)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::COUNT)
             .write(&p.storage, GcOperand::i64_local(count), schema, &mut f);
         // Dropping chain roots before rebuild lets deleted descriptors reclaim.
         cursor.set_null(schema, &mut f);
@@ -652,7 +646,7 @@ impl FunctionBuilder<'_> {
         let empty = schema
             .reserve_gc_local(&mut f)
             .initialize(schema.empty_array_buckets(&mut f), &mut f);
-        schema.field(ArrayIndexStorageSchema::BUCKETS).write(
+        schema.field(ArrayObjectSchema::BUCKETS).write(
             &p.storage,
             GcOperand::reference(&empty, schema),
             schema,
@@ -726,16 +720,16 @@ impl FunctionBuilder<'_> {
         let storage = self.emit_array_index_storage(array, f);
         let buckets = schema.reserve_gc_local(f).initialize(
             schema
-                .struct_type::<ArrayIndexStorage>()
-                .field(ArrayIndexStorageSchema::BUCKETS)
+                .struct_type::<ArrayObject>()
+                .field(ArrayObjectSchema::BUCKETS)
                 .read(&storage, schema, f)
                 .reference(),
             f,
         );
         let count64 = schema.reserve_i64_local(f);
         schema
-            .struct_type::<ArrayIndexStorage>()
-            .field(ArrayIndexStorageSchema::COUNT)
+            .struct_type::<ArrayObject>()
+            .field(ArrayObjectSchema::COUNT)
             .read(&storage, schema, f)
             .store_i64(count64, f);
         let count = schema.reserve_i32_local(f);

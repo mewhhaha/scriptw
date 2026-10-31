@@ -2247,6 +2247,7 @@ dependencies = [
  "sha2",
  "wasm-encoder 0.245.1",
  "wasmparser 0.245.1",
+ "wasmtime-environ",
 ]
 
 [[package]]

@@ -1139,8 +1139,8 @@ runtime_helper_domain! {
     ArrayPackedPush1 / ArrayPackedPush1Arguments / ArrayPackedPush1Parameters / "array_packed_push1" { receiver:Value,first:Value } => Completion;
     ArrayPackedPush2 / ArrayPackedPush2Arguments / ArrayPackedPush2Parameters / "array_packed_push2" { receiver:Value,first:Value,second:Value } => Completion;
     ArrayPackedPush3 / ArrayPackedPush3Arguments / ArrayPackedPush3Parameters / "array_packed_push3" { receiver:Value,first:Value,second:Value,third:Value } => Completion;
-    ArrayIndexedPublish / ArrayIndexedPublishArguments / ArrayIndexedPublishParameters / "array_indexed_publish" { storage:(Ref ArrayIndexStorage NonNullable),index:I64,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
-    ArrayIndexedDelete / ArrayIndexedDeleteArguments / ArrayIndexedDeleteParameters / "array_indexed_delete" { storage:(Ref ArrayIndexStorage NonNullable),index:I64 } => Void;
+    ArrayIndexedPublish / ArrayIndexedPublishArguments / ArrayIndexedPublishParameters / "array_indexed_publish" { storage:(Ref ArrayObject NonNullable),index:I64,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
+    ArrayIndexedDelete / ArrayIndexedDeleteArguments / ArrayIndexedDeleteParameters / "array_indexed_delete" { storage:(Ref ArrayObject NonNullable),index:I64 } => Void;
     ObjectRead / ObjectReadArguments / ObjectReadParameters / "object_read" { target:Value,receiver:Value,key:Key,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectWrite / ObjectWriteArguments / ObjectWriteParameters / "object_write" { target:Value,key:Key,value:Value,strict:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectDefineData / ObjectDefineDataArguments / ObjectDefineDataParameters / "object_define_data" { target:Value,key:Key,value:Value,writable:I32,enumerable:I32,configurable:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;

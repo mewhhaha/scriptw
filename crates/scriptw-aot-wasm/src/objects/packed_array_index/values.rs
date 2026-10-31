@@ -5,12 +5,12 @@ use crate::gc_types::{PackedValueTable, StoredValue};
 impl FunctionBuilder<'_> {
     fn packed_values(
         &self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         f: &mut Function,
     ) -> GcLocal<PackedValueTable> {
         let s = self.runtime_schema();
         s.reserve_gc_local(f).initialize(
-            s.field(ArrayIndexStorageSchema::VALUES)
+            s.field(ArrayObjectSchema::VALUES)
                 .read(storage, s, f)
                 .reference()
                 .require_non_null(f),
@@ -20,7 +20,7 @@ impl FunctionBuilder<'_> {
 
     pub(super) fn emit_packed_array_probe(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         output: Option<&ValueLocals>,
         found: I32Local,
@@ -72,7 +72,7 @@ impl FunctionBuilder<'_> {
 
     /// Promote only an occupancy-bounded default-data publication. The old
     /// numeric backing remains rooted until all immutable values are allocated.
-    fn promote_packed_numbers(&mut self, storage: &GcLocal<ArrayIndexStorage>, f: &mut Function) {
+    fn promote_packed_numbers(&mut self, storage: &GcLocal<ArrayObject>, f: &mut Function) {
         let s = self.runtime_schema();
         let (numbers, presence) = self.packed_backings(storage, f);
         let capacity = s.reserve_i32_local(f);
@@ -124,7 +124,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.clear_packed_backings(storage, f);
-        s.field(ArrayIndexStorageSchema::VALUES).write(
+        s.field(ArrayObjectSchema::VALUES).write(
             storage,
             GcOperand::nullable_reference(&values, s),
             s,
@@ -145,7 +145,7 @@ impl FunctionBuilder<'_> {
     /// is actually admitted by the same capacity/occupancy policy.
     pub(super) fn packed_number_write(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         value: &ValueLocals,
         f: &mut Function,
@@ -167,7 +167,7 @@ impl FunctionBuilder<'_> {
         s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
         capacity.store(f);
         let count = s.reserve_i64_local(f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .read(storage, s, f)
             .store_i64(count, f);
         self.emit_packed_capacity_admission(index, capacity, count, f);
@@ -218,7 +218,7 @@ impl FunctionBuilder<'_> {
 
     fn write_packed_value(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         value: &ValueLocals,
         handled: I32Local,
@@ -230,7 +230,7 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>().length(&values, s, f);
         capacity.store(f);
         let count = s.reserve_i64_local(f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .read(storage, s, f)
             .store_i64(count, f);
         self.emit_packed_capacity_admission(index, capacity, count, f);
@@ -272,7 +272,7 @@ impl FunctionBuilder<'_> {
         );
         s.array_type::<PackedValueTable>()
             .copy_prefix_from(&next, &values, capacity, s, f);
-        s.field(ArrayIndexStorageSchema::VALUES).write(
+        s.field(ArrayObjectSchema::VALUES).write(
             storage,
             GcOperand::nullable_reference(&next, s),
             s,
@@ -303,7 +303,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Add);
         count.store(f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .write(storage, GcOperand::i64_local(count), s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -327,7 +327,7 @@ impl FunctionBuilder<'_> {
 
     pub(in crate::objects) fn emit_materialize_packed_array(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
@@ -405,12 +405,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.field(ArrayIndexStorageSchema::DENSE).write(
-            storage,
-            GcOperand::reference(&dense, s),
-            s,
-            f,
-        );
+        s.field(ArrayObjectSchema::DENSE)
+            .write(storage, GcOperand::reference(&dense, s), s, f);
         self.clear_packed_backings(storage, f);
         s.set_array_storage_mode(storage, ArrayIndexedStorageMode::DenseDescriptors, f);
         absent.clear(f);
@@ -426,7 +422,7 @@ impl FunctionBuilder<'_> {
 
     pub(in crate::objects) fn emit_packed_array_delete(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         f: &mut Function,
     ) -> I32Local {
@@ -458,14 +454,14 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>()
             .write(&values, slot, GcOperand::null(s), s, f);
         let count = s.reserve_i64_local(f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .read(storage, s, f)
             .store_i64(count, f);
         count.load(f);
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Sub);
         count.store(f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .write(storage, GcOperand::i64_local(count), s, f);
         count.load(f);
         f.instruction(&Instruction::I64Eqz);
@@ -495,7 +491,7 @@ impl FunctionBuilder<'_> {
 
     pub(in crate::objects) fn emit_packed_array_keys(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         keys: &ArrayIndexKeyConstruction,
         output: I32Local,
         f: &mut Function,

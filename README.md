@@ -145,6 +145,15 @@ also retain two rejected candidates: deferred numeric bitmaps and direct
 general-value publication. Repeated retained-call controls slowed, so both
 production changes were reverted. Their mutation and snapshot regressions remain.
 
+Arrays now keep indexed-storage metadata in their Array record, removing one
+allocation and 48 bytes per Array under the pinned copying collector. In two
+[local balanced cohorts](docs/rust-rewrite/array-owner-fusion-20261031.json),
+retained objects ran 10–17% faster across ordinary/precompiled execution and used
+0.58–0.77 MiB less post-execution RSS. All 2,648 selected native checks and 1,326
+original Test262 executions passed across the recorded continuation. Shorter
+controls and separate retained-call results remain in the evidence. The published
+comparisons above retain their original sources; every-case parity remains open.
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /

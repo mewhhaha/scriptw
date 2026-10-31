@@ -765,9 +765,9 @@ macro_rules! gc_layout_registry {
         impl GcWritableArray for $owner {}
     };
     (@writable_array $owner:ident, Immutable) => {};
-    (@construct ArrayIndexStorage; $($field:ident: $value:ty, $mutability:ident, $nullability:ty;)+) => {
+    (@construct ArrayObject; $($field:ident: $value:ty, $mutability:ident, $nullability:ty;)+) => {
         #[allow(non_snake_case)]
-        pub(super) fn construct(self, fields: ($(GcOperand<'_, $value, $nullability>,)+), function: &mut Function) -> GcStackReference<ArrayIndexStorage> {
+        pub(super) fn construct(self, fields: ($(GcOperand<'_, $value, $nullability>,)+), function: &mut Function) -> GcStackReference<ArrayObject> {
             let ($($field,)+) = fields;
             $($field.emit(function);)+ self.emit_new(function); self.construction_result()
         }
@@ -970,21 +970,6 @@ gc_layout_registry! {
         // Zero is empty; other buckets are ordered entry positions plus one.
         array OrdinaryPropertyIndex => OrdinaryPropertyIndexSchema { ELEMENT: I32Value, Mutable, NonNullable; }
         array IndexedTable => IndexedTableSchema { ELEMENT: GcRef<PropertyDescriptor>, Mutable, Nullable; }
-        // Arrays retain occupied indices independently of observable length.
-        // Only the storage constructor and registered mutation bodies own the
-        // closed mode and occupied-entry count. Packed Number values use raw
-        // bits plus a hole-presence bitmap; full descriptors remain available
-        // after one-way transitions. General ordinary data uses nullable immutable
-        // StoredValue slots; inactive VALUES is null and other backings empty.
-        struct ArrayIndexStorage => ArrayIndexStorageSchema {
-            BUCKETS: GcRef<ArrayIndexBucketTable>, Mutable, NonNullable;
-            COUNT: I64Value, Mutable, NonNullable;
-            DENSE: GcRef<IndexedTable>, Mutable, NonNullable;
-            MODE: ArrayIndexedStorageMode, Mutable, NonNullable;
-            NUMBERS: GcRef<NumberBitsI64Array>, Mutable, NonNullable;
-            NUMBER_PRESENT: GcRef<NumberPresenceU64Array>, Mutable, NonNullable;
-            VALUES: GcRef<PackedValueTable>, Mutable, Nullable;
-        }
         array PackedValueTable => PackedValueTableSchema { ELEMENT: GcRef<StoredValue>, Mutable, Nullable; }
         array NumberBitsI64Array => NumberBitsI64ArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         array NumberPresenceU64Array => NumberPresenceU64ArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
@@ -1253,9 +1238,18 @@ gc_layout_registry! {
         }
         struct ArrayObject: JavaScriptObject => ArrayObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
-            ELEMENTS: GcRef<ArrayIndexStorage>, Immutable, NonNullable;
-            LENGTH: I64Value, Mutable, NonNullable;
             LENGTH_WRITABLE: bool, Mutable, NonNullable;
+            LENGTH: I64Value, Mutable, NonNullable;
+            // Occupancy and packed/descriptor backing belong to this actual
+            // Array, independently of its observable length. Keep wide fields
+            // together so the pinned copying collector needs only 64 bytes.
+            COUNT: I64Value, Mutable, NonNullable;
+            BUCKETS: GcRef<ArrayIndexBucketTable>, Mutable, NonNullable;
+            DENSE: GcRef<IndexedTable>, Mutable, NonNullable;
+            MODE: ArrayIndexedStorageMode, Mutable, NonNullable;
+            NUMBERS: GcRef<NumberBitsI64Array>, Mutable, NonNullable;
+            NUMBER_PRESENT: GcRef<NumberPresenceU64Array>, Mutable, NonNullable;
+            VALUES: GcRef<PackedValueTable>, Mutable, Nullable;
         }
         struct ArrayBuffer: JavaScriptObject => ArrayBufferSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;

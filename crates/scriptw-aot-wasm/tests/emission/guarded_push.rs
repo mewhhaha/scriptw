@@ -115,7 +115,7 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
             let program = Module::read(&artifact.bytes, true);
             let stored = runtime.witness_type(GcSnapshotLayout::Stored);
             let array = runtime.witness_type(GcSnapshotLayout::Array);
-            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let storage = runtime.witness_type(GcSnapshotLayout::Array);
             let code = runtime.witness_type(GcSnapshotLayout::Code);
             let context = runtime.witness_type(GcSnapshotLayout::Context);
             let (dispatch, _) = runtime.named("helper::proxy_call");

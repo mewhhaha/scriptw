@@ -1,9 +1,9 @@
 //! P calls shared R publication, physical Number/bitmap and descriptor owners.
 use scriptw_aot_wasm::{
-    GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
 };
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{ExprIr, SpecOperationIr, StatementIr, lower};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower, ExprIr, SpecOperationIr, StatementIr};
 use std::collections::BTreeMap;
 use wasmparser::{
     ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload, TypeRef, UnpackedIndex,
@@ -192,7 +192,7 @@ fn real_push_and_join_builtins_reach_guarded_canonical_packed_kernels() {
             }
             let runtime = Module::read(runtime.bytes());
             let array = runtime.witness_type(GcSnapshotLayout::Array);
-            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let storage = runtime.witness_type(GcSnapshotLayout::Array);
             let values = runtime.witness_type(GcSnapshotLayout::ArrayValues);
             let units = runtime.witness_type(GcSnapshotLayout::CodeUnits);
             let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
@@ -467,7 +467,7 @@ fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons
                 "the typed entry is optional and immutable"
             );
             let array = runtime.witness_type(GcSnapshotLayout::Array);
-            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let storage = runtime.witness_type(GcSnapshotLayout::Array);
             let object = runtime.witness_type(GcSnapshotLayout::Object);
             let values = runtime.witness_type(GcSnapshotLayout::ArrayValues);
             let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
@@ -843,7 +843,7 @@ fn bounded_dynamic_literals_guard_one_complete_number_backing_and_retain_the_run
             assert_eq!(&program.types[..runtime.types.len()], &runtime.types);
             let numbers = runtime.witness_type(GcSnapshotLayout::ArrayNumbers);
             let presence = runtime.witness_type(GcSnapshotLayout::ArrayNumberPresence);
-            let storage = runtime.witness_type(GcSnapshotLayout::ArrayStorage);
+            let storage = runtime.witness_type(GcSnapshotLayout::Array);
             let (publish, _) = runtime.named("helper::array_indexed_publish_default_data");
             let publish = program.imported_runtime(&runtime, publish);
             for (name, length, capacity) in [("js::three#", 3, 4), ("js::four#", 4, 4), ("js::eight#", 8, 8)] {

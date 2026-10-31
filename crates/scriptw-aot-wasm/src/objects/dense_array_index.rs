@@ -6,7 +6,7 @@
 use super::*;
 use crate::gc_types::{
     ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexEntrySchema, ArrayIndexKeyConstruction,
-    ArrayIndexStorage, ArrayIndexStorageSchema, ArrayIndexedStorageMode, IndexedTable,
+    ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, IndexedTable,
 };
 
 const DENSE_INDEX_LIMIT: i64 = 1 << 20;
@@ -14,24 +14,20 @@ const DENSE_INDEX_LIMIT: i64 = 1 << 20;
 impl FunctionBuilder<'_> {
     fn emit_array_dense_elements(
         &self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         f: &mut Function,
     ) -> GcLocal<IndexedTable> {
         let schema = self.runtime_schema();
         schema.reserve_gc_local(f).initialize(
             schema
-                .field(ArrayIndexStorageSchema::DENSE)
+                .field(ArrayObjectSchema::DENSE)
                 .read(storage, schema, f)
                 .reference(),
             f,
         )
     }
 
-    fn emit_array_dense_mode(
-        &self,
-        storage: &GcLocal<ArrayIndexStorage>,
-        f: &mut Function,
-    ) -> I32Local {
+    fn emit_array_dense_mode(&self, storage: &GcLocal<ArrayObject>, f: &mut Function) -> I32Local {
         let schema = self.runtime_schema();
         let dense = schema.reserve_i32_local(f);
         schema.array_storage_mode_is(storage, ArrayIndexedStorageMode::DenseDescriptors, f);
@@ -42,7 +38,7 @@ impl FunctionBuilder<'_> {
     /// The caller has selected dense mode. Out-of-capacity reads are holes.
     pub(super) fn emit_dense_array_descriptor(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         output: &GcLocal<PropertyDescriptor, Nullable>,
         f: &mut Function,
@@ -77,7 +73,7 @@ impl FunctionBuilder<'_> {
     /// converts existing descriptors, then returns false to the sparse owner.
     pub(super) fn emit_dense_array_publish(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         descriptor: &GcLocal<PropertyDescriptor>,
         f: &mut Function,
@@ -96,7 +92,7 @@ impl FunctionBuilder<'_> {
         capacity.store(f);
         let count = schema.reserve_i64_local(f);
         schema
-            .field(ArrayIndexStorageSchema::COUNT)
+            .field(ArrayObjectSchema::COUNT)
             .read(storage, schema, f)
             .store_i64(count, f);
         // Existing capacity can be reused after deletion. New capacity stays
@@ -163,7 +159,7 @@ impl FunctionBuilder<'_> {
             schema,
             f,
         );
-        schema.field(ArrayIndexStorageSchema::DENSE).write(
+        schema.field(ArrayObjectSchema::DENSE).write(
             storage,
             GcOperand::reference(&replacement, schema),
             schema,
@@ -188,7 +184,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Add);
         count.store(f);
-        schema.field(ArrayIndexStorageSchema::COUNT).write(
+        schema.field(ArrayObjectSchema::COUNT).write(
             storage,
             GcOperand::i64_local(count),
             schema,
@@ -220,7 +216,7 @@ impl FunctionBuilder<'_> {
 
     fn emit_dense_array_to_sparse(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         dense: &GcLocal<IndexedTable>,
         dense_capacity: I32Local,
         count: I64Local,
@@ -331,13 +327,13 @@ impl FunctionBuilder<'_> {
         let empty = schema
             .reserve_gc_local(f)
             .initialize(schema.empty_array_elements(f), f);
-        schema.field(ArrayIndexStorageSchema::DENSE).write(
+        schema.field(ArrayObjectSchema::DENSE).write(
             storage,
             GcOperand::reference(&empty, schema),
             schema,
             f,
         );
-        schema.field(ArrayIndexStorageSchema::BUCKETS).write(
+        schema.field(ArrayObjectSchema::BUCKETS).write(
             storage,
             GcOperand::reference(&buckets, schema),
             schema,
@@ -356,7 +352,7 @@ impl FunctionBuilder<'_> {
     /// Dense deletion leaves a hole and adjusts occupancy only for a live slot.
     pub(super) fn emit_dense_array_delete(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         index: I64Local,
         f: &mut Function,
     ) -> I32Local {
@@ -388,14 +384,14 @@ impl FunctionBuilder<'_> {
             .write(&dense, slot, GcOperand::null(schema), schema, f);
         let count = schema.reserve_i64_local(f);
         schema
-            .field(ArrayIndexStorageSchema::COUNT)
+            .field(ArrayObjectSchema::COUNT)
             .read(storage, schema, f)
             .store_i64(count, f);
         count.load(f);
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Sub);
         count.store(f);
-        schema.field(ArrayIndexStorageSchema::COUNT).write(
+        schema.field(ArrayObjectSchema::COUNT).write(
             storage,
             GcOperand::i64_local(count),
             schema,
@@ -409,7 +405,7 @@ impl FunctionBuilder<'_> {
         let empty = schema
             .reserve_gc_local(f)
             .initialize(schema.empty_array_elements(f), f);
-        schema.field(ArrayIndexStorageSchema::DENSE).write(
+        schema.field(ArrayObjectSchema::DENSE).write(
             storage,
             GcOperand::reference(&empty, schema),
             schema,
@@ -433,7 +429,7 @@ impl FunctionBuilder<'_> {
     /// Capacity is bounded and every occupied slot is visited once, in order.
     pub(super) fn emit_dense_array_keys(
         &mut self,
-        storage: &GcLocal<ArrayIndexStorage>,
+        storage: &GcLocal<ArrayObject>,
         keys: &ArrayIndexKeyConstruction,
         output: I32Local,
         f: &mut Function,

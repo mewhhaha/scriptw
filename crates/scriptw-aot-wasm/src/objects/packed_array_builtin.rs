@@ -2,8 +2,8 @@
 //! receiver/length work. No JavaScript runs inside the validated borrow.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexStorage, ArrayIndexStorageSchema, ArrayIndexedStorageMode, ArrayObject,
-    ArrayObjectSchema, JavaScriptObject, NumberBitsI64Array, PackedValueTable, ValueArray,
+    ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, JavaScriptObject, NumberBitsI64Array,
+    PackedValueTable, ValueArray,
 };
 
 mod fixed_push;
@@ -13,7 +13,7 @@ mod numeric_sort;
 /// guard. Packed modes contain default writable/enumerable/configurable data.
 pub(crate) struct PackedArraySnapshot {
     array: GcLocal<ArrayObject>,
-    storage: GcLocal<ArrayIndexStorage>,
+    storage: GcLocal<ArrayObject>,
 }
 
 impl PackedArraySnapshot {
@@ -50,7 +50,7 @@ impl FunctionBuilder<'_> {
             |builder, packed, decline, f| {
                 // Canonical Array indices are below length. Occupancy equal to
                 // length therefore proves every own index, including undefined.
-                s.field(ArrayIndexStorageSchema::COUNT)
+                s.field(ArrayObjectSchema::COUNT)
                     .read(&packed.storage, s, f);
                 length.load(f);
                 f.instruction(&Instruction::I64Ne);
@@ -71,7 +71,7 @@ impl FunctionBuilder<'_> {
                 s.array_storage_mode_is(&packed.storage, ArrayIndexedStorageMode::PackedValues, f);
                 builder.open_frame(ControlFrameKind::If, f);
                 let values = s.reserve_gc_local(f).initialize(
-                    s.field(ArrayIndexStorageSchema::VALUES)
+                    s.field(ArrayObjectSchema::VALUES)
                         .read(&packed.storage, s, f)
                         .reference()
                         .require_non_null(f),
@@ -110,7 +110,7 @@ impl FunctionBuilder<'_> {
                 values.clear(f);
                 f.instruction(&Instruction::Else);
                 let numbers = s.reserve_gc_local(f).initialize(
-                    s.field(ArrayIndexStorageSchema::NUMBERS)
+                    s.field(ArrayObjectSchema::NUMBERS)
                         .read(&packed.storage, s, f)
                         .reference(),
                     f,
@@ -184,7 +184,7 @@ impl FunctionBuilder<'_> {
                 length.load(f);
                 f.instruction(&Instruction::I64Ne);
                 builder.emit_branch_if_to_target(decline, f);
-                s.field(ArrayIndexStorageSchema::COUNT)
+                s.field(ArrayObjectSchema::COUNT)
                     .read(&packed.storage, s, f);
                 length.load(f);
                 f.instruction(&Instruction::I64Ne);
@@ -317,7 +317,7 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(current.load(s, f).cast_subtype::<ArrayObject>(s, f), f);
         let storage = self.emit_array_index_storage(&array, f);
-        s.field(ArrayIndexStorageSchema::COUNT)
+        s.field(ArrayObjectSchema::COUNT)
             .read(&storage, s, f)
             .store_i64(index, f);
         index.load(f);
@@ -460,7 +460,7 @@ impl FunctionBuilder<'_> {
                 builder.emit_branch_if_to_target(decline, f);
                 // Every canonical Array index is below its length. Thus COUNT ==
                 // length proves a contiguous prefix without an O(length) rescan.
-                s.field(ArrayIndexStorageSchema::COUNT)
+                s.field(ArrayObjectSchema::COUNT)
                     .read(&packed.storage, s, f);
                 captured_length.load(f);
                 f.instruction(&Instruction::I64Ne);

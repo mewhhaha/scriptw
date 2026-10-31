@@ -5,6 +5,7 @@ use crate::runtime_artifact::ModuleKind;
 use crate::runtime_helpers::{HelperOwner, HelperTypeRegion, ProgramHook, RuntimeHelperId};
 use wasmparser::{CompositeInnerType, Parser, Payload, SubType, Validator, WasmFeatures};
 
+mod array_storage_fusion;
 mod compact_records;
 
 fn encoded(kind: ModuleKind<'_>) -> (FinalizedRuntimeModule, Vec<u8>) {
@@ -475,21 +476,24 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     let schema = runtime.globals().schema();
     let layouts = schema.layouts();
     let index = |layout| layouts.layout_index(layout);
-    let CompositeInnerType::Struct(storage) = &types[index(GcLayout::ArrayIndexStorage) as usize]
+    let CompositeInnerType::Struct(storage) = &types[index(GcLayout::ArrayObject) as usize]
         .composite_type
         .inner
     else {
         panic!("indexed storage is a real GC struct");
     };
-    assert_eq!(ArrayIndexStorageSchema::BUCKETS.ordinal().raw(), 0);
-    assert_eq!(ArrayIndexStorageSchema::COUNT.ordinal().raw(), 1);
-    assert_eq!(ArrayIndexStorageSchema::DENSE.ordinal().raw(), 2);
-    assert_eq!(ArrayIndexStorageSchema::MODE.ordinal().raw(), 3);
-    assert_eq!(ArrayIndexStorageSchema::NUMBERS.ordinal().raw(), 4);
-    assert_eq!(ArrayIndexStorageSchema::NUMBER_PRESENT.ordinal().raw(), 5);
-    assert_eq!(storage.fields.len(), 7);
-    assert_eq!(ArrayIndexStorageSchema::VALUES.ordinal().raw(), 6);
-    let values = &storage.fields[6];
+    assert_eq!(ArrayObjectSchema::OBJECT.ordinal().raw(), 0);
+    assert_eq!(ArrayObjectSchema::LENGTH_WRITABLE.ordinal().raw(), 1);
+    assert_eq!(ArrayObjectSchema::LENGTH.ordinal().raw(), 2);
+    assert_eq!(ArrayObjectSchema::COUNT.ordinal().raw(), 3);
+    assert_eq!(ArrayObjectSchema::BUCKETS.ordinal().raw(), 4);
+    assert_eq!(ArrayObjectSchema::DENSE.ordinal().raw(), 5);
+    assert_eq!(ArrayObjectSchema::MODE.ordinal().raw(), 6);
+    assert_eq!(ArrayObjectSchema::NUMBERS.ordinal().raw(), 7);
+    assert_eq!(ArrayObjectSchema::NUMBER_PRESENT.ordinal().raw(), 8);
+    assert_eq!(storage.fields.len(), 10);
+    assert_eq!(ArrayObjectSchema::VALUES.ordinal().raw(), 9);
+    let values = &storage.fields[9];
     assert!(values.mutable);
     assert_eq!(
         values.element_type,
@@ -522,7 +526,7 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
             .unwrap()
         ))
     );
-    let mode = ArrayIndexStorageSchema::MODE.ordinal().raw() as usize;
+    let mode = ArrayObjectSchema::MODE.ordinal().raw() as usize;
     assert!(storage.fields[mode].mutable);
     assert_eq!(
         storage.fields[mode].element_type,
@@ -534,11 +538,11 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     );
     for (field, layout) in [
         (
-            ArrayIndexStorageSchema::NUMBERS.ordinal().raw(),
+            ArrayObjectSchema::NUMBERS.ordinal().raw(),
             GcLayout::NumberBitsI64Array,
         ),
         (
-            ArrayIndexStorageSchema::NUMBER_PRESENT.ordinal().raw(),
+            ArrayObjectSchema::NUMBER_PRESENT.ordinal().raw(),
             GcLayout::NumberPresenceU64Array,
         ),
     ] {
@@ -565,11 +569,33 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
             wasmparser::StorageType::Val(wasmparser::ValType::I64)
         );
     }
-    let mut constructor = Function::new(crate::code_sink::LocalDeclarations::from_types([]));
+    // Reuse a registered void signature whose first parameter is the exact
+    // ordinary header. Frozen type ownership admits no append operation.
+    let constructor_signature = RuntimeHelperId::IntrinsicDataPublish;
+    let parameters = constructor_signature
+        .definition(schema.layouts())
+        .parameters()
+        .to_vec();
+    let CompositeInnerType::Func(signature) = &types[constructor_signature.type_index() as usize]
+        .composite_type
+        .inner
+    else {
+        panic!("registered constructor validation signature is a function");
+    };
+    let parameter_types = signature.params().to_vec();
+    let mut constructor = Function::with_parameters(
+        crate::code_sink::LocalDeclarations::from_types([]),
+        parameters.clone(),
+    );
+    let header = schema.parameter_gc::<OrdinaryObject, NonNullable>(0, &mut constructor);
+    let length = schema.reserve_i64_local(&mut constructor);
+    length.set_constant(u32::MAX as i64, &mut constructor);
     let _ = schema
-        .struct_type::<ArrayIndexStorage>()
-        .empty(schema, &mut constructor);
+        .struct_type::<ArrayObject>()
+        .with_empty_index_storage(&header, length, true, schema, &mut constructor);
     constructor.instruction(&Instruction::Drop);
+    header.clear(&mut constructor);
+    schema.release_i64_local(length, &mut constructor);
     constructor.instruction(&Instruction::End);
     let constructor = constructor.into_body();
     // Validate the actual constructor with its real local declarations and
@@ -578,7 +604,7 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     let mut module = wasm_encoder::Module::new();
     module.section(runtime.types());
     let mut functions = wasm_encoder::FunctionSection::new();
-    functions.function(StaticSignature::HostCollectGc.type_index()); // () -> ()
+    functions.function(constructor_signature.type_index());
     module.section(&functions);
     module.section(&runtime.globals().defined_section(0));
     let mut code = wasm_encoder::CodeSection::new();
@@ -586,7 +612,7 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     module.section(&code);
     Validator::new_with_features(WasmFeatures::all())
         .validate_all(&module.finish())
-        .expect("the complete seven-field constructor has valid Wasm stack types");
+        .expect("the actual Array constructor has valid Wasm stack types");
     let mut body = Vec::new();
     wasm_encoder::Encode::encode(&constructor, &mut body);
     let mut reader = wasmparser::BinaryReader::new(&body, 0);
@@ -599,23 +625,49 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
         .into_iter()
         .map(Result::unwrap)
         .collect::<Vec<_>>();
-    let allocation = operators.iter().position(|op| matches!(op, wasmparser::Operator::StructNew { struct_type_index } if *struct_type_index == index(GcLayout::ArrayIndexStorage))).unwrap();
+    let allocation = operators.iter().position(|op| matches!(op, wasmparser::Operator::StructNew { struct_type_index } if *struct_type_index == index(GcLayout::ArrayObject))).unwrap();
+    assert_eq!(
+        operators
+            .iter()
+            .filter(|op| matches!(op, wasmparser::Operator::StructNew { .. }))
+            .count(),
+        1,
+        "the actual Array alone owns indexed state; no separate indexed record is allocated"
+    );
+    assert!(
+        !operators.iter().any(|op| matches!(
+            op,
+            wasmparser::Operator::ArrayNew { .. }
+                | wasmparser::Operator::ArrayNewDefault { .. }
+                | wasmparser::Operator::ArrayNewFixed { .. }
+        )),
+        "even maximum logical length starts with shared empty backings"
+    );
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Operand {
         I32(i32),
         I64(i64),
         Reference { global: Option<u32>, non_null: bool },
     }
-    let local_types = body
-        .get_locals_reader()
-        .unwrap()
+    let local_types = parameter_types
         .into_iter()
-        .flat_map(|local| {
-            let (count, ty) = local.unwrap();
-            std::iter::repeat(ty).take(count as usize)
-        })
+        .chain(
+            body.get_locals_reader()
+                .unwrap()
+                .into_iter()
+                .flat_map(|local| {
+                    let (count, ty) = local.unwrap();
+                    std::iter::repeat(ty).take(count as usize)
+                }),
+        )
         .collect::<Vec<_>>();
-    let mut locals = std::collections::BTreeMap::<u32, Operand>::new();
+    let mut locals = std::collections::BTreeMap::<u32, Operand>::from([(
+        0,
+        Operand::Reference {
+            global: None,
+            non_null: true,
+        },
+    )]);
     let mut operands = Vec::new();
     // Follow stack values, not instruction offsets: a LocalGet followed by
     // RefAsNonNull is one constructor operand, and neither local numbers nor
@@ -672,15 +724,18 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     assert_eq!(
         operands,
         vec![
-            empty(schema.empty_arrays.array_buckets.index()),
+            Operand::Reference { global: None, non_null: true },
+            Operand::I32(1),
+            Operand::I64(u32::MAX as i64),
             Operand::I64(0),
+            empty(schema.empty_arrays.array_buckets.index()),
             empty(schema.empty_arrays.array_elements.index()),
             Operand::I32(ArrayIndexedStorageMode::PackedNumbers.encode()),
             empty(schema.empty_arrays.number_bits.index()),
             empty(schema.empty_arrays.number_presence.index()),
             Operand::Reference {global:None,non_null:false},
         ],
-        "StructNew consumes exactly the declared BUCKETS/COUNT/DENSE/MODE/NUMBERS/NUMBER_PRESENT/VALUES values"
+        "StructNew consumes the actual header, length metadata and complete canonical empty indexed state"
     );
 }
 

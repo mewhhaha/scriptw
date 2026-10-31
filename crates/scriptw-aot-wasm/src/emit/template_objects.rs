@@ -1,10 +1,10 @@
 //! Parsed-source executions and the Realm's GetTemplateObject cache.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexStorage, ArrayObject, FunctionContext, FunctionContextSchema, FunctionObject,
-    GcLocal, GcOperand, GcStackReference, Nullable, OrdinaryObject, OrdinaryObjectSchema,
-    PropertyDescriptor, RealmRecord, RealmRecordSchema, StoredValue, TemplateSiteTable,
-    TemplateSource, TemplateSourceSchema, ValueLocals,
+    ArrayObject, FunctionContext, FunctionContextSchema, FunctionObject, GcLocal, GcOperand,
+    GcStackReference, Nullable, OrdinaryObject, OrdinaryObjectSchema, PropertyDescriptor,
+    RealmRecord, RealmRecordSchema, StoredValue, TemplateSiteTable, TemplateSource,
+    TemplateSourceSchema, ValueLocals,
 };
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{TemplateObjectIr, TemplateSourceIr};
@@ -439,12 +439,6 @@ impl FunctionBuilder<'_> {
             );
             stored.clear(function);
         }
-        let indexed = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<ArrayIndexStorage>()
-                .empty(schema, function),
-            function,
-        );
         if let Some(raw) = raw {
             element.set_reference(raw, schema, function);
             let text = schema.reserve_gc_local(function).initialize(
@@ -462,20 +456,18 @@ impl FunctionBuilder<'_> {
             .struct_type::<OrdinaryObject>()
             .field(OrdinaryObjectSchema::EXTENSIBLE)
             .write(&header, GcOperand::boolean(false), schema, function);
-        let array = schema.reserve_gc_local(function).initialize(
-            schema.struct_type::<ArrayObject>().construct(
-                (
-                    GcOperand::reference(&header, schema),
-                    GcOperand::reference(&indexed, schema),
-                    GcOperand::i64(
-                        i64::try_from(elements.len()).expect("template length fits i64"),
-                    ),
-                    GcOperand::boolean(false),
-                ),
-                function,
-            ),
+        let length = schema.reserve_i64_local(function);
+        length.set_constant(
+            i64::try_from(elements.len()).expect("template length fits i64"),
             function,
         );
+        let array = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<ArrayObject>()
+                .with_empty_index_storage(&header, length, false, schema, function),
+            function,
+        );
+        schema.release_i64_local(length, function);
         let index = schema.reserve_i64_local(function);
         for (ordinal, descriptor) in descriptors.iter().enumerate() {
             function.instruction(&Instruction::I64Const(
@@ -488,7 +480,6 @@ impl FunctionBuilder<'_> {
         for descriptor in descriptors.into_iter().rev() {
             descriptor.clear(function);
         }
-        indexed.clear(function);
         absent_accessor.clear(function);
         element.clear(function);
         header.clear(function);

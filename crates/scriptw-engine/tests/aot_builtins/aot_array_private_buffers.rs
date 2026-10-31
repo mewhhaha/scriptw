@@ -76,6 +76,14 @@ fn dense_number_prefix_preserves_holes_bits_and_storage_transitions() {
 }
 
 #[test]
+fn array_owner_preserves_indexed_identity_across_header_and_private_state_changes() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/fused_owner_lifecycle.js"),
+        "array-fused-owner-lifecycle:ok",
+    );
+}
+
+#[test]
 fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/packed_push.js"),

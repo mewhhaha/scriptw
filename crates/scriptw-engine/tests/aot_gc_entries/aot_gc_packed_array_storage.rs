@@ -314,6 +314,132 @@ fn graph_snapshot_dense_prefix_ignores_spare_capacity_and_large_logical_length()
 }
 
 #[test]
+fn graph_snapshot_preserves_array_owner_cycles_after_header_and_descriptor_changes() {
+    use scriptw_runtime::rooted_snapshot::SnapshotObjectKind;
+
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let observed = Engine::new(RealmBuilder::new().build())
+        .observe_script_graph(
+            r#"
+var array=[0,-0,2,3],token=Object.create(null),prototype=Object.create(null);
+token.owner=array;token.value=23;prototype.owner=array;
+Object.setPrototypeOf(array,prototype);
+array[2]=token;array[3]=array;delete array[0];
+Object.defineProperty(array,'1',{writable:false,enumerable:false,configurable:false});
+Object.defineProperty(array,'alias',{value:token,writable:false,enumerable:false,configurable:true});
+array.length=4294967295;Object.defineProperty(array,'length',{writable:false});
+Object.preventExtensions(array);gc();array;
+"#,
+            CompileOptions {
+                host_surface_policy: HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                timeout_ms: Some(30_000),
+                ..RunOptions::default()
+            },
+            SnapshotLimits::new(8, 16, 4, 128, 1024, 128, 1024, 16).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(observed.backend_used, ExecutionBackend::WasmAot);
+    let SnapshotOutcome::Captured { graph } = observed.completion.outcome else {
+        panic!("cyclic array snapshot must fit an occupied-property work budget");
+    };
+    assert_eq!(graph.root(), &SnapshotValue::Object { id: 0 });
+    assert_eq!(graph.nodes().len(), 3);
+    let array = &graph.nodes()[0];
+    assert_eq!(array.kind, SnapshotObjectKind::Array {});
+    assert!(!array.extensible);
+    let keys = array
+        .properties
+        .iter()
+        .map(|property| match &property.key {
+            SnapshotKey::String { units } => String::from_utf16(units.units()).unwrap(),
+            _ => panic!("unexpected Symbol"),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(keys, ["1", "2", "3", "length", "alias"]);
+    let data = |value, writable, enumerable, configurable| SnapshotDescriptor::Data {
+        value,
+        writable,
+        enumerable,
+        configurable,
+    };
+    let root = SnapshotValue::Object { id: 0 };
+    let SnapshotDescriptor::Data {
+        value: token @ SnapshotValue::Object { id: token_id },
+        ..
+    } = &array.properties[1].descriptor
+    else {
+        panic!("promoted index retains its object reference");
+    };
+    assert_eq!(
+        array.properties[0].descriptor,
+        data(
+            SnapshotValue::Number {
+                bits: (-0f64).to_bits()
+            },
+            false,
+            false,
+            false
+        )
+    );
+    assert_eq!(
+        array.properties[1].descriptor,
+        data(token.clone(), true, true, true)
+    );
+    assert_eq!(
+        array.properties[2].descriptor,
+        data(root.clone(), true, true, true)
+    );
+    assert_eq!(
+        array.properties[3].descriptor,
+        data(
+            SnapshotValue::Number {
+                bits: 4294967295f64.to_bits()
+            },
+            false,
+            false,
+            false
+        )
+    );
+    assert_eq!(
+        array.properties[4].descriptor,
+        data(token.clone(), false, false, true)
+    );
+    let token = &graph.nodes()[*token_id as usize];
+    assert_eq!(token.prototype, SnapshotValue::Null {});
+    assert_eq!(token.properties.len(), 2);
+    assert_eq!(
+        token.properties[0].descriptor,
+        data(root.clone(), true, true, true)
+    );
+    assert_eq!(
+        token.properties[1].descriptor,
+        data(
+            SnapshotValue::Number {
+                bits: 23f64.to_bits()
+            },
+            true,
+            true,
+            true
+        )
+    );
+    let SnapshotValue::Object { id: prototype_id } = &array.prototype else {
+        panic!("mutated array prototype remains an ordinary object");
+    };
+    assert_ne!(prototype_id, token_id);
+    let prototype = &graph.nodes()[*prototype_id as usize];
+    assert_eq!(prototype.prototype, SnapshotValue::Null {});
+    assert_eq!(prototype.properties.len(), 1);
+    assert_eq!(
+        prototype.properties[0].descriptor,
+        data(root, true, true, true)
+    );
+}
+
+#[test]
 fn fresh_numeric_literal_padding_preserves_snapshot_capacity_and_occupied_keys() {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     for length in [3, 5, 6, 7] {

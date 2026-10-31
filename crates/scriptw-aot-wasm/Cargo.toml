@@ -17,6 +17,9 @@ sha2 = "0.10.9"
 wasm-encoder = { version = "0.245.1", features = ["wasmparser"] }
 wasmparser = "0.245.1"
 
+[dev-dependencies]
+wasmtime-environ = { version = "=47.0.0", default-features = false, features = ["gc-copying", "std"] }
+
 [build-dependencies]
 icu_calendar = { version = "=2.0.6", default-features = false, features = ["compiled_data"] }
 icu_normalizer = { version = "=2.0.1", default-features = false, features = ["compiled_data"] }

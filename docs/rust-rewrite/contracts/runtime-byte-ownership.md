@@ -47,7 +47,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The current private runtime ABI is layout 40. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 41. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate
@@ -63,6 +63,16 @@ native caches and Portable bundles must match that current ABI.
 These are per-record layout sizes, not measured process RSS reductions. GC
 headers, backing arrays, native code, compiler metadata and allocator retention
 remain separate costs.
+
+An Array owns its indexed-storage fields directly. Its ordinary object header
+remains separate, while logical length, occupied count, storage mode and backing
+references share one 64-byte Array record under the pinned copying collector.
+This replaces the former 48-byte Array and 64-byte indexed-storage records,
+removing 48 bytes and one allocation per Array. Numeric presence bits, descriptor
+promotion and inactive-backing retirement retain their existing rules. Frozen
+template arrays use the same complete constructor. Snapshot readers use the
+concrete Array witness for both ordinary and indexed state, without fabricating
+a second object identity. These layout savings do not predict process RSS.
 
 Eager Realm constructors allocate their initial dictionary metadata directly,
 then bootstrap adds prototype and family properties. This avoids temporary
