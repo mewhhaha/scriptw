@@ -52,9 +52,14 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   and reverted: ordinary toSorted repeated +7.16% median / +6.99% mean and
   retained empty joins +3.83% / +5.58%, despite retained-object gains and 660
   passing native checks. RSS stayed flat; the 8,192-record / 256-KiB bound did
-  not predict a process saving. Review a closed scalar-count encoding that
-  retains nominal bitmap references before repeating the abstract GC field.
-  Every count read/write, growth, hole and snapshot path needs an owner.
+  not predict a process saving. The separate
+  [scalar-count alternative](numeric-presence-packed-count-20261031.json) also
+  failed both-group ordinary toSorted/singleton controls and is reverted.
+  Its original/retained target gains coexist with slower ordinary target
+  execution, slightly higher RSS, larger native R and a 112-byte ObjectRead
+  frame increase. Preserve its source-bound 1,043 native passes and structural
+  witness repair history. Next inspect fresh toSorted numeric-buffer ownership
+  before changing read-side representation again.
   Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,

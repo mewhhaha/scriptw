@@ -210,6 +210,14 @@ and 19.2% in the separate follow-up, with effectively unchanged RSS. Ordinary
 repeated 3.83% / 5.58%. All 660 selected native checks and 48 original Test262
 variants passed. Production retains nominal bitmap storage and ABI 42.
 
+The [scalar-count alternative](docs/rust-rewrite/numeric-presence-packed-count-20261031.json)
+is also rejected and reverted. Retained objects improved 7.2% in fresh execution
+and 18.4% in retained calls, but ordinary invocation slowed 4.4% and RSS rose
+0.08 MiB. Both balanced groups slowed ordinary `toSorted` and singleton joins;
+pooled medians rose 11.13% and 17.99%. Native R grew 133,368 bytes and its
+ObjectRead frame grew from 800 to 912 bytes. The report preserves 1,043
+source-bound native passes, test-witness repairs and their evidence limits.
+
 In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
 RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was
 7.69 MiB versus 8.89 MiB. These process counters do not measure live JavaScript
