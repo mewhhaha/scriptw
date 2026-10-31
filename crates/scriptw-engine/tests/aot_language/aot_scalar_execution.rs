@@ -5,11 +5,15 @@ use scriptw_engine::{
 };
 
 fn assert_scalar_execution(source: &str) {
+    assert_scalar_execution_with_options(source, CompileOptions::default());
+}
+
+fn assert_scalar_execution_with_options(source: &str, compile_options: CompileOptions) {
     scriptw_engine::configure_compilation_jobs(1).expect("one compilation worker");
     let outcome = Engine::new(RealmBuilder::new().build())
         .observe_script(
             source,
-            CompileOptions::default(),
+            compile_options,
             RunOptions {
                 timeout_ms: Some(30_000),
                 ..RunOptions::default()
@@ -734,4 +738,369 @@ increments(4294967295) && decrements(-2147483648) && compound(4294967295) &&
 finalTest() && Object.is(falseTest(-0),0);
 "#,
     );
+}
+
+#[test]
+fn scalar_whole_trip_affine_literal_counts_match_while_state_and_counter() {
+    let mut source = String::from(
+        r#"
+function same(left,right) {return Object.is(left[0],right[0]) && Object.is(left[1],right[1]);}
+function check(value,message) {if(!value)throw message;}
+var seeds=[0,-0,1,-1,-2147483648,2147483647,2147483648,4294967295,
+  4294967297,7.75,NaN,Infinity,-Infinity,9007199254740991];
+"#,
+    );
+    // Every candidate has literal C/L, unlike the existing dynamic-count tests.
+    // While references cannot enter ScalarNumberLoop's for-only admission.
+    for (map, body) in [
+        ("unsigned", "(Math.imul(value,3)+1)>>>0"),
+        ("signed", "(Math.imul(value,5)-7)|0"),
+        ("zero", "(Math.imul(value,0)+4294967295)>>>0"),
+        ("unit", "(Math.imul(value,1)-1)|0"),
+        ("wrapped", "(Math.imul(value,4294967291)+11)>>>0"),
+    ] {
+        for trips in [1, 7, 8, 9, 19] {
+            let limit = 3 + trips;
+            source.push_str(&format!(
+                r#"
+function actual_{map}_{trips}(value) {{
+  for(var index=3;index<{limit};index++) value={body};
+  return [value,index];
+}}
+function reference_{map}_{trips}(value) {{
+  var index=3;
+  while(index<{limit}) {{value={body};index++;}}
+  return [value,index];
+}}
+for(var seed=0;seed<seeds.length;seed++) {{
+  var actual=actual_{map}_{trips}(seeds[seed]);
+  check(same(actual,reference_{map}_{trips}(seeds[seed])) && actual[1]==={limit},
+    '{map}:{trips}:'+seed);
+}}
+"#,
+            ));
+        }
+    }
+    source.push_str("true;");
+    assert_scalar_execution_modes(&source);
+}
+
+#[test]
+fn scalar_whole_trip_boundaries_keep_initializer_control_and_completion_semantics() {
+    let mut source = String::from(
+        r#"
+function same(left,right) {
+  if(left.length!==right.length)return false;
+  var index=0;while(index<left.length){if(!Object.is(left[index],right[index]))return false;index++;}
+  return true;
+}
+function check(value,message) {if(!value)throw message;}
+"#,
+    );
+    for (name, setup, initializer, reference_setup, test, update, body, result) in [
+        (
+            "zero",
+            "",
+            "var index=3",
+            "var index=3;",
+            "index<3",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "past",
+            "",
+            "var index=5",
+            "var index=5;",
+            "index<4",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "negative_counter",
+            "",
+            "var index=-3",
+            "var index=-3;",
+            "index<2",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "negative_zero",
+            "",
+            "var index=-0",
+            "var index=-0;",
+            "index<0",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "negative_zero_one",
+            "",
+            "var index=-0",
+            "var index=-0;",
+            "index<1",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "missing",
+            "var index=3;",
+            "var index",
+            "var index=3;",
+            "index<12",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "expression",
+            "var index;",
+            "index=3",
+            "var index;index=3;",
+            "index<12",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "multiple",
+            "",
+            "var index=3,other=17",
+            "var index=3,other=17;",
+            "index<12",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index,other]",
+        ),
+        (
+            "fractional_counter",
+            "",
+            "var index=0.5",
+            "var index=0.5;",
+            "index<2",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "fractional_limit",
+            "",
+            "var index=1",
+            "var index=1;",
+            "index<2.5",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "last_i32",
+            "",
+            "var index=2147483646",
+            "var index=2147483646;",
+            "index<2147483647",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "past_i32",
+            "",
+            "var index=2147483647",
+            "var index=2147483647;",
+            "index<2147483648",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "inclusive",
+            "",
+            "var index=3",
+            "var index=3;",
+            "index<=4",
+            "index++",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "descending",
+            "",
+            "var index=9",
+            "var index=9;",
+            "index>3",
+            "index--",
+            "value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "counter_read",
+            "",
+            "var index=3",
+            "var index=3;",
+            "index<22",
+            "index++",
+            "value=(Math.imul(value,3)+index)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "counter_write",
+            "",
+            "var index=3",
+            "var index=3;",
+            "index<22",
+            "index++",
+            "index++;value=(Math.imul(value,3)+1)>>>0;",
+            "[value,index]",
+        ),
+        (
+            "nested",
+            "var full=0;",
+            "var index=3",
+            "var full=0,index=3;",
+            "index<22",
+            "index++",
+            "value=(full=Math.imul(value,3)+4294967295)>>>0;",
+            "[value,index,full]",
+        ),
+    ] {
+        source.push_str(&format!(
+            r#"
+function actual_{name}(value) {{
+  {setup}
+  for({initializer};{test};{update}) {{{body}}}
+  return {result};
+}}
+function reference_{name}(value) {{
+  {reference_setup}
+  while({test}) {{{body}{update};}}
+  return {result};
+}}
+check(same(actual_{name}(-0),reference_{name}(-0)), '{name}:zero');
+check(same(actual_{name}(2147483647),reference_{name}(2147483647)), '{name}:boundary');
+"#,
+        ));
+    }
+    source.push_str(
+        r#"
+function dynamic(value,limit) {
+  for(var index=3;index<limit;index++)value=(Math.imul(value,3)+1)>>>0;
+  return [value,index];
+}
+function referenceDynamic(value,limit) {
+  var index=3;while(index<limit){value=(Math.imul(value,3)+1)>>>0;index++;}
+  return [value,index];
+}
+check(same(dynamic(17,12),referenceDynamic(17,12)), 'dynamic limit');
+function aliased() {
+  for(var value=1;value<22;value++)value=(Math.imul(value,3)+1)>>>0;
+  return value;
+}
+function referenceAliased() {
+  var value=1;while(value<22){value=(Math.imul(value,3)+1)>>>0;value++;}
+  return value;
+}
+check(aliased()===referenceAliased(), 'counter and state cannot share a binding');
+var coercions=0,unreached={valueOf(){coercions++;throw 'unreached';}};
+check(actual_zero(unreached)[0]===unreached && actual_past(unreached)[0]===unreached &&
+  coercions===0, 'zero trips never coerce state');
+// Eval/capture ownership retains the ordinary completion path, not the new lane.
+var completion=eval('var state=1;for(var index=3;index<22;index++)state=(Math.imul(state,3)+1)>>>0;');
+var expected=referenceDynamic(1,22);
+var emptyCompletion=eval('42;for(var index=3;index<3;index++)index;');
+check(completion===expected[0] && emptyCompletion===undefined, 'body and zero-trip completion');
+true;
+"#,
+    );
+    assert_scalar_execution_modes(&source);
+}
+
+#[test]
+fn scalar_whole_trip_literal_loops_keep_live_imul_and_coercion_fallbacks() {
+    let source = r#"
+function check(value,message) {if(!value)throw message;}
+function same(left,right) {return Object.is(left[0],right[0]) && Object.is(left[1],right[1]);}
+function repeat(text,count) {var result='';while(count-->0)result+=text;return result;}
+function run(value) {
+  for(var index=3;index<22;index++)value=(Math.imul(value,3)+1)>>>0;
+  return [value,index];
+}
+var actualMath=Math,original=Math.imul,descriptor=Object.getOwnPropertyDescriptor(Math,'imul');
+function reference(value) {
+  var index=3;while(index<22){value=(original(value,3)+1)>>>0;index++;}
+  return [value,index];
+}
+check(same(run(13),reference(13)), 'live native method');
+var events='';
+actualMath.imul=function(left,right){events+='m';return left+right;};
+var changed=1,step=3;while(step<22){changed=(changed+3+1)>>>0;step++;}
+check(same(run(1),[changed,step]) && events===repeat('m',19), 'replaced method');
+Object.defineProperty(actualMath,'imul',{configurable:true,get(){events+='g';return original;}});
+events='';
+check(same(run(13),reference(13)) && events===repeat('g',19), 'getter not consulted by admission');
+Object.defineProperty(actualMath,'imul',descriptor);
+var parent=Object.getPrototypeOf(actualMath),inherited=Object.create(parent);
+Object.defineProperty(inherited,'imul',{get(){events+='i';return original;}});
+delete actualMath.imul;Object.setPrototypeOf(actualMath,inherited);events='';
+check(same(run(13),reference(13)) && events===repeat('i',19), 'inherited method getter');
+Object.setPrototypeOf(actualMath,parent);Object.defineProperty(actualMath,'imul',descriptor);
+globalThis.Math=new Proxy(actualMath,{get(target,key,receiver){events+='p';return Reflect.get(target,key,receiver);}});
+events='';
+check(same(run(13),reference(13)) && events===repeat('p',19), 'proxy receiver');
+globalThis.Math=actualMath;
+actualMath.imul=new Proxy(original,{apply(target,receiver,args){events+='a';return Reflect.apply(target,receiver,args);}});
+events='';
+check(same(run(13),reference(13)) && events===repeat('a',19), 'proxy callable');
+Object.defineProperty(actualMath,'imul',descriptor);
+
+function changingReceiver(value) {
+  var receiver=actualMath,replacement={imul(left,right){events+='w';return left+right;}};
+  for(var index=3;index<6;index++) {
+    value=(receiver.imul(value,3)+1)>>>0;
+    receiver=replacement;
+  }
+  return [value,index];
+}
+function referenceChangingReceiver(value) {
+  var receiver=actualMath,replacement={imul(left,right){return left+right;}},index=3;
+  while(index<6){value=(receiver.imul(value,3)+1)>>>0;receiver=replacement;index++;}
+  return [value,index];
+}
+events='';
+check(same(changingReceiver(1),referenceChangingReceiver(1)) && events==='ww',
+  'written local receiver remains live');
+
+events='';
+var boxed={valueOf(){events+='v';return 2;}};
+check(same(run(boxed),reference(2)) && events==='v', 'state coercion once before numeric results');
+var marker={},abrupt={valueOf(){events+='c';throw marker;}},caught=false;
+events='';try{run(abrupt);}catch(error){caught=error===marker;}
+check(caught && events==='c', 'abrupt state coercion');
+Object.defineProperty(actualMath,'imul',{configurable:true,get(){events+='g';throw marker;}});
+caught=false;events='';try{run(abrupt);}catch(error){caught=error===marker;}
+check(caught && events==='g', 'callee lookup throws before state coercion');
+Object.defineProperty(actualMath,'imul',descriptor);
+
+var foreign=__scriptwCreateRealm().global;
+globalThis.Math=foreign.Math;
+check(same(run(13),reference(13)), 'foreign native method result');
+caught=false;try{run(1n);}catch(error){caught=Object.getPrototypeOf(error)===foreign.TypeError.prototype;}
+globalThis.Math=actualMath;
+check(caught, 'foreign native method retains its error Realm');
+true;
+"#;
+    for directive in ["", "\"use strict\";\n"] {
+        assert_scalar_execution_with_options(
+            &format!("{directive}{source}"),
+            CompileOptions {
+                host_surface_policy: scriptw_engine::HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+        );
+    }
 }

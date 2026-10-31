@@ -30,7 +30,10 @@ binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
 other values retain the full coercion path. Closed scalar loops retain proven
 32-bit integers in integer locals, with bounded unrolling and exact integer
-recurrence reduction while preserving Number values at their exits.
+recurrence reduction while preserving Number values at their exits. Fixed positive
+literal trip counts can use one guarded affine transform after the existing
+Number and native-method checks; dirty bindings and the last body completion
+share the ordinary loop exit.
 Strict ordinary module functions keep proven uncaptured `var` bindings and simple
 parameters in local storage; exports, captures and Realm-relative names retain
 their live environment lookup. Actual eval/arguments use keeps the conservative
@@ -159,6 +162,30 @@ repeatable target benefit. The [two balanced cohorts](docs/rust-rewrite/numeric-
 retain all 17 workloads: ordinary retained objects slowed 8.3% and 2.8%, while
 compiler-free results changed direction. The production change was reverted;
 the branch-aware read regression and exact experimental products remain.
+
+The [combined runtime ownership experiment](docs/rust-rewrite/runtime-ownership-20261031.json),
+[full construction fold](docs/rust-rewrite/runtime-fold-20261031.json) and
+[string-only fold](docs/rust-rewrite/runtime-strings-20261031.json) passed their
+selected correctness checks but failed performance controls and were reverted.
+The string-only fold saved 96,040 native bytes, yet pooled eight-round retained
+mixed/large joins slowed by 12.18%/7.73%. Exact products and slower observations
+remain in their separate source-bound records.
+
+[Guarded whole-trip affine composition](docs/rust-rewrite/whole-trip-affine-20261031.json)
+improves the unchanged integer workload by 2.4–6.8% in compiler-free execution
+and 6.1–7.0% in ordinary invocation across two balanced groups. Million-step
+signed/unsigned controls improve about 70%/84% at those separate boundaries.
+The runtime and the other 16 original programs retain identical Wasm. Validation
+covers 35 selected native checks through one documented fixture correction and
+78 original Test262 executions. Singleton joins and derived retained integer
+calls still vary; small-join ordinary results include a 2.95% median and 38.07%
+mean slowdown in the final control. Every observation is retained; this is a
+scoped CPU improvement, with no RSS or all-workload parity claim.
+
+In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
+RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was
+7.69 MiB versus 8.89 MiB. These process counters do not measure live JavaScript
+ownership; the remaining residency gap needs code, stack and host attribution.
 
 ## Tests
 

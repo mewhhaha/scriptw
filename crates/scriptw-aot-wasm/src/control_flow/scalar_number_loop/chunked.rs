@@ -1,6 +1,7 @@
 //! Bounded pure iterations share a backedge; exact residues may compose steps.
 //! The original scalar loop remains the tail and owns every rejected boundary.
 use super::*;
+use std::num::NonZeroU32;
 
 const UNROLL: u32 = 5;
 const AFFINE_STEPS: u32 = 8;
@@ -270,6 +271,137 @@ fn node_count(value: &NumberExpression) -> usize {
     }
 }
 
+/// Only a literal private initializer and exact positive trip count may bypass
+/// the existing iterations. All Number/native entry guards remain outside it.
+pub(super) struct WholeTripAffine32 {
+    counter: usize,
+    initial_bits: u64,
+    limit: u32,
+    iterations: NonZeroU32,
+    affine: Affine32,
+}
+
+impl WholeTripAffine32 {
+    pub(super) fn new(
+        builder: &FunctionBuilder<'_>,
+        init: Option<&ForInitIr>,
+        source_test: &TypedExpr,
+        plan: &ScalarNumberLoop,
+    ) -> Option<Self> {
+        let (counter, Direction::Up) = counter_update(plan.update.as_ref()?)? else {
+            return None;
+        };
+        let Some(ForInitIr::Var(declarators)) = init else {
+            return None;
+        };
+        let [declarator] = declarators.as_slice() else {
+            return None;
+        };
+        let ExprIr::Number(initial_bits) = &declarator.init.as_ref()?.expr else {
+            return None;
+        };
+        let initial = bounded_counter_literal(*initial_bits)?;
+        if builder.is_script_global_binding(&declarator.name) {
+            return None;
+        }
+        let BindingStorage::Local(initial_binding) = builder.lookup_binding(&declarator.name)?
+        else {
+            return None;
+        };
+        let counter_binding = plan.bindings[counter].id;
+        if initial_binding != counter_binding {
+            return None;
+        }
+        // Inspect the original IR as well as the admitted Number tree: that
+        // tree deliberately normalizes unary plus and other counter forms.
+        let (left, right) = match &source_test.expr {
+            ExprIr::CompareNumber {
+                op: RelationalBinaryOp::LessThan,
+                lhs,
+                rhs,
+            }
+            | ExprIr::CompareValue {
+                op: RelationalBinaryOp::LessThan,
+                lhs,
+                rhs,
+            } => (lhs, rhs),
+            _ => return None,
+        };
+        let ExprIr::Identifier(name) = &left.expr else {
+            return None;
+        };
+        let BindingStorage::Local(test_binding) = builder.lookup_binding(name)? else {
+            return None;
+        };
+        let ExprIr::Number(limit_bits) = &right.expr else {
+            return None;
+        };
+        if test_binding != counter_binding
+            || !matches!(&plan.test,
+                NumberPredicate::Compare(RelationalBinaryOp::LessThan,
+                    NumberExpression::Binding(index), NumberExpression::Constant(bits))
+                    if *index == counter && *bits == *limit_bits)
+        {
+            return None;
+        }
+        let limit = bounded_counter_literal(*limit_bits)?;
+        let iterations = NonZeroU32::new(limit.checked_sub(initial)?)?;
+        // This is the existing one-assignment/exact32 affine admission. It
+        // rejects counter reads, nested observers and every additional write.
+        let step = Affine32::one_step(plan, counter)?;
+        if plan.bindings[step.binding].id == counter_binding {
+            return None;
+        }
+        Some(Self {
+            counter,
+            initial_bits: *initial_bits,
+            limit,
+            iterations,
+            affine: step.repeated(iterations),
+        })
+    }
+
+    pub(super) fn emit_guarded(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        value: LoopLocal,
+        iterated: I32Local,
+        done: ControlTarget,
+        function: &mut Function,
+    ) {
+        debug_assert!(self.iterations.get() <= i32::MAX as u32);
+        let LoopLocal::Number(counter) = locals.values[self.counter] else {
+            unreachable!("unit counter updates establish Number storage")
+        };
+        counter.load(function);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        function.instruction(&Instruction::I64Const(self.initial_bits as i64));
+        function.instruction(&Instruction::I64Eq);
+        builder.open_frame(ControlFrameKind::If, function);
+        self.affine.emit(locals, value, function);
+        function.instruction(&Instruction::F64Const(Ieee64::from(self.limit as f64)));
+        counter.store(function);
+        iterated.set_constant(1, function);
+        builder.emit_branch_to_target(done, function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+    }
+}
+
+fn bounded_counter_literal(bits: u64) -> Option<u32> {
+    let value = f64::from_bits(bits);
+    if !value.is_finite()
+        || value < 0.0
+        || value > i32::MAX as f64
+        || value.trunc() != value
+        || bits == (-0.0_f64).to_bits()
+    {
+        return None;
+    }
+    Some(value as u32)
+}
+
 struct Affine32 {
     binding: usize,
     multiplier: u32,
@@ -278,6 +410,23 @@ struct Affine32 {
 
 impl Affine32 {
     fn new(plan: &ScalarNumberLoop, counter: usize) -> Option<Self> {
+        let step = Self::one_step(plan, counter)?;
+        let (multiplier, addend) = (step.multiplier, step.addend);
+        let (mut composed_multiplier, mut composed_addend) = (1_u32, 0_u32);
+        for _ in 0..AFFINE_STEPS {
+            composed_multiplier = multiplier.wrapping_mul(composed_multiplier);
+            composed_addend = multiplier
+                .wrapping_mul(composed_addend)
+                .wrapping_add(addend);
+        }
+        Some(Self {
+            binding: step.binding,
+            multiplier: composed_multiplier,
+            addend: composed_addend,
+        })
+    }
+
+    fn one_step(plan: &ScalarNumberLoop, counter: usize) -> Option<Self> {
         let [NumberExpression::Assign(binding, value)] = plan.body.as_slice() else {
             return None;
         };
@@ -290,18 +439,32 @@ impl Affine32 {
             return None;
         }
         let (multiplier, addend) = affine(value, *binding, &plan.bindings)?;
-        let (mut composed_multiplier, mut composed_addend) = (1_u32, 0_u32);
-        for _ in 0..AFFINE_STEPS {
-            composed_multiplier = multiplier.wrapping_mul(composed_multiplier);
-            composed_addend = multiplier
-                .wrapping_mul(composed_addend)
-                .wrapping_add(addend);
-        }
         Some(Self {
             binding: *binding,
-            multiplier: composed_multiplier,
-            addend: composed_addend,
+            multiplier,
+            addend,
         })
+    }
+
+    fn repeated(self, iterations: NonZeroU32) -> Self {
+        debug_assert!(iterations.get() <= i32::MAX as u32);
+        let mut remaining = iterations.get();
+        let mut result = (1_u32, 0_u32);
+        let mut power = (self.multiplier, self.addend);
+        // The constructor's literal bounds give at most 31 compiler steps.
+        // Both coefficients are computed from the old pairs before assignment.
+        while remaining != 0 {
+            if remaining & 1 != 0 {
+                result = compose_affine(power, result);
+            }
+            power = compose_affine(power, power);
+            remaining >>= 1;
+        }
+        Self {
+            binding: self.binding,
+            multiplier: result.0,
+            addend: result.1,
+        }
     }
 
     fn emit(&self, locals: &LoopLocals<'_>, value: LoopLocal, function: &mut Function) {
@@ -319,6 +482,10 @@ impl Affine32 {
         state.load(function);
         value.store(function);
     }
+}
+
+fn compose_affine((a, b): (u32, u32), (c, d): (u32, u32)) -> (u32, u32) {
+    (a.wrapping_mul(c), a.wrapping_mul(d).wrapping_add(b))
 }
 
 /// Return coefficients only where the existing residue emitter proves the

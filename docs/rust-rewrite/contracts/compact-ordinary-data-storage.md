@@ -1,6 +1,6 @@
 # Compact ordinary data storage
 
-The current private runtime ABI is layout 35. Compact ordinary property storage
+The current private runtime ABI is layout 41. Compact ordinary property storage
 belongs to the single Wasm GC object model and requires the experimental
 Wasmtime GC/reference feature baseline. Layout 31 adds the inline representation
 and shared store kernel described in
@@ -42,6 +42,11 @@ Its immutable shapes are shared through R's separate configurable/fixed metadata
 roots, with the appropriate nonenumerable, nonwritable data attributes. This is
 distinct from source-literal site ownership. Each callable still owns its
 current metadata values and follows ordinary structural mutation rules.
+
+The [shared-empty Array experiment](../runtime-ownership-20261031.json) failed
+performance controls and was reverted. ArrayCreate retains independent ordinary
+named-property storage; ordinary, native and frozen-template ownership remains
+unchanged. This experiment does not establish a storage-mode improvement.
 
 ## Physical storage and value updates
 

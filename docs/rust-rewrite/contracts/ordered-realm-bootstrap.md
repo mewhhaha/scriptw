@@ -31,6 +31,12 @@ metadata, while user programs remain compiled Wasm. Every Realm still allocates
 its own recipes and mutable descriptors. The new helper and static boundary require
 layout-33 admission; previous packages and cache entries are replaced.
 
+The [full deferred-method fold](../runtime-fold-20261031.json) and
+[string-only fold](../runtime-strings-20261031.json) failed performance controls
+and were reverted. Exact-ID leaves retain their original checked code allocation,
+name resolution and source resolution, followed by the shared callable tail.
+Defining-Realm roots, aliases and completed-cache publication stay ordered.
+
 `IntrinsicConstructorAllocate` receives the caller's already rooted native
 header, exact typed executable code, defining Realm and unresolved runtime source
 ordinal. Its checked producer admits only uniform strict native constructors.

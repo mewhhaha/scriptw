@@ -10,7 +10,7 @@ use crate::emit::LocalBindingId;
 mod invariant_imul;
 use invariant_imul::InvariantImul;
 mod chunked;
-use chunked::ChunkedLoop;
+use chunked::{ChunkedLoop, WholeTripAffine32};
 
 const MAX_NODES: usize = 256;
 const MAX_DEPTH: usize = 64;
@@ -127,6 +127,7 @@ pub(super) struct ScalarNumberLoop {
     body: Vec<NumberExpression>,
     update: Option<NumberExpression>,
     imul: Vec<InvariantImul>,
+    whole_trip: Option<WholeTripAffine32>,
 }
 
 struct LoopProof<'a, 'b> {
@@ -155,6 +156,7 @@ impl ScalarNumberLoop {
 
     pub(super) fn new(
         builder: &FunctionBuilder<'_>,
+        init: Option<&ForInitIr>,
         test: Option<&TypedExpr>,
         update: Option<&TypedExpr>,
         body: &StatementIr,
@@ -175,7 +177,8 @@ impl ScalarNumberLoop {
             remaining: MAX_NODES,
             imul: Vec::new(),
         };
-        let test = proof.predicate(test?, MAX_DEPTH)?;
+        let source_test = test?;
+        let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
         proof.statement(body, &mut expressions, MAX_DEPTH)?;
         let update = match update {
@@ -205,13 +208,17 @@ impl ScalarNumberLoop {
         for (binding, domain) in proof.bindings.iter_mut().zip(writes) {
             binding.domain = domain.unwrap_or(NumberDomain::Number);
         }
-        Some(Self {
+        let mut plan = Self {
             bindings: proof.bindings,
             test,
             body: expressions,
             update,
             imul: proof.imul,
-        })
+            whole_trip: None,
+        };
+        // Declining this narrower proof keeps the existing scalar plan intact.
+        plan.whole_trip = WholeTripAffine32::new(builder, init, source_test, &plan);
+        Some(plan)
     }
 
     pub(super) fn emit_entry_guard(
@@ -898,6 +905,18 @@ impl FunctionBuilder<'_> {
             });
         let iterated = schema.reserve_i32_local(function);
         iterated.set_constant(0, function);
+        let iterations_done = plan.whole_trip.as_ref().map(|whole_trip| {
+            let done = self.open_frame(ControlFrameKind::Block, function);
+            whole_trip.emit_guarded(
+                self,
+                &locals,
+                value.expect("whole-trip assignment has a body value"),
+                iterated,
+                done,
+                function,
+            );
+            done
+        });
         if let Some(chunked) = ChunkedLoop::new(plan) {
             chunked.emit(self, plan, &locals, value, iterated, function);
         }
@@ -916,6 +935,10 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
+        if iterations_done.is_some() {
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         for (binding, local) in plan.bindings.iter().zip(&locals.values) {
             if binding.written {
                 local.load_number(function);

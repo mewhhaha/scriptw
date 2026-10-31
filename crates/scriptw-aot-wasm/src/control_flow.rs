@@ -6905,7 +6905,7 @@ impl<'a> FunctionBuilder<'a> {
         }
         let scalar_plan = lexical_environment
             .is_none()
-            .then(|| scalar_number_loop::ScalarNumberLoop::new(self, test, update, body))
+            .then(|| scalar_number_loop::ScalarNumberLoop::new(self, init, test, update, body))
             .flatten();
         if let Some(plan) = scalar_plan {
             plan.emit_entry_guard(self, function)?;

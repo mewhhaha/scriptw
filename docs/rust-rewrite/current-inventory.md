@@ -31,10 +31,16 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   boundaries; the published comparison still belongs to its earlier source.
   The [pre-`ToObject` probe relocation](numeric-getv-probe-20261031.json) failed
   to demonstrate repeatable target benefit and is reverted; preserve its exact
-  products and both balanced orders. Next measure shared empty Array named
-  storage and one shared deferred-method code/string construction tail. Preserve
-  exotic own keys, exact rooted snapshots, independent named-storage promotion,
-  defining-Realm identities and allocation order.
+  products and both balanced orders. The
+  [combined runtime ownership candidate](runtime-ownership-20261031.json),
+  [full construction fold](runtime-fold-20261031.json) and
+  [string-only fold](runtime-strings-20261031.json) also failed controls and are
+  reverted. [Bounded whole-trip affine composition](whole-trip-affine-20261031.json)
+  now improves original/ordinary integer execution; all live guards, completion
+  and fallbacks remain. Keep its slower singleton/derived retained and small-join
+  observations explicit. Next measure eager Date-family deferral with canonical
+  demand, global mutation, alias, foreign-Realm and snapshot ownership preserved.
+  Its 203-record method slice is a startup-work bound, not a net RSS prediction.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

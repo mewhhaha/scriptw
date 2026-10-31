@@ -1,6 +1,200 @@
 //! Inspect real encoded source bodies, independently of emitter scratch APIs.
 use super::*;
 
+// Follow encoded labels rather than recognizing a coefficient in isolation.
+// A whole-trip route must skip both retained primitive loops, then use their
+// common binding/body-completion publication under the original entry guard.
+fn whole_trip_lanes(operators: &[Operator<'_>]) -> Vec<(u32, u32, u64, u64)> {
+    let mut stack = Vec::new();
+    let mut end = vec![None; operators.len()];
+    let mut otherwise = vec![None; operators.len()];
+    for (index, operator) in operators.iter().enumerate() {
+        match operator {
+            Operator::Block { .. }
+            | Operator::Loop { .. }
+            | Operator::If { .. }
+            | Operator::TryTable { .. } => stack.push(index),
+            Operator::Else => otherwise[*stack.last().unwrap()] = Some(index),
+            Operator::End => {
+                if let Some(start) = stack.pop() {
+                    end[start] = Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut lanes = Vec::new();
+    for (start, window) in operators.windows(5).enumerate() {
+        let [Operator::LocalGet { local_index: state }, Operator::I32Const { value: multiplier }, Operator::I32Mul, Operator::I32Const { value: addend }, Operator::I32Add] =
+            window
+        else {
+            continue;
+        };
+        let frames = (0..start)
+            .filter(|index| end[*index].is_some_and(|last| last > start))
+            .collect::<Vec<_>>();
+        if frames
+            .iter()
+            .any(|index| matches!(operators[*index], Operator::Loop { .. }))
+        {
+            continue;
+        }
+        let Some(&guard) = frames.last() else {
+            continue;
+        };
+        if !matches!(operators[guard], Operator::If { .. }) || guard < 4 {
+            continue;
+        }
+        let [Operator::LocalGet {
+            local_index: counter,
+        }, Operator::I64ReinterpretF64, Operator::I64Const { value: initial }, Operator::I64Eq] =
+            &operators[guard - 4..guard]
+        else {
+            continue;
+        };
+        assert_eq!(
+            start,
+            guard + 1,
+            "the actual counter check immediately guards the affine payload"
+        );
+        let last = end[guard].unwrap();
+        let payload = &operators[start..last];
+        let [Operator::LocalGet { .. }, Operator::I32Const { .. }, Operator::I32Mul, Operator::I32Const { .. }, Operator::I32Add, Operator::LocalSet {
+            local_index: written_state,
+        }, Operator::LocalGet {
+            local_index: body_source,
+        }, Operator::LocalSet {
+            local_index: body_value,
+        }, Operator::F64Const { value: limit }, Operator::LocalSet {
+            local_index: written_counter,
+        }, Operator::I32Const { value: 1 }, Operator::LocalSet {
+            local_index: iterated,
+        }, Operator::Br { relative_depth }] = payload
+        else {
+            panic!("the whole-trip route must update live state, body completion, counter and iterated before its common exit: {payload:?}");
+        };
+        assert_eq!(state, written_state);
+        assert_eq!(state, body_source);
+        assert_eq!(counter, written_counter);
+        let mut distinct = vec![*state, *counter, *body_value, *iterated];
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(
+            distinct.len(),
+            4,
+            "last body value must remain independent of the counter update"
+        );
+        assert!(
+            (*relative_depth as usize) < frames.len(),
+            "the whole-trip branch targets an enclosing encoded frame, not the function label"
+        );
+        let target = frames[frames.len() - 1 - *relative_depth as usize];
+        assert!(
+            matches!(operators[target], Operator::Block { .. }),
+            "success exits a block, never an interruptible loop backedge"
+        );
+        let done = end[target].unwrap();
+        let fallback = loop_regions(&operators[last + 1..done]);
+        assert_eq!(
+            fallback
+                .iter()
+                .filter(|region| scalar_integer_loop(region))
+                .count(),
+            2,
+            "a missed actual-counter guard retains the composed chunk and scalar tail"
+        );
+        let outer = frames.iter().rev().copied().find(|index| *index < target
+            && matches!(operators[*index], Operator::If { .. }) && otherwise[*index].is_some())
+            .expect("the whole-trip route and primitive fallbacks remain inside the live Number/native entry guard");
+        let generic = otherwise[outer].unwrap();
+        assert!(done < generic);
+        assert!(
+            loop_regions(&operators[generic + 1..end[outer].unwrap()])
+                .iter()
+                .any(
+                    |region| region.iter().any(|op| matches!(op, Operator::Call { .. }))
+                        && region.iter().any(|op| matches!(op, Operator::I32Mul))
+                ),
+            "outer admission failure retains the full ordered callable/coercion path"
+        );
+        let publication = &operators[done + 1..generic];
+        for local in [state, counter, body_value, iterated] {
+            assert!(
+                publication.iter().any(
+                    |op| matches!(op, Operator::LocalGet { local_index } if local_index == local)
+                ),
+                "the common exit must use every selected live state/completion local"
+            );
+        }
+        assert!(
+            publication
+                .iter()
+                .any(|op| matches!(op, Operator::I64ReinterpretF64)),
+            "common binding/completion publication restores Number representation"
+        );
+        let completion_guard = (done + 2..generic).find(|index| {
+            matches!(operators[*index], Operator::If { .. })
+                && matches!(operators[*index - 1], Operator::LocalGet { local_index } if local_index == *iterated)
+        }).expect("common completion publication is guarded by the selected iterated flag");
+        let completion_end = end[completion_guard].unwrap();
+        assert!(
+            completion_end < generic,
+            "the body completion finishes within the admitted scalar exit"
+        );
+        assert!(
+            operators[completion_guard + 1..completion_end]
+                .windows(4)
+                .any(|ops| matches!(ops,
+            [Operator::LocalGet { local_index },
+             Operator::F64ConvertI32S | Operator::F64ConvertI32U,
+             Operator::I64ReinterpretF64, Operator::LocalSet { .. }]
+                if local_index == body_value)),
+            "the independent last body value is converted and stored only on the iterated exit"
+        );
+        lanes.push((
+            *multiplier as u32,
+            *addend as u32,
+            *initial as u64,
+            limit.bits(),
+        ));
+    }
+    lanes
+}
+
+#[test]
+fn whole_trip_affine_routes_keep_guards_fallbacks_and_common_completion() {
+    for (source, name, expected) in [
+        (include_str!("../../../scriptw-cli/tests/fixtures/v8_baseline/integer.js"), "workload",
+            (1244127297, 2845218640, 0.0_f64.to_bits(), 10000.0_f64.to_bits())),
+        ("function run(state){\"use strict\";for(var i=3;i<22;i++)state=(Math.imul(state,3)+1)>>>0;return state+':'+i;} run(7);", "run",
+            (1162261467, 581130733, 3.0_f64.to_bits(), 22.0_f64.to_bits())),
+        ("function run(state){\"use strict\";for(var i=0;i<1;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);", "run",
+            (3, 1, 0.0_f64.to_bits(), 1.0_f64.to_bits())),
+        ("function run(state){\"use strict\";for(var i=3;i<4;i++)state=(Math.imul(state,5)-7)|0;return state+':'+i;} run(7);", "run",
+            (5, (-7_i32) as u32, 3.0_f64.to_bits(), 4.0_f64.to_bits())),
+        ("function run(state){\"use strict\";for(var i=0;i<2147483647;i++)state=(Math.imul(state,1)+1)>>>0;return state+':'+i;} run(7);", "run",
+            (1, 2147483647, 0.0_f64.to_bits(), 2147483647.0_f64.to_bits())),
+        ("function run(state){\"use strict\";for(var i=2147483646;i<2147483647;i++)state=(Math.imul(state,3)+1)>>>0;return state+':'+i;} run(7);", "run",
+            (3, 1, 2147483646.0_f64.to_bits(), 2147483647.0_f64.to_bits())),
+    ] {
+        with_source_operators(source, name, |operators| assert_eq!(whole_trip_lanes(operators), vec![expected], "{source}"));
+    }
+    for source in [
+        "function run(state){\"use strict\";var i=3;for(;i<22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";var i;for(i=3;i<22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3,other=0;i<22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3;(i+0)<22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3;+i<22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3;i<=22;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3;i<3;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=0;i<2147483648;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";var limit=22;for(var i=3;i<limit;i++)state=(Math.imul(state,3)+1)>>>0;return state;} run(7);",
+        "function run(state){\"use strict\";for(var i=3;i<22;i++){state=(Math.imul(state,3)+i)>>>0;}return state;} run(7);",
+    ] {
+        with_source_operators(source, "run", |operators| assert!(whole_trip_lanes(operators).is_empty(), "unproved shape keeps existing execution: {source}"));
+    }
+}
+
 fn scalar_traffic(source: &str, name: &str) -> (u32, u32, usize) {
     let artifact = emit_script(source).expect("scalar traffic control emits");
     expect_valid_module(&artifact, 1);
@@ -266,6 +460,8 @@ fn scalar_integer_loop(operators: &[Operator<'_>]) -> bool {
                     | Operator::F64Lt
                     | Operator::I32Mul
                     | Operator::I32Add
+                    | Operator::I32Sub
+                    | Operator::I32Or
                     | Operator::I32ShrU
                     | Operator::I32Eqz
                     | Operator::Br { .. }

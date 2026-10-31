@@ -31,6 +31,28 @@ invoking getters or materializing functions. Proven signed/unsigned integer rang
 can simplify ToUint32; arithmetic remains binary64 and arbitrary Numbers retain
 the complete modulo conversion.
 
+A private whole-trip affine proof can further collapse one exact32 state
+assignment for a single `var` counter initialized by literal C, bare ascending
+`counter < L`, and an independent unit increment, with `0 <= C < L <= i32::MAX`.
+Its checked binding identity, positive count and one-step residue map mint the
+composed coefficients; the existing eight-step constructor remains unchanged.
+The actual loaded counter must match C's Number bits after the existing entry
+checks. A hit updates live state, the independent last body value, final counter
+L and iterated flag, then branches to the common publication exit. A miss keeps
+the chunk and scalar tail; outer guard misses retain the complete classic loop.
+
+Coefficient composition uses wrapping u32 pairs at compile time, bounded to 31
+steps. Zero trips, negative zero, dynamic/fractional or larger bounds, other
+initializers, counter-dependent/nonlinear bodies and observable writes keep
+existing paths. No runtime exponentiation loop, GC schema, global or ABI change
+is introduced. Original/strict Engine controls use independent while references;
+actual encoded labels witness the guarded skip and common body-completion exit.
+The existing large-loop epoch-timeout boundary remains unchanged. The
+[source-bound checkpoint](../whole-trip-affine-20261031.json) records 35 selected
+native checks through one fixture-only continuation, 78 original Test262
+executions and balanced original/ordinary integer improvements. It retains
+slower controls and separate derived-call results; no RSS benefit is claimed.
+
 Formatting calls first acquire the live property and evaluate their arguments,
 then use the native formatting algorithm. Compiler folds must not bypass an
 override, receiver coercion or argument effects. ToFixed, ToExponential and

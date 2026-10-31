@@ -207,6 +207,12 @@ Descriptors already present in R receive one deduplicated P copy. Their wire
 bytes and matching semantics stay identical; construction publishes the GC
 program only after the copy is complete.
 
+The [combined ownership](../runtime-ownership-20261031.json),
+[full resolver fold](../runtime-fold-20261031.json) and
+[string-only fold](../runtime-strings-20261031.json) failed performance gates.
+Their static graph/native-byte reductions do not establish acceptable runtime
+costs. Production retains the accepted Array fusion and original resolver.
+
 ## Observe resident memory
 
 On Linux, capture a serial diagnostic using a built `runtime_baseline` example:
@@ -230,3 +236,10 @@ mapping permissions. Anonymous ranges and the kernel's `Anonymous` counter do
 not identify a JavaScript heap. Mappings intersecting native text are recorded
 whole; no proportional allocation of their RSS to individual functions is
 invented. GC capacity, virtual reservations and process RSS remain distinct.
+
+The [accepted fusion comparison](../array-owner-fusion-20261031.json) records
+retained-object Scriptw/Scriptc RSS of 21.46/17.43 MiB and private dirty memory of
+7.69/8.89 MiB on the same host. Higher RSS alone does not prove larger live
+JavaScript ownership. The fixture's four-number child Arrays already use raw
+number bits and a presence bitmap, with no StoredValue allocation per number;
+immediate references would require a separate backing-representation change.
