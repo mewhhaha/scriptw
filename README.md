@@ -140,6 +140,11 @@ failed its repeatability gate and was reverted: ordinary small joins slowed
 7–9% in both balanced orders. These local diagnostics retain their own compiler
 identities and measurement boundaries.
 
+The [array-storage experiments](docs/rust-rewrite/array-storage-experiments-20261030.json)
+also retain two rejected candidates: deferred numeric bitmaps and direct
+general-value publication. Repeated retained-call controls slowed, so both
+production changes were reverted. Their mutation and snapshot regressions remain.
+
 ## Tests
 
 **Full verification, 2026-10-23:** **102,990 passed / 4 failed / 0 crashed /

@@ -235,6 +235,85 @@ fn graph_snapshot_reads_packed_numbers_and_empty_sparse_mode_without_mutation() 
 }
 
 #[test]
+fn graph_snapshot_dense_prefix_ignores_spare_capacity_and_large_logical_length() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    // A huge logical length must not size or scan the snapshot's indexed work.
+    let limits = SnapshotLimits::new(512, 256, 16, 4096, 32768, 4096, 16384, 64).unwrap();
+    for (source, expected_values, expected_length) in [
+        (
+            "var a=[NaN,-0,Infinity];gc();a;",
+            vec![f64::NAN, -0.0, f64::INFINITY],
+            3.0_f64,
+        ),
+        (
+            "var a=[];for(var i=0;i<130;i++)a.push(i+0.5);a.length=4294967295;delete a[129];gc();a;",
+            (0..129).map(|index| f64::from(index) + 0.5).collect(),
+            4294967295.0,
+        ),
+        (
+            "var a=[-0];a.length=4294967295;delete a[0];gc();a;",
+            Vec::new(),
+            4294967295.0,
+        ),
+    ] {
+        let result = Engine::new(RealmBuilder::new().build())
+            .observe_script_graph(
+                source,
+                CompileOptions {
+                    host_surface_policy: HostSurfacePolicy::Test262,
+                    ..CompileOptions::default()
+                },
+                RunOptions {
+                    backend: ExecutionBackend::WasmAot,
+                    timeout_ms: Some(30_000),
+                    ..RunOptions::default()
+                },
+                limits,
+            )
+            .unwrap();
+        assert_eq!(result.backend_used, ExecutionBackend::WasmAot);
+        let SnapshotOutcome::Captured { graph } = result.completion.outcome else {
+            panic!("dense prefix must fit the snapshot work budget: {source}");
+        };
+        let node = &graph.nodes()[0];
+        let keys = node
+            .properties
+            .iter()
+            .map(|property| match &property.key {
+                SnapshotKey::String { units } => String::from_utf16(units.units()).unwrap(),
+                _ => panic!("unexpected Symbol"),
+            })
+            .collect::<Vec<_>>();
+        let expected_keys = (0..expected_values.len())
+            .map(|index| index.to_string())
+            .chain(["length".to_owned()])
+            .collect::<Vec<_>>();
+        assert_eq!(keys, expected_keys, "no stale capacity entries: {source}");
+        for (property, expected) in node.properties.iter().zip(&expected_values) {
+            let SnapshotDescriptor::Data {
+                value: SnapshotValue::Number { bits },
+                writable: true,
+                enumerable: true,
+                configurable: true,
+            } = &property.descriptor
+            else {
+                panic!("dense Number retains its ordinary data descriptor");
+            };
+            if expected.is_nan() {
+                assert!(f64::from_bits(*bits).is_nan());
+            } else {
+                assert_eq!(*bits, expected.to_bits(), "{source}");
+            }
+        }
+        assert!(
+            matches!(&node.properties.last().unwrap().descriptor, SnapshotDescriptor::Data {
+            value: SnapshotValue::Number { bits }, writable: true, enumerable: false, configurable: false
+        } if *bits == expected_length.to_bits())
+        );
+    }
+}
+
+#[test]
 fn fresh_numeric_literal_padding_preserves_snapshot_capacity_and_occupied_keys() {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     for length in [3, 5, 6, 7] {

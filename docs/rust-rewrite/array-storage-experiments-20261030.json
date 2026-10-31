@@ -1,0 +1,1249 @@
+{
+  "schema": "scriptw-array-performance-experiment-disposition-v1",
+  "disposition": {
+    "status": "BOTH_CANDIDATES_REJECTED",
+    "summary": "Dense-number storage v1 and Values-first publication v2 both fail the predeclared performance gate. Production is restored to the original baseline. Only baseline-compatible semantic and snapshot regressions are retained; neither runtime candidate ships.",
+    "production_baseline_commit": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60",
+    "accepted_speedup": false,
+    "acceptance_boundary": "Candidate native coverage, baseline selected Test262 replays, and final restored-source checks are separate evidence. None constitutes full release acceptance or a new full-suite Test262 publication."
+  },
+  "dates": {
+    "measurements_utc": "2026-10-30",
+    "archive_verification_utc": "2026-10-31",
+    "assembled_at_utc": "2026-10-31T00:06:28.067209+00:00",
+    "date_policy": "The 20261030 filenames name the experiment cohort. Final validation and durable evidence assembly cross UTC midnight; their receipts retain actual dates.",
+    "final_native_started_utc": ["2026-10-30T23:56:20Z", "2026-10-31T00:03:28Z"],
+    "final_archive_packaged_at_utc": "2026-10-31T00:07:58.310329+00:00"
+  },
+  "measurement_contract": {
+    "gate": "Declared before measurement: above 5% slowdown in both balanced orders triggers an opposite-order confirmation; reproducible material regression rejects, regardless of allocation savings or other wins.",
+    "original_17": "The original ordinary scripts and separately derived strict retained-call modules are distinct boundaries. The eighteenth ordinary numeric-join-fallback diagnostic is outside the original 17; it has no retained-call result.",
+    "ordinary_boundary": "Unchanged ordinary script execution through runtime_baseline; setup and compilation phase diagnostics are reported separately from measured invocation execution.",
+    "retained_boundary": "Derived strict module exported calls through compiler_precompiled_baseline, with native admission, setup and module initialization outside the call timer. This is a diagnostic excluded from ordinary cohorts.",
+    "startup_boundary": "Fresh frozen scriptw CLI processes execute `scriptw run startup.js`: ten checked process warmups, then 21 measured whole-process samples per product round. Startup is separate from runtime_baseline ordinary invocations and retained exported calls.",
+    "initial_order": "ABBA then BAAB",
+    "confirmation_order": "BAAB then ABBA",
+    "samples": "Each repetition uses eight product rounds, ten warmups and 21 measured samples per round. Original raw samples, per-process command receipts, output digests, resources and exact artifact identities are archived.",
+    "no_external_parity_claim": "No V8/Scriptc parity, global chart update, full conformance claim, or published speed score."
+  },
+  "resources": {
+    "machine": {
+      "system": "Linux-6.18.57-x86_64-with-glibc2.41",
+      "architecture": "x86_64",
+      "affinity_before_measurement_pin": [0, 1, 2, 3, 4],
+      "cgroup": {
+        "cpu.max": "400000 100000",
+        "memory.max": "34359738368",
+        "memory.swap.max": "max",
+        "memory.oom.group": "0",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "rust_toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "time_binary": "/workspace/toolchains/system/usr/bin/time",
+      "baseline_clean": true,
+      "baseline_head": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60"
+    },
+    "measurement_affinity": [0],
+    "native_scheduling": {
+      "native_cpus": [0],
+      "test_processes": 1,
+      "test_threads_per_process": 1,
+      "cargo_jobs": 1,
+      "strip_test_debug": false,
+      "idle_builds": false,
+      "compilation_policy": "all quota-bound inherited parent CPUs when idle; one free CPU while native targets run; the build tree expands to the parent budget once every native wrapper has exited"
+    },
+    "policy": "Managed cloud verification and measurement retain the inherited finite 32 GiB cgroup and four-CPU quota; measured processes and native tests pin to one CPU, Cargo and libtest remain serial. Actual memory.swap.max=max and memory.oom.group=0; this is not the local 4 GiB/no-swap/grouped-OOM policy.",
+    "exact_resources": [
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/measurement-resources.json",
+        "sha256": "0039d3ed8389f3696d14d0cf35a777f293c20d1c64766668d41ea9da66a46f6b"
+      },
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/confirmation/measurement-resources.json",
+        "sha256": "35f28e87683dc71c6ed46ca5d9c4a2ec9d3edb5ffaa5289793de533fc7ecdecb"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/measurement-resources.json",
+        "sha256": "45129bd72260fafd8c609dc444a8aa5cc83d8d3f23c938c2f7c5c736f374a4f2"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/confirmation/measurement-resources.json",
+        "sha256": "b35e815e03b175fada84a440a656153bbbe3a6fa8047346a4c284d9ff7c973ef"
+      }
+    ]
+  },
+  "baseline": {
+    "source_commit": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60",
+    "source_fingerprint": "cf48836cd6550acc4e8450bc1194d4a9416f07123fa97ccd6c5752e783667070",
+    "artifact_columns": ["name", "bytes", "sha256"],
+    "artifacts": [
+      ["compiler_precompiled_baseline", 223629504, "03cd9be685269d039bf879476cb5eb0f7050b1140435ee7475937c4be6cb5ee1"],
+      ["runtime_baseline", 219461384, "b9b8659cd121dd8a1b6be2e8d2d94f315d413dacbd750a8749622e7d725a1747"],
+      ["scriptw", 226790768, "974bc179a283ee4baeb98858f59a71b4ebf61c26b49c740d49962300c724f4d5"]
+    ],
+    "identity": {
+      "archive": "array-storage-v1-20261030-inert.tar.xz",
+      "member": "raw/baseline/identity.json",
+      "sha256": "5e43bf5079fd6e1022326ce6b04148c50cf1bcca0469621ac003ebdf358234c8"
+    },
+    "cargo_producers": {
+      "archive": "array-storage-v1-20261030-inert.tar.xz",
+      "member": "raw/baseline/products.json",
+      "sha256": "8c3034d7b7ad6012707a4deb15be513a24e4a0c6d573c524bf750f6cdecd0676"
+    },
+    "runtime_semantic_abi": 40,
+    "build": {
+      "archive": "array-storage-v1-20261030-inert.tar.xz",
+      "member": "raw/baseline-build.json",
+      "sha256": "84833ec20edea742a206bbcca21456e5d0930194b478698ebbc440e9a5316d5c"
+    }
+  },
+  "workload_source_identity_columns": ["workload", "original_sha256", "strict_derived_sha256"],
+  "workload_source_identities": [
+    ["sort-reverse-128.js", "71625f52de39a4bc2b698ae8ffc4ac81d2035bd96d391477a09742a2742a3794", "3c8e9c189c8c3e533c93d10784ee1e6bdbcb11e2f301b6e8827a947976e43e6c"],
+    ["sort-reverse-512.js", "d38825f64f853170f6da0f8375990bd1da83799c921505dd21d5d5dfe7e4e3e5", "7187386ee1da7885f68a250602a75dc2ef8e0ca71ae27b0487b843f5e0194590"],
+    ["sort-sorted-512.js", "68b786bf2ae8b4a6d1f6e1c4e9adb1c8940f819dcce8d25e0c9cb5fb2888939c", "22f404f22abc17e5982df78ae47d2b60db9e17be765c6924db75c6dd5868d555"],
+    ["to-sorted-512.js", "0e40c47ddc2f946f5d27c63996ff16361eb0f176d07d32a051ae3a17ebc551b0", "b99b1ee36ffd531db2410f630a7aba9510a1af02b078e8d9422aaafbc925f3da"],
+    ["join-1024.js", "0ece87d734083e7956428a0b546bb52e290df60fc0bc6edca864441a9b200e06", "56472f6b484a2d264a80551fc7ec5ab98cd8b569f310002beadaf66de0d5e030"],
+    ["join-4096.js", "8b30570ea8f6b22d8dbe91526b86634c0152457ed57a86e5d8fe13ee8dc7667f", "902801afc1819f60920e3836fc23ef3d939d4cb8bcd7f55ae46eee48f6845f33"],
+    ["join-mixed-1024.js", "6fc9aa48d1d577fc0f5c14424838636f529b2d4acf2e7994975d12b56547bcff", "f35b1078a1d7754ced8905357ab89a3d154ddc3fce9640e452297aa412a82abd"],
+    ["numeric-loop-10000.js", "867d762eecaf5619ae33934577669ff56415d6ae69a81ebb05b97dda630bc040", "3ed12c809001cbcfd6b474a24e638daf5e792a8578aaf690683ee648d7be357e"],
+    ["numeric-loop-50000.js", "3767d7de64987f8d89d6f20ae31fbd5752836b2be0b439d36b2efb6af0d800c0", "b0193d550b29a755ff373b2fde5c9cfb3d5d8dbbef6481dbb5980800d520af6e"],
+    ["folded-string-4096.js", "821723ecb9b4bf828e5447fa289a42688ac2a6eafa84316a8e668700e4bdc44e", "4af0e641c7f9bda1b4c266937e6dec8e7a4dc72209fa59e9b2420539c8f04f25"],
+    ["dynamic-string-4096.js", "77e871388666cba861f92b3198298629ac553089f18bf5c313a9302e1d5c7e87", "dc1ae808baa0b1f989b04ecd7029bea0d9f43030be24adc36835185064ec6ec8"],
+    ["integer.js", "bbf3e6bb123b44f3f39acaa46140af1bd3f4801cce1d19e8b390f21a33637f3c", "95fcacbd3258464e55f2d3b2f000f8a5167069cefbfcf70f33bc4947610bc675"],
+    ["objects.js", "22a86d6fd5ee43b42ff3ca36273f0be2a3089b91c79d3c064ff7e4fb35b7b22d", "efe58ebd0949442334dd4f55155ab23ca00e92f5564097dc9fd8da45836fd2bd"],
+    ["retained-objects.js", "9648fbc87f9361de8b2b0bb418929af1c79331a58ebf38817cc511dc512c5911", "eecc0886c94df1c6d163e6cedd63b18d355835808cc4bac8b1f80a6e0d985437"],
+    ["join-empty-1024.js", "dadbd8cdf5f2d732bd89327581d63975ed5c52d26130b7fd4b978a72ce060cb0", "a98c6277baa8d408c212a2905ead60c74066ad84009cd2884744bf883dc35576"],
+    ["join-singleton-1024.js", "a79413e8ef5250ddd75037680268821e8d08bbc0bc5f896381ae83e52e87ffd2", "47a2b1630a5e18a6344f01ade104ac26e9682f8a35ca855ac836ad4b4d17394e"],
+    ["join-small-1024.js", "95e16da16d4b656b766a774ca0ba33f83ec026afe1c754e2a95f4f122d430d85", "2299e9555753a5532a5800bb0077a44ca369e6edf4425401655e880929c424fc"]
+  ],
+  "workload_provenance": "Original/derived bytes are raw/baseline-images/<workload>.original.js and <workload>.retained.mjs in v1. Candidate bytes, retained image/native/Wasm hashes and preparation phases are in each archive artifact-metadata.json. Numeric fallback bytes/manifest are under raw/numeric-fallback-fixture/. Frozen native, executable, and Wasm payloads are deliberately excluded; their identities remain recorded.",
+  "candidates": [
+    {
+      "id": "v1-dense-number-prefix",
+      "status": "REJECTED",
+      "reason": "Ordinary mixed joins slow in all four balanced groups (+8.685%, +13.266%, +11.967%, +4.986%). Retained-object calls also slow (+3.308%, +5.779%, +11.998%, +4.916%). Faster ordinary retained-object runs and fewer private buffers do not satisfy the control gate.",
+      "production_change": "Explicit DenseNumbers mode 4 and semantic ABI 41; COUNT is the occupied numeric prefix. Presence storage stays shared empty until an admitted interior hole requires a bitmap. Numeric/descriptor fallback and GC roots remain correctness obligations.",
+      "products": {
+        "source_commit": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60",
+        "source_fingerprint": "3a2d2485b49c32b1d0a3821d798ee6386679c47ffd7db3b388527883d69eb0aa",
+        "artifact_columns": ["name", "bytes", "sha256"],
+        "artifacts": [
+          ["compiler_precompiled_baseline", 223840728, "1ebf3a74b92fbaed3965c7456cbae3f1278cc56c2d0730ee6da2517b016c453d"],
+          ["runtime_baseline", 219677256, "3730176a84ff1add28fa4278f4f1c93a48a9661907fe994798d334aeb7317fa3"],
+          ["scriptw", 227006896, "a5d571f2860944c4375b2ffd46e0b8fe58cf1d8e4605cf55b9417a63e774a0da"]
+        ],
+        "identity": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/candidate/identity.json",
+          "sha256": "5eb6ef458bfce38d0fb10235cba0beda78b153d452ab008296a86d4db95ba2d8"
+        },
+        "cargo_producers": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/candidate/products.json",
+          "sha256": "9d90ce6a049fe710cf40ab63fe8a7093efc2f8893c2deb56e455f216a0f58751"
+        }
+      },
+      "runtime_semantic_abi": 41,
+      "source_provenance": {
+        "build": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/candidate-build.json",
+          "sha256": "3457f17d7ae5df728ec903fd51b34a8a2a809796ac38d9ac2da777c0576bb14a"
+        },
+        "compile_patch": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/compile-inputs.patch",
+          "sha256": "5f04827fe8e15fb9d036428c200f1c782d55decd8ab7ed5f13c5f555d5152544"
+        },
+        "compiled_input_hashes": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/compiled-crate-inputs.json",
+          "sha256": "5839cc16f3ba26b8ebfdc55176d8c63651300bafc40ff5b398e7405938d0844a"
+        },
+        "candidate_source": "raw/implementation-v1/ retains the experimental source and tests as inert text.",
+        "supplemental_source": {
+          "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+          "member": "raw/supplemental-v1-source/crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs",
+          "sha256": "6ba4f8b9c436a3527098168948f06d3e3563837014f97430c87b5baa4ea9796d"
+        },
+        "source_copy_verification": {
+          "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+          "member": "raw/evidence-assembly/compiled-source-copy-verification.json",
+          "sha256": "93f86c2787735bd7ad1e4146b42e0c10ced4e129ae684fae390f4d25b34cc514"
+        },
+        "supplement_reason": "The original v1 directory filter omits a source copy under src/runtime_artifact/cache. Its change remains in the original compile-inputs.patch; the final-validation archive additionally preserves the complete source text checked against the original compile-input digest. All seventeen v1 and five v2 compiled-input copies are accounted for."
+      },
+      "mechanism": {
+        "result": "Encoded-Wasm/source proof removes 8,192 private presence-array allocations and 65,536 payload bytes per original retained-objects invocation, excluding GC headers. This is allocation/liveness reasoning, not live-heap or RSS telemetry.",
+        "plan": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/plan.json",
+          "sha256": "8d98ef7f3a25ec27c4973bf7a2a72e0b4d1688233d66373f82faac17ef96e4ba"
+        },
+        "emitted_wasm_assertions": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/implementation-v1/crates/scriptw-aot-wasm/tests/emission/packed_array_storage.rs",
+          "sha256": "eccbdd270b9f09fa0abfa155d46f364a326d663fe52cc371c4dc1ca00e19fcd8"
+        },
+        "memory_result": "Sampled ordinary retained-object RSS is essentially flat; both products retain 16 MiB GC capacity. No RSS reduction is claimed."
+      },
+      "candidate_native_validation": {
+        "scope": "Selected default-feature release native targets on the measured candidate source. This does not validate the final restored source.",
+        "passed": 2494,
+        "source_unchanged": true,
+        "source_map_sha256": "a01aed04abe2a83fbc046694f7a134d2214ebce48d364ebcafb3aa3769109a80",
+        "columns": ["package", "target", "passed", "executable_sha256"],
+        "targets": [
+          ["scriptw-aot-wasm", "scriptw_aot_wasm", 565, "6fc48409ba5868b0572b9ec2e8b571f3d1c8117c7861e0e11853df040b5ca765"],
+          ["scriptw-aot-wasm", "emission", 41, "f61fef29b6e1bffa166731c21e66d613d573a03e90cc5702220d7ab91c8bd0d6"],
+          ["scriptw-aot-wasm", "runtime_link", 31, "634fb40d2cd8a6d97042001aee415f1a64d0cdfc25c54839eebbea5a34ab2d37"],
+          ["scriptw-aot-wasm", "structure_builtins", 172, "6f056325aafa2b53d0c0b86205f42c92f0a248ea2264bf14bd8b757eb8a69cbf"],
+          ["scriptw-engine", "scriptw_engine", 34, "0052cdd39b0c8675aadfdb4925e6b07a8146c7109b434f2e98cca74fa7281ff4"],
+          ["scriptw-engine", "aot_builtins", 568, "5c3d44cfed54df7013a0c1071db66f354faf93d7111131042693b6fee883b5d7"],
+          ["scriptw-engine", "aot_gc_entries", 255, "509e1e314d8d52137d5de34956e92cb11f99e7900f39dfbd06a12b64b4a7042a"],
+          ["scriptw-engine", "aot_language", 386, "39c5454c785455b04bed5e01502d284b3006167004403b288330a4bf78402ec0"],
+          ["scriptw-engine", "aot_realm_modules", 438, "e2319130c7467686e00195b70a2cf4c05dc7ee17754a1f512977eef3b7a8057a"],
+          ["scriptw-engine", "runtime_cache", 4, "3b894b293f835d069377cd35c1ae28b7de429b28bedc7074d8e56cf64e7a571a"]
+        ],
+        "receipt": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/native/receipt.json",
+          "sha256": "5fc35d17091ba3b01742f0bebf697906b7d29265bf566f56948be7f39b24edb8"
+        },
+        "source_map": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/native/source-start.json",
+          "sha256": "4c628539599c2eb00e3ca43e1a46a58bf41c92c8aabc8397949579310f242d86"
+        },
+        "immutable_watcher_map": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/v1-native-transcript-map.json",
+          "sha256": "c679a47a76c3ec0157a904a23e67fa24d0a0719530670aae8e2f763d7c747cd0"
+        },
+        "source_guards": {
+          "passed": 359,
+          "scope": "Separate source-only checks; overlap with native targets, so do not add these to native totals.",
+          "receipt": {
+            "archive": "array-storage-v1-20261030-inert.tar.xz",
+            "member": "raw/source-guards/receipt.json",
+            "sha256": "881d90f4f4c716e4cfbf9f34ede1025f6c6f4552fdd372c1eac666f360e6310c"
+          }
+        }
+      },
+      "candidate_original_test262": "NOT_RUN: failed performance gate first. The 713 passing selected original cases below belong to the frozen baseline only.",
+      "timing": {
+        "scope": "same-machine default-feature diagnostic; original ordinary scripts and separately derived strict retained-call modules; numeric join fallback is a separate diagnostic, not part of the original 17 cases; no V8/Scriptc parity claim",
+        "columns": ["workload", "boundary", "initial_baseline_median_ns", "initial_candidate_median_ns", "initial_change_percent", "initial_ABBA_change_percent", "initial_BAAB_change_percent", "confirmation_baseline_median_ns", "confirmation_candidate_median_ns", "confirmation_change_percent", "confirmation_BAAB_change_percent", "confirmation_ABBA_change_percent"],
+        "rows": [
+          ["sort-reverse-128.js", "ordinary", 321129.0, 288592.0, -10.132, -0.241, -18.655, 295632.0, 282582.5, -4.414, 3.157, -4.953],
+          ["sort-reverse-128.js", "retained", 74014.5, 72692.5, -1.786, 0.218, -4.123, 74224.0, 72963.0, -1.699, -3.056, -0.347],
+          ["sort-reverse-512.js", "ordinary", 574729.0, 544254.5, -5.302, 0.981, -8.974, 569897.0, 533427.5, -6.399, -15.795, 1.329],
+          ["sort-reverse-512.js", "retained", 261967.0, 250825.5, -4.253, 0.345, -10.402, 261230.5, 259118.5, -0.808, -4.003, 8.401],
+          ["sort-sorted-512.js", "ordinary", 571745.0, 567739.0, -0.701, -4.373, 4.038, 616201.0, 556347.0, -9.713, -21.498, 2.26],
+          ["sort-sorted-512.js", "retained", 255923.0, 277865.5, 8.574, -12.162, 24.579, 248041.0, 252473.0, 1.787, 14.522, -2.998],
+          ["to-sorted-512.js", "ordinary", 629059.0, 588669.5, -6.421, 0.452, -4.719, 638794.5, 561044.5, -12.171, -12.685, -11.127],
+          ["to-sorted-512.js", "retained", 281601.0, 272893.5, -3.092, -18.301, 1.532, 278066.0, 295171.5, 6.152, 4.402, -0.46],
+          ["join-1024.js", "ordinary", 812690.5, 818459.0, 0.71, -0.648, 1.013, 896950.5, 748176.0, -16.587, -14.168, -16.531],
+          ["join-1024.js", "retained", 503279.0, 560287.5, 11.327, 7.64, 15.519, 493579.5, 487580.5, -1.215, -1.794, 0.169],
+          ["join-4096.js", "ordinary", 2518130.0, 2527333.0, 0.365, 4.729, -1.352, 2577353.5, 2672048.0, 3.674, 4.616, 3.907],
+          ["join-4096.js", "retained", 2050224.0, 2141513.5, 4.453, 3.556, 4.348, 2241698.5, 2109888.0, -5.88, -10.303, -0.14],
+          ["join-mixed-1024.js", "ordinary", 1230763.5, 1349123.0, 9.617, 8.685, 13.266, 1199498.0, 1327551.5, 10.676, 11.967, 4.986],
+          ["join-mixed-1024.js", "retained", 706393.5, 736908.5, 4.32, 13.684, -3.284, 669339.0, 688722.5, 2.896, -6.005, 12.794],
+          ["numeric-loop-10000.js", "ordinary", 236314.0, 263660.0, 11.572, 38.907, -12.885, 216329.5, 239404.0, 10.666, 8.846, 15.795],
+          ["numeric-loop-10000.js", "retained", 27956.5, 28221.5, 0.948, 2.127, 0.055, 27856.0, 28157.0, 1.081, 0.467, 1.403],
+          ["numeric-loop-50000.js", "ordinary", 365160.0, 358023.5, -1.954, -0.481, -4.322, 362651.0, 380667.5, 4.968, 6.013, 1.198],
+          ["numeric-loop-50000.js", "retained", 83658.5, 83724.0, 0.078, 6.392, -1.274, 83243.0, 83563.0, 0.384, 1.531, -1.058],
+          ["folded-string-4096.js", "ordinary", 485552.5, 463435.0, -4.555, -6.53, -3.94, 473769.5, 492237.5, 3.898, 16.814, -5.538],
+          ["folded-string-4096.js", "retained", 3545307.5, 3680146.0, 3.803, 17.863, 1.846, 3469765.0, 3708373.0, 6.877, 5.634, 7.443],
+          ["dynamic-string-4096.js", "ordinary", 1101292.0, 1088062.5, -1.201, 0.326, -2.161, 1076721.0, 1129744.5, 4.925, 7.651, 4.029],
+          ["dynamic-string-4096.js", "retained", 178944.5, 176416.0, -1.413, -0.59, -5.476, 175219.0, 177452.5, 1.275, 0.983, 1.392],
+          ["integer.js", "ordinary", 208052.5, 231672.5, 11.353, 13.291, -6.801, 208838.5, 232564.5, 11.361, 6.306, 22.375],
+          ["integer.js", "retained", 7056865.5, 6843980.0, -3.017, -5.347, -2.796, 6776099.0, 6922145.0, 2.155, 0.411, 4.469],
+          ["objects.js", "ordinary", 1079659.5, 1044317.5, -3.273, -2.983, -5.323, 1072295.0, 992427.0, -7.448, -12.21, -0.446],
+          ["objects.js", "retained", 399140.0, 424252.0, 6.292, 9.051, 6.011, 418713.5, 383586.5, -8.389, -1.8, -20.865],
+          ["retained-objects.js", "ordinary", 29337451.5, 24545131.5, -16.335, -8.596, -22.653, 27920215.0, 24540550.0, -12.105, -11.304, -13.57],
+          ["retained-objects.js", "retained", 15512832.0, 16289742.5, 5.008, 3.308, 5.779, 14338947.0, 15838238.5, 10.456, 11.998, 4.916],
+          ["join-empty-1024.js", "ordinary", 614242.5, 643680.5, 4.793, 3.525, 5.89, 644642.5, 611493.0, -5.142, -14.821, 13.797],
+          ["join-empty-1024.js", "retained", 280054.0, 326182.0, 16.471, 23.259, 9.149, 288851.5, 301345.0, 4.325, -0.682, 12.917],
+          ["join-singleton-1024.js", "ordinary", 637787.0, 691782.0, 8.466, 22.425, -0.909, 623015.0, 670851.5, 7.678, -1.062, 14.038],
+          ["join-singleton-1024.js", "retained", 293624.0, 310248.5, 5.662, 4.876, 3.147, 311335.5, 291786.5, -6.279, -12.128, -1.037],
+          ["join-small-1024.js", "ordinary", 851127.5, 853991.0, 0.336, 1.902, -2.769, 857567.5, 810808.0, -5.453, -8.575, -0.881],
+          ["join-small-1024.js", "retained", 519572.5, 508651.0, -2.102, -1.503, -1.905, 511070.5, 470304.5, -7.977, -9.962, -4.305],
+          ["numeric-join-fallback.js", "ordinary", 1612732.0, 1480512.0, -8.199, -1.556, -13.719, 1542699.5, 1544752.5, 0.133, -6.891, -0.899]
+        ],
+        "startup_columns": ["initial_baseline_median_ns", "initial_candidate_median_ns", "initial_change_percent", "initial_ABBA_change_percent", "initial_BAAB_change_percent", "confirmation_baseline_median_ns", "confirmation_candidate_median_ns", "confirmation_change_percent", "confirmation_BAAB_change_percent", "confirmation_ABBA_change_percent"],
+        "startup": [343029719.0, 345421240.0, 0.697, 4.983, -0.995, 342090723.0, 340099921.5, -0.582, 0.181, -3.24],
+        "initial_raw_analysis": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/analysis.json",
+          "sha256": "dbffe89fa5da8134a340332dde24a1a13f8a49bf4bdc605a7178e8d02462a793"
+        },
+        "confirmation_raw_analysis": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/confirmation/analysis.json",
+          "sha256": "acc0f822a49e3b578f4ab8ae8a8568816c6b69620d987544255b794b511cd62c"
+        },
+        "round_raw_paths": "Each analysis products[].raw points to the full samples and original command receipt in its own archive directory. Confirmation raw paths are relative to raw/confirmation/.",
+        "rounds_per_repetition": 8,
+        "measured_samples_per_round": 21,
+        "warmups_per_round": 10,
+        "aggregation": "For each product, take the median of all 84 measured samples in a repetition; each balanced group uses 42 samples. Percent is (candidate/baseline - 1)*100. Rounded summary values only; full samples and precision remain in the archive."
+      },
+      "primary_phase_and_memory": {
+        "scope": "Sampled process RSS and whole-child high-water RSS include different lifetimes; GC capacity is reserved capacity. None measures live JavaScript bytes or per-call allocation bytes.",
+        "initial": {
+          "baseline": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47370240.0,
+              "final_rss_bytes": 53133312.0,
+              "maximum_rss_bytes": 53133312.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 298921138.5,
+              "lowering": 13094.5,
+              "preparation": 26857733.0,
+              "validation": 1410353.5
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1762.5,
+              "engine": 615.5,
+              "export_lookup": 4872.0,
+              "host_import_registration": 28041.0,
+              "instantiate": 311821.0,
+              "module": 76938.5,
+              "store_and_linker": 61600.5,
+              "total": 30067818.5
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 358454.0,
+              "native_admission": 142418383.5,
+              "setup": 613581.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86568960.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30955520.0
+          },
+          "candidate": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47589376.0,
+              "final_rss_bytes": 53090304.0,
+              "maximum_rss_bytes": 53090304.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 293360514.0,
+              "lowering": 12408.5,
+              "preparation": 28717571.5,
+              "validation": 1237157.5
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1682.5,
+              "engine": 490.5,
+              "export_lookup": 5718.0,
+              "host_import_registration": 27816.0,
+              "instantiate": 327614.0,
+              "module": 77460.0,
+              "store_and_linker": 63048.0,
+              "total": 25140907.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 630897.0,
+              "native_admission": 147578125.0,
+              "setup": 760824.0
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86757376.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 31166464.0
+          }
+        },
+        "confirmation": {
+          "baseline": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47036416.0,
+              "final_rss_bytes": 52799488.0,
+              "maximum_rss_bytes": 52799488.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 279617218.5,
+              "lowering": 11997.5,
+              "preparation": 26525039.5,
+              "validation": 1197449.5
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1663.0,
+              "engine": 531.0,
+              "export_lookup": 4676.0,
+              "host_import_registration": 25752.5,
+              "instantiate": 303038.0,
+              "module": 76583.5,
+              "store_and_linker": 59287.5,
+              "total": 28552635.5
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 345596.5,
+              "native_admission": 141146175.0,
+              "setup": 698206.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86145024.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30679040.0
+          },
+          "candidate": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47597568.0,
+              "final_rss_bytes": 53098496.0,
+              "maximum_rss_bytes": 53098496.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 287376077.0,
+              "lowering": 12924.0,
+              "preparation": 28083568.0,
+              "validation": 1449966.5
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1608.0,
+              "engine": 491.0,
+              "export_lookup": 5373.0,
+              "host_import_registration": 26815.0,
+              "instantiate": 312812.0,
+              "module": 76783.5,
+              "store_and_linker": 59678.0,
+              "total": 25085104.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 476108.0,
+              "native_admission": 143370675.5,
+              "setup": 647767.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86792192.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 31356928.0
+          }
+        },
+        "raw_phase_receipts": [
+          {
+            "archive": "array-storage-v1-20261030-inert.tar.xz",
+            "member": "raw/boundary-phases.json",
+            "sha256": "47faf55204076d2ac0327011b34aa3e8442a9cc27b1e8d44fd531e10b94891b1"
+          },
+          {
+            "archive": "array-storage-v1-20261030-inert.tar.xz",
+            "member": "raw/confirmation/boundary-phases.json",
+            "sha256": "1fd8e7f64c77eebfcac33418838f85953b402357dc01ccd0f41187b416c6aef8"
+          }
+        ]
+      },
+      "native_inspection": {
+        "scope": "Inert inspection of exact frozen NativeR bytes. Static partial-path counts and disassembly size do not establish retired instructions, cycles, or a timing cause.",
+        "native_products": {
+          "baseline": {
+            "host_sha256": "03cd9be685269d039bf879476cb5eb0f7050b1140435ee7475937c4be6cb5ee1",
+            "source_fingerprint": "cf48836cd6550acc4e8450bc1194d4a9416f07123fa97ccd6c5752e783667070",
+            "layout": 40,
+            "runtime_key": "bd267cdbd71d687df140ef9aeb8d01260cfc9d2a63281b1cccbabb30a563496d",
+            "packed_sha256": "74b88e8e7165c0d7b0f83fad6d772089b0cfba2e2b038031c2e85bf3b34f5aff",
+            "native_bytes": 66058392,
+            "native_sha256": "c56ad0e431ee7916530aebc79cd38a3d193d232f575f96dd12db52bbaa9a6ac4"
+          },
+          "candidate": {
+            "host_sha256": "1ebf3a74b92fbaed3965c7456cbae3f1278cc56c2d0730ee6da2517b016c453d",
+            "source_fingerprint": "3a2d2485b49c32b1d0a3821d798ee6386679c47ffd7db3b388527883d69eb0aa",
+            "layout": 41,
+            "runtime_key": "820da35abb3f102313e9a2154940dd8b6ebb7ac7638b9a0a53b3484062967277",
+            "packed_sha256": "899b4ec1b242557e944a53df56e4027acbc3423d0ea9af19d63038ad8768b192",
+            "native_bytes": 66227152,
+            "native_sha256": "cfe0a900fc948691ebb9662d3c97f80d5aca356e0cb4e96963f9277b53091180"
+          }
+        },
+        "function_columns": ["function", "baseline_bytes", "candidate_bytes", "baseline_entry_stack_bytes", "candidate_entry_stack_bytes"],
+        "functions": [
+          ["helper::array_packed_join", 6416, 6840, 272, 272],
+          ["helper::array_indexed_publish_default_data", 9950, 12415, 272, 272],
+          ["helper::array_packed_push1", 2664, 2672, 208, 208],
+          ["helper::array_indexed_publish", 21632, 24008, 256, 272],
+          ["helper::array_indexed_delete", 4392, 6032, 144, 144],
+          ["helper::object_read", 113136, 113376, 800, 800],
+          ["helper::object_write", 1824, 1824, 224, 224],
+          ["builtin::Array.prototype.push", 5600, 5616, 304, 304],
+          ["builtin::Array.prototype.join", 11168, 11168, 384, 384]
+        ],
+        "already_values_partial_dispatch": {
+          "baseline": {
+            "instructions": 65,
+            "stack_referencing_instructions": 22
+          },
+          "candidate": {
+            "instructions": 72,
+            "stack_referencing_instructions": 23
+          }
+        },
+        "exact_extraction": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/native-cause/report.json",
+          "sha256": "fc60e8b952350dca43c6de1a55e6d4487b6c1c6937a939eb3f89d92180ad6ea6"
+        },
+        "exact_dispatch_path": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/native-cause/packed-values-dispatch-path.json",
+          "sha256": "0e89ad2dcd31b348be604f5170e75ffbef0b22df31a857e299b173003c55bb6f"
+        }
+      },
+      "construction_isolation": {
+        "scope": "Whole ordinary lifetime stage diagnostics; not an isolated subtraction score or original17 result.",
+        "interpretation": "Construction-heavy whole lifetimes slow by 3.666%/6.242%, while 128-join lifetimes change by -1.974%/-5.673%. These diagnostics identify construction/publication as a refinement target; subtracting totals would not isolate a causal per-operation cost.",
+        "workloads": [
+          {
+            "file": "mixed-construction.js",
+            "source_sha256": "fc22e891abc6deeacf4c4102106335bd01ff16875a97b17fe8a31bcffd7d7181",
+            "stdout": "1030\n",
+            "balanced_orders": [
+              {
+                "order": "ABBA",
+                "median_ns": {
+                  "baseline": 1166874.0,
+                  "candidate": 1209646.5
+                },
+                "change_percent": 3.6655628628283754
+              },
+              {
+                "order": "BAAB",
+                "median_ns": {
+                  "baseline": 1118843.0,
+                  "candidate": 1188676.0
+                },
+                "change_percent": 6.241537016364229
+              }
+            ]
+          },
+          {
+            "file": "mixed-joins-128.js",
+            "source_sha256": "223a291effea6ffa8fc6fb7d56465a367c32fbffd6e5019b5daf5aa737c6fb4d",
+            "stdout": "230278\n",
+            "balanced_orders": [
+              {
+                "order": "ABBA",
+                "median_ns": {
+                  "baseline": 5325009.5,
+                  "candidate": 5219875.0
+                },
+                "change_percent": -1.9743532851913215
+              },
+              {
+                "order": "BAAB",
+                "median_ns": {
+                  "baseline": 5045267.0,
+                  "candidate": 4759054.5
+                },
+                "change_percent": -5.67289104818437
+              }
+            ]
+          }
+        ],
+        "raw": {
+          "archive": "array-storage-v1-20261030-inert.tar.xz",
+          "member": "raw/stage-isolation/analysis.json",
+          "sha256": "245b05ec9ef231c11f57df6f908dcc6b76b7355bba535b927b6a8c3edc4e88f1"
+        }
+      },
+      "predeclared_plan": {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/plan.json",
+        "sha256": "8d98ef7f3a25ec27c4973bf7a2a72e0b4d1688233d66373f82faac17ef96e4ba"
+      },
+      "disposition_receipt": {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/v1-disposition.json",
+        "sha256": "99f5313bff2a6f7def3bae1d186f78742133d491a0f14bde2c14c72f645d8a18"
+      }
+    },
+    {
+      "id": "v2-values-first-publication",
+      "status": "REJECTED",
+      "reason": "Retained joins remain slower after opposite-order confirmation: 1,024 joins +9.4/+11.1/+4.7/+24.0%, singleton +9.4/+12.8/+15.4/+1.0%, empty +3.4/+12.6/+10.4/+7.8%. The initial ordinary mixed-array gain (-2.2/-1.9%) does not reproduce (+8.1/+1.0%).",
+      "production_change": "Baseline ABI 40 with only objects/packed_array_index/values.rs changed: classify Values readiness once, skip numeric attempts for existing Values, and join successful promotion into one common Values writer.",
+      "products": {
+        "source_commit": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60",
+        "source_fingerprint": "7401427ac8d4c60b044b079b3264578dbff20bcb223600822f46e25752426d2a",
+        "artifact_columns": ["name", "bytes", "sha256"],
+        "artifacts": [
+          ["compiler_precompiled_baseline", 223614896, "8c102e022b42c04a673a2e74075e08c370a0a51caadbdffe53d1197d91abf998"],
+          ["runtime_baseline", 219446744, "6a0f43d8467e02e3a585e09e612704591f8ca8d411461b965a88e31b5455fcac"],
+          ["scriptw", 226776128, "1ffab30aea45ab22f44ebb356a273fa82e51ee3c51e43202bcd6f75aa31cd416"]
+        ],
+        "identity": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/candidate/identity.json",
+          "sha256": "8a3c603097eaebf327d8db33d352a6cf92ea93e77871c79702cd7eaa883ca399"
+        },
+        "cargo_producers": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/candidate/products.json",
+          "sha256": "e0f5722b2c78cb50de677b766835a6f875d94c709ee3d8e5803b6138cb305882"
+        }
+      },
+      "runtime_semantic_abi": 40,
+      "source_provenance": {
+        "build": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/candidate-build.json",
+          "sha256": "573181ad4b6dc08a2f31017680a0873552b8ddc650f38b5d678d4f6faf0f8ea7"
+        },
+        "compile_patch": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/compile-inputs.patch",
+          "sha256": "9ab9d72aa856d5a65c71e614b0ac7575affa6999886dfac897dcb95f24bb6d93"
+        },
+        "compiled_input_hashes": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/compiled-crate-inputs.json",
+          "sha256": "0a6761d9bc8491b6f9ddf9b6f8d17b025ef7b18f41e7000c5a86775a91052d02"
+        },
+        "candidate_source": "raw/implementation/ retains the experimental source and tests as inert text."
+      },
+      "candidate_native_validation": {
+        "scope": "Selected default-feature release native targets on the measured candidate source. This does not validate the final restored source.",
+        "passed": 2493,
+        "source_unchanged": true,
+        "source_map_sha256": "d5d07a21b4b365339dfe935c11962574e891a8618f0b1a20e900763ed99a7242",
+        "columns": ["package", "target", "passed", "executable_sha256"],
+        "targets": [
+          ["scriptw-aot-wasm", "scriptw_aot_wasm", 564, "7231c76a7790366c03e5173a702ffc40108ec0f20afd8ab77b908e2f5b41d732"],
+          ["scriptw-aot-wasm", "emission", 41, "82bbda2b42e2eab74390886be7918ea3c6e87efaeec8321ee8f8d81684fdb646"],
+          ["scriptw-aot-wasm", "runtime_link", 31, "fff81ebfd82dda216a9566c5d99184b5a7e3dfd49c16fc51d9f86a3fa694f40c"],
+          ["scriptw-aot-wasm", "structure_builtins", 172, "85b47795766a2851d55c0c24098cf3ea1df6ad058b40bcd47ac3e800070aef1c"],
+          ["scriptw-engine", "scriptw_engine", 34, "983ea451520d20675667f3dbdfd06e2ac16ee3e4f4089bdd469852c0d27e55a2"],
+          ["scriptw-engine", "aot_builtins", 568, "dddea33224fd58202ca5600e0a7c5f8223b5d619732206b6d3049873ab8ff6c8"],
+          ["scriptw-engine", "aot_gc_entries", 255, "c4564c80b0f3e784c5c8d63b15ca915e8ce998ac67cb3a4c97e3d0c1e521452f"],
+          ["scriptw-engine", "aot_language", 386, "f568e06a90c05b60d2b781a91e7b0c8ddbc694d6c0490e98672aa83a9c99d442"],
+          ["scriptw-engine", "aot_realm_modules", 438, "f1f3f920c7a828fcaa9133ea715a844e4778915ef7580075e6760b7811f79fc4"],
+          ["scriptw-engine", "runtime_cache", 4, "f1435a7e10b101b17f3261df1c478643d9eb2b0865af16a7eb2a9774570b4df1"]
+        ],
+        "receipt": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/native/receipt.json",
+          "sha256": "61c2f0eb6550033b9f9558373c8f8cd133f62406bbce322d8097feb06ac35c5a"
+        },
+        "source_map": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/native/source-start.json",
+          "sha256": "052f2a01a4d65de1d540906bbf80a5ce8f8bcccc1ba693d133c336b6f630d7b6"
+        },
+        "immutable_watcher_map": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/native-transcript-map.json",
+          "sha256": "61beddeea5c92068e9eb2da9cdee32081989c82f6959c3ad6d67f6c6deaff05b"
+        },
+        "source_guards": {
+          "passed": 359,
+          "scope": "Separate source-only checks; overlap with native targets, so do not add these to native totals.",
+          "receipt": {
+            "archive": "array-publication-v2-20261030-inert.tar.xz",
+            "member": "raw/source-guards/receipt.json",
+            "sha256": "881d90f4f4c716e4cfbf9f34ede1025f6c6f4552fdd372c1eac666f360e6310c"
+          }
+        }
+      },
+      "candidate_original_test262": "NOT_RUN: failed performance gate first. Prepared mutation controls were not run and are not acceptance evidence.",
+      "timing": {
+        "scope": "same-machine default-feature diagnostic; original ordinary scripts and separately derived strict retained-call modules; numeric join fallback is a separate diagnostic, not part of the original 17 cases; no V8/Scriptc parity claim",
+        "columns": ["workload", "boundary", "initial_baseline_median_ns", "initial_candidate_median_ns", "initial_change_percent", "initial_ABBA_change_percent", "initial_BAAB_change_percent", "confirmation_baseline_median_ns", "confirmation_candidate_median_ns", "confirmation_change_percent", "confirmation_BAAB_change_percent", "confirmation_ABBA_change_percent"],
+        "rows": [
+          ["sort-reverse-128.js", "ordinary", 297639.5, 328035.0, 10.212, 26.217, -1.841, 291490.5, 295552.0, 1.393, -0.055, 4.655],
+          ["sort-reverse-128.js", "retained", 74515.0, 77244.5, 3.663, 6.256, 0.836, 74059.5, 78080.0, 5.429, 7.024, 4.204],
+          ["sort-reverse-512.js", "ordinary", 553959.0, 562917.5, 1.617, -1.441, 0.256, 540483.5, 558860.5, 3.4, 1.314, 6.992],
+          ["sort-reverse-512.js", "retained", 250280.5, 263875.5, 5.432, 0.64, 8.577, 244936.5, 274130.0, 11.919, 6.145, 28.102],
+          ["sort-sorted-512.js", "ordinary", 543464.0, 563057.5, 3.605, 13.287, 0.883, 530719.5, 561289.5, 5.76, 10.412, 5.313],
+          ["sort-sorted-512.js", "retained", 253240.5, 261066.0, 3.09, -0.686, 10.272, 244256.0, 258867.5, 5.982, 5.219, 6.707],
+          ["to-sorted-512.js", "ordinary", 574974.0, 627753.0, 9.179, 13.049, 7.871, 541029.0, 569215.5, 5.21, 9.503, 3.193],
+          ["to-sorted-512.js", "retained", 282447.0, 299142.5, 5.911, -2.376, 11.042, 270344.5, 284360.0, 5.184, 6.254, 4.22],
+          ["join-1024.js", "ordinary", 820233.0, 816346.5, -0.474, -1.513, -2.013, 760834.0, 787678.5, 3.528, 8.106, -2.634],
+          ["join-1024.js", "retained", 489279.0, 523788.5, 7.053, 9.402, 11.101, 485472.0, 532001.0, 9.584, 4.736, 24.027],
+          ["join-4096.js", "ordinary", 2606237.5, 2537921.0, -2.621, 2.31, -4.092, 2423601.0, 2566481.0, 5.895, 7.659, 3.587],
+          ["join-4096.js", "retained", 2135135.5, 2090979.0, -2.068, 1.432, -4.651, 1938173.0, 2136756.5, 10.246, 11.309, 8.51],
+          ["join-mixed-1024.js", "ordinary", 1242758.5, 1213805.0, -2.33, -2.197, -1.927, 1196792.5, 1253897.5, 4.772, 8.053, 1.025],
+          ["join-mixed-1024.js", "retained", 631479.0, 682998.5, 8.159, 16.59, 5.015, 623466.0, 662759.0, 6.302, 20.168, -0.653],
+          ["numeric-loop-10000.js", "ordinary", 220696.0, 218528.5, -0.982, 1.949, -5.653, 226805.0, 211978.5, -6.537, -4.572, -10.788],
+          ["numeric-loop-10000.js", "retained", 28527.0, 28131.5, -1.386, -0.054, -1.765, 28006.0, 28332.0, 1.164, 0.214, 2.055],
+          ["numeric-loop-50000.js", "ordinary", 349951.5, 371424.0, 6.136, 13.252, -3.015, 330022.5, 353041.5, 6.975, 16.189, 4.313],
+          ["numeric-loop-50000.js", "retained", 82872.5, 82897.5, 0.03, -0.62, 0.242, 82957.0, 83183.0, 0.272, 1.885, -0.06],
+          ["folded-string-4096.js", "ordinary", 490285.0, 476016.5, -2.91, -5.755, 3.683, 431808.0, 454176.0, 5.18, 7.915, 3.507],
+          ["folded-string-4096.js", "retained", 3461145.0, 3418828.5, -1.223, 2.341, -1.944, 3208855.0, 3442199.5, 7.272, 12.828, -1.999],
+          ["dynamic-string-4096.js", "ordinary", 1093521.0, 1078348.5, -1.387, -0.056, -0.108, 1066715.5, 1084712.0, 1.687, 8.204, -1.199],
+          ["dynamic-string-4096.js", "retained", 176020.5, 177137.0, 0.634, 1.984, -1.14, 173942.0, 173841.5, -0.058, 1.391, -0.683],
+          ["integer.js", "ordinary", 210306.0, 221712.5, 5.424, 1.938, 1.292, 206605.0, 213335.5, 3.258, 1.232, 3.972],
+          ["integer.js", "retained", 6785998.0, 6801034.0, 0.222, 0.819, -1.041, 6466992.0, 6507776.5, 0.631, 2.658, -3.428],
+          ["objects.js", "ordinary", 980287.5, 1042631.5, 6.36, 9.444, 1.938, 1093345.0, 1048378.5, -4.113, -6.287, -0.612],
+          ["objects.js", "retained", 409054.0, 413812.0, 1.163, 1.425, -2.963, 369575.5, 395709.5, 7.071, 10.127, 1.449],
+          ["retained-objects.js", "ordinary", 27210571.0, 27692368.0, 1.771, 2.064, -1.184, 26812262.0, 26930604.0, 0.441, 3.181, -2.589],
+          ["retained-objects.js", "retained", 14323554.5, 14492474.0, 1.179, -0.38, 5.128, 14319773.5, 14346505.0, 0.187, 7.932, -11.297],
+          ["join-empty-1024.js", "ordinary", 597152.5, 630881.5, 5.648, 11.759, 2.367, 608554.0, 619945.5, 1.872, 5.827, -0.261],
+          ["join-empty-1024.js", "retained", 284660.5, 311450.5, 9.411, 3.411, 12.611, 285842.0, 313218.0, 9.577, 10.42, 7.814],
+          ["join-singleton-1024.js", "ordinary", 624157.5, 617863.5, -1.008, -6.186, 2.771, 556512.0, 582269.5, 4.628, 5.881, 3.986],
+          ["join-singleton-1024.js", "retained", 298296.0, 328300.0, 10.058, 9.449, 12.764, 296127.5, 327629.0, 10.638, 15.44, 1.0],
+          ["join-small-1024.js", "ordinary", 833182.0, 874002.5, 4.899, 17.092, -2.381, 844623.0, 811173.0, -3.96, -8.821, 3.085],
+          ["join-small-1024.js", "retained", 488917.5, 552907.5, 13.088, -9.946, 142.814, 483474.0, 496694.5, 2.734, 11.791, -11.86],
+          ["numeric-join-fallback.js", "ordinary", 1508695.5, 1575870.5, 4.453, 1.404, 1.795, 1555497.5, 1494404.5, -3.928, -1.901, -4.494]
+        ],
+        "startup_columns": ["initial_baseline_median_ns", "initial_candidate_median_ns", "initial_change_percent", "initial_ABBA_change_percent", "initial_BAAB_change_percent", "confirmation_baseline_median_ns", "confirmation_candidate_median_ns", "confirmation_change_percent", "confirmation_BAAB_change_percent", "confirmation_ABBA_change_percent"],
+        "startup": [327103443.5, 319357876.5, -2.368, -2.122, -1.454, 316478542.0, 318330487.0, 0.585, 0.522, 0.648],
+        "initial_raw_analysis": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/analysis.json",
+          "sha256": "ab1b9e92cac6595b104c02b4b323e6a5028982256fa9b61ebb34da2b03cd8119"
+        },
+        "confirmation_raw_analysis": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/confirmation/analysis.json",
+          "sha256": "ba54a21a01e110a1be55138b80b4ab47950a60220de3a4fdd80147dce034548f"
+        },
+        "round_raw_paths": "Each analysis products[].raw points to the full samples and original command receipt in its own archive directory. Confirmation raw paths are relative to raw/confirmation/.",
+        "rounds_per_repetition": 8,
+        "measured_samples_per_round": 21,
+        "warmups_per_round": 10,
+        "aggregation": "For each product, take the median of all 84 measured samples in a repetition; each balanced group uses 42 samples. Percent is (candidate/baseline - 1)*100. Rounded summary values only; full samples and precision remain in the archive."
+      },
+      "primary_phase_and_memory": {
+        "scope": "Sampled process RSS and whole-child high-water RSS include different lifetimes; GC capacity is reserved capacity. None measures live JavaScript bytes or per-call allocation bytes.",
+        "initial": {
+          "baseline": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47181824.0,
+              "final_rss_bytes": 52944896.0,
+              "maximum_rss_bytes": 52944896.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 282487898.0,
+              "lowering": 12604.0,
+              "preparation": 26533169.0,
+              "validation": 1188296.0
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1692.0,
+              "engine": 555.5,
+              "export_lookup": 4832.0,
+              "host_import_registration": 26609.5,
+              "instantiate": 293063.5,
+              "module": 76643.0,
+              "store_and_linker": 60129.0,
+              "total": 27791924.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 438638.5,
+              "native_admission": 134673871.0,
+              "setup": 853937.0
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86349824.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30863360.0
+          },
+          "candidate": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47601664.0,
+              "final_rss_bytes": 53364736.0,
+              "maximum_rss_bytes": 53364736.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 264644014.5,
+              "lowering": 12453.5,
+              "preparation": 24898721.0,
+              "validation": 1425492.0
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1712.5,
+              "engine": 475.5,
+              "export_lookup": 4732.0,
+              "host_import_registration": 26414.0,
+              "instantiate": 294825.5,
+              "module": 76478.0,
+              "store_and_linker": 61942.0,
+              "total": 28393110.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 361655.0,
+              "native_admission": 139523701.5,
+              "setup": 630337.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86736896.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30930944.0
+          }
+        },
+        "confirmation": {
+          "baseline": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 46907392.0,
+              "final_rss_bytes": 52670464.0,
+              "maximum_rss_bytes": 52670464.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 266874558.5,
+              "lowering": 13295.0,
+              "preparation": 23934314.5,
+              "validation": 1206247.0
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1577.5,
+              "engine": 510.5,
+              "export_lookup": 4777.0,
+              "host_import_registration": 24346.0,
+              "instantiate": 273544.5,
+              "module": 75386.0,
+              "store_and_linker": 57450.0,
+              "total": 27375482.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 347924.0,
+              "native_admission": 135017512.5,
+              "setup": 708241.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86075392.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30980096.0
+          },
+          "candidate": {
+            "ordinary_gc_capacity_median_bytes": {
+              "gc_capacity_before_bytes": 16777216.0,
+              "gc_capacity_after_bytes": 16777216.0
+            },
+            "ordinary_sampled_rss_median_bytes": {
+              "initial_rss_bytes": 47415296.0,
+              "final_rss_bytes": 53178368.0,
+              "maximum_rss_bytes": 53178368.0
+            },
+            "ordinary_compilation_median_ns": {
+              "emission": 279310836.0,
+              "lowering": 11146.5,
+              "preparation": 24395023.0,
+              "validation": 1233552.0
+            },
+            "ordinary_nonwarmup_phase_median_ns": {
+              "admission": 1577.0,
+              "engine": 430.5,
+              "export_lookup": 4767.0,
+              "host_import_registration": 24411.0,
+              "instantiate": 276313.0,
+              "module": 74815.5,
+              "store_and_linker": 56092.5,
+              "total": 27516680.0
+            },
+            "retained_per_process_phase_median_ns": {
+              "module_initialization": 352395.5,
+              "native_admission": 132645510.0,
+              "setup": 637341.5
+            },
+            "ordinary_process_lifetime_peak_rss_median_bytes": 86552576.0,
+            "retained_process_lifetime_peak_rss_median_bytes": 30869504.0
+          }
+        },
+        "raw_phase_receipts": [
+          {
+            "archive": "array-publication-v2-20261030-inert.tar.xz",
+            "member": "raw/boundary-phases.json",
+            "sha256": "efad5ca71ce078b21ad918fd531f601e81326b82ec3832dea3df98a8cd1c6dd5"
+          },
+          {
+            "archive": "array-publication-v2-20261030-inert.tar.xz",
+            "member": "raw/confirmation/boundary-phases.json",
+            "sha256": "779866332a46a865ca7d677b6e0d778e42c316b6c6acb6cc0c22c687663750cd"
+          }
+        ]
+      },
+      "native_inspection": {
+        "scope": "Inert inspection of exact frozen NativeR bytes. Static partial-path counts and disassembly size do not establish retired instructions, cycles, or a timing cause.",
+        "native_products": {
+          "baseline": {
+            "host_sha256": "03cd9be685269d039bf879476cb5eb0f7050b1140435ee7475937c4be6cb5ee1",
+            "source_fingerprint": "cf48836cd6550acc4e8450bc1194d4a9416f07123fa97ccd6c5752e783667070",
+            "layout": 40,
+            "runtime_key": "bd267cdbd71d687df140ef9aeb8d01260cfc9d2a63281b1cccbabb30a563496d",
+            "packed_sha256": "74b88e8e7165c0d7b0f83fad6d772089b0cfba2e2b038031c2e85bf3b34f5aff",
+            "native_bytes": 66058392,
+            "native_sha256": "c56ad0e431ee7916530aebc79cd38a3d193d232f575f96dd12db52bbaa9a6ac4"
+          },
+          "candidate": {
+            "host_sha256": "8c102e022b42c04a673a2e74075e08c370a0a51caadbdffe53d1197d91abf998",
+            "source_fingerprint": "7401427ac8d4c60b044b079b3264578dbff20bcb223600822f46e25752426d2a",
+            "layout": 40,
+            "runtime_key": "09f004b3218b6402d8294667d8415d7f0cd9f21ec2a4ae43ca28be382c027283",
+            "packed_sha256": "2ae8a9045275b5e39ea1236377df5825bfcccc9eea5b113c9d67ef26c7bee6b8",
+            "native_bytes": 66062472,
+            "native_sha256": "92e99e724e6e2cb9ebd21462cb27c4f3723a5c2cbd7f18d87bb7fdfe43e547ab"
+          }
+        },
+        "function_columns": ["function", "baseline_bytes", "candidate_bytes", "baseline_entry_stack_bytes", "candidate_entry_stack_bytes"],
+        "functions": [
+          ["helper::array_packed_join", 6416, 6416, 272, 272],
+          ["helper::array_indexed_publish_default_data", 9950, 9780, 272, 272],
+          ["helper::array_packed_push1", 2664, 2664, 208, 208],
+          ["helper::array_indexed_publish", 21632, 21688, 256, 272],
+          ["helper::array_indexed_delete", 4392, 4392, 144, 144],
+          ["helper::object_read", 113136, 113136, 800, 800],
+          ["helper::object_write", 1824, 1824, 224, 224],
+          ["builtin::Array.prototype.push", 5600, 5600, 304, 304],
+          ["builtin::Array.prototype.join", 11168, 11168, 384, 384]
+        ],
+        "already_values_partial_dispatch": {
+          "baseline": {
+            "instructions": 65,
+            "stack_referencing_instructions": 22,
+            "branches": 10,
+            "storage_mode_loads": 3
+          },
+          "candidate": {
+            "instructions": 15,
+            "stack_referencing_instructions": 6,
+            "branches": 3,
+            "storage_mode_loads": 1
+          }
+        },
+        "exact_extraction": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/native-cause/report.json",
+          "sha256": "6c241b4e610c7bc40f5fe57158596d7e42f824cb96e98245ee9310df1a227a38"
+        },
+        "exact_dispatch_path": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/native-cause/packed-values-dispatch-path.json",
+          "sha256": "6c354e75916d1cca1f14440d7aa8113f08e749b141b5c266f5aadacf5e5a503b"
+        }
+      },
+      "native_interpretation": "The valid already-Values static partial dispatch shrinks from 65 to 15 listed instructions, ten to three branches and three to one classification dereference stages. Default-data publication shrinks 9,950→9,780 bytes with a 272-byte entry frame; descriptor publication grows 21,632→21,688 bytes and 256→272 entry-stack bytes. NativeR grows 4,080 bytes. These counts establish emitted structure, not cycles or speed.",
+      "program_and_join_identity": {
+        "all_18_ordinary_program_standard_sections_identical": true,
+        "program_comparison": {
+          "archive": "array-publication-v2-20261030-inert.tar.xz",
+          "member": "raw/ordinary-image-comparison.json",
+          "sha256": "a3ba4d8e1a40ea96184160e86a9a2300590bb08d0e41d5a3acc76ad95f250c8e"
+        },
+        "normalized_join_comparison": {
+          "scope": "Address-normalized disassembly identity only; instruction-fetch or placement effects have not been measured.",
+          "normalization": "Select objdump lines beginning with a hexadecimal address and colon; remove the leading instruction address; replace numeric addresses immediately before symbolic <targets> with the unchanged symbol. Register operands, constants, offsets, mnemonics and symbolic target offsets remain unchanged.",
+          "functions": [
+            {
+              "function": "helper::array_packed_join",
+              "equal_after_normalization": true,
+              "products": {
+                "baseline": {
+                  "assembly": {
+                    "archive": "array-publication-v2-20261030-inert.tar.xz",
+                    "member": "raw/native-cause/baseline/helper__array_packed_join.asm",
+                    "sha256": "31ad255af9a3673cbf66412a80637e9a3d5e700381f6b688c822699ae7f1c45d"
+                  },
+                  "normalized_sha256": "7bf4677901d8cb1be18c62096048dac7cb69f1d5f2c4ab890fdb3e49df11ec2c",
+                  "addressed_disassembly_lines": 1506,
+                  "symbol_value": 43871808,
+                  "symbol_value_modulo_64": 0
+                },
+                "candidate": {
+                  "assembly": {
+                    "archive": "array-publication-v2-20261030-inert.tar.xz",
+                    "member": "raw/native-cause/candidate/helper__array_packed_join.asm",
+                    "sha256": "b5ed23b90dc8ad23de48c9fc33809c9bf798f7977149b2c6620323c4ebb74c18"
+                  },
+                  "normalized_sha256": "7bf4677901d8cb1be18c62096048dac7cb69f1d5f2c4ab890fdb3e49df11ec2c",
+                  "addressed_disassembly_lines": 1506,
+                  "symbol_value": 43871648,
+                  "symbol_value_modulo_64": 32
+                }
+              }
+            },
+            {
+              "function": "builtin::Array.prototype.join",
+              "equal_after_normalization": true,
+              "products": {
+                "baseline": {
+                  "assembly": {
+                    "archive": "array-publication-v2-20261030-inert.tar.xz",
+                    "member": "raw/native-cause/baseline/builtin__Array_prototype_join.asm",
+                    "sha256": "9bddd9ee6f93cb230d0454040187b85b821b9e2bcd971d11972153ed51d52b2d"
+                  },
+                  "normalized_sha256": "50c521e91f96d9f36889895bc13662d3cdf52b3a3b8c4185c47fc5e4fe44ae7f",
+                  "addressed_disassembly_lines": 2372,
+                  "symbol_value": 4253728,
+                  "symbol_value_modulo_64": 32
+                },
+                "candidate": {
+                  "assembly": {
+                    "archive": "array-publication-v2-20261030-inert.tar.xz",
+                    "member": "raw/native-cause/candidate/builtin__Array_prototype_join.asm",
+                    "sha256": "f79537d8394ec6e49e4ed0ce5fdc9356037f0ffa41b4ab0542ac01669eadbb34"
+                  },
+                  "normalized_sha256": "50c521e91f96d9f36889895bc13662d3cdf52b3a3b8c4185c47fc5e4fe44ae7f",
+                  "addressed_disassembly_lines": 2372,
+                  "symbol_value": 4253728,
+                  "symbol_value_modulo_64": 32
+                }
+              }
+            }
+          ]
+        },
+        "placement_observation": "array_packed_join moves from address modulo 64 = 0 to 32. The observed cache-line position shift is not causal proof; instruction-fetch, placement and dynamic execution remain unmeasured."
+      },
+      "predeclared_plan": {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/plan.json",
+        "sha256": "b4f73ec0dcaa465f3929d4cf2e6ceb86bba1bcdac327941a25f8259e1ff2f471"
+      },
+      "disposition_receipt": {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/disposition.json",
+        "sha256": "e59e294bdeee56b710c999c0a622a87e1a3953902eb1c3e4b0054c78bf7ecec7"
+      }
+    }
+  ],
+  "baseline_selected_original_test262": {
+    "scope": "Frozen baseline only: eleven original pinned families, 713/713 executions. Selected replay is not the full suite or a status publication.",
+    "executable_sha256": "974bc179a283ee4baeb98858f59a71b4ebf61c26b49c740d49962300c724f4d5",
+    "policy": {
+      "suite_root": "test262/vendor/test262",
+      "execution_backend": "wasm-aot",
+      "jobs": 1,
+      "threads": 1,
+      "timeout_ms": 60000,
+      "reuse_case_workers": true
+    },
+    "columns": ["family", "passed", "total", "raw_log_member"],
+    "families": [
+      ["language/expressions/array", 104, 104, "raw/test262-baseline-array-literal.log"],
+      ["built-ins/Array/prototype/push", 48, 48, "raw/test262-baseline-array-push.log"],
+      ["built-ins/Array/prototype/pop", 46, 46, "raw/test262-baseline-array-pop.log"],
+      ["built-ins/Array/prototype/sort", 107, 107, "raw/test262-baseline-array-sort.log"],
+      ["built-ins/Array/prototype/reverse", 36, 36, "raw/test262-baseline-array-reverse.log"],
+      ["built-ins/Array/prototype/join", 48, 48, "raw/test262-baseline-array-join.log"],
+      ["built-ins/Array/prototype/toSorted", 42, 42, "raw/test262-baseline-array-to-sorted.log"],
+      ["built-ins/Array/length", 60, 60, "raw/test262-baseline-array-length.log"],
+      ["built-ins/Array/prototype/copyWithin", 78, 78, "raw/test262-baseline-array-copy-within.log"],
+      ["built-ins/Object/keys", 118, 118, "raw/test262-baseline-object-keys.log"],
+      ["built-ins/Reflect/ownKeys", 26, 26, "raw/test262-baseline-reflect-ownkeys.log"]
+    ],
+    "summary": {
+      "archive": "array-storage-v1-20261030-inert.tar.xz",
+      "member": "raw/test262-baseline-summary.json",
+      "sha256": "ec57f84348419038be39bbbdeb50422d2103e1104809d21c51b048c144ff4a36"
+    },
+    "snapshots": "v1 raw/test262-baseline/ contains all original per-case snapshot results and progress; raw/test262-baseline-*.receipt.json records original argv, deadlines and executable digest.",
+    "pinned_revisions": {
+      "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+      "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+    },
+    "pinned_revision_binding": {
+      "matching_family_snapshots": 11,
+      "example_receipt": {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/test262-baseline/dense-numbers-baseline-array-copy-within-16340220162581181699.json",
+        "sha256": "6fe50896eba346bf928c81eda438cb90083afc11445b366ec097601e6e646666"
+      },
+      "scope": "All eleven baseline per-family snapshot JSON records carry these same original pinned revisions."
+    }
+  },
+  "formatting_and_source_checks": {
+    "result": "Both candidate formatting comparisons retain the same eighteen pre-existing full-format failures and zero newly failing files. Source guards pass separately; product-graph and source ownership checks are archived.",
+    "receipts": [
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/format-comparison.json",
+        "sha256": "7e9b076ba0051f2cc0b999eddcdf6db6fb9645382c76f6fc952034091dc8a86a"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/format-comparison.json",
+        "sha256": "7e9b076ba0051f2cc0b999eddcdf6db6fb9645382c76f6fc952034091dc8a86a"
+      },
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/conformance-owners.log",
+        "sha256": "fe6234efe32277dbcc7bb47654d3634ef0002072b9de690d9f7849d542ba6a8f"
+      },
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/intl-source-identities.log",
+        "sha256": "aea91f342925b6a428fe910d44274be01bdcbcae89f570087bbd7ed926594197"
+      },
+      {
+        "archive": "array-storage-v1-20261030-inert.tar.xz",
+        "member": "raw/product-graph.log",
+        "sha256": "3abe41e07f092fead9f70e9618d4bff87bee26520c8cc6a7e911a153f2584ec4"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/conformance-owners.log",
+        "sha256": "fe6234efe32277dbcc7bb47654d3634ef0002072b9de690d9f7849d542ba6a8f"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/intl-source-identities.log",
+        "sha256": "aea91f342925b6a428fe910d44274be01bdcbcae89f570087bbd7ed926594197"
+      },
+      {
+        "archive": "array-publication-v2-20261030-inert.tar.xz",
+        "member": "raw/product-graph.log",
+        "sha256": "3abe41e07f092fead9f70e9618d4bff87bee26520c8cc6a7e911a153f2584ec4"
+      }
+    ],
+    "final_formatting": {
+      "result": "The final cargo fmt check fails on exactly the same eighteen pre-existing files, with no new failures.",
+      "comparison": {
+        "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+        "member": "raw/final-format-comparison.json",
+        "sha256": "163b53ed9271bee9938b8be1ad108b93c356fb448ea32a1e6a61f6d4b40a4acc"
+      },
+      "log": {
+        "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+        "member": "raw/final-format.log",
+        "sha256": "c22beb61bc6ead958dc1e10fb73384fd66d993c9d0fb5e29ddc5bbf09728319f"
+      }
+    }
+  },
+  "final_restored_source_validation": {
+    "status": "PASSED_TWO_RETAINED_REGRESSIONS",
+    "summary": "On restored baseline production, both newly retained Rust test filters pass with one inventoried test each. The semantic wrapper executes the JavaScript fixture in both strict and sloppy modes; the separate graph snapshot regression passes. This is focused acceptance for the retained tests, with no transfer of the rejected candidates' wide native coverage.",
+    "production": {
+      "checked_at_utc": "2026-10-31T00:07:57.651823+00:00",
+      "baseline_commit": "28bbffe0c7e930fab457d2e4dc69b75fa90d5f60",
+      "tracked_production_source_pathspec": ":(glob)crates/*/src/**",
+      "tracked_production_files": 1903,
+      "tracked_production_file_list_sha256": "2a6ab07a5bdd78e719b05af4b5d5950fcd86ccb80c631fadd7419892a286665c",
+      "git_diff_HEAD_exit_code": 0,
+      "untracked_production_files": 0,
+      "result": "Every tracked crates/*/src file matches the baseline Git tree; no untracked production source file exists.",
+      "fingerprint_binding": "The frozen baseline artifact receipts bind this baseline commit to compiler source fingerprint cf48836cd6550acc4e8450bc1194d4a9416f07123fa97ccd6c5752e783667070. No new production artifact execution is claimed."
+    },
+    "passed": 2,
+    "source_unchanged_during_native_checks": true,
+    "tests": [
+      {
+        "package": "scriptw-engine",
+        "target": "aot_builtins",
+        "test": "aot_array_private_buffers::dense_number_prefix_preserves_holes_bits_and_storage_transitions",
+        "passed": 1,
+        "inventory_matches": true,
+        "executable_sha256": "66c2f1c4d76c4c5f9d001042fab7c50af8273865b2fb309e3abcc7c70b806abb",
+        "inventory_sha256": "5a3fee80162ea785fd951313eedb4b97db4bc3416e9a6ebe5331c85f87c8f628",
+        "watcher_sha256": "67ca00e8633cfa3699c2a7aa799d5c8c6b748aae0db78849cafdd36e58b00fb1",
+        "started_utc": "2026-10-30T23:56:20Z",
+        "command": ["/workspace/scriptw/target/release/deps/aot_builtins-d3ce74c7cec57e12", "--test-threads=1", "aot_array_private_buffers::dense_number_prefix_preserves_holes_bits_and_storage_transitions"]
+      },
+      {
+        "package": "scriptw-engine",
+        "target": "aot_gc_entries",
+        "test": "aot_gc_packed_array_storage::graph_snapshot_dense_prefix_ignores_spare_capacity_and_large_logical_length",
+        "passed": 1,
+        "inventory_matches": true,
+        "executable_sha256": "f41770aaea09c6e5aa85eb166790323b9b85f494b868ff892ea0b1ad0599cac8",
+        "inventory_sha256": "a8a7a81d7cf18deedc01983e3fd78b30e34202b01698ff796c60ef327a05112b",
+        "watcher_sha256": "d5d8a02a8becf44db6c4e57aabf8e7140ff4fa34098ef3fd8bd9bd7460f1c5c0",
+        "started_utc": "2026-10-31T00:03:28Z",
+        "command": ["/workspace/scriptw/target/release/deps/aot_gc_entries-fab15eff95935716", "--test-threads=1", "aot_gc_packed_array_storage::graph_snapshot_dense_prefix_ignores_spare_capacity_and_large_logical_length"]
+      }
+    ],
+    "test_file_sha256": {
+      "crates/scriptw-engine/tests/aot_builtins/aot_array_private_buffers.rs": "3ec19a4ada31329c3080934132de3ff812f59db396f182652515d0fff6f0758e",
+      "crates/scriptw-engine/tests/aot_gc_entries/aot_gc_packed_array_storage.rs": "e7d24bc5ce7f6c01480219513484287659a7ac43d19852c0323b6c22823c2b5d",
+      "crates/scriptw-engine/tests/fixtures/array_private_buffers/dense_number_prefix.js": "64e28648a492b8598f8c2b65b321037fde042b5061d86450390b2bec58bf232e"
+    },
+    "source_map_sha256": "8f9b98c516ad3d2c601e28e28ee84e6cdb2289dbb9bd5ce846c60b4bb04b8bb6",
+    "source_map_scope": "The final-native source map captures its original verification start; later documentation/evidence assembly does not extend the native coverage. Final retained test bytes and the restored production comparison are preserved separately.",
+    "validation": {
+      "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+      "member": "raw/final-source-validation.json",
+      "sha256": "60f70d1c04203a61860c06bcece96c7d3d5e868612a8831cd70c6de10fbbe836"
+    },
+    "receipt": {
+      "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+      "member": "raw/final-native/receipt.json",
+      "sha256": "2a2edecfbe8cb4453ce05d5798c449e2d2f60580e04dd9d4e6ff514980af77fe"
+    },
+    "source_map": {
+      "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+      "member": "raw/final-native/source-start.json",
+      "sha256": "ad0d70dc131b69554b4fbae9b9d919cdfff3dab07665b7d12b9579dad5e4d119"
+    },
+    "immutable_watcher_map": {
+      "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+      "member": "raw/final-native-transcript-map.json",
+      "sha256": "b014c0b82a029c5e517d8c812589f87e8af3aa71633ea1fd5fb325f0d026ad6a"
+    },
+    "production_comparison": {
+      "archive": "array-storage-final-validation-20261030-inert.tar.xz",
+      "member": "raw/production-baseline-match.json",
+      "sha256": "e576e6de87dadd56987e84a719745a2d9e82528bada5df131ec2e01470b4928a"
+    },
+    "retained_test_bytes": "raw/final-tests/ in the final-validation archive contains the three exact retained test/fixture files and their tracked patch."
+  },
+  "raw_archives": [
+    {
+      "path": "array-storage-v1-20261030-inert.tar.xz",
+      "verified_at_utc": "2026-10-31T00:01:32.082695+00:00",
+      "verified": true,
+      "sha256": "6d2d9f598b6b03ecdc36d2edb03a47a7f96e364b237b8b21e7f644ca1fc544ba",
+      "bytes": 1689896,
+      "members": 3566,
+      "expanded_member_bytes": 116535154,
+      "regular_files_only": true,
+      "member_names_unique_and_relative": true,
+      "all_indexed_member_sizes_and_sha256_match": true,
+      "native_payload_magic_count": 0,
+      "index_sha256": "f324237be798ab0f990f057b42a36d65e7c4084924621206028e949db1917436",
+      "mapping": "raw/ maps to target/performance-dense-numbers-20261030. immutable-v1-native holds transcript copies bound by v1-native-transcript-map.json. Shared confirmation inputs are the original frozen products/images; symlink directories are omitted.",
+      "payload_policy": "Inert source, patches, disassembly, commands, hashes, receipts, logs and samples only. No native executable, Wasm module or retained-image payload."
+    },
+    {
+      "path": "array-publication-v2-20261030-inert.tar.xz",
+      "verified_at_utc": "2026-10-31T00:01:32.539933+00:00",
+      "verified": true,
+      "sha256": "3f26db31c1b6b214b92bb3f93790bc39010344c2e40de95ba6eef9f7ea6b2e07",
+      "bytes": 1301828,
+      "members": 3376,
+      "expanded_member_bytes": 71768784,
+      "regular_files_only": true,
+      "member_names_unique_and_relative": true,
+      "all_indexed_member_sizes_and_sha256_match": true,
+      "native_payload_magic_count": 0,
+      "index_sha256": "e7bc0aa3aad0aca6cd646215078fd0a6b35324a86ab772bcb6a9125e129f7e41",
+      "mapping": "raw/ maps to target/performance-dense-numbers-20261030/v2. immutable-native contains bound watcher transcripts. Shared baseline identities, metadata, original/derived source bytes and image/native/Wasm hashes are preserved in the v1 archive. Neither archive stores baseline or candidate native, executable, Wasm, or .swpc retained-image payloads; symlinked product/image directories are omitted.",
+      "payload_policy": "Inert source, patches, disassembly, commands, hashes, receipts, logs and samples only. No native executable, Wasm module or retained-image payload.",
+      "archive_index_mapping_clarification": "The sealed v2 index uses the shorthand that baseline and retained images are stored in v1; this means their metadata and source bytes only. Native and .swpc payloads are excluded from both inert archives."
+    },
+    {
+      "path": "array-storage-final-validation-20261030-inert.tar.xz",
+      "sha256": "62f4e7ef50de5d7396328133063a1fbff4dba05b1dbe5c3b752b7b7215c3ca25",
+      "bytes": 120688,
+      "members": 30,
+      "expanded_member_bytes": 471091,
+      "index_sha256": "15600b1e0d0e66106d4ff65768c5205819be7a6741aab4a6fbda203607bda718",
+      "regular_files_only": true,
+      "all_indexed_member_sizes_and_sha256_match": true,
+      "native_payloads_archived": false,
+      "verified_at_utc": "2026-10-31T00:07:58.407024+00:00",
+      "payload_policy": "Inert final test bytes, source map, inventory, immutable watchers, sealed Cargo logs, baseline comparison, format limitation, one supplementary v1 source copy and independent archive/normalization/source-copy receipts only. No native executable or Wasm payload."
+    }
+  ],
+  "open_acceptance": ["Full default/all-feature, ignored, documentation, differential, robustness and complete pinned conformance acceptance remain open.", "No candidate original Test262 comparison or mutation-control execution is claimed.", "Further runtime work needs a measured dynamic cause and a fresh gate; neither rejected runtime candidate is retained in production.", "Exact failing hosts and retained images remain frozen locally under target/performance-dense-numbers-20261030/{baseline,candidate,baseline-images,candidate-images,v2/candidate,v2/candidate-images}. Native/executable/Wasm payloads are absent from the inert Git archives. Rebuilding may change placement and does not promise byte identity; future layout investigation must use the preserved exact binaries."]
+}

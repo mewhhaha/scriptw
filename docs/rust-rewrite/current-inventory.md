@@ -18,6 +18,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   while ordinary small joins slowed in both. Require a different measured
   hypothesis before repeating it. Any change needs concrete receiver/backing
   proofs and must preserve holes, accessors, proxies and user-code ordering.
+  The [dense-number and publication experiments](array-storage-experiments-20261030.json)
+  also failed repeated control gates; both production changes are reverted.
+  Preserve their exact failing products and distinguish retired work from
+  frontend/cache effects before changing function placement. A cache-line offset
+  shift is observed, not established as the cause.
   The earlier ordinary retained-object time regression remains unresolved; the
   module-local diagnostic does not refresh that published comparison.
 - Continue measuring module function storage after private activation `var`

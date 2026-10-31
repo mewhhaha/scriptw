@@ -68,6 +68,14 @@ fn unboxed_numeric_sort_keeps_stable_bits_and_complete_generic_fallbacks() {
 }
 
 #[test]
+fn dense_number_prefix_preserves_holes_bits_and_storage_transitions() {
+    assert_modes(
+        include_str!("../fixtures/array_private_buffers/dense_number_prefix.js"),
+        "array-dense-number-prefix:ok",
+    );
+}
+
+#[test]
 fn packed_push_guards_live_prototypes_attributes_overflow_and_realms() {
     assert_modes(
         include_str!("../fixtures/array_private_buffers/packed_push.js"),
