@@ -42,9 +42,16 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   now improves normal-cache startup 7–8% behind ABI 42's closed demand boundary;
   1,312 selected native checks and 106 original Test262 variants pass. Preserve
   its first-Date/retained-Date/large-join costs and higher selected RSS; the
-  203-record dormant slice is not a net memory saving. Next measure the live
-  dictionary key summary for packed push, then a separately validated immediate
-  numeric-presence bitmap. Keep cache filesystems and admission modes explicit.
+  203-record dormant slice is not a net memory saving. Both the
+  [eager](append-key-summary-20261031.json) and
+  [lazy](append-key-lazy-summary-20261031.json) dictionary summaries are rejected
+  and reverted despite target gains. Lazy ordinary small joins repeat +8.00%
+  median / +13.25% mean, and retained empty joins repeat +4.67% / +6.86%; its
+  Date ordinary and numeric-original concerns cleared. Next validate a sealed
+  i31/heap-bitmap numeric-presence field independently: preserve holes,
+  owner-bound writes, growth, P/R read fallbacks and exact host snapshots.
+  The 8,192-record / 256-KiB bound is conditional, not an RSS prediction.
+  Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

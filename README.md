@@ -193,6 +193,15 @@ execution slows 3.46% median / 4.91% mean, repeated Date retained calls slow
 mean. Selected normal-cache RSS rises 0.15–0.46 MiB. This is a startup CPU
 improvement; memory parity and those control costs remain open.
 
+The [eager](docs/rust-rewrite/append-key-summary-20261031.json) and
+[lazy](docs/rust-rewrite/append-key-lazy-summary-20261031.json) prototype-key
+summaries are rejected and reverted. Both improved array-building workloads,
+but repeated controls failed. The lazy candidate reduced large-join time by
+18–22% and retained-object calls by about 25%; its final ordinary small-join
+control still slowed 8.00% median / 13.25% mean, and retained empty joins slowed
+4.67% / 6.86%. Its 680 native checks, 72 selected original Test262 variants and
+both balanced cohorts remain available. Neither candidate changes production.
+
 In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
 RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was
 7.69 MiB versus 8.89 MiB. These process counters do not measure live JavaScript
