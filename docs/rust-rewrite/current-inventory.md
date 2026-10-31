@@ -29,12 +29,12 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   allocation and 48 bytes per Array. Two local balanced cohorts show 10–17% lower
   retained-object execution and 0.58–0.77 MiB lower RSS across ordinary/precompiled
   boundaries; the published comparison still belongs to its earlier source.
-  Next measure moving the existing canonical numeric `GetV` packed probe before
-  `ToObject`: original objects/retained-objects execute 1,000/65,536 avoidable
-  calls. Preserve its complete fallback and the separate retained-call controls.
-  Shared empty Array named storage is another measured-ownership candidate;
-  compact own-key shortcuts and rooted snapshots must still recognize Array
-  indices and virtual length.
+  The [pre-`ToObject` probe relocation](numeric-getv-probe-20261031.json) failed
+  to demonstrate repeatable target benefit and is reverted; preserve its exact
+  products and both balanced orders. Next measure shared empty Array named
+  storage and one shared deferred-method code/string construction tail. Preserve
+  exotic own keys, exact rooted snapshots, independent named-storage promotion,
+  defining-Realm identities and allocation order.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

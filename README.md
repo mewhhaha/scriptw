@@ -24,7 +24,7 @@ Runtime initialization uses compact intrinsic-installation tables and defers
 the Error, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 40
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 41
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
@@ -153,6 +153,12 @@ retained objects ran 10–17% faster across ordinary/precompiled execution and u
 original Test262 executions passed across the recorded continuation. Shorter
 controls and separate retained-call results remain in the evidence. The published
 comparisons above retain their original sources; every-case parity remains open.
+
+Moving the existing numeric Array probe before `ToObject` did not demonstrate a
+repeatable target benefit. The [two balanced cohorts](docs/rust-rewrite/numeric-getv-probe-20261031.json)
+retain all 17 workloads: ordinary retained objects slowed 8.3% and 2.8%, while
+compiler-free results changed direction. The production change was reverted;
+the branch-aware read regression and exact experimental products remain.
 
 ## Tests
 

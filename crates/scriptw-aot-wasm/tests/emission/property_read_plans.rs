@@ -189,67 +189,135 @@ pub(super) fn calls(body: &[Operator<'_>], target: u32) -> bool {
     })
 }
 
-fn assert_numeric_probe_before_conversion(body: &[Operator<'_>], conversion: u32) {
-    let conversion = body
-        .iter()
-        .position(|operator| {
-            matches!(operator, Operator::Call { function_index } if *function_index == conversion)
-        })
-        .expect("the original property-key conversion remains available on a miss");
-    let prefix = &body[..conversion];
-    let cast = prefix
-        .iter()
-        .position(|operator| matches!(operator, Operator::I64TruncF64U))
-        .expect("the admitted numeric key becomes an integer before conversion");
-    let guard = &prefix[..cast];
+fn assert_numeric_probe_before_conversion(
+    body: &[Operator<'_>],
+    conversion: u32,
+    module: &Module<'_>,
+    complete_get_v: Option<(u32, u32)>,
+) {
+    let calls_to = |target| {
+        body.iter()
+            .enumerate()
+            .filter_map(|(index, op)| {
+                matches!(op, Operator::Call { function_index } if *function_index == target)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>()
+    };
+    let conversion_calls = calls_to(conversion);
+    if complete_get_v.is_some() {
+        assert_eq!(
+            conversion_calls.len(),
+            1,
+            "one computed GetV property-key conversion on a miss"
+        );
+    }
     assert!(
-        guard.windows(4).any(|ops| matches!(
-            ops,
-            [
-                Operator::I32Eq,
-                Operator::If { .. },
-                Operator::LocalGet { .. },
-                Operator::RefTestNonNull { .. }
-            ]
-        )),
-        "nonnumeric keys skip the GC subtype test, not just the numeric backing load"
+        !conversion_calls.is_empty(),
+        "the complete key-conversion fallback remains available"
     );
+    let conversion = conversion_calls[0];
+    let cast = body[..conversion]
+        .iter()
+        .position(|op| matches!(op, Operator::I64TruncF64U))
+        .expect("the admitted numeric key becomes an integer before conversion");
+    let candidates = body[..cast].windows(4).enumerate().filter_map(|(start, ops)| {
+        if !matches!(ops,
+            [Operator::LocalGet { .. }, Operator::I32Const { value }, Operator::I32Eq, Operator::If { .. }]
+                if *value == scriptw_aot_wasm::WasmRuntimeValueTag::Number as i32)
+        { return None; }
+        let end = frame_end(body, start + 3);
+        (cast < end && end < conversion).then_some((start, end))
+    }).collect::<Vec<_>>();
+    assert_eq!(
+        candidates.len(),
+        1,
+        "one primitive Number probe contains the guarded index cast"
+    );
+    let (start, end) = candidates[0];
+    let array = module.witness_type(GcSnapshotLayout::Array);
+    assert!(body[start + 4..cast].windows(2).any(|ops| matches!(ops,
+        [Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }, Operator::If { .. }]
+            if *index == array)), "the Number arm tests the actual concrete Array before the trapping cast");
+    let guard = &body[start..cast];
     assert!(
-        guard
-            .iter()
-            .any(|op| matches!(op, Operator::RefTestNonNull { .. }))
-            && guard.iter().any(|op| matches!(op, Operator::F64Ge))
+        guard.iter().any(|op| matches!(op, Operator::F64Ge))
             && guard.iter().any(|op| matches!(op, Operator::F64Lt))
             && guard.iter().any(|op| matches!(op, Operator::F64Trunc))
             && guard.iter().any(|op| matches!(op, Operator::F64Eq)),
-        "concrete Array and finite integral index guards precede the trapping cast"
+        "finite integral index guards precede the trapping cast"
     );
-    let load = prefix
-        .iter()
-        .rposition(|op| matches!(op, Operator::ArrayGet { .. }))
-        .expect("the source path loads existing packed data before allocating a key");
+    let [Operator::LocalGet { .. }, Operator::BrIf { relative_depth }, ..] = &body[end + 1..]
+    else {
+        panic!("the completed probe's handled flag controls the property exit");
+    };
+    let hit = end + 2;
+    let mut frames = Vec::new();
+    for (index, op) in body[..hit].iter().enumerate() {
+        match op {
+            Operator::If { .. }
+            | Operator::Block { .. }
+            | Operator::Loop { .. }
+            | Operator::TryTable { .. }
+            | Operator::Try { .. } => frames.push(index),
+            Operator::End => {
+                frames
+                    .pop()
+                    .expect("the hit remains inside the source body");
+            }
+            _ => {}
+        }
+    }
+    let target = frames[frames.len() - 1 - *relative_depth as usize];
+    let exit = frame_end(body, target);
     assert!(
-        load > cast,
-        "the guarded index addresses the packed backing"
+        matches!(body[target], Operator::Block { .. }) && exit > conversion,
+        "the actual hit target skips the complete property-key conversion fallback"
     );
+    // Operand evaluation and identity boxing may precede this guard. Only the
+    // admitted Number/concrete-Array probe and its hit must stay call-free.
+    let region = &body[start..=hit];
     assert!(
-        prefix[load..]
-            .iter()
-            .any(|op| matches!(op, Operator::BrIf { .. })),
-        "a successful own-data load bypasses property-key conversion"
-    );
-    assert!(
-        !prefix[cast..].iter().any(|op| matches!(
+        !region.iter().any(|op| matches!(
             op,
             Operator::StructNew { .. }
+                | Operator::StructNewDefault { .. }
                 | Operator::ArrayNew { .. }
                 | Operator::ArrayNewDefault { .. }
                 | Operator::ArrayNewFixed { .. }
+                | Operator::ArrayNewData { .. }
+                | Operator::ArrayNewElem { .. }
                 | Operator::Call { .. }
                 | Operator::CallRef { .. }
+                | Operator::CallIndirect { .. }
+                | Operator::ReturnCall { .. }
+                | Operator::ReturnCallRef { .. }
+                | Operator::ReturnCallIndirect { .. }
         )),
-        "the packed read arm allocates no descriptors or keys and calls no user code"
+        "the complete numeric hit path allocates nothing and calls no runtime or user code"
     );
+    for layout in [
+        GcSnapshotLayout::ArrayValues,
+        GcSnapshotLayout::ArrayNumbers,
+        GcSnapshotLayout::ArrayNumberPresence,
+    ] {
+        let backing = module.witness_type(layout);
+        assert!(
+            region.iter().any(|op| matches!(op,
+            Operator::ArrayGet { array_type_index } if *array_type_index == backing)),
+            "the hit reads each actual live packed backing: {layout:?}"
+        );
+    }
+    if let Some((boxing, get)) = complete_get_v {
+        let boxing = calls_to(boxing);
+        let get = calls_to(get);
+        assert_eq!(boxing.len(), 1, "one saved-operand ToObject fallback");
+        assert_eq!(get.len(), 1, "one saved-receiver ObjectRead fallback");
+        assert!(
+            hit < conversion && boxing[0] < conversion && conversion < get[0] && get[0] < exit,
+            "the actual hit skips the ordered key-conversion/Get fallback; boxing precedes key conversion"
+        );
+    }
 }
 
 fn frame_end(body: &[Operator<'_>], start: usize) -> usize {
@@ -472,8 +540,10 @@ function repeatedRead(record, count, callback) {
             assert_numeric_probe_before_conversion(
                 computed,
                 program.imported_runtime_function(&runtime, key_conversion),
+                &runtime,
+                Some((program.imported_runtime_function(&runtime, boxing), canonical_get)),
             );
-            assert_numeric_probe_before_conversion(dynamic_read, key_conversion);
+            assert_numeric_probe_before_conversion(dynamic_read, key_conversion, &runtime, None);
             assert!(
                 calls(cached_body, object_read_definition),
                 "cache miss retains full Get with its canonical key and explicit receiver"
