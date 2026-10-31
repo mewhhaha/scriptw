@@ -38,9 +38,13 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   reverted. [Bounded whole-trip affine composition](whole-trip-affine-20261031.json)
   now improves original/ordinary integer execution; all live guards, completion
   and fallbacks remain. Keep its slower singleton/derived retained and small-join
-  observations explicit. Next measure eager Date-family deferral with canonical
-  demand, global mutation, alias, foreign-Realm and snapshot ownership preserved.
-  Its 203-record method slice is a startup-work bound, not a net RSS prediction.
+  observations explicit. [Date-family deferral](runtime-date-demand-20261031.json)
+  now improves normal-cache startup 7–8% behind ABI 42's closed demand boundary;
+  1,312 selected native checks and 106 original Test262 variants pass. Preserve
+  its first-Date/retained-Date/large-join costs and higher selected RSS; the
+  203-record dormant slice is not a net memory saving. Next measure the live
+  dictionary key summary for packed push, then a separately validated immediate
+  numeric-presence bitmap. Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

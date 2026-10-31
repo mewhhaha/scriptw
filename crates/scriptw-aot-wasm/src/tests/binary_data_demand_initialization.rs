@@ -2,8 +2,9 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredBinaryDataConstructor, GcHeapType, GcNullability, GcSnapshotField, GlobalLedger,
-    IntrinsicTable, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
+    DeferredBinaryDataConstructor, FinalizedRuntimeModule, GcHeapType, GcNullability,
+    GcSnapshotField, GlobalLedger, IntrinsicTable, NonNullable, PropertyValue, RealmRecord,
+    RealmRecordSchema, RuntimeModuleTypes, RuntimeSchema,
 };
 use crate::heap::BinaryDataInitializationState;
 
@@ -122,6 +123,42 @@ fn named(names: &BTreeMap<u32, String>, requested: &str) -> u32 {
         .collect();
     assert_eq!(found.len(), 1, "one actual R body for {requested}");
     found[0]
+}
+
+fn binary_data_state_field(runtime: &FinalizedRuntimeModule) -> u32 {
+    let schema = runtime.globals().schema();
+    let mut function = crate::code_sink::Function::with_parameters(
+        crate::code_sink::LocalDeclarations::from_types([]),
+        vec![wasm_encoder::ValType::Ref(
+            schema.reference_type::<RealmRecord>(GcNullability::NonNullable),
+        )],
+    );
+    let realm = schema.parameter_gc::<RealmRecord, NonNullable>(0, &mut function);
+    let state = schema.reserve_i32_local(&mut function);
+    schema
+        .field(RealmRecordSchema::BINARY_DATA_STATE)
+        .read(&realm, schema, &mut function)
+        .store(state, &mut function);
+    realm.clear(&mut function);
+    schema.release_i32_local(state, &mut function);
+    function.instruction(&wasm_encoder::Instruction::End);
+    let bytes = super::error_demand_initialization::encode_realm_probe(runtime, function);
+    let reads: Vec<_> = body(&bytes, 0)
+        .into_iter()
+        .filter_map(|op| match op {
+            Operator::StructGet {
+                struct_type_index,
+                field_index,
+            } if struct_type_index == type_index::<RealmRecord>(schema) => Some(field_index),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        reads.len(),
+        1,
+        "one typed BINARY_DATA_STATE declaration read"
+    );
+    reads[0]
 }
 
 #[test]
@@ -263,14 +300,7 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
     let (types, declarations, exports) = inventory(bytes);
-    let wasmparser::CompositeInnerType::Struct(realm) =
-        &types[realm_index as usize].composite_type.inner
-    else {
-        panic!("Realm is a physical struct");
-    };
-    // ABI 40 appends Error state after the existing binary-data state.
-    // Observe the physical tail without exposing encoder field ordinals.
-    let state_field = realm.fields.len() as u32 - 2;
+    let state_field = binary_data_state_field(&registered);
     assert!(exports.contains(&ensure_index));
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[ensure_index as usize] as usize]
@@ -330,13 +360,10 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
         .windows(2)
         .enumerate()
         .filter_map(|(index, ops)| match ops {
-            [
-                Operator::I32Const { value },
-                Operator::StructSet {
-                    struct_type_index,
-                    field_index,
-                },
-            ] if *struct_type_index == realm_index && *field_index == state_field => {
+            [Operator::I32Const { value }, Operator::StructSet {
+                struct_type_index,
+                field_index,
+            }] if *struct_type_index == realm_index && *field_index == state_field => {
                 Some((index + 1, *value))
             }
             _ => None,
@@ -530,21 +557,15 @@ fn physical_canonical_binary_data_reads_ensure_the_same_realm_before_table_acces
                 let projection = ops[call + 1..position].iter().position(|op| matches!(op,
                     Operator::StructGet { struct_type_index, field_index } if *struct_type_index == realm && *field_index == field))
                     .map(|offset| call + 1 + offset).expect("read the ensured Realm's table");
-                let [
-                    Operator::LocalGet {
-                        local_index: ensured_realm,
-                    },
-                    Operator::RefAsNonNull,
-                ] = &ops[call - 2..call]
+                let [Operator::LocalGet {
+                    local_index: ensured_realm,
+                }, Operator::RefAsNonNull] = &ops[call - 2..call]
                 else {
                     panic!("ensure receives its actual defining Realm");
                 };
-                let [
-                    Operator::LocalGet {
-                        local_index: read_realm,
-                    },
-                    Operator::RefAsNonNull,
-                ] = &ops[projection - 2..projection]
+                let [Operator::LocalGet {
+                    local_index: read_realm,
+                }, Operator::RefAsNonNull] = &ops[projection - 2..projection]
                 else {
                     panic!("table projection receives its actual defining Realm");
                 };

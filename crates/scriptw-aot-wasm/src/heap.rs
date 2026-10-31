@@ -165,6 +165,13 @@ runtime_scalar_domain!(ErrorInitializationState, 0, {
     Ready = 2,
 });
 
+// Initialization of one Realm's complete canonical Date graph.
+runtime_scalar_domain!(DateInitializationState, 0, {
+    Dormant = 0,
+    Building = 1,
+    Ready = 2,
+});
+
 // Public Error recipes select only one of the nine canonical constructors.
 runtime_scalar_domain!(ErrorIntrinsicConstructor, 0, {
     Error = 0,

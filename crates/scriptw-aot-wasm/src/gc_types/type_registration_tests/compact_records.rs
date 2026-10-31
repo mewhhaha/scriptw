@@ -1,6 +1,10 @@
 use super::*;
 use crate::gc_types::host::GcHostField;
 use crate::heap::StoredPropertyAttributes;
+use wasmtime_environ::{
+    copying::CopyingTypeLayouts, EngineOrModuleTypeIndex, GcTypeLayouts, ModuleInternedTypeIndex,
+    WasmFieldType, WasmHeapType, WasmRefType, WasmStorageType, WasmStructType, WasmValType,
+};
 
 #[test]
 fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
@@ -29,6 +33,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .raw();
     let error_index = schema
         .struct_type::<DeferredErrorConstructor>()
+        .type_index()
+        .raw();
+    let date_index = schema
+        .struct_type::<DeferredDateConstructor>()
         .type_index()
         .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
@@ -68,6 +76,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         intl_index,
         binary_index,
         error_index,
+        date_index,
     ];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
@@ -135,14 +144,13 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         );
     }
 
-    for namespace_index in [temporal_index, intl_index] {
-        let CompositeInnerType::Struct(namespace) =
-            &types[namespace_index as usize].composite_type.inner
+    for recipe_index in [temporal_index, intl_index, date_index] {
+        let CompositeInnerType::Struct(recipe) = &types[recipe_index as usize].composite_type.inner
         else {
-            panic!("deferred namespace must be a registered struct");
+            panic!("deferred family recipe must be a registered struct");
         };
         assert_eq!(
-            namespace
+            recipe
                 .fields
                 .iter()
                 .map(|field| (field.element_type, field.mutable))
@@ -160,6 +168,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         RealmRecordSchema::INTL_STATE.ordinal(),
         RealmRecordSchema::BINARY_DATA_STATE.ordinal(),
         RealmRecordSchema::ERROR_STATE.ordinal(),
+        RealmRecordSchema::DATE_STATE.ordinal(),
     ] {
         let state = &realm.fields[field.raw() as usize];
         assert!(state.mutable);
@@ -176,6 +185,20 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         assert!(namespace.mutable);
         assert_eq!(namespace.element_type, reference(stored_index, true));
     }
+    let intrinsics_index = schema.array_type::<IntrinsicTable>().type_index().raw();
+    let CompositeInnerType::Array(intrinsics) =
+        &types[intrinsics_index as usize].composite_type.inner
+    else {
+        panic!("canonical intrinsics must retain their registered array type");
+    };
+    assert_eq!(intrinsics.0.element_type, reference(stored_index, false));
+    assert!(intrinsics.0.mutable);
+    let intrinsics_edge = &realm.fields[RealmRecordSchema::INTRINSICS.ordinal().raw() as usize];
+    assert_eq!(
+        intrinsics_edge.element_type,
+        reference(intrinsics_index, false)
+    );
+    assert!(!intrinsics_edge.mutable);
 
     let descriptor_index = schema
         .struct_type::<PropertyDescriptor>()
@@ -199,6 +222,91 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
     for field in &descriptor.fields[2..] {
         assert_eq!(field.element_type, reference(stored_index, false));
     }
+}
+
+#[test]
+fn date_recipe_and_realm_fit_the_actual_copying_collector_records() {
+    let (runtime, bytes) = encoded(ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ));
+    let (types, _, _) = declarations(&bytes);
+    let schema = runtime.globals().schema();
+    let collector_layout = |index: u32| {
+        let CompositeInnerType::Struct(record) = &types[index as usize].composite_type.inner else {
+            panic!("the actual declaration must be a GC struct");
+        };
+        // Use the pinned product collector's implementation, preserving the
+        // actual encoded field widths, nullability and concrete edge kinds.
+        let fields = record
+            .fields
+            .iter()
+            .map(|field| {
+                let element_type = match field.element_type {
+                    wasmparser::StorageType::Val(wasmparser::ValType::I32) => {
+                        WasmStorageType::Val(WasmValType::I32)
+                    }
+                    wasmparser::StorageType::Val(wasmparser::ValType::I64) => {
+                        WasmStorageType::Val(WasmValType::I64)
+                    }
+                    wasmparser::StorageType::Val(wasmparser::ValType::Ref(reference)) => {
+                        let wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(
+                            index,
+                        )) = reference.heap_type()
+                        else {
+                            panic!("the Date recipe and Realm retain concrete reference types");
+                        };
+                        let index_type = EngineOrModuleTypeIndex::Module(
+                            ModuleInternedTypeIndex::from_u32(index),
+                        );
+                        let heap_type = match &types[index as usize].composite_type.inner {
+                            CompositeInnerType::Struct(_) => {
+                                WasmHeapType::ConcreteStruct(index_type)
+                            }
+                            CompositeInnerType::Array(_) => WasmHeapType::ConcreteArray(index_type),
+                            unexpected => panic!("unexpected Date/Realm edge type: {unexpected:?}"),
+                        };
+                        WasmStorageType::Val(WasmValType::Ref(WasmRefType {
+                            nullable: reference.is_nullable(),
+                            heap_type,
+                        }))
+                    }
+                    unexpected => panic!("unexpected Date/Realm field: {unexpected:?}"),
+                };
+                WasmFieldType {
+                    element_type,
+                    mutable: field.mutable,
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        CopyingTypeLayouts
+            .struct_layout(&WasmStructType { fields })
+            .unwrap()
+    };
+    let recipe = collector_layout(
+        schema
+            .struct_type::<DeferredDateConstructor>()
+            .type_index()
+            .raw(),
+    );
+    assert_eq!(recipe.size, 32);
+    assert_eq!(recipe.align, 16);
+    assert_eq!(recipe.fields.len(), 1);
+    assert_eq!(recipe.fields[0].offset, 16);
+    assert!(recipe.fields[0].is_gc_ref);
+
+    let realm = collector_layout(schema.struct_type::<RealmRecord>().type_index().raw());
+    assert_eq!(realm.size, 96);
+    assert_eq!(realm.align, 16);
+    assert_eq!(realm.fields.len(), 17);
+    assert_eq!(
+        realm.fields[RealmRecordSchema::DATE_STATE.ordinal().raw() as usize].offset,
+        88,
+    );
+    assert_eq!(
+        realm.fields.iter().filter(|field| field.is_gc_ref).count(),
+        10
+    );
 }
 
 #[test]

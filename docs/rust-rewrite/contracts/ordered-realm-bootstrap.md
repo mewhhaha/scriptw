@@ -37,6 +37,32 @@ and were reverted. Exact-ID leaves retain their original checked code allocation
 name resolution and source resolution, followed by the shared callable tail.
 Defining-Realm roots, aliases and completed-cache publication stay ordered.
 
+ABI 42 additionally demand-initializes the defining Realm's Date graph. Global
+insertion order and the writable, nonenumerable, configurable data descriptor
+remain; its value edge is a private `DeferredDateConstructor` with one Realm
+reference. Own-key/existence queries, delete and attribute-only updates retain
+that edge without observing its value. Value exposure resolves the captured
+Realm's canonical DateConstructor rather than rewriting the public global.
+
+`RealmEnsureDate` changes Dormant to Building, creates and roots the ordinary
+DatePrototype in its existing slot, and uses the original constructor producer
+to close/root the constructor/prototype cycle before installing methods. The two
+method runs and single UTC/GMT alias recipe retain all 51 publications and their
+flags/order. Ready is stored last. Only a module-private build capability reads
+completed Date slots during Building; other reads trap on incomplete reentry.
+The nonnull IntrinsicTable keeps shared undefined placeholders in slots 48/112
+while dormant. No Date instance layout or snapshot mode is added.
+
+Normal canonical reads, native callable materialization, foreign newTarget default
+prototype fallback and rooted property snapshots share the same demand owner.
+Default prototype demand follows the ordinary Get of newTarget.prototype and
+GetFunctionRealm, preserving abrupt completion and object-valued alternatives.
+Delete/overwrite/accessor/freeze changes to a public Date global stay in force;
+private demand does not reinstall it. Metadata construction reads no clock or
+time zone and does not initialize Intl or Temporal. Allocation/resource failure
+can now occur at first observation; it cannot publish a partial successful graph.
+This batch requires its own semantic and measured acceptance.
+
 `IntrinsicConstructorAllocate` receives the caller's already rooted native
 header, exact typed executable code, defining Realm and unresolved runtime source
 ordinal. Its checked producer admits only uniform strict native constructors.

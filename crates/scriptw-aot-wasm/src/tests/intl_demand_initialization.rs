@@ -2,9 +2,9 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredIntlNamespace, GcHeapType, GcNullability, GcSnapshotField, GlobalLedger,
-    IntrinsicTable, OrdinaryObject, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
-    StoredValue,
+    DeferredIntlNamespace, FinalizedRuntimeModule, GcHeapType, GcNullability, GcSnapshotField,
+    GlobalLedger, IntrinsicTable, NonNullable, Nullable, OrdinaryObject, PropertyValue,
+    RealmRecord, RealmRecordSchema, RuntimeModuleTypes, RuntimeSchema, StoredValue,
 };
 use crate::heap::IntlInitializationState;
 
@@ -115,6 +115,52 @@ fn named(names: &BTreeMap<u32, String>, requested: &str) -> u32 {
     found[0]
 }
 
+fn intl_fields(runtime: &FinalizedRuntimeModule) -> (u32, u32) {
+    let schema = runtime.globals().schema();
+    let mut function = crate::code_sink::Function::with_parameters(
+        crate::code_sink::LocalDeclarations::from_types([]),
+        vec![wasm_encoder::ValType::Ref(
+            schema.reference_type::<RealmRecord>(GcNullability::NonNullable),
+        )],
+    );
+    let realm = schema.parameter_gc::<RealmRecord, NonNullable>(0, &mut function);
+    let state = schema.reserve_i32_local(&mut function);
+    schema
+        .field(RealmRecordSchema::INTL_STATE)
+        .read(&realm, schema, &mut function)
+        .store(state, &mut function);
+    let namespace = schema
+        .reserve_gc_local::<StoredValue, Nullable>(&mut function)
+        .initialize(
+            schema
+                .field(RealmRecordSchema::INTL_NAMESPACE)
+                .read(&realm, schema, &mut function)
+                .reference(),
+            &mut function,
+        );
+    namespace.clear(&mut function);
+    realm.clear(&mut function);
+    schema.release_i32_local(state, &mut function);
+    function.instruction(&wasm_encoder::Instruction::End);
+    let bytes = super::error_demand_initialization::encode_realm_probe(runtime, function);
+    let reads: Vec<_> = body(&bytes, 0)
+        .into_iter()
+        .filter_map(|op| match op {
+            Operator::StructGet {
+                struct_type_index,
+                field_index,
+            } if struct_type_index == type_index::<RealmRecord>(schema) => Some(field_index),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        reads.len(),
+        2,
+        "typed Intl state and namespace declaration reads"
+    );
+    (reads[0], reads[1])
+}
+
 #[test]
 fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi() {
     // A program with no Intl reference still retains its complete canonical R.
@@ -215,15 +261,7 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
     let (types, declarations, exports) = inventory(bytes);
-    let wasmparser::CompositeInnerType::Struct(realm) =
-        &types[realm_index as usize].composite_type.inner
-    else {
-        panic!("Realm is a physical struct");
-    };
-    // The physical tail is Intl state/namespace, binary-data state, Error state.
-    // Check its ABI-40 types without exposing private encoder ordinals.
-    let state_field = realm.fields.len() as u32 - 4;
-    let namespace_field = realm.fields.len() as u32 - 3;
+    let (state_field, namespace_field) = intl_fields(&registered);
     assert!(resolve.windows(5).any(|ops| matches!(ops,
         [Operator::StructGet { struct_type_index, field_index }, Operator::LocalSet { local_index: retained_realm },
          Operator::LocalGet { local_index: argument_realm }, Operator::RefAsNonNull, Operator::Call { function_index }]

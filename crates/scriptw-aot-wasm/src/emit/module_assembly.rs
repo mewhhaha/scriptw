@@ -1454,6 +1454,7 @@ fn emit_script_module_with_factory(
             RealmEnsureTemporal, compile_realm_ensure_temporal_helper;
             RealmEnsureBinaryData, compile_realm_ensure_binary_data_helper;
             RealmEnsureErrors, compile_realm_ensure_errors_helper;
+            RealmEnsureDate, compile_realm_ensure_date_helper;
             RealmEnsureIntl, compile_realm_ensure_intl_helper;
             AsyncGeneratorStartBody, compile_async_generator_start_body_helper;
             AsyncGeneratorDrainQueue, compile_async_generator_drain_queue_helper;

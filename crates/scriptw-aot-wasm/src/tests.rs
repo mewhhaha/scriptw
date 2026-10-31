@@ -11,6 +11,7 @@ mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
 mod constant_leaf;
+mod date_demand_initialization;
 mod direct_eval_dispatch;
 mod error_demand_initialization;
 mod guarded_number_add;

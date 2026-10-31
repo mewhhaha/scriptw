@@ -11,6 +11,8 @@ use scriptw_ir::StandardBuiltinInstaller;
 
 mod error_initialization;
 pub(crate) use error_initialization::ErrorIntrinsicBuild;
+mod date_initialization;
+pub(crate) use date_initialization::DateIntrinsicBuild;
 mod binary_data_initialization;
 pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod intl_initialization;
@@ -1111,12 +1113,6 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         primitive.clear(function);
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::DatePrototype,
-            &object_prototype,
-            function,
-        )?;
         self.emit_bootstrap_constructor_from_slot(
             StandardBuiltinId::FunctionConstructor,
             &context,
@@ -1187,22 +1183,16 @@ impl<'a> FunctionBuilder<'a> {
             array.clear(function);
         }
         self.emit_bootstrap_iterator_prototypes(&context, function)?;
-        for (builtin, slot) in [
-            (
-                StandardBuiltinId::DateConstructor,
-                NonArrayRealmIntrinsicSlot::DatePrototype,
-            ),
-            (
+        if self
+            .runtime_bootstrap_plan
+            .should_initialize_standard_builtin(StandardBuiltinId::RegExpConstructor)
+        {
+            self.emit_bootstrap_constructor_from_slot(
                 StandardBuiltinId::RegExpConstructor,
+                &context,
                 NonArrayRealmIntrinsicSlot::RegExpPrototype,
-            ),
-        ] {
-            if self
-                .runtime_bootstrap_plan
-                .should_initialize_standard_builtin(builtin)
-            {
-                self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
-            }
+                function,
+            )?;
         }
         for (builtin, slot) in [
             (
@@ -1572,6 +1562,15 @@ impl<'a> FunctionBuilder<'a> {
                     continue;
                 }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
+                    if *builtin == StandardBuiltinId::DateConstructor {
+                        self.emit_install_deferred_date_constructor(
+                            &object,
+                            &binding.name,
+                            &bootstrap.realm,
+                            function,
+                        )?;
+                        continue;
+                    }
                     if let Some(constructor) =
                         crate::heap::ErrorIntrinsicConstructor::from_builtin(*builtin)
                     {

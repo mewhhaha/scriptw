@@ -6,6 +6,7 @@
 //! namespace recipes initialize their complete defining-Realm graph together.
 
 use super::*;
+use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::*;
 use crate::runtime_helpers::{
     DeferredIntrinsicInstallArguments, HelperParameters, IntrinsicDataPublishArguments,
@@ -165,6 +166,35 @@ impl FunctionBuilder<'_> {
             .value
             .load(s, &mut f)
             .cast_subtype::<StoredValue>(s, &mut f);
+        f.instruction(&Instruction::Return);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
+            .is_subtype::<DeferredDateConstructor>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredDateConstructor>(s, &mut f),
+            &mut f,
+        );
+        let realm = s.reserve_gc_local(&mut f).initialize(
+            s.field(DeferredDateConstructorSchema::REALM)
+                .read(&recipe, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let stored = self.emit_load_non_array_realm_intrinsic_stored(
+            &realm,
+            NonArrayRealmIntrinsicSlot::DateConstructor,
+            &mut f,
+        );
+        stored.load(s, &mut f);
+        stored.clear(&mut f);
+        realm.clear(&mut f);
+        recipe.clear(&mut f);
         f.instruction(&Instruction::Return);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

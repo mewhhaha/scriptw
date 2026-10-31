@@ -47,7 +47,7 @@ mapping; borrowing raw Wasm does not borrow executable native memory.
 
 ## Compact GC records
 
-The current private runtime ABI is layout 41. Stored values put the 64-bit scalar
+The current private runtime ABI is layout 42. Stored values put the 64-bit scalar
 before the 32-bit tag and GC reference. Under the pinned copying collector's
 16-byte object header and alignment, this reduces each record from 48 to 32
 bytes while retaining the complete scalar and reference payload. The separate
@@ -84,6 +84,28 @@ independently of public namespace deletion or replacement. Own-key enumeration
 can inspect unresolved property recipes without creating those graphs; reads
 that expose property values resolve them through the defining Realm.
 The callable shared by Array and TypedArray `toString` remains core-owned.
+
+Date's ordinary global data descriptor holds one immutable defining-Realm recipe.
+First value observation builds the canonical constructor/prototype graph through
+`RealmEnsureDate`; no public global supplies a parent or receives a replacement
+publication. Its two existing intrinsic slots retain the shared nonnull undefined
+record while dormant. A closed state and private build capability prevent partial
+observation and keep every normal slot read behind the demand gate. The graph
+retains its Realm after the requesting program is dropped. This changes schema,
+helper and package ownership in ABI 42, with no collector/stack/default change.
+
+The deferred Date method slice contains 203 records / 7,312 gross bytes before
+constructor, prototype, backing and String costs. Actual collector layout checks
+confirm a 32-byte global recipe and a 96-byte Realm record. First use still
+performs the original installation; all 51 Date native roots remain available.
+
+The [accepted Date checkpoint](../runtime-date-demand-20261031.json) is a scoped
+fresh-Realm startup CPU improvement. In its eight-source normal-cache follow-up,
+startup improved 7.27% median / 11.59% mean at the original boundary and 7.70%
+median / 9.38% mean at the ordinary boundary. First-demand and retained
+repeated-use costs remain separate tradeoffs. Selected-case RSS increased about 0.15–0.46 MiB;
+the gross dormant slice establishes neither a net memory gain nor an improvement
+for every workload.
 
 ## Execution stacks
 
@@ -154,6 +176,16 @@ Unsupported backing filesystems retain bounded-source decoding into the existing
 weak byte lease; concurrent fallback loads can share that transient owner.
 Subsequent mappings reuse the admitted private file without retaining decoded
 storage, an Engine, or a Module.
+
+Use a disk-backed `SCRIPTW_CACHE_DIR` for footprint comparisons, and record its
+filesystem and native backing mode with the image identities. Moving a cache to
+tmpfs/ramfs selects the existing fallback to anonymous loading and can change RSS
+without changing the compiler or image. An unscored same-host, same-image control
+reproduced this roughly 66 MB runtime copy: after-admission private dirty memory
+was 69,378,048 bytes with tmpfs versus 3,354,624 bytes with normal overlay-backed
+storage. These process endpoints do not measure live JavaScript ownership.
+Compare RSS only across matching cache filesystems and native backing modes;
+keep this admission effect separate from Date's CPU result.
 
 The packed Cargo array remains part of the executable. On Linux, its pointer
 and length select an exact read-only file-backed VMA in bounded

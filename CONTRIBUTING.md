@@ -154,6 +154,12 @@ and resource policy; filenames alone prove nothing. Keep fresh evidence director
 for new cohorts and preserve failed receipts. Shared immutable runtime images and
 bounded caches reduce rebuilds without sharing mutable JavaScript state.
 
+Use a disk-backed `SCRIPTW_CACHE_DIR` for footprint comparisons and record the
+cache filesystem and native backing mode alongside image digests. On Linux, the
+Cargo runtime's private-file loader rejects tmpfs/ramfs and uses anonymous loading.
+Moving a verification cache to `/tmp` or `/dev/shm` can change RSS for the same
+image. Compare RSS only across matching cache filesystems and backing modes.
+
 Keep evidence in durable workspace/archive storage; `/dev/shm` is scratch. Preserve
 outputs by digest before moving them, inspect symlink/hardlink destinations before
 a rebuild, and account for actual filesystem free space and cgroup file pages.

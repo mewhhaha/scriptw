@@ -2,8 +2,9 @@
 use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
-    DeferredErrorConstructor, GcHeapType, GcNullability, GcSnapshotField, GlobalLedger,
-    IntrinsicTable, PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
+    DeferredErrorConstructor, FinalizedRuntimeModule, GcHeapType, GcNullability, GcSnapshotField,
+    GlobalLedger, IntrinsicTable, NonNullable, PropertyValue, RealmRecord, RealmRecordSchema,
+    RuntimeModuleTypes, RuntimeSchema,
 };
 use crate::heap::ErrorInitializationState;
 
@@ -28,7 +29,7 @@ const ERROR_SLOTS: [Slot; 18] = [
     Slot::ReferenceErrorConstructor,
 ];
 
-fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
+pub(super) fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
     let wasm_encoder::HeapType::Concrete(index) = schema
         .reference_type::<T>(GcNullability::NonNullable)
         .heap_type
@@ -38,7 +39,7 @@ fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
     index
 }
 
-fn reference(index: u32, nullable: bool) -> wasmparser::ValType {
+pub(super) fn reference(index: u32, nullable: bool) -> wasmparser::ValType {
     wasmparser::ValType::Ref(
         wasmparser::RefType::new(
             nullable,
@@ -48,7 +49,7 @@ fn reference(index: u32, nullable: bool) -> wasmparser::ValType {
     )
 }
 
-fn body(bytes: &[u8], target: u32) -> Vec<Operator<'_>> {
+pub(super) fn body(bytes: &[u8], target: u32) -> Vec<Operator<'_>> {
     let mut index = imported_function_count_in_bytes(bytes);
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
@@ -66,7 +67,7 @@ fn body(bytes: &[u8], target: u32) -> Vec<Operator<'_>> {
     panic!("named R helper has a physical body");
 }
 
-fn inventory(bytes: &[u8]) -> (Vec<wasmparser::SubType>, Vec<u32>, BTreeSet<u32>) {
+pub(super) fn inventory(bytes: &[u8]) -> (Vec<wasmparser::SubType>, Vec<u32>, BTreeSet<u32>) {
     let (mut types, mut declarations, mut exports) = (Vec::new(), Vec::new(), BTreeSet::new());
     for payload in Parser::new(0).parse_all(bytes) {
         match payload.unwrap() {
@@ -101,13 +102,68 @@ fn inventory(bytes: &[u8]) -> (Vec<wasmparser::SubType>, Vec<u32>, BTreeSet<u32>
     (types, declarations, exports)
 }
 
-fn named(names: &BTreeMap<u32, String>, requested: &str) -> u32 {
+pub(super) fn named(names: &BTreeMap<u32, String>, requested: &str) -> u32 {
     let found: Vec<_> = names
         .iter()
         .filter_map(|(&index, name)| (name == requested).then_some(index))
         .collect();
     assert_eq!(found.len(), 1, "one actual R body for {requested}");
     found[0]
+}
+
+pub(super) fn encode_realm_probe(
+    runtime: &FinalizedRuntimeModule,
+    function: crate::code_sink::Function,
+) -> Vec<u8> {
+    let mut functions = wasm_encoder::FunctionSection::new();
+    functions.function(crate::runtime_helpers::RuntimeHelperId::RealmEnsureErrors.type_index());
+    let mut code = wasm_encoder::CodeSection::new();
+    code.function(&function.into_body());
+    let mut module = wasm_encoder::Module::new();
+    module.section(runtime.types());
+    module.section(&functions);
+    module.section(&code);
+    let bytes = module.finish();
+    Validator::new_with_features(WasmFeatures::all())
+        .validate_all(&bytes)
+        .expect(
+            "test-local (RealmRecord) -> void probe validates with its actual registered types",
+        );
+    bytes
+}
+
+fn error_state_field(runtime: &FinalizedRuntimeModule) -> u32 {
+    let schema = runtime.globals().schema();
+    // Ask the typed field reader to encode its actual declaration. Appending
+    // another demand family to RealmRecord must not retarget this proof.
+    let mut function = crate::code_sink::Function::with_parameters(
+        crate::code_sink::LocalDeclarations::from_types([]),
+        vec![wasm_encoder::ValType::Ref(
+            schema.reference_type::<RealmRecord>(GcNullability::NonNullable),
+        )],
+    );
+    let realm = schema.parameter_gc::<RealmRecord, NonNullable>(0, &mut function);
+    let state = schema.reserve_i32_local(&mut function);
+    schema
+        .field(RealmRecordSchema::ERROR_STATE)
+        .read(&realm, schema, &mut function)
+        .store(state, &mut function);
+    realm.clear(&mut function);
+    schema.release_i32_local(state, &mut function);
+    function.instruction(&wasm_encoder::Instruction::End);
+    let bytes = encode_realm_probe(runtime, function);
+    let reads: Vec<_> = body(&bytes, 0)
+        .into_iter()
+        .filter_map(|op| match op {
+            Operator::StructGet {
+                struct_type_index,
+                field_index,
+            } if struct_type_index == type_index::<RealmRecord>(schema) => Some(field_index),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reads.len(), 1, "one test-local typed ERROR_STATE read");
+    reads[0]
 }
 
 #[test]
@@ -197,13 +253,7 @@ fn canonical_runtime_defers_the_complete_error_graph_with_a_void_realm_abi() {
     let schema = registered.globals().schema();
     let realm_index = type_index::<RealmRecord>(schema);
     let (types, declarations, exports) = inventory(bytes);
-    let wasmparser::CompositeInnerType::Struct(realm) =
-        &types[realm_index as usize].composite_type.inner
-    else {
-        panic!("Realm is a physical struct");
-    };
-    // Error state is the appended ABI-40 field, not a public encoder index.
-    let state_field = realm.fields.len() as u32 - 1;
+    let state_field = error_state_field(&registered);
     assert!(exports.contains(&ensure_index));
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[ensure_index as usize] as usize]
@@ -275,13 +325,10 @@ fn canonical_runtime_defers_the_complete_error_graph_with_a_void_realm_abi() {
         .windows(2)
         .enumerate()
         .filter_map(|(index, ops)| match ops {
-            [
-                Operator::I32Const { value },
-                Operator::StructSet {
-                    struct_type_index,
-                    field_index,
-                },
-            ] if *struct_type_index == realm_index && *field_index == state_field => {
+            [Operator::I32Const { value }, Operator::StructSet {
+                struct_type_index,
+                field_index,
+            }] if *struct_type_index == realm_index && *field_index == state_field => {
                 Some((index + 1, *value))
             }
             _ => None,
@@ -499,21 +546,15 @@ fn physical_canonical_error_reads_ensure_the_same_realm_before_table_access() {
                 let projection = ops[call + 1..position].iter().position(|op| matches!(op,
                     Operator::StructGet { struct_type_index, field_index } if *struct_type_index == realm && *field_index == field))
                     .map(|offset| call + 1 + offset).expect("read the ensured Realm's table");
-                let [
-                    Operator::LocalGet {
-                        local_index: ensured_realm,
-                    },
-                    Operator::RefAsNonNull,
-                ] = &ops[call - 2..call]
+                let [Operator::LocalGet {
+                    local_index: ensured_realm,
+                }, Operator::RefAsNonNull] = &ops[call - 2..call]
                 else {
                     panic!("ensure receives its actual defining Realm");
                 };
-                let [
-                    Operator::LocalGet {
-                        local_index: read_realm,
-                    },
-                    Operator::RefAsNonNull,
-                ] = &ops[projection - 2..projection]
+                let [Operator::LocalGet {
+                    local_index: read_realm,
+                }, Operator::RefAsNonNull] = &ops[projection - 2..projection]
                 else {
                     panic!("table projection receives its actual defining Realm");
                 };

@@ -372,6 +372,10 @@ impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
     pub(crate) const TABLE_LENGTH: u32 = 159;
 
+    pub(crate) const fn is_date(self) -> bool {
+        matches!(self, Self::DateConstructor | Self::DatePrototype)
+    }
+
     pub(crate) const fn is_error(self) -> bool {
         matches!(
             self,
@@ -753,6 +757,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(schema),
                 GcOperand::constant(crate::heap::BinaryDataInitializationState::Dormant),
                 GcOperand::constant(crate::heap::ErrorInitializationState::Dormant),
+                GcOperand::constant(crate::heap::DateInitializationState::Dormant),
             ),
             function,
         );

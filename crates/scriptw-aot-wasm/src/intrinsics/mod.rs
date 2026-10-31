@@ -180,6 +180,22 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let value = schema.reserve_value_local(function);
         value.set_undefined(function);
+        if builtin == StandardBuiltinId::DateConstructor {
+            // The demand gate either publishes the canonical constructor or
+            // traps; no independent, incomplete constructor fallback exists.
+            self.emit_load_non_array_realm_intrinsic(
+                realm.realm(),
+                crate::functions::NonArrayRealmIntrinsicSlot::DateConstructor,
+                &value,
+                function,
+            );
+            let callable = schema.reserve_gc_local(function).initialize(
+                value.cast_reference::<crate::gc_types::FunctionObject>(schema, function),
+                function,
+            );
+            value.clear(function);
+            return Ok(callable);
+        }
         let slot = crate::module::standard_builtin_function_realm_slot(builtin);
         if let Some(slot) = slot {
             if slot.is_temporal() || slot.is_intl() || slot.is_binary_data() || slot.is_error() {

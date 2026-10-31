@@ -21,10 +21,10 @@ can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
 Runtime initialization uses compact intrinsic-installation tables and defers
-the Error, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
+the Error, Date, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 41
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 42
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
@@ -181,6 +181,17 @@ covers 35 selected native checks through one documented fixture correction and
 calls still vary; small-join ordinary results include a 2.95% median and 38.07%
 mean slowdown in the final control. Every observation is retained; this is a
 scoped CPU improvement, with no RSS or all-workload parity claim.
+
+[Date graph deferral](docs/rust-rewrite/runtime-date-demand-20261031.json)
+improves normal-cache startup by 7.3% in compiler-free execution and 7.7% in
+ordinary invocation across two balanced groups. Validation covers 1,312 selected
+native checks and 106 variants from 53 original Test262 files. The normal-cache
+follow-up preserves eight sources at all three boundaries; the full 21-source
+cohort used the separate anonymous native-backing fallback. First-epoch original
+execution slows 3.46% median / 4.91% mean, repeated Date retained calls slow
+1.58% / 4.69%, and join-4096 original has a 3.94% median slowdown despite a lower
+mean. Selected normal-cache RSS rises 0.15–0.46 MiB. This is a startup CPU
+improvement; memory parity and those control costs remain open.
 
 In the accepted fusion baseline's same-host retained-object comparison, Scriptw's
 RSS was 21.46 MiB versus Scriptc's 17.43 MiB, while private dirty memory was

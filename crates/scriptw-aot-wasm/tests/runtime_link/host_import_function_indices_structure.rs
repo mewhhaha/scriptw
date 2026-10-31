@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 const PLANNING_SOURCE: &str = include_str!("../../src/planning.rs");
+const LIBRARY_SOURCE: &str = include_str!("../../src/lib.rs");
 const GC_HOST_SOURCE: &str = include_str!("../../src/gc_types/host.rs");
 const EMIT_SOURCE: &str = include_str!("../../src/emit/module_assembly.rs");
 const CONTRACT: &str = include_str!(
@@ -348,13 +349,26 @@ fn exact_identifier_count(source: &str, identifier: &str) -> usize {
         .count()
 }
 
-fn count_identifier_in_rust_sources(dir: &Path, identifier: &str) -> usize {
+fn count_identifier_in_rust_sources(
+    dir: &Path,
+    identifier: &str,
+    test_entry: &Path,
+    test_subtree: &Path,
+) -> usize {
     fs::read_dir(dir)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", dir.display()))
         .map(|entry| entry.expect("failed to read Rust source entry").path())
         .map(|path| {
+            if path == test_entry || path == test_subtree {
+                return 0;
+            }
             if path.is_dir() {
-                return count_identifier_in_rust_sources(&path, identifier);
+                return count_identifier_in_rust_sources(
+                    &path,
+                    identifier,
+                    test_entry,
+                    test_subtree,
+                );
             }
             if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
                 return 0;
@@ -364,6 +378,23 @@ fn count_identifier_in_rust_sources(dir: &Path, identifier: &str) -> usize {
             exact_identifier_count(&rust_code(&source).identifiers, identifier)
         })
         .sum()
+}
+
+fn count_identifier_in_product_sources(source_root: &Path, identifier: &str) -> usize {
+    // This exact declaration gives tests.rs and its tests/ descendants one
+    // cfg(test) owner. Keep scratch emitter probes outside the product census
+    // without excluding any production directory or relaxing its role counts.
+    let library = rust_code(LIBRARY_SOURCE);
+    assert_eq!(
+        library.normalized.matches("#[cfg(test)]modtests;").count(),
+        1
+    );
+    assert_eq!(exact_identifier_count(&library.identifiers, "tests"), 1);
+    let test_entry = source_root.join("tests.rs");
+    let test_subtree = source_root.join("tests");
+    assert!(test_entry.is_file());
+    assert!(test_subtree.is_dir());
+    count_identifier_in_rust_sources(source_root, identifier, &test_entry, &test_subtree)
 }
 
 #[test]
@@ -472,7 +503,7 @@ fn authority_has_twenty_six_scalar_roles_and_one_required_role_plus_gc_imports()
         "SystemTimeZoneImportFunctionIndex",
     ] {
         assert_eq!(
-            count_identifier_in_rust_sources(
+            count_identifier_in_product_sources(
                 &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
                 retired
             ),
@@ -485,16 +516,19 @@ fn authority_has_twenty_six_scalar_roles_and_one_required_role_plus_gc_imports()
 fn role_and_authority_census_is_closed_over_product_sources() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     assert_eq!(
-        count_identifier_in_rust_sources(&source_root, "HostImportFunctionIndices"),
+        count_identifier_in_product_sources(&source_root, "HostImportFunctionIndices"),
         5
     );
     assert_eq!(
-        count_identifier_in_rust_sources(&source_root, "RejectRuntimeSemanticsImportFunctionIndex"),
+        count_identifier_in_product_sources(
+            &source_root,
+            "RejectRuntimeSemanticsImportFunctionIndex"
+        ),
         5,
     );
     for (role, _, _, _) in ROLES {
         assert_eq!(
-            count_identifier_in_rust_sources(&source_root, role),
+            count_identifier_in_product_sources(&source_root, role),
             5,
             "{role} census"
         );

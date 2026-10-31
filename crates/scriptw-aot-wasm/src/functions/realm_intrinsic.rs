@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::builtins::{
-    BinaryDataIntrinsicBuild, ErrorIntrinsicBuild, IntlIntrinsicBuild, TemporalIntrinsicBuild,
+    BinaryDataIntrinsicBuild, DateIntrinsicBuild, ErrorIntrinsicBuild, IntlIntrinsicBuild,
+    TemporalIntrinsicBuild,
 };
 use crate::gc_types::{
     ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcStackReference, IntrinsicTable,
@@ -82,6 +83,15 @@ impl FunctionBuilder<'_> {
         slot: NonArrayRealmIntrinsicSlot,
         function: &mut Function,
     ) -> GcLocal<StoredValue> {
+        if slot.is_date() {
+            let schema = self.runtime_schema();
+            schema.call_helper(
+                crate::runtime_helpers::RealmEnsureDateArguments::new(realm),
+                self.runtime_helper_base()
+                    .expect("Date intrinsic reads require registered runtime helpers"),
+                function,
+            );
+        }
         if slot.is_error() {
             let schema = self.runtime_schema();
             schema.call_helper(
@@ -125,6 +135,26 @@ impl FunctionBuilder<'_> {
             namespace.clear(function);
         }
         self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function)
+    }
+
+    /// Only the Date builder may read completed Date slots while Building.
+    pub(crate) fn emit_load_building_date_intrinsic(
+        &mut self,
+        building: &DateIntrinsicBuild<'_>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        assert!(
+            slot.is_date(),
+            "Date build capability used for another family"
+        );
+        self.emit_load_realm_intrinsic_at_index(
+            building.realm(),
+            slot.gc_index(),
+            result,
+            function,
+        );
     }
 
     /// Only the Error builder may read completed Error slots while Building.

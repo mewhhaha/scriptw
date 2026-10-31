@@ -151,6 +151,7 @@ closed_scalar_storage!(
     crate::heap::BinaryDataInitializationState,
     crate::heap::BinaryDataConstructor,
     crate::heap::ErrorInitializationState,
+    crate::heap::DateInitializationState,
     crate::heap::ErrorIntrinsicConstructor,
     crate::heap::DisposableStackState,
     crate::heap::AsyncDisposableStackState,
@@ -874,6 +875,9 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             CONSTRUCTOR: crate::heap::ErrorIntrinsicConstructor, Immutable, NonNullable;
         }
+        struct DeferredDateConstructor: PropertyValue => DeferredDateConstructorSchema {
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+        }
         struct DeferredBinaryDataConstructor: PropertyValue => DeferredBinaryDataConstructorSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             CONSTRUCTOR: crate::heap::BinaryDataConstructor, Immutable, NonNullable;
@@ -1430,6 +1434,7 @@ gc_layout_registry! {
             INTL_NAMESPACE: GcRef<StoredValue>, Mutable, Nullable;
             BINARY_DATA_STATE: crate::heap::BinaryDataInitializationState, Mutable, NonNullable;
             ERROR_STATE: crate::heap::ErrorInitializationState, Mutable, NonNullable;
+            DATE_STATE: crate::heap::DateInitializationState, Mutable, NonNullable;
         }
         // Opt-in host observations retain actual Realm records without adding
         // a JavaScript property or consulting mutable globals/prototypes.
