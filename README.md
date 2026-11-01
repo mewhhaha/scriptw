@@ -62,6 +62,8 @@ calls eliminate temporary objects and call setup. Pure numeric sort callbacks
 have typed entries; packed Number sort snapshots stay unboxed, admit the callback
 once and recognize ordered runs. Writeback retains ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
+Linux profiling records execution-worker CPU alongside wall time, including
+synchronous host work. Unsupported clocks report an explicit reason.
 
 The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
@@ -86,10 +88,15 @@ about 21% lower object medians and 28% lower retained-object medians. Its
 reduces those medians another **2.1–2.8%** and **11.1–11.4%**, respectively,
 against that checkpoint in both blocks. The separate precompiled control records
 0.8–1.0% and 4.35–4.54% lower medians, without a repeated veto. Both R/native
-profiles and the other 15 original programs stay byte-identical. Latest reference
-median wins are 2/17 V8 and 5/17 Scriptc; slower sort, join and retained-object
-reference processes remain in the record. These local cohorts retain their own
-settings and do not refresh published CI results; overall parity remains open.
+profiles and the other 15 original programs stay byte-identical. That checkpoint
+retains its slower sort, join and retained-object reference processes.
+A [fresh gap diagnosis](docs/rust-rewrite/performance-gaps-20261101.json) records
+median and mean wins on 2/17 V8 and 6/17 Scriptc cases with the same accepted
+programs. Array construction dominates several gaps. An identical-binary A/A
+control failed, so the primitive-append prototype remains unbuilt. Worker CPU
+now accompanies wall time and reports complete coverage; noisy observations and
+failed controls remain retained. These local cohorts do not refresh published
+CI results; overall parity remains open.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

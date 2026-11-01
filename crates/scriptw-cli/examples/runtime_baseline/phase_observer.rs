@@ -1,6 +1,8 @@
 //! Opt-in benchmark markers through the ordinary synchronous print hook.
 //! The workload still enters through JS main in a fresh product Store.
-use scriptw_engine::HostHooks;
+use scriptw_engine::{
+    HostHooks, WasmThreadCpuInstant, WasmThreadCpuObservation, WasmThreadCpuUnavailable,
+};
 use serde_json::{json, Value};
 use std::{
     fs::{File, OpenOptions},
@@ -14,6 +16,51 @@ const MARKERS: [&str; 3] = [
     "scriptw:rows:traversal:start",
     "scriptw:rows:traversal:end",
 ];
+
+type CpuReading = Result<WasmThreadCpuInstant, WasmThreadCpuUnavailable>;
+
+struct MarkerTimes {
+    entered: Instant,
+    returned: Instant,
+    entered_cpu: CpuReading,
+    returned_cpu: CpuReading,
+}
+
+struct CpuPhases {
+    construction: WasmThreadCpuObservation,
+    traversal: WasmThreadCpuObservation,
+    combined: WasmThreadCpuObservation,
+    middle_callback: WasmThreadCpuObservation,
+}
+
+impl CpuPhases {
+    fn new(start: &MarkerTimes, middle: &MarkerTimes, end: &MarkerTimes) -> Self {
+        fn span(earlier: &CpuReading, later: &CpuReading) -> WasmThreadCpuObservation {
+            match (earlier, later) {
+                (Ok(earlier), Ok(later)) => later.duration_since(earlier),
+                (Err(reason), _) | (_, Err(reason)) => {
+                    WasmThreadCpuObservation::Unavailable(*reason)
+                }
+            }
+        }
+        Self {
+            construction: span(&start.returned_cpu, &middle.entered_cpu),
+            traversal: span(&middle.returned_cpu, &end.entered_cpu),
+            combined: span(&start.returned_cpu, &end.entered_cpu),
+            middle_callback: span(&middle.entered_cpu, &middle.returned_cpu),
+        }
+    }
+
+    fn json(&self) -> Value {
+        let scope = "marker-callback-worker-thread";
+        json!({
+            "construction": super::thread_cpu_json(&self.construction, scope),
+            "traversal": super::thread_cpu_json(&self.traversal, scope),
+            "combined": super::thread_cpu_json(&self.combined, scope),
+            "middle_callback": super::thread_cpu_json(&self.middle_callback, scope),
+        })
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Region {
@@ -149,7 +196,7 @@ impl Drop for PerfControl {
 struct State {
     active_invocation: bool,
     measured: bool,
-    times: Vec<(Instant, Instant)>,
+    times: Vec<MarkerTimes>,
     error: Option<String>,
     control: Option<PerfControl>,
     control_spans: Vec<(bool, Duration)>,
@@ -191,16 +238,18 @@ impl Observer {
         }
         state.active_invocation = false;
         let t = &state.times;
+        let cpu = CpuPhases::new(&t[0], &t[1], &t[2]);
         Ok(json!({
-            "construction_ns": t[1].0.duration_since(t[0].1).as_nanos(),
-            "traversal_ns": t[2].0.duration_since(t[1].1).as_nanos(),
-            "combined_ns": t[2].0.duration_since(t[0].1).as_nanos(),
-            "middle_callback_ns": t[1].1.duration_since(t[1].0).as_nanos(),
+            "construction_ns": t[1].entered.duration_since(t[0].returned).as_nanos(),
+            "traversal_ns": t[2].entered.duration_since(t[1].returned).as_nanos(),
+            "combined_ns": t[2].entered.duration_since(t[0].returned).as_nanos(),
+            "middle_callback_ns": t[1].returned.duration_since(t[1].entered).as_nanos(),
+            "thread_cpu": cpu.json(),
             "perf_sampled": state.measured && state.control.is_some(),
             "perf_region": state.control.as_ref().map(|control| control.region.as_str()),
             "perf_control_spans": state.control_spans.iter().map(|(enable, elapsed)|
                 json!({"enable":enable,"elapsed_ns":elapsed.as_nanos()})).collect::<Vec<_>>(),
-            "boundary": "Host-hook wall time; marker return/next marker entry includes guest print work. Combined includes middle callback. Perf acknowledgements occur inside callbacks, outside the two individual phase spans. Not isolated CPU or allocation time."
+            "boundary": "Host-hook wall time; marker return/next marker entry includes guest print work. Combined includes middle callback. Perf acknowledgements occur inside callbacks, outside the two individual phase spans. CPU scope and clock-read overhead follow the report's thread_cpu_observation_policy."
         }))
     }
 }
@@ -211,6 +260,7 @@ impl HostHooks for Observer {
             return;
         }
         let entered = Instant::now();
+        let entered_cpu = WasmThreadCpuInstant::now();
         let Ok(mut state) = self.0.lock() else {
             return;
         };
@@ -236,7 +286,14 @@ impl HostHooks for Observer {
                 }
             }
         }
-        state.times.push((entered, Instant::now()));
+        let returned_cpu = WasmThreadCpuInstant::now();
+        let returned = Instant::now();
+        state.times.push(MarkerTimes {
+            entered,
+            returned,
+            entered_cpu,
+            returned_cpu,
+        });
     }
 }
 
@@ -286,6 +343,68 @@ mod tests {
         observer.begin(false).unwrap();
         assert!(observer.begin(true).is_err());
         assert!(observer.finish().is_err());
+    }
+    #[cfg(target_os = "linux")]
+    fn cpu_phases(observer: &Observer) -> CpuPhases {
+        let state = observer.0.lock().unwrap();
+        let [start, middle, end] = state.times.as_slice() else {
+            panic!("all marker endpoints are required");
+        };
+        CpuPhases::new(start, middle, end)
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn cpu_phases_belong_to_the_marker_worker_and_keep_callback_time() {
+        let observer = observer();
+        observer.begin(true).unwrap();
+        let worker = observer.clone();
+        std::thread::spawn(move || {
+            for marker in MARKERS {
+                worker.print_line(marker);
+            }
+        })
+        .join()
+        .unwrap();
+        // Subtract the captured worker endpoints on this coordinating thread;
+        // finish must never sample the coordinator's own CPU counter.
+        observer.finish().unwrap();
+        let CpuPhases {
+            construction: WasmThreadCpuObservation::Sampled(construction),
+            traversal: WasmThreadCpuObservation::Sampled(traversal),
+            combined: WasmThreadCpuObservation::Sampled(combined),
+            middle_callback: WasmThreadCpuObservation::Sampled(callback),
+        } = cpu_phases(&observer)
+        else {
+            panic!("Linux worker thread CPU endpoints must be sampled");
+        };
+        assert_eq!(combined, construction + callback + traversal);
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn cpu_phases_reject_cross_thread_frontiers_without_losing_valid_spans() {
+        let observer = observer();
+        observer.begin(false).unwrap();
+        observer.print_line(MARKERS[0]);
+        let worker = observer.clone();
+        std::thread::spawn(move || worker.print_line(MARKERS[1]))
+            .join()
+            .unwrap();
+        observer.print_line(MARKERS[2]);
+        observer.finish().unwrap();
+        let cpu = cpu_phases(&observer);
+        assert!(matches!(
+            cpu.construction,
+            WasmThreadCpuObservation::Unavailable(WasmThreadCpuUnavailable::DifferentThread)
+        ));
+        assert!(matches!(
+            cpu.traversal,
+            WasmThreadCpuObservation::Unavailable(WasmThreadCpuUnavailable::DifferentThread)
+        ));
+        assert!(matches!(cpu.combined, WasmThreadCpuObservation::Sampled(_)));
+        assert!(matches!(
+            cpu.middle_callback,
+            WasmThreadCpuObservation::Sampled(_)
+        ));
     }
     #[cfg(target_os = "linux")]
     #[test]

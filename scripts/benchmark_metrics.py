@@ -59,6 +59,24 @@ def summary(values):
                 p95=ordered[math.ceil(len(values) * .95) - 1])
 
 
+def execution_thread_cpu(observation):
+    """Validate an optional raw worker sample without replacing missing data."""
+    if 'execution_thread_cpu' not in observation:
+        return None
+    cpu = observation['execution_thread_cpu']
+    if not isinstance(cpu, dict) or cpu.get('scope') != 'execution-worker-thread':
+        raise ValueError('invalid execution thread CPU scope')
+    if cpu.get('status') == 'sampled':
+        if type(cpu.get('elapsed_ns')) is not int or cpu['elapsed_ns'] < 0:
+            raise ValueError('invalid execution thread CPU elapsed_ns')
+    elif cpu.get('status') == 'unavailable':
+        if not isinstance(cpu.get('reason'), str) or not cpu['reason'].strip():
+            raise ValueError('unavailable execution thread CPU requires a reason')
+    else:
+        raise ValueError('invalid execution thread CPU status')
+    return cpu
+
+
 def measure_process(command, *, cwd, env, stdout, stderr, timeout, time_binary=None):
     """GNU time observes the actual exec child's kernel-recorded RSS peak.
 
@@ -141,6 +159,12 @@ def summarize(report):
             if len(samples) != report['samples']:
                 raise ValueError('incomplete execution sample inventory')
             metrics = dict(execution_ns=summary([p['execution_ns'] for p in samples]))
+            cpu = [execution_thread_cpu(p) for p in case['observations']]
+            if any(p is not None for p in cpu):
+                measured_cpu = [p for row, p in zip(case['observations'], cpu, strict=True) if not row['warmup']]
+                metrics['execution_thread_cpu_ns'] = None
+                if all(p is not None and p['status'] == 'sampled' for p in measured_cpu):
+                    metrics['execution_thread_cpu_ns'] = summary([p['elapsed_ns'] for p in measured_cpu])
             if runtime == 'wasmtime':
                 for stage in samples[0]['phases_ns']:
                     metrics[stage + '_ns'] = summary([p['phases_ns'][stage] for p in samples])
@@ -447,6 +471,23 @@ def render(report):
             heap = metrics['gc_capacity_after_bytes'] if runtime == 'wasmtime' else metrics['heapUsed_after_bytes']
             rss_text = f"{rss['median']/2**20:.2f}" if rss else 'unavailable'
             lines.append(f"| {name} | {runtime} | {metrics['execution_ns']['median']/1e6:.3f} | {metrics['execution_ns']['p95']/1e6:.3f} | {rss_text} | {heap['median']/2**20:.2f} |")
+    cpu_rows = []
+    for runtime, result in report['execution'].items():
+        for case in result['cases']:
+            cpu = [execution_thread_cpu(p) for p in case['observations']]
+            if not any(p is not None for p in cpu):
+                continue
+            measured = [p for row, p in zip(case['observations'], cpu, strict=True) if not row['warmup']]
+            covered = sum(p is not None and p['status'] == 'sampled' for p in measured)
+            metric = report['summaries']['execution'][runtime][case['file']]['execution_thread_cpu_ns']
+            median = 'unavailable'
+            if metric is not None:
+                median = f"{metric['median']/1e6:.3f}"
+            cpu_rows.append(f"| {case['file']} | {runtime} | {median} | {covered}/{len(measured)} |")
+    if cpu_rows:
+        lines += ['', '| Worker-thread CPU (diagnostic) | Runtime | Median CPU ms | Measured coverage |',
+                  '| --- | --- | ---: | ---: |', *cpu_rows,
+                  '', 'Worker CPU is separate from wall scores and gates. A median requires every measured observation; unavailable or missing samples are retained, never filled or trimmed.']
     lines += ['', 'RSS covers the process, including caches and host/runtime overhead. Wasmtime GC capacity and V8 used heap have different meanings; do not compare them as live JS bytes.',
               'Raw phase timings, compilation spans, CPU time, whole-child high-water RSS, artifact bytes and all warmups are retained in report.json and logs/.', '']
     lines += ['| Whole execution child (one observation per case) | Peak RSS MiB | User CPU ms | System CPU ms |',

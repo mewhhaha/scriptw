@@ -9,22 +9,21 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [compact-row entry checkpoint](compact-row-entry-20261101.json) moves first-shape
-  and key-slot setup before the hot loop. Against the accepted
-  [compact-row checkpoint](compact-rows-20261101.json), ordinary object medians
-  fall another 2.1–2.8% and retained-object medians 11.1–11.4%; separate hot-R
-  medians fall 0.8–1.0% and 4.35–4.54%. All 1,296 process inputs are audited
-  with zero statistical discrepancy and no control veto.
-  Both ABI-42 R modules/native images and all 15 original control programs/code
-  sections remain byte-identical. This local evidence does not refresh published
-  CI charts or establish overall parity. The [namespace experiment](deferred-namespaces-20261101.json)
-  remains rejected. Investigate unexplained reference timing/RSS variation with
-  execution-thread CPU spans before assigning a cause. Next measure fresh
-  two-static-field literal stores; their draft remains unverified. Preserve the [ownership contract](contracts/runtime-byte-ownership.md)
-  and [performance queue](../performance-hills.md). Preserve fresh-entry timing,
-  source/tool pins, slower controls, A/A outliers and both
-  [rejected](numeric-array-region-screen-20261101.json)
-  [predecessors](joined-length-zero-trip-20261101.json).
+  [current gap diagnosis](performance-gaps-20261101.json) retains fresh references,
+  the failed 480-process identical-binary A/A and worker-CPU diagnostics.
+  Join4096 spends about 2.40 ms constructing its Array and 0.16 ms consuming it.
+  Qualify measurement reproducibility before building the parked primitive-append
+  region; its source review is not native or performance acceptance. Keep wall
+  time and CPU separate; the new diagnostic does not waive the original veto.
+- Attribute cold compiler emission before changing P type generation. The
+  measured 246–260 ms join4096 emission span eagerly reaches full-executable
+  hashing before embedded R selection. Isolate that contribution and ordinary
+  compiler-owned pool rebuilding; moving work outside a timer is no saving.
+- Attribute the roughly 2.45 ms P loading span: cache lookup/read/digest,
+  deserialization and type registration. Preserve the one-Module/64-MiB cap;
+  counting two Modules as one bundle would bypass it. Intrinsic descriptor
+  templates are a later hypothesis for the roughly 0.22 ms Realm entry floor;
+  the [namespace experiment](deferred-namespaces-20261101.json) remains rejected.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

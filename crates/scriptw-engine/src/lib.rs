@@ -56,7 +56,8 @@ pub use runtime_profile::{
     WasmRuntimeEmbeddedImageTimings, WasmRuntimeHeapObservation, WasmRuntimeHostImportCacheOutcome,
     WasmRuntimeMatchedImageCacheOutcome, WasmRuntimeMetricUnavailable,
     WasmRuntimeModuleCacheOutcome, WasmRuntimeModuleLoading, WasmRuntimeProfile,
-    WasmRuntimeProfileOptions, WasmRuntimeTimings,
+    WasmRuntimeProfileOptions, WasmRuntimeTimings, WasmThreadCpuInstant, WasmThreadCpuObservation,
+    WasmThreadCpuUnavailable,
 };
 mod embedding;
 #[cfg(feature = "benchmark-module-images")]
@@ -4203,6 +4204,7 @@ impl Engine {
             Default::default()
         };
         let execution_started = std::time::Instant::now();
+        let execution_cpu_started = profile.as_ref().map(|_| WasmThreadCpuInstant::now());
         if agent_execution.is_none() {
             execution_control.arm(execution_started, timeout_ms);
         }
@@ -4380,6 +4382,10 @@ impl Engine {
             }
         });
         let result = finish_wasm_execution(execution_result, agent_result);
+        let execution_thread_cpu = execution_cpu_started.map(|start| match start {
+            Ok(start) => start.elapsed(),
+            Err(reason) => WasmThreadCpuObservation::Unavailable(reason),
+        });
         let execution_elapsed = if profile.is_some() {
             execution_started.elapsed()
         } else {
@@ -4397,6 +4403,7 @@ impl Engine {
                 actual_native_mode: Some(actual_options.native_mode()),
                 actual_options: Some(actual_options),
                 host_import_cache: Some(host_import_cache),
+                execution_thread_cpu,
                 matched_runtime_image_cache,
                 timings: WasmRuntimeTimings {
                     admission: admission_elapsed,

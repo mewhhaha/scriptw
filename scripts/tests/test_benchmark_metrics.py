@@ -291,6 +291,106 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(row['availability_changed'])
             self.assertIsNone(row['ratio'])
 
+    def test_worker_cpu_summary_uses_every_measured_sample_and_excludes_warmups(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, report = self.make_report(Path(directory))
+            rows = report['execution']['wasmtime']['cases'][0]['observations']
+            for row, elapsed in zip(rows, [999_000_000, 2_000_000, 1_000_000, 30_000_000], strict=True):
+                row['execution_thread_cpu'] = dict(status='sampled', scope='execution-worker-thread', elapsed_ns=elapsed)
+            original = copy.deepcopy(rows)
+            report['summaries'] = metrics.summarize(report)
+            cpu = report['summaries']['execution']['wasmtime']['case.js']['execution_thread_cpu_ns']
+            self.assertEqual(cpu, metrics.summary([2_000_000, 1_000_000, 30_000_000]))
+            self.assertEqual(rows, original, 'all raw values and warmups remain intact')
+            self.assertNotIn('execution_thread_cpu_ns', report['summaries']['execution']['v8']['case.js'])
+            rendered = metrics.render(report)
+            self.assertIn('| case.js | wasmtime | 2.000 | 3/3 |', rendered)
+            self.assertIn('separate from wall scores and gates', rendered)
+            # An unavailable warmup does not discard complete measured CPU.
+            rows[0]['execution_thread_cpu'] = dict(status='unavailable', scope='execution-worker-thread', reason='clock_read_failed', os_error=5)
+            self.assertEqual(metrics.summarize(report)['execution']['wasmtime']['case.js']['execution_thread_cpu_ns'], cpu)
+
+    def test_partial_or_unavailable_worker_cpu_is_not_summarized_or_zero_filled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, report = self.make_report(Path(directory))
+            rows = report['execution']['wasmtime']['cases'][0]['observations']
+            for row in rows:
+                row['execution_thread_cpu'] = dict(status='sampled', scope='execution-worker-thread', elapsed_ns=3_000_000)
+            complete = copy.deepcopy(report)
+            complete['summaries'] = metrics.summarize(complete)
+            for replacement in [None, dict(status='unavailable', scope='execution-worker-thread', reason='clock_read_failed', os_error=13)]:
+                with self.subTest(replacement=replacement):
+                    if replacement is None:
+                        rows[2].pop('execution_thread_cpu', None)
+                    else:
+                        rows[2]['execution_thread_cpu'] = replacement
+                    original = copy.deepcopy(rows)
+                    report['summaries'] = metrics.summarize(report)
+                    self.assertIsNone(report['summaries']['execution']['wasmtime']['case.js']['execution_thread_cpu_ns'])
+                    self.assertEqual(rows, original)
+                    self.assertIn('| case.js | wasmtime | unavailable | 2/3 |', metrics.render(report))
+                    change = next(row for row in metrics.compare(complete, report)['changes']
+                                  if row['metric'].endswith('/execution_thread_cpu_ns'))
+                    self.assertTrue(change['availability_changed'])
+                    self.assertIsNone(change['ratio'])
+            for row in rows:
+                row['execution_thread_cpu'] = dict(status='unavailable', scope='execution-worker-thread', reason='unsupported_platform')
+            report['summaries'] = metrics.summarize(report)
+            self.assertIsNone(report['summaries']['execution']['wasmtime']['case.js']['execution_thread_cpu_ns'])
+            self.assertIn('| case.js | wasmtime | unavailable | 0/3 |', metrics.render(report))
+            for row in rows:
+                row.pop('execution_thread_cpu')
+            rows[0]['execution_thread_cpu'] = dict(status='sampled', scope='execution-worker-thread', elapsed_ns=7)
+            report['summaries'] = metrics.summarize(report)
+            self.assertIsNone(report['summaries']['execution']['wasmtime']['case.js']['execution_thread_cpu_ns'])
+            self.assertIn('| case.js | wasmtime | unavailable | 0/3 |', metrics.render(report))
+
+    def test_worker_cpu_observation_schema_fails_closed(self):
+        valid = dict(status='sampled', scope='execution-worker-thread', elapsed_ns=7)
+        invalid = [None, [], dict(valid, status='estimated'), dict(valid, scope='process'),
+                   dict(valid, elapsed_ns=True), dict(valid, elapsed_ns=-1), dict(valid, elapsed_ns=1.5),
+                   dict(valid, elapsed_ns='7'), {'status': 'sampled', 'scope': 'execution-worker-thread'},
+                   dict(status='unavailable', scope='execution-worker-thread'),
+                   dict(status='unavailable', scope='execution-worker-thread', reason=''),
+                   dict(status='unavailable', scope='execution-worker-thread', reason='  '),
+                   dict(status='unavailable', scope='execution-worker-thread', reason=3)]
+        with tempfile.TemporaryDirectory() as directory:
+            _, report = self.make_report(Path(directory))
+            rows = report['execution']['wasmtime']['cases'][0]['observations']
+            for observation in invalid:
+                with self.subTest(observation=observation):
+                    rows[1]['execution_thread_cpu'] = observation
+                    with self.assertRaisesRegex(ValueError, 'thread CPU'):
+                        metrics.summarize(report)
+            rows[1]['execution_thread_cpu'] = valid
+            # Validation also covers raw warmups, although their values never
+            # enter a repeated execution summary.
+            rows[0]['execution_thread_cpu'] = dict(valid, elapsed_ns=False)
+            with self.assertRaisesRegex(ValueError, 'thread CPU'):
+                metrics.summarize(report)
+
+    def test_legacy_reports_keep_their_exact_summary_inventory_and_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, report = self.make_report(Path(directory))
+            def constant(value):
+                return metrics.summary([value] * 3)
+            legacy_wasm = dict(execution_ns=metrics.summary([11, 12, 13]))
+            for name, value in [('engine_ns', 1), ('module_ns', 2), ('store_and_linker_ns', 3),
+                                ('instantiate_ns', 4), ('export_lookup_ns', 1), ('total_ns', 1000),
+                                ('gc_capacity_before_bytes', 0), ('gc_capacity_after_bytes', 4096),
+                                ('sampled_invocation_max_rss_bytes', 2048)]:
+                legacy_wasm[name] = constant(value)
+            legacy_v8 = dict(execution_ns=metrics.summary([11, 12, 13]))
+            for name, value in [('rss_after_bytes', 4096), ('heapUsed_after_bytes', 1024),
+                                ('heapTotal_after_bytes', 2048), ('external_after_bytes', 0),
+                                ('arrayBuffers_after_bytes', 0)]:
+                legacy_v8[name] = constant(value)
+            expected = dict(startup={}, execution=dict(wasmtime={'case.js': legacy_wasm}, v8={'case.js': legacy_v8}))
+            self.assertEqual(json.dumps(metrics.summarize(report), separators=(',', ':')).encode(),
+                             json.dumps(expected, separators=(',', ':')).encode())
+            self.assertEqual(metrics.load_report(path), report)
+            self.assertNotIn('Worker-thread CPU', metrics.render(report))
+
     def test_complete_report_requires_both_runtimes_and_exact_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             path, report = self.make_report(Path(directory))

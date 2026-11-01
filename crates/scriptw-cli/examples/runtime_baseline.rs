@@ -6,11 +6,35 @@ mod policy_options;
 use scriptw_engine::{
     CompileOptions, CompilerIdentity, CompilerSourceRevision, Engine, ExecutionBackend,
     HostOutputEvent, ObservedCompletion, RealmBuilder, WasmProcessMemoryObservation,
-    WasmProcessMemorySample,
+    WasmProcessMemorySample, WasmThreadCpuObservation, WasmThreadCpuUnavailable,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
+
+fn thread_cpu_json(observation: &WasmThreadCpuObservation, scope: &str) -> Value {
+    match observation {
+        WasmThreadCpuObservation::Sampled(elapsed) => json!({
+            "status": "sampled", "elapsed_ns": elapsed.as_nanos(), "scope": scope,
+        }),
+        WasmThreadCpuObservation::Unavailable(reason) => {
+            let (kind, os_error) = match reason {
+                WasmThreadCpuUnavailable::UnsupportedPlatform => ("unsupported_platform", None),
+                WasmThreadCpuUnavailable::ClockReadFailed(code) => {
+                    ("clock_read_failed", Some(*code))
+                }
+                WasmThreadCpuUnavailable::InvalidClockValue => ("invalid_clock_value", None),
+                WasmThreadCpuUnavailable::ClockWentBackwards => ("clock_went_backwards", None),
+                WasmThreadCpuUnavailable::DifferentThread => ("different_thread", None),
+            };
+            let mut result = json!({"status": "unavailable", "reason": kind, "scope": scope});
+            if let Some(code) = os_error {
+                result["os_error"] = json!(code);
+            }
+            result
+        }
+    }
+}
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -133,6 +157,8 @@ fn run() -> Result<(), String> {
             let retention = scriptw_engine::wasm_runtime_module_cache_observation();
             let mut observation = json!({"warmup": index < warmups,
                 "execution_ns": p.timings.execution_and_completion.as_nanos(),
+                "execution_thread_cpu": thread_cpu_json(&p.execution_thread_cpu,
+                    "execution-worker-thread"),
                 "phases_ns": {"admission": p.timings.admission.as_nanos(),
                     "engine": p.timings.engine.as_nanos(),
                     "module": p.timings.module.as_nanos(),
@@ -213,6 +239,7 @@ fn run() -> Result<(), String> {
             (true, true) => "scriptw-wasmtime-policy-row-phases-v1",
         },
         "requested_native_policy": options.policy.map(policy_options::policy_json),
+        "thread_cpu_observation_policy": "Observation only; no acceptance gate or runtime-policy change. CPU includes guest and synchronous host/GC work, including nested work on the same worker; it excludes descheduled time and other threads, including agents. Paired CPU/wall reads have boundary skew. Row-marker CPU reads occur inside wall callback endpoints and their overhead remains in middle_callback_ns. CPU/wall differences do not identify allocation, GC, scheduler or other causes.",
         "source_commit": revision, "source_fingerprint": identity.source_fingerprint().to_string(),
         "executable_sha256": identity.executable_sha256().to_string(),
         "samples": samples, "warmups": warmups, "cases": results})

@@ -4,6 +4,7 @@ use std::time::Duration;
 mod inlining;
 mod native_compilation;
 mod process_memory;
+mod thread_cpu;
 pub(crate) use inlining::PINNED_WASMTIME_INLINING_LIMITS;
 pub use inlining::{WasmProfileInlining, WasmProfileInliningLimits};
 pub use native_compilation::WasmProgramNativeCompilationProfile;
@@ -12,6 +13,7 @@ pub use process_memory::{
     WasmProcessMemoryObservation, WasmProcessMemorySample, WasmProcessMemoryScope,
     WasmProcessMemoryUnavailable,
 };
+pub use thread_cpu::{WasmThreadCpuInstant, WasmThreadCpuObservation, WasmThreadCpuUnavailable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WasmRuntimeModuleCacheOutcome {
@@ -328,6 +330,9 @@ pub struct WasmRuntimeProfile {
     pub options: WasmRuntimeProfileOptions,
     pub outcome: ObservedRunOutcome,
     pub timings: WasmRuntimeTimings,
+    /// Worker CPU sampled just inside the existing execution/completion wall
+    /// span. Clock reads add profiling overhead; other threads are excluded.
+    pub execution_thread_cpu: WasmThreadCpuObservation,
     pub module_cache: WasmRuntimeModuleCacheOutcome,
     pub module_loading: WasmRuntimeModuleLoading,
     pub host_import_cache: WasmRuntimeHostImportCacheOutcome,
@@ -352,6 +357,7 @@ pub(super) struct RuntimeObservation {
     pub(super) host_import_cache: Option<WasmRuntimeHostImportCacheOutcome>,
     pub(super) matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome,
     pub(super) timings: WasmRuntimeTimings,
+    pub(super) execution_thread_cpu: Option<WasmThreadCpuObservation>,
     pub(super) module_cache: WasmRuntimeModuleCacheOutcome,
     pub(super) module_loading: WasmRuntimeModuleLoading,
     pub(super) heap: WasmRuntimeHeapObservation,
@@ -366,6 +372,7 @@ impl Default for RuntimeObservation {
             host_import_cache: None,
             matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
             timings: WasmRuntimeTimings::default(),
+            execution_thread_cpu: None,
             heap: WasmRuntimeHeapObservation::default(),
             process_memory: None,
             module_cache: WasmRuntimeModuleCacheOutcome::Bypassed,
@@ -464,11 +471,17 @@ impl Engine {
                     "completed runtime profile omitted its host-import cache observation",
                 )
             })?;
+            let execution_thread_cpu = observation.execution_thread_cpu.ok_or_else(|| {
+                EngineError::new(
+                    "completed runtime profile omitted its execution-thread CPU observation",
+                )
+            })?;
             Ok(WasmRuntimeProfile {
                 native_mode: actual_mode,
                 options: actual_options,
                 outcome,
                 timings: observation.timings,
+                execution_thread_cpu,
                 module_cache: observation.module_cache,
                 module_loading: observation.module_loading,
                 host_import_cache,
@@ -557,6 +570,11 @@ mod tests {
             assert!(sample.maximum_rss_bytes() >= sample.final_rss_bytes());
         }
         assert_eq!(profile.runtime_policy, PRODUCT_WASMTIME_POLICY.report());
+        #[cfg(target_os = "linux")]
+        assert!(matches!(
+            profile.execution_thread_cpu,
+            WasmThreadCpuObservation::Sampled(elapsed) if elapsed > Duration::ZERO
+        ));
     }
 
     #[test]
@@ -572,6 +590,11 @@ mod tests {
             profile.outcome.completion,
             ObservedCompletion::Throw(ObservedJsValue::Number(ObservedNumber::from_f64(7.0)))
         );
+        #[cfg(target_os = "linux")]
+        assert!(matches!(
+            profile.execution_thread_cpu,
+            WasmThreadCpuObservation::Sampled(elapsed) if elapsed > Duration::ZERO
+        ));
         assert!(engine
             .profile_wasm_execution(
                 &Artifact {
@@ -585,6 +608,65 @@ mod tests {
                 false,
             )
             .is_err());
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn profiling_cpu_covers_the_execution_worker_and_synchronous_host_work() {
+        use std::sync::{Arc, Mutex};
+
+        struct CpuHook {
+            caller: WasmThreadCpuInstant,
+            observed: Arc<Mutex<Option<Duration>>>,
+        }
+        impl HostHooks for CpuHook {
+            fn print_line(&self, _: &str) {
+                let start = WasmThreadCpuInstant::now().unwrap();
+                assert_eq!(
+                    start.duration_since(&self.caller),
+                    WasmThreadCpuObservation::Unavailable(
+                        WasmThreadCpuUnavailable::DifferentThread
+                    ),
+                    "execution must be observed on its sized-stack worker"
+                );
+                let mut value = 1_u64;
+                for _ in 0..2_000_000 {
+                    value = std::hint::black_box(value.wrapping_mul(17).wrapping_add(3));
+                }
+                let WasmThreadCpuObservation::Sampled(elapsed) = start.elapsed() else {
+                    panic!("host callback remains on one execution worker");
+                };
+                *self.observed.lock().unwrap() = Some(elapsed);
+            }
+        }
+        let observed = Arc::new(Mutex::new(None));
+        let engine = Engine::new(
+            RealmBuilder::new()
+                .with_host_hooks(Box::new(CpuHook {
+                    caller: WasmThreadCpuInstant::now().unwrap(),
+                    observed: Arc::clone(&observed),
+                }))
+                .build(),
+        );
+        let artifact = engine
+            .profile_script_compilation("print(42); 42;", CompileOptions::default())
+            .unwrap()
+            .artifact;
+        let profile = engine
+            .profile_wasm_execution(&artifact, None, false)
+            .unwrap();
+        let callback = observed.lock().unwrap().expect("the host callback ran");
+        let WasmThreadCpuObservation::Sampled(execution) = profile.execution_thread_cpu else {
+            panic!("profile sampled the execution worker");
+        };
+        assert!(
+            execution >= callback,
+            "synchronous host work belongs to execution"
+        );
+        assert_eq!(
+            profile.outcome.completion,
+            ObservedCompletion::Normal(ObservedJsValue::Number(ObservedNumber::from_f64(42.0)))
+        );
     }
 }
 
