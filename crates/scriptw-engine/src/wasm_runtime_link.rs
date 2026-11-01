@@ -41,21 +41,17 @@ mod tests;
 /// policy. Distinct key domains prevent one artifact kind from aliasing another.
 pub(super) struct RuntimeWasmCache<'a> {
     cache: &'a cache::FunctionCache,
-    compiler: &'static [u8; 32],
 }
 
 impl<'a> RuntimeWasmCache<'a> {
-    pub(super) fn new(cache: &'a cache::FunctionCache) -> Option<Self> {
-        Some(Self {
-            cache,
-            compiler: compiler_fingerprint()?,
-        })
+    pub(super) fn new(cache: &'a cache::FunctionCache) -> Self {
+        Self { cache }
     }
 }
 
 impl RuntimeArtifactCache for RuntimeWasmCache<'_> {
-    fn compiler_identity(&self) -> &[u8; 32] {
-        self.compiler
+    fn compiler_identity(&self) -> Option<&[u8; 32]> {
+        compiler_fingerprint()
     }
 
     fn load(&self, key: RuntimeArtifactCacheKey) -> Option<Vec<u8>> {
@@ -187,7 +183,7 @@ pub(super) fn decode_cache_entry(
         }
         (&ENTRY_LINKED, rest) => {
             let (recorded, program) = rest.split_at_checked(KEY_BYTES)?;
-            let runtime_cache = RuntimeWasmCache::new(cache)?;
+            let runtime_cache = RuntimeWasmCache::new(cache);
             let inputs = embedded_runtime::inputs(
                 Some(&runtime_cache),
                 scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,

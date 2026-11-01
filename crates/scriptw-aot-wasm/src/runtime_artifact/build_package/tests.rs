@@ -39,6 +39,137 @@ fn resign(package: &mut [u8]) {
     package[end..].copy_from_slice(&digest);
 }
 
+struct UnusedCache;
+impl RuntimeArtifactCache for UnusedCache {
+    fn compiler_identity(&self) -> Option<&[u8; 32]> {
+        panic!("a supplied runtime or R-free program must not request cache identity")
+    }
+    fn load(&self, _: super::super::RuntimeArtifactCacheKey) -> Option<Vec<u8>> {
+        panic!("unused cache must not be read")
+    }
+    fn store(&self, _: super::super::RuntimeArtifactCacheKey, _: Vec<u8>) -> bool {
+        panic!("unused cache must not be written")
+    }
+    fn remove(&self, _: super::super::RuntimeArtifactCacheKey) {
+        panic!("unused cache must not remove entries")
+    }
+}
+
+#[test]
+fn accepted_safe_and_immutable_packages_never_query_the_persistence_identity() {
+    let package = fixture();
+    let selection = IntlDataSelection::new(IntlCompilationProfile::Minimal);
+    let intl: &'static [u8] = Box::leak(
+        selection
+            .selected()
+            .unwrap()
+            .minimal_build_metadata(&SOURCE)
+            .unwrap()
+            .into_boxed_slice(),
+    );
+    let receipt: &'static [u8] = Box::leak(
+        package
+            .immutable_build_metadata(&selection, &SOURCE, intl)
+            .unwrap()
+            .into_boxed_slice(),
+    );
+    let cache = UnusedCache;
+    let safe = RuntimeArtifactInputs::new(Some(&cache))
+        .with_build_package(package.package_bytes(), &SOURCE);
+    // SAFETY: all three immutable slices are unchanged, exact outputs of the
+    // real producer above. No caller-created metadata is granted authority.
+    let (immutable, cargo) = unsafe {
+        (
+            RuntimeArtifactInputs::new(Some(&cache))
+                .with_immutable_build_package(package.package_bytes(), &SOURCE),
+            RuntimeArtifactInputs::new(Some(&cache)).with_immutable_minimal_build(
+                package.package_bytes(),
+                &SOURCE,
+                intl,
+                receipt,
+            ),
+        )
+    };
+    for inputs in [safe, immutable, cargo] {
+        let selection = inputs
+            .intl_selection(&IntlCompilationProfile::Minimal)
+            .unwrap();
+        let identity = inputs.admit_identity(&selection).unwrap();
+        let runtime = inputs
+            .load_or_emit(&identity, || panic!("accepted producer must not emit"))
+            .unwrap();
+        assert_eq!(runtime.key(), package.key());
+        assert_eq!(runtime.bytes(), package.wasm());
+        assert_eq!(runtime.layout(), package.runtime.layout());
+    }
+}
+
+#[test]
+fn r_free_emission_never_queries_a_supplied_cache() {
+    let parsed = scriptw_front::parse("1;", scriptw_front::ParseOptions::script()).unwrap();
+    let program = scriptw_ir::lower(&parsed);
+    let artifact = crate::emit_with_intl_profile_and_runtime_inputs(
+        &program,
+        crate::PromiseRejectionPolicy::default(),
+        &IntlCompilationProfile::Minimal,
+        RuntimeArtifactInputs::new(Some(&UnusedCache)),
+    )
+    .unwrap();
+    assert!(
+        artifact.runtime().is_none(),
+        "the closed scalar program remains R-free"
+    );
+}
+
+#[derive(Default)]
+struct FallbackCache {
+    identity_queries: Cell<u32>,
+    loads: Cell<u32>,
+    stores: Cell<u32>,
+}
+impl RuntimeArtifactCache for FallbackCache {
+    fn compiler_identity(&self) -> Option<&[u8; 32]> {
+        self.identity_queries.set(self.identity_queries.get() + 1);
+        Some(&SOURCE)
+    }
+    fn load(&self, _: super::super::RuntimeArtifactCacheKey) -> Option<Vec<u8>> {
+        assert_eq!(self.identity_queries.get(), 1);
+        self.loads.set(self.loads.get() + 1);
+        None
+    }
+    fn store(&self, _: super::super::RuntimeArtifactCacheKey, _: Vec<u8>) -> bool {
+        assert_eq!(self.identity_queries.get(), 1);
+        self.stores.set(self.stores.get() + 1);
+        true
+    }
+    fn remove(&self, _: super::super::RuntimeArtifactCacheKey) {
+        panic!("no persisted entry was loaded")
+    }
+}
+
+#[test]
+fn absent_or_rejected_packages_query_identity_only_when_persistence_is_needed() {
+    let identity = minimal_identity();
+    for supplied in [None, Some(&b"not a runtime package"[..])] {
+        let cache = FallbackCache::default();
+        let mut inputs = RuntimeArtifactInputs::new(Some(&cache));
+        if let Some(bytes) = supplied {
+            inputs = inputs.with_build_package(bytes, &SOURCE);
+        }
+        let emitted = Cell::new(0);
+        let runtime = inputs
+            .load_or_emit(&identity, || {
+                emitted.set(emitted.get() + 1);
+                Ok(Arc::clone(&fixture().runtime))
+            })
+            .unwrap();
+        assert_eq!(runtime.key(), fixture().key());
+        assert_eq!(emitted.get(), 1);
+        assert_eq!(cache.identity_queries.get(), 1);
+        assert_eq!((cache.loads.get(), cache.stores.get()), (1, 1));
+    }
+}
+
 #[test]
 fn strict_public_portable_package_codec_never_uses_the_emitter_fallback() {
     let selection = IntlDataSelection::new(IntlCompilationProfile::Minimal);

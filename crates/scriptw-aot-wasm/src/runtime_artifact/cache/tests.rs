@@ -55,38 +55,134 @@ fn immutable_minimal_identity_matches_full_frames_without_aliasing_custom_profil
 }
 
 struct MemoryCache {
-    compiler: [u8; 32],
+    compiler: Option<[u8; 32]>,
     entries: RefCell<HashMap<RuntimeArtifactCacheKey, Vec<u8>>>,
+    identity_queries: Cell<u32>,
+    loads: Cell<u32>,
+    stores: Cell<u32>,
     removals: Cell<u32>,
 }
 
 impl MemoryCache {
     fn new() -> Self {
         Self {
-            compiler: [17; 32],
+            compiler: Some([17; 32]),
             entries: RefCell::new(HashMap::new()),
+            identity_queries: Cell::new(0),
+            loads: Cell::new(0),
+            stores: Cell::new(0),
             removals: Cell::new(0),
         }
     }
 }
 
 impl RuntimeArtifactCache for MemoryCache {
-    fn compiler_identity(&self) -> &[u8; 32] {
-        &self.compiler
+    fn compiler_identity(&self) -> Option<&[u8; 32]> {
+        self.identity_queries.set(self.identity_queries.get() + 1);
+        self.compiler.as_ref()
     }
 
     fn load(&self, key: RuntimeArtifactCacheKey) -> Option<Vec<u8>> {
+        assert!(
+            self.compiler.is_some(),
+            "absent identity must not read storage"
+        );
+        self.loads.set(self.loads.get() + 1);
         self.entries.borrow().get(&key).cloned()
     }
 
     fn store(&self, key: RuntimeArtifactCacheKey, entry: Vec<u8>) -> bool {
+        assert!(
+            self.compiler.is_some(),
+            "absent identity must not write storage"
+        );
+        self.stores.set(self.stores.get() + 1);
         self.entries.borrow_mut().insert(key, entry);
         true
     }
 
     fn remove(&self, key: RuntimeArtifactCacheKey) {
+        assert!(
+            self.compiler.is_some(),
+            "absent identity must not remove storage"
+        );
         self.removals.set(self.removals.get() + 1);
         self.entries.borrow_mut().remove(&key);
+    }
+}
+
+#[test]
+fn absent_compiler_identity_emits_uncached_and_preserves_emitter_errors() {
+    let identity = identity();
+    for jobs in [
+        std::num::NonZeroUsize::MIN,
+        std::num::NonZeroUsize::new(4).unwrap(),
+    ] {
+        let mut cache = MemoryCache::new();
+        cache.compiler = None;
+        let runtime = fixture(Defect::None);
+        let emitted = Cell::new(0);
+        let actual = load_or_emit_with_jobs(&identity, Some(&cache), jobs, || {
+            emitted.set(emitted.get() + 1);
+            Ok(Arc::clone(&runtime))
+        })
+        .unwrap();
+        assert!(
+            Arc::ptr_eq(&actual, &runtime),
+            "return the uncached producer's exact owner"
+        );
+        assert_eq!(emitted.get(), 1);
+        assert_eq!(cache.identity_queries.get(), 1);
+        assert!(cache.entries.borrow().is_empty());
+        let error = EmitError::unsupported("deliberate uncached runtime emission failure");
+        let actual = load_or_emit_with_jobs(&identity, Some(&cache), jobs, || {
+            emitted.set(emitted.get() + 1);
+            Err(error.clone())
+        })
+        .unwrap_err();
+        assert_eq!(actual, error);
+        assert_eq!(emitted.get(), 2);
+        assert_eq!(cache.identity_queries.get(), 2);
+        assert_eq!(
+            (cache.loads.get(), cache.stores.get(), cache.removals.get()),
+            (0, 0, 0)
+        );
+    }
+}
+
+#[test]
+fn actual_cache_lookup_queries_one_identity_for_hits_misses_and_rejected_bodies() {
+    let identity = identity();
+    let key = identity.cache_key(&[17; 32]);
+    let valid = fixture(Defect::None);
+    for (entry, expected_emissions, expected_removals) in [
+        (None, 1, 0),
+        (Some(encode(&valid, key)), 0, 0),
+        (Some(encode(&fixture(Defect::FunctionResult), key)), 1, 1),
+    ] {
+        let cache = MemoryCache::new();
+        if let Some(entry) = entry {
+            cache.entries.borrow_mut().insert(key, entry);
+        }
+        let emitted = Cell::new(0);
+        let actual = load_or_emit(&identity, Some(&cache), || {
+            emitted.set(emitted.get() + 1);
+            Ok(Arc::clone(&valid))
+        })
+        .unwrap();
+        assert_eq!(actual.bytes(), valid.bytes());
+        assert_eq!(cache.identity_queries.get(), 1);
+        assert_eq!(cache.loads.get(), 1);
+        assert_eq!(emitted.get(), expected_emissions);
+        assert_eq!(cache.stores.get(), expected_emissions);
+        assert_eq!(cache.removals.get(), expected_removals);
+        let entries = cache.entries.borrow();
+        assert_eq!(entries.len(), 1);
+        let admitted = decode(&entries[&key], key, &identity)
+            .expect("original exact key and raw body admission remain required");
+        assert_eq!(admitted.layout_admission.unwrap().0, LAYOUT_VERSION);
+        assert_eq!(admitted.layout(), valid.layout());
+        assert_eq!(admitted.bytes(), valid.bytes());
     }
 }
 
@@ -134,7 +230,7 @@ enum Defect {
 fn concurrent_cache_admission_rejects_invalid_bodies_and_rebuilds_checked_layout() {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let invalid = fixture(Defect::FunctionResult);
     cache
         .entries
@@ -325,7 +421,7 @@ fn runtime_cache_reconstructs_calendar_rows_between_exact_active_fragments() {
 fn runtime_cache_round_trip_reconstructs_the_encoded_types_and_pool() {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let runtime = fixture(Defect::None);
     let restored = decode(&encode(&runtime, key), key, &identity).expect("valid entry");
     assert!(runtime.layout_admission.is_none());
@@ -351,7 +447,7 @@ fn runtime_cache_round_trip_reconstructs_the_encoded_types_and_pool() {
 fn previous_layout_runtime_cache_entry_is_replaced_before_current_entry_is_reused() {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let runtime = fixture(Defect::None);
     let mut previous = encode(&runtime, key);
     let previous_version = 15u32;
@@ -390,7 +486,7 @@ fn previous_layout_runtime_cache_entry_is_replaced_before_current_entry_is_reuse
 fn abi6_runtime_cache_envelope_is_replaced_before_abi7_reuse() {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let runtime = fixture(Defect::None);
     let mut previous = encode(&runtime, key);
     let previous_version = 6u32;
@@ -510,7 +606,7 @@ fn runtime_cache_identity_binds_compiler_and_exact_admitted_sections() {
 fn runtime_cache_rejects_and_replaces_a_corrupt_entry_once() {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let runtime = fixture(Defect::None);
     cache.store(key, vec![0, 1, 2, 3]);
     let replacements = Cell::new(0);
@@ -624,7 +720,7 @@ fn abi35_runtime_cache_is_replaced_before_temporal_demand_initialization_is_admi
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(cache.compiler_identity().unwrap());
     let runtime = fixture(Defect::None);
     let mut previous = encode(&runtime, key);
     assert_ne!(LAYOUT_VERSION, previous_version);

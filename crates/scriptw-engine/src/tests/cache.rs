@@ -452,20 +452,18 @@ fn component_projection_cache_keys_bind_each_filter_presence_and_order_independe
         key(profile("same-id", Some(&["fr"]), None)),
         key(profile("same-id", None, Some(&["fr"]))),
     );
-    assert!(
-        CustomIntlProfile::new(
-            CustomProfileId::parse("same-id").unwrap(),
-            Some(&[]),
-            Some(&["fr"]),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .is_err()
-    );
+    assert!(CustomIntlProfile::new(
+        CustomProfileId::parse("same-id").unwrap(),
+        Some(&[]),
+        Some(&["fr"]),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .is_err());
 }
 
 #[test]
@@ -1251,14 +1249,12 @@ fn initial_module_cache_candidate_does_not_name_a_prepared_source_closure() {
             candidate, closed,
             "newly discovered authority must change the key"
         );
-        assert!(
-            prepared
-                .modules
-                .graph()
-                .unwrap()
-                .realm_requests
-                .contains_key(&scriptw_ir::ModuleRequestKeyIr::plain("./hidden.js"))
-        );
+        assert!(prepared
+            .modules
+            .graph()
+            .unwrap()
+            .realm_requests
+            .contains_key(&scriptw_ir::ModuleRequestKeyIr::plain("./hidden.js")));
     });
 }
 
@@ -1452,4 +1448,120 @@ fn wasm_backend_for_await_sync_iterator_caches_next_and_awaits_values() {
         lines.lock().expect("capture mutex poisoned").as_slice(),
         &["sync".to_string(), "9:1:3".to_string()]
     );
+}
+
+#[test]
+fn emitted_embedded_and_runtime_free_programs_do_not_request_persistence_identity() {
+    run_on_sized_stack(|| {
+        let root = std::env::temp_dir().join(format!(
+            "scriptw-lazy-emission-identity-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let cache = crate::cache::FunctionCache::new(root.clone(), 1024 * 1024).unwrap();
+        let engine = Engine::new(RealmBuilder::new().build());
+        for (source, linked) in [
+            ("1 + 41;", false),
+            ("var value={answer:42}; value.answer;", true),
+        ] {
+            let unit = engine
+                .compile_script(source, CompileOptions::default())
+                .unwrap();
+            for profile in [
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable,
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
+            ] {
+                COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(0));
+                let artifact = engine
+                    .emit_wasm_with_cache_on_current_thread(&unit, Some(&cache), profile)
+                    .unwrap();
+                assert_eq!(artifact.runtime.is_some(), linked);
+                assert_eq!(
+                    COMPILER_CACHE_IDENTITY_REQUESTS.with(std::cell::Cell::get),
+                    0,
+                    "unused disk R identity must stay lazy for {profile:?}: {source}"
+                );
+                WasmtimeModule::validate(&shared_wasm_engine().unwrap(), &artifact.bytes).unwrap();
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    });
+}
+
+#[test]
+fn unavailable_program_cache_skips_identity_for_cold_and_lookup_compilation() {
+    run_on_sized_stack(|| {
+        let engine = Engine::new(RealmBuilder::new().build());
+        for (source, goal) in [
+            ("var value={answer:42}; value.answer;", ParseGoal::Script),
+            ("export const value={answer:42};", ParseGoal::Module),
+        ] {
+            COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(0));
+            let direct = engine
+                .compile_program_wasm_on_current_thread(
+                    source,
+                    goal,
+                    CompileOptions::default(),
+                    None,
+                )
+                .unwrap();
+            assert!(direct.runtime.is_some());
+            let lookup = engine
+                .load_or_compile_program_wasm_on_current_thread(
+                    source,
+                    goal,
+                    CompileOptions::default(),
+                    None,
+                )
+                .unwrap();
+            assert_eq!(lookup.bytes, direct.bytes);
+            assert_eq!(
+                COMPILER_CACHE_IDENTITY_REQUESTS.with(std::cell::Cell::get),
+                0,
+                "absent P cache cannot use a compiler key: {source}"
+            );
+        }
+    });
+}
+
+#[test]
+fn persisted_programs_still_request_executable_bound_identity_and_hit_checked_cache() {
+    run_on_sized_stack(|| {
+        let root = std::env::temp_dir().join(format!(
+            "scriptw-required-persistence-identity-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let cache = Arc::new(crate::cache::FunctionCache::new(root.clone(), 1024 * 1024).unwrap());
+        let engine = Engine::new(RealmBuilder::new().build());
+        let source = "var persisted={answer:42}; persisted.answer;";
+        COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(0));
+        let first = engine
+            .compile_program_wasm_on_current_thread(
+                source,
+                ParseGoal::Script,
+                CompileOptions::default(),
+                Some(Arc::clone(&cache)),
+            )
+            .unwrap();
+        assert!(COMPILER_CACHE_IDENTITY_REQUESTS.with(std::cell::Cell::get) > 0);
+        assert!(first.cached_entry.is_none());
+        COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(0));
+        let second = engine
+            .load_or_compile_program_wasm_on_current_thread(
+                source,
+                ParseGoal::Script,
+                CompileOptions::default(),
+                Some(cache),
+            )
+            .unwrap();
+        assert!(COMPILER_CACHE_IDENTITY_REQUESTS.with(std::cell::Cell::get) > 0);
+        assert!(
+            second.cached_entry.is_some(),
+            "the actual persisted P was admitted"
+        );
+        assert_eq!(first.bytes, second.bytes);
+        assert_eq!(first.runtime.unwrap().key(), second.runtime.unwrap().key());
+        std::fs::remove_dir_all(root).unwrap();
+    });
 }

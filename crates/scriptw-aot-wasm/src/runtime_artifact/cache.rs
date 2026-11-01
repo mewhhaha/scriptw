@@ -45,8 +45,10 @@ impl RuntimeArtifactCacheKey {
 /// executable input capable of changing emitted Wasm. Storage must use the
 /// caller's existing bounded cache policy. Cache failures are recoverable;
 /// entries are fully checked before they can construct a runtime artifact.
+/// Identity may be acquired lazily: this method is called only when persistence
+/// is needed. `None` disables persistence without touching storage.
 pub trait RuntimeArtifactCache {
-    fn compiler_identity(&self) -> &[u8; DIGEST_BYTES];
+    fn compiler_identity(&self) -> Option<&[u8; DIGEST_BYTES]>;
     fn load(&self, key: RuntimeArtifactCacheKey) -> Option<Vec<u8>>;
     fn store(&self, key: RuntimeArtifactCacheKey, entry: Vec<u8>) -> bool;
     fn remove(&self, key: RuntimeArtifactCacheKey);
@@ -221,9 +223,12 @@ pub(super) fn load_or_emit_with_jobs(
     let Some(cache) = cache else {
         return emit();
     };
+    let Some(compiler) = cache.compiler_identity() else {
+        return emit();
+    };
     let started = std::time::Instant::now();
     let trace = std::env::var_os("SCRIPTW_WASM_TRACE").is_some();
-    let key = identity.cache_key(cache.compiler_identity());
+    let key = identity.cache_key(compiler);
     if let Some(entry) = cache.load(key) {
         let decoded = if jobs == std::num::NonZeroUsize::MIN {
             decode(&entry, key, identity)

@@ -64,6 +64,9 @@ once and recognize ordered runs. Writeback retains ordinary mutation checks. The
 identify each measurement's source and configuration.
 Linux profiling records execution-worker CPU alongside wall time, including
 synchronous host work. Unsupported clocks report an explicit reason.
+Wasm emission requests the executable's cache identity only when it needs a
+persistent entry. Embedded runtime admission and compilation without a cache
+avoid that work; persisted entries remain bound to the actual compiler executable.
 
 The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
@@ -97,6 +100,15 @@ control failed, so the primitive-append prototype remains unbuilt. Worker CPU
 now accompanies wall time and reports complete coverage; noisy observations and
 failed controls remain retained. These local cohorts do not refresh published
 CI results; overall parity remains open.
+
+[Cold compilation](docs/rust-rewrite/cold-compiler-20261101.json) records
+**42.7–42.9% lower wall** and **43.1–43.5% lower CPU** geometric means of
+process medians across 19 sources in two balanced blocks. The boundary includes
+startup, requested P/R file writes and teardown. All program Wasm, both runtime
+Wasm profiles and complete native runtime images remain byte-identical.
+Persisted-program execution controls retain executable identity and pass the
+predeclared regression gates; slower retained-object and join observations remain
+in the record.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

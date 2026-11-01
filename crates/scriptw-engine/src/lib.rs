@@ -585,7 +585,14 @@ fn compiler_identity_cache_fingerprint(identity: &CompilerIdentity) -> [u8; 32] 
     )
 }
 
+#[cfg(test)]
+thread_local! {
+    static COMPILER_CACHE_IDENTITY_REQUESTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn compiler_fingerprint() -> Option<&'static [u8; 32]> {
+    #[cfg(test)]
+    COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(requests.get() + 1));
     // The selected algorithm admits actual loaded-image bytes. Full execution
     // evidence remains independently SHA-256; errors disable compiler caches.
     compiler_cache_identity()
@@ -1073,10 +1080,13 @@ struct PreparedCompilation {
 fn wasm_aot_program_is_cached(source: &str, goal: ParseGoal, options: &CompileOptions) -> bool {
     // This is only a scheduling hint. The execution path still reads and
     // validates the artifact, then rebuilds it if it disappeared or is corrupt.
+    let Some(cache) = program_wasm_cache() else {
+        return false;
+    };
     let Some(key) = program_wasm_cache_key(source, goal, options) else {
         return false;
     };
-    program_wasm_cache().is_some_and(|cache| cache.contains(&key))
+    cache.contains(&key)
 }
 
 #[doc(hidden)]
@@ -3112,8 +3122,9 @@ impl Engine {
         // If finite-source discovery extends this graph, its final digest is
         // different and cannot be reached through this candidate. A previously
         // closed static graph can therefore hit without rebuilding its IR.
-        let candidate_key =
-            program_cache_key_for_role(source, goal, &options, parsed.modules.graph(), role);
+        let candidate_key = cache.as_ref().and_then(|_| {
+            program_cache_key_for_role(source, goal, &options, parsed.modules.graph(), role)
+        });
         if let (Some(cache), Some(key)) = (&cache, candidate_key) {
             if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
                 return Ok(artifact);
@@ -3121,8 +3132,9 @@ impl Engine {
         }
 
         let prepared = Self::lower_parsed_compilation(parsed, &options)?;
-        let key =
-            program_cache_key_for_role(source, goal, &options, prepared.modules.graph(), role);
+        let key = cache.as_ref().and_then(|_| {
+            program_cache_key_for_role(source, goal, &options, prepared.modules.graph(), role)
+        });
         // A graph discovered by finite-source lowering gets its final digest;
         // a graph-free miss does not reread the same cache entry.
         if key != candidate_key {
@@ -3190,7 +3202,9 @@ impl Engine {
         cache: Option<Arc<cache::FunctionCache>>,
     ) -> Result<ProgramWasmArtifact, EngineError> {
         let prepared = self.prepare_compilation(source, goal, &options)?;
-        let key = program_cache_key(source, goal, &options, prepared.modules.graph());
+        let key = cache
+            .as_ref()
+            .and_then(|_| program_cache_key(source, goal, &options, prepared.modules.graph()));
         self.compile_program_wasm_with_key_on_current_thread(prepared, cache, key)
     }
 
@@ -3260,7 +3274,7 @@ impl Engine {
         cache: Option<&cache::FunctionCache>,
         source_compilation_profile: scriptw_aot_wasm::RuntimeSourceCompilationProfile,
     ) -> Result<Artifact, EngineError> {
-        let runtime_cache = cache.and_then(wasm_runtime_link::RuntimeWasmCache::new);
+        let runtime_cache = cache.map(wasm_runtime_link::RuntimeWasmCache::new);
         match scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
             &unit.ir,
             unit.promise_rejection_policy,
@@ -3709,7 +3723,7 @@ impl Engine {
         let cache = program_wasm_cache();
         let runtime_cache = cache
             .as_deref()
-            .and_then(wasm_runtime_link::RuntimeWasmCache::new);
+            .map(wasm_runtime_link::RuntimeWasmCache::new);
         let artifact = scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
             &unit.ir,
             unit.promise_rejection_policy,

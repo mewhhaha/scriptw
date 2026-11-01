@@ -1,0 +1,2002 @@
+{
+  "schema": "scriptw-cold-compiler-comparison-v1",
+  "date": "2026-11-01",
+  "status": "accepted_after_independent_audit",
+  "change": "Acquire executable-bound compiler cache identity only when persistent P/R storage is actually used; embedded R admission and absent caches avoid identity work.",
+  "source_parent_commit": "8b3810db0c4835f57bc9ca7f1f58de94830962b5",
+  "products": {
+    "baseline": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "0937c86e5c61302c9691b42950d6765c740629fe2ec064b68b802ac918dbbc5f",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "ac96d422a0a05637113077bc97b5b216026f6d5c"
+      },
+      "executable_sha256": "b0cefb5477ac96dd164bcf749c323c04ffc741343e21fcb82549f497771b8c0d"
+    },
+    "candidate": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "8f895ff65a60f98bbaded819f6ac75410a707d3ab5d2fe39facb8c0ba0474c2d",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "8b3810db0c4835f57bc9ca7f1f58de94830962b5"
+      },
+      "executable_sha256": "6a60d04c10d08ff467bb279fd0190c52f540eaa1de1dfe4d5f99ee2fd5e624a7"
+    }
+  },
+  "boundaries": {
+    "primary": "Fresh CLI process: scriptw build wasm SOURCE, including source read, actual P/R writes and teardown; process-cold, OS page-cache state uncontrolled, no fsync durability claim.",
+    "controls": "Fresh private-cache scriptw run SOURCE, exact guest stdout and WasmAot completion. Actual persisted P still requires executable identity.",
+    "cpu": "GNU-time supervisor and runtime child user+system CPU, summed per process before medians/means.",
+    "not_measured": [
+      "isolated emitter CPU",
+      "Scriptc JavaScript frontend compilation",
+      "fresh V8/Scriptc execution parity",
+      "browser support"
+    ]
+  },
+  "design": {
+    "primary_sources": 19,
+    "original_sources": 17,
+    "additional_sources": [
+      "hello.js",
+      "tiny42.js"
+    ],
+    "blocks": 2,
+    "processes_per_product_source_block": 4,
+    "orders": [
+      "ABBABAAB",
+      "BAABABBA"
+    ],
+    "aa_processes": 304,
+    "comparison_build_processes": 304,
+    "comparison_run_processes": 48,
+    "retention": "Every observation retained; every build P/R checked. Duplicate output files removed only after hashing. Raw command accounting and stdout/stderr retained in inert archive."
+  },
+  "gates": {
+    "primary_wall_geomean_median_pass": true,
+    "primary_cpu_geomean_median_at_least_20_percent_reduction_pass": true,
+    "primary_repeated_regression_vetoes": [],
+    "primary_regressions_pass": true,
+    "cold_run_control_vetoes": [],
+    "controls_pass": true,
+    "predeclared_candidate_gate_pass": true,
+    "gate_note": "Per-process total CPU is user+system before process medians/means. Main build needs a 19-source median geomean CPU ratio <=0.80 and wall ratio <1 in both blocks; any one source can veto for repeated >=3% median+mean regression in either metric. Cold-run controls use the same per-metric repeated-regression veto."
+  },
+  "results": {
+    "build": [
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.5732234922651092,
+          "geomean_mean_candidate_over_baseline": 0.5774420649748174,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 321.585711,
+                "mean_ms": 322.9033035
+              },
+              "candidate": {
+                "median_ms": 179.280979,
+                "mean_ms": 179.917568
+              },
+              "candidate_over_baseline": {
+                "median": 0.5574905005651821,
+                "mean": 0.5571871394620155
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 304.2582835,
+                "mean_ms": 304.0758385
+              },
+              "candidate": {
+                "median_ms": 170.973,
+                "mean_ms": 171.62087225
+              },
+              "candidate_over_baseline": {
+                "median": 0.5619337558643658,
+                "mean": 0.5644015423803559
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 305.2593965,
+                "mean_ms": 305.73966325
+              },
+              "candidate": {
+                "median_ms": 172.299633,
+                "mean_ms": 172.23546625
+              },
+              "candidate_over_baseline": {
+                "median": 0.5644367871244219,
+                "mean": 0.5633402759038331
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 304.300482,
+                "mean_ms": 304.68633325
+              },
+              "candidate": {
+                "median_ms": 171.498022,
+                "mean_ms": 171.3735855
+              },
+              "candidate_over_baseline": {
+                "median": 0.5635811710610436,
+                "mean": 0.5624590498431882
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 305.9644165,
+                "mean_ms": 306.15762175
+              },
+              "candidate": {
+                "median_ms": 173.510672,
+                "mean_ms": 173.5231255
+              },
+              "candidate_over_baseline": {
+                "median": 0.5670942849656506,
+                "mean": 0.5667770885733306
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 315.3935835,
+                "mean_ms": 314.23387175
+              },
+              "candidate": {
+                "median_ms": 177.9882915,
+                "mean_ms": 178.49104825
+              },
+              "candidate_over_baseline": {
+                "median": 0.5643370721903098,
+                "mean": 0.5680197594739402
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 312.789232,
+                "mean_ms": 324.747066
+              },
+              "candidate": {
+                "median_ms": 175.2379775,
+                "mean_ms": 176.07086225
+              },
+              "candidate_over_baseline": {
+                "median": 0.5602429993497986,
+                "mean": 0.5421784542004146
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 318.051234,
+                "mean_ms": 316.773863
+              },
+              "candidate": {
+                "median_ms": 183.554823,
+                "mean_ms": 186.36495275
+              },
+              "candidate_over_baseline": {
+                "median": 0.5771234423193592,
+                "mean": 0.5883217478394043
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 314.4219465,
+                "mean_ms": 314.29089725
+              },
+              "candidate": {
+                "median_ms": 184.5266165,
+                "mean_ms": 201.199806
+              },
+              "candidate_over_baseline": {
+                "median": 0.5868757526440668,
+                "mean": 0.6401706436949631
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 337.703783,
+                "mean_ms": 336.9431105
+              },
+              "candidate": {
+                "median_ms": 203.4960325,
+                "mean_ms": 205.23591575
+              },
+              "candidate_over_baseline": {
+                "median": 0.6025873642641427,
+                "mean": 0.6091114771435577
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 351.046751,
+                "mean_ms": 349.809868
+              },
+              "candidate": {
+                "median_ms": 212.698297,
+                "mean_ms": 212.59475025
+              },
+              "candidate_over_baseline": {
+                "median": 0.6058973524013614,
+                "mean": 0.6077437193681454
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 313.8514075,
+                "mean_ms": 312.458234
+              },
+              "candidate": {
+                "median_ms": 177.3066965,
+                "mean_ms": 177.52789975
+              },
+              "candidate_over_baseline": {
+                "median": 0.5649383506428914,
+                "mean": 0.5681652151628047
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 316.1047045,
+                "mean_ms": 315.1513355
+              },
+              "candidate": {
+                "median_ms": 178.3471355,
+                "mean_ms": 179.33912075
+              },
+              "candidate_over_baseline": {
+                "median": 0.5642027244804894,
+                "mean": 0.5690571498466647
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 316.2666215,
+                "mean_ms": 314.981326
+              },
+              "candidate": {
+                "median_ms": 183.898083,
+                "mean_ms": 195.62283075
+              },
+              "candidate_over_baseline": {
+                "median": 0.5814653539086798,
+                "mean": 0.6210616776373593
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 316.1413525,
+                "mean_ms": 320.90294275
+              },
+              "candidate": {
+                "median_ms": 174.5588855,
+                "mean_ms": 184.44241725
+              },
+              "candidate_over_baseline": {
+                "median": 0.5521545477034675,
+                "mean": 0.5747607537326019
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 312.4594455,
+                "mean_ms": 316.6831825
+              },
+              "candidate": {
+                "median_ms": 197.9002665,
+                "mean_ms": 195.3175765
+              },
+              "candidate_over_baseline": {
+                "median": 0.6333630471094208,
+                "mean": 0.6167601795526354
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 312.813558,
+                "mean_ms": 319.31096375
+              },
+              "candidate": {
+                "median_ms": 188.2498525,
+                "mean_ms": 186.88010075
+              },
+              "candidate_over_baseline": {
+                "median": 0.6017956948656298,
+                "mean": 0.5852605202003497
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 292.4539955,
+                "mean_ms": 296.013326
+              },
+              "candidate": {
+                "median_ms": 171.3997475,
+                "mean_ms": 168.57995475
+              },
+              "candidate_over_baseline": {
+                "median": 0.58607422068884,
+                "mean": 0.5695012350558839
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 279.261742,
+                "mean_ms": 276.52913225
+              },
+              "candidate": {
+                "median_ms": 141.51201,
+                "mean_ms": 141.4136555
+              },
+              "candidate_over_baseline": {
+                "median": 0.5067361142508379,
+                "mean": 0.511387911824614
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.564927759951409,
+          "geomean_mean_candidate_over_baseline": 0.572034083625441,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 317.223,
+                "mean_ms": 317.5975
+              },
+              "candidate": {
+                "median_ms": 176.4295,
+                "mean_ms": 176.604
+              },
+              "candidate_over_baseline": {
+                "median": 0.5561686889033898,
+                "mean": 0.5560623115736113
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 302.29,
+                "mean_ms": 301.94575
+              },
+              "candidate": {
+                "median_ms": 168.995,
+                "mean_ms": 169.675
+              },
+              "candidate_over_baseline": {
+                "median": 0.559049257335671,
+                "mean": 0.5619386926293879
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 303.331,
+                "mean_ms": 303.776
+              },
+              "candidate": {
+                "median_ms": 170.7045,
+                "mean_ms": 170.7435
+              },
+              "candidate_over_baseline": {
+                "median": 0.5627664168845254,
+                "mean": 0.5620704071421047
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 302.4425,
+                "mean_ms": 302.894
+              },
+              "candidate": {
+                "median_ms": 170.2805,
+                "mean_ms": 170.22
+              },
+              "candidate_over_baseline": {
+                "median": 0.563017763707151,
+                "mean": 0.5619787780543689
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 304.084,
+                "mean_ms": 304.25825
+              },
+              "candidate": {
+                "median_ms": 172.1335,
+                "mean_ms": 172.23675
+              },
+              "candidate_over_baseline": {
+                "median": 0.566072203733179,
+                "mean": 0.5660873616409744
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 313.104,
+                "mean_ms": 311.949
+              },
+              "candidate": {
+                "median_ms": 175.6135,
+                "mean_ms": 175.779
+              },
+              "candidate_over_baseline": {
+                "median": 0.5608791328121008,
+                "mean": 0.5634863391131243
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 309.829,
+                "mean_ms": 321.23
+              },
+              "candidate": {
+                "median_ms": 173.866,
+                "mean_ms": 174.345
+              },
+              "candidate_over_baseline": {
+                "median": 0.5611676118116767,
+                "mean": 0.542741960588986
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 315.8775,
+                "mean_ms": 314.58725
+              },
+              "candidate": {
+                "median_ms": 181.234,
+                "mean_ms": 183.6205
+              },
+              "candidate_over_baseline": {
+                "median": 0.5737477344856787,
+                "mean": 0.5836870375388704
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 311.873,
+                "mean_ms": 312.1175
+              },
+              "candidate": {
+                "median_ms": 182.0255,
+                "mean_ms": 199.01775
+              },
+              "candidate_over_baseline": {
+                "median": 0.5836526406582166,
+                "mean": 0.6376372680160517
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 335.435,
+                "mean_ms": 334.6975
+              },
+              "candidate": {
+                "median_ms": 201.622,
+                "mean_ms": 202.56725
+              },
+              "candidate_over_baseline": {
+                "median": 0.6010762144677806,
+                "mean": 0.6052248672308577
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 348.689,
+                "mean_ms": 347.3945
+              },
+              "candidate": {
+                "median_ms": 210.3495,
+                "mean_ms": 209.95425
+              },
+              "candidate_over_baseline": {
+                "median": 0.6032582043024013,
+                "mean": 0.604368376586273
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 305.9075,
+                "mean_ms": 306.4685
+              },
+              "candidate": {
+                "median_ms": 173.08,
+                "mean_ms": 173.67075
+              },
+              "candidate_over_baseline": {
+                "median": 0.5657919469120567,
+                "mean": 0.566683851684594
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 310.7105,
+                "mean_ms": 310.45175
+              },
+              "candidate": {
+                "median_ms": 175.4365,
+                "mean_ms": 175.982
+              },
+              "candidate_over_baseline": {
+                "median": 0.5646300977919961,
+                "mean": 0.5668578128485344
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 311.409,
+                "mean_ms": 310.548
+              },
+              "candidate": {
+                "median_ms": 177.868,
+                "mean_ms": 190.6395
+              },
+              "candidate_over_baseline": {
+                "median": 0.5711716745501896,
+                "mean": 0.6138809459407242
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 312.317,
+                "mean_ms": 317.5155
+              },
+              "candidate": {
+                "median_ms": 170.53,
+                "mean_ms": 181.485
+              },
+              "candidate_over_baseline": {
+                "median": 0.5460157468213386,
+                "mean": 0.5715783953854221
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 306.1265,
+                "mean_ms": 307.073
+              },
+              "candidate": {
+                "median_ms": 171.2045,
+                "mean_ms": 176.833
+              },
+              "candidate_over_baseline": {
+                "median": 0.5592606324509639,
+                "mean": 0.5758663249455341
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 310.467,
+                "mean_ms": 316.70525
+              },
+              "candidate": {
+                "median_ms": 173.375,
+                "mean_ms": 178.7015
+              },
+              "candidate_over_baseline": {
+                "median": 0.5584329413432023,
+                "mean": 0.5642517766914189
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 290.729,
+                "mean_ms": 294.0615
+              },
+              "candidate": {
+                "median_ms": 169.1415,
+                "mean_ms": 166.752
+              },
+              "candidate_over_baseline": {
+                "median": 0.5817840669489456,
+                "mean": 0.567065052718564
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 275.7825,
+                "mean_ms": 273.58275
+              },
+              "candidate": {
+                "median_ms": 138.6895,
+                "mean_ms": 139.33075
+              },
+              "candidate_over_baseline": {
+                "median": 0.5028944911297852,
+                "mean": 0.5092819265834561
+              }
+            }
+          }
+        }
+      },
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.5714546622237457,
+          "geomean_mean_candidate_over_baseline": 0.5673588981052147,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 320.8054045,
+                "mean_ms": 326.38086825
+              },
+              "candidate": {
+                "median_ms": 183.5589455,
+                "mean_ms": 183.51380725
+              },
+              "candidate_over_baseline": {
+                "median": 0.5721815871091411,
+                "mean": 0.5622688861451057
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 319.7890615,
+                "mean_ms": 321.78780725
+              },
+              "candidate": {
+                "median_ms": 178.0910875,
+                "mean_ms": 179.4957675
+              },
+              "candidate_over_baseline": {
+                "median": 0.5569017484983613,
+                "mean": 0.5578078580228741
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 332.470898,
+                "mean_ms": 329.6908255
+              },
+              "candidate": {
+                "median_ms": 194.622919,
+                "mean_ms": 193.942241
+              },
+              "candidate_over_baseline": {
+                "median": 0.5853833227833373,
+                "mean": 0.588254892158047
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 322.182638,
+                "mean_ms": 330.25694875
+              },
+              "candidate": {
+                "median_ms": 180.8645605,
+                "mean_ms": 180.77133825
+              },
+              "candidate_over_baseline": {
+                "median": 0.5613727717382462,
+                "mean": 0.5473657372969961
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 317.5855205,
+                "mean_ms": 317.3907255
+              },
+              "candidate": {
+                "median_ms": 178.6560235,
+                "mean_ms": 178.81491325
+              },
+              "candidate_over_baseline": {
+                "median": 0.5625446122944386,
+                "mean": 0.5633904801985148
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 322.399086,
+                "mean_ms": 323.5127355
+              },
+              "candidate": {
+                "median_ms": 179.7601855,
+                "mean_ms": 179.8448015
+              },
+              "candidate_over_baseline": {
+                "median": 0.557570394290758,
+                "mean": 0.5559125863222779
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 322.2328915,
+                "mean_ms": 322.18598225
+              },
+              "candidate": {
+                "median_ms": 179.6007975,
+                "mean_ms": 179.60163425
+              },
+              "candidate_over_baseline": {
+                "median": 0.5573633301800912,
+                "mean": 0.5574470776032653
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 318.017681,
+                "mean_ms": 319.390105
+              },
+              "candidate": {
+                "median_ms": 179.978792,
+                "mean_ms": 181.439862
+              },
+              "candidate_over_baseline": {
+                "median": 0.5659395774287154,
+                "mean": 0.5680822892118088
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 327.554088,
+                "mean_ms": 332.94968425
+              },
+              "candidate": {
+                "median_ms": 190.8250105,
+                "mean_ms": 192.98257625
+              },
+              "candidate_over_baseline": {
+                "median": 0.5825755729844532,
+                "mean": 0.5796148348502301
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 349.068727,
+                "mean_ms": 349.13594975
+              },
+              "candidate": {
+                "median_ms": 204.0405425,
+                "mean_ms": 206.807147
+              },
+              "candidate_over_baseline": {
+                "median": 0.584528279727562,
+                "mean": 0.5923398812069768
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 356.80304,
+                "mean_ms": 374.60407175
+              },
+              "candidate": {
+                "median_ms": 215.9968685,
+                "mean_ms": 216.78451025
+              },
+              "candidate_over_baseline": {
+                "median": 0.6053672314563239,
+                "mean": 0.5787030270046711
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 310.1199875,
+                "mean_ms": 310.98313
+              },
+              "candidate": {
+                "median_ms": 171.120278,
+                "mean_ms": 170.854823
+              },
+              "candidate_over_baseline": {
+                "median": 0.551787323930548,
+                "mean": 0.549402223200982
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 318.0979235,
+                "mean_ms": 323.56532725
+              },
+              "candidate": {
+                "median_ms": 178.0654095,
+                "mean_ms": 183.44332225
+              },
+              "candidate_over_baseline": {
+                "median": 0.5597817412347867,
+                "mean": 0.5669436951390779
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 329.4346965,
+                "mean_ms": 328.6136995
+              },
+              "candidate": {
+                "median_ms": 192.2473205,
+                "mean_ms": 192.96467525
+              },
+              "candidate_over_baseline": {
+                "median": 0.5835673125584087,
+                "mean": 0.5872082495148685
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 306.5242035,
+                "mean_ms": 316.81984625
+              },
+              "candidate": {
+                "median_ms": 170.063619,
+                "mean_ms": 173.12442325
+              },
+              "candidate_over_baseline": {
+                "median": 0.5548130198468977,
+                "mean": 0.5464443761941254
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 313.946828,
+                "mean_ms": 323.3287925
+              },
+              "candidate": {
+                "median_ms": 174.5987185,
+                "mean_ms": 179.96274825
+              },
+              "candidate_over_baseline": {
+                "median": 0.5561410497831181,
+                "mean": 0.5565936360276359
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 309.577951,
+                "mean_ms": 310.347435
+              },
+              "candidate": {
+                "median_ms": 169.263688,
+                "mean_ms": 174.3190525
+              },
+              "candidate_over_baseline": {
+                "median": 0.5467562772259579,
+                "mean": 0.5616900055900252
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 292.6343455,
+                "mean_ms": 292.98145375
+              },
+              "candidate": {
+                "median_ms": 157.202388,
+                "mean_ms": 156.8208645
+              },
+              "candidate_over_baseline": {
+                "median": 0.5371973263473272,
+                "mean": 0.5352586742020015
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 272.006365,
+                "mean_ms": 281.9391305
+              },
+              "candidate": {
+                "median_ms": 188.168221,
+                "mean_ms": 178.32771125
+              },
+              "candidate_over_baseline": {
+                "median": 0.6917787420158348,
+                "mean": 0.6325042959937766
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.5691119095485833,
+          "geomean_mean_candidate_over_baseline": 0.5661966097514868,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 317.777,
+                "mean_ms": 322.07475
+              },
+              "candidate": {
+                "median_ms": 180.3635,
+                "mean_ms": 180.30825
+              },
+              "candidate_over_baseline": {
+                "median": 0.5675788367314186,
+                "mean": 0.5598335479574229
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 315.1375,
+                "mean_ms": 317.17775
+              },
+              "candidate": {
+                "median_ms": 176.3275,
+                "mean_ms": 177.23975
+              },
+              "candidate_over_baseline": {
+                "median": 0.5595256039030582,
+                "mean": 0.5588025957054049
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 324.993,
+                "mean_ms": 324.18425
+              },
+              "candidate": {
+                "median_ms": 190.4075,
+                "mean_ms": 188.63125
+              },
+              "candidate_over_baseline": {
+                "median": 0.585881849762918,
+                "mean": 0.5818643256111301
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 318.974,
+                "mean_ms": 326.262
+              },
+              "candidate": {
+                "median_ms": 178.9165,
+                "mean_ms": 178.707
+              },
+              "candidate_over_baseline": {
+                "median": 0.5609124881651796,
+                "mean": 0.5477407727531861
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 315.0765,
+                "mean_ms": 314.635
+              },
+              "candidate": {
+                "median_ms": 177.1835,
+                "mean_ms": 177.3965
+              },
+              "candidate_over_baseline": {
+                "median": 0.5623507306955612,
+                "mean": 0.5638168035978197
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 319.2055,
+                "mean_ms": 320.549
+              },
+              "candidate": {
+                "median_ms": 177.983,
+                "mean_ms": 178.0165
+              },
+              "candidate_over_baseline": {
+                "median": 0.5575812446840671,
+                "mean": 0.5553487922283332
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 318.682,
+                "mean_ms": 318.65925
+              },
+              "candidate": {
+                "median_ms": 177.322,
+                "mean_ms": 177.25175
+              },
+              "candidate_over_baseline": {
+                "median": 0.5564230173025148,
+                "mean": 0.5562422870197554
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 316.036,
+                "mean_ms": 316.88825
+              },
+              "candidate": {
+                "median_ms": 178.783,
+                "mean_ms": 180.1095
+              },
+              "candidate_over_baseline": {
+                "median": 0.5657045399891152,
+                "mean": 0.5683691332827897
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 323.537,
+                "mean_ms": 328.96875
+              },
+              "candidate": {
+                "median_ms": 189.2585,
+                "mean_ms": 190.789
+              },
+              "candidate_over_baseline": {
+                "median": 0.5849670980444277,
+                "mean": 0.5799608625439346
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 346.586,
+                "mean_ms": 345.61625
+              },
+              "candidate": {
+                "median_ms": 202.527,
+                "mean_ms": 205.12875
+              },
+              "candidate_over_baseline": {
+                "median": 0.5843484733947707,
+                "mean": 0.5935159298788758
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 354.0315,
+                "mean_ms": 371.41925
+              },
+              "candidate": {
+                "median_ms": 214.4225,
+                "mean_ms": 215.1955
+              },
+              "candidate_over_baseline": {
+                "median": 0.6056593834164474,
+                "mean": 0.579387040386302
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 308.1825,
+                "mean_ms": 308.637
+              },
+              "candidate": {
+                "median_ms": 169.1175,
+                "mean_ms": 169.16175
+              },
+              "candidate_over_baseline": {
+                "median": 0.5487576354919569,
+                "mean": 0.5480929052576328
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 315.6685,
+                "mean_ms": 321.114
+              },
+              "candidate": {
+                "median_ms": 176.7105,
+                "mean_ms": 181.838
+              },
+              "candidate_over_baseline": {
+                "median": 0.5597976991685898,
+                "mean": 0.5662724141582117
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 323.275,
+                "mean_ms": 324.54575
+              },
+              "candidate": {
+                "median_ms": 177.24,
+                "mean_ms": 184.472
+              },
+              "candidate_over_baseline": {
+                "median": 0.5482638620369654,
+                "mean": 0.56840060299665
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 304.807,
+                "mean_ms": 308.4095
+              },
+              "candidate": {
+                "median_ms": 168.841,
+                "mean_ms": 171.8235
+              },
+              "candidate_over_baseline": {
+                "median": 0.553927567280279,
+                "mean": 0.5571277797862906
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 311.1645,
+                "mean_ms": 320.75975
+              },
+              "candidate": {
+                "median_ms": 172.9175,
+                "mean_ms": 178.285
+              },
+              "candidate_over_baseline": {
+                "median": 0.5557108860425917,
+                "mean": 0.5558209843972007
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 307.242,
+                "mean_ms": 308.22225
+              },
+              "candidate": {
+                "median_ms": 168.172,
+                "mean_ms": 172.4685
+              },
+              "candidate_over_baseline": {
+                "median": 0.547360061449932,
+                "mean": 0.5595588897297323
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 290.761,
+                "mean_ms": 291.04625
+              },
+              "candidate": {
+                "median_ms": 155.4635,
+                "mean_ms": 155.29675
+              },
+              "candidate_over_baseline": {
+                "median": 0.5346779657519406,
+                "mean": 0.5335810030192796
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 270.0785,
+                "mean_ms": 279.9735
+              },
+              "candidate": {
+                "median_ms": 186.3305,
+                "mean_ms": 176.56825
+              },
+              "candidate_over_baseline": {
+                "median": 0.6899123773273326,
+                "mean": 0.6306605803763571
+              }
+            }
+          }
+        }
+      }
+    ],
+    "run": [
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 1.0386947172274423,
+          "geomean_mean_candidate_over_baseline": 1.0264785022457135,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 644.687268,
+                "mean_ms": 645.7300985
+              },
+              "candidate": {
+                "median_ms": 642.329779,
+                "mean_ms": 642.244747
+              },
+              "candidate_over_baseline": {
+                "median": 0.9963432052763914,
+                "mean": 0.994602463927117
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 657.008139,
+                "mean_ms": 662.09952175
+              },
+              "candidate": {
+                "median_ms": 736.930452,
+                "mean_ms": 723.65512425
+              },
+              "candidate_over_baseline": {
+                "median": 1.1216458492000507,
+                "mean": 1.0929703171168315
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 519.046864,
+                "mean_ms": 524.4562675
+              },
+              "candidate": {
+                "median_ms": 520.48189,
+                "mean_ms": 521.79625325
+              },
+              "candidate_over_baseline": {
+                "median": 1.0027647330126244,
+                "mean": 0.9949280532718584
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 1.0345054657061026,
+          "geomean_mean_candidate_over_baseline": 1.0274661728262275,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 592.4615,
+                "mean_ms": 592.61325
+              },
+              "candidate": {
+                "median_ms": 584.2945,
+                "mean_ms": 584.801
+              },
+              "candidate_over_baseline": {
+                "median": 0.9862151380300661,
+                "mean": 0.9868172876661128
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 605.2085,
+                "mean_ms": 607.4865
+              },
+              "candidate": {
+                "median_ms": 678.4945,
+                "mean_ms": 671.155
+              },
+              "candidate_over_baseline": {
+                "median": 1.1210921525391662,
+                "mean": 1.104806444258432
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 499.695,
+                "mean_ms": 505.24575
+              },
+              "candidate": {
+                "median_ms": 500.369,
+                "mean_ms": 502.66925
+              },
+              "candidate_over_baseline": {
+                "median": 1.001348822781897,
+                "mean": 0.9949005013896702
+              }
+            }
+          }
+        }
+      },
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 1.0245284208729388,
+          "geomean_mean_candidate_over_baseline": 1.1283128467089623,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 671.397678,
+                "mean_ms": 669.223682
+              },
+              "candidate": {
+                "median_ms": 707.8014245,
+                "mean_ms": 942.13080675
+              },
+              "candidate_over_baseline": {
+                "median": 1.0542208406326958,
+                "mean": 1.4077965739861549
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 652.6226695,
+                "mean_ms": 661.9267235
+              },
+              "candidate": {
+                "median_ms": 653.8808935,
+                "mean_ms": 670.62564275
+              },
+              "candidate_over_baseline": {
+                "median": 1.0019279501905196,
+                "mean": 1.013141816066896
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 552.073442,
+                "mean_ms": 559.0211195
+              },
+              "candidate": {
+                "median_ms": 562.083449,
+                "mean_ms": 562.99776375
+              },
+              "candidate_over_baseline": {
+                "median": 1.0181316582875943,
+                "mean": 1.0071135849993589
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.9944924600879294,
+          "geomean_mean_candidate_over_baseline": 1.0081973964410917,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 610.318,
+                "mean_ms": 609.0985
+              },
+              "candidate": {
+                "median_ms": 596.5045,
+                "mean_ms": 618.73925
+              },
+              "candidate_over_baseline": {
+                "median": 0.977366717022929,
+                "mean": 1.0158278997567718
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 607.4805,
+                "mean_ms": 617.39325
+              },
+              "candidate": {
+                "median_ms": 607.7365,
+                "mean_ms": 624.8265
+              },
+              "candidate_over_baseline": {
+                "median": 1.0004214127037823,
+                "mean": 1.0120397331846436
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 509.9475,
+                "mean_ms": 512.86925
+              },
+              "candidate": {
+                "median_ms": 512.967,
+                "mean_ms": 511.241
+              },
+              "candidate_over_baseline": {
+                "median": 1.0059211977703588,
+                "mean": 0.9968252142237032
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "aa": {
+    "purpose": "Descriptive identical-binary calibration only, no promotion gate; does not waive the previous append A/A failure.",
+    "geomean_median_ratios": {
+      "build-block0": {
+        "elapsed_ns": 0.9960936713515793,
+        "total_cpu_ns": 0.9942278558087811
+      },
+      "build-block1": {
+        "elapsed_ns": 0.9902182692464098,
+        "total_cpu_ns": 0.9921813064666446
+      }
+    }
+  },
+  "runtime_invariance": {
+    "status": "verified",
+    "baseline_source_fingerprint": "0937c86e5c61302c9691b42950d6765c740629fe2ec064b68b802ac918dbbc5f",
+    "candidate_source_fingerprint": "8f895ff65a60f98bbaded819f6ac75410a707d3ab5d2fe39facb8c0ba0474c2d",
+    "baseline_runtime_build": "target/performance-worker-cpu/candidate/runtime-build",
+    "candidate_runtime_build_dir": "target/release/build/scriptw-runtime-image-1d4fdcd75007dec6/out",
+    "profiles": {
+      "standard": {
+        "runtime_abi": 42,
+        "candidate_runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+        "baseline_runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+        "runtime_wasm_identical": true,
+        "candidate_native_sha256": "2bb695622cacb273cc5f6ece7320d57d936052ca9bfe5d644036704162fcac48",
+        "baseline_native_sha256": "2bb695622cacb273cc5f6ece7320d57d936052ca9bfe5d644036704162fcac48",
+        "native_identical": true,
+        "candidate_package": {
+          "package_sha256": "4fd4b75687a859af63effa0620621b40308497c179b0e0423f14610b4a2a8b78",
+          "package_bytes": 39054380,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+          "runtime_wasm_bytes": 39054212
+        },
+        "baseline_package": {
+          "package_sha256": "7340029a12d8d3e6458f85b0f45906842793b5351e2dd9dba4a889d1120b6770",
+          "package_bytes": 39054380,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+          "runtime_wasm_bytes": 39054212
+        }
+      },
+      "portable": {
+        "runtime_abi": 42,
+        "candidate_runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+        "baseline_runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+        "runtime_wasm_identical": true,
+        "candidate_native_sha256": "786851f96e20eacc5bb52bb08a17485e050538075fa6f3c6c6df617bdd5150b7",
+        "baseline_native_sha256": "786851f96e20eacc5bb52bb08a17485e050538075fa6f3c6c6df617bdd5150b7",
+        "native_identical": true,
+        "candidate_package": {
+          "package_sha256": "b3d1f76397515495819908969c0d2ba8879fbdb21d1be3aca50ddc78e2c5532d",
+          "package_bytes": 39052396,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+          "runtime_wasm_bytes": 39052228
+        },
+        "baseline_package": {
+          "package_sha256": "356c388a0d29c5af8525149d95ab382fde13506d1c6963c3f0c1bbe7b83560b5",
+          "package_bytes": 39052396,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+          "runtime_wasm_bytes": 39052228
+        }
+      }
+    }
+  },
+  "program_invariance": {
+    "sources": 19,
+    "all_repetitions_equivalent": true,
+    "artifacts": {
+      "baseline": {
+        "sort-reverse-128.js": {
+          "program": {
+            "sha256": "e2a39e6007f91b2d8cefcdb4642f5007d36e853ee9c652b28f859a930be72b05",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-128.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-128.js.runtime.wasm"
+        },
+        "sort-reverse-512.js": {
+          "program": {
+            "sha256": "cfce4751a79e4caffffac24b4708921704addd0b20682aaef15a7776c6170fe6",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-512.js.runtime.wasm"
+        },
+        "sort-sorted-512.js": {
+          "program": {
+            "sha256": "9190fa76a8269aefb99950892e8c340e7a3b2abea2def9208969a22939a92613",
+            "bytes": 75843
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-sorted-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-sorted-512.js.runtime.wasm"
+        },
+        "to-sorted-512.js": {
+          "program": {
+            "sha256": "5804c3eb1213479a221400b7c3c88596137c4ae86ef7d9cecbbaa510b0d5294e",
+            "bytes": 78547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/to-sorted-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/to-sorted-512.js.runtime.wasm"
+        },
+        "join-1024.js": {
+          "program": {
+            "sha256": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-1024.js.runtime.wasm"
+        },
+        "join-4096.js": {
+          "program": {
+            "sha256": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-4096.js.runtime.wasm"
+        },
+        "join-mixed-1024.js": {
+          "program": {
+            "sha256": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53",
+            "bytes": 74016
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-mixed-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-mixed-1024.js.runtime.wasm"
+        },
+        "numeric-loop-10000.js": {
+          "program": {
+            "sha256": "3c4ce1fd35f223a33de46ca507623878791be7063fe326cd2aa567e784e3dda3",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-10000.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-10000.js.runtime.wasm"
+        },
+        "numeric-loop-50000.js": {
+          "program": {
+            "sha256": "6f710ef09137f122c4faecd89f27685308af09fe11f6e899e06296d5e75f6d31",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-50000.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-50000.js.runtime.wasm"
+        },
+        "folded-string-4096.js": {
+          "program": {
+            "sha256": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3",
+            "bytes": 66587
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/folded-string-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/folded-string-4096.js.runtime.wasm"
+        },
+        "dynamic-string-4096.js": {
+          "program": {
+            "sha256": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71",
+            "bytes": 64851
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/dynamic-string-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/dynamic-string-4096.js.runtime.wasm"
+        },
+        "integer.js": {
+          "program": {
+            "sha256": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf",
+            "bytes": 67547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/integer.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/integer.js.runtime.wasm"
+        },
+        "objects.js": {
+          "program": {
+            "sha256": "a9d73d0dec49bb793db7b9f75fb23a489cc3445eaeb998bbb06ba26224176dd2",
+            "bytes": 78664
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/objects.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/objects.js.runtime.wasm"
+        },
+        "retained-objects.js": {
+          "program": {
+            "sha256": "089393fcb94e0f8c921ff214671180ce495840b92344988964f2c515af493687",
+            "bytes": 78774
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/retained-objects.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/retained-objects.js.runtime.wasm"
+        },
+        "join-empty-1024.js": {
+          "program": {
+            "sha256": "16061580fbc24c917aa32271e774e1523ce4e804988ec0121e4e7d37a26fbadf",
+            "bytes": 67128
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-empty-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-empty-1024.js.runtime.wasm"
+        },
+        "join-singleton-1024.js": {
+          "program": {
+            "sha256": "aeb9ea1d7e33ccd058db2fb971516df67ea9cf16f749309ca0023052dc43154e",
+            "bytes": 67590
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-singleton-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-singleton-1024.js.runtime.wasm"
+        },
+        "join-small-1024.js": {
+          "program": {
+            "sha256": "b66d815a0582149957e92385902fc1b8437cccf71f62a7d79e7b4a48864e547a",
+            "bytes": 68002
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-small-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/join-small-1024.js.runtime.wasm"
+        },
+        "hello.js": {
+          "program": {
+            "sha256": "7cff66260c0d50f8f002e2a2ac156290269944e050d650d66d9b3e91e7207587",
+            "bytes": 47996
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/hello.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/hello.js.runtime.wasm"
+        },
+        "tiny42.js": {
+          "program": {
+            "sha256": "a07081ac710865be454006443f4c8c5b0804700239a5576c56d28cfaf6d4b0e5",
+            "bytes": 599327
+          },
+          "runtime": null,
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/baseline/tiny42.js",
+          "runtime_path": null
+        }
+      },
+      "candidate": {
+        "sort-reverse-128.js": {
+          "program": {
+            "sha256": "e2a39e6007f91b2d8cefcdb4642f5007d36e853ee9c652b28f859a930be72b05",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-128.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-128.js.runtime.wasm"
+        },
+        "sort-reverse-512.js": {
+          "program": {
+            "sha256": "cfce4751a79e4caffffac24b4708921704addd0b20682aaef15a7776c6170fe6",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-512.js.runtime.wasm"
+        },
+        "sort-sorted-512.js": {
+          "program": {
+            "sha256": "9190fa76a8269aefb99950892e8c340e7a3b2abea2def9208969a22939a92613",
+            "bytes": 75843
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-sorted-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-sorted-512.js.runtime.wasm"
+        },
+        "to-sorted-512.js": {
+          "program": {
+            "sha256": "5804c3eb1213479a221400b7c3c88596137c4ae86ef7d9cecbbaa510b0d5294e",
+            "bytes": 78547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/to-sorted-512.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/to-sorted-512.js.runtime.wasm"
+        },
+        "join-1024.js": {
+          "program": {
+            "sha256": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-1024.js.runtime.wasm"
+        },
+        "join-4096.js": {
+          "program": {
+            "sha256": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-4096.js.runtime.wasm"
+        },
+        "join-mixed-1024.js": {
+          "program": {
+            "sha256": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53",
+            "bytes": 74016
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-mixed-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-mixed-1024.js.runtime.wasm"
+        },
+        "numeric-loop-10000.js": {
+          "program": {
+            "sha256": "3c4ce1fd35f223a33de46ca507623878791be7063fe326cd2aa567e784e3dda3",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-10000.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-10000.js.runtime.wasm"
+        },
+        "numeric-loop-50000.js": {
+          "program": {
+            "sha256": "6f710ef09137f122c4faecd89f27685308af09fe11f6e899e06296d5e75f6d31",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-50000.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-50000.js.runtime.wasm"
+        },
+        "folded-string-4096.js": {
+          "program": {
+            "sha256": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3",
+            "bytes": 66587
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/folded-string-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/folded-string-4096.js.runtime.wasm"
+        },
+        "dynamic-string-4096.js": {
+          "program": {
+            "sha256": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71",
+            "bytes": 64851
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/dynamic-string-4096.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/dynamic-string-4096.js.runtime.wasm"
+        },
+        "integer.js": {
+          "program": {
+            "sha256": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf",
+            "bytes": 67547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/integer.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/integer.js.runtime.wasm"
+        },
+        "objects.js": {
+          "program": {
+            "sha256": "a9d73d0dec49bb793db7b9f75fb23a489cc3445eaeb998bbb06ba26224176dd2",
+            "bytes": 78664
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/objects.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/objects.js.runtime.wasm"
+        },
+        "retained-objects.js": {
+          "program": {
+            "sha256": "089393fcb94e0f8c921ff214671180ce495840b92344988964f2c515af493687",
+            "bytes": 78774
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/retained-objects.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/retained-objects.js.runtime.wasm"
+        },
+        "join-empty-1024.js": {
+          "program": {
+            "sha256": "16061580fbc24c917aa32271e774e1523ce4e804988ec0121e4e7d37a26fbadf",
+            "bytes": 67128
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-empty-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-empty-1024.js.runtime.wasm"
+        },
+        "join-singleton-1024.js": {
+          "program": {
+            "sha256": "aeb9ea1d7e33ccd058db2fb971516df67ea9cf16f749309ca0023052dc43154e",
+            "bytes": 67590
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-singleton-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-singleton-1024.js.runtime.wasm"
+        },
+        "join-small-1024.js": {
+          "program": {
+            "sha256": "b66d815a0582149957e92385902fc1b8437cccf71f62a7d79e7b4a48864e547a",
+            "bytes": 68002
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-small-1024.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/join-small-1024.js.runtime.wasm"
+        },
+        "hello.js": {
+          "program": {
+            "sha256": "7cff66260c0d50f8f002e2a2ac156290269944e050d650d66d9b3e91e7207587",
+            "bytes": 47996
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/hello.js",
+          "runtime_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/hello.js.runtime.wasm"
+        },
+        "tiny42.js": {
+          "program": {
+            "sha256": "a07081ac710865be454006443f4c8c5b0804700239a5576c56d28cfaf6d4b0e5",
+            "bytes": 599327
+          },
+          "runtime": null,
+          "program_path": "target/performance-cold-compiler/runs/baseline-vs-candidate/retained-artifacts/candidate/tiny42.js",
+          "runtime_path": null
+        }
+      }
+    }
+  },
+  "verification": {
+    "native_passes": {
+      "scriptw_aot_wasm": 587,
+      "structure_language": 152,
+      "scriptw_engine": 66
+    },
+    "native_total": 805,
+    "source_guards": 359,
+    "product_graph": "check-no-interpreter-in-product-graph: ok",
+    "unavailable_cache_cli": {
+      "status": "passed",
+      "observations": [
+        {
+          "product": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-worker-cpu/candidate/scriptw",
+            "run",
+            "/home/jacobt/src/scriptw/target/performance-cold-compiler/sources/hello.js"
+          ],
+          "executable_sha256": "b0cefb5477ac96dd164bcf749c323c04ffc741343e21fcb82549f497771b8c0d",
+          "executable_unchanged": true,
+          "exit_code": 0,
+          "exact_output": true
+        },
+        {
+          "product": "candidate",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-cold-compiler/candidate/scriptw",
+            "run",
+            "/home/jacobt/src/scriptw/target/performance-cold-compiler/sources/hello.js"
+          ],
+          "executable_sha256": "6a60d04c10d08ff467bb279fd0190c52f540eaa1de1dfe4d5f99ee2fd5e624a7",
+          "executable_unchanged": true,
+          "exit_code": 0,
+          "exact_output": true
+        }
+      ],
+      "performance_claim": false
+    },
+    "test_build_correction": "Two test-only cache paths were qualified with crate::. Original Engine compile failure retained; unchanged backend build reused.",
+    "receipt_parser_correction": {
+      "status": "verified",
+      "reason": "Normalize only the libtest should-panic annotation; all original backend tests passed.",
+      "original_failed_native_receipt_sha256": "b260f9b2496ad2c49f04268cd8fae1d3a69f3b9780ecfba419633c7831d2fa18",
+      "original_scope_02_sha256": "5a399f12bed138fbc7a370863dc4dfbd302e5a0f656aec5e6926897fb1990ec0",
+      "original_runner_sha256": "e711a1a8fc3d3747b8f7a1f66b4468a5f2231816f85f7ad85dc80da8bd63a957",
+      "corrected_runner_sha256": "60f3243dad3146db6eaddeb513ab6fb44c8f0ec037d7bcb61311bfa09de98f21",
+      "continuation_sha256": "04945665e03a3426334ce09f1eb8c35a5bc3c5b4b1506a3ae191a8781772ed84",
+      "executable_sha256": "f7826ff43d88a8f46c887e98439b160cbc7146cb6b894a2ce9dad1ca8da9e2a4",
+      "retained_backend_passes": 587,
+      "normalized_annotations": 18,
+      "raw_scopes": [
+        {
+          "stdout": "scriptw_aot_wasm-scope-00.stdout",
+          "stdout_sha256": "5f12fd617815eb4014f0ba7211ae8c85d6ffabe2a2febe21329db259725fb507",
+          "stderr": "scriptw_aot_wasm-scope-00.stderr",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selected": 22
+        },
+        {
+          "stdout": "scriptw_aot_wasm-scope-01.stdout",
+          "stdout_sha256": "154fba3d380e42a9ccb59bfa68b7d5030c3acee9d00dce0cac884648cc717d46",
+          "stderr": "scriptw_aot_wasm-scope-01.stderr",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selected": 20
+        },
+        {
+          "stdout": "scriptw_aot_wasm-scope-02.stdout",
+          "stdout_sha256": "514772e98c75405b75d9a3275be097f4c45828465eb369ef9b77fd09ecf5dd24",
+          "stderr": "scriptw_aot_wasm-scope-02.stderr",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selected": 545
+        }
+      ],
+      "backend_processes_rerun": 0
+    },
+    "limits": "One CPU, 4 GiB, zero swap, serial workers, 1 retained Module / 64 MiB; disk-backed private caches use unchanged pinned tier budgets.",
+    "coverage": "Full backend lib + structure_language, selected Engine cache/link/identity tests, 19-source emission and 48 cold execution controls. Not full Engine, default/all-feature release or pinned Test262 acceptance.",
+    "formatting": "Changed Rust files pass; pre-existing workspace formatting failures remain open."
+  },
+  "limitations": [
+    "Cold-run controls are noisy and not all improve: retained-object block0 median wall/CPU rose about12%, while block1 join mean wall rose about41%. Neither repeated in the other block under the predeclared veto. All samples remain retained.",
+    "Both perf sampling attempts were denied by host permissions; failures retained, no sampled attribution claimed.",
+    "Separate identity-command diagnostics are not subtracted from build timings.",
+    "No execution code-generation change; overall V8/Scriptc execution and RSS parity remains open.",
+    "Ordinary P-owned prefix collection remains a separate warm multi-program hypothesis; no pool sharing change landed.",
+    "The prior failed 480-process append A/A and parked unbuilt append candidate remain unchanged."
+  ],
+  "evidence": {
+    "archive": "cold-compiler-20261101-inert.tar.xz",
+    "source_directory": "target/performance-cold-compiler",
+    "reproduction": [
+      "python3 -B scripts/limited_verification.py -- python3 -B target/performance-cold-compiler/campaign.py --stage aa",
+      "python3 -B scripts/limited_verification.py -- python3 -B target/performance-cold-compiler/campaign.py --stage comparison"
+    ],
+    "prerequisite": "Exact frozen hosts, source inputs and runtime artifacts are fingerprinted in stage-inputs.json. Binaries and Wasm/native images are excluded from the inert archive.",
+    "archive_sha256": "00a5f9f1d4d3f570f4f2352c67cd6887ee27c8c567139ca659173faa17e568b3",
+    "archive_bytes": 826184,
+    "archive_members": 2210,
+    "expanded_bytes": 173083966
+  },
+  "independent_audit": {
+    "reviewer": "Astra xhigh",
+    "verdict": "PASS",
+    "receipt": "target/performance-cold-compiler/final-audit.json",
+    "sha256": "108d0008c5410d6a89438fd78fd456fb6abf7a96d1e6c932313b462f6d348907",
+    "counts": {
+      "all_processes": 656,
+      "descriptive_aa": 304,
+      "comparison_build": 304,
+      "separate_run_controls": 48,
+      "native_unique_selected": 805
+    }
+  }
+}

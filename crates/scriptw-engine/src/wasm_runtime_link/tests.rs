@@ -11,7 +11,7 @@ fn program_cache_decoder_reattaches_only_the_recorded_runtime() {
     let cache = cache::FunctionCache::new(root.clone(), 64 * 1024 * 1024).unwrap();
     let profile = IntlCompilationProfile::default();
     let selection = IntlDataSelection::new(profile.clone());
-    let runtime_cache = RuntimeWasmCache::new(&cache).expect("loaded test compiler identity");
+    let runtime_cache = RuntimeWasmCache::new(&cache);
     let runtime = scriptw_aot_wasm::runtime_artifact_with_inputs(
         &selection,
         embedded_runtime::inputs(

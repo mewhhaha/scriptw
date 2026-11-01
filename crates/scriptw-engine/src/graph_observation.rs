@@ -57,7 +57,9 @@ impl Engine {
     ) -> Result<GraphRunOutcome, EngineError> {
         let cache = program_wasm_cache();
         let prepared = self.prepare_compilation(source, goal, &options)?;
-        let base = program_cache_key(source, goal, &options, prepared.modules.graph());
+        let base = cache
+            .as_ref()
+            .and_then(|_| program_cache_key(source, goal, &options, prepared.modules.graph()));
         let key = base.map(graph_artifact_key);
         // Snapshot artifacts link against a snapshot runtime that the program
         // cache cannot name, so only standalone entries are cached or reused.
@@ -119,7 +121,7 @@ impl Engine {
         let unit = self.compile_prepared_on_current_thread(prepared)?;
         let runtime_cache = cache
             .as_deref()
-            .and_then(wasm_runtime_link::RuntimeWasmCache::new);
+            .map(wasm_runtime_link::RuntimeWasmCache::new);
         let artifact = scriptw_aot_wasm::emit_with_rooted_snapshot_and_runtime_inputs(
             &unit.ir,
             unit.promise_rejection_policy,
