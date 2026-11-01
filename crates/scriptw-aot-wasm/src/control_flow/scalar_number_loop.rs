@@ -10,7 +10,7 @@ use crate::emit::LocalBindingId;
 mod dense_array;
 use dense_array::{ArrayRead, ArrayReadBorrow, ArrayReadLoop, PropertyReadView};
 mod compact_path;
-use compact_path::{CompactPathBorrow, CompactPathId, CompactReadPath};
+use compact_path::{CompactPathBorrow, CompactPathId, CompactReadPath, PreparedCompactRows};
 mod joined_length;
 use joined_length::{JoinedLengthFact, JoinedStringArrayLength};
 
@@ -1202,23 +1202,24 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::End);
         }
         let done = self.open_frame(ControlFrameKind::Block, function);
+        let compact = match locals.invariant {
+            Some(RegionFact::ArrayReads(array)) => array.prepare_compact_loop(done, self, function),
+            _ => None,
+        };
         let next = self.open_frame(ControlFrameKind::Loop, function);
-        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
-            array.emit_test(function);
-        } else {
-            plan.test.emit(self, &locals, function);
-        }
-        function.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(done, function);
-        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
-            if let Some(ready) = array.try_prepare_row(self, function) {
-                ready.load(function);
-                schema.release_i32_local(ready, function);
-                function.instruction(&Instruction::I32Eqz);
-                self.emit_branch_if_to_target(done, function);
+        if compact.is_none() {
+            if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
+                array.emit_test(function);
+            } else {
+                plan.test.emit(self, &locals, function);
             }
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(done, function);
         }
         plan.emit_iteration(self, &locals, value, iterated, function);
+        if let Some(compact) = compact {
+            compact.prepare_next(self, function);
+        }
         self.emit_branch_to_target(next, function);
         self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);

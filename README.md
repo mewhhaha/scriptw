@@ -39,8 +39,9 @@ literal trip counts can use one guarded affine transform after the existing
 Number and native-method checks; dirty bindings and the last body completion
 share the ordinary loop exit.
 Read-only loops over dense Number Arrays can borrow one guarded backing and
-keep their counter and arithmetic in primitive locals. Closed row reads can also
-validate uniform own-data shapes and Number leaves before using direct slots.
+keep their counter and arithmetic in primitive locals. Closed row reads resolve
+key slots on the first actual row, then validate each row's shape and Number leaves
+before using direct slots.
 Other layouts, effects and index forms retain ordinary property access and coercion.
 Bounded integer sums can reduce a complete trip when every sequential Number
 operation stays exact. Pure loops that observe only the length of a native
@@ -80,12 +81,15 @@ overall parity remains open. Slower controls and unequal setup boundaries remain
 explicit. These local results do not refresh the published CI cohorts.
 
 The [compact-row checkpoint](docs/rust-rewrite/compact-rows-20261101.json) records
-**about 21% lower object medians** and **28% lower retained-object medians** in
-both blocks. Its separate precompiled control improves 14–22% without a repeated
-veto. Both R/native profiles and the other 15 original programs stay byte-identical.
-The refreshed reference still wins on 2/17 V8 and 6/17 Scriptc cases; its object
-mean is 9% slower than baseline despite a faster median. All observations and
-setup boundaries remain in the record; overall parity remains open.
+about 21% lower object medians and 28% lower retained-object medians. Its
+[first-row setup follow-up](docs/rust-rewrite/compact-row-entry-20261101.json)
+reduces those medians another **2.1–2.8%** and **11.1–11.4%**, respectively,
+against that checkpoint in both blocks. The separate precompiled control records
+0.8–1.0% and 4.35–4.54% lower medians, without a repeated veto. Both R/native
+profiles and the other 15 original programs stay byte-identical. Latest reference
+median wins are 2/17 V8 and 5/17 Scriptc; slower sort, join and retained-object
+reference processes remain in the record. These local cohorts retain their own
+settings and do not refresh published CI results; overall parity remains open.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

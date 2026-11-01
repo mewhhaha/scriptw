@@ -206,11 +206,32 @@ impl<'a> CompactPathBorrow<'a> {
         }
     }
 
-    /// Validate and capture the complete current row before any body effect.
-    /// Every miss clears temporary roots, then the caller publishes the completed
-    /// prefix and resumes its original loop at the untouched current counter.
-    pub(super) fn try_prepare_row(
+    /// Positive-trip admission prepares the first complete row exactly once.
+    /// Only the returned owner can emit established-shape next-row guards.
+    pub(super) fn prepare_loop(
         &self,
+        slot: I32Local,
+        length: I64Local,
+        done: ControlTarget,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) -> PreparedCompactRows<'_, 'a> {
+        let prepared = PreparedCompactRows {
+            rows: self,
+            slot,
+            length,
+            done,
+        };
+        prepared.guard_bound(builder, function);
+        prepared.guard_row(RowSetup::First, builder, function);
+        prepared
+    }
+
+    /// Every row guard captures the complete footprint before a source body and
+    /// clears temporary roots before a miss reaches shared prefix publication.
+    fn try_prepare_row(
+        &self,
+        setup: RowSetup,
         slot: I32Local,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
@@ -218,24 +239,11 @@ impl<'a> CompactPathBorrow<'a> {
         let s = builder.runtime_schema();
         let accepted = s.reserve_i32_local(function);
         accepted.set_constant(0, function);
-        let key_length = s.reserve_i32_local(function);
         let scratch = RowScratch::new(builder, function);
-        let actual_shape = s
-            .reserve_gc_local::<CompactDataShape, Nullable>(function)
-            .initialize_null(s, function);
-        let keys = s
-            .reserve_gc_local::<CompactShapeKeys, Nullable>(function)
-            .initialize_null(s, function);
-        // Compiler-owned roots are all initialized before any emitted decline;
-        // name cache reads occur only while selecting the first actual shape.
-        let names = self
-            .paths
-            .iter()
-            .map(|_| {
-                s.reserve_gc_local::<StringValue, Nullable>(function)
-                    .initialize_null(s, function)
-            })
-            .collect::<Vec<_>>();
+        let first = match setup {
+            RowSetup::First => Some(FirstRowKeys::new(self, builder, function)),
+            RowSetup::Established => None,
+        };
         let declined = builder.open_frame(ControlFrameKind::Block, function);
         scratch.load_row(&self.values, slot, builder, function);
         scratch.value.tag().load(function);
@@ -260,74 +268,23 @@ impl<'a> CompactPathBorrow<'a> {
         function.instruction(&Instruction::I32Eqz);
         builder.emit_branch_if_to_target(declined, function);
         scratch.cast_inline(builder, function);
-        actual_shape.replace(
-            s.field(InlineCompactDataStorageSchema::SHAPE)
-                .read(&scratch.inline, s, function)
-                .reference()
-                .nullable(),
-            function,
-        );
-        self.shape.load(s, function).is_null(function);
-        builder.open_frame(ControlFrameKind::If, function);
-        self.shape.replace(actual_shape.load(s, function), function);
-        keys.replace(
-            s.field(CompactDataShapeSchema::KEYS)
-                .read(&actual_shape, s, function)
-                .reference()
-                .nullable(),
-            function,
-        );
-        s.array_type::<CompactShapeKeys>()
-            .length(&keys, s, function);
-        key_length.store(function);
-        key_length.load(function);
-        function.instruction(&Instruction::I32Const(2));
-        function.instruction(&Instruction::I32GtU);
-        builder.emit_branch_if_to_target(declined, function);
-        for ((path, slot), name) in self.paths.iter().zip(&self.slots).zip(&names) {
-            let cached = path.name().cached(builder, function);
-            name.replace(cached.load(s, function), function);
-            cached.clear(function);
-            name.load(s, function).is_null(function);
-            builder.emit_branch_if_to_target(declined, function);
-            slot.set_constant(0, function);
-            let found = builder.open_frame(ControlFrameKind::Block, function);
-            let probe = builder.open_frame(ControlFrameKind::Loop, function);
-            slot.load(function);
-            key_length.load(function);
-            function.instruction(&Instruction::I32GeU);
-            builder.emit_branch_if_to_target(declined, function);
-            let actual = s.reserve_gc_local(function).initialize(
-                s.array_type::<CompactShapeKeys>()
-                    .read(&keys, *slot, s, function)
-                    .reference(),
+        if let Some(first) = &first {
+            self.shape.replace(
+                s.field(InlineCompactDataStorageSchema::SHAPE)
+                    .read(&scratch.inline, s, function)
+                    .reference()
+                    .nullable(),
                 function,
             );
-            let expected = s
-                .reserve_gc_local(function)
-                .initialize(name.load(s, function).require_non_null(function), function);
-            builder.emit_string_payload_equality_i32(&actual, &expected, function);
-            expected.clear(function);
-            actual.clear(function);
-            builder.emit_branch_if_to_target(found, function);
-            slot.load(function);
-            function.instruction(&Instruction::I32Const(1));
-            function.instruction(&Instruction::I32Add);
-            slot.store(function);
-            builder.emit_branch_to_target(probe, function);
-            builder.pop_control(ControlFrameKind::Loop);
-            function.instruction(&Instruction::End);
-            builder.pop_control(ControlFrameKind::Block);
-            function.instruction(&Instruction::End);
+            first.resolve(builder, declined, function);
+        } else {
+            s.field(InlineCompactDataStorageSchema::SHAPE)
+                .read(&scratch.inline, s, function);
+            self.shape.load(s, function);
+            function.instruction(&Instruction::RefEq);
+            function.instruction(&Instruction::I32Eqz);
+            builder.emit_branch_if_to_target(declined, function);
         }
-        function.instruction(&Instruction::Else);
-        actual_shape.load(s, function);
-        self.shape.load(s, function);
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32Eqz);
-        builder.emit_branch_if_to_target(declined, function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
         for (((path, slot), column), number) in self
             .paths
             .iter()
@@ -391,13 +348,10 @@ impl<'a> CompactPathBorrow<'a> {
         accepted.set_constant(1, function);
         builder.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        for name in names {
-            name.clear(function);
+        if let Some(first) = first {
+            first.release(builder, function);
         }
-        keys.clear(function);
-        actual_shape.clear(function);
         scratch.release(builder, function);
-        s.release_i32_local(key_length, function);
         accepted
     }
 
@@ -424,6 +378,156 @@ impl<'a> CompactPathBorrow<'a> {
         for number in self.numbers {
             s.release_f64_local(number, function);
         }
+    }
+}
+
+enum RowSetup {
+    First,
+    Established,
+}
+
+/// Construction emits first-row admission before returning this capability.
+/// Its bound and next-row guard retain the same borrow and publication target.
+pub(super) struct PreparedCompactRows<'a, 'p> {
+    rows: &'a CompactPathBorrow<'p>,
+    slot: I32Local,
+    length: I64Local,
+    done: ControlTarget,
+}
+
+impl PreparedCompactRows<'_, '_> {
+    fn guard_bound(&self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
+        self.slot.load(function);
+        self.length.load(function);
+        function.instruction(&Instruction::I32WrapI64);
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::I32Eqz);
+        builder.emit_branch_if_to_target(self.done, function);
+    }
+
+    fn guard_row(
+        &self,
+        setup: RowSetup,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
+        let ready = self
+            .rows
+            .try_prepare_row(setup, self.slot, builder, function);
+        ready.load(function);
+        builder.runtime_schema().release_i32_local(ready, function);
+        function.instruction(&Instruction::I32Eqz);
+        builder.emit_branch_if_to_target(self.done, function);
+    }
+
+    pub(super) fn prepare_next(&self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
+        self.guard_bound(builder, function);
+        self.guard_row(RowSetup::Established, builder, function);
+    }
+}
+
+struct FirstRowKeys<'a, 'p> {
+    rows: &'a CompactPathBorrow<'p>,
+    keys: GcLocal<CompactShapeKeys, Nullable>,
+    length: I32Local,
+    names: Vec<GcLocal<StringValue, Nullable>>,
+}
+
+impl<'a, 'p> FirstRowKeys<'a, 'p> {
+    fn new(
+        rows: &'a CompactPathBorrow<'p>,
+        builder: &FunctionBuilder<'_>,
+        function: &mut Function,
+    ) -> Self {
+        let s = builder.runtime_schema();
+        Self {
+            rows,
+            keys: s.reserve_gc_local(function).initialize_null(s, function),
+            length: s.reserve_i32_local(function),
+            names: rows
+                .paths
+                .iter()
+                .map(|_| {
+                    s.reserve_gc_local::<StringValue, Nullable>(function)
+                        .initialize_null(s, function)
+                })
+                .collect(),
+        }
+    }
+
+    fn resolve(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        declined: ControlTarget,
+        function: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        self.keys.replace(
+            s.field(CompactDataShapeSchema::KEYS)
+                .read(&self.rows.shape, s, function)
+                .reference()
+                .nullable(),
+            function,
+        );
+        s.array_type::<CompactShapeKeys>()
+            .length(&self.keys, s, function);
+        self.length.store(function);
+        self.length.load(function);
+        function.instruction(&Instruction::I32Const(2));
+        function.instruction(&Instruction::I32GtU);
+        builder.emit_branch_if_to_target(declined, function);
+        for ((path, slot), name) in self
+            .rows
+            .paths
+            .iter()
+            .zip(&self.rows.slots)
+            .zip(&self.names)
+        {
+            let cached = path.name().cached(builder, function);
+            name.replace(cached.load(s, function), function);
+            cached.clear(function);
+            name.load(s, function).is_null(function);
+            builder.emit_branch_if_to_target(declined, function);
+            slot.set_constant(0, function);
+            let found = builder.open_frame(ControlFrameKind::Block, function);
+            let probe = builder.open_frame(ControlFrameKind::Loop, function);
+            slot.load(function);
+            self.length.load(function);
+            function.instruction(&Instruction::I32GeU);
+            builder.emit_branch_if_to_target(declined, function);
+            let actual = s.reserve_gc_local(function).initialize(
+                s.array_type::<CompactShapeKeys>()
+                    .read(&self.keys, *slot, s, function)
+                    .reference(),
+                function,
+            );
+            let expected = s
+                .reserve_gc_local(function)
+                .initialize(name.load(s, function).require_non_null(function), function);
+            builder.emit_string_payload_equality_i32(&actual, &expected, function);
+            expected.clear(function);
+            actual.clear(function);
+            builder.emit_branch_if_to_target(found, function);
+            slot.load(function);
+            function.instruction(&Instruction::I32Const(1));
+            function.instruction(&Instruction::I32Add);
+            slot.store(function);
+            builder.emit_branch_to_target(probe, function);
+            builder.pop_control(ControlFrameKind::Loop);
+            function.instruction(&Instruction::End);
+            builder.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
+    }
+
+    fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        for name in self.names {
+            name.clear(function);
+        }
+        self.keys.clear(function);
+        builder
+            .runtime_schema()
+            .release_i32_local(self.length, function);
     }
 }
 

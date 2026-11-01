@@ -191,3 +191,63 @@ calls===1 && rows[0].x===99;
 "#,
     );
 }
+
+#[test]
+fn compact_first_row_misses_run_accessors_and_proxies_once_before_later_rows() {
+    assert_rows(
+        r#"
+var trace='',rows=[row(1,2),row(3,4)];
+Object.defineProperty(rows[0],'x',{get:function(){trace+='a';rows[1].x=10;return 1;}});
+var accessor=sum(rows,0,7);
+var target=row(5,6),receiver,later=row(7,8);
+var proxy=new Proxy(target,{get:function(t,k,r){trace+=k;receiver=r;later.y=20;return Reflect.get(t,k,r);}});
+var proxied=sum([proxy,later],0,0);
+accessor[0]===24 && accessor[1]===2 && proxied[0]===38 && proxied[1]===2 &&
+trace==='axy' && receiver===proxy;
+"#,
+    );
+}
+
+#[test]
+fn compact_first_row_captures_all_leaves_before_arithmetic_or_index_updates() {
+    assert_rows(
+        r#"
+var calls=0,rows=[row(2,null),row(3,4)];
+rows[0].y={valueOf:function(){calls++;rows[1].x=10;return 'q';}};
+var converted=sum(rows,0,7);
+function caught(rows){
+  var total=7,index=-0,stamp=9;
+  try{
+    for(;index<rows.length;index++){
+      total+=rows[index].x+rows[index].y;
+      stamp=total+index;
+    }
+  }catch(error){return [total,index,stamp,error instanceof TypeError];}
+  return [total,index,stamp,false];
+}
+var abrupt=caught([row(2,3n),row(4,5)]);
+converted[0]==='72q14' && converted[1]===2 && calls===1 &&
+abrupt[0]===7 && Object.is(abrupt[1],-0) && abrupt[2]===9 && abrupt[3];
+"#,
+    );
+}
+
+#[test]
+fn compact_first_row_slot_mapping_is_fresh_for_each_invocation_and_shape() {
+    assert_rows(
+        r#"
+function reversed(x,y){return {y:y,x:x};}
+function positional(rows){
+  var total=0;
+  for(var index=0;index<rows.length;index++) total+=rows[index].x*100+rows[index].y;
+  return [total,index];
+}
+var first=positional([row(1,2)]);gc();
+var second=positional([reversed(3,4)]);gc();
+var next=positional([reversed(5,6),reversed(7,8)]);
+var mixed=positional([row(1,2),reversed(3,4),row(5,6)]);
+first[0]===102 && first[1]===1 && second[0]===304 && second[1]===1 &&
+next[0]===1214 && next[1]===2 && mixed[0]===912 && mixed[1]===3;
+"#,
+    );
+}

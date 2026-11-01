@@ -290,6 +290,9 @@ struct CompactRegionTypes {
     inline: u32,
     values: u32,
     numbers: u32,
+    shape: u32,
+    keys: u32,
+    string: u32,
 }
 
 impl CompactRegionTypes {
@@ -313,6 +316,9 @@ impl CompactRegionTypes {
             inline: index::<crate::gc_types::InlineCompactDataStorage>(schema),
             values: index::<crate::gc_types::PackedValueTable>(schema),
             numbers: index::<NumberBitsI64Array>(schema),
+            shape: index::<crate::gc_types::CompactDataShape>(schema),
+            keys: index::<crate::gc_types::CompactShapeKeys>(schema),
+            string: index::<crate::gc_types::StringValue>(schema),
         }
     }
 }
@@ -326,15 +332,9 @@ fn compact_string_equality(artifact: &WasmArtifact) -> Option<u32> {
     imported_runtime_function_index(artifact, equality)
 }
 
-fn compact_payload_loop(
-    operators: &[Operator<'_>],
-    types: &CompactRegionTypes,
-    equality: Option<u32>,
-) -> bool {
-    // Generic property reads also contain compact-storage caches. The closed
-    // row region permits only pure String equality and never writes the heap.
+fn compact_readonly_operators(operators: &[Operator<'_>], allowed_call: Option<u32>) -> bool {
     operators.iter().all(|op| match op {
-        Operator::Call { function_index } => Some(*function_index) == equality,
+        Operator::Call { function_index } => Some(*function_index) == allowed_call,
         Operator::CallRef { .. }
         | Operator::CallIndirect { .. }
         | Operator::ReturnCall { .. }
@@ -351,15 +351,24 @@ fn compact_payload_loop(
         | Operator::ArrayNewData { .. }
         | Operator::ArrayNewElem { .. } => false,
         _ => true,
-    }) && operators.iter().any(|op| {
-        matches!(op,
+    })
+}
+
+fn compact_payload_loop(operators: &[Operator<'_>], types: &CompactRegionTypes) -> bool {
+    // Generic property reads also contain compact-storage caches. The closed
+    // row loop calls nothing and never writes the heap; key setup precedes it.
+    compact_readonly_operators(operators, None)
+        && operators.iter().any(|op| {
+            matches!(op,
         Operator::StructGet { struct_type_index, field_index: 2..=5 }
             if *struct_type_index == types.inline)
-    }) && operators.iter().any(|op| {
-        matches!(op,
+        })
+        && operators.iter().any(|op| {
+            matches!(op,
             Operator::StructGet { struct_type_index, field_index: 0 }
                 if *struct_type_index == types.inline)
-    }) && operators.iter().any(|op| matches!(op, Operator::RefEq))
+        })
+        && operators.iter().any(|op| matches!(op, Operator::RefEq))
         && operators.iter().any(|op| matches!(op, Operator::F64Add))
         && operators.iter().any(|op| {
             matches!(op,
@@ -370,11 +379,10 @@ fn compact_payload_loop(
 fn compact_loop_ranges(
     operators: &[Operator<'_>],
     types: &CompactRegionTypes,
-    equality: Option<u32>,
 ) -> Vec<std::ops::Range<usize>> {
     let ranges = loop_ranges(operators)
         .into_iter()
-        .filter(|range| compact_payload_loop(&operators[range.clone()], types, equality))
+        .filter(|range| compact_payload_loop(&operators[range.clone()], types))
         .collect::<Vec<_>>();
     // The retained-object fixture has an ordinary outer column loop containing
     // this region. Select the actual inner row owner, not its enclosing loop.
@@ -405,9 +413,8 @@ fn original_object_checksums_have_one_guarded_compact_read_loop() {
         ),
     ] {
         let artifact = emit_script(source).expect("original object workload emits");
-        let equality = compact_string_equality(&artifact);
         with_source_artifact_variants(artifact, "workload", |name, operators| {
-            let compact = compact_loop_ranges(operators, &types, equality);
+            let compact = compact_loop_ranges(operators, &types);
             assert_eq!(
                 compact.len(),
                 1,
@@ -415,6 +422,47 @@ fn original_object_checksums_have_one_guarded_compact_read_loop() {
             );
             let region = &operators[compact[0].clone()];
             assert!(region.iter().any(|op| matches!(op, Operator::I32LtU)));
+            assert!(
+                region.iter().all(|op| match op {
+                    Operator::StructGet {
+                        struct_type_index, ..
+                    } => *struct_type_index != types.shape,
+                    Operator::ArrayGet { array_type_index } => *array_type_index != types.keys,
+                    Operator::RefNull { hty } =>
+                        ![types.keys, types.string].into_iter().any(|index| *hty
+                            == wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(
+                                index
+                            ))),
+                    _ => true,
+                }),
+                "first-shape keys and String roots belong outside the hot loop: {name}"
+            );
+            let shape = region
+                .windows(3)
+                .find_map(|ops| match ops {
+                    [Operator::StructGet {
+                        struct_type_index,
+                        field_index: 0,
+                    }, Operator::LocalGet { local_index }, Operator::RefEq]
+                        if *struct_type_index == types.inline =>
+                    {
+                        Some(*local_index)
+                    }
+                    _ => None,
+                })
+                .expect("later rows compare their actual shape to the established shape");
+            assert!(region.windows(2).all(|ops| !matches!(ops,
+                [Operator::LocalGet { local_index }, Operator::RefIsNull] if *local_index == shape)),
+                "the hot loop never redispatches unresolved shape setup");
+            let additions = region
+                .iter()
+                .filter(|op| matches!(op, Operator::F64Add))
+                .count();
+            let expected_additions = if nested { 2 } else { 3 };
+            assert_eq!(
+                additions, expected_additions,
+                "one original body plus one original counter update: {name}"
+            );
             assert!(
                 region.iter().all(|op| !matches!(
                     op,
@@ -464,12 +512,11 @@ fn compact_read_regions_require_closed_paths_and_private_unchanged_inputs() {
     ] {
         let source = format!("function varied(rows,other,column,key){{'use strict';var total=0;for(var i=0;i<rows.length;i++){{{body}}}return total;}}varied([],[],0,'x');");
         let artifact = emit_script(&source).expect("compact admission emits");
-        let equality = compact_string_equality(&artifact);
         with_source_artifact_variants(artifact, "varied", |name, operators| {
             assert_eq!(
                 loop_regions(operators)
                     .iter()
-                    .any(|region| compact_payload_loop(region, &types, equality)),
+                    .any(|region| compact_payload_loop(region, &types)),
                 expected,
                 "{name}: {body}"
             )
@@ -482,77 +529,92 @@ fn compact_read_regions_require_closed_paths_and_private_unchanged_inputs() {
         ("function varied(rows,column){var total=0;for(var i=0;i<rows.length;i++)total+=rows[i].values[column];return [total,arguments[0]];}varied([],0);", false),
     ] {
         let artifact = emit_script(source).expect("compact binding control emits");
-        let equality = compact_string_equality(&artifact);
         with_source_artifact_variants(artifact,
             "varied", |name, operators| assert_eq!(loop_regions(operators).iter()
-                .any(|region| compact_payload_loop(region, &types, equality)), expected, "{name}: {source}"));
+                .any(|region| compact_payload_loop(region, &types)), expected, "{name}: {source}"));
     }
 }
 
 #[test]
 fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume() {
     let types = CompactRegionTypes::new();
-    let source = "function varied(rows,column,start,total){'use strict';for(var i=start;i<rows.length;i++)total+=rows[i].values[column];return total;}varied([],0,0,0);";
+    let source = "function varied(rows,column,start,total){'use strict';for(var i=start;i<rows.length;i++)total+=rows[i].values[column]+rows[i].more[column];return total;}varied([],0,0,0);";
     let artifact = emit_script(source).expect("prefix continuation emits");
     let equality = compact_string_equality(&artifact);
     with_source_artifact_variants(artifact, "varied", |name, operators| {
-        let compact = compact_loop_ranges(operators, &types, equality);
+        let compact = compact_loop_ranges(operators, &types);
         assert_eq!(compact.len(), 1, "actual guarded row loop: {name}");
         let range = &compact[0];
         let region = &operators[range.clone()];
+        // Recover the actual loop owner, so unrelated function setup and the
+        // later generic property caches cannot satisfy these assertions.
+        let mut frames = Vec::new();
+        for (index, op) in operators[..range.start - 1].iter().enumerate() {
+            match op {
+                Operator::Block { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::TryTable { .. } => frames.push(index),
+                Operator::End => {
+                    frames.pop();
+                }
+                _ => {}
+            }
+        }
+        let done = *frames.last().expect("rotated loop has an enclosing exit");
+        assert!(matches!(operators[done], Operator::Block { .. }));
+        let preheader = &operators[done + 1..range.start - 1];
         let [Operator::LocalGet {
             local_index: cursor,
         }, Operator::LocalGet {
             local_index: length,
-        }, Operator::I32WrapI64, Operator::I32LtU, Operator::I32Eqz, Operator::BrIf { relative_depth: 1 }, ..] =
-            region
+        }, Operator::I32WrapI64, Operator::I32LtU, Operator::I32Eqz, Operator::BrIf { relative_depth: 0 }, ..] =
+            preheader
         else {
-            panic!("zero trips leave before any row/key inspection: {name}");
+            panic!("zero trips exit before first-row or key inspection: {name}");
         };
-        let first_arithmetic = region
-            .iter()
-            .position(|op| matches!(op, Operator::F64Add))
-            .expect("source accumulator arithmetic");
-        let ready_exit = region[..first_arithmetic]
-            .windows(3)
-            .rposition(|ops| {
-                matches!(
-                    ops,
-                    [
-                        Operator::LocalGet { .. },
-                        Operator::I32Eqz,
-                        Operator::BrIf { relative_depth: 1 }
-                    ]
-                )
+        assert!(
+            matches!(
+                preheader[preheader.len() - 3..],
+                [
+                    Operator::LocalGet { .. },
+                    Operator::I32Eqz,
+                    Operator::BrIf { relative_depth: 0 }
+                ]
+            ),
+            "first-row miss exits before the source body: {name}"
+        );
+        assert!(
+            preheader.iter().any(|op| matches!(op,
+            Operator::Call { function_index } if Some(*function_index) == equality)),
+            "actual first-row key resolution occurs in the positive-trip preheader: {name}"
+        );
+        assert!(
+            preheader.iter().all(|op| !matches!(op, Operator::F64Add)),
+            "first-row rejection preserves the original accumulator and counter"
+        );
+
+        let bound = region
+            .windows(6)
+            .position(|ops| {
+                matches!(ops,
+            [Operator::LocalGet { local_index: actual_cursor },
+             Operator::LocalGet { local_index: actual_length },
+             Operator::I32WrapI64, Operator::I32LtU, Operator::I32Eqz,
+             Operator::BrIf { relative_depth: 1 }]
+                if actual_cursor == cursor && actual_length == length)
             })
-            .expect("a failed complete row exits to the common scalar publication");
-        let guard = &region[..ready_exit];
-        for index in [types.ordinary, types.inline, types.array] {
-            let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index));
-            assert!(
-                guard.iter().any(|op| matches!(op,
-                Operator::RefTestNonNull { hty } if *hty == heap)),
-                "every row checks actual own storage and nested Array identity"
-            );
-        }
-        for field in [2, 3, 6, 7] {
-            assert!(
-                guard.iter().any(|op| matches!(op,
-                Operator::StructGet { struct_type_index, field_index }
-                    if *struct_type_index == types.array && *field_index == field)),
-                "each nested Array validates length, occupancy, mode and Number backing"
-            );
-        }
-        assert!(
-            guard.iter().any(|op| matches!(op, Operator::I64GeU)),
-            "the column is bounded by this row's actual nested length"
+            .expect("the updated mirror is bounded before inspecting another row");
+        assert_eq!(
+            region[..bound]
+                .iter()
+                .filter(|op| matches!(op, Operator::F64Add))
+                .count(),
+            3,
+            "two source additions and the original f64 counter update occur once"
         );
         assert!(
-            guard.iter().any(|op| matches!(op, Operator::I64LtU)),
-            "nested capacity is checked before indexing"
-        );
-        assert!(
-            region[ready_exit + 3..].iter().all(|op| !matches!(
+            region[..bound].iter().all(|op| !matches!(
                 op,
                 Operator::Call { .. }
                     | Operator::StructGet { .. }
@@ -560,8 +622,87 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
                     | Operator::RefTestNonNull { .. }
                     | Operator::RefTestNullable { .. }
             )),
-            "all leaves are captured before any source arithmetic/update"
+            "source arithmetic uses only the completely captured current row"
         );
+        assert!(
+            matches!(
+                region[region.len() - 4..],
+                [
+                    Operator::LocalGet { .. },
+                    Operator::I32Eqz,
+                    Operator::BrIf { relative_depth: 1 },
+                    Operator::Br { relative_depth: 0 }
+                ]
+            ),
+            "next-row rejection publishes the prefix; success returns to the sole body"
+        );
+        let first_guard = &preheader[6..preheader.len() - 3];
+        let next_guard = &region[bound + 6..region.len() - 4];
+        assert!(
+            compact_readonly_operators(first_guard, equality),
+            "first-row setup neither mutates the heap nor resolves Strings or properties"
+        );
+        assert!(
+            next_guard.iter().all(|op| !matches!(op, Operator::F64Add)),
+            "next-row validation does not change the completed body or update"
+        );
+        let mut captured = Vec::new();
+        for guard in [first_guard, next_guard] {
+            for index in [types.ordinary, types.inline, types.array] {
+                let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index));
+                assert!(
+                    guard.iter().any(|op| matches!(op,
+                    Operator::RefTestNonNull { hty } if *hty == heap)),
+                    "both guards check actual own storage and nested Array identity"
+                );
+            }
+            for field in [2, 3, 6, 7] {
+                assert_eq!(
+                    guard
+                        .iter()
+                        .filter(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == types.array && *field_index == field))
+                        .count(),
+                    2,
+                    "both nested leaves validate length, occupancy, mode and Number backing"
+                );
+            }
+            for check in [Operator::I64GeU, Operator::I64LtU] {
+                let discriminant = std::mem::discriminant(&check);
+                assert_eq!(
+                    guard
+                        .iter()
+                        .filter(|op| std::mem::discriminant(*op) == discriminant)
+                        .count(),
+                    2,
+                    "each captured leaf checks its actual column and backing capacity"
+                );
+            }
+            let leaf_locals = guard.windows(3).filter_map(|ops| match ops {
+                [Operator::ArrayGet { array_type_index }, Operator::F64ReinterpretI64,
+                 Operator::LocalSet { local_index }] if *array_type_index == types.numbers => Some(*local_index),
+                _ => None,
+            }).collect::<Vec<_>>();
+            assert_eq!(
+                leaf_locals.len(),
+                2,
+                "both leaves are captured before any body effect"
+            );
+            assert_ne!(leaf_locals[0], leaf_locals[1]);
+            captured.push(leaf_locals);
+        }
+        assert_eq!(
+            captured[0], captured[1],
+            "first and later rows fill the same two body inputs"
+        );
+        for leaf in &captured[0] {
+            assert!(
+                region[..bound].iter().any(|op| matches!(op,
+                Operator::LocalGet { local_index } if local_index == leaf)),
+                "the sole body reads each validated leaf"
+            );
+        }
 
         let fallback = loop_ranges(operators)
             .into_iter()

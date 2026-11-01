@@ -425,15 +425,16 @@ impl<'a> ArrayReadBorrow<'a> {
         matches!(self.backing, ReadBacking::Compact(_))
     }
 
-    pub(super) fn try_prepare_row(
+    pub(super) fn prepare_compact_loop(
         &self,
+        done: ControlTarget,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> Option<I32Local> {
+    ) -> Option<PreparedCompactRows<'_, 'a>> {
         let ReadBacking::Compact(rows) = &self.backing else {
             return None;
         };
-        Some(rows.try_prepare_row(self.slot, builder, function))
+        Some(rows.prepare_loop(self.slot, self.length, done, builder, function))
     }
 
     pub(super) fn emit_compact_path(&self, path: CompactPathId, function: &mut Function) {

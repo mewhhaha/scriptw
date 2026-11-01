@@ -9,14 +9,18 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [compact-row checkpoint](compact-rows-20261101.json) lowers ordinary object
-  medians about 21% and retained-object medians about 28% in both blocks;
-  separate hot-R medians fall 14–14.5% and 20–22%, with no control veto.
+  [compact-row entry checkpoint](compact-row-entry-20261101.json) moves first-shape
+  and key-slot setup before the hot loop. Against the accepted
+  [compact-row checkpoint](compact-rows-20261101.json), ordinary object medians
+  fall another 2.1–2.8% and retained-object medians 11.1–11.4%; separate hot-R
+  medians fall 0.8–1.0% and 4.35–4.54%. All 1,296 process inputs are audited
+  with zero statistical discrepancy and no control veto.
   Both ABI-42 R modules/native images and all 15 original control programs/code
   sections remain byte-identical. This local evidence does not refresh published
   CI charts or establish overall parity. The [namespace experiment](deferred-namespaces-20261101.json)
-  remains rejected. Next measure first-shape/key-slot setup in the compact loop
-  or private construction under the [ownership contract](contracts/runtime-byte-ownership.md)
+  remains rejected. Investigate unexplained reference timing/RSS variation with
+  execution-thread CPU spans before assigning a cause. Next measure fresh
+  two-static-field literal stores; their draft remains unverified. Preserve the [ownership contract](contracts/runtime-byte-ownership.md)
   and [performance queue](../performance-hills.md). Preserve fresh-entry timing,
   source/tool pins, slower controls, A/A outliers and both
   [rejected](numeric-array-region-screen-20261101.json)
