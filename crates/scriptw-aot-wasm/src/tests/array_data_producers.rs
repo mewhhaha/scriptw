@@ -108,7 +108,7 @@ fn fresh_array_producers_reach_number_storage_without_an_eager_descriptor() {
     ))
     .expect("both literal producer forms emit");
     expect_valid_module(&artifact, 1);
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let wasm_encoder::HeapType::Concrete(number_bits) = registered
         .globals()

@@ -32,6 +32,13 @@ fn emit_script_module_with_factory(
     factory: Option<NativeProgramFactory<'_>>,
     validated_runtime: Option<&crate::ValidatedRuntimeArtifact>,
 ) -> Result<EmittedModule, EmitError> {
+    if let ModuleKind::Standalone(admission) = kind {
+        if !std::ptr::eq(script, admission.script()) {
+            return Err(EmitError::unsupported(
+                "standalone admission belongs to a different script",
+            ));
+        }
+    }
     let uses_heap = kind.uses_heap();
     let compile_runtime = kind.compiles_runtime();
     let compile_program = kind.compiles_program();
@@ -343,28 +350,33 @@ fn emit_script_module_with_factory(
     )
     .with_foreign_imports(foreign_imports);
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
+    let owned_pool;
     let string_pool = match (kind, validated_runtime) {
         // Standalone admission excludes runtime operations and source functions.
-        // Literal Strings construct their GC code-unit arrays inline.
-        (ModuleKind::Standalone, None) => StringPool::default(),
+        // Literal Strings copy their source-only passive UTF-16 image into GC.
+        (ModuleKind::Standalone(admission), None) => admission.pool(),
         (ModuleKind::Program(runtime), Some(validated))
             if std::sync::Arc::ptr_eq(runtime, validated.runtime()) =>
         {
-            StringPool::collect_with_validated_runtime(
+            owned_pool = StringPool::collect_with_validated_runtime(
                 script,
                 function_metas.metas(),
                 &compiled_standard_builtins,
                 uses_temporal_calendar,
                 validated,
-            )?
+            )?;
+            &owned_pool
         }
-        (_, None) => StringPool::collect(
-            script,
-            function_metas.metas(),
-            &compiled_standard_builtins,
-            uses_temporal_calendar,
-            intl_selection,
-        )?,
+        (_, None) => {
+            owned_pool = StringPool::collect(
+                script,
+                function_metas.metas(),
+                &compiled_standard_builtins,
+                uses_temporal_calendar,
+                intl_selection,
+            )?;
+            &owned_pool
+        }
         _ => {
             return Err(EmitError::unsupported(
                 "native pool proof must retain its exact linked runtime",
@@ -372,11 +384,11 @@ fn emit_script_module_with_factory(
         }
     };
     match kind {
-        ModuleKind::Standalone => {}
+        ModuleKind::Standalone(_) => {}
         ModuleKind::Runtime(_) => string_pool.require_runtime_only()?,
-        ModuleKind::Program(runtime) => runtime.layout().require_pool(&string_pool)?,
+        ModuleKind::Program(runtime) => runtime.layout().require_pool(string_pool)?,
     }
-    let provided_hooks = ProvidedHooks::of(&function_metas, &string_pool);
+    let provided_hooks = ProvidedHooks::of(&function_metas, string_pool);
     let module_guard_count = module_unit_guard_count(script);
 
     // Only numeric byte-scratch state and module status are scalar globals
@@ -418,10 +430,10 @@ fn emit_script_module_with_factory(
     let mut module_package = module_sections.begin(first_defined_function, layout.entry_role());
     if let Some(index) = layout.program_initialize_index() {
         let image =
-            ProgramInstanceImage::from_program_pool(&string_pool, kind, script.language_features)?;
+            ProgramInstanceImage::from_program_pool(string_pool, kind, script.language_features)?;
         module_package.compile_program_initialize(ProgramInitializeCompilation::new(
             &image,
-            &string_pool,
+            string_pool,
             &function_metas,
             runtime_bootstrap_plan.clone(),
             runtime_helper_base.expect("linked P has registered R helpers"),
@@ -432,7 +444,7 @@ fn emit_script_module_with_factory(
         module_package.compile_main(MainFunctionCompilation::new(
             script,
             promise_rejection_policy,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -464,7 +476,7 @@ fn emit_script_module_with_factory(
                     .prepared_script_units()
                     .find(|unit| unit.function_ids.contains(&function.id))
                     .map_or(&script.global_bindings, |unit| &unit.global_bindings),
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -477,7 +489,7 @@ fn emit_script_module_with_factory(
         let mut builder = FunctionBuilder::new_prepared_script(
             module_package.schema(),
             unit,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -508,7 +520,7 @@ fn emit_script_module_with_factory(
                 .get(&builtin.function_id())
                 .expect("standard builtin has its planned entry")
                 .entry,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -520,7 +532,7 @@ fn emit_script_module_with_factory(
         let mut builder = FunctionBuilder::new_host_builtin(
             module_package.schema(),
             *builtin,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -539,7 +551,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectRead,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -553,7 +565,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectWrite,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -567,7 +579,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectDefineData,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -581,7 +593,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ProxyCall,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -595,7 +607,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ProxyConstruct,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -609,7 +621,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::StringEquality,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -623,7 +635,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::NumberToString,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -637,7 +649,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::StringToNumber,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -651,7 +663,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ValueToString,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -665,7 +677,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ValueToNumber,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -679,7 +691,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ValueToNumeric,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -693,7 +705,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectGetPrototypeOf,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -707,7 +719,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectSetPrototypeOf,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -721,7 +733,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectDelete,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -735,7 +747,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectIsExtensible,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -749,7 +761,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectPreventExtensions,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -763,7 +775,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectReadProxy,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -777,7 +789,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::RegExpMatcher,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -791,7 +803,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::RegExpCompiler,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -805,7 +817,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::FunctionCall,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -819,7 +831,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::DynamicPropertyRead,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -833,7 +845,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::OrdinarySetDataOnReceiver,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -848,7 +860,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::OrdinarySet,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -862,7 +874,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::DecimalToBinary64,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -876,7 +888,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::BigIntArithmetic,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -890,7 +902,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::JsonStringifyValue,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -904,7 +916,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ObjectHasProperty,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -918,7 +930,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::RuntimeErrorObject,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -932,7 +944,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::WithEnvironmentHasBinding,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -946,7 +958,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::IndexedElementRead,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -960,7 +972,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::IndexedElementWrite,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -985,7 +997,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::helper_for(hint),
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -1002,7 +1014,7 @@ fn emit_script_module_with_factory(
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
                 module_package.schema(),
                 RuntimeHelperId::ValueToPropertyKey,
-                &string_pool,
+                string_pool,
                 &function_metas,
                 uses_heap,
                 runtime_bootstrap_plan.clone(),
@@ -1020,7 +1032,7 @@ fn emit_script_module_with_factory(
             ($helper:expr, $compile:ident $(, $argument:expr)* $(; $propagate:tt)?) => {{
                 let helper = $helper;
                 let mut builder = FunctionBuilder::new_runtime_operation_helper(
-                    module_package.schema(), helper, &string_pool, &function_metas,
+                    module_package.schema(), helper, string_pool, &function_metas,
                     uses_heap, runtime_bootstrap_plan.clone(), runtime_helper_base,
                 );
                 temporal_helper_functions.insert(
@@ -1089,7 +1101,7 @@ fn emit_script_module_with_factory(
         let mut default_publisher = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayIndexedPublishDefaultData,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -1102,7 +1114,7 @@ fn emit_script_module_with_factory(
         let mut joiner = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayPackedJoin,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -1117,7 +1129,7 @@ fn emit_script_module_with_factory(
                 let mut builder = FunctionBuilder::new_runtime_operation_helper(
                     module_package.schema(),
                     RuntimeHelperId::$id,
-                    &string_pool,
+                    string_pool,
                     &function_metas,
                     uses_heap,
                     runtime_bootstrap_plan.clone(),
@@ -1132,7 +1144,7 @@ fn emit_script_module_with_factory(
         let mut publisher = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayIndexedPublish,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -1145,7 +1157,7 @@ fn emit_script_module_with_factory(
         let mut deleter = FunctionBuilder::new_runtime_operation_helper(
             module_package.schema(),
             RuntimeHelperId::ArrayIndexedDelete,
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
@@ -1189,7 +1201,7 @@ fn emit_script_module_with_factory(
         );
         helper_bodies.extend(array_iterator_helpers::compile(
             module_package.schema(),
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             &runtime_bootstrap_plan,
@@ -1355,7 +1367,7 @@ fn emit_script_module_with_factory(
                 let mut builder = FunctionBuilder::new_runtime_operation_helper(
                     module_package.schema(),
                     RuntimeHelperId::$id,
-                    &string_pool,
+                    string_pool,
                     &function_metas,
                     uses_heap,
                     runtime_bootstrap_plan.clone(),
@@ -1479,7 +1491,7 @@ fn emit_script_module_with_factory(
     if compile_program_helpers {
         program_helper_bodies::compile_program_helper_bodies(
             module_package.schema(),
-            &string_pool,
+            string_pool,
             &function_metas,
             uses_heap,
             &runtime_bootstrap_plan,
@@ -1767,7 +1779,15 @@ fn emit_script_module_with_factory(
 
     let mut memories = None;
     let mut data = None;
-    if !string_pool.bytes.is_empty() || uses_heap {
+    if matches!(kind, ModuleKind::Standalone(_)) {
+        // Empty String literals still need a live zero-length segment for
+        // array.new_data. Numeric-only modules own no data or linear memory.
+        if string_pool.pooled_string_count() > 0 {
+            let mut section = DataSection::new();
+            string_pool.append_standalone_data(&mut section);
+            data = Some(section);
+        }
+    } else if !string_pool.bytes.is_empty() || uses_heap {
         if !uses_shared_memory {
             let mut section = MemorySection::new();
             section.memory(MemoryType {
@@ -1782,13 +1802,7 @@ fn emit_script_module_with_factory(
         exports.export("memory", ExportKind::Memory, 0);
         let mut section = DataSection::new();
         match kind {
-            ModuleKind::Standalone => {
-                section.active(
-                    0,
-                    &ConstExpr::i32_const(STATIC_DATA_OFFSET as i32),
-                    string_pool.bytes.iter().copied(),
-                );
-            }
+            ModuleKind::Standalone(_) => unreachable!("standalone data has no linear-memory owner"),
             ModuleKind::Runtime(_) => string_pool.append_runtime_data(&mut section),
             ModuleKind::Program(_) => string_pool.append_program_data(&mut section),
         }
@@ -1824,7 +1838,7 @@ fn emit_script_module_with_factory(
             data,
             match kind {
                 ModuleKind::Program(_) => runtime_global_types.len() as u32,
-                ModuleKind::Standalone | ModuleKind::Runtime(_) => 0,
+                ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => 0,
             },
         ),
     );
@@ -1963,12 +1977,20 @@ fn emit_script_module_with_factory(
         "import func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_REJECT_RUNTIME_SEMANTICS}"
     ));
 
-    metadata::append_memory_attribution(
-        &mut debug_dump,
-        &string_pool,
-        uses_heap,
-        uses_shared_memory,
-    );
+    if matches!(kind, ModuleKind::Standalone(_)) {
+        debug_dump.push("memory: none".to_string());
+        debug_dump.push(format!(
+            "data segments: {}",
+            u8::from(string_pool.pooled_string_count() > 0)
+        ));
+    } else {
+        metadata::append_memory_attribution(
+            &mut debug_dump,
+            string_pool,
+            uses_heap,
+            uses_shared_memory,
+        );
+    }
 
     intl::append_sections(
         &mut module,
@@ -1997,7 +2019,7 @@ fn emit_script_module_with_factory(
     let bytes = module.finish();
     let bytes = match kind {
         ModuleKind::Program(_) => crate::program_imports::compact(bytes, &mut function_table)?,
-        ModuleKind::Standalone | ModuleKind::Runtime(_) => bytes,
+        ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => bytes,
     };
     let mut attribution = Vec::new();
     let function_sizes = metadata::append_function_attribution(&mut attribution, &function_table);
@@ -2013,7 +2035,7 @@ fn emit_script_module_with_factory(
         gc_host_imports: function_metas.gc_host_imports().imports().collect(),
         runtime: match kind {
             ModuleKind::Program(runtime) => Some(runtime.clone()),
-            ModuleKind::Standalone | ModuleKind::Runtime(_) => None,
+            ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => None,
         },
     };
     Ok(EmittedModule {

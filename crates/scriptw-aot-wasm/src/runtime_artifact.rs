@@ -245,8 +245,8 @@ pub(crate) fn export_runtime_symbols(
 /// Which module of a linked artifact an emission produces.
 #[derive(Clone, Copy)]
 pub(crate) enum ModuleKind<'r> {
-    /// A program without a heap: one self-contained module.
-    Standalone,
+    /// A self-contained program bound to its admitted script and literal data.
+    Standalone(&'r crate::emit::runtime_requirement::StandaloneAdmission<'r>),
     /// The program-independent runtime module.
     Runtime(RuntimeSourceCompilationProfile),
     /// A program module that links against exactly this runtime.
@@ -256,7 +256,7 @@ pub(crate) enum ModuleKind<'r> {
 impl ModuleKind<'_> {
     pub(crate) fn source_compilation_profile(self) -> RuntimeSourceCompilationProfile {
         match self {
-            Self::Standalone => RuntimeSourceCompilationProfile::Portable,
+            Self::Standalone(_) => RuntimeSourceCompilationProfile::Portable,
             Self::Runtime(profile) => profile,
             Self::Program(runtime) => runtime.source_compilation_profile(),
         }
@@ -264,7 +264,7 @@ impl ModuleKind<'_> {
 
     pub(crate) const fn uses_heap(&self) -> bool {
         match self {
-            Self::Standalone => false,
+            Self::Standalone(_) => false,
             Self::Runtime(_) | Self::Program(_) => true,
         }
     }
@@ -273,14 +273,14 @@ impl ModuleKind<'_> {
     pub(crate) const fn compiles_runtime(&self) -> bool {
         match self {
             Self::Runtime(_) => true,
-            Self::Standalone | Self::Program(_) => false,
+            Self::Standalone(_) | Self::Program(_) => false,
         }
     }
 
     /// Whether this module defines `main` and the program's own bodies.
     pub(crate) const fn compiles_program(&self) -> bool {
         match self {
-            Self::Standalone | Self::Program(_) => true,
+            Self::Standalone(_) | Self::Program(_) => true,
             Self::Runtime(_) => false,
         }
     }
@@ -289,7 +289,7 @@ impl ModuleKind<'_> {
     /// Intl data images.
     pub(crate) const fn owns_globals(&self) -> bool {
         match self {
-            Self::Standalone | Self::Runtime(_) => true,
+            Self::Standalone(_) | Self::Runtime(_) => true,
             Self::Program(_) => false,
         }
     }

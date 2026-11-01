@@ -33,6 +33,22 @@ mod temporal_demand_initialization;
 mod typed_array_numeric_callback;
 mod unobserved_arguments;
 
+pub(crate) fn standalone_kind() -> crate::runtime_artifact::ModuleKind<'static> {
+    static SCRIPT: std::sync::OnceLock<ScriptIr> = std::sync::OnceLock::new();
+    static ADMISSION: std::sync::OnceLock<
+        crate::emit::runtime_requirement::StandaloneAdmission<'static>,
+    > = std::sync::OnceLock::new();
+    let script = SCRIPT.get_or_init(|| {
+        lower(&parse(";", ParseOptions::script()).unwrap())
+            .script
+            .unwrap()
+    });
+    let admission = ADMISSION.get_or_init(|| {
+        crate::emit::runtime_requirement::StandaloneAdmission::new(script).unwrap()
+    });
+    crate::runtime_artifact::ModuleKind::Standalone(admission)
+}
+
 fn emit_script(source: &str) -> Result<WasmArtifact, EmitError> {
     let source = parse(source, ParseOptions::script()).expect("script should parse");
     emit(&lower_with_host_surface_policy(
@@ -3053,11 +3069,12 @@ fn preseeded_wire_data_stays_in_private_memory() {
     let mut expected_prefix = vec![b' '; 11];
     expected_prefix.extend_from_slice(b"\n: ,undefinednulltruefalse");
 
-    // Runtime-free Strings own GC code units and need no wire-data preseed.
+    // Runtime-free Strings copy a literal-only passive UTF-16 image into GC.
     let standalone = emit_script("\",\";").expect("emit should work");
     expect_valid_module(&standalone, 0);
     assert!(standalone.runtime().is_none());
-    assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 0));
+    assert_eq!(wire_data_segment_counts(&standalone.bytes), (1, 0));
+    assert_eq!(data_segment_at(&standalone.bytes, 0), [b',', 0]);
     assert!(memory_initial_pages(&standalone.bytes).is_empty());
 
     // A heap program's preseed is R's active prefix; later active fragments
@@ -3293,18 +3310,15 @@ fn constructed_constant_regexp_retains_one_validated_program_image() {
 }
 
 #[test]
-fn large_standalone_string_needs_no_linear_memory_or_data() {
+fn large_standalone_string_uses_only_passive_utf16_without_linear_memory() {
     let source = format!("\"{}\";", "x".repeat(WASM_PAGE_SIZE as usize));
     let artifact = emit_script(&source).expect("emit should work");
     expect_valid_module(&artifact, 0);
     assert!(artifact.runtime().is_none());
     assert!(memory_initial_pages(&artifact.bytes).is_empty());
-    for payload in Parser::new(0).parse_all(&artifact.bytes) {
-        assert!(!matches!(
-            payload.expect("large standalone String module decodes"),
-            Payload::DataSection(_) | Payload::DataCountSection { .. }
-        ));
-    }
+    assert_eq!(wire_data_segment_counts(&artifact.bytes), (1, 0));
+    let expected = [b'x', 0].repeat(WASM_PAGE_SIZE as usize);
+    assert_eq!(data_segment_at(&artifact.bytes, 0), expected);
 }
 
 #[test]

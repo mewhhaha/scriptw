@@ -57,7 +57,7 @@ fn caller_traffic(arity: usize) -> Traffic {
         .into_iter()
         .find_map(|(index, name)| name.starts_with("js::caller#").then_some(index))
         .unwrap();
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let wasm_encoder::HeapType::Concrete(stored) = schema

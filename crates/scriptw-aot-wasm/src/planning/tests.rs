@@ -15,7 +15,7 @@ fn plan_metas(script: &ScriptIr) -> Result<BTreeMap<FunctionId, WasmFunctionMeta
         source.program.len() + script.prepared_script_units().count(),
         source.binary_numeric_count(),
         0,
-        crate::runtime_artifact::ModuleKind::Standalone,
+        crate::tests::standalone_kind(),
         crate::function_layout::ModuleEntryRole::Main,
     );
     build_function_metas(&source, script.prepared_script_units(), &[], &[], &layout)

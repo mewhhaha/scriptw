@@ -23,7 +23,7 @@ mod body_compilation;
 mod body_entry;
 mod completion_exit;
 mod module_assembly;
-mod runtime_requirement;
+pub(crate) mod runtime_requirement;
 pub(crate) use body_compilation::{CompletedProgramInitializeBody, ProgramInitializeCompilation};
 pub(crate) use completion_exit::CompletionExit;
 pub(crate) use module_assembly::{
@@ -596,11 +596,19 @@ fn emit_script(
     snapshot: bool,
     inputs: crate::RuntimeArtifactInputs<'_>,
 ) -> Result<WasmArtifact, EmitError> {
-    let uses_heap = snapshot || runtime_requirement::requires_runtime(script);
-    let mut prepared_script = script.clone();
-    if uses_heap {
-        super::builtins::append_empty_dynamic_function_bodies(&mut prepared_script);
+    if !snapshot {
+        if let Some(standalone) = runtime_requirement::StandaloneAdmission::new(script) {
+            return Ok(module_assembly::emit_script_module(
+                standalone.script(),
+                ModuleKind::Standalone(&standalone),
+                promise_rejection_policy,
+                intl_selection,
+            )?
+            .artifact);
+        }
     }
+    let mut prepared_script = script.clone();
+    super::builtins::append_empty_dynamic_function_bodies(&mut prepared_script);
     let script = &prepared_script;
     for function in script.functions.iter().filter(|function| {
         function.protocol.execution_kind() == FunctionExecutionKind::AsyncGenerator
@@ -618,22 +626,14 @@ fn emit_script(
         }
     }
 
-    let runtime = uses_heap
-        .then(|| crate::runtime_artifact_with_inputs(intl_selection, inputs))
-        .transpose()?;
-    let kind = match &runtime {
-        Some(runtime) => ModuleKind::Program(runtime),
-        None => ModuleKind::Standalone,
-    };
-    Ok(
-        module_assembly::emit_script_module(
-            script,
-            kind,
-            promise_rejection_policy,
-            intl_selection,
-        )?
-        .artifact,
-    )
+    let runtime = crate::runtime_artifact_with_inputs(intl_selection, inputs)?;
+    Ok(module_assembly::emit_script_module(
+        script,
+        ModuleKind::Program(&runtime),
+        promise_rejection_policy,
+        intl_selection,
+    )?
+    .artifact)
 }
 
 /// The runtime module, emitted from the empty script every program is a
@@ -1380,32 +1380,13 @@ impl<'a> FunctionBuilder<'a> {
             return self.emit_pooled_string_reference(ordinal, function);
         }
         // Runtime-free scripts do not initialize the module's pooled table.
-        // Their literal primitives still own real GC Strings and UTF-16 units.
+        // Each executed literal owns a fresh GC copy of its passive UTF-16.
         let schema = self.schema;
-        let units = StringPool::runtime_code_units_for_string(value);
-        let length = schema.reserve_i32_local(function);
-        let index = schema.reserve_i32_local(function);
-        let unit = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(
-            i32::try_from(units.len()).expect("literal UTF-16 length"),
-        ));
-        length.store(function);
+        let units = self.strings.pooled_code_units(value)?;
         let units_slot = schema.reserve_gc_local::<CodeUnitArray, NonNullable>(function);
-        let construction = StringConstruction::allocate(schema, units_slot, length, function);
-        for (ordinal, code_unit) in units.into_iter().enumerate() {
-            function.instruction(&Instruction::I32Const(
-                i32::try_from(ordinal).expect("literal UTF-16 index"),
-            ));
-            index.store(function);
-            function.instruction(&Instruction::I32Const(i32::from(code_unit)));
-            unit.store(function);
-            construction.write(index, unit, schema, function);
-        }
-        let string = construction.publish(schema, function);
-        schema.release_i32_local(unit, function);
-        schema.release_i32_local(index, function);
-        schema.release_i32_local(length, function);
-        Ok(string)
+        let construction =
+            StringConstruction::from_pooled_code_units(schema, units_slot, units, function);
+        Ok(construction.publish(schema, function))
     }
     pub(crate) fn emit_runtime_error_message_reference(
         &self,

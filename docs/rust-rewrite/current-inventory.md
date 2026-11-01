@@ -23,14 +23,17 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   its roughly 2-MiB compiler-owned pool. Exact-R sharing is a warm multi-program
   hypothesis; first population still admits and freezes that prefix.
 - Profile the remaining cold `run` cost for
-  [runtime-free primitive programs](standalone-pool-20261101.json). They now
-  emit about 7.6-KiB P modules without compiler pools or linear memory; exact
-  UTF-16 and Number completions retain the existing WasmGC representation.
+  [runtime-free primitive programs](standalone-pool-20261101.json). The
+  [literal checkpoint](literal-admission-20261101.json) uses passive UTF-16 data
+  and 204–205-byte main bodies on its seven literal inputs, without compiler
+  pools or linear memory. Exact completions retain the existing WasmGC representation.
   The [cache-identity checkpoint](cache-image-20261101.json) promotes full-image
   BLAKE3 after an ordinary CLI-only comparison. It still reads the whole loaded
   executable. Attribute remaining hashing, P lookup and Wasmtime loading before
-  changing cache policy; never substitute a source-only key. Diagnose the retained
-  object's RSS rises and slow wall outlier before making further memory claims.
+  changing cache policy; never substitute a source-only key. Measure cheap P
+  regeneration separately: bypassing native caches can activate Cranelift and
+  increase RSS. Earlier retained-object RSS rises and slow wall outliers still
+  need attribution within their original cohorts.
   Broader programs and rooted snapshots still require R. Extending admission is
   separate correctness work, including numeric relation lowering distinctions.
 - Isolate dependency-heavy CLI benchmark examples from the product's Cargo graph.

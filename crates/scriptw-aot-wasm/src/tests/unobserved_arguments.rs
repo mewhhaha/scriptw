@@ -56,7 +56,7 @@ fn activation_traffic(source: &str) -> ActivationTraffic {
         }
     }
     // An unused R import can be absent from the final compacted P.
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let wasm_encoder::HeapType::Concrete(arguments) = schema

@@ -72,8 +72,10 @@ Persistent cache identity defaults to serial BLAKE3 over the opened executable;
 `SCRIPTW_COMPILER_CACHE_IMAGE_HASH=sha256` uses its separate cache domain.
 Unicode property catalog construction reuses pinned ICU Script ranges across
 aliases; each exact spelling still receives its own Unicode 17 delta.
-Runtime-free primitive programs omit compiler data images and linear memory.
+Runtime-free primitive programs omit compiler-owned pools and linear memory.
 String literals retain the same WasmGC String and UTF-16 array representation.
+Their UTF-16 bytes use passive program data and copy into fresh GC arrays when
+evaluated, without linear memory or compiler-owned tables.
 
 The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
@@ -139,6 +141,14 @@ All 37 P/R outputs and both native runtime profiles stay byte-identical. A mixed
 CLI/example build failed the RSS gate and remains rejected; the separately built
 ordinary CLI passes. Its retained-object RSS rises and slower observations remain
 recorded. These startup results do not refresh V8/Scriptc execution comparisons.
+
+[Standalone literal emission](docs/rust-rewrite/literal-admission-20261101.json)
+lowers cold-run wall and CPU median geomeans **about 68%** across seven literal
+programs in both balanced blocks. Passive UTF-16 data replaces per-unit Wasm
+stores; admission collects the exact literal image once. All 22 scalar/heap P/R
+controls and both raw/native R profiles stay byte-identical. Two rejected
+experiments, slower controls and the unchanged gates remain recorded. This
+compilation result does not refresh V8/Scriptc execution comparisons.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

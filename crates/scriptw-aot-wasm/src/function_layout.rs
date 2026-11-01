@@ -44,7 +44,7 @@ impl ModuleEntryRole {
     pub(crate) const fn for_module(kind: ModuleKind<'_>) -> Self {
         match kind {
             ModuleKind::Runtime(_) => Self::RuntimeOnly,
-            ModuleKind::Standalone | ModuleKind::Program(_) => Self::Main,
+            ModuleKind::Standalone(_) | ModuleKind::Program(_) => Self::Main,
         }
     }
 }
@@ -188,7 +188,7 @@ impl FunctionIndexLayout {
             matches!(
                 (kind, entry_role),
                 (ModuleKind::Runtime(_), ModuleEntryRole::RuntimeOnly)
-                    | (ModuleKind::Standalone, ModuleEntryRole::Main)
+                    | (ModuleKind::Standalone(_), ModuleEntryRole::Main)
                     | (
                         ModuleKind::Program(_),
                         ModuleEntryRole::Main | ModuleEntryRole::NativeFactory

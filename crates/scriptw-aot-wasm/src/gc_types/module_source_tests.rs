@@ -63,7 +63,7 @@ fn module_source_gc_brand_keeps_actual_module_realm_and_string_references() {
         &targets,
     );
     let (program, program_indexes) = declared_fields(
-        ModuleKind::Standalone,
+        crate::tests::standalone_kind(),
         GcLayout::ModuleSourceObject,
         &targets,
     );

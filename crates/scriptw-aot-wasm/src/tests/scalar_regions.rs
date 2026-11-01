@@ -3,7 +3,7 @@ use super::*;
 use crate::gc_types::{GcNullability, GlobalLedger, NumberBitsI64Array, RuntimeModuleTypes};
 
 fn number_array_type() -> u32 {
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let wasm_encoder::HeapType::Concrete(index) = registered
         .globals()
@@ -306,9 +306,8 @@ impl CompactRegionTypes {
             };
             index
         }
-        let registered =
-            RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
-                .finalize_globals(GlobalLedger::new(), false, 0);
+        let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
+            .finalize_globals(GlobalLedger::new(), false, 0);
         let schema = registered.globals().schema();
         Self {
             array: index::<crate::gc_types::ArrayObject>(schema),

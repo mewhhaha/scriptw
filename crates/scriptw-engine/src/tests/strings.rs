@@ -13,6 +13,83 @@ fn wasm_backend_returns_rooted_string_code_units_without_a_scalar_address() {
 }
 
 #[test]
+fn wasm_backend_standalone_passive_literals_remain_fresh_across_main_calls() {
+    with_wasm_raw_main("'unused'; '\\ud800\\0\\udfff';", |store, main| {
+        let mut roots = wasmtime::RootScope::new(store);
+        let first = main.call(&mut roots, ()).unwrap();
+        assert_eq!(
+            (first.0, first.1, first.3, first.4),
+            (WasmRuntimeValueTag::String as i32, 0, 0, 0)
+        );
+        let first = first.2.expect("first String root");
+        assert_eq!(
+            &*wasm_gc_completion::string_units(&mut roots, first).unwrap(),
+            &[0xd800, 0, 0xdfff]
+        );
+        let WasmtimeVal::AnyRef(Some(first_backing)) = wasm_gc_completion::field(
+            &mut roots,
+            first,
+            scriptw_aot_wasm::GcHostField::StringCodeUnits,
+        )
+        .unwrap() else {
+            panic!("String owns code units");
+        };
+        let first_backing = first_backing.as_array(&roots).unwrap().unwrap();
+        first_backing
+            .set(&mut roots, 0, WasmtimeVal::I32(0x007a))
+            .unwrap();
+        let second = main
+            .call(&mut roots, ())
+            .expect("passive data remains live after first main");
+        let second = second.2.expect("second String root");
+        assert_eq!(
+            &*wasm_gc_completion::string_units(&mut roots, second).unwrap(),
+            &[0xd800, 0, 0xdfff]
+        );
+        let WasmtimeVal::AnyRef(Some(second_backing)) = wasm_gc_completion::field(
+            &mut roots,
+            second,
+            scriptw_aot_wasm::GcHostField::StringCodeUnits,
+        )
+        .unwrap() else {
+            panic!("second String owns code units");
+        };
+        let second_backing = second_backing.as_array(&roots).unwrap().unwrap();
+        assert!(!wasmtime::Rooted::ref_eq(&roots, &first_backing, &second_backing).unwrap());
+        assert_eq!(
+            &*wasm_gc_completion::string_units(&mut roots, first).unwrap(),
+            &[0x007a, 0, 0xdfff]
+        );
+    });
+}
+
+#[test]
+fn wasm_backend_standalone_large_literal_preserves_every_utf16_code_unit() {
+    use std::fmt::Write;
+
+    let prefix = [
+        0, 0xd800, 0x0078, 0xdfff, 0xd83d, 0xde00, 0xdb80, 0xdc00, 0x0044, 0x0038, 0x0030, 0x0030,
+    ];
+    for length in [4096, 16_384, 65_536] {
+        let mut units = Vec::with_capacity(length);
+        units.extend_from_slice(&prefix);
+        for index in units.len()..length {
+            units.push((index * 257) as u16);
+        }
+        let mut source = String::from("'");
+        for unit in &units {
+            write!(&mut source, "\\u{unit:04x}").unwrap();
+        }
+        source.push_str("';");
+        let (scalar, tag, completion, actual) = run_wasm_raw(&source);
+        assert_eq!(tag.value_kind(), ValueKind::String, "{length}");
+        assert_eq!(completion, 0, "{length}");
+        assert_eq!(scalar, 0, "{length}");
+        assert_eq!(actual.as_deref(), Some(units.as_slice()), "{length}");
+    }
+}
+
+#[test]
 fn wasm_backend_standalone_primitives_preserve_utf16_and_number_completions() {
     for (source, expected) in [
         ("'';", &[][..]),

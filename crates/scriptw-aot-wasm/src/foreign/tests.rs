@@ -250,7 +250,7 @@ fn transfer_signatures_require_the_emitted_nonnull_canonical_array_types() {
         )
         .unwrap()])
         .unwrap();
-        let (types, imports) = RuntimeModuleTypes::register(ModuleKind::Standalone)
+        let (types, imports) = RuntimeModuleTypes::register(crate::tests::standalone_kind())
             .with_foreign_modules(&registry)
             .unwrap();
         let (id, _) = registry.functions().next().unwrap();

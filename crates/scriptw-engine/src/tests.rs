@@ -1083,6 +1083,34 @@ fn wasm_math_transcendentals_match_ecmascript_special_values() {
 }
 
 fn run_wasm_raw(source: &str) -> (i64, WasmRuntimeValueTag, i32, Option<Box<[u16]>>) {
+    with_wasm_raw_main(source, |store, main| {
+        let mut roots = wasmtime::RootScope::new(store);
+        let result @ (_, payload, _, completion_kind, _) =
+            main.call(&mut roots, ()).expect("main should run");
+        let (tag, _, value) = wasm_gc_completion::observe(&mut roots, result)
+            .expect("Main result follows the actual GC ABI")
+            .into_parts();
+        let bytes = match value {
+            ObservedJsValue::String(units) => Some(units),
+            ObservedJsValue::Undefined
+            | ObservedJsValue::Null
+            | ObservedJsValue::Boolean(_)
+            | ObservedJsValue::Number(_)
+            | ObservedJsValue::BigInt(_)
+            | ObservedJsValue::Symbol
+            | ObservedJsValue::Object => None,
+        };
+        (payload, tag, completion_kind, bytes)
+    })
+}
+
+fn with_wasm_raw_main<T>(
+    source: &str,
+    observe: impl FnOnce(
+        &mut WasmtimeStore<WasmHostState>,
+        wasmtime::TypedFunc<(), GcMainCompletion>,
+    ) -> T,
+) -> T {
     let engine = engine();
     let unit = engine
         .compile_script(source, CompileOptions::default())
@@ -1289,23 +1317,7 @@ fn run_wasm_raw(source: &str) -> (i64, WasmRuntimeValueTag, i32, Option<Box<[u16
     let main = instance
         .get_typed_func::<(), GcMainCompletion>(&mut store, "main")
         .expect("main export should exist");
-    let mut roots = wasmtime::RootScope::new(&mut store);
-    let result @ (_, payload, _, completion_kind, _) =
-        main.call(&mut roots, ()).expect("main should run");
-    let (tag, _, value) = wasm_gc_completion::observe(&mut roots, result)
-        .expect("Main result follows the actual GC ABI")
-        .into_parts();
-    let bytes = match value {
-        ObservedJsValue::String(units) => Some(units),
-        ObservedJsValue::Undefined
-        | ObservedJsValue::Null
-        | ObservedJsValue::Boolean(_)
-        | ObservedJsValue::Number(_)
-        | ObservedJsValue::BigInt(_)
-        | ObservedJsValue::Symbol
-        | ObservedJsValue::Object => None,
-    };
-    (payload, tag, completion_kind, bytes)
+    observe(&mut store, main)
 }
 
 #[test]

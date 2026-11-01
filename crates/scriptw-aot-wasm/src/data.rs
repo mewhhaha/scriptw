@@ -143,7 +143,7 @@ struct StringRef {
     code_units: PooledCodeUnits,
 }
 
-/// A slice of the module's compiler-owned passive UTF-16 image. Only string
+/// A slice of the module-owned passive UTF-16 image. Only string
 /// interning creates these bounds; GC construction cannot accept raw offsets.
 #[derive(Debug)]
 pub(crate) struct PooledCodeUnits {
@@ -172,6 +172,11 @@ impl PooledModuleBytes {
 
 impl PooledCodeUnits {
     pub(crate) const DATA_SEGMENT: PassiveDataSegment = PassiveDataSegment::PooledCodeUnits;
+
+    pub(crate) fn emit_bounds(&self, function: &mut Function) {
+        function.instruction(&Instruction::I32Const(self.byte_offset as i32));
+        function.instruction(&Instruction::I32Const(self.length as i32));
+    }
 }
 
 /// Compile-time storage locator for a validated descriptor. Executable P rows
@@ -498,6 +503,15 @@ pub(crate) struct StringPool {
 }
 
 impl StringPool {
+    /// Encode only the ordered literal names retained by complete admission.
+    pub(crate) fn from_standalone_literals(names: BTreeSet<&str>) -> Self {
+        let mut literals = Self::default();
+        for value in names {
+            literals.intern_string(value);
+        }
+        literals
+    }
+
     pub(crate) fn intl_default_locale(
         &self,
     ) -> Result<&scriptw_intl::CanonicalLocaleId, EmitError> {
@@ -514,7 +528,7 @@ impl StringPool {
     ///
     /// Builtin and helper bodies embed pool slots and linear-memory addresses.
     /// [`CompilerOwnedPool`] lays out everything they can reference and is the
-    /// only way to start script collection, so a program's literals cannot
+    /// Realm-bearing entry to script collection, so a program's literals cannot
     /// shift a compiler-owned constant.
     pub(crate) fn collect(
         script: &ScriptIr,
@@ -543,8 +557,8 @@ fn is_runtime_owned_function(id: &str, meta: &WasmFunctionMeta) -> bool {
 
 /// A [`StringPool`] whose compiler-owned strings and tables are complete.
 ///
-/// Only this type can start script collection, so script-derived strings and
-/// bytes always land after every constant builtin bodies can reference.
+/// Realm-bearing script collection starts here, so its strings and bytes
+/// always land after every constant builtin bodies can reference.
 #[derive(Debug)]
 pub(crate) struct CompilerOwnedPool(StringPool);
 
@@ -4644,6 +4658,31 @@ impl StringPool {
 
     pub(crate) fn pooled_string_count(&self) -> u32 {
         u32::try_from(self.refs.len()).expect("pooled strings fit a GC array")
+    }
+    pub(crate) fn append_standalone_data(&self, section: &mut wasm_encoder::DataSection) {
+        section.passive(self.pooled_code_unit_bytes.iter().copied());
+    }
+
+    pub(crate) fn pooled_code_units(&self, value: &str) -> Result<&PooledCodeUnits, EmitError> {
+        let units = &self
+            .refs
+            .get(value)
+            .ok_or_else(|| {
+                EmitError::unsupported(format!("string `{value}` was not collected in this module"))
+            })?
+            .code_units;
+        let end = units
+            .length
+            .checked_mul(2)
+            .and_then(|bytes| units.byte_offset.checked_add(bytes));
+        if units.byte_offset % 2 != 0
+            || !end.is_some_and(|end| end as usize <= self.pooled_code_unit_bytes.len())
+        {
+            return Err(EmitError::unsupported(
+                "literal UTF-16 span exceeds its passive image",
+            ));
+        }
+        Ok(units)
     }
     pub(crate) fn pooled_string_initializers(
         &self,

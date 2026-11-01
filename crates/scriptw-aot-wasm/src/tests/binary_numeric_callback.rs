@@ -40,7 +40,7 @@ fn thunk_indices(artifact: &WasmArtifact) -> BTreeSet<u32> {
 }
 
 fn code_type_index() -> u32 {
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let wasm_encoder::HeapType::Concrete(index) = registered
         .globals()

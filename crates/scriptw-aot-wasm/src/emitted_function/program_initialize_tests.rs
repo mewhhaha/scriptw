@@ -30,7 +30,7 @@ fn runtime_program_and_standalone_layouts_match_actual_emission_order() {
         ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::Portable),
         ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::NativeHost),
         ModuleKind::Program(&runtime),
-        ModuleKind::Standalone,
+        crate::tests::standalone_kind(),
     ] {
         for imported in [0, 3] {
             for source_count in [0, 2] {
@@ -137,7 +137,7 @@ fn runtime_program_and_standalone_layouts_match_actual_emission_order() {
                     if matches!(kind, ModuleKind::Runtime(_)) {
                         assert_eq!(table.records().len(), r_count + r_helpers);
                     }
-                    if matches!(kind, ModuleKind::Standalone) {
+                    if matches!(kind, ModuleKind::Standalone(_)) {
                         assert_eq!(table.records().len(), 1 + source_count);
                     }
                 }
@@ -190,7 +190,7 @@ fn native_factory_layout_starts_with_its_typed_initializer_without_main() {
 #[test]
 fn only_a_linked_program_can_have_a_native_factory_entry() {
     for kind in [
-        ModuleKind::Standalone,
+        crate::tests::standalone_kind(),
         ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::NativeHost),
     ] {
         assert!(std::panic::catch_unwind(|| FunctionIndexLayout::new(

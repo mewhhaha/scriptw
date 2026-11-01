@@ -3029,6 +3029,23 @@ pub(crate) struct StringConstruction {
     units: GcLocal<CodeUnitArray>,
 }
 impl StringConstruction {
+    /// Copy the pool's checked literal span into a fresh private GC backing.
+    pub(crate) fn from_pooled_code_units(
+        schema: &RuntimeSchema,
+        slot: GcLocalSlot<CodeUnitArray>,
+        units: &crate::data::PooledCodeUnits,
+        function: &mut Function,
+    ) -> Self {
+        units.emit_bounds(function);
+        function.instruction(&Instruction::ArrayNewData {
+            array_type_index: schema.array_type::<CodeUnitArray>().type_index().raw(),
+            array_data_index: crate::data::PooledCodeUnits::DATA_SEGMENT.index(),
+        });
+        Self {
+            units: slot.initialize(GcStackReference::new(), function),
+        }
+    }
+
     /// Construct one exact UTF-16 unit without a fill followed by a copy.
     pub(crate) fn from_code_unit(
         schema: &RuntimeSchema,

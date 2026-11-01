@@ -12,7 +12,7 @@ fn cached_read_allocates_fixed_pages_and_indexes_the_directory_by_page() {
         .into_iter()
         .find_map(|(index, name)| (name == "helper::cached_property_read").then_some(index))
         .unwrap();
-    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
     let wasm_encoder::HeapType::Concrete(leaf) = registered
         .globals()

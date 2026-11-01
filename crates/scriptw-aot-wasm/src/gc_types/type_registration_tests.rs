@@ -55,7 +55,7 @@ fn direct_program_signatures_follow_the_exact_core_graph_and_hooks_keep_core_typ
         runtime_bytes, native_bytes,
         "source compiler authority cannot change the core GC schema"
     );
-    let (_, program_bytes) = encoded(ModuleKind::Standalone);
+    let (_, program_bytes) = encoded(crate::tests::standalone_kind());
     let (core, core_groups, core_globals) = declarations(&runtime_bytes);
     let (program, program_groups, program_globals) = declarations(&program_bytes);
     let core_end = StaticSignature::ALL.len()
@@ -268,7 +268,7 @@ fn empty_storage_globals_are_nonnull_immutable_zero_length_arrays() {
     for kind in [
         ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::NativeHost),
         ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::Portable),
-        ModuleKind::Standalone,
+        crate::tests::standalone_kind(),
     ] {
         let (module, bytes) = encoded(kind);
         let schema = module.globals().schema();

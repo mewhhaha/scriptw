@@ -361,7 +361,7 @@ fn emitter_consumes_the_package_through_the_reviewed_lifecycle() {
     assert!(compact(finalization).contains(concat!(
         "letbytes=matchkind{",
         "ModuleKind::Program(_)=>crate::program_imports::compact(bytes,&mutfunction_table)?,",
-        "ModuleKind::Standalone|ModuleKind::Runtime(_)=>bytes,",
+        "ModuleKind::Standalone(_)|ModuleKind::Runtime(_)=>bytes,",
         "};"
     )), "only linked P may rewrite its completed package; R and standalone bytes retain their owners");
     assert!(
