@@ -69,6 +69,8 @@ persistent entry. Embedded runtime admission and compilation without a cache
 avoid that work; persisted entries remain bound to the actual compiler executable.
 Unicode property catalog construction reuses pinned ICU Script ranges across
 aliases; each exact spelling still receives its own Unicode 17 delta.
+Runtime-free primitive programs omit compiler data images and linear memory.
+String literals retain the same WasmGC String and UTF-16 array representation.
 
 The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
@@ -118,6 +120,14 @@ lowers cold-build median geomeans another **34.5–35.9% wall** and
 and **11.2–11.6% CPU** in aggregate. Program Wasm and both raw/native runtime
 profiles remain byte-identical. Hello's peak RSS rises about 3.4 MiB in one
 block; all observations and the passing repeated-regression gates are retained.
+
+The [runtime-free primitive checkpoint](docs/rust-rewrite/standalone-pool-20261101.json)
+reduces cold-build median geomeans **88.3% wall** and **88.7–88.8% CPU** across
+19 admitted expression programs. Cold `run` wall time falls **28.7–28.9%**;
+median P size drops from **599,381 to 7,592 bytes**. These programs keep the
+existing WasmGC representation and omit linear memory/data. All 18 heap-backed
+control P/R outputs and both native runtime profiles stay byte-identical.
+Slower control observations and a one-block 3.9-MiB RSS rise remain recorded.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

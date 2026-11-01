@@ -13,6 +13,59 @@ fn wasm_backend_returns_rooted_string_code_units_without_a_scalar_address() {
 }
 
 #[test]
+fn wasm_backend_standalone_primitives_preserve_utf16_and_number_completions() {
+    for (source, expected) in [
+        ("'';", &[][..]),
+        ("'a\\0b';", &[0x0061, 0x0000, 0x0062][..]),
+        ("'\\u{1f600}';", &[0xd83d, 0xde00][..]),
+        ("'\\ud800x\\udfff';", &[0xd800, 0x0078, 0xdfff][..]),
+        (
+            "'\\u{f0000}D800';",
+            &[0xdb80, 0xdc00, 0x0044, 0x0038, 0x0030, 0x0030][..],
+        ),
+        ("'' ? 'wrong' : '\\ud800';", &[0xd800][..]),
+        ("'x' && '\\udfff';", &[0xdfff][..]),
+        ("('ignored', '\\0');", &[0x0000][..]),
+    ] {
+        let (scalar, tag, completion, units) = run_wasm_raw(source);
+        assert_eq!(tag.value_kind(), ValueKind::String, "{source}");
+        assert_eq!(completion, 0, "{source}");
+        assert_eq!(scalar, 0, "{source}");
+        assert_eq!(
+            &*units.expect("rooted String code units"),
+            expected,
+            "{source}"
+        );
+    }
+    for (source, expected) in [
+        ("-0;", -0.0f64),
+        ("(-0, 0, -0);", -0.0),
+        ("'' ? 1 : -0;", -0.0),
+        ("1 / 0;", f64::INFINITY),
+        ("1 / -0;", f64::NEG_INFINITY),
+        ("(1 + 2) * 3;", 9.0),
+        ("0 / 0;", f64::NAN),
+    ] {
+        let (scalar, tag, completion, units) = run_wasm_raw(source);
+        assert_eq!(tag.value_kind(), ValueKind::Number, "{source}");
+        assert_eq!(completion, 0, "{source}");
+        assert!(units.is_none(), "{source}");
+        if expected.is_nan() {
+            assert!(f64::from_bits(scalar as u64).is_nan(), "{source}");
+        } else {
+            assert_eq!(scalar as u64, expected.to_bits(), "{source}");
+        }
+    }
+    for (source, expected) in [("!'';", 1), ("!'x';", 0), ("!!'\\0';", 1)] {
+        let (scalar, tag, completion, units) = run_wasm_raw(source);
+        assert_eq!(tag.value_kind(), ValueKind::Boolean, "{source}");
+        assert_eq!(completion, 0, "{source}");
+        assert_eq!(scalar, expected, "{source}");
+        assert!(units.is_none(), "{source}");
+    }
+}
+
+#[test]
 fn wasm_backend_lowers_template_expression_legacy_octal_string_literal() {
     let outcome = engine()
         .run_script(

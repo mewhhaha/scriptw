@@ -22,12 +22,15 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   inside about 75 ms of emission; those spans overlap. Ordinary P still collects
   its roughly 2-MiB compiler-owned pool. Exact-R sharing is a warm multi-program
   hypothesis; first population still admits and freezes that prefix.
-- Give Standalone programs a separate minimal compiler pool only after proving
-  literal String collection, inline UTF-16 emission, truthiness and completion
-  decoding with an empty runtime-data boundary. Runtime admission already
-  excludes functions, bindings, calls, host builtins and snapshots here; literal
-  Strings still use the existing WasmGC model. Preserve heap-backed P/R/native
-  output and measure the actual cold saving before promotion.
+- Profile the remaining cold `run` cost for
+  [runtime-free primitive programs](standalone-pool-20261101.json). They now
+  emit about 7.6-KiB P modules without compiler pools or linear memory; exact
+  UTF-16 and Number completions retain the existing WasmGC representation.
+  Determine whether persistent-P identity and lookup cost exceeds recompiling
+  this narrowly admitted class before changing cache policy. Actual persisted
+  entries must retain executable binding; do not substitute a source-only key.
+  Broader programs and rooted snapshots still require R. Extending admission is
+  separate correctness work, including numeric relation lowering distinctions.
 - Reduce repeated Rust compilation across Cargo graphs using the
   [source-bound unit timings](regexp-catalog-20261101.json). The IR unit-test
   target took about 204 seconds, and its separate ordinary library took about

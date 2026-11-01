@@ -1375,8 +1375,8 @@ impl<'a> FunctionBuilder<'a> {
         value: &str,
         function: &mut Function,
     ) -> Result<GcStackReference<StringValue>, EmitError> {
-        let ordinal = self.strings.pooled_string_index(value)?;
         if self.uses_heap {
+            let ordinal = self.strings.pooled_string_index(value)?;
             return self.emit_pooled_string_reference(ordinal, function);
         }
         // Runtime-free scripts do not initialize the module's pooled table.

@@ -28,6 +28,7 @@ mod regexp_programs;
 mod runtime_error_for_throw;
 mod scalar_predicates;
 mod scalar_regions;
+mod standalone_pool;
 mod temporal_demand_initialization;
 mod typed_array_numeric_callback;
 mod unobserved_arguments;
@@ -3052,13 +3053,12 @@ fn preseeded_wire_data_stays_in_private_memory() {
     let mut expected_prefix = vec![b' '; 11];
     expected_prefix.extend_from_slice(b"\n: ,undefinednulltruefalse");
 
-    // A runtime-free program is one self-contained module that owns its
-    // preseed as the only (active) segment.
+    // Runtime-free Strings own GC code units and need no wire-data preseed.
     let standalone = emit_script("\",\";").expect("emit should work");
     expect_valid_module(&standalone, 0);
     assert!(standalone.runtime().is_none());
-    assert!(data_segment_at(&standalone.bytes, 0).starts_with(&expected_prefix));
-    assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 1));
+    assert_eq!(wire_data_segment_counts(&standalone.bytes), (0, 0));
+    assert!(memory_initial_pages(&standalone.bytes).is_empty());
 
     // A heap program's preseed is R's active prefix; later active fragments
     // skip all three passive cold-table images. P retains passive images.
@@ -3293,11 +3293,18 @@ fn constructed_constant_regexp_retains_one_validated_program_image() {
 }
 
 #[test]
-fn large_static_string_data_increases_initial_memory_pages() {
+fn large_standalone_string_needs_no_linear_memory_or_data() {
     let source = format!("\"{}\";", "x".repeat(WASM_PAGE_SIZE as usize));
     let artifact = emit_script(&source).expect("emit should work");
-    let pages = memory_initial_pages(&artifact.bytes);
-    assert!(pages[0] >= 2);
+    expect_valid_module(&artifact, 0);
+    assert!(artifact.runtime().is_none());
+    assert!(memory_initial_pages(&artifact.bytes).is_empty());
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        assert!(!matches!(
+            payload.expect("large standalone String module decodes"),
+            Payload::DataSection(_) | Payload::DataCountSection { .. }
+        ));
+    }
 }
 
 #[test]

@@ -344,6 +344,9 @@ fn emit_script_module_with_factory(
     .with_foreign_imports(foreign_imports);
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
     let string_pool = match (kind, validated_runtime) {
+        // Standalone admission excludes runtime operations and source functions.
+        // Literal Strings construct their GC code-unit arrays inline.
+        (ModuleKind::Standalone, None) => StringPool::default(),
         (ModuleKind::Program(runtime), Some(validated))
             if std::sync::Arc::ptr_eq(runtime, validated.runtime()) =>
         {

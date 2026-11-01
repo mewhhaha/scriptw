@@ -398,7 +398,6 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
         exports,
         [
             "main",
-            "memory",
             WASM_THROW_ERROR_CONSTRUCTOR_NAME_EXPORT,
             WASM_THROW_ERROR_MESSAGE_EXPORT,
             WASM_THROW_ERROR_NAME_EXPORT,
