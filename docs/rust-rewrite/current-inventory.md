@@ -68,6 +68,9 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   is also rejected: reverse-128 misses one target block, despite larger-sort and
   derived-kernel gains. It remains unpromoted; continue with integer induction
   and bounded scalar-region proofs before measuring another candidate.
+  The separate [joined-length candidate](joined-length-zero-trip-20261101.json)
+  improves three small joins but fails the zero-trip preflight control. Measure
+  a pure entry-test guard before promoting this region.
   Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,

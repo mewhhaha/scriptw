@@ -1,0 +1,358 @@
+{
+  "schema": "scriptw-joined-length-zero-trip-rejection-v1",
+  "date": "2026-11-01",
+  "title": "Joined-length preflight: zero-trip boundary rejects the broad candidate",
+  "decision": {
+    "status": "rejected-screen",
+    "promotion": "joined-length preflight is not promoted",
+    "candidate_source_commit": "aeb7b0c31ac303f7462f9081e51760922a9495f9",
+    "candidate_source_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544",
+    "reason": "join-boundary-256-trip0.js is the sole persistent control veto: +31.599426% median/+30.504687% mean in block 0, then +29.815075% median/+29.763948% mean in block 1.",
+    "interpretation": "Scanning String elements before the first loop test adds substantial work on zero trips. One-trip and larger boundary results do not offset the failed predeclared control gate."
+  },
+  "identities": {
+    "baseline": {
+      "source_commit": "ae07c2921d34b65f09e2458ed577bad9a03ae6ff",
+      "source_fingerprint": "a35adbcb61dbc57b4ee44dd1527019358deb137b11ae559de7d0d4b4a860b480",
+      "runtime_baseline_sha256": "4a882ea53d5de4b762571c22cb6efe0957a6e3a1783f7ed832bc5188316214e1"
+    },
+    "candidate": {
+      "source_commit": "aeb7b0c31ac303f7462f9081e51760922a9495f9",
+      "source_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544",
+      "compiler_precompiled_identity_sha256": "493d8552cbd28740ebb267bada147567c2355c1a02a4d92cb6f53aa710f6709a",
+      "ordinary_runtime_baseline_sha256": "2320792f8f184a3c022304062fc7fe23f2982f3ac576294607bccbd19dd6a0a6",
+      "identity_note": "The compiler-precompiled identity is a source/configuration binder. Ordinary timing used runtime_baseline; each host report separately records and is checked against its runtime executable SHA."
+    }
+  },
+  "measurement": {
+    "executed_host": "runtime_baseline",
+    "samples_per_invocation": 21,
+    "warmups_per_invocation": 10,
+    "block_order": "two case-local balanced blocks; four independent process invocations per product per block",
+    "experimental_unit": "process invocation; gate aggregates four invocation medians and four invocation means per block",
+    "boundary_screen": {
+      "analysis": "target/performance-scalar-regions-next/join-boundary/runs/20261101T014322Z-candidate-screen/analysis.json",
+      "cases": [
+        "join-empty-1024.js",
+        "join-singleton-1024.js",
+        "join-small-1024.js",
+        "join-boundary-256-trip0.js",
+        "join-boundary-256-trip1.js",
+        "join-boundary-257-trip0.js",
+        "join-boundary-257-trip1.js",
+        "join-boundary-4096-trip0.js",
+        "join-boundary-4096-trip1.js",
+        "retained-objects.js"
+      ],
+      "invocations": 160,
+      "measured_observations": 3360,
+      "warmups": 1600,
+      "scope_clarification": "The immutable analysis has a stale prose target_rule saying nine targets. Actual row classification and pre-run study plan are three canonical joins as targets plus six extent/trip controls and retained-objects as seven controls."
+    },
+    "aa": {
+      "analysis": "target/performance-scalar-regions-next/aa-analysis.json",
+      "cases": 12,
+      "invocations": 192,
+      "measured_observations": 4032,
+      "warmups": 1920,
+      "persistent_control_vetoes": []
+    }
+  },
+  "case_results": {
+    "join-empty-1024.js": {
+      "case": "join-empty-1024.js",
+      "control": false,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": -63.31772133422391,
+          "mean_change_percent": -62.13338167911434
+        },
+        {
+          "block": "block1",
+          "median_change_percent": -63.518627171286,
+          "mean_change_percent": -63.1011395261996
+        }
+      ]
+    },
+    "join-singleton-1024.js": {
+      "case": "join-singleton-1024.js",
+      "control": false,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": -64.37467360858349,
+          "mean_change_percent": -65.2694857753163
+        },
+        {
+          "block": "block1",
+          "median_change_percent": -64.71412160472924,
+          "mean_change_percent": -63.87585607186092
+        }
+      ]
+    },
+    "join-small-1024.js": {
+      "case": "join-small-1024.js",
+      "control": false,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": -70.80866093149703,
+          "mean_change_percent": -71.45840943945365
+        },
+        {
+          "block": "block1",
+          "median_change_percent": -71.26217383779327,
+          "mean_change_percent": -71.24123092679686
+        }
+      ]
+    },
+    "join-boundary-256-trip0.js": {
+      "case": "join-boundary-256-trip0.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": 31.59942631449595,
+          "mean_change_percent": 30.50468659740144
+        },
+        {
+          "block": "block1",
+          "median_change_percent": 29.815074871321933,
+          "mean_change_percent": 29.76394805930451
+        }
+      ]
+    },
+    "join-boundary-256-trip1.js": {
+      "case": "join-boundary-256-trip1.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": -7.268009711196221,
+          "mean_change_percent": -7.936904342763196
+        },
+        {
+          "block": "block1",
+          "median_change_percent": -7.119669858268541,
+          "mean_change_percent": -6.881421074458349
+        }
+      ]
+    },
+    "join-boundary-257-trip0.js": {
+      "case": "join-boundary-257-trip0.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": -0.30002828008895976,
+          "mean_change_percent": 0.7009565471684631
+        },
+        {
+          "block": "block1",
+          "median_change_percent": 2.6013053907571804,
+          "mean_change_percent": 1.5922157544563609
+        }
+      ]
+    },
+    "join-boundary-257-trip1.js": {
+      "case": "join-boundary-257-trip1.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": 1.3674522885157137,
+          "mean_change_percent": 1.2288709568854195
+        },
+        {
+          "block": "block1",
+          "median_change_percent": 1.3018630401923525,
+          "mean_change_percent": 1.4475146390338756
+        }
+      ]
+    },
+    "join-boundary-4096-trip0.js": {
+      "case": "join-boundary-4096-trip0.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": 0.27163771434723927,
+          "mean_change_percent": 0.26460280352900156
+        },
+        {
+          "block": "block1",
+          "median_change_percent": 0.3899772320463901,
+          "mean_change_percent": 0.6439332427595534
+        }
+      ]
+    },
+    "join-boundary-4096-trip1.js": {
+      "case": "join-boundary-4096-trip1.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": 0.5463945927155489,
+          "mean_change_percent": 0.4441857558223017
+        },
+        {
+          "block": "block1",
+          "median_change_percent": 0.6822197620847348,
+          "mean_change_percent": 0.5896156277870546
+        }
+      ]
+    },
+    "retained-objects.js": {
+      "case": "retained-objects.js",
+      "control": true,
+      "blocks": [
+        {
+          "block": "block0",
+          "median_change_percent": 0.33855192600391604,
+          "mean_change_percent": 0.5235699584901887
+        },
+        {
+          "block": "block1",
+          "median_change_percent": -0.6362013258701116,
+          "mean_change_percent": 7.117710264531629
+        }
+      ]
+    }
+  },
+  "gate": {
+    "targets": [
+      "join-empty-1024.js",
+      "join-singleton-1024.js",
+      "join-small-1024.js"
+    ],
+    "targets_improved_in_median_both_blocks": true,
+    "controls": [
+      "join-boundary-256-trip0.js",
+      "join-boundary-256-trip1.js",
+      "join-boundary-257-trip0.js",
+      "join-boundary-257-trip1.js",
+      "join-boundary-4096-trip0.js",
+      "join-boundary-4096-trip1.js",
+      "retained-objects.js"
+    ],
+    "veto": "any control slowing by at least 3% in both block median and block mean in both blocks",
+    "vetoes": [
+      "join-boundary-256-trip0.js"
+    ]
+  },
+  "prebuild_fixture_budget": {
+    "generic_cli_diagnostic": {
+      "status": "incomplete",
+      "successful_builds": 8,
+      "largest_function_metric": "unavailable: frozen CLI printed only direct-js-to-wasm module; retained as incomplete, not a size pass"
+    },
+    "wasm_body_diagnostic": {
+      "status": "complete",
+      "compiler_source_fingerprint": "12e1ffe694b36125aa62dadefc558e0033ac3ce4a9a3a4f968876b96222cdf97",
+      "core_code_body_limit_bytes": 131072,
+      "largest_core_body": {
+        "fixture": "dense_number_chunks_preserve_sequential_writes_rounding_and_counter_sign.js",
+        "bytes": 111031
+      },
+      "bodies_by_fixture": {
+        "dense_number_chunks_preserve_sequential_writes_rounding_and_counter_sign.js": 111031,
+        "exact_sum_accepts_safe_positive_and_negative_prefixes.js": 53799,
+        "exact_sum_preserves_seed_boundaries_and_rounding_misses.js": 48669,
+        "exact_sum_preserves_signed_zero_nonfinite_and_zero_trip_values.js": 58721,
+        "exact_sum_retains_unsafe_intermediates_and_observable_coercions.js": 55547,
+        "joined_length_preflight_keeps_late_coercions_holes_and_caps_observable.js": 106196,
+        "joined_length_region_misses_preserve_live_methods_and_read_order.js": 109405,
+        "joined_length_regions_preserve_utf16_and_number_arithmetic.js": 85149
+      }
+    },
+    "coverage": "eight semantic fixture builds under the old rejected compiler only; not correctness evidence for b7fe"
+  },
+  "verification": {
+    "source_only_guards": {
+      "passed": 359,
+      "suites": [
+        149,
+        135,
+        72,
+        3
+      ]
+    },
+    "focused_native": {
+      "passed": 62,
+      "scope": "62 focused tests only; do not present aggregate/broad test totals"
+    },
+    "v8_semantic_oracles": {
+      "passed": 8,
+      "total": 8,
+      "records": [
+        "dense_number_chunks_preserve_sequential_writes_rounding_and_counter_sign.js true",
+        "exact_sum_accepts_safe_positive_and_negative_prefixes.js true",
+        "exact_sum_preserves_seed_boundaries_and_rounding_misses.js true",
+        "exact_sum_preserves_signed_zero_nonfinite_and_zero_trip_values.js true",
+        "exact_sum_retains_unsafe_intermediates_and_observable_coercions.js true",
+        "joined_length_preflight_keeps_late_coercions_holes_and_caps_observable.js true",
+        "joined_length_region_misses_preserve_live_methods_and_read_order.js true",
+        "joined_length_regions_preserve_utf16_and_number_arithmetic.js true"
+      ]
+    },
+    "runtime_invariance": {
+      "wasm": [
+        {
+          "artifact": "scriptw-runtime-package.bin",
+          "runtime_abi": 42,
+          "identical_to_baseline": true,
+          "bytes": 39037690,
+          "sha256": "16147e0175353b8c599cfc909249b9ecdc3c6c39e41c218666c58c54607e7eb4"
+        },
+        {
+          "artifact": "scriptw-runtime-portable-package.bin",
+          "runtime_abi": 42,
+          "identical_to_baseline": true,
+          "bytes": 39035706,
+          "sha256": "208535ae2c9885a9294774ccf82ffcc15e2f9296450feb4d1a7cac900eb93975"
+        }
+      ],
+      "native": [
+        {
+          "artifact": "scriptw-runtime-native.bin",
+          "identical_to_baseline": true,
+          "bytes": 66037136,
+          "sha256": "bfb44f2dbb27a6551bbd64639935804f22c4e3d9dfebc1230b5e530c08bcf2dc"
+        },
+        {
+          "artifact": "scriptw-runtime-portable-native.bin",
+          "identical_to_baseline": true,
+          "bytes": 66032200,
+          "sha256": "57fe66f26ce33206613470d4c20f7ccd60887d0c478ebedce16163e91b2001eb"
+        }
+      ]
+    },
+    "not_run_after_failed_boundary": [
+      "main nine-target screen",
+      "full17 ordinary run",
+      "derived kernels",
+      "Test262",
+      "V8/Scriptc performance references",
+      "native broad suite"
+    ],
+    "independent_raw_audit": {
+      "auditor": "Astra",
+      "boundary_invocations_audited": 160,
+      "measured_observations": 3360,
+      "warmup_observations": 1600,
+      "checksums": "valid",
+      "resource_receipts": "valid",
+      "maximum_recomputed_statistics_difference": 0,
+      "scope": "independent recomputation of the preserved boundary raw measurements"
+    }
+  },
+  "evidence": {
+    "archive_path": "docs/rust-rewrite/joined-length-zero-trip-20261101-inert.tar.xz",
+    "archive_sha256": "ee962dbd99a5126d0fb557285ec2269a0a7ff4b31353f968105bff941086425e",
+    "archive_bytes": 1123608,
+    "member_count": 1259,
+    "expanded_bytes": 89877724,
+    "index_sha256": "7b9ead5b80e6577a2565ba4edbbc78df08c0dbbd5432154cfbec8d415d88a0cc"
+  }
+}
