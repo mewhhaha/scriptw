@@ -1,0 +1,2446 @@
+{
+  "schema": "scriptw-scalar-regions-performance-v1",
+  "state": {
+    "status": "accepted-local-improvement",
+    "decision": "All nine primary target medians improve in both original17 blocks; no repeated control veto. Native, selected pinned conformance, CLI and independent artifact/statistic audits pass.",
+    "overall_v8_scriptc_parity": "open",
+    "published_ci_refresh": false
+  },
+  "source": {
+    "scope": "Identity-aware private locals, guarded dense Number reads with integer induction and ordered four-step chunks, bounded exact sums, native Array joins on Strings observed through length, and measured pure entry-test bypass.",
+    "parent_commit": "39b6f24ac1eb01e0a1cd59907699810b81cf8900",
+    "parent_commit_is_final_source": false,
+    "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+    "dirty_patch_sha256": "61f82fbee49780448b7adbd4d14aff5161845e25b285e7df39e754d4413db756",
+    "source_commit_in_product_identity": "39b6f24ac1eb01e0a1cd59907699810b81cf8900",
+    "source_files": 11,
+    "predecessor_b7fe_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544",
+    "predecessor_runtime_invariance": "predecessor-runtime-invariance.json (b7fe only); current runtime-invariance.json is ce4d",
+    "final_compiler_files_sha256": {
+      "crates/scriptw-aot-wasm/src/control_flow.rs": "26aed2bb676e90af19f3f7fa3860f0efde65929e41707c1e53c783c56a1a6348",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop.rs": "335657fe0dd5d01ceb4b50f24fc8aec445c3e646546217a83c5483ec6fce5592",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/chunked.rs": "368342b4bb0acf44a5a7ac9d2630530eff3e8b425363a735cd7d7ddd178179b6",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/dense_array.rs": "c14e38d0a04960e11787587654eff80074045bf94163fd4f7e45c2fccdc208e4",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/invariant_imul.rs": "94eda31a74e3d8e1fbf19d584aaba53d692cff9c8cc81223b1311adfa62ffad5",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/joined_length.rs": "72fccb26ac89655dd49c1617eb6972d439edb754c75666ddb905a192dfbb92a2",
+      "crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/whole_trip.rs": "bd6bf45df51a75cc12fe11b751a8d7780207f3113a0917d720d3c1481fe612b2",
+      "crates/scriptw-aot-wasm/src/environments.rs": "9363abf755df3772281792be0fd3055b765090d09b8bbdb75ca5651a5fe2b927"
+    },
+    "delivery_note": "Measured dirty production sources on parent 39b6f24ac, bound by compiler fingerprint, patch and individual input hashes. Final documentation and commit identity do not refresh these frozen measurements."
+  },
+  "identities": {
+    "baseline": {
+      "source_commit": "ae07c2921d34b65f09e2458ed577bad9a03ae6ff",
+      "source_fingerprint": "a35adbcb61dbc57b4ee44dd1527019358deb137b11ae559de7d0d4b4a860b480",
+      "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+      "executed_host": "runtime_baseline",
+      "executed_host_sha256": "4a882ea53d5de4b762571c22cb6efe0957a6e3a1783f7ed832bc5188316214e1",
+      "host_report_schema": "scriptw-wasmtime-baseline-v2",
+      "requested_native_policy": null
+    },
+    "candidate": {
+      "source_commit": "39b6f24ac1eb01e0a1cd59907699810b81cf8900",
+      "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+      "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+      "executed_host": "runtime_baseline",
+      "executed_host_sha256": "7d88201ade1af7dcd6cb9878d38708ef3d7a4bbbe1af97ea95438dab410c6a31",
+      "host_report_schema": "scriptw-wasmtime-baseline-v2",
+      "requested_native_policy": null
+    },
+    "compiler_precompiled_identity_sha256": "350d4aa7a4d249af7f7ae4a36562780973fbd8745c21aebd7579e3dabb789b4a",
+    "scriptw_cli_sha256": "ad026373f478c0619f2637ed8a0df9822355ff9eda07c3823c6115350e4da806",
+    "runtime_profile_invariance": {
+      "scriptw-runtime-package.bin": {
+        "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+        "runtime_abi": 42,
+        "runtime_wasm_identical": true,
+        "runtime_wasm_bytes": 39037690,
+        "runtime_wasm_sha256": "16147e0175353b8c599cfc909249b9ecdc3c6c39e41c218666c58c54607e7eb4"
+      },
+      "scriptw-runtime-native.bin": {
+        "native_identical": true,
+        "bytes": 66037136,
+        "sha256": "bfb44f2dbb27a6551bbd64639935804f22c4e3d9dfebc1230b5e530c08bcf2dc"
+      },
+      "scriptw-runtime-portable-package.bin": {
+        "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+        "runtime_abi": 42,
+        "runtime_wasm_identical": true,
+        "runtime_wasm_bytes": 39035706,
+        "runtime_wasm_sha256": "208535ae2c9885a9294774ccf82ffcc15e2f9296450feb4d1a7cac900eb93975"
+      },
+      "scriptw-runtime-portable-native.bin": {
+        "native_identical": true,
+        "bytes": 66032200,
+        "sha256": "57fe66f26ce33206613470d4c20f7ccd60887d0c478ebedce16163e91b2001eb"
+      }
+    },
+    "predecessor_runtime_invariance": {
+      "scriptw-runtime-package.bin": {
+        "source_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544",
+        "runtime_abi": 42,
+        "runtime_wasm_identical": true,
+        "runtime_wasm_bytes": 39037690,
+        "runtime_wasm_sha256": "16147e0175353b8c599cfc909249b9ecdc3c6c39e41c218666c58c54607e7eb4"
+      },
+      "scriptw-runtime-native.bin": {
+        "native_identical": true,
+        "bytes": 66037136,
+        "sha256": "bfb44f2dbb27a6551bbd64639935804f22c4e3d9dfebc1230b5e530c08bcf2dc"
+      },
+      "scriptw-runtime-portable-package.bin": {
+        "source_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544",
+        "runtime_abi": 42,
+        "runtime_wasm_identical": true,
+        "runtime_wasm_bytes": 39035706,
+        "runtime_wasm_sha256": "208535ae2c9885a9294774ccf82ffcc15e2f9296450feb4d1a7cac900eb93975"
+      },
+      "scriptw-runtime-portable-native.bin": {
+        "native_identical": true,
+        "bytes": 66032200,
+        "sha256": "57fe66f26ce33206613470d4c20f7ccd60887d0c478ebedce16163e91b2001eb"
+      }
+    },
+    "identity_note": "The compiler-precompiled identity is a source/configuration binder. Ordinary measurements executed runtime_baseline and check its SHA from each report."
+  },
+  "verification": {
+    "source_guards": {
+      "passed": 359,
+      "suite_counts": [
+        149,
+        135,
+        72,
+        3
+      ]
+    },
+    "focused_native": {
+      "passed": 63,
+      "scope": "focused tests only"
+    },
+    "native_union": {
+      "broad_unique": 1174,
+      "focused_unique": 63,
+      "overlap": 40,
+      "unique_union": 1197,
+      "broad_suite_counts": {
+        "scriptw_aot_wasm": 578,
+        "structure_language": 152,
+        "emission": 41,
+        "aot_language": 403
+      },
+      "focused_suite_counts": {
+        "scriptw_aot_wasm": 17,
+        "aot_language": 23,
+        "aot_builtins": 11,
+        "aot_gc_entries": 12
+      }
+    },
+    "frozen_cli_semantics": {
+      "passed": 9,
+      "total": 9,
+      "cli_sha256": "ad026373f478c0619f2637ed8a0df9822355ff9eda07c3823c6115350e4da806",
+      "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+      "exact_expected_stdout": "run outcome: RunOutcome { backend_used: WasmAot, note: \"wasm-aot completion: boolean(true)\" }\n"
+    },
+    "native_status": "focused and broad receipts pass; unique total derived by inventory union, not by summing overlapping focused and broad totals",
+    "selected_test262": {
+      "status": "pass",
+      "passed": 997,
+      "total": 997,
+      "backend": "wasm-aot",
+      "jobs": 1,
+      "threads": 1,
+      "timeout_ms": 60000,
+      "scopes": [
+        {
+          "selection": "language/statements/for",
+          "passed": 758,
+          "total": 758,
+          "elapsed_seconds": 719.11984983,
+          "pinned_revisions": {
+            "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+            "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+          },
+          "snapshot": "test262-for/numeric-array-for-20261101-2251414518959299738.json"
+        },
+        {
+          "selection": "language/expressions/property-accessors",
+          "passed": 42,
+          "total": 42,
+          "elapsed_seconds": 57.557119337001495,
+          "pinned_revisions": {
+            "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+            "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+          },
+          "snapshot": "test262-property-access/numeric-array-property-access-20261101-4418131706573278757.json"
+        },
+        {
+          "selection": "built-ins/Array/prototype/sort",
+          "passed": 107,
+          "total": 107,
+          "elapsed_seconds": 179.2048240160002,
+          "pinned_revisions": {
+            "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+            "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+          },
+          "snapshot": "test262-sort/numeric-array-sort-20261101-15684997972756709802.json"
+        },
+        {
+          "selection": "built-ins/Array/prototype/toSorted",
+          "passed": 42,
+          "total": 42,
+          "elapsed_seconds": 59.42744250599935,
+          "pinned_revisions": {
+            "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+            "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+          },
+          "snapshot": "test262-to-sorted/numeric-array-to-sorted-20261101-9661697090157831210.json"
+        },
+        {
+          "selection": "built-ins/Array/prototype/join",
+          "passed": 48,
+          "total": 48,
+          "elapsed_seconds": 76.6097066939983,
+          "pinned_revisions": {
+            "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+            "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+          },
+          "snapshot": "test262-join/numeric-array-join-20261101-10565265004796693066.json"
+        }
+      ],
+      "scope": "Five original pinned subtrees, not full pinned Test262 or release acceptance."
+    },
+    "direct_references": {
+      "status": "complete-descriptive-comparison",
+      "compile_status": "All 17 Scriptc compilations succeeded",
+      "runtime_attempts": 136,
+      "measured_observations": 2856,
+      "warmups": 1360,
+      "tools": {
+        "node": "v24.12.0",
+        "v8": "13.6.233.17-node.37",
+        "scriptc": "0.4.5",
+        "zig": "0.16.0",
+        "wasi_host_sha256": "c16549231893f04fc75133313d5a70aa497545c05c13c50a5a2fd6f9f973c6d8",
+        "scriptc_package_lock_sha256": "9233abe85b00f00014246d7d73e9dd11ebd89fcfbec5c6ad7e20a6d863ca5c8f"
+      },
+      "primary_statistics": "Median of two independent process medians; mean of two independent process means. Original pooled42 summaries retained separately.",
+      "at_least_as_fast_counts": {
+        "v8_median": 2,
+        "scriptc_median": 5,
+        "v8_mean": 2,
+        "scriptc_mean": 4
+      },
+      "overall_parity": false,
+      "audit": "entry-gate/reference-audit.json"
+    },
+    "no_interpreter_product_graph": {
+      "status": "pass",
+      "receipt": "entry-gate/no-interpreter.log"
+    }
+  },
+  "performance": {
+    "experimental_unit": "Independent host process invocation. Each product/block has four invocations; block median is median of their medians and block mean is mean of their means.21 measured observations and10 warmups per invocation.",
+    "gate": {
+      "targets": "Each included target median improves in both blocks.",
+      "controls": "Veto a control only when median AND mean are each at least3% slower in BOTH blocks.",
+      "full17_target_count": 9,
+      "full17_control_count": 8
+    },
+    "totals": {
+      "raw_invocations": 896,
+      "measured_observations": 18816,
+      "warmups": 8960,
+      "actual_program_artifacts_hashed_and_parsed": 896,
+      "actual_host_files_hashed": 3,
+      "cross_cohort_case_product_source_and_program_identity_pairs": 68,
+      "maximum_block_statistic_difference_from_report": 0,
+      "maximum_observed_child_peak_rss_bytes": 265490432
+    },
+    "cohorts": [
+      {
+        "name": "aa",
+        "analysis": "target/performance-scalar-regions-entry-gate/runs/20261101T020800Z-aa-controls12/analysis.json",
+        "raw_invocations": 192,
+        "measured_observations": 4032,
+        "warmups": 1920,
+        "artifact_files_hashed_and_code_sections_parsed": 192,
+        "gate": "calibration has no repeated control veto",
+        "included_target_count": 0
+      },
+      {
+        "name": "boundary",
+        "analysis": "target/performance-scalar-regions-entry-gate/join-boundary/runs/20261101T021048Z-candidate-screen/analysis.json",
+        "raw_invocations": 160,
+        "measured_observations": 3360,
+        "warmups": 1600,
+        "artifact_files_hashed_and_code_sections_parsed": 160,
+        "gate": "all included target medians improve in both blocks; no repeated control veto",
+        "included_target_count": 3
+      },
+      {
+        "name": "screen",
+        "analysis": "target/performance-scalar-regions-entry-gate/runs/20261101T021656Z-candidate-screen/analysis.json",
+        "raw_invocations": 192,
+        "measured_observations": 4032,
+        "warmups": 1920,
+        "artifact_files_hashed_and_code_sections_parsed": 192,
+        "gate": "all included target medians improve in both blocks; no repeated control veto",
+        "included_target_count": 9
+      },
+      {
+        "name": "full17",
+        "analysis": "target/performance-scalar-regions-entry-gate/runs/20261101T022013Z-candidate-full17/analysis.json",
+        "raw_invocations": 272,
+        "measured_observations": 5712,
+        "warmups": 2720,
+        "artifact_files_hashed_and_code_sections_parsed": 272,
+        "gate": "all included target medians improve in both blocks; no repeated control veto",
+        "included_target_count": 9
+      },
+      {
+        "name": "kernels",
+        "analysis": "target/performance-scalar-regions-entry-gate/kernels-run/analysis.json",
+        "raw_invocations": 80,
+        "measured_observations": 1680,
+        "warmups": 800,
+        "artifact_files_hashed_and_code_sections_parsed": 80,
+        "gate": "all included target medians improve in both blocks; no repeated control veto",
+        "included_target_count": 3
+      }
+    ],
+    "screen": {
+      "status": "complete",
+      "cases": 12,
+      "targets": 9,
+      "controls": 3,
+      "target_changes": [
+        {
+          "case": "sort-reverse-128.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -4.245480481621433,
+              "mean_change_percent": -5.041245289585672
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -4.354112446812907,
+              "mean_change_percent": -6.93982796478717
+            }
+          ]
+        },
+        {
+          "case": "sort-reverse-512.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -10.247036746716077,
+              "mean_change_percent": -9.992609349637648
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -10.953390163110877,
+              "mean_change_percent": -10.789390895397544
+            }
+          ]
+        },
+        {
+          "case": "sort-sorted-512.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -10.746558030738317,
+              "mean_change_percent": -10.52388210341042
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -8.920234971657182,
+              "mean_change_percent": -9.19097342727695
+            }
+          ]
+        },
+        {
+          "case": "to-sorted-512.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -10.902394464743836,
+              "mean_change_percent": -10.896653783262867
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -12.838013626842171,
+              "mean_change_percent": -13.776768827565055
+            }
+          ]
+        },
+        {
+          "case": "numeric-loop-10000.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -10.26851136634349,
+              "mean_change_percent": -12.325001319511497
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -9.068156884256718,
+              "mean_change_percent": -9.767918144078946
+            }
+          ]
+        },
+        {
+          "case": "numeric-loop-50000.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -35.7357046179668,
+              "mean_change_percent": -35.978401238883876
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -35.66054777475289,
+              "mean_change_percent": -34.971527772227454
+            }
+          ]
+        },
+        {
+          "case": "join-empty-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -63.02522203545253,
+              "mean_change_percent": -63.61549741110804
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -63.26536114773502,
+              "mean_change_percent": -63.793927607047664
+            }
+          ]
+        },
+        {
+          "case": "join-singleton-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -64.45009203713441,
+              "mean_change_percent": -64.10102104849452
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -64.26843590310204,
+              "mean_change_percent": -64.50394065998333
+            }
+          ]
+        },
+        {
+          "case": "join-small-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -70.9728297643213,
+              "mean_change_percent": -70.52413569604722
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -70.49806517100767,
+              "mean_change_percent": -69.7410905145071
+            }
+          ]
+        },
+        {
+          "case": "retained-objects.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.39107442128801795,
+              "mean_change_percent": -0.74642616698678
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.9200457163149545,
+              "mean_change_percent": -1.9780585887983482
+            }
+          ]
+        },
+        {
+          "case": "objects.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.7629208115071617,
+              "mean_change_percent": -1.7084325349907004
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.7554834035848446,
+              "mean_change_percent": -0.9192029785771161
+            }
+          ]
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.28312563355753495,
+              "mean_change_percent": -0.31718273252749896
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.0456063767086734,
+              "mean_change_percent": -1.3793052844752962
+            }
+          ]
+        }
+      ],
+      "control_changes": [
+        {
+          "case": "retained-objects.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.39107442128801795,
+              "mean_change_percent": -0.74642616698678
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.9200457163149545,
+              "mean_change_percent": -1.9780585887983482
+            }
+          ]
+        },
+        {
+          "case": "objects.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.7629208115071617,
+              "mean_change_percent": -1.7084325349907004
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.7554834035848446,
+              "mean_change_percent": -0.9192029785771161
+            }
+          ]
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.28312563355753495,
+              "mean_change_percent": -0.31718273252749896
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.0456063767086734,
+              "mean_change_percent": -1.3793052844752962
+            }
+          ]
+        }
+      ],
+      "repeated_control_vetoes": []
+    },
+    "full17": {
+      "status": "complete",
+      "target_changes": [
+        {
+          "case": "sort-reverse-128.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -3.8651491784107206,
+              "mean_change_percent": -2.167426973587705
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -4.268784641824941,
+              "mean_change_percent": -6.5719488600799565
+            }
+          ]
+        },
+        {
+          "case": "sort-reverse-512.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -10.961532018211296,
+              "mean_change_percent": -4.357860046205452
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -11.113960462504624,
+              "mean_change_percent": -12.096730052040595
+            }
+          ]
+        },
+        {
+          "case": "sort-sorted-512.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -9.79926637532289,
+              "mean_change_percent": -1.3547213083729748
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -9.930881440593032,
+              "mean_change_percent": -7.705856968746161
+            }
+          ]
+        },
+        {
+          "case": "to-sorted-512.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -13.483266846618736,
+              "mean_change_percent": -4.738781705330341
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -13.516002195611021,
+              "mean_change_percent": -13.979193007071212
+            }
+          ]
+        },
+        {
+          "case": "numeric-loop-10000.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -9.959870062088816,
+              "mean_change_percent": -11.644944289448922
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -9.895011016261247,
+              "mean_change_percent": -7.639656221400792
+            }
+          ]
+        },
+        {
+          "case": "numeric-loop-50000.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -34.655920566123655,
+              "mean_change_percent": -32.01398574881693
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -35.043084406846795,
+              "mean_change_percent": -33.502419572873634
+            }
+          ]
+        },
+        {
+          "case": "join-empty-1024.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -63.1084729267626,
+              "mean_change_percent": -59.80675271376805
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -63.73163117449228,
+              "mean_change_percent": -64.35878377597902
+            }
+          ]
+        },
+        {
+          "case": "join-singleton-1024.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -64.00306171038633,
+              "mean_change_percent": -60.85504625903102
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -64.5109927243956,
+              "mean_change_percent": -64.34880617317673
+            }
+          ]
+        },
+        {
+          "case": "join-small-1024.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -70.55452633069477,
+              "mean_change_percent": -68.20015437282456
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -70.88112076954276,
+              "mean_change_percent": -70.84233042592511
+            }
+          ]
+        }
+      ],
+      "controls": [
+        {
+          "case": "join-1024.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.39477805023477863,
+              "mean_change_percent": -1.6933646551701043
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.2892210914480886,
+              "mean_change_percent": 32.20943299246808
+            }
+          ]
+        },
+        {
+          "case": "join-4096.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -1.0061985851398503,
+              "mean_change_percent": -0.9176676774751424
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.3284622396890535,
+              "mean_change_percent": 25.024984976462726
+            }
+          ]
+        },
+        {
+          "case": "join-mixed-1024.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -1.799879269717497,
+              "mean_change_percent": -0.8237286114951226
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.4322480617376945,
+              "mean_change_percent": 12.042633813178627
+            }
+          ]
+        },
+        {
+          "case": "folded-string-4096.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.2494130634637326,
+              "mean_change_percent": -2.096199677775812
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.43243967429328345,
+              "mean_change_percent": -0.9782174674842326
+            }
+          ]
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.23666924265841605,
+              "mean_change_percent": 1.6667650135071987
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.21775693831762588,
+              "mean_change_percent": -0.48380043656793825
+            }
+          ]
+        },
+        {
+          "case": "integer.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.06901905002255626,
+              "mean_change_percent": -0.7886581844621543
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 2.5177144293117237,
+              "mean_change_percent": 1.6522810966547175
+            }
+          ]
+        },
+        {
+          "case": "objects.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.7716052693110487,
+              "mean_change_percent": -0.13637360405758248
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.850345800487573,
+              "mean_change_percent": 4.13976236986362
+            }
+          ]
+        },
+        {
+          "case": "retained-objects.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.7229063772315913,
+              "mean_change_percent": -1.1389298531284453
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -0.3835604466327247,
+              "mean_change_percent": 1.6040707296232304
+            }
+          ]
+        }
+      ],
+      "slower_control_means": [
+        {
+          "case": "join-1024.js",
+          "block": "block1",
+          "median_change_percent": 0.2892210914480886,
+          "mean_change_percent": 32.20943299246808
+        },
+        {
+          "case": "join-4096.js",
+          "block": "block1",
+          "median_change_percent": 0.3284622396890535,
+          "mean_change_percent": 25.024984976462726
+        },
+        {
+          "case": "join-mixed-1024.js",
+          "block": "block1",
+          "median_change_percent": -0.4322480617376945,
+          "mean_change_percent": 12.042633813178627
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "block": "block0",
+          "median_change_percent": 0.23666924265841605,
+          "mean_change_percent": 1.6667650135071987
+        },
+        {
+          "case": "integer.js",
+          "block": "block1",
+          "median_change_percent": 2.5177144293117237,
+          "mean_change_percent": 1.6522810966547175
+        },
+        {
+          "case": "objects.js",
+          "block": "block1",
+          "median_change_percent": 0.850345800487573,
+          "mean_change_percent": 4.13976236986362
+        },
+        {
+          "case": "retained-objects.js",
+          "block": "block1",
+          "median_change_percent": -0.3835604466327247,
+          "mean_change_percent": 1.6040707296232304
+        }
+      ],
+      "repeated_control_vetoes": [],
+      "interpretation": "Several control means are slower, especially block1 join1024(+32.209%),join4096(+25.025%),mixedjoin(+12.043%),objects(+4.140%). Their block medians do not meet the declared repeated median+mean veto. These observations remain included and do not support a claim that every control is faster."
+    },
+    "current_boundary": {
+      "status": "complete",
+      "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+      "analysis": "join-boundary/runs/20261101T021048Z-candidate-screen/analysis.json",
+      "cases": [
+        {
+          "case": "join-empty-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -63.67020571072304,
+              "mean_change_percent": -63.80836836707915
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -63.626325535785924,
+              "mean_change_percent": -63.43109472277821
+            }
+          ]
+        },
+        {
+          "case": "join-singleton-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -64.34616341658264,
+              "mean_change_percent": -64.28711860654579
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -64.52532292026775,
+              "mean_change_percent": -64.43172419677981
+            }
+          ]
+        },
+        {
+          "case": "join-small-1024.js",
+          "control": false,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -70.49324558551247,
+              "mean_change_percent": -70.0224984836083
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -70.73390811816476,
+              "mean_change_percent": -70.33860174000746
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-256-trip0.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.5193715957443112,
+              "mean_change_percent": 0.24181835005596675
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.48828106228122614,
+              "mean_change_percent": 0.2145648768440367
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-256-trip1.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -7.0992676882233425,
+              "mean_change_percent": -7.461898643322574
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -5.755838474096409,
+              "mean_change_percent": -6.424376418939226
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-257-trip0.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.3024854107601893,
+              "mean_change_percent": -0.6084016617164623
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.15401764521789651,
+              "mean_change_percent": -0.183668832659023
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-257-trip1.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.6452537071901743,
+              "mean_change_percent": -0.05954791133369053
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.6109118212140441,
+              "mean_change_percent": 0.7580360030726707
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-4096-trip0.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -0.43101317345766166,
+              "mean_change_percent": -0.3350999763684248
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -1.597295428526091,
+              "mean_change_percent": -1.4347714270446121
+            }
+          ]
+        },
+        {
+          "case": "join-boundary-4096-trip1.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.09272087000433693,
+              "mean_change_percent": 0.1540147290681304
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.07512890226857305,
+              "mean_change_percent": 0.19403506026181017
+            }
+          ]
+        },
+        {
+          "case": "retained-objects.js",
+          "control": true,
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.057311280925231856,
+              "mean_change_percent": 0.986822789312658
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -2.29446464846792,
+              "mean_change_percent": 3.194487712390659
+            }
+          ]
+        }
+      ],
+      "targets": 3,
+      "controls": 7,
+      "repeated_control_vetoes": [],
+      "note": "This nested join-boundary run is current ce4d data. The rejected b7fe run remains in the earlier cohort and report."
+    },
+    "derived_kernels": {
+      "scope": "Derived kernels, never pooled with original17",
+      "cases": [
+        {
+          "case": "checksum-0.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": 0.2099491771796025,
+              "mean_change_percent": 2.159308639522406
+            },
+            {
+              "block": "block1",
+              "median_change_percent": 0.2977805773113573,
+              "mean_change_percent": -1.6895213662313613
+            }
+          ]
+        },
+        {
+          "case": "checksum-1.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -1.5039359640429018,
+              "mean_change_percent": -3.3737304095689646
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -1.115090418711584,
+              "mean_change_percent": 4.689884939505129
+            }
+          ]
+        },
+        {
+          "case": "checksum-65.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -21.13254164839845,
+              "mean_change_percent": -19.941914376027547
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -20.9937205306293,
+              "mean_change_percent": -19.44741132082084
+            }
+          ]
+        },
+        {
+          "case": "checksum-513.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -35.534927152554665,
+              "mean_change_percent": -35.2302023531814
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -35.83918531747371,
+              "mean_change_percent": -35.830578578552455
+            }
+          ]
+        },
+        {
+          "case": "checksum-4096.js",
+          "blocks": [
+            {
+              "block": "block0",
+              "median_change_percent": -39.796509336571916,
+              "mean_change_percent": -40.46181125168666
+            },
+            {
+              "block": "block1",
+              "median_change_percent": -38.73059433435802,
+              "mean_change_percent": -38.89998609011241
+            }
+          ]
+        }
+      ],
+      "targets": [
+        "checksum-65.js",
+        "checksum-513.js",
+        "checksum-4096.js"
+      ],
+      "controls": [
+        "checksum-0.js",
+        "checksum-1.js"
+      ],
+      "separate_from_original17": true
+    },
+    "actual_full17_program_footprints": [
+      {
+        "case": "sort-reverse-128.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 74508,
+          "candidate": 75824
+        },
+        "wasm_sha256": {
+          "baseline": "0feda02a173bf926aff57547b572c20a6c32a1b50a3431cc3a9b2a6a785cde9b",
+          "candidate": "e2a39e6007f91b2d8cefcdb4642f5007d36e853ee9c652b28f859a930be72b05"
+        },
+        "code_body_bytes": {
+          "baseline": 61936,
+          "candidate": 63252
+        },
+        "defined_functions": {
+          "baseline": 24,
+          "candidate": 24
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "sort-reverse-512.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 74508,
+          "candidate": 75824
+        },
+        "wasm_sha256": {
+          "baseline": "d7c1d3efa4f00d7ca00713c4239d1480c4bf33c3542ac462cc9ed5beb894a6e9",
+          "candidate": "cfce4751a79e4caffffac24b4708921704addd0b20682aaef15a7776c6170fe6"
+        },
+        "code_body_bytes": {
+          "baseline": 61936,
+          "candidate": 63252
+        },
+        "defined_functions": {
+          "baseline": 24,
+          "candidate": 24
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "sort-sorted-512.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 74527,
+          "candidate": 75843
+        },
+        "wasm_sha256": {
+          "baseline": "0e6131a089bb679ad786de2e9eedf68b42a1b4cce1cb5e848ba82ab9e77642f3",
+          "candidate": "9190fa76a8269aefb99950892e8c340e7a3b2abea2def9208969a22939a92613"
+        },
+        "code_body_bytes": {
+          "baseline": 61952,
+          "candidate": 63268
+        },
+        "defined_functions": {
+          "baseline": 24,
+          "candidate": 24
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "to-sorted-512.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 77217,
+          "candidate": 78547
+        },
+        "wasm_sha256": {
+          "baseline": "81980b28869be7d69913f8360876a5ab37c7f5530f62c65edb91b4eca962e28b",
+          "candidate": "5804c3eb1213479a221400b7c3c88596137c4ae86ef7d9cecbbaa510b0d5294e"
+        },
+        "code_body_bytes": {
+          "baseline": 64578,
+          "candidate": 65908
+        },
+        "defined_functions": {
+          "baseline": 24,
+          "candidate": 24
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "join-1024.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 78719,
+          "candidate": 78719
+        },
+        "wasm_sha256": {
+          "baseline": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2",
+          "candidate": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2"
+        },
+        "code_body_bytes": {
+          "baseline": 66075,
+          "candidate": 66075
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "join-4096.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 78719,
+          "candidate": 78719
+        },
+        "wasm_sha256": {
+          "baseline": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5",
+          "candidate": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5"
+        },
+        "code_body_bytes": {
+          "baseline": 66075,
+          "candidate": 66075
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "join-mixed-1024.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 74016,
+          "candidate": 74016
+        },
+        "wasm_sha256": {
+          "baseline": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53",
+          "candidate": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53"
+        },
+        "code_body_bytes": {
+          "baseline": 61668,
+          "candidate": 61668
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "numeric-loop-10000.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 60100,
+          "candidate": 60292
+        },
+        "wasm_sha256": {
+          "baseline": "5603add9f0eb3b048f26574f18333eb76d72f60272f78cabbb57a25e7b8d666d",
+          "candidate": "3c4ce1fd35f223a33de46ca507623878791be7063fe326cd2aa567e784e3dda3"
+        },
+        "code_body_bytes": {
+          "baseline": 48310,
+          "candidate": 48502
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "numeric-loop-50000.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 60100,
+          "candidate": 60292
+        },
+        "wasm_sha256": {
+          "baseline": "184f29237485fd9a98d58a3a7f3aa121d2394cc111d293acb3747d536333ae46",
+          "candidate": "6f710ef09137f122c4faecd89f27685308af09fe11f6e899e06296d5e75f6d31"
+        },
+        "code_body_bytes": {
+          "baseline": 48310,
+          "candidate": 48502
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "folded-string-4096.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 66587,
+          "candidate": 66587
+        },
+        "wasm_sha256": {
+          "baseline": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3",
+          "candidate": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3"
+        },
+        "code_body_bytes": {
+          "baseline": 54202,
+          "candidate": 54202
+        },
+        "defined_functions": {
+          "baseline": 24,
+          "candidate": 24
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "dynamic-string-4096.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 64851,
+          "candidate": 64851
+        },
+        "wasm_sha256": {
+          "baseline": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71",
+          "candidate": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71"
+        },
+        "code_body_bytes": {
+          "baseline": 52642,
+          "candidate": 52642
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "integer.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 67547,
+          "candidate": 67547
+        },
+        "wasm_sha256": {
+          "baseline": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf",
+          "candidate": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf"
+        },
+        "code_body_bytes": {
+          "baseline": 55356,
+          "candidate": 55356
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "objects.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 75778,
+          "candidate": 75778
+        },
+        "wasm_sha256": {
+          "baseline": "fc1f2e065ce40ce90a1c8b2bb5a03196eed0318d50617ea3cac733de210a5714",
+          "candidate": "fc1f2e065ce40ce90a1c8b2bb5a03196eed0318d50617ea3cac733de210a5714"
+        },
+        "code_body_bytes": {
+          "baseline": 63168,
+          "candidate": 63168
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "retained-objects.js",
+        "role": "control",
+        "program_bytes": {
+          "baseline": 75912,
+          "candidate": 75912
+        },
+        "wasm_sha256": {
+          "baseline": "8edbf0873390097e7a697b2e0ded56ffdf911d909f7ad6eb743e181c72970156",
+          "candidate": "8edbf0873390097e7a697b2e0ded56ffdf911d909f7ad6eb743e181c72970156"
+        },
+        "code_body_bytes": {
+          "baseline": 62915,
+          "candidate": 62915
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": true
+      },
+      {
+        "case": "join-empty-1024.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 64562,
+          "candidate": 67128
+        },
+        "wasm_sha256": {
+          "baseline": "e82e28449a30be535da4ef58226a4a94555b1b242b43e775c9ad0a1a779c9e09",
+          "candidate": "16061580fbc24c917aa32271e774e1523ce4e804988ec0121e4e7d37a26fbadf"
+        },
+        "code_body_bytes": {
+          "baseline": 52460,
+          "candidate": 55026
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "join-singleton-1024.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 65026,
+          "candidate": 67590
+        },
+        "wasm_sha256": {
+          "baseline": "b0e7e79541f6854057c302bce940899f86823a0942b094f5e1eb057e13fc5be8",
+          "candidate": "aeb9ea1d7e33ccd058db2fb971516df67ea9cf16f749309ca0023052dc43154e"
+        },
+        "code_body_bytes": {
+          "baseline": 52828,
+          "candidate": 55392
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      },
+      {
+        "case": "join-small-1024.js",
+        "role": "target",
+        "program_bytes": {
+          "baseline": 65408,
+          "candidate": 68002
+        },
+        "wasm_sha256": {
+          "baseline": "efb36661017f59623a401698681b30522441d3ceff99145d80102b2836350bb2",
+          "candidate": "b66d815a0582149957e92385902fc1b8437cccf71f62a7d79e7b4a48864e547a"
+        },
+        "code_body_bytes": {
+          "baseline": 53232,
+          "candidate": 55826
+        },
+        "defined_functions": {
+          "baseline": 22,
+          "candidate": 22
+        },
+        "largest_code_body_bytes": {
+          "baseline": 26043,
+          "candidate": 26043
+        },
+        "program_bytes_identical": false
+      }
+    ],
+    "independent_raw_audit": {
+      "status": "pass",
+      "record": "entry-gate/independent-audit.json",
+      "script": "entry-gate/independent-audit.py",
+      "maximum_statistic_discrepancy": 0,
+      "actual_programs_checked": 896,
+      "control_programs_equal_to_baseline": 8
+    }
+  },
+  "rejected_predecessor_reports": [
+    "docs/rust-rewrite/numeric-array-region-screen-20261101.json",
+    "docs/rust-rewrite/joined-length-zero-trip-20261101.json"
+  ],
+  "date": "2026-11-01",
+  "references": {
+    "primary": {
+      "schema": "scriptw-reference-process-aggregates-v1",
+      "source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+      "tools": {
+        "node": "v24.12.0",
+        "v8": "13.6.233.17-node.37",
+        "scriptc": "0.4.5",
+        "zig": "0.16.0",
+        "wasi_host_sha256": "c16549231893f04fc75133313d5a70aa497545c05c13c50a5a2fd6f9f973c6d8",
+        "scriptc_package_lock_sha256": "9233abe85b00f00014246d7d73e9dd11ebd89fcfbec5c6ad7e20a6d863ca5c8f"
+      },
+      "scope": "Separate descriptive local comparison; compilation/setup excluded; not a paired improvement gate or whole-runtime parity proof.",
+      "experimental_unit": "Median of two independent process medians; mean of two independent process means. Original pooled42 summaries retained separately.",
+      "cases": [
+        {
+          "case": "sort-reverse-128.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 368716.5,
+              "mean_of_invocation_means_ns": 445965.38095238095,
+              "median_of_invocation_rss_medians_bytes": 134150144.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 357550.5,
+              "mean_of_invocation_means_ns": 358951.45238095237,
+              "median_of_invocation_rss_medians_bytes": 49174528.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 23770.0,
+              "mean_of_invocation_means_ns": 23886.690476190477,
+              "median_of_invocation_rss_medians_bytes": 57329664.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 157870.5,
+              "mean_of_invocation_means_ns": 159701.59523809524,
+              "median_of_invocation_rss_medians_bytes": 32098304.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 15.042090870845604,
+              "mean": 15.027257657930646,
+              "rss": 0.8577501518236702
+            },
+            "scriptc": {
+              "median": 2.2648341520423383,
+              "mean": 2.247638490058915,
+              "rss": 1.5319977030562113
+            }
+          }
+        },
+        {
+          "case": "sort-reverse-512.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 660061.5,
+              "mean_of_invocation_means_ns": 711216.9285714286,
+              "median_of_invocation_rss_medians_bytes": 134057984.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 573717.5,
+              "mean_of_invocation_means_ns": 600711.6428571428,
+              "median_of_invocation_rss_medians_bytes": 49217536.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 69622.5,
+              "mean_of_invocation_means_ns": 141020.40476190476,
+              "median_of_invocation_rss_medians_bytes": 57765888.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 495989.5,
+              "mean_of_invocation_means_ns": 495874.5714285714,
+              "median_of_invocation_rss_medians_bytes": 32307200.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 8.240403605156379,
+              "mean": 4.259749813308003,
+              "rss": 0.8520173012834149
+            },
+            "scriptc": {
+              "median": 1.1567129949323525,
+              "mean": 1.211418526920114,
+              "rss": 1.5234231378763867
+            }
+          }
+        },
+        {
+          "case": "sort-sorted-512.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 647012.0,
+              "mean_of_invocation_means_ns": 739153.5238095238,
+              "median_of_invocation_rss_medians_bytes": 134443008.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 566383.0,
+              "mean_of_invocation_means_ns": 571333.6904761905,
+              "median_of_invocation_rss_medians_bytes": 48572416.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 69953.0,
+              "mean_of_invocation_means_ns": 135515.88095238095,
+              "median_of_invocation_rss_medians_bytes": 57700352.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 497763.0,
+              "mean_of_invocation_means_ns": 497146.1666666667,
+              "median_of_invocation_rss_medians_bytes": 32059392.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 8.096622017640415,
+              "mean": 4.21599067549103,
+              "rss": 0.8418045006033932
+            },
+            "scriptc": {
+              "median": 1.1378567711943235,
+              "mean": 1.1492267843619242,
+              "rss": 1.515076018908905
+            }
+          }
+        },
+        {
+          "case": "to-sorted-512.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 676137.5,
+              "mean_of_invocation_means_ns": 762624.9761904762,
+              "median_of_invocation_rss_medians_bytes": 134590464.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 582784.5,
+              "mean_of_invocation_means_ns": 607752.119047619,
+              "median_of_invocation_rss_medians_bytes": 49788928.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 70364.0,
+              "mean_of_invocation_means_ns": 71114.66666666666,
+              "median_of_invocation_rss_medians_bytes": 57806848.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 579393.0,
+              "mean_of_invocation_means_ns": 579728.119047619,
+              "median_of_invocation_rss_medians_bytes": 32137216.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 8.282424251037462,
+              "mean": 8.546086869763656,
+              "rss": 0.8612980939559272
+            },
+            "scriptc": {
+              "median": 1.0058535398253,
+              "mean": 1.0483399012040988,
+              "rss": 1.549260769819016
+            }
+          }
+        },
+        {
+          "case": "join-1024.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 959131.0,
+              "mean_of_invocation_means_ns": 1024786.0238095238,
+              "median_of_invocation_rss_medians_bytes": 46114816.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 939148.0,
+              "mean_of_invocation_means_ns": 1003708.0714285714,
+              "median_of_invocation_rss_medians_bytes": 48060416.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 56693.0,
+              "mean_of_invocation_means_ns": 72725.59523809524,
+              "median_of_invocation_rss_medians_bytes": 58198016.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 626723.0,
+              "mean_of_invocation_means_ns": 625423.2380952381,
+              "median_of_invocation_rss_medians_bytes": 31109120.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 16.565501913816522,
+              "mean": 13.80130431579895,
+              "rss": 0.8258084949150156
+            },
+            "scriptc": {
+              "median": 1.498505719432668,
+              "mean": 1.6048461430461414,
+              "rss": 1.5448979591836736
+            }
+          }
+        },
+        {
+          "case": "join-4096.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 2969568.0,
+              "mean_of_invocation_means_ns": 3075388.595238095,
+              "median_of_invocation_rss_medians_bytes": 46477312.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 2887427.0,
+              "mean_of_invocation_means_ns": 2973287.1904761903,
+              "median_of_invocation_rss_medians_bytes": 48496640.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 233329.0,
+              "mean_of_invocation_means_ns": 249601.33333333334,
+              "median_of_invocation_rss_medians_bytes": 59553792.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 2239263.0,
+              "mean_of_invocation_means_ns": 2242113.8571428573,
+              "median_of_invocation_rss_medians_bytes": 32055296.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 12.374916962743594,
+              "mean": 11.912144661925645,
+              "rss": 0.8143333677224114
+            },
+            "scriptc": {
+              "median": 1.2894541641602617,
+              "mean": 1.3261089221691322,
+              "rss": 1.5129056989522105
+            }
+          }
+        },
+        {
+          "case": "join-mixed-1024.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 1127812.0,
+              "mean_of_invocation_means_ns": 1144007.3333333335,
+              "median_of_invocation_rss_medians_bytes": 47788032.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 1118358.5,
+              "mean_of_invocation_means_ns": 1137611.9761904762,
+              "median_of_invocation_rss_medians_bytes": 48703488.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 95322.0,
+              "mean_of_invocation_means_ns": 112695.85714285714,
+              "median_of_invocation_rss_medians_bytes": 59201536.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 392912.5,
+              "mean_of_invocation_means_ns": 394384.88095238095,
+              "median_of_invocation_rss_medians_bytes": 31555584.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 11.732427980948785,
+              "mean": 10.09453235488861,
+              "rss": 0.8226727090324143
+            },
+            "scriptc": {
+              "median": 2.846329653548818,
+              "mean": 2.884522280477163,
+              "rss": 1.5434190031152648
+            }
+          }
+        },
+        {
+          "case": "numeric-loop-10000.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 295031.5,
+              "mean_of_invocation_means_ns": 335826.0,
+              "median_of_invocation_rss_medians_bytes": 134019072.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 265485.5,
+              "mean_of_invocation_means_ns": 278991.7142857143,
+              "median_of_invocation_rss_medians_bytes": 49152000.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 146278.5,
+              "mean_of_invocation_means_ns": 157707.90476190476,
+              "median_of_invocation_rss_medians_bytes": 62119936.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 89525.5,
+              "mean_of_invocation_means_ns": 90973.95238095238,
+              "median_of_invocation_rss_medians_bytes": 26363904.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 1.8149317910697744,
+              "mean": 1.7690407764082245,
+              "rss": 0.7912435711459844
+            },
+            "scriptc": {
+              "median": 2.9654735243031314,
+              "mean": 3.0667208248514886,
+              "rss": 1.8643672803542297
+            }
+          }
+        },
+        {
+          "case": "numeric-loop-50000.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 396695.5,
+              "mean_of_invocation_means_ns": 411960.5238095238,
+              "median_of_invocation_rss_medians_bytes": 133754880.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 254404.5,
+              "mean_of_invocation_means_ns": 274455.61904761905,
+              "median_of_invocation_rss_medians_bytes": 49145856.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 724269.0,
+              "mean_of_invocation_means_ns": 736650.0952380951,
+              "median_of_invocation_rss_medians_bytes": 65382400.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 154944.5,
+              "mean_of_invocation_means_ns": 155369.57142857142,
+              "median_of_invocation_rss_medians_bytes": 26425344.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 0.35125692249702806,
+              "mean": 0.37257256982897874,
+              "rss": 0.7516679718089272
+            },
+            "scriptc": {
+              "median": 1.641907263568568,
+              "mean": 1.7664695636609609,
+              "rss": 1.8598000465008138
+            }
+          }
+        },
+        {
+          "case": "folded-string-4096.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 542347.5,
+              "mean_of_invocation_means_ns": 564886.5476190476,
+              "median_of_invocation_rss_medians_bytes": 53600256.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 543064.0,
+              "mean_of_invocation_means_ns": 569705.7619047619,
+              "median_of_invocation_rss_medians_bytes": 55134208.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 124387.0,
+              "mean_of_invocation_means_ns": 137400.07142857142,
+              "median_of_invocation_rss_medians_bytes": 63334400.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 1480167.5,
+              "mean_of_invocation_means_ns": 1482587.5714285714,
+              "median_of_invocation_rss_medians_bytes": 26656768.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 4.365922483860854,
+              "mean": 4.146327989363006,
+              "rss": 0.8705254648342765
+            },
+            "scriptc": {
+              "median": 0.3668936117027296,
+              "mean": 0.3842644932978985,
+              "rss": 2.068300553165335
+            }
+          }
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 758814.5,
+              "mean_of_invocation_means_ns": 761574.142857143,
+              "median_of_invocation_rss_medians_bytes": 51310592.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 757958.0,
+              "mean_of_invocation_means_ns": 760229.2857142857,
+              "median_of_invocation_rss_medians_bytes": 52953088.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 193784.0,
+              "mean_of_invocation_means_ns": 239387.2380952381,
+              "median_of_invocation_rss_medians_bytes": 61876224.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 409018.5,
+              "mean_of_invocation_means_ns": 410226.85714285716,
+              "median_of_invocation_rss_medians_bytes": 25978880.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 3.911354910622136,
+              "mean": 3.1757302175475,
+              "rss": 0.8557905537351471
+            },
+            "scriptc": {
+              "median": 1.853114223439771,
+              "mean": 1.853192379965371,
+              "rss": 2.0383129680725265
+            }
+          }
+        },
+        {
+          "case": "integer.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 267298.5,
+              "mean_of_invocation_means_ns": 294587.69047619053,
+              "median_of_invocation_rss_medians_bytes": 47390720.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 264724.0,
+              "mean_of_invocation_means_ns": 279164.7380952381,
+              "median_of_invocation_rss_medians_bytes": 48834560.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 2563259.5,
+              "mean_of_invocation_means_ns": 2569692.928571428,
+              "median_of_invocation_rss_medians_bytes": 65089536.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 73299.5,
+              "mean_of_invocation_means_ns": 74274.66666666666,
+              "median_of_invocation_rss_medians_bytes": 26114048.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 0.1032763167365614,
+              "mean": 0.1086373920367343,
+              "rss": 0.7502674469825688
+            },
+            "scriptc": {
+              "median": 3.6115389600201913,
+              "mean": 3.7585458221991996,
+              "rss": 1.8700494078895773
+            }
+          }
+        },
+        {
+          "case": "objects.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 1619653.5,
+              "mean_of_invocation_means_ns": 1559524.2380952379,
+              "median_of_invocation_rss_medians_bytes": 133122048.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 949808.5,
+              "mean_of_invocation_means_ns": 1052277.8095238095,
+              "median_of_invocation_rss_medians_bytes": 47712256.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 67208.0,
+              "mean_of_invocation_means_ns": 83002.52380952382,
+              "median_of_invocation_rss_medians_bytes": 58181632.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 1034079.0,
+              "mean_of_invocation_means_ns": 1040692.6666666666,
+              "median_of_invocation_rss_medians_bytes": 31959040.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 14.132372634210213,
+              "mean": 12.67766040390051,
+              "rss": 0.8200570241824774
+            },
+            "scriptc": {
+              "median": 0.9185067098355155,
+              "mean": 1.0111321461447884,
+              "rss": 1.4929189362383852
+            }
+          }
+        },
+        {
+          "case": "retained-objects.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 20409024.0,
+              "mean_of_invocation_means_ns": 20523961.38095238,
+              "median_of_invocation_rss_medians_bytes": 51628032.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 20428271.0,
+              "mean_of_invocation_means_ns": 20538329.523809522,
+              "median_of_invocation_rss_medians_bytes": 52899840.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 3689048.0,
+              "mean_of_invocation_means_ns": 3626048.6666666665,
+              "median_of_invocation_rss_medians_bytes": 82296832.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 53663187.5,
+              "mean_of_invocation_means_ns": 53668123.47619048,
+              "median_of_invocation_rss_medians_bytes": 38479872.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 5.537545458882617,
+              "mean": 5.664107520843034,
+              "rss": 0.6427931515030858
+            },
+            "scriptc": {
+              "median": 0.38067569132005064,
+              "mean": 0.3826914040123132,
+              "rss": 1.3747405396774708
+            }
+          }
+        },
+        {
+          "case": "join-empty-1024.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 758954.5,
+              "mean_of_invocation_means_ns": 838333.0476190476,
+              "median_of_invocation_rss_medians_bytes": 133789696.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 278716.0,
+              "mean_of_invocation_means_ns": 280731.8095238095,
+              "median_of_invocation_rss_medians_bytes": 48476160.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 62433.5,
+              "mean_of_invocation_means_ns": 63658.52380952381,
+              "median_of_invocation_rss_medians_bytes": 57026560.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 381521.0,
+              "mean_of_invocation_means_ns": 382745.5238095238,
+              "median_of_invocation_rss_medians_bytes": 31623168.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 4.464205915093659,
+              "mean": 4.40996417642047,
+              "rss": 0.8500628479080625
+            },
+            "scriptc": {
+              "median": 0.7305390791070479,
+              "mean": 0.7334685634717386,
+              "rss": 1.5329318049349134
+            }
+          }
+        },
+        {
+          "case": "join-singleton-1024.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 765357.0,
+              "mean_of_invocation_means_ns": 854063.357142857,
+              "median_of_invocation_rss_medians_bytes": 133947392.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 275358.5,
+              "mean_of_invocation_means_ns": 276088.4285714285,
+              "median_of_invocation_rss_medians_bytes": 48875520.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 98281.5,
+              "mean_of_invocation_means_ns": 117034.7380952381,
+              "median_of_invocation_rss_medians_bytes": 58124288.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 190242.0,
+              "mean_of_invocation_means_ns": 191448.9761904762,
+              "median_of_invocation_rss_medians_bytes": 26286080.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 2.8017327777862566,
+              "mean": 2.3590297467642385,
+              "rss": 0.8408794616116416
+            },
+            "scriptc": {
+              "median": 1.4474117177069206,
+              "mean": 1.4420992687719725,
+              "rss": 1.8593689131281652
+            }
+          }
+        },
+        {
+          "case": "join-small-1024.js",
+          "runtimes": {
+            "baseline": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 956616.0,
+              "mean_of_invocation_means_ns": 1162612.0476190476,
+              "median_of_invocation_rss_medians_bytes": 134006784.0
+            },
+            "candidate": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 276045.5,
+              "mean_of_invocation_means_ns": 284827.2857142857,
+              "median_of_invocation_rss_medians_bytes": 48873472.0
+            },
+            "v8": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 166842.5,
+              "mean_of_invocation_means_ns": 241451.07142857142,
+              "median_of_invocation_rss_medians_bytes": 59459584.0
+            },
+            "scriptc": {
+              "invocations": 2,
+              "median_of_invocation_medians_ns": 317053.5,
+              "mean_of_invocation_means_ns": 317971.7380952381,
+              "median_of_invocation_rss_medians_bytes": 26296320.0
+            }
+          },
+          "candidate_ratios": {
+            "v8": {
+              "median": 1.6545274735154412,
+              "mean": 1.1796480505515017,
+              "rss": 0.8219612165466883
+            },
+            "scriptc": {
+              "median": 0.8706590528096994,
+              "mean": 0.8957628983648066,
+              "rss": 1.8585669781931464
+            }
+          }
+        }
+      ],
+      "counts_at_least_as_fast": {
+        "v8_median": 2,
+        "scriptc_median": 5,
+        "v8_mean": 2,
+        "scriptc_mean": 4
+      }
+    },
+    "median_wins": {
+      "v8": {
+        "count": 2,
+        "of": 17,
+        "cases": [
+          "numeric-loop-50000.js",
+          "integer.js"
+        ]
+      },
+      "scriptc": {
+        "count": 5,
+        "of": 17,
+        "cases": [
+          "folded-string-4096.js",
+          "objects.js",
+          "retained-objects.js",
+          "join-empty-1024.js",
+          "join-small-1024.js"
+        ]
+      }
+    },
+    "mean_wins": {
+      "v8": {
+        "count": 2,
+        "of": 17,
+        "cases": [
+          "numeric-loop-50000.js",
+          "integer.js"
+        ]
+      },
+      "scriptc": {
+        "count": 4,
+        "of": 17,
+        "cases": [
+          "folded-string-4096.js",
+          "retained-objects.js",
+          "join-empty-1024.js",
+          "join-small-1024.js"
+        ]
+      }
+    },
+    "boundaries": {
+      "scriptw": "Source/native compilation, fresh Store/linker and module instantiation precede execution. main executes ProgramInitialize, R literal-cache initialization, fresh Realm setup, source and completion/output handling inside execution_ns.",
+      "v8": "Source vm.Script compilation and vm.createContext are outside execution_ns. script.runInContext is timed in a fresh context. Context creation is separately recorded; fresh-Realm setup is therefore not identically inside both runtimes execution metrics.",
+      "scriptc": "The JS frontend/Zig compilation is a separate process. WASI host module compilation, fresh Store and instantiation are outside execution_ns; _start and output-buffer extraction are timed.",
+      "rss": "Post-execution process endpoints, not peak/live workload heap, and frontend memory is separate for Scriptc. No comparative live-allocation/RSS efficiency claim follows.",
+      "meaning": "These retain the established local execution boundaries. They are not an equal-cost end-to-end fresh-Realm benchmark, conformance result or updated published performance chart."
+    },
+    "close_to_sorted": {
+      "candidate_primary_median_ns": 582784.5,
+      "scriptc_primary_median_ns": 579393.0,
+      "primary_median_change_percent": 0.5853539825299903,
+      "pooled42_median_change_percent": 0.39552195711400895,
+      "candidate_processes": [
+        {
+          "round": 0,
+          "raw": "reference-r0-candidate-to-sorted-512.js.stdout",
+          "median_ns": 577610,
+          "mean_ns": 581351.7142857143
+        },
+        {
+          "round": 1,
+          "raw": "reference-r1-candidate-to-sorted-512.js.stdout",
+          "median_ns": 587959,
+          "mean_ns": 634152.5238095238
+        }
+      ],
+      "scriptc_processes": [
+        {
+          "round": 0,
+          "raw": "reference-r0-scriptc-to-sorted-512.js.stdout",
+          "median_ns": 568532,
+          "mean_ns": 569084.380952381
+        },
+        {
+          "round": 1,
+          "raw": "reference-r1-scriptc-to-sorted-512.js.stdout",
+          "median_ns": 590254,
+          "mean_ns": 590371.8571428572
+        }
+      ],
+      "interpretation": "Candidate is0.585354% slower by the primary median. Round0 candidate median is slower, round1 faster. Candidate means are slower in both rounds. This close descriptive result does not establish equality or parity; do not round582.7845us and579.393us into a claimed tie."
+    },
+    "unchanged_objects_caution": {
+      "primary_baseline_median_ns": 1619653.5,
+      "pooled_baseline_median_ns": 1130647.0,
+      "primary_candidate_median_ns": 949808.5,
+      "scriptc_median_ns": 1034079.0,
+      "candidate_mean_ns": 1052277.8095238095,
+      "scriptc_mean_ns": 1040692.6666666666,
+      "interpretation": "Its P bytes and linked R are unchanged between Scriptw baseline/candidate. The reference baseline/candidate timing difference is not an optimization effect established by this batch. Its Scriptc win is median-only; candidate mean is about1.11% slower."
+    },
+    "remaining_cost_assessment": {
+      "artifact_identity": "target/performance-scalar-regions-entry-gate/program-inspection/identity.json",
+      "observed_workload_cluster": "Primary Scriptw medians for exact-sum numeric10k/50k and the three optimized joins are approximately254\u2013279us. This is a measured whole-workload cluster; no pure Realm/bootstrap cost or component fraction was isolated.",
+      "actual_numeric_code": {
+        "scriptw_wat": "program-inspection/scriptw-numeric-loop-50000.js.wat:14710",
+        "scriptw_observation": "Guarded exact-sum path converts the initial integer seed, adds i64 constant3749975000, converts back to f64 and publishes counter50000. Generic/chunked fallback remains.",
+        "scriptc_wat": "program-inspection/scriptc-numeric-loop-50000.js.wat:92000",
+        "scriptc_observation": "Actual Wasm retains a five-step unrolled sequence of f64 multiply/add terms, advances an i64 counter by5, and branches until50000.",
+        "inference": "Scriptw already removes the arithmetic trip count on this admitted source yet is slower overall than Scriptc(254.405us vs154.945us primary medians). Investigate work outside the source arithmetic loop; this does not assign the difference specifically to Realm initialization."
+      },
+      "actual_dense_code": {
+        "wat": "program-inspection/scriptw-sort-reverse-512.js.wat:18865",
+        "observation": "One preheader index conversion followed by four typed array.get and original ordered f64 arithmetic/update operations per integer-tested chunk, then an integer scalar tail. Array construction, comparator sort and printing remain outside this read-only checksum region."
+      },
+      "actual_join_code": {
+        "wat": "program-inspection/scriptw-join-small-1024.js.wat:15670",
+        "observation": "After the bounded String/native-method preflight, the1024-iteration fast loop adds a captured numeric length without repeated join calls or result String construction. The scalar additions and source array/printing remain."
+      },
+      "larger_workloads": "The larger join/objects controls have unchanged P code. Their remaining work includes array/object construction, string operations and output. Existing packed push already bypasses argument vectors for one to three saved operands; a future construction region must remove repeated lookup/guards/growth under real prototype/write proofs, not rediscover that fast path.",
+      "future_priorities_not_implemented": [
+        "Profile actual first-entry work around ProgramInitialize/Realm installation and output before changing R; preserve setup/entry boundaries and canonical per-Realm identities.",
+        "Evaluate a distinct bounded array-construction region with guards for native push, writable/extensible storage, indexed-prototype hazards and zero-trip behavior.",
+        "For object-heavy loops, separately measure the previously reviewed compact-property-path preflight against tiny/zero-trip controls; do not infer its benefit from unchanged objects reference timings.",
+        "Canonical R String prehashing and immutable key-wrapper sharing are source-supported future leads, not measured explanations of the current gap."
+      ]
+    },
+    "note": "Separate from paired improvement cohorts. Pooled42-sample summaries remain archived; primary comparisons aggregate independent processes. RSS is process endpoint, not peak or live JS heap. No causal unchanged-control or universal speedup claim."
+  },
+  "codegen_evidence": {
+    "record": "entry-gate/program-inspection/identity.json",
+    "programs": [
+      "numeric-loop-50000.js",
+      "sort-reverse-512.js",
+      "join-small-1024.js"
+    ],
+    "products": [
+      "scriptw",
+      "scriptc"
+    ],
+    "scope": "Actual source-bound emitted Wasm/WAT and Scriptc LLVM; no Scriptw R module dump."
+  },
+  "limitations": [
+    "Global V8/Scriptc time and RSS parity remains open.",
+    "Selected 997 pinned Test262 passes are not full Test262 or default/all-feature release acceptance.",
+    "Unchanged controls have slower mean outliers in the full17 record; all eight control P programs and both R profiles/native images are byte-identical to baseline.",
+    "Local records do not replace older published CI benchmarks/status.",
+    "The observed 254\u2013279us workload level does not isolate Realm initialization cost."
+  ],
+  "evidence": {
+    "output": "docs/rust-rewrite/scalar-regions-20261101-inert.tar.xz",
+    "sha256": "a717333485a797ec923b529fda1a9bcac94eb8e3a266c29dccbba6b25b1ddd0f",
+    "bytes": 3378200,
+    "member_count": 3981,
+    "expanded_bytes": 162628912,
+    "source_identities": {
+      "candidate_source_fingerprint": "ce4d1397299c945cffdc9ec80de0cb96c146fc4d7e83e63d24c437de6fea764b",
+      "predecessor_source_fingerprint": "b7fe482be872af94a11247a63df4f306acbbf5799eba6da446b1bc393aaae544"
+    },
+    "index": "evidence-index.json",
+    "policy": "UTF-8 non-executable records only; no Wasm/native binaries, caches or toolchains. Source-bound program WAT/LLVM included."
+  }
+}

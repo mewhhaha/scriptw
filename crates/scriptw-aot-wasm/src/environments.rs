@@ -1270,6 +1270,26 @@ impl<'a> FunctionBuilder<'a> {
             .find_map(|scope| scope.get(name).copied())
     }
 
+    /// Resolve the active identity before classifying its storage. Ordinary
+    /// function locals may shadow a declared Script-global name. Only the
+    /// exact owner-scope mirror also published by mirror_binding_to_global_object
+    /// must retain its observable global write path.
+    pub(crate) fn private_local_binding(&self, name: &str) -> Option<crate::emit::LocalBindingId> {
+        if name == LEXICAL_THIS_NAME {
+            return None;
+        }
+        let BindingStorage::Local(id) = self.lookup_binding(name)? else {
+            return None;
+        };
+        if self.has_global_script_bindings()
+            && self.is_script_global_binding(name)
+            && self.lookup_owner_binding(name) == Some(BindingStorage::Local(id))
+        {
+            return None;
+        }
+        Some(id)
+    }
+
     pub(crate) fn lookup_current_scope_binding(&self, name: &str) -> Option<BindingStorage> {
         self.binding_scopes
             .last()

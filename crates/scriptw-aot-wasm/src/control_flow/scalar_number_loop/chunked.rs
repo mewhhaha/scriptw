@@ -51,6 +51,9 @@ pub(super) struct ChunkedLoop {
 
 impl ChunkedLoop {
     pub(super) fn new(plan: &ScalarNumberLoop) -> Option<Self> {
+        if plan.invariant.is_some() {
+            return None;
+        }
         let (counter, direction) = counter_update(plan.update.as_ref()?)?;
         let NumberPredicate::Compare(op, left, right) = &plan.test else {
             return None;
@@ -236,6 +239,13 @@ fn counter_update(expression: &NumberExpression) -> Option<(usize, Direction)> {
     }
 }
 
+pub(super) fn increasing_counter(expression: &NumberExpression) -> Option<usize> {
+    let (counter, Direction::Up) = counter_update(expression)? else {
+        return None;
+    };
+    Some(counter)
+}
+
 fn one(value: &NumberExpression) -> bool {
     matches!(value, NumberExpression::Constant(bits) if f64::from_bits(*bits) == 1.0)
 }
@@ -259,6 +269,9 @@ fn node_count(value: &NumberExpression) -> usize {
     1 + match value {
         NumberExpression::Constant(_)
         | NumberExpression::Binding(_)
+        | NumberExpression::ArrayLength
+        | NumberExpression::ArrayElement
+        | NumberExpression::JoinedLength
         | NumberExpression::Update(_, _, _) => 0,
         NumberExpression::Negate(value)
         | NumberExpression::Complement(value)
@@ -288,6 +301,9 @@ impl WholeTripAffine32 {
         source_test: &TypedExpr,
         plan: &ScalarNumberLoop,
     ) -> Option<Self> {
+        if plan.invariant.is_some() {
+            return None;
+        }
         let (counter, Direction::Up) = counter_update(plan.update.as_ref()?)? else {
             return None;
         };
@@ -301,13 +317,7 @@ impl WholeTripAffine32 {
             return None;
         };
         let initial = bounded_counter_literal(*initial_bits)?;
-        if builder.is_script_global_binding(&declarator.name) {
-            return None;
-        }
-        let BindingStorage::Local(initial_binding) = builder.lookup_binding(&declarator.name)?
-        else {
-            return None;
-        };
+        let initial_binding = builder.private_local_binding(&declarator.name)?;
         let counter_binding = plan.bindings[counter].id;
         if initial_binding != counter_binding {
             return None;
@@ -330,9 +340,7 @@ impl WholeTripAffine32 {
         let ExprIr::Identifier(name) = &left.expr else {
             return None;
         };
-        let BindingStorage::Local(test_binding) = builder.lookup_binding(name)? else {
-            return None;
-        };
+        let test_binding = builder.private_local_binding(name)?;
         let ExprIr::Number(limit_bits) = &right.expr else {
             return None;
         };
@@ -389,7 +397,7 @@ impl WholeTripAffine32 {
     }
 }
 
-fn bounded_counter_literal(bits: u64) -> Option<u32> {
+pub(super) fn bounded_counter_literal(bits: u64) -> Option<u32> {
     let value = f64::from_bits(bits);
     if !value.is_finite()
         || value < 0.0

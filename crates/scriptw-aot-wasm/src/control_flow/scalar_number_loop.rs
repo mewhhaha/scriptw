@@ -7,10 +7,17 @@
 use super::*;
 use crate::emit::LocalBindingId;
 
+mod dense_array;
+use dense_array::{ArrayRead, DenseArrayBorrow, DenseNumberArrayLoop, PropertyReadView};
+mod joined_length;
+use joined_length::{JoinedLengthFact, JoinedStringArrayLength};
+
 mod invariant_imul;
 use invariant_imul::InvariantImul;
 mod chunked;
-use chunked::{ChunkedLoop, WholeTripAffine32};
+use chunked::ChunkedLoop;
+mod whole_trip;
+use whole_trip::WholeTrip;
 
 const MAX_NODES: usize = 256;
 const MAX_DEPTH: usize = 64;
@@ -49,6 +56,9 @@ impl NumberArithmetic {
 enum NumberExpression {
     Constant(u64),
     Binding(usize),
+    ArrayLength,
+    ArrayElement,
+    JoinedLength,
     Negate(Box<Self>),
     Arithmetic(NumberArithmetic, Box<Self>, Box<Self>),
     Bitwise(BitwiseBinaryOp, Box<Self>, Box<Self>),
@@ -118,6 +128,52 @@ impl LoopLocal {
 struct LoopLocals<'a> {
     bindings: &'a [NumberBinding],
     values: Vec<LoopLocal>,
+    invariant: Option<&'a RegionFact>,
+}
+
+impl LoopLocals<'_> {
+    fn dense(&self) -> &DenseArrayBorrow {
+        let Some(RegionFact::DenseNumbers(borrow)) = self.invariant else {
+            unreachable!("dense reads require their matching entry fact");
+        };
+        borrow
+    }
+
+    fn joined(&self) -> &JoinedLengthFact {
+        let Some(RegionFact::JoinedStringLength(length)) = self.invariant else {
+            unreachable!("joined length requires its matching entry fact");
+        };
+        length
+    }
+}
+
+/// One region owns one closed fact. Conflicting receivers/operations decline.
+enum RegionInvariant {
+    DenseNumbers(DenseNumberArrayLoop),
+    JoinedStringLength(JoinedStringArrayLength),
+}
+
+impl RegionInvariant {
+    fn is_receiver(&self, id: LocalBindingId) -> bool {
+        match self {
+            Self::DenseNumbers(array) => array.is_array(id),
+            Self::JoinedStringLength(joined) => joined.receiver() == id,
+        }
+    }
+}
+
+enum RegionFact {
+    DenseNumbers(DenseArrayBorrow),
+    JoinedStringLength(JoinedLengthFact),
+}
+
+impl RegionFact {
+    fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        match self {
+            Self::DenseNumbers(array) => array.release(builder, function),
+            Self::JoinedStringLength(length) => length.release(builder, function),
+        }
+    }
 }
 
 /// Construction seals the complete operation and binding set before emission.
@@ -127,7 +183,22 @@ pub(super) struct ScalarNumberLoop {
     body: Vec<NumberExpression>,
     update: Option<NumberExpression>,
     imul: Vec<InvariantImul>,
-    whole_trip: Option<WholeTripAffine32>,
+    invariant: Option<RegionInvariant>,
+    dense_four_step: bool,
+    whole_trip: Option<WholeTrip>,
+}
+
+/// Carries the actual guarded roots until either loop path has completed.
+pub(super) struct ScalarNumberLoopEntry {
+    fact: Option<RegionFact>,
+}
+
+impl ScalarNumberLoopEntry {
+    pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        if let Some(fact) = self.fact {
+            fact.release(builder, function);
+        }
+    }
 }
 
 struct LoopProof<'a, 'b> {
@@ -135,6 +206,7 @@ struct LoopProof<'a, 'b> {
     bindings: Vec<NumberBinding>,
     remaining: usize,
     imul: Vec<InvariantImul>,
+    invariant: Option<RegionInvariant>,
 }
 
 impl ScalarNumberLoop {
@@ -151,6 +223,24 @@ impl ScalarNumberLoop {
             } else {
                 expression.emit_discard(builder, locals, function);
             }
+        }
+    }
+
+    fn emit_iteration(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        value: Option<LoopLocal>,
+        iterated: I32Local,
+        function: &mut Function,
+    ) {
+        self.emit_body(builder, locals, value, function);
+        iterated.set_constant(1, function);
+        if let Some(update) = &self.update {
+            update.emit_discard(builder, locals, function);
+        }
+        if let Some(RegionFact::DenseNumbers(array)) = locals.invariant {
+            array.advance(function);
         }
     }
 
@@ -171,13 +261,15 @@ impl ScalarNumberLoop {
         {
             return None;
         }
+        let source_test = test?;
         let mut proof = LoopProof {
             builder,
             bindings: Vec::new(),
             remaining: MAX_NODES,
             imul: Vec::new(),
+            invariant: DenseNumberArrayLoop::new(builder, source_test, update)
+                .map(RegionInvariant::DenseNumbers),
         };
-        let source_test = test?;
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
         proof.statement(body, &mut expressions, MAX_DEPTH)?;
@@ -185,6 +277,18 @@ impl ScalarNumberLoop {
             Some(expression) => Some(proof.expression(expression, MAX_DEPTH)?),
             None => None,
         };
+        if let Some(RegionInvariant::DenseNumbers(array)) = &proof.invariant {
+            if !array.body_preserves_counter(&proof.bindings, &expressions) {
+                return None;
+            }
+        }
+        if matches!(
+            proof.invariant.as_ref(),
+            Some(RegionInvariant::JoinedStringLength(_))
+        ) && !proof.imul.is_empty()
+        {
+            return None;
+        }
         if proof.imul.iter().any(|guard| {
             guard.local_receiver().is_some_and(|id| {
                 proof
@@ -208,16 +312,24 @@ impl ScalarNumberLoop {
         for (binding, domain) in proof.bindings.iter_mut().zip(writes) {
             binding.domain = domain.unwrap_or(NumberDomain::Number);
         }
+        // This conservative budget includes test and update proof nodes too;
+        // four body expansions therefore never exceed MAX_NODES source nodes.
+        let dense_four_step = matches!(
+            proof.invariant.as_ref(),
+            Some(RegionInvariant::DenseNumbers(_))
+        ) && MAX_NODES - proof.remaining <= MAX_NODES / 4;
         let mut plan = Self {
             bindings: proof.bindings,
             test,
             body: expressions,
             update,
             imul: proof.imul,
+            invariant: proof.invariant,
+            dense_four_step,
             whole_trip: None,
         };
         // Declining this narrower proof keeps the existing scalar plan intact.
-        plan.whole_trip = WholeTripAffine32::new(builder, init, source_test, &plan);
+        plan.whole_trip = WholeTrip::new(builder, init, source_test, &plan);
         Some(plan)
     }
 
@@ -225,7 +337,7 @@ impl ScalarNumberLoop {
         &self,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) -> Result<ScalarNumberLoopEntry, EmitError> {
         function.instruction(&Instruction::I32Const(1));
         for binding in &self.bindings {
             let source = builder.local_binding(binding.id);
@@ -270,7 +382,8 @@ impl ScalarNumberLoop {
                 function.instruction(&Instruction::I32And);
             }
         }
-        if !self.imul.is_empty() {
+        let mut fact = None;
+        if !self.imul.is_empty() || self.invariant.is_some() {
             let schema = builder.runtime_schema();
             let accepted = schema.reserve_i32_local(function);
             accepted.store(function);
@@ -281,10 +394,68 @@ impl ScalarNumberLoop {
                 builder.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
             }
+            if let Some(invariant) = &self.invariant {
+                fact = Some(match invariant {
+                    RegionInvariant::DenseNumbers(plan) => RegionFact::DenseNumbers(
+                        DenseArrayBorrow::new(plan, builder, accepted, function),
+                    ),
+                    RegionInvariant::JoinedStringLength(plan) => {
+                        // Speculate only after Number/initialization admission.
+                        // This view proves a repeated false entry test has no
+                        // source write, coercion, property read or call.
+                        let compare = match &self.test {
+                            NumberPredicate::Compare(
+                                op,
+                                left @ (NumberExpression::Binding(_)
+                                | NumberExpression::Constant(_)),
+                                right @ (NumberExpression::Binding(_)
+                                | NumberExpression::Constant(_)),
+                            ) => Some((*op, left, right)),
+                            _ => None,
+                        };
+                        if let Some((op, left, right)) = compare {
+                            accepted.load(function);
+                            builder.open_frame(ControlFrameKind::If, function);
+                            for operand in [left, right] {
+                                match operand {
+                                    NumberExpression::Binding(index) => {
+                                        builder
+                                            .local_binding(self.bindings[*index].id)
+                                            .value()
+                                            .scalar()
+                                            .load(function);
+                                        function.instruction(&Instruction::F64ReinterpretI64);
+                                    }
+                                    NumberExpression::Constant(bits) => {
+                                        function.instruction(&Instruction::F64Const(Ieee64::from(
+                                            f64::from_bits(*bits),
+                                        )));
+                                    }
+                                    _ => unreachable!(
+                                        "the entry comparison view admits only primitive operands"
+                                    ),
+                                }
+                            }
+                            function.instruction(&match op {
+                                RelationalBinaryOp::LessThan => Instruction::F64Lt,
+                                RelationalBinaryOp::LessThanOrEqual => Instruction::F64Le,
+                                RelationalBinaryOp::GreaterThan => Instruction::F64Gt,
+                                RelationalBinaryOp::GreaterThanOrEqual => Instruction::F64Ge,
+                            });
+                            accepted.store(function);
+                            builder.pop_control(ControlFrameKind::If);
+                            function.instruction(&Instruction::End);
+                        }
+                        RegionFact::JoinedStringLength(
+                            plan.emit_guard(builder, accepted, function)?,
+                        )
+                    }
+                });
+            }
             accepted.load(function);
             schema.release_i32_local(accepted, function);
         }
-        Ok(())
+        Ok(ScalarNumberLoopEntry { fact })
     }
 }
 
@@ -295,13 +466,17 @@ impl LoopProof<'_, '_> {
     }
 
     fn binding(&mut self, name: &str, written: bool) -> Option<usize> {
-        if name == LEXICAL_THIS_NAME || self.builder.is_script_global_binding(name) {
+        // Captured cells and actual global mirrors keep their observable owner.
+        let id = self.builder.private_local_binding(name)?;
+        // A receiver cannot also become a deferred Number binding, even in
+        // syntax whose result would be discarded or whose branch never runs.
+        if self
+            .invariant
+            .as_ref()
+            .is_some_and(|fact| fact.is_receiver(id))
+        {
             return None;
         }
-        let BindingStorage::Local(id) = self.builder.lookup_binding(name)? else {
-            // A captured binding's actual cell is never a scalar snapshot.
-            return None;
-        };
         if let Some(index) = self.bindings.iter().position(|binding| binding.id == id) {
             self.bindings[index].written |= written;
             return Some(index);
@@ -320,6 +495,30 @@ impl LoopProof<'_, '_> {
 
     fn expression(&mut self, value: &TypedExpr, depth: usize) -> Option<NumberExpression> {
         let depth = self.visit(depth)?;
+        if let Some(joined) = JoinedStringArrayLength::of_length(value, self.builder) {
+            if self
+                .bindings
+                .iter()
+                .any(|binding| binding.id == joined.receiver())
+            {
+                return None;
+            }
+            match &self.invariant {
+                None => self.invariant = Some(RegionInvariant::JoinedStringLength(joined)),
+                Some(RegionInvariant::JoinedStringLength(existing)) if existing == &joined => {}
+                Some(_) => return None,
+            }
+            return Some(NumberExpression::JoinedLength);
+        }
+        if let Some(read) = PropertyReadView::of(value) {
+            let Some(RegionInvariant::DenseNumbers(array)) = self.invariant.as_ref() else {
+                return None;
+            };
+            return Some(match array.read(self.builder, read)? {
+                ArrayRead::Length => NumberExpression::ArrayLength,
+                ArrayRead::Element => NumberExpression::ArrayElement,
+            });
+        }
         Some(match &value.expr {
             ExprIr::Number(bits) => NumberExpression::Constant(*bits),
             ExprIr::Identifier(name) => NumberExpression::Binding(self.binding(name, false)?),
@@ -457,7 +656,9 @@ impl NumberExpression {
                     NumberDomain::Number
                 }
             }
-            Self::Bitwise(BitwiseBinaryOp::UShr, _, _) => NumberDomain::Unsigned32,
+            Self::ArrayLength | Self::Bitwise(BitwiseBinaryOp::UShr, _, _) => {
+                NumberDomain::Unsigned32
+            }
             Self::Bitwise(_, _, _) | Self::Complement(_) | Self::Imul(_, _) => {
                 NumberDomain::Signed32
             }
@@ -470,6 +671,8 @@ impl NumberExpression {
                 rhs.intrinsic_domain(),
             ),
             Self::Binding(_)
+            | Self::ArrayElement
+            | Self::JoinedLength
             | Self::Negate(_)
             | Self::Compound(_, _, _)
             | Self::Update(_, _, _) => NumberDomain::Number,
@@ -574,7 +777,11 @@ impl NumberExpression {
                 lhs.collect_writes(writes);
                 rhs.collect_writes(writes);
             }
-            Self::Constant(_) | Self::Binding(_) => {}
+            Self::Constant(_)
+            | Self::Binding(_)
+            | Self::ArrayLength
+            | Self::ArrayElement
+            | Self::JoinedLength => {}
         }
     }
 
@@ -731,6 +938,9 @@ impl NumberExpression {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
             Self::Binding(index) => locals.values[*index].load_number(function),
+            Self::ArrayLength => locals.dense().emit_length(function),
+            Self::ArrayElement => locals.dense().emit_element(builder, function),
+            Self::JoinedLength => locals.joined().emit(function),
             Self::Negate(value) => {
                 value.emit(builder, locals, function);
                 function.instruction(&Instruction::F64Neg);
@@ -856,6 +1066,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn compile_scalar_number_loop(
         &mut self,
         plan: &ScalarNumberLoop,
+        entry: &ScalarNumberLoopEntry,
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
@@ -888,6 +1099,7 @@ impl FunctionBuilder<'_> {
         let locals = LoopLocals {
             bindings: &plan.bindings,
             values,
+            invariant: entry.fact.as_ref(),
         };
         // The body's last value is independent of later update/final-test
         // writes. Keep its proven representation until loop exit, too.
@@ -920,16 +1132,32 @@ impl FunctionBuilder<'_> {
         if let Some(chunked) = ChunkedLoop::new(plan) {
             chunked.emit(self, plan, &locals, value, iterated, function);
         }
+        if plan.dense_four_step {
+            let array = locals.dense();
+            let done = self.open_frame(ControlFrameKind::Block, function);
+            let next = self.open_frame(ControlFrameKind::Loop, function);
+            array.emit_four_step_test(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(done, function);
+            for _ in 0..4 {
+                plan.emit_iteration(self, &locals, value, iterated, function);
+            }
+            self.emit_branch_to_target(next, function);
+            self.pop_control(ControlFrameKind::Loop);
+            function.instruction(&Instruction::End);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         let done = self.open_frame(ControlFrameKind::Block, function);
         let next = self.open_frame(ControlFrameKind::Loop, function);
-        plan.test.emit(self, &locals, function);
+        if let Some(RegionFact::DenseNumbers(array)) = locals.invariant {
+            array.emit_test(function);
+        } else {
+            plan.test.emit(self, &locals, function);
+        }
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, function);
-        plan.emit_body(self, &locals, value, function);
-        iterated.set_constant(1, function);
-        if let Some(update) = &plan.update {
-            update.emit_discard(self, &locals, function);
-        }
+        plan.emit_iteration(self, &locals, value, iterated, function);
         self.emit_branch_to_target(next, function);
         self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);

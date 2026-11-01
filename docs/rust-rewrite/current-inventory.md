@@ -8,70 +8,18 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-- Every-case Scriptc time/RSS parity remains open. Continue from the
-  [runtime ownership contract](contracts/runtime-byte-ownership.md) and
-  [performance queue](../performance-hills.md). Re-profile current-source
-  execution after the push, own-data cache, sort and scalar-loop batch before
-  choosing another optimization. Check append prototype probes and String
-  allocation/copying. The [dense packed-join borrow](join-dense-values-20261030.json)
-  was rejected: retained small-join changes disagreed between balanced orders,
-  while ordinary small joins slowed in both. Require a different measured
-  hypothesis before repeating it. Any change needs concrete receiver/backing
-  proofs and must preserve holes, accessors, proxies and user-code ordering.
-  The [dense-number and publication experiments](array-storage-experiments-20261030.json)
-  also failed repeated control gates; both production changes are reverted.
-  Preserve their exact failing products and distinguish retired work from
-  frontend/cache effects before changing function placement. A cache-line offset
-  shift is observed, not established as the cause.
-  The earlier ordinary retained-object time regression remains unresolved; the
-  module-local diagnostic does not refresh that published comparison.
-  [Array/index fusion](array-owner-fusion-20261031.json) now removes one GC
-  allocation and 48 bytes per Array. Two local balanced cohorts show 10–17% lower
-  retained-object execution and 0.58–0.77 MiB lower RSS across ordinary/precompiled
-  boundaries; the published comparison still belongs to its earlier source.
-  The [pre-`ToObject` probe relocation](numeric-getv-probe-20261031.json) failed
-  to demonstrate repeatable target benefit and is reverted; preserve its exact
-  products and both balanced orders. The
-  [combined runtime ownership candidate](runtime-ownership-20261031.json),
-  [full construction fold](runtime-fold-20261031.json) and
-  [string-only fold](runtime-strings-20261031.json) also failed controls and are
-  reverted. [Bounded whole-trip affine composition](whole-trip-affine-20261031.json)
-  now improves original/ordinary integer execution; all live guards, completion
-  and fallbacks remain. Keep its slower singleton/derived retained and small-join
-  observations explicit. [Date-family deferral](runtime-date-demand-20261031.json)
-  now improves normal-cache startup 7–8% behind ABI 42's closed demand boundary;
-  1,312 selected native checks and 106 original Test262 variants pass. Preserve
-  its first-Date/retained-Date/large-join costs and higher selected RSS; the
-  203-record dormant slice is not a net memory saving. Both the
-  [eager](append-key-summary-20261031.json) and
-  [lazy](append-key-lazy-summary-20261031.json) dictionary summaries are rejected
-  and reverted despite target gains. Lazy ordinary small joins repeat +8.00%
-  median / +13.25% mean, and retained empty joins repeat +4.67% / +6.86%; its
-  Date ordinary and numeric-original concerns cleared. The separate
-  [i31 presence experiment](numeric-presence-i31-20261031.json) is also rejected
-  and reverted: ordinary toSorted repeated +7.16% median / +6.99% mean and
-  retained empty joins +3.83% / +5.58%, despite retained-object gains and 660
-  passing native checks. RSS stayed flat; the 8,192-record / 256-KiB bound did
-  not predict a process saving. The separate
-  [scalar-count alternative](numeric-presence-packed-count-20261031.json) also
-  failed both-group ordinary toSorted/singleton controls and is reverted.
-  Its original/retained target gains coexist with slower ordinary target
-  execution, slightly higher RSS, larger native R and a 112-byte ObjectRead
-  frame increase. Preserve its source-bound 1,043 native passes and structural
-  witness repair history. Both [fresh sorted-buffer experiments](fresh-sorted-buffer-20261031.json)
-  are rejected and reverted. Inline transfer failed retained empty-join controls;
-  outlining restored the caller frame but failed fresh precompiled retained-object
-  controls. Production remains at ABI 42; retained regression fixtures do not
-  imply a production speedup. Continue with the separate architecture questions
-  in the performance queue.
-  The [dense Number region screen](numeric-array-region-screen-20261101.json)
-  is also rejected: reverse-128 misses one target block, despite larger-sort and
-  derived-kernel gains. It remains unpromoted; continue with integer induction
-  and bounded scalar-region proofs before measuring another candidate.
-  The separate [joined-length candidate](joined-length-zero-trip-20261101.json)
-  improves three small joins but fails the zero-trip preflight control. Measure
-  a pure entry-test guard before promoting this region.
-  Keep cache filesystems and admission modes explicit.
+- Every-case V8/Scriptc execution and RSS parity remains open. The
+  [scalar-region checkpoint](scalar-regions-20261101.json) improves all nine
+  targeted medians in both original17 blocks, with no repeated control veto.
+  The separate reference cohort has median wins on 2/17 V8 and 5/17 Scriptc cases;
+  its setup boundaries differ and it does not replace the published CI cohorts.
+  Continue from the [ownership contract](contracts/runtime-byte-ownership.md)
+  and [performance queue](../performance-hills.md). Profile first-entry key
+  hashing/wrappers and repeated Array construction before another runtime change.
+  Builtin name Strings are already shared per R instance. Preserve fresh-entry
+  timing, source/tool pins, slower control means and both
+  [rejected](numeric-array-region-screen-20261101.json)
+  [predecessors](joined-length-zero-trip-20261101.json).
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
   arrows and other protocols retain their existing cells. Preserve live exports,

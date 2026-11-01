@@ -34,6 +34,12 @@ recurrence reduction while preserving Number values at their exits. Fixed positi
 literal trip counts can use one guarded affine transform after the existing
 Number and native-method checks; dirty bindings and the last body completion
 share the ordinary loop exit.
+Read-only loops over dense Number Arrays can borrow one guarded backing and
+keep their counter and arithmetic in primitive locals. Other layouts, effects
+and index forms retain ordinary property access and coercion.
+Bounded integer sums can reduce a complete trip when every sequential Number
+operation stays exact. Pure loops that observe only the length of a native
+Array join on Strings can compute it once behind live method and layout guards.
 Strict ordinary module functions keep proven uncaptured `var` bindings and simple
 parameters in local storage; exports, captures and Realm-relative names retain
 their live environment lookup. Actual eval/arguments use keeps the conservative
@@ -51,13 +57,13 @@ have typed entries; packed Number sort snapshots stay unboxed, admit the callbac
 once and recognize ordered runs. Writeback retains ordinary mutation checks. The benchmark sections below
 identify each measurement's source and configuration.
 
-The [matched local runtime checkpoint](docs/rust-rewrite/typed-regions-20261030.json)
-records **15.7% lower entry time** as the geometric mean of per-workload ratios
-across 17 workloads. Retained-object entry time was **6.2–6.4% higher**, with
-**3–5% lower post-execution RSS** in the full comparison and repeat.
-The unchanged WASI control's overall time moved −0.5% and RSS +1.2%.
-Local measurements retain their own source and configuration, separate from the
-CI cohorts. Scriptc time and memory parity remains open.
+The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
+records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
+and **63–71% lower small-join medians**, in both balanced orders.
+All eight control programs remain byte-identical; slower control means remain in
+the record. V8 and Scriptc parity remains open. This and the
+[earlier checkpoint](docs/rust-rewrite/typed-regions-20261030.json) retain their
+own sources and settings; neither refreshes the published CI cohorts below.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

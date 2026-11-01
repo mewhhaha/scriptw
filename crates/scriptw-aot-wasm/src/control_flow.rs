@@ -6908,9 +6908,9 @@ impl<'a> FunctionBuilder<'a> {
             .then(|| scalar_number_loop::ScalarNumberLoop::new(self, init, test, update, body))
             .flatten();
         if let Some(plan) = scalar_plan {
-            plan.emit_entry_guard(self, function)?;
+            let entry = plan.emit_entry_guard(self, function)?;
             self.open_frame(ControlFrameKind::If, function);
-            self.compile_scalar_number_loop(&plan, function);
+            self.compile_scalar_number_loop(&plan, &entry, function);
             function.instruction(&Instruction::Else);
             self.compile_classic_for_iterations(
                 test,
@@ -6923,6 +6923,7 @@ impl<'a> FunctionBuilder<'a> {
             )?;
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
+            entry.release(self, function);
         } else {
             self.compile_classic_for_iterations(
                 test,

@@ -11,10 +11,10 @@ use crate::operations::PropertyKeyLocals;
 /// Construction proves this ordinal belongs to R, never a Program literal.
 /// Emission reads only an existing cache entry; an absent name declines.
 #[derive(PartialEq, Eq)]
-struct CachedRuntimeName(u32);
+pub(super) struct CachedRuntimeName(u32);
 
 impl CachedRuntimeName {
-    fn new(name: &str, strings: &StringPool) -> Option<Self> {
+    pub(super) fn new(name: &str, strings: &StringPool) -> Option<Self> {
         let index = strings.pooled_string_index(name).ok()?;
         let PooledLiteralDomain::Runtime(index) = strings.pooled_string_domain(index).ok()? else {
             return None;
@@ -22,7 +22,7 @@ impl CachedRuntimeName {
         Some(Self(index.ordinal()))
     }
 
-    fn cached(
+    pub(super) fn cached(
         &self,
         builder: &FunctionBuilder<'_>,
         function: &mut Function,
@@ -109,12 +109,7 @@ impl InvariantImul {
             ExprIr::GlobalPropertyRead { name } | ExprIr::GlobalIdentifierRead { name } => {
                 Receiver::Global(CachedRuntimeName::new(name, builder.strings)?)
             }
-            ExprIr::Identifier(name) if !builder.is_script_global_binding(name) => {
-                let BindingStorage::Local(id) = builder.lookup_binding(name)? else {
-                    return None;
-                };
-                Receiver::Local(id)
-            }
+            ExprIr::Identifier(name) => Receiver::Local(builder.private_local_binding(name)?),
             _ => return None,
         };
         Some((
@@ -218,61 +213,14 @@ impl InvariantImul {
             function,
         );
         let property = PropertyKeyLocals::from_string(schema, &key, function);
-        let stored = own_data(builder, &receiver, &property, function)?;
-        stored.is_subtype::<DeferredIntrinsicValue>(schema, function);
-        builder.open_frame(ControlFrameKind::If, function);
-        let recipe = schema.reserve_gc_local(function).initialize(
-            stored
-                .load(schema, function)
-                .cast_subtype::<DeferredIntrinsicValue>(schema, function),
+        emit_own_native_method_guard(
+            builder,
+            &receiver,
+            &property,
+            PureNativeMethod::Imul,
+            accepted,
             function,
-        );
-        let builtin = schema.reserve_i32_local(function);
-        schema
-            .field(DeferredIntrinsicValueSchema::BUILTIN)
-            .read(&recipe, schema, function)
-            .store(builtin, function);
-        builtin.load(function);
-        function.instruction(&Instruction::I32Const(StandardBuiltinId::MathImul.encode()));
-        function.instruction(&Instruction::I32Eq);
-        let realm = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(DeferredIntrinsicValueSchema::REALM)
-                .read(&recipe, schema, function)
-                .reference(),
-            function,
-        );
-        let current = builder.load_current_realm(function);
-        realm.load(schema, function);
-        current.load(schema, function);
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32And);
-        accepted.store(function);
-        current.clear(function);
-        realm.clear(function);
-        schema.release_i32_local(builtin, function);
-        recipe.clear(function);
-        function.instruction(&Instruction::Else);
-        stored.is_subtype::<StoredValue>(schema, function);
-        builder.open_frame(ControlFrameKind::If, function);
-        let value = schema.reserve_gc_local(function).initialize(
-            stored
-                .load(schema, function)
-                .cast_subtype::<StoredValue>(schema, function),
-            function,
-        );
-        let callee = schema.reserve_value_local(function);
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&value, &callee, schema, function);
-        emit_identity(builder, &callee, accepted, function);
-        callee.clear(function);
-        value.clear(function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        stored.clear(function);
+        )?;
         property.clear(function);
         key.clear(function);
         builder.pop_control(ControlFrameKind::If);
@@ -283,6 +231,91 @@ impl InvariantImul {
         receiver.clear(function);
         Ok(())
     }
+}
+
+/// The two guarded source operations have dedicated closed region owners.
+#[derive(Clone, Copy)]
+pub(super) enum PureNativeMethod {
+    Imul,
+    ArrayJoin,
+}
+
+impl PureNativeMethod {
+    fn builtin(self) -> StandardBuiltinId {
+        match self {
+            Self::Imul => StandardBuiltinId::MathImul,
+            Self::ArrayJoin => StandardBuiltinId::ArrayPrototypeJoin,
+        }
+    }
+}
+
+/// The caller supplies an ordinary header and an existing primitive key, with
+/// accepted initially false. This pure peek never resolves a deferred value.
+pub(super) fn emit_own_native_method_guard(
+    builder: &mut FunctionBuilder<'_>,
+    target: &ValueLocals,
+    key: &PropertyKeyLocals,
+    method: PureNativeMethod,
+    accepted: I32Local,
+    function: &mut Function,
+) -> Result<(), EmitError> {
+    let schema = builder.runtime_schema();
+    let stored = own_data(builder, target, key, function)?;
+    stored.is_subtype::<DeferredIntrinsicValue>(schema, function);
+    builder.open_frame(ControlFrameKind::If, function);
+    let recipe = schema.reserve_gc_local(function).initialize(
+        stored
+            .load(schema, function)
+            .cast_subtype::<DeferredIntrinsicValue>(schema, function),
+        function,
+    );
+    let builtin = schema.reserve_i32_local(function);
+    schema
+        .field(DeferredIntrinsicValueSchema::BUILTIN)
+        .read(&recipe, schema, function)
+        .store(builtin, function);
+    builtin.load(function);
+    function.instruction(&Instruction::I32Const(method.builtin().encode()));
+    function.instruction(&Instruction::I32Eq);
+    let realm = schema.reserve_gc_local(function).initialize(
+        schema
+            .field(DeferredIntrinsicValueSchema::REALM)
+            .read(&recipe, schema, function)
+            .reference(),
+        function,
+    );
+    let current = builder.load_current_realm(function);
+    realm.load(schema, function);
+    current.load(schema, function);
+    function.instruction(&Instruction::RefEq);
+    function.instruction(&Instruction::I32And);
+    accepted.store(function);
+    current.clear(function);
+    realm.clear(function);
+    schema.release_i32_local(builtin, function);
+    recipe.clear(function);
+    function.instruction(&Instruction::Else);
+    stored.is_subtype::<StoredValue>(schema, function);
+    builder.open_frame(ControlFrameKind::If, function);
+    let value = schema.reserve_gc_local(function).initialize(
+        stored
+            .load(schema, function)
+            .cast_subtype::<StoredValue>(schema, function),
+        function,
+    );
+    let callee = schema.reserve_value_local(function);
+    schema
+        .struct_type::<StoredValue>()
+        .read_into(&value, &callee, schema, function);
+    emit_identity(builder, &callee, method, accepted, function);
+    callee.clear(function);
+    value.clear(function);
+    builder.pop_control(ControlFrameKind::If);
+    function.instruction(&Instruction::End);
+    builder.pop_control(ControlFrameKind::If);
+    function.instruction(&Instruction::End);
+    stored.clear(function);
+    Ok(())
 }
 
 /// Only an existing dictionary descriptor can be returned. Compact storage
@@ -359,6 +392,7 @@ fn own_data(
 fn emit_identity(
     builder: &mut FunctionBuilder<'_>,
     callee: &ValueLocals,
+    method: PureNativeMethod,
     accepted: I32Local,
     function: &mut Function,
 ) {
@@ -416,7 +450,7 @@ fn emit_identity(
     ));
     function.instruction(&Instruction::I32Eq);
     builtin.load(function);
-    function.instruction(&Instruction::I32Const(StandardBuiltinId::MathImul.encode()));
+    function.instruction(&Instruction::I32Const(method.builtin().encode()));
     function.instruction(&Instruction::I32Eq);
     function.instruction(&Instruction::I32And);
     let current = builder.load_current_realm(function);
