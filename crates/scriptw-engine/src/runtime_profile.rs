@@ -710,11 +710,14 @@ mod native_mode_cohort_tests {
         let bytes = b"\0asm\x01\0\0\0\0\x08\x07cohorts";
         let source = WasmModuleSource::Program(bytes);
         for native in [&first, &second, &first] {
-            let (module, _) =
-                memory_cached_wasm_module(native, source, WasmNativeCompilationMode::Fast, || {
-                    compile_wasm_module(native, bytes)
-                })
-                .unwrap();
+            let (module, _) = memory_cached_wasm_module(
+                native,
+                source,
+                WasmNativeCompilationMode::Fast,
+                None,
+                || compile_wasm_module(native, bytes),
+            )
+            .unwrap();
             assert!(WasmtimeEngine::same(module.engine(), native));
         }
     }

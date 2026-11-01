@@ -9,14 +9,17 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [scalar-region checkpoint](scalar-regions-20261101.json) improves all nine
-  targeted medians in both original17 blocks, with no repeated control veto.
-  The separate reference cohort has median wins on 2/17 V8 and 5/17 Scriptc cases;
+  [entry checkpoint](entry-bootstrap-20261101.json) follows scalar regions with
+  lower medians on all nine targets in both blocks, with no repeated control
+  veto. All 17 program Wasm files remain byte-identical; R String prehashing and
+  bounded runtime retention pass the separate hot-R controls. Its direct
+  reference has median and mean wins on 2/17 V8 and 6/17 Scriptc cases;
   its setup boundaries differ and it does not replace the published CI cohorts.
   Continue from the [ownership contract](contracts/runtime-byte-ownership.md)
-  and [performance queue](../performance-hills.md). Profile first-entry key
-  hashing/wrappers and repeated Array construction before another runtime change.
-  Builtin name Strings are already shared per R instance. Preserve fresh-entry
+  and [performance queue](../performance-hills.md). Measure deferred namespace
+  publication and repeated private Array construction next. Math, Reflect, JSON
+  and Atomics still publish their namespace records eagerly; their method values
+  are already deferred. Preserve fresh-entry
   timing, source/tool pins, slower control means and both
   [rejected](numeric-array-region-screen-20261101.json)
   [predecessors](joined-length-zero-trip-20261101.json).

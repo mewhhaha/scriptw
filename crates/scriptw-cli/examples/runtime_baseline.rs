@@ -130,6 +130,7 @@ fn run() -> Result<(), String> {
                 WasmProcessMemoryObservation::Unavailable(reason) => json!({
                     "status": "unavailable", "reason": format!("{reason:?}")}),
             };
+            let retention = scriptw_engine::wasm_runtime_module_cache_observation();
             let mut observation = json!({"warmup": index < warmups,
                 "execution_ns": p.timings.execution_and_completion.as_nanos(),
                 "phases_ns": {"admission": p.timings.admission.as_nanos(),
@@ -150,6 +151,23 @@ fn run() -> Result<(), String> {
                         "gc_pause_time": format!("{:?}", p.gc_pause_time),
                         "peak_gc_heap_bytes": format!("{:?}", p.peak_gc_heap_bytes)}},
                 "module_cache": format!("{:?}", p.module_cache),
+                "module_loading": {
+                    "runtime_cache": p.module_loading.runtime_cache.map(|outcome| format!("{outcome:?}")),
+                    "runtime_ns": p.module_loading.runtime.as_nanos(),
+                    "program_ns": p.module_loading.program.as_nanos(),
+                    "embedded_image_ns": p.module_loading.embedded_image.as_ref().map(|timings| json!({
+                        "admission": timings.admission.as_nanos(),
+                        "native_backing_preparation": timings.native_backing_preparation.as_nanos(),
+                        "native_lease_decode_and_digest": timings.native_lease_decode_and_digest.as_nanos(),
+                        "deserialize": timings.deserialize.as_nanos(),
+                    })),
+                },
+                "module_retention": {
+                    "entry_limit": retention.entry_limit,
+                    "image_byte_limit": retention.image_byte_limit,
+                    "entries": retention.retained_entries,
+                    "image_bytes": retention.retained_image_bytes,
+                },
                 "host_import_cache": format!("{:?}", p.host_import_cache), "stdout": output,
                 "matched_runtime_image_cache": format!("{:?}", p.matched_runtime_image_cache),
                 "runtime_policy": p.runtime_policy});

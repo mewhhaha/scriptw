@@ -248,7 +248,7 @@ fn throwing_tail_uses_actual_r_export_and_compacted_p_import_with_caller_complet
 fn runtime_names(bytes: &[u8], ordinals: &[u32]) -> Vec<String> {
     let resolver = body(bytes, named(bytes, "helper::pooled_string_resolve"));
     let address=resolver.windows(4).find_map(|ops|match ops {
-        [Operator::I32Mul,Operator::I32Const {value},Operator::I32Add,Operator::I32Load {memarg}] if memarg.offset==0=>Some(*value as u32),_=>None,
+        [Operator::I32Mul,Operator::I32Const {value},Operator::I32Add,Operator::I64Load {memarg}] if memarg.offset==0=>Some(*value as u32),_=>None,
     }).expect("real descriptor row address");
     let count = resolver
         .windows(2)
@@ -285,7 +285,11 @@ fn runtime_names(bytes: &[u8], ordinals: &[u32]) -> Vec<String> {
                 "R name stays inside R's sealed descriptor domain"
             );
             let row_address = address
-                .checked_add(ordinal.checked_mul(12).unwrap())
+                .checked_add(
+                    ordinal
+                        .checked_mul(crate::data::RuntimeStringDescriptors::ROW_BYTES)
+                        .unwrap(),
+                )
                 .unwrap();
             let row = data
                 .iter()
@@ -303,25 +307,96 @@ fn runtime_names(bytes: &[u8], ordinals: &[u32]) -> Vec<String> {
                         panic!("constant active data address");
                     };
                     let offset = row_address.checked_sub(value as u32)? as usize;
-                    segment.data.get(offset..offset.checked_add(12)?)
+                    segment.data.get(
+                        offset
+                            ..offset.checked_add(
+                                crate::data::RuntimeStringDescriptors::ROW_BYTES as usize,
+                            )?,
+                    )
                 })
                 .expect("selected descriptor row is physically present in R");
-            let words = row
-                .chunks_exact(4)
-                .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
-                .collect::<Vec<_>>();
-            assert_eq!(words[0], ordinal);
-            let start = words[1] as usize;
-            let end = start.checked_add(words[2] as usize * 2).unwrap();
+            let raw_hash = u64::from_le_bytes(row[..8].try_into().unwrap());
+            let start = u32::from_le_bytes(row[8..12].try_into().unwrap()) as usize;
+            let length = u32::from_le_bytes(row[12..16].try_into().unwrap()) as usize;
+            let end = start.checked_add(length * 2).unwrap();
             let units = utf16
                 .get(start..end)
                 .unwrap()
                 .chunks_exact(2)
                 .map(|unit| u16::from_le_bytes(unit.try_into().unwrap()))
                 .collect::<Vec<_>>();
+            assert_eq!(
+                raw_hash,
+                units.iter().fold(14695981039346656037u64, |hash, unit| {
+                    (hash ^ u64::from(*unit)).wrapping_mul(1099511628211)
+                }),
+                "the actual R descriptor hashes its exact passive UTF16 span"
+            );
             String::from_utf16(&units).unwrap()
         })
         .collect()
+}
+
+#[test]
+fn runtime_string_resolver_publishes_the_sealed_raw_hash_with_its_rooted_utf16_span() {
+    let artifact = emit_script("({key:'program-only-string'});").unwrap();
+    let runtime = artifact.runtime().unwrap();
+    let bytes = runtime.bytes();
+    Validator::new_with_features(WasmFeatures::all())
+        .validate_all(bytes)
+        .unwrap();
+    let registered =
+        RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Program(runtime))
+            .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(string_type) = registered
+        .globals()
+        .schema()
+        .reference_type::<StringValue>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("the actual String has a concrete registered type");
+    };
+    let ops = body(bytes, named(bytes, "helper::pooled_string_resolve"));
+    let hash = ops
+        .windows(2)
+        .find_map(|window| match window {
+            [Operator::I64Load { memarg }, Operator::LocalSet { local_index }]
+                if memarg.offset == 0 =>
+            {
+                Some(*local_index)
+            }
+            _ => None,
+        })
+        .expect("resolver loads the exact sealed 64-bit raw hash");
+    assert!(ops.windows(6).any(|window| matches!(window,
+        [Operator::ArrayNewData { .. }, Operator::LocalSet { local_index: saved },
+         Operator::LocalGet { local_index: loaded }, Operator::RefAsNonNull,
+         Operator::LocalGet { local_index: raw_hash }, Operator::StructNew { struct_type_index }]
+            if saved == loaded && *raw_hash == hash && *struct_type_index == string_type
+    )), "the exact UTF16 backing is rooted until the same row's hash publishes with it");
+    assert!(
+        ops.iter().all(|op| !matches!(
+            op,
+            Operator::Loop { .. } | Operator::I64Xor | Operator::I64Mul
+        )),
+        "pooled-string materialization does not run the UTF16 hash loop"
+    );
+
+    let read = body(bytes, named(bytes, "helper::ordinary_property_append"));
+    assert!(read.windows(5).any(|window| matches!(window,
+        [Operator::StructGet { struct_type_index, .. }, Operator::LocalSet { local_index: saved },
+         Operator::LocalGet { local_index: loaded }, Operator::I64Eqz, Operator::If { .. }]
+            if *struct_type_index == string_type && saved == loaded
+    )), "unprepared dynamic Strings retain their zero-sentinel hash fallback");
+    assert!(
+        read.iter().any(|op| matches!(
+            op,
+            Operator::I64Const {
+                value: -3750763034362895579
+            }
+        )),
+        "the existing raw hash algorithm remains available for dynamic Strings"
+    );
 }
 
 #[test]

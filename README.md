@@ -23,6 +23,10 @@ Portable embedding API remains available; static compiler dependencies remain.
 Runtime initialization uses compact intrinsic-installation tables and defers
 the Error, Date, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
+Immutable runtime String descriptors carry exact UTF-16 key hashes; separately
+created equal Strings retain the ordinary lazy hash path. Linked-module caching
+keeps an admitted runtime resident when its program cannot share the configured
+entry or image-byte budget. Programs still execute in fresh Stores and Realms.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
 host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 42
 requires rebuilding older Portable bundles and native images. Native images use
@@ -61,9 +65,18 @@ The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
 and **63–71% lower small-join medians**, in both balanced orders.
 All eight control programs remain byte-identical; slower control means remain in
-the record. V8 and Scriptc parity remains open. This and the
+the record. This and the
 [earlier checkpoint](docs/rust-rewrite/typed-regions-20261030.json) retain their
 own sources and settings; neither refreshes the published CI cohorts below.
+
+The [entry checkpoint](docs/rust-rewrite/entry-bootstrap-20261101.json) adds
+**5–16% lower sorting medians**, **15–16% lower numeric-loop medians** and
+**15–16% lower small-join medians** in both balanced orders. All 17 program
+Wasm files remain byte-identical; R caches exact String hashes and stays resident
+within the existing module budget. Its separate hot-R control passes. The direct
+reference has median and mean wins on **6/17 Scriptc** and **2/17 V8** cases;
+overall parity remains open. Slower controls and unequal setup boundaries remain
+explicit. These local results do not refresh the published CI cohorts.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

@@ -113,6 +113,15 @@ impl MemoryWasmModuleCache {
         key: WasmModuleMemoryCacheKey,
         module: WasmtimeModule,
     ) -> WasmtimeModule {
+        self.retain_compiled_preserving_runtime(key, module, None)
+    }
+
+    fn retain_compiled_preserving_runtime(
+        &mut self,
+        key: WasmModuleMemoryCacheKey,
+        module: WasmtimeModule,
+        runtime: Option<WasmModuleMemoryCacheKey>,
+    ) -> WasmtimeModule {
         // Compilation happens outside the mutex. Another worker can have
         // admitted this key since the initial miss; keep only its hot entry.
         if let Some(existing) = self.get(&key) {
@@ -128,12 +137,38 @@ impl MemoryWasmModuleCache {
             return module;
         }
 
+        // Protect only this execution's admitted dependency. An oversized,
+        // absent or foreign-Engine R must not prevent ordinary P retention.
+        let runtime = runtime.and_then(|key| {
+            self.entries
+                .iter()
+                .find(|entry| {
+                    entry.key == key
+                        && crate::WasmtimeEngine::same(entry.module.engine(), module.engine())
+                })
+                .map(|entry| (key, entry.image_bytes))
+        });
+        if let Some((_, runtime_bytes)) = runtime {
+            if self.limits.entries.get() < 2
+                || !self.limits.has_image_room(runtime_bytes, image_bytes)
+            {
+                // Both active Modules remain owned by the caller. Retention
+                // still counts each image separately within the same budget.
+                return module;
+            }
+        }
+
         while self.entries.len() >= self.limits.entries.get()
             || !self
                 .limits
                 .has_image_room(self.retained_image_bytes, image_bytes)
         {
-            let oldest = self.entries.pop_front().expect("full cache has an entry");
+            let index = self
+                .entries
+                .iter()
+                .position(|entry| runtime.is_none_or(|(key, _)| entry.key != key))
+                .expect("admitted images fit after removing an unprotected entry");
+            let oldest = self.entries.remove(index).expect("eviction index exists");
             self.retained_image_bytes = self
                 .retained_image_bytes
                 .checked_sub(oldest.image_bytes)
@@ -229,7 +264,7 @@ mod tests {
                 wasm.push(11); // Data section.
                 push_leb128(&mut wasm, data.len());
                 wasm.extend_from_slice(&data);
-                WasmtimeModule::new(&WasmtimeEngine::default(), &wasm)
+                WasmtimeModule::new(small_module().engine(), &wasm)
                     .expect("passive-data binary module should compile")
             })
             .clone()
@@ -397,5 +432,127 @@ mod tests {
         assert_state(&cache, &[1, 3], bytes * 2);
         assert!(cache.contains_wasm_sha256(&key(1).wasm_sha256));
         assert!(!cache.contains_wasm_sha256(&key(2).wasm_sha256));
+    }
+
+    #[test]
+    fn linked_program_cannot_displace_its_runtime_from_one_entry() {
+        let module = small_module();
+        let bytes = image_bytes(&module);
+        let mut cache = MemoryWasmModuleCache::new(limits(1, bytes * 3));
+        cache.retain_compiled_for_engine(key(1), module.clone());
+        for _ in 0..2 {
+            let executed = cache.retain_compiled_for_engine_preserving_runtime(
+                key(2),
+                module.clone(),
+                Some(key(1)),
+            );
+            assert!(WasmtimeModule::same(&executed, &module));
+            assert_state(&cache, &[1], bytes);
+            assert!(cache.get_for_engine(&key(2), module.engine()).is_none());
+            let retained = cache.get_for_engine(&key(1), module.engine()).unwrap();
+            assert!(WasmtimeModule::same(&retained, &module));
+        }
+    }
+
+    #[test]
+    fn linked_program_respects_actual_combined_image_bytes() {
+        let runtime = large_module();
+        let program = small_module();
+        let runtime_bytes = image_bytes(&runtime);
+        let program_bytes = image_bytes(&program);
+        for (budget, retained) in [
+            (runtime_bytes + program_bytes - 1, false),
+            (runtime_bytes + program_bytes, true),
+        ] {
+            let mut cache = MemoryWasmModuleCache::new(limits(2, budget));
+            cache.retain_compiled_for_engine(key(1), runtime.clone());
+            cache.retain_compiled_for_engine_preserving_runtime(
+                key(2),
+                program.clone(),
+                Some(key(1)),
+            );
+            if retained {
+                assert_state(&cache, &[1, 2], budget);
+                let hit = cache.get_for_engine(&key(2), program.engine()).unwrap();
+                assert!(WasmtimeModule::same(&hit, &program));
+            } else {
+                assert_state(&cache, &[1], runtime_bytes);
+                assert!(cache.get_for_engine(&key(2), program.engine()).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn fitting_linked_program_evicts_oldest_non_runtime_entries() {
+        let small = small_module();
+        let large = large_module();
+        let small_bytes = image_bytes(&small);
+        let large_bytes = image_bytes(&large);
+        let mut cache = MemoryWasmModuleCache::new(limits(3, small_bytes * 3));
+        for identity in [1, 2, 3] {
+            cache.retain_compiled_for_engine(key(identity), small.clone());
+        }
+        cache.retain_compiled_for_engine_preserving_runtime(key(4), small.clone(), Some(key(1)));
+        assert_state(&cache, &[1, 3, 4], small_bytes * 3);
+
+        let mut cache = MemoryWasmModuleCache::new(limits(4, small_bytes + large_bytes));
+        for identity in [1, 2, 3] {
+            cache.retain_compiled_for_engine(key(identity), small.clone());
+        }
+        cache.retain_compiled_for_engine_preserving_runtime(key(4), large, Some(key(1)));
+        assert_state(&cache, &[1, 4], small_bytes + large_bytes);
+    }
+
+    #[test]
+    fn missing_or_oversized_runtime_does_not_block_program_reuse() {
+        let program = small_module();
+        let oversized_runtime = large_module();
+        let bytes = image_bytes(&program);
+        let mut cache = MemoryWasmModuleCache::new(limits(1, bytes));
+        cache.retain_compiled_for_engine(key(1), oversized_runtime);
+        assert_state(&cache, &[], 0);
+        for runtime_key in [key(1), key(9)] {
+            cache.retain_compiled_for_engine_preserving_runtime(
+                key(2),
+                program.clone(),
+                Some(runtime_key),
+            );
+            assert_state(&cache, &[2], bytes);
+            let hit = cache.get_for_engine(&key(2), program.engine()).unwrap();
+            assert!(WasmtimeModule::same(&hit, &program));
+        }
+    }
+
+    #[test]
+    fn foreign_engine_runtime_is_not_protected() {
+        let runtime = small_module();
+        let engine = WasmtimeEngine::default();
+        let program = WasmtimeModule::new(&engine, b"\0asm\x01\0\0\0").unwrap();
+        assert!(!WasmtimeEngine::same(runtime.engine(), program.engine()));
+        let budget = image_bytes(&runtime).max(image_bytes(&program));
+        let mut cache = MemoryWasmModuleCache::new(limits(1, budget));
+        cache.retain_compiled_for_engine(key(1), runtime);
+        cache.retain_compiled_for_engine_preserving_runtime(key(2), program.clone(), Some(key(1)));
+        assert_state(&cache, &[2], image_bytes(&program));
+        let hit = cache.get_for_engine(&key(2), &engine).unwrap();
+        assert!(WasmtimeModule::same(&hit, &program));
+    }
+
+    #[test]
+    fn oversized_linked_program_preserves_existing_cache() {
+        let runtime = small_module();
+        let bytes = image_bytes(&runtime);
+        let program = large_module();
+        assert!(image_bytes(&program) > bytes * 2);
+        let mut cache = MemoryWasmModuleCache::new(limits(2, bytes * 2));
+        cache.retain_compiled_for_engine(key(1), runtime.clone());
+        cache.retain_compiled_for_engine(key(2), runtime);
+        let executed = cache.retain_compiled_for_engine_preserving_runtime(
+            key(3),
+            program.clone(),
+            Some(key(1)),
+        );
+        assert!(WasmtimeModule::same(&executed, &program));
+        assert_state(&cache, &[1, 2], bytes * 2);
     }
 }

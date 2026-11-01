@@ -40,15 +40,16 @@ impl FunctionBuilder<'_> {
             parameters.ordinal,
             &mut function,
         );
-        let construction = StringConstruction::from_runtime_pooled_row(
-            schema,
-            schema.reserve_gc_local(&mut function),
-            &row,
-            &mut function,
-        );
         let string = schema
             .reserve_gc_local::<StringValue, NonNullable>(&mut function)
-            .initialize(construction.publish(schema, &mut function), &mut function);
+            .initialize(
+                row.publish_string(
+                    schema,
+                    schema.reserve_gc_local(&mut function),
+                    &mut function,
+                ),
+                &mut function,
+            );
         schema.array_type::<PooledStringTable>().write(
             &table,
             parameters.ordinal,

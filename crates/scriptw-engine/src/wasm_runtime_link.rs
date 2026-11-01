@@ -308,8 +308,8 @@ impl WasmModules {
 }
 
 /// `bypass_retention` overrides `memory_cache_policy` (agent workers never
-/// retain). Both modules share the one bounded in-memory LRU. Execution may
-/// borrow both even when retaining P evicts R from that cache.
+/// retain). Both modules share the one bounded in-memory LRU. P admission
+/// preserves its admitted R dependency, bypassing P retention if both cannot fit.
 pub(super) fn compile_modules(
     engine: &WasmtimeEngine,
     program: WasmProgramRef<'_>,
@@ -334,6 +334,12 @@ pub(super) fn compile_modules(
     let trace = std::env::var_os("SCRIPTW_WASM_TRACE").is_some();
     let mut matched_runtime_image_cache = WasmRuntimeMatchedImageCacheOutcome::NotAccessed;
     let mut loading = WasmRuntimeModuleLoading::default();
+    let runtime_key = program.runtime.map(|runtime| {
+        wasm_module_memory_cache_key(
+            WasmModuleSource::runtime(runtime, runtime_image_policy),
+            mode,
+        )
+    });
     let mut module_for_execution = |label: &str,
                                     source: WasmModuleSource<'_>|
      -> Result<_, EngineError> {
@@ -352,12 +358,8 @@ pub(super) fn compile_modules(
         };
         let result = match source {
             WasmModuleSource::Runtime(runtime) | WasmModuleSource::DiagnosticRuntime(runtime) => {
-                wasm_module_for_execution_with_factory(
-                    engine,
-                    source,
-                    policy,
-                    mode,
-                    || match source.runtime_image_policy() {
+                wasm_module_for_execution_with_factory(engine, source, policy, mode, None, || {
+                    match source.runtime_image_policy() {
                         WasmRuntimeImagePolicy::MatchedDiagnostic => {
                             let (module, outcome) =
                                 embedded_runtime::load_capacity_matched_native(engine, runtime)?;
@@ -374,10 +376,12 @@ pub(super) fn compile_modules(
                             }
                             compile_wasm_module(engine, bytes)
                         }
-                    },
-                )?
+                    }
+                })?
             }
-            WasmModuleSource::Program(_) => wasm_module_for_execution(engine, bytes, policy, mode)?,
+            WasmModuleSource::Program(_) => {
+                wasm_module_for_execution(engine, bytes, policy, mode, runtime_key)?
+            }
         };
         if trace {
             eprintln!(

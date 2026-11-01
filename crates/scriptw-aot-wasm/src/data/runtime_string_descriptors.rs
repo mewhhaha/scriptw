@@ -8,7 +8,7 @@ pub(crate) struct RuntimeStringDescriptors {
     count: u32,
 }
 impl RuntimeStringDescriptors {
-    pub(crate) const ROW_BYTES: u32 = 12;
+    pub(crate) const ROW_BYTES: u32 = 16;
     pub(crate) fn address(self) -> u32 {
         self.address
     }
@@ -36,23 +36,32 @@ impl StringPool {
         let mut seen = vec![false; count as usize];
         for (ordinal, units) in self.pooled_string_initializers() {
             let slot = seen.get_mut(ordinal.ordinal() as usize).ok_or_else(error)?;
+            let end = units
+                .length
+                .checked_mul(2)
+                .and_then(|len| units.byte_offset.checked_add(len))
+                .ok_or_else(error)?;
             if std::mem::replace(slot, true)
                 || units.byte_offset % 2 != 0
-                || units
-                    .length
-                    .checked_mul(2)
-                    .and_then(|len| units.byte_offset.checked_add(len))
-                    .is_none_or(|end| end as usize > self.pooled_code_unit_bytes.len())
+                || end as usize > self.pooled_code_unit_bytes.len()
             {
                 return Err(error());
             }
-            let start = ordinal.ordinal() as usize * RuntimeStringDescriptors::ROW_BYTES as usize;
-            for (slot, word) in rows[start..start + RuntimeStringDescriptors::ROW_BYTES as usize]
-                .chunks_exact_mut(4)
-                .zip([ordinal.ordinal(), units.byte_offset, units.length])
+            // Match emit_string_key_hash's raw UTF-16 FNV-1a exactly, before
+            // caller-specific tag mixing. A real zero retains its sentinel
+            // meaning and may be safely recomputed by the runtime owner.
+            let mut raw_hash = 14695981039346656037u64;
+            for unit in self.pooled_code_unit_bytes[units.byte_offset as usize..end as usize]
+                .chunks_exact(2)
             {
-                slot.copy_from_slice(&word.to_le_bytes());
+                raw_hash ^= u64::from(u16::from_le_bytes(unit.try_into().unwrap()));
+                raw_hash = raw_hash.wrapping_mul(1099511628211);
             }
+            let start = ordinal.ordinal() as usize * RuntimeStringDescriptors::ROW_BYTES as usize;
+            let row = &mut rows[start..start + RuntimeStringDescriptors::ROW_BYTES as usize];
+            row[..8].copy_from_slice(&raw_hash.to_le_bytes());
+            row[8..12].copy_from_slice(&units.byte_offset.to_le_bytes());
+            row[12..16].copy_from_slice(&units.length.to_le_bytes());
         }
         if seen.iter().any(|present| !present) || rows.len() != length as usize {
             return Err(error());
@@ -76,17 +85,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn descriptor_rows_preserve_ordinals_and_utf16_spans_in_ordinal_order() {
+    fn descriptor_rows_bind_exact_utf16_hashes_and_spans_in_ordinal_order() {
         let mut pool = StringPool::default();
-        for text in ["z", "", "\0", "a", "\u{1f600}", "\u{10ffff}"] {
-            pool.intern_string(text);
+        // Known raw hashes include lone surrogates, a surrogate pair, NUL and
+        // a non-ASCII unit whose hash differs from hashing its encoded bytes.
+        let cases: &[(&[u16], u64)] = &[
+            (&[0x7a], 0xaf63f74c86021a6d),
+            (&[], 0xcbf29ce484222325),
+            (&[0], 0xaf63bd4c8601b7df),
+            (&[0x61], 0xaf63dc4c8601ec8c),
+            (&[0x100], 0xaf62bd4c860004df),
+            (&[0x61, 0, 0x62], 0xe5d29919042666b2),
+            (&[0xd800], 0xb03bbd4c8770bfdf),
+            (&[0xdfff], 0xb03d724c8773a66e),
+            (&[0xd83d, 0xde00], 0xe5e45a0a241b88d8),
+            (&[0xdbff, 0xdfff], 0xdda2c90a1c8d7563),
+        ];
+        for (units, _) in cases {
+            pool.intern_string(&scriptw_ir::encode_js_string_utf16(units));
         }
         let expected = pool
             .pooled_string_initializers()
-            .map(|(index, units)| [index.ordinal(), units.byte_offset, units.length])
+            .map(|(index, units)| {
+                (
+                    index.ordinal(),
+                    (
+                        cases[index.ordinal() as usize].1,
+                        units.byte_offset,
+                        units.length,
+                    ),
+                )
+            })
             .collect::<Vec<_>>();
         assert!(
-            expected.windows(2).any(|rows| rows[0][0] > rows[1][0]),
+            expected.windows(2).any(|rows| rows[0].0 > rows[1].0),
             "lexical initialization order differs from insertion ordinals"
         );
         let utf16 = pool.pooled_code_unit_bytes[..].to_vec();
@@ -98,16 +130,21 @@ mod tests {
         assert_eq!(&pool.pooled_code_unit_bytes[..], &utf16);
         let offset = (descriptors.address() - STATIC_DATA_OFFSET) as usize;
         let actual = pool.bytes[offset..]
-            .chunks_exact(12)
+            .chunks_exact(RuntimeStringDescriptors::ROW_BYTES as usize)
             .map(|row| {
-                std::array::from_fn::<_, 3, _>(|word| {
-                    u32::from_le_bytes(row[word * 4..word * 4 + 4].try_into().unwrap())
-                })
+                (
+                    u64::from_le_bytes(row[..8].try_into().unwrap()),
+                    u32::from_le_bytes(row[8..12].try_into().unwrap()),
+                    u32::from_le_bytes(row[12..16].try_into().unwrap()),
+                )
             })
             .collect::<Vec<_>>();
         let mut ordered = expected;
-        ordered.sort_by_key(|row| row[0]);
-        assert_eq!(actual, ordered);
+        ordered.sort_by_key(|row| row.0);
+        assert_eq!(
+            actual,
+            ordered.into_iter().map(|row| row.1).collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -1429,6 +1429,7 @@ fn memory_cached_wasm_module(
     engine: &WasmtimeEngine,
     source: WasmModuleSource<'_>,
     native_compilation_mode: WasmNativeCompilationMode,
+    runtime: Option<WasmModuleMemoryCacheKey>,
     create: impl FnOnce() -> Result<WasmtimeModule, EngineError>,
 ) -> Result<(WasmtimeModule, WasmModuleMemoryCacheOutcome), EngineError> {
     let key = wasm_module_memory_cache_key(source, native_compilation_mode);
@@ -1446,7 +1447,7 @@ fn memory_cached_wasm_module(
     let mut modules = modules
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let module = modules.retain_compiled_for_engine(key, module);
+    let module = modules.retain_compiled_for_engine_preserving_runtime(key, module, runtime);
     Ok((module, WasmModuleMemoryCacheOutcome::Miss))
 }
 
@@ -1455,12 +1456,14 @@ fn wasm_module_for_execution(
     bytes: &[u8],
     memory_cache_policy: WasmModuleMemoryCachePolicy,
     native_compilation_mode: WasmNativeCompilationMode,
+    runtime: Option<WasmModuleMemoryCacheKey>,
 ) -> Result<(WasmtimeModule, WasmModuleMemoryCacheOutcome), EngineError> {
     wasm_module_for_execution_with_factory(
         engine,
         WasmModuleSource::Program(bytes),
         memory_cache_policy,
         native_compilation_mode,
+        runtime,
         || compile_wasm_module(engine, bytes),
     )
 }
@@ -1470,13 +1473,14 @@ fn wasm_module_for_execution_with_factory(
     source: WasmModuleSource<'_>,
     memory_cache_policy: WasmModuleMemoryCachePolicy,
     native_compilation_mode: WasmNativeCompilationMode,
+    runtime: Option<WasmModuleMemoryCacheKey>,
     create: impl FnOnce() -> Result<WasmtimeModule, EngineError>,
 ) -> Result<(WasmtimeModule, WasmModuleMemoryCacheOutcome), EngineError> {
     match (memory_cache_policy, source) {
         (WasmModuleMemoryCachePolicy::Retain, _)
         | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::Runtime(_))
         | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::DiagnosticRuntime(_)) => {
-            memory_cached_wasm_module(engine, source, native_compilation_mode, create)
+            memory_cached_wasm_module(engine, source, native_compilation_mode, runtime, create)
         }
         (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::Program(_))
         | (WasmModuleMemoryCachePolicy::BypassRetention, _) => {

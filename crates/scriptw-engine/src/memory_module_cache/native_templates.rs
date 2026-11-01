@@ -24,6 +24,15 @@ impl MemoryWasmModuleCache {
         key: WasmModuleMemoryCacheKey,
         module: WasmtimeModule,
     ) -> WasmtimeModule {
+        self.retain_compiled_for_engine_preserving_runtime(key, module, None)
+    }
+
+    pub(crate) fn retain_compiled_for_engine_preserving_runtime(
+        &mut self,
+        key: WasmModuleMemoryCacheKey,
+        module: WasmtimeModule,
+        runtime: Option<WasmModuleMemoryCacheKey>,
+    ) -> WasmtimeModule {
         if let Some(index) = self.entries.iter().position(|entry| {
             entry.key == key && !crate::WasmtimeEngine::same(entry.module.engine(), module.engine())
         }) {
@@ -36,7 +45,10 @@ impl MemoryWasmModuleCache {
                 .checked_sub(removed.image_bytes)
                 .expect("foreign image belongs to aggregate");
         }
-        self.retain_compiled(key, module)
+        match runtime {
+            Some(runtime) => self.retain_compiled_preserving_runtime(key, module, Some(runtime)),
+            None => self.retain_compiled(key, module),
+        }
     }
 }
 
