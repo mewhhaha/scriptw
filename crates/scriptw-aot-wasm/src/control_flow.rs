@@ -6909,21 +6909,45 @@ impl<'a> FunctionBuilder<'a> {
             .flatten();
         if let Some(plan) = scalar_plan {
             let entry = plan.emit_entry_guard(self, function)?;
-            self.open_frame(ControlFrameKind::If, function);
-            self.compile_scalar_number_loop(&plan, &entry, function);
-            function.instruction(&Instruction::Else);
-            self.compile_classic_for_iterations(
-                test,
-                update,
-                body,
-                lexical_environment,
-                labels,
-                break_frame,
-                function,
-            )?;
-            self.pop_control(ControlFrameKind::If);
-            function.instruction(&Instruction::End);
-            entry.release(self, function);
+            if let Some(fallback) = entry.compact_fallback(self, function) {
+                self.open_frame(ControlFrameKind::If, function);
+                self.compile_scalar_number_loop(&plan, &entry, function);
+                fallback.capture_remaining(function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                fallback.load_and_release(self, function);
+                // The pending primitive condition survives these balanced root
+                // clears. No borrowed row/shape root reaches source fallback.
+                entry.release(self, function);
+                self.open_frame(ControlFrameKind::If, function);
+                self.compile_classic_for_iterations(
+                    test,
+                    update,
+                    body,
+                    lexical_environment,
+                    labels,
+                    break_frame,
+                    function,
+                )?;
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+            } else {
+                self.open_frame(ControlFrameKind::If, function);
+                self.compile_scalar_number_loop(&plan, &entry, function);
+                function.instruction(&Instruction::Else);
+                self.compile_classic_for_iterations(
+                    test,
+                    update,
+                    body,
+                    lexical_environment,
+                    labels,
+                    break_frame,
+                    function,
+                )?;
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                entry.release(self, function);
+            }
         } else {
             self.compile_classic_for_iterations(
                 test,

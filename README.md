@@ -39,8 +39,9 @@ literal trip counts can use one guarded affine transform after the existing
 Number and native-method checks; dirty bindings and the last body completion
 share the ordinary loop exit.
 Read-only loops over dense Number Arrays can borrow one guarded backing and
-keep their counter and arithmetic in primitive locals. Other layouts, effects
-and index forms retain ordinary property access and coercion.
+keep their counter and arithmetic in primitive locals. Closed row reads can also
+validate uniform own-data shapes and Number leaves before using direct slots.
+Other layouts, effects and index forms retain ordinary property access and coercion.
 Bounded integer sums can reduce a complete trip when every sequential Number
 operation stays exact. Pure loops that observe only the length of a native
 Array join on Strings can compute it once behind live method and layout guards.
@@ -77,6 +78,14 @@ within the existing module budget. Its separate hot-R control passes. The direct
 reference has median and mean wins on **6/17 Scriptc** and **2/17 V8** cases;
 overall parity remains open. Slower controls and unequal setup boundaries remain
 explicit. These local results do not refresh the published CI cohorts.
+
+The [compact-row checkpoint](docs/rust-rewrite/compact-rows-20261101.json) records
+**about 21% lower object medians** and **28% lower retained-object medians** in
+both blocks. Its separate precompiled control improves 14–22% without a repeated
+veto. Both R/native profiles and the other 15 original programs stay byte-identical.
+The refreshed reference still wins on 2/17 V8 and 6/17 Scriptc cases; its object
+mean is 9% slower than baseline despite a faster median. All observations and
+setup boundaries remain in the record; overall parity remains open.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

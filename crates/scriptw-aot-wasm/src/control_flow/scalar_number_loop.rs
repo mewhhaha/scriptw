@@ -2,13 +2,15 @@
 //!
 //! The checked plan contains the entire test/body/update region. No admitted
 //! operation can call source code, observe a deferred store, or leave the loop
-//! abruptly. Entry tags and initialization are runtime facts; failure keeps the
-//! original loop, including its coercions, references and completion handling.
+//! abruptly. Entry misses keep the original loop. Compact row misses publish
+//! the completed prefix and resume its original coercions/completion handling.
 use super::*;
 use crate::emit::LocalBindingId;
 
 mod dense_array;
-use dense_array::{ArrayRead, DenseArrayBorrow, DenseNumberArrayLoop, PropertyReadView};
+use dense_array::{ArrayRead, ArrayReadBorrow, ArrayReadLoop, PropertyReadView};
+mod compact_path;
+use compact_path::{CompactPathBorrow, CompactPathId, CompactReadPath};
 mod joined_length;
 use joined_length::{JoinedLengthFact, JoinedStringArrayLength};
 
@@ -58,6 +60,7 @@ enum NumberExpression {
     Binding(usize),
     ArrayLength,
     ArrayElement,
+    CompactPath(CompactPathId),
     JoinedLength,
     Negate(Box<Self>),
     Arithmetic(NumberArithmetic, Box<Self>, Box<Self>),
@@ -128,12 +131,12 @@ impl LoopLocal {
 struct LoopLocals<'a> {
     bindings: &'a [NumberBinding],
     values: Vec<LoopLocal>,
-    invariant: Option<&'a RegionFact>,
+    invariant: Option<&'a RegionFact<'a>>,
 }
 
 impl LoopLocals<'_> {
-    fn dense(&self) -> &DenseArrayBorrow {
-        let Some(RegionFact::DenseNumbers(borrow)) = self.invariant else {
+    fn array(&self) -> &ArrayReadBorrow<'_> {
+        let Some(RegionFact::ArrayReads(borrow)) = self.invariant else {
             unreachable!("dense reads require their matching entry fact");
         };
         borrow
@@ -149,28 +152,28 @@ impl LoopLocals<'_> {
 
 /// One region owns one closed fact. Conflicting receivers/operations decline.
 enum RegionInvariant {
-    DenseNumbers(DenseNumberArrayLoop),
+    ArrayReads(ArrayReadLoop),
     JoinedStringLength(JoinedStringArrayLength),
 }
 
 impl RegionInvariant {
     fn is_receiver(&self, id: LocalBindingId) -> bool {
         match self {
-            Self::DenseNumbers(array) => array.is_array(id),
+            Self::ArrayReads(array) => array.is_array(id),
             Self::JoinedStringLength(joined) => joined.receiver() == id,
         }
     }
 }
 
-enum RegionFact {
-    DenseNumbers(DenseArrayBorrow),
+enum RegionFact<'a> {
+    ArrayReads(ArrayReadBorrow<'a>),
     JoinedStringLength(JoinedLengthFact),
 }
 
-impl RegionFact {
+impl RegionFact<'_> {
     fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         match self {
-            Self::DenseNumbers(array) => array.release(builder, function),
+            Self::ArrayReads(array) => array.release(builder, function),
             Self::JoinedStringLength(length) => length.release(builder, function),
         }
     }
@@ -189,15 +192,52 @@ pub(super) struct ScalarNumberLoop {
 }
 
 /// Carries the actual guarded roots until either loop path has completed.
-pub(super) struct ScalarNumberLoopEntry {
-    fact: Option<RegionFact>,
+pub(super) struct ScalarNumberLoopEntry<'a> {
+    fact: Option<RegionFact<'a>>,
 }
 
-impl ScalarNumberLoopEntry {
+impl<'a> ScalarNumberLoopEntry<'a> {
+    pub(super) fn compact_fallback(
+        &self,
+        builder: &FunctionBuilder<'_>,
+        function: &mut Function,
+    ) -> Option<CompactLoopFallback<'_, 'a>> {
+        let Some(RegionFact::ArrayReads(array)) = &self.fact else {
+            return None;
+        };
+        if !array.is_compact() {
+            return None;
+        }
+        let needed = builder.runtime_schema().reserve_i32_local(function);
+        needed.set_constant(1, function);
+        Some(CompactLoopFallback { array, needed })
+    }
+
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         if let Some(fact) = self.fact {
             fact.release(builder, function);
         }
+    }
+}
+
+/// The caller owns the original loop. A completed compact prefix reaches the
+/// existing scalar publication tail, then this same borrow selects continuation.
+pub(super) struct CompactLoopFallback<'a, 'p> {
+    array: &'a ArrayReadBorrow<'p>,
+    needed: I32Local,
+}
+
+impl CompactLoopFallback<'_, '_> {
+    pub(super) fn capture_remaining(&self, function: &mut Function) {
+        self.array.emit_test(function);
+        self.needed.store(function);
+    }
+
+    pub(super) fn load_and_release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        self.needed.load(function);
+        builder
+            .runtime_schema()
+            .release_i32_local(self.needed, function);
     }
 }
 
@@ -239,7 +279,7 @@ impl ScalarNumberLoop {
         if let Some(update) = &self.update {
             update.emit_discard(builder, locals, function);
         }
-        if let Some(RegionFact::DenseNumbers(array)) = locals.invariant {
+        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
             array.advance(function);
         }
     }
@@ -267,8 +307,8 @@ impl ScalarNumberLoop {
             bindings: Vec::new(),
             remaining: MAX_NODES,
             imul: Vec::new(),
-            invariant: DenseNumberArrayLoop::new(builder, source_test, update)
-                .map(RegionInvariant::DenseNumbers),
+            invariant: ArrayReadLoop::new(builder, source_test, update)
+                .map(RegionInvariant::ArrayReads),
         };
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
@@ -277,15 +317,16 @@ impl ScalarNumberLoop {
             Some(expression) => Some(proof.expression(expression, MAX_DEPTH)?),
             None => None,
         };
-        if let Some(RegionInvariant::DenseNumbers(array)) = &proof.invariant {
+        if let Some(RegionInvariant::ArrayReads(array)) = &proof.invariant {
             if !array.body_preserves_counter(&proof.bindings, &expressions) {
                 return None;
             }
         }
-        if matches!(
+        if (matches!(
             proof.invariant.as_ref(),
             Some(RegionInvariant::JoinedStringLength(_))
-        ) && !proof.imul.is_empty()
+        ) || matches!(proof.invariant.as_ref(), Some(RegionInvariant::ArrayReads(array)) if array.is_compact()))
+            && !proof.imul.is_empty()
         {
             return None;
         }
@@ -316,7 +357,7 @@ impl ScalarNumberLoop {
         // four body expansions therefore never exceed MAX_NODES source nodes.
         let dense_four_step = matches!(
             proof.invariant.as_ref(),
-            Some(RegionInvariant::DenseNumbers(_))
+            Some(RegionInvariant::ArrayReads(array)) if !array.is_compact()
         ) && MAX_NODES - proof.remaining <= MAX_NODES / 4;
         let mut plan = Self {
             bindings: proof.bindings,
@@ -337,7 +378,7 @@ impl ScalarNumberLoop {
         &self,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> Result<ScalarNumberLoopEntry, EmitError> {
+    ) -> Result<ScalarNumberLoopEntry<'_>, EmitError> {
         function.instruction(&Instruction::I32Const(1));
         for binding in &self.bindings {
             let source = builder.local_binding(binding.id);
@@ -396,8 +437,8 @@ impl ScalarNumberLoop {
             }
             if let Some(invariant) = &self.invariant {
                 fact = Some(match invariant {
-                    RegionInvariant::DenseNumbers(plan) => RegionFact::DenseNumbers(
-                        DenseArrayBorrow::new(plan, builder, accepted, function),
+                    RegionInvariant::ArrayReads(plan) => RegionFact::ArrayReads(
+                        ArrayReadBorrow::new(plan, builder, accepted, function),
                     ),
                     RegionInvariant::JoinedStringLength(plan) => {
                         // Speculate only after Number/initialization admission.
@@ -468,6 +509,10 @@ impl LoopProof<'_, '_> {
     fn binding(&mut self, name: &str, written: bool) -> Option<usize> {
         // Captured cells and actual global mirrors keep their observable owner.
         let id = self.builder.private_local_binding(name)?;
+        self.binding_id(id, written)
+    }
+
+    fn binding_id(&mut self, id: LocalBindingId, written: bool) -> Option<usize> {
         // A receiver cannot also become a deferred Number binding, even in
         // syntax whose result would be discarded or whose branch never runs.
         if self
@@ -511,12 +556,17 @@ impl LoopProof<'_, '_> {
             return Some(NumberExpression::JoinedLength);
         }
         if let Some(read) = PropertyReadView::of(value) {
-            let Some(RegionInvariant::DenseNumbers(array)) = self.invariant.as_ref() else {
+            let Some(RegionInvariant::ArrayReads(array)) = self.invariant.as_mut() else {
                 return None;
             };
-            return Some(match array.read(self.builder, read)? {
+            let (read, column) = array.read(self.builder, read)?;
+            if let Some(column) = column {
+                self.binding_id(column, false)?;
+            }
+            return Some(match read {
                 ArrayRead::Length => NumberExpression::ArrayLength,
                 ArrayRead::Element => NumberExpression::ArrayElement,
+                ArrayRead::CompactPath(path) => NumberExpression::CompactPath(path),
             });
         }
         Some(match &value.expr {
@@ -672,6 +722,7 @@ impl NumberExpression {
             ),
             Self::Binding(_)
             | Self::ArrayElement
+            | Self::CompactPath(_)
             | Self::JoinedLength
             | Self::Negate(_)
             | Self::Compound(_, _, _)
@@ -781,6 +832,7 @@ impl NumberExpression {
             | Self::Binding(_)
             | Self::ArrayLength
             | Self::ArrayElement
+            | Self::CompactPath(_)
             | Self::JoinedLength => {}
         }
     }
@@ -938,8 +990,9 @@ impl NumberExpression {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
             Self::Binding(index) => locals.values[*index].load_number(function),
-            Self::ArrayLength => locals.dense().emit_length(function),
-            Self::ArrayElement => locals.dense().emit_element(builder, function),
+            Self::ArrayLength => locals.array().emit_length(function),
+            Self::ArrayElement => locals.array().emit_element(builder, function),
+            Self::CompactPath(path) => locals.array().emit_compact_path(*path, function),
             Self::JoinedLength => locals.joined().emit(function),
             Self::Negate(value) => {
                 value.emit(builder, locals, function);
@@ -1066,7 +1119,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn compile_scalar_number_loop(
         &mut self,
         plan: &ScalarNumberLoop,
-        entry: &ScalarNumberLoopEntry,
+        entry: &ScalarNumberLoopEntry<'_>,
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
@@ -1133,7 +1186,7 @@ impl FunctionBuilder<'_> {
             chunked.emit(self, plan, &locals, value, iterated, function);
         }
         if plan.dense_four_step {
-            let array = locals.dense();
+            let array = locals.array();
             let done = self.open_frame(ControlFrameKind::Block, function);
             let next = self.open_frame(ControlFrameKind::Loop, function);
             array.emit_four_step_test(function);
@@ -1150,13 +1203,21 @@ impl FunctionBuilder<'_> {
         }
         let done = self.open_frame(ControlFrameKind::Block, function);
         let next = self.open_frame(ControlFrameKind::Loop, function);
-        if let Some(RegionFact::DenseNumbers(array)) = locals.invariant {
+        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
             array.emit_test(function);
         } else {
             plan.test.emit(self, &locals, function);
         }
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, function);
+        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
+            if let Some(ready) = array.try_prepare_row(self, function) {
+                ready.load(function);
+                schema.release_i32_local(ready, function);
+                function.instruction(&Instruction::I32Eqz);
+                self.emit_branch_if_to_target(done, function);
+            }
+        }
         plan.emit_iteration(self, &locals, value, iterated, function);
         self.emit_branch_to_target(next, function);
         self.pop_control(ControlFrameKind::Loop);

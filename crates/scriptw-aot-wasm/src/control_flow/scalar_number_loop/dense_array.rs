@@ -1,18 +1,29 @@
-//! One immutable dense Number borrow belongs to the complete scalar region.
+//! One canonical indexed Array borrow belongs to the complete scalar region.
 use super::*;
 
 pub(super) enum ArrayRead {
     Length,
     Element,
+    CompactPath(CompactPathId),
 }
 
 /// Construction fixes the sole receiver, induction binding and loop shape.
-pub(super) struct DenseNumberArrayLoop {
+pub(super) struct ArrayReadLoop {
     array: LocalBindingId,
     counter: LocalBindingId,
+    paths: ReadPaths,
 }
 
-fn private_local(builder: &FunctionBuilder<'_>, expression: &TypedExpr) -> Option<LocalBindingId> {
+enum ReadPaths {
+    LengthOnly,
+    Numbers,
+    Compact(Vec<CompactReadPath>),
+}
+
+pub(super) fn private_local(
+    builder: &FunctionBuilder<'_>,
+    expression: &TypedExpr,
+) -> Option<LocalBindingId> {
     let ExprIr::Identifier(name) = &expression.expr else {
         return None;
     };
@@ -78,7 +89,7 @@ impl<'a> PropertyReadView<'a> {
     }
 }
 
-impl DenseNumberArrayLoop {
+impl ArrayReadLoop {
     pub(super) fn new(
         builder: &FunctionBuilder<'_>,
         test: &TypedExpr,
@@ -118,7 +129,11 @@ impl DenseNumberArrayLoop {
         {
             return None;
         }
-        Some(Self { array, counter })
+        Some(Self {
+            array,
+            counter,
+            paths: ReadPaths::LengthOnly,
+        })
     }
 
     pub(super) fn is_array(&self, id: LocalBindingId) -> bool {
@@ -131,24 +146,58 @@ impl DenseNumberArrayLoop {
             .position(|binding| binding.id == self.counter)
     }
 
+    pub(super) fn is_compact(&self) -> bool {
+        matches!(self.paths, ReadPaths::Compact(_))
+    }
+
+    fn is_counter_key(&self, builder: &FunctionBuilder<'_>, key: ReadKey<'_>) -> bool {
+        let ReadKey::Computed(index) = key else {
+            return false;
+        };
+        private_local(builder, index) == Some(self.counter)
+    }
+
     pub(super) fn read(
-        &self,
+        &mut self,
         builder: &FunctionBuilder<'_>,
         read: PropertyReadView<'_>,
-    ) -> Option<ArrayRead> {
-        if private_local(builder, read.target)? != self.array {
+    ) -> Option<(ArrayRead, Option<LocalBindingId>)> {
+        if private_local(builder, read.target) == Some(self.array) {
+            if read.key.is_length() {
+                return Some((ArrayRead::Length, None));
+            }
+            if !self.is_counter_key(builder, read.key) || self.is_compact() {
+                return None;
+            }
+            self.paths = ReadPaths::Numbers;
+            return Some((ArrayRead::Element, None));
+        }
+        let (path, row) = CompactReadPath::new(builder, read)?;
+        let row = PropertyReadView::of(row)?;
+        if private_local(builder, row.target) != Some(self.array)
+            || !self.is_counter_key(builder, row.key)
+            || path
+                .input()
+                .is_some_and(|id| id == self.array || id == self.counter)
+        {
             return None;
         }
-        if read.key.is_length() {
-            return Some(ArrayRead::Length);
+        let input = path.input();
+        if matches!(self.paths, ReadPaths::LengthOnly) {
+            self.paths = ReadPaths::Compact(Vec::new());
         }
-        let ReadKey::Computed(index) = read.key else {
+        let ReadPaths::Compact(paths) = &mut self.paths else {
             return None;
         };
-        if private_local(builder, index)? != self.counter {
+        if let Some(index) = paths.iter().position(|existing| existing == &path) {
+            return Some((ArrayRead::CompactPath(CompactPathId::new(index)), input));
+        }
+        if paths.len() == 2 {
             return None;
         }
-        Some(ArrayRead::Element)
+        let index = paths.len();
+        paths.push(path);
+        Some((ArrayRead::CompactPath(CompactPathId::new(index)), input))
     }
 
     pub(super) fn body_preserves_counter(
@@ -163,23 +212,64 @@ impl DenseNumberArrayLoop {
         for expression in body {
             expression.collect_writes(&mut writes);
         }
-        writes[counter].is_none()
+        if writes[counter].is_some() {
+            return false;
+        }
+        if let ReadPaths::Compact(paths) = &self.paths {
+            for input in paths.iter().filter_map(CompactReadPath::input) {
+                if !bindings
+                    .iter()
+                    .any(|binding| binding.id == input && !binding.written)
+                {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
 /// Only this guarded constructor can root the private region's receiver and
 /// backing. Nullable roots stay empty whenever the original loop must run.
-pub(super) struct DenseArrayBorrow {
+pub(super) struct ArrayReadBorrow<'a> {
     array: GcLocal<ArrayObject, Nullable>,
-    numbers: GcLocal<NumberBitsI64Array, Nullable>,
+    backing: ReadBacking<'a>,
     length: I64Local,
     length_number: F64Local,
     slot: I32Local,
 }
 
-impl DenseArrayBorrow {
+enum ReadBacking<'a> {
+    Numbers(GcLocal<NumberBitsI64Array, Nullable>),
+    Compact(CompactPathBorrow<'a>),
+}
+
+impl ReadBacking<'_> {
+    fn mode(&self) -> ArrayIndexedStorageMode {
+        match self {
+            Self::Numbers(_) => ArrayIndexedStorageMode::PackedNumbers,
+            Self::Compact(_) => ArrayIndexedStorageMode::PackedValues,
+        }
+    }
+
+    fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        match self {
+            Self::Numbers(numbers) => numbers.set_null(builder.runtime_schema(), function),
+            Self::Compact(rows) => rows.clear_roots(builder, function),
+        }
+    }
+
+    fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        match self {
+            Self::Numbers(numbers) => numbers.clear(function),
+            Self::Compact(rows) => rows.release(builder, function),
+        }
+    }
+}
+
+impl<'a> ArrayReadBorrow<'a> {
     pub(super) fn new(
-        plan: &DenseNumberArrayLoop,
+        plan: &'a ArrayReadLoop,
         builder: &mut FunctionBuilder<'_>,
         accepted: I32Local,
         function: &mut Function,
@@ -187,7 +277,14 @@ impl DenseArrayBorrow {
         let s = builder.runtime_schema();
         let borrow = Self {
             array: s.reserve_gc_local(function).initialize_null(s, function),
-            numbers: s.reserve_gc_local(function).initialize_null(s, function),
+            backing: match &plan.paths {
+                ReadPaths::LengthOnly | ReadPaths::Numbers => {
+                    ReadBacking::Numbers(s.reserve_gc_local(function).initialize_null(s, function))
+                }
+                ReadPaths::Compact(paths) => {
+                    ReadBacking::Compact(CompactPathBorrow::new(paths, builder, function))
+                }
+            },
             length: s.reserve_i64_local(function),
             length_number: s.reserve_f64_local(function),
             slot: s.reserve_i32_local(function),
@@ -232,9 +329,7 @@ impl DenseArrayBorrow {
         );
         s.field(ArrayObjectSchema::MODE)
             .read(&borrow.array, s, function);
-        function.instruction(&Instruction::I32Const(
-            ArrayIndexedStorageMode::PackedNumbers.encode(),
-        ));
+        function.instruction(&Instruction::I32Const(borrow.backing.mode().encode()));
         function.instruction(&Instruction::I32Ne);
         builder.emit_branch_if_to_target(decline, function);
         s.field(ArrayObjectSchema::LENGTH)
@@ -249,15 +344,25 @@ impl DenseArrayBorrow {
         borrow.length.load(function);
         function.instruction(&Instruction::I64Ne);
         builder.emit_branch_if_to_target(decline, function);
-        borrow.numbers.replace(
-            s.field(ArrayObjectSchema::NUMBERS)
-                .read(&borrow.array, s, function)
-                .reference()
-                .nullable(),
-            function,
-        );
-        s.array_type::<NumberBitsI64Array>()
-            .length(&borrow.numbers, s, function);
+        match &borrow.backing {
+            ReadBacking::Numbers(numbers) => {
+                numbers.replace(
+                    s.field(ArrayObjectSchema::NUMBERS)
+                        .read(&borrow.array, s, function)
+                        .reference()
+                        .nullable(),
+                    function,
+                );
+                s.array_type::<NumberBitsI64Array>()
+                    .length(numbers, s, function);
+            }
+            ReadBacking::Compact(rows) => {
+                rows.capture(&borrow.array, builder, function);
+                rows.missing(builder, function);
+                builder.emit_branch_if_to_target(decline, function);
+                rows.emit_capacity(builder, function);
+            }
+        }
         function.instruction(&Instruction::I64ExtendI32U);
         borrow.length.load(function);
         function.instruction(&Instruction::I64LtU);
@@ -294,6 +399,9 @@ impl DenseArrayBorrow {
         borrow.length.load(function);
         function.instruction(&Instruction::F64ConvertI64U);
         borrow.length_number.store(function);
+        if let ReadBacking::Compact(rows) = &borrow.backing {
+            rows.capture_columns(builder, decline, function);
+        }
         accepted.set_constant(1, function);
         builder.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
@@ -303,7 +411,7 @@ impl DenseArrayBorrow {
         function.instruction(&Instruction::I32Eqz);
         builder.open_frame(ControlFrameKind::If, function);
         borrow.array.set_null(s, function);
-        borrow.numbers.set_null(s, function);
+        borrow.backing.clear_roots(builder, function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         borrow
@@ -311,6 +419,28 @@ impl DenseArrayBorrow {
 
     pub(super) fn emit_length(&self, function: &mut Function) {
         self.length_number.load(function);
+    }
+
+    pub(super) fn is_compact(&self) -> bool {
+        matches!(self.backing, ReadBacking::Compact(_))
+    }
+
+    pub(super) fn try_prepare_row(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) -> Option<I32Local> {
+        let ReadBacking::Compact(rows) = &self.backing else {
+            return None;
+        };
+        Some(rows.try_prepare_row(self.slot, builder, function))
+    }
+
+    pub(super) fn emit_compact_path(&self, path: CompactPathId, function: &mut Function) {
+        let ReadBacking::Compact(rows) = &self.backing else {
+            unreachable!("compact leaves require their matching guarded backing");
+        };
+        rows.emit_number(path, function);
     }
 
     pub(super) fn emit_test(&self, function: &mut Function) {
@@ -339,14 +469,17 @@ impl DenseArrayBorrow {
 
     pub(super) fn emit_element(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         let s = builder.runtime_schema();
+        let ReadBacking::Numbers(numbers) = &self.backing else {
+            unreachable!("direct Number reads require their matching guarded backing");
+        };
         s.array_type::<NumberBitsI64Array>()
-            .read(&self.numbers, self.slot, s, function);
+            .read(numbers, self.slot, s, function);
         function.instruction(&Instruction::F64ReinterpretI64);
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         let s = builder.runtime_schema();
-        self.numbers.clear(function);
+        self.backing.release(builder, function);
         self.array.clear(function);
         s.release_f64_local(self.length_number, function);
         s.release_i32_local(self.slot, function);

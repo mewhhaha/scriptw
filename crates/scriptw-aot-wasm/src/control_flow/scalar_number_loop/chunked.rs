@@ -271,6 +271,7 @@ fn node_count(value: &NumberExpression) -> usize {
         | NumberExpression::Binding(_)
         | NumberExpression::ArrayLength
         | NumberExpression::ArrayElement
+        | NumberExpression::CompactPath(_)
         | NumberExpression::JoinedLength
         | NumberExpression::Update(_, _, _) => 0,
         NumberExpression::Negate(value)

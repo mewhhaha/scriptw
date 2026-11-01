@@ -284,6 +284,341 @@ fn dense_number_body_budget_retains_scalar_admission() {
     );
 }
 
+struct CompactRegionTypes {
+    array: u32,
+    ordinary: u32,
+    inline: u32,
+    values: u32,
+    numbers: u32,
+}
+
+impl CompactRegionTypes {
+    fn new() -> Self {
+        fn index<T: crate::gc_types::GcHeapType>(schema: &crate::gc_types::RuntimeSchema) -> u32 {
+            let wasm_encoder::HeapType::Concrete(index) = schema
+                .reference_type::<T>(GcNullability::NonNullable)
+                .heap_type
+            else {
+                panic!("region storage has a concrete registered type");
+            };
+            index
+        }
+        let registered =
+            RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Standalone)
+                .finalize_globals(GlobalLedger::new(), false, 0);
+        let schema = registered.globals().schema();
+        Self {
+            array: index::<crate::gc_types::ArrayObject>(schema),
+            ordinary: index::<crate::gc_types::OrdinaryObject>(schema),
+            inline: index::<crate::gc_types::InlineCompactDataStorage>(schema),
+            values: index::<crate::gc_types::PackedValueTable>(schema),
+            numbers: index::<NumberBitsI64Array>(schema),
+        }
+    }
+}
+
+fn compact_string_equality(artifact: &WasmArtifact) -> Option<u32> {
+    let runtime = artifact.runtime().expect("ordinary canonical runtime");
+    let equality = function_names_in_bytes(runtime.bytes())
+        .into_iter()
+        .find_map(|(index, name)| (name == "helper::string_equality").then_some(index))
+        .expect("canonical pure String equality helper");
+    imported_runtime_function_index(artifact, equality)
+}
+
+fn compact_payload_loop(
+    operators: &[Operator<'_>],
+    types: &CompactRegionTypes,
+    equality: Option<u32>,
+) -> bool {
+    // Generic property reads also contain compact-storage caches. The closed
+    // row region permits only pure String equality and never writes the heap.
+    operators.iter().all(|op| match op {
+        Operator::Call { function_index } => Some(*function_index) == equality,
+        Operator::CallRef { .. }
+        | Operator::CallIndirect { .. }
+        | Operator::ReturnCall { .. }
+        | Operator::ReturnCallRef { .. }
+        | Operator::ReturnCallIndirect { .. }
+        | Operator::StructSet { .. }
+        | Operator::ArraySet { .. }
+        | Operator::GlobalSet { .. }
+        | Operator::StructNew { .. }
+        | Operator::StructNewDefault { .. }
+        | Operator::ArrayNew { .. }
+        | Operator::ArrayNewDefault { .. }
+        | Operator::ArrayNewFixed { .. }
+        | Operator::ArrayNewData { .. }
+        | Operator::ArrayNewElem { .. } => false,
+        _ => true,
+    }) && operators.iter().any(|op| {
+        matches!(op,
+        Operator::StructGet { struct_type_index, field_index: 2..=5 }
+            if *struct_type_index == types.inline)
+    }) && operators.iter().any(|op| {
+        matches!(op,
+            Operator::StructGet { struct_type_index, field_index: 0 }
+                if *struct_type_index == types.inline)
+    }) && operators.iter().any(|op| matches!(op, Operator::RefEq))
+        && operators.iter().any(|op| matches!(op, Operator::F64Add))
+        && operators.iter().any(|op| {
+            matches!(op,
+            Operator::ArrayGet { array_type_index } if *array_type_index == types.values)
+        })
+}
+
+fn compact_loop_ranges(
+    operators: &[Operator<'_>],
+    types: &CompactRegionTypes,
+    equality: Option<u32>,
+) -> Vec<std::ops::Range<usize>> {
+    let ranges = loop_ranges(operators)
+        .into_iter()
+        .filter(|range| compact_payload_loop(&operators[range.clone()], types, equality))
+        .collect::<Vec<_>>();
+    // The retained-object fixture has an ordinary outer column loop containing
+    // this region. Select the actual inner row owner, not its enclosing loop.
+    ranges
+        .iter()
+        .filter(|range| {
+            !ranges
+                .iter()
+                .any(|child| child.start > range.start && child.end < range.end)
+        })
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn original_object_checksums_have_one_guarded_compact_read_loop() {
+    let types = CompactRegionTypes::new();
+    for (source, nested) in [
+        (
+            include_str!("../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/objects.js"),
+            false,
+        ),
+        (
+            include_str!(
+                "../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/retained-objects.js"
+            ),
+            true,
+        ),
+    ] {
+        let artifact = emit_script(source).expect("original object workload emits");
+        let equality = compact_string_equality(&artifact);
+        with_source_artifact_variants(artifact, "workload", |name, operators| {
+            let compact = compact_loop_ranges(operators, &types, equality);
+            assert_eq!(
+                compact.len(),
+                1,
+                "one guarded loop, without a separate row scan: {name}"
+            );
+            let region = &operators[compact[0].clone()];
+            assert!(region.iter().any(|op| matches!(op, Operator::I32LtU)));
+            assert!(
+                region.iter().all(|op| !matches!(
+                    op,
+                    Operator::I32TruncSatF64U
+                        | Operator::I32TruncSatF64S
+                        | Operator::I32TruncF64U
+                        | Operator::I32TruncF64S
+                )),
+                "induction and column conversion remain outside the body"
+            );
+            assert_eq!(
+                region.iter().any(|op| matches!(op,
+                Operator::ArrayGet { array_type_index } if *array_type_index == types.numbers)),
+                nested,
+                "only nested Number leaves read a Number backing"
+            );
+            assert!(
+                loop_ranges(operators)
+                    .iter()
+                    .any(|range| range.start > compact[0].end
+                        && operators[range.clone()]
+                            .iter()
+                            .any(|op| matches!(op, Operator::Call { .. }))),
+                "guard miss keeps the later ordered generic loop: {name}"
+            );
+        });
+    }
+}
+
+#[test]
+fn compact_read_regions_require_closed_paths_and_private_unchanged_inputs() {
+    let types = CompactRegionTypes::new();
+    for (body, expected) in [
+        ("total+=rows[i].x+rows[i].y;", true),
+        ("total+=rows[i].values[column];", true),
+        ("total+=rows[i].values[i];", false),
+        ("total+=rows[i+1].x;", false),
+        ("total+=other[i].x;", false),
+        ("total+=rows[i][key];", false),
+        ("total+=rows[i].values[column+1];", false),
+        ("total+=rows[i].values[column];column++;", false),
+        ("column++;total+=rows[i].values[column];", false),
+        ("total+=rows[i].x;rows[i].x=7;", false),
+        ("total+=rows[i].x;rows=other;", false),
+        ("total+=rows[i].x;i++;", false),
+        ("total+=rows[i].x;observe();", false),
+    ] {
+        let source = format!("function varied(rows,other,column,key){{'use strict';var total=0;for(var i=0;i<rows.length;i++){{{body}}}return total;}}varied([],[],0,'x');");
+        let artifact = emit_script(&source).expect("compact admission emits");
+        let equality = compact_string_equality(&artifact);
+        with_source_artifact_variants(artifact, "varied", |name, operators| {
+            assert_eq!(
+                loop_regions(operators)
+                    .iter()
+                    .any(|region| compact_payload_loop(region, &types, equality)),
+                expected,
+                "{name}: {body}"
+            )
+        });
+    }
+    for (source, expected) in [
+        ("var rows,i,total,column;function varied(rows,column){'use strict';var total=0;for(var i=0;i<rows.length;i++)total+=rows[i].values[column];return total;}varied([],0);", true),
+        ("var rows=[];function varied(){'use strict';var total=0;for(var i=0;i<rows.length;i++)total+=rows[i].x;return total;}varied();", false),
+        ("function varied(rows){'use strict';function capture(){return rows;}var total=0;for(var i=0;i<rows.length;i++)total+=rows[i].x;return total+capture().length;}varied([]);", false),
+        ("function varied(rows,column){var total=0;for(var i=0;i<rows.length;i++)total+=rows[i].values[column];return [total,arguments[0]];}varied([],0);", false),
+    ] {
+        let artifact = emit_script(source).expect("compact binding control emits");
+        let equality = compact_string_equality(&artifact);
+        with_source_artifact_variants(artifact,
+            "varied", |name, operators| assert_eq!(loop_regions(operators).iter()
+                .any(|region| compact_payload_loop(region, &types, equality)), expected, "{name}: {source}"));
+    }
+}
+
+#[test]
+fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume() {
+    let types = CompactRegionTypes::new();
+    let source = "function varied(rows,column,start,total){'use strict';for(var i=start;i<rows.length;i++)total+=rows[i].values[column];return total;}varied([],0,0,0);";
+    let artifact = emit_script(source).expect("prefix continuation emits");
+    let equality = compact_string_equality(&artifact);
+    with_source_artifact_variants(artifact, "varied", |name, operators| {
+        let compact = compact_loop_ranges(operators, &types, equality);
+        assert_eq!(compact.len(), 1, "actual guarded row loop: {name}");
+        let range = &compact[0];
+        let region = &operators[range.clone()];
+        let [Operator::LocalGet {
+            local_index: cursor,
+        }, Operator::LocalGet {
+            local_index: length,
+        }, Operator::I32WrapI64, Operator::I32LtU, Operator::I32Eqz, Operator::BrIf { relative_depth: 1 }, ..] =
+            region
+        else {
+            panic!("zero trips leave before any row/key inspection: {name}");
+        };
+        let first_arithmetic = region
+            .iter()
+            .position(|op| matches!(op, Operator::F64Add))
+            .expect("source accumulator arithmetic");
+        let ready_exit = region[..first_arithmetic]
+            .windows(3)
+            .rposition(|ops| {
+                matches!(
+                    ops,
+                    [
+                        Operator::LocalGet { .. },
+                        Operator::I32Eqz,
+                        Operator::BrIf { relative_depth: 1 }
+                    ]
+                )
+            })
+            .expect("a failed complete row exits to the common scalar publication");
+        let guard = &region[..ready_exit];
+        for index in [types.ordinary, types.inline, types.array] {
+            let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index));
+            assert!(
+                guard.iter().any(|op| matches!(op,
+                Operator::RefTestNonNull { hty } if *hty == heap)),
+                "every row checks actual own storage and nested Array identity"
+            );
+        }
+        for field in [2, 3, 6, 7] {
+            assert!(
+                guard.iter().any(|op| matches!(op,
+                Operator::StructGet { struct_type_index, field_index }
+                    if *struct_type_index == types.array && *field_index == field)),
+                "each nested Array validates length, occupancy, mode and Number backing"
+            );
+        }
+        assert!(
+            guard.iter().any(|op| matches!(op, Operator::I64GeU)),
+            "the column is bounded by this row's actual nested length"
+        );
+        assert!(
+            guard.iter().any(|op| matches!(op, Operator::I64LtU)),
+            "nested capacity is checked before indexing"
+        );
+        assert!(
+            region[ready_exit + 3..].iter().all(|op| !matches!(
+                op,
+                Operator::Call { .. }
+                    | Operator::StructGet { .. }
+                    | Operator::ArrayGet { .. }
+                    | Operator::RefTestNonNull { .. }
+                    | Operator::RefTestNullable { .. }
+            )),
+            "all leaves are captured before any source arithmetic/update"
+        );
+
+        let fallback = loop_ranges(operators)
+            .into_iter()
+            .find(|candidate| {
+                candidate.start > range.end
+                    && operators[candidate.clone()]
+                        .iter()
+                        .any(|op| matches!(op, Operator::Call { .. }))
+            })
+            .expect("one later original iteration owner");
+        let between = &operators[range.end + 1..fallback.start];
+        assert!(
+            between.windows(5).any(|ops| matches!(ops,
+            [Operator::LocalGet { local_index: actual_cursor },
+             Operator::LocalGet { local_index: actual_length }, Operator::I32WrapI64,
+             Operator::I32LtU, Operator::LocalSet { .. }]
+                if actual_cursor == cursor && actual_length == length)),
+            "continuation uses the same bounded mirror and extent"
+        );
+        assert!(
+            between
+                .windows(3)
+                .filter(|ops| matches!(
+                    ops,
+                    [
+                        Operator::LocalGet { .. },
+                        Operator::I64ReinterpretF64,
+                        Operator::LocalSet { .. }
+                    ]
+                ))
+                .count()
+                >= 2,
+            "completed accumulator and original f64 counter are published before resume"
+        );
+        let backing = operators[..range.start]
+            .windows(2)
+            .find_map(|ops| match ops {
+                [Operator::StructGet {
+                    struct_type_index,
+                    field_index: 9,
+                }, Operator::LocalSet { local_index }]
+                    if *struct_type_index == types.array =>
+                {
+                    Some(*local_index)
+                }
+                _ => None,
+            })
+            .expect("canonical outer PackedValues is held in a typed root");
+        assert!(
+            between.windows(2).any(|ops| matches!(ops,
+            [Operator::RefNull { .. }, Operator::LocalSet { local_index }]
+                if *local_index == backing)),
+            "retained row backing is cleared before the generic loop can throw or leave"
+        );
+    });
+}
+
 fn exact_sum_routes(operators: &[Operator<'_>]) -> Vec<(i64, u64)> {
     let mut frames = Vec::new();
     let mut routes = Vec::new();
@@ -860,6 +1195,13 @@ fn with_source_artifact_variants(
 }
 
 fn loop_regions<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Operator<'a>]> {
+    loop_ranges(operators)
+        .into_iter()
+        .map(|range| &operators[range])
+        .collect()
+}
+
+fn loop_ranges(operators: &[Operator<'_>]) -> Vec<std::ops::Range<usize>> {
     let mut frames = Vec::new();
     let mut loops = Vec::new();
     for (index, operator) in operators.iter().enumerate() {
@@ -870,7 +1212,7 @@ fn loop_regions<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Operator<'a>]> {
             }
             Operator::End => {
                 if let Some(Some(start)) = frames.pop() {
-                    loops.push(&operators[start + 1..index]);
+                    loops.push(start + 1..index);
                 }
             }
             _ => {}

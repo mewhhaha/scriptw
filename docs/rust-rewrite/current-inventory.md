@@ -9,14 +9,16 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [entry checkpoint](entry-bootstrap-20261101.json) remains production
-  (`c5586f330`, ABI 42). The [unified six-kind namespace experiment](deferred-namespaces-20261101.json)
-  is rejected: retained-object hot-R CP medians rose +4.946/+4.820% and means
-  +3.671/+5.149% across the two blocks. Passing ordinary-target and first-touch
-  gates do not override this veto. Next measure P-only compact-row reads under
-  the [ownership contract](contracts/runtime-byte-ownership.md) and
-  [performance queue](../performance-hills.md). Preserve fresh-entry timing,
-  source/tool pins, slower control means and both
+  [compact-row checkpoint](compact-rows-20261101.json) lowers ordinary object
+  medians about 21% and retained-object medians about 28% in both blocks;
+  separate hot-R medians fall 14–14.5% and 20–22%, with no control veto.
+  Both ABI-42 R modules/native images and all 15 original control programs/code
+  sections remain byte-identical. This local evidence does not refresh published
+  CI charts or establish overall parity. The [namespace experiment](deferred-namespaces-20261101.json)
+  remains rejected. Next measure first-shape/key-slot setup in the compact loop
+  or private construction under the [ownership contract](contracts/runtime-byte-ownership.md)
+  and [performance queue](../performance-hills.md). Preserve fresh-entry timing,
+  source/tool pins, slower controls, A/A outliers and both
   [rejected](numeric-array-region-screen-20261101.json)
   [predecessors](joined-length-zero-trip-20261101.json).
 - Continue measuring module function storage after private activation `var`
