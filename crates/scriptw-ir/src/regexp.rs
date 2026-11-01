@@ -2689,7 +2689,7 @@ enum CodePointPropertyKind {
     },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum ScriptPropertyFamily {
     Script,
     Extensions,
@@ -2771,15 +2771,19 @@ impl<'a> RegExpCodePointProperty<'a> {
         }
     }
 
-    fn into_ranges(self) -> Option<Vec<(u32, u32)>> {
-        let base = match &self.kind {
+    fn icu_ranges(&self) -> Option<Vec<(u32, u32)>> {
+        match &self.kind {
             CodePointPropertyKind::Binary(property) => Some(binary_property_ranges(*property)),
             CodePointPropertyKind::GeneralCategory(group) => Some(general_category_ranges(*group)),
             CodePointPropertyKind::Script { family, value } => match value {
                 ScriptPropertyValue::PinnedIcu(script) => Some(script_ranges(*script, *family)),
                 ScriptPropertyValue::Unicode17(_) => None,
             },
-        };
+        }
+    }
+
+    fn into_ranges(self) -> Option<Vec<(u32, u32)>> {
+        let base = self.icu_ranges();
         crate::regexp_unicode17::apply_unicode17_delta(self, base)
     }
 }
@@ -2825,57 +2829,76 @@ impl RegExpUnicodePropertyCatalogEntry {
 /// image borrow this same once-validated authority; no Pattern selects rows.
 pub fn regexp_unicode_property_catalog() -> &'static [RegExpUnicodePropertyCatalogEntry] {
     static CATALOG: OnceLock<Vec<RegExpUnicodePropertyCatalogEntry>> = OnceLock::new();
-    CATALOG.get_or_init(|| {
-        use icu_properties::props::ParseableEnumeratedProperty;
-        let mut names = BTreeSet::new();
-        for property in UnicodePropertyBinary::ALL {
-            for alias in property.aliases() {
-                names.insert((*alias).to_owned());
-            }
+    CATALOG.get_or_init(|| build_unicode_property_catalog(script_ranges))
+}
+
+fn build_unicode_property_catalog(
+    mut script_provider: impl FnMut(Script, ScriptPropertyFamily) -> Vec<(u32, u32)>,
+) -> Vec<RegExpUnicodePropertyCatalogEntry> {
+    use icu_properties::props::ParseableEnumeratedProperty;
+    let mut names = BTreeSet::new();
+    for property in UnicodePropertyBinary::ALL {
+        for alias in property.aliases() {
+            names.insert((*alias).to_owned());
         }
-        for (alias, _) in GeneralCategoryGroup::SINGLETON.map.iter() {
-            names.insert(alias.clone());
-            for family in ["General_Category", "gc"] {
-                names.insert(format!("{family}={alias}"));
-            }
+    }
+    for (alias, _) in GeneralCategoryGroup::SINGLETON.map.iter() {
+        names.insert(alias.clone());
+        for family in ["General_Category", "gc"] {
+            names.insert(format!("{family}={alias}"));
         }
-        let mut scripts: BTreeSet<String> = Script::SINGLETON
-            .map
-            .iter()
-            .map(|(alias, _)| alias)
-            .collect();
-        for script in crate::regexp_unicode17::Unicode17Script::ALL {
-            scripts.extend(script.aliases().iter().map(|alias| (*alias).to_owned()));
+    }
+    let mut scripts: BTreeSet<String> = Script::SINGLETON
+        .map
+        .iter()
+        .map(|(alias, _)| alias)
+        .collect();
+    for script in crate::regexp_unicode17::Unicode17Script::ALL {
+        scripts.extend(script.aliases().iter().map(|alias| (*alias).to_owned()));
+    }
+    for alias in scripts {
+        for family in ["Script", "sc", "Script_Extensions", "scx"] {
+            names.insert(format!("{family}={alias}"));
         }
-        for alias in scripts {
-            for family in ["Script", "sc", "Script_Extensions", "scx"] {
-                names.insert(format!("{family}={alias}"));
-            }
-        }
-        let mut rows: BTreeMap<String, UnicodePropertyCatalogValue> = BTreeMap::new();
-        for name in names {
-            let property = RegExpCodePointProperty::parse(&name)
-                .expect("enumerated alias must pass the native ECMAScript property constructor");
-            let ranges = property
-                .into_ranges()
-                .expect("validated property has pinned Unicode ranges");
-            rows.insert(
-                name,
-                UnicodePropertyCatalogValue::CodePoints(normalize_ranges(ranges)),
-            );
-        }
-        for &property in UnicodeStringProperty::ALL {
-            rows.insert(
-                property.name().to_owned(),
-                UnicodePropertyCatalogValue::Strings(validated_unicode_string_property_sequences(
-                    property,
-                )),
-            );
-        }
-        rows.into_iter()
-            .map(|(name, value)| RegExpUnicodePropertyCatalogEntry { name, value })
-            .collect()
-    })
+    }
+    let mut rows: BTreeMap<String, UnicodePropertyCatalogValue> = BTreeMap::new();
+    let mut script_bases = BTreeMap::new();
+    for name in names {
+        let property = RegExpCodePointProperty::parse(&name)
+            .expect("enumerated alias must pass the native ECMAScript property constructor");
+        // ICU aliases repeat the same provider traversal. Reuse only that
+        // base; the Unicode 17 delta still consumes each exact spelling and
+        // its own Vec. This temporary map is dropped after construction.
+        let base = match &property.kind {
+            CodePointPropertyKind::Script {
+                family,
+                value: ScriptPropertyValue::PinnedIcu(script),
+            } => Some(
+                script_bases
+                    .entry((*family, *script))
+                    .or_insert_with(|| script_provider(*script, *family))
+                    .clone(),
+            ),
+            _ => property.icu_ranges(),
+        };
+        let ranges = crate::regexp_unicode17::apply_unicode17_delta(property, base)
+            .expect("validated property has pinned Unicode ranges");
+        rows.insert(
+            name,
+            UnicodePropertyCatalogValue::CodePoints(normalize_ranges(ranges)),
+        );
+    }
+    for &property in UnicodeStringProperty::ALL {
+        rows.insert(
+            property.name().to_owned(),
+            UnicodePropertyCatalogValue::Strings(validated_unicode_string_property_sequences(
+                property,
+            )),
+        );
+    }
+    rows.into_iter()
+        .map(|(name, value)| RegExpUnicodePropertyCatalogEntry { name, value })
+        .collect()
 }
 
 /// A property set has no empty sequence. Keep its complete singleton and
@@ -5764,6 +5787,9 @@ fn is_syntax_character(byte: u8) -> bool {
 fn is_unicode_identity_escape(byte: u8) -> bool {
     is_syntax_character(byte) || byte == b'/'
 }
+
+#[cfg(test)]
+mod catalog_tests;
 
 #[cfg(test)]
 mod tests {

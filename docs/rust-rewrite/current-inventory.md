@@ -16,16 +16,24 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   region; its source review is not native or performance acceptance. Keep wall
   time and CPU separate; the new diagnostic does not waive the original veto.
 - Attribute remaining cold compiler emission before changing P type generation.
-  The [cold compiler checkpoint](cold-compiler-20261101.json) removes unused
-  executable-identity work with unchanged P/R/native output. Ordinary P emission
-  still collects its roughly 2-MiB compiler-owned pool; exact-R sharing remains
-  a warm multi-program hypothesis because first population also admits and
-  freezes that prefix. Measure actual cold savings before adding retained state.
-- Measure Rust compilation units before changing the build graph. This batch's
-  backend and structural test builds each took about three minutes; retained
-  runtime-image phase records already show native cache hits. Separate host AOT
-  code generation from receipt, emission and packaging work before choosing a
-  smaller crate or feature boundary. Preserve complete current-source receipts.
+  The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
+  Script-range enumeration after the earlier executable-identity removal.
+  An intrusive diagnostic still places about 55 ms in catalog construction
+  inside about 75 ms of emission; those spans overlap. Ordinary P still collects
+  its roughly 2-MiB compiler-owned pool. Exact-R sharing is a warm multi-program
+  hypothesis; first population still admits and freezes that prefix.
+- Give Standalone programs a separate minimal compiler pool only after proving
+  literal String collection, inline UTF-16 emission, truthiness and completion
+  decoding with an empty runtime-data boundary. Runtime admission already
+  excludes functions, bindings, calls, host builtins and snapshots here; literal
+  Strings still use the existing WasmGC model. Preserve heap-backed P/R/native
+  output and measure the actual cold saving before promotion.
+- Reduce repeated Rust compilation across Cargo graphs using the
+  [source-bound unit timings](regexp-catalog-20261101.json). The IR unit-test
+  target took about 204 seconds, and its separate ordinary library took about
+  149 seconds before integration linking. Measure feature/host-role duplication
+  before choosing a smaller crate or different build invocation. Preserve
+  complete current-source receipts and bounded verification.
 - Attribute the roughly 2.45 ms P loading span: cache lookup/read/digest,
   deserialization and type registration. Preserve the one-Module/64-MiB cap;
   counting two Modules as one bundle would bypass it. Intrinsic descriptor

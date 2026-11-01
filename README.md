@@ -67,6 +67,8 @@ synchronous host work. Unsupported clocks report an explicit reason.
 Wasm emission requests the executable's cache identity only when it needs a
 persistent entry. Embedded runtime admission and compilation without a cache
 avoid that work; persisted entries remain bound to the actual compiler executable.
+Unicode property catalog construction reuses pinned ICU Script ranges across
+aliases; each exact spelling still receives its own Unicode 17 delta.
 
 The [2026-11-01 local scalar-region comparison](docs/rust-rewrite/scalar-regions-20261101.json)
 records **4–14% lower sorting medians**, **10–35% lower numeric-loop medians**
@@ -109,6 +111,13 @@ Wasm profiles and complete native runtime images remain byte-identical.
 Persisted-program execution controls retain executable identity and pass the
 predeclared regression gates; slower retained-object and join observations remain
 in the record.
+
+[RegExp catalog construction](docs/rust-rewrite/regexp-catalog-20261101.json)
+lowers cold-build median geomeans another **34.5–35.9% wall** and
+**35.6–35.8% CPU**. Three cold-execution controls improve **9.4–10.1% wall**
+and **11.2–11.6% CPU** in aggregate. Program Wasm and both raw/native runtime
+profiles remain byte-identical. Hello's peak RSS rises about 3.4 MiB in one
+block; all observations and the passing repeated-regression gates are retained.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

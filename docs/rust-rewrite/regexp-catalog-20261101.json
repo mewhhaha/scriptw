@@ -1,0 +1,2950 @@
+{
+  "schema": "scriptw-regexp-catalog-experiment-v1",
+  "date": "2026-11-01",
+  "status": "accepted_after_independent_audit",
+  "change": "Implement only the reviewed local Script ICU/base deduplication in IR regexp preparation; aliases must preserve exact per-alias Unicode 17 semantic deltas. No unrelated production changes.",
+  "source": {
+    "accepted_parent_commit": "3427587bde9f6ee346f83d91eaa7f0f13329de56",
+    "candidate_embedded_source_commit": "3427587bde9f6ee346f83d91eaa7f0f13329de56",
+    "candidate_source_fingerprint": "b11cbfe2a1d92332078b8b7d7f81951dab9b430592d1a4628c9e945a58bd3a4d",
+    "candidate_executable_sha256": "42f787fa18d0151dd0247ec153f5b8fb9bd02e8fa0c68b098229a495976cff8e",
+    "source_event": {
+      "status": "captured_before_build",
+      "captured_at_utc": "2026-11-01T14:22:20.086573+00:00",
+      "head": "3427587bde9f6ee346f83d91eaa7f0f13329de56",
+      "required_paths": [
+        "README.md",
+        "crates/scriptw-ir/src/regexp.rs",
+        "crates/scriptw-ir/src/regexp/catalog_tests.rs"
+      ],
+      "files": {
+        "README.md": "b5c6530f4551a8c24f3a7e0968c1778c591423269c84a50d8a6f123edd1b0b1a",
+        "crates/scriptw-ir/src/regexp.rs": "b5d323fe04ea06ea4172d0402d1c84460a975be372b9c57c5c236d5fa6f18495",
+        "crates/scriptw-ir/src/regexp/catalog_tests.rs": "63b6c64d7793eabfcb110eeccb320c03d254e5eb0839db0b80131573a97af7b7"
+      },
+      "purpose": "Cold compiler RegExp-catalog candidate; exact intended three-file input set."
+    },
+    "frozen_source": {
+      "head": "3427587bde9f6ee346f83d91eaa7f0f13329de56",
+      "source_event_sha256": "d47039d8710a64bab01a1f88efd6a2380e0ed563c9d23a80dbfb8ac23578b2be",
+      "patch_sha256": "18b1f1d395d9fa45dafe9b514a4ef79a0f85ad7b315400e7103007747e0058d5",
+      "source_fingerprint": "b11cbfe2a1d92332078b8b7d7f81951dab9b430592d1a4628c9e945a58bd3a4d",
+      "executable_sha256": "42f787fa18d0151dd0247ec153f5b8fb9bd02e8fa0c68b098229a495976cff8e",
+      "required_paths": [
+        "README.md",
+        "crates/scriptw-ir/src/regexp.rs",
+        "crates/scriptw-ir/src/regexp/catalog_tests.rs"
+      ]
+    }
+  },
+  "products": {
+    "baseline": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "8f895ff65a60f98bbaded819f6ac75410a707d3ab5d2fe39facb8c0ba0474c2d",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "8b3810db0c4835f57bc9ca7f1f58de94830962b5"
+      },
+      "executable_sha256": "6a60d04c10d08ff467bb279fd0190c52f540eaa1de1dfe4d5f99ee2fd5e624a7"
+    },
+    "candidate": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "b11cbfe2a1d92332078b8b7d7f81951dab9b430592d1a4628c9e945a58bd3a4d",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "3427587bde9f6ee346f83d91eaa7f0f13329de56"
+      },
+      "executable_sha256": "42f787fa18d0151dd0247ec153f5b8fb9bd02e8fa0c68b098229a495976cff8e"
+    }
+  },
+  "design": {
+    "primary_source_count": 19,
+    "sources": [
+      {
+        "file": "sort-reverse-128.js",
+        "source_sha256": "71625f52de39a4bc2b698ae8ffc4ac81d2035bd96d391477a09742a2742a3794",
+        "expected_sha256": "48c15bb0b9e7b6735b6b30e8a684999bc6e867480dc5349b4befbc5d5a0ff005"
+      },
+      {
+        "file": "sort-reverse-512.js",
+        "source_sha256": "d38825f64f853170f6da0f8375990bd1da83799c921505dd21d5d5dfe7e4e3e5",
+        "expected_sha256": "1472843af51ffb2b1b3e601c757e6a290613e61c94568acc18a055d36be0882e"
+      },
+      {
+        "file": "sort-sorted-512.js",
+        "source_sha256": "68b786bf2ae8b4a6d1f6e1c4e9adb1c8940f819dcce8d25e0c9cb5fb2888939c",
+        "expected_sha256": "1472843af51ffb2b1b3e601c757e6a290613e61c94568acc18a055d36be0882e"
+      },
+      {
+        "file": "to-sorted-512.js",
+        "source_sha256": "0e40c47ddc2f946f5d27c63996ff16361eb0f176d07d32a051ae3a17ebc551b0",
+        "expected_sha256": "6fb113586c2ad96691f8e34e44697db20265a27208623860b323fb9fafd6a2bd"
+      },
+      {
+        "file": "join-1024.js",
+        "source_sha256": "0ece87d734083e7956428a0b546bb52e290df60fc0bc6edca864441a9b200e06",
+        "expected_sha256": "1fb8b439dcae351e9a615e16065c3dce7afd33967f7104eaabf78dff57def9d0"
+      },
+      {
+        "file": "join-4096.js",
+        "source_sha256": "8b30570ea8f6b22d8dbe91526b86634c0152457ed57a86e5d8fe13ee8dc7667f",
+        "expected_sha256": "d8d32d4a7d7fc052f8d3c6e62c55afb7660852c9214b866a1d186792787a2ef4"
+      },
+      {
+        "file": "join-mixed-1024.js",
+        "source_sha256": "6fc9aa48d1d577fc0f5c14424838636f529b2d4acf2e7994975d12b56547bcff",
+        "expected_sha256": "6ece62b766157fb272713fd26aecd1c4e0d6747be0fee831b7a05b1abd488496"
+      },
+      {
+        "file": "numeric-loop-10000.js",
+        "source_sha256": "867d762eecaf5619ae33934577669ff56415d6ae69a81ebb05b97dda630bc040",
+        "expected_sha256": "f586b038c4c7371912a8ab680b1ab86008dd4204fe480809f9946fd1b083077e"
+      },
+      {
+        "file": "numeric-loop-50000.js",
+        "source_sha256": "3767d7de64987f8d89d6f20ae31fbd5752836b2be0b439d36b2efb6af0d800c0",
+        "expected_sha256": "dedc800c8633645d516bca92976f811f083dd65c477ea649b25a94a7756245d6"
+      },
+      {
+        "file": "folded-string-4096.js",
+        "source_sha256": "821723ecb9b4bf828e5447fa289a42688ac2a6eafa84316a8e668700e4bdc44e",
+        "expected_sha256": "2d9bc02c27dfffdb06538ce9e39591861392571820ae1d16e477f1ef943e4d85"
+      },
+      {
+        "file": "dynamic-string-4096.js",
+        "source_sha256": "77e871388666cba861f92b3198298629ac553089f18bf5c313a9302e1d5c7e87",
+        "expected_sha256": "de33640a0eb4eaa5ecd485dccb29eab8e5af8268c84edd0794b4c6a4acae7607"
+      },
+      {
+        "file": "integer.js",
+        "source_sha256": "bbf3e6bb123b44f3f39acaa46140af1bd3f4801cce1d19e8b390f21a33637f3c",
+        "expected_sha256": "e816b0f7d667f370677adf7268c53b9f39f001973cc3f8d62091aa454b1c4f69"
+      },
+      {
+        "file": "objects.js",
+        "source_sha256": "22a86d6fd5ee43b42ff3ca36273f0be2a3089b91c79d3c064ff7e4fb35b7b22d",
+        "expected_sha256": "27674984c7e992af9eeb6d40dc1de6c1ef1fdcf8eb7be58c57d449c4c496d742"
+      },
+      {
+        "file": "retained-objects.js",
+        "source_sha256": "9648fbc87f9361de8b2b0bb418929af1c79331a58ebf38817cc511dc512c5911",
+        "expected_sha256": "f870ee7f3ca69b5d2f43677a695f6ce6f638e8fd9bee515153e77bd2ac9ffda4"
+      },
+      {
+        "file": "join-empty-1024.js",
+        "source_sha256": "dadbd8cdf5f2d732bd89327581d63975ed5c52d26130b7fd4b978a72ce060cb0",
+        "expected_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "file": "join-singleton-1024.js",
+        "source_sha256": "a79413e8ef5250ddd75037680268821e8d08bbc0bc5f896381ae83e52e87ffd2",
+        "expected_sha256": "25ac87b7309b7946b51c32e824793ff48b56b735efa16875cf33e4ba67523d91"
+      },
+      {
+        "file": "join-small-1024.js",
+        "source_sha256": "95e16da16d4b656b766a774ca0ba33f83ec026afe1c754e2a95f4f122d430d85",
+        "expected_sha256": "337272adaaec693715758645e05bdce6da090486fbbb988ffb2e3be355091919"
+      },
+      {
+        "file": "hello.js",
+        "source_sha256": "4862a21e5eecf992ca500432f7b420ab72bc6fa487b85b69bfbbf02184b8a737",
+        "expected_sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+      },
+      {
+        "file": "tiny42.js",
+        "source_sha256": "82e7b71cc68054b3a73b14e550774213679c49e044893d0d86588b03da84f243",
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "blocks": 2,
+    "processes_per_product_source_block": 4,
+    "orders": [
+      "ABBABAAB",
+      "BAABABBA"
+    ],
+    "aa_processes": 304,
+    "comparison_build_processes": 304,
+    "comparison_run_control_processes": 48,
+    "comparison_total_processes": 352,
+    "rss_metric": "Per-process peak RSS high-water mark; reported as median and mean MiB per source/control/block."
+  },
+  "gates": {
+    "primary_wall_geomean_median_pass": true,
+    "primary_cpu_geomean_median_at_least_20_percent_reduction_pass": true,
+    "primary_repeated_regression_vetoes": [],
+    "primary_regressions_pass": true,
+    "cold_run_control_vetoes": [],
+    "controls_pass": true,
+    "primary_repeated_rss_vetoes": [],
+    "primary_rss_pass": true,
+    "cold_run_control_rss_vetoes": [],
+    "control_rss_pass": true,
+    "predeclared_candidate_gate_pass": true,
+    "gate_note": "Per-process total CPU is user+system before process medians/means. Main build needs a 19-source median geomean CPU ratio <=0.80 and wall ratio <1 in both blocks; any one source can veto for repeated >=3% median+mean regression in either metric. Cold-run controls use the same per-metric veto. RSS is reported for every source/control; any source/control vetoes if candidate peak-RSS median AND mean are each at least 4 MiB higher in both blocks."
+  },
+  "results": {
+    "build": [
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.6551316646159564,
+          "geomean_mean_candidate_over_baseline": 0.6586405029174432,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 168.912695,
+                "mean_ms": 168.9657255
+              },
+              "candidate": {
+                "median_ms": 108.711255,
+                "mean_ms": 108.968304
+              },
+              "candidate_over_baseline": {
+                "median": 0.6435943432197325,
+                "mean": 0.6449136573559116
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 168.143607,
+                "mean_ms": 168.29861925
+              },
+              "candidate": {
+                "median_ms": 110.0661855,
+                "mean_ms": 110.04940625
+              },
+              "candidate_over_baseline": {
+                "median": 0.6545963148036904,
+                "mean": 0.6538936964570492
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 184.5800885,
+                "mean_ms": 184.8663975
+              },
+              "candidate": {
+                "median_ms": 137.587129,
+                "mean_ms": 130.9927355
+              },
+              "candidate_over_baseline": {
+                "median": 0.7454061275953934,
+                "mean": 0.7085805601853631
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 169.829236,
+                "mean_ms": 169.95884775
+              },
+              "candidate": {
+                "median_ms": 110.717063,
+                "mean_ms": 111.3357265
+              },
+              "candidate_over_baseline": {
+                "median": 0.6519317027369775,
+                "mean": 0.6550746134956661
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 170.7840065,
+                "mean_ms": 170.86875525
+              },
+              "candidate": {
+                "median_ms": 110.489571,
+                "mean_ms": 111.25759575
+              },
+              "candidate_over_baseline": {
+                "median": 0.6469550238593331,
+                "mean": 0.6511289649603742
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 169.8460785,
+                "mean_ms": 169.942582
+              },
+              "candidate": {
+                "median_ms": 110.4485475,
+                "mean_ms": 111.017907
+              },
+              "candidate_over_baseline": {
+                "median": 0.6502861206771989,
+                "mean": 0.6532671546675688
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 168.763361,
+                "mean_ms": 169.010215
+              },
+              "candidate": {
+                "median_ms": 108.8978605,
+                "mean_ms": 109.6435455
+              },
+              "candidate_over_baseline": {
+                "median": 0.6452695647605643,
+                "mean": 0.6487391634878401
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 173.532681,
+                "mean_ms": 173.60012925
+              },
+              "candidate": {
+                "median_ms": 113.830266,
+                "mean_ms": 114.191034
+              },
+              "candidate_over_baseline": {
+                "median": 0.6559586663678642,
+                "mean": 0.6577819641801909
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 172.965398,
+                "mean_ms": 173.04411
+              },
+              "candidate": {
+                "median_ms": 113.6521575,
+                "mean_ms": 114.43129575
+              },
+              "candidate_over_baseline": {
+                "median": 0.6570803109417295,
+                "mean": 0.6612839682899349
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 193.7088,
+                "mean_ms": 193.9804665
+              },
+              "candidate": {
+                "median_ms": 134.935601,
+                "mean_ms": 135.25868975
+              },
+              "candidate_over_baseline": {
+                "median": 0.6965899380926421,
+                "mean": 0.697279948803505
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 231.2090665,
+                "mean_ms": 225.21748575
+              },
+              "candidate": {
+                "median_ms": 158.3548135,
+                "mean_ms": 157.97534975
+              },
+              "candidate_over_baseline": {
+                "median": 0.6848988056443712,
+                "mean": 0.7014346564784879
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 165.7591265,
+                "mean_ms": 165.97392475
+              },
+              "candidate": {
+                "median_ms": 107.8279225,
+                "mean_ms": 108.05785725
+              },
+              "candidate_over_baseline": {
+                "median": 0.6505097171829027,
+                "mean": 0.6510532146104474
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 170.281217,
+                "mean_ms": 170.67518575
+              },
+              "candidate": {
+                "median_ms": 111.1021505,
+                "mean_ms": 111.3672395
+              },
+              "candidate_over_baseline": {
+                "median": 0.6524627463756029,
+                "mean": 0.6525098479349392
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 169.5846885,
+                "mean_ms": 169.9743415
+              },
+              "candidate": {
+                "median_ms": 110.7137175,
+                "mean_ms": 122.529428
+              },
+              "candidate_over_baseline": {
+                "median": 0.6528520851692339,
+                "mean": 0.7208701438034398
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 165.283168,
+                "mean_ms": 165.12495975
+              },
+              "candidate": {
+                "median_ms": 106.0617215,
+                "mean_ms": 106.8495185
+              },
+              "candidate_over_baseline": {
+                "median": 0.641697051087501,
+                "mean": 0.6470827830133657
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 180.0045685,
+                "mean_ms": 180.55531525
+              },
+              "candidate": {
+                "median_ms": 136.153782,
+                "mean_ms": 133.8511655
+              },
+              "candidate_over_baseline": {
+                "median": 0.7563907023837565,
+                "mean": 0.7413305186538949
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 165.6721475,
+                "mean_ms": 165.7029535
+              },
+              "candidate": {
+                "median_ms": 106.3191,
+                "mean_ms": 107.1435095
+              },
+              "candidate_over_baseline": {
+                "median": 0.6417439600099347,
+                "mean": 0.6465998778953569
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 151.29188,
+                "mean_ms": 151.2753035
+              },
+              "candidate": {
+                "median_ms": 91.4773205,
+                "mean_ms": 91.739574
+              },
+              "candidate_over_baseline": {
+                "median": 0.6046413098971339,
+                "mean": 0.606441182912583
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 130.962305,
+                "mean_ms": 131.37595625
+              },
+              "candidate": {
+                "median_ms": 71.0935625,
+                "mean_ms": 71.121102
+              },
+              "candidate_over_baseline": {
+                "median": 0.5428551559168113,
+                "mean": 0.5413555419886811
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.643542243171711,
+          "geomean_mean_candidate_over_baseline": 0.6438591019818908,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 167.859,
+                "mean_ms": 167.84975
+              },
+              "candidate": {
+                "median_ms": 107.8865,
+                "mean_ms": 108.1115
+              },
+              "candidate_over_baseline": {
+                "median": 0.6427209741509243,
+                "mean": 0.6440968783093213
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 167.0735,
+                "mean_ms": 167.2615
+              },
+              "candidate": {
+                "median_ms": 108.936,
+                "mean_ms": 108.71
+              },
+              "candidate_over_baseline": {
+                "median": 0.6520244084190491,
+                "mean": 0.6499403628450062
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 168.894,
+                "mean_ms": 168.9235
+              },
+              "candidate": {
+                "median_ms": 108.5025,
+                "mean_ms": 108.7345
+              },
+              "candidate_over_baseline": {
+                "median": 0.6424295712103449,
+                "mean": 0.6436907831059622
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 168.8,
+                "mean_ms": 168.88475
+              },
+              "candidate": {
+                "median_ms": 109.8905,
+                "mean_ms": 110.01975
+              },
+              "candidate_over_baseline": {
+                "median": 0.6510100710900474,
+                "mean": 0.6514486950420331
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 169.7345,
+                "mean_ms": 169.81725
+              },
+              "candidate": {
+                "median_ms": 109.636,
+                "mean_ms": 109.952
+              },
+              "candidate_over_baseline": {
+                "median": 0.6459264321631725,
+                "mean": 0.6474725035295296
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 168.777,
+                "mean_ms": 168.788
+              },
+              "candidate": {
+                "median_ms": 109.637,
+                "mean_ms": 109.7395
+              },
+              "candidate_over_baseline": {
+                "median": 0.6495968052519004,
+                "mean": 0.6501617413560206
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 167.638,
+                "mean_ms": 167.926
+              },
+              "candidate": {
+                "median_ms": 108.079,
+                "mean_ms": 108.30025
+              },
+              "candidate_over_baseline": {
+                "median": 0.6447165917035517,
+                "mean": 0.6449284208520419
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 172.4385,
+                "mean_ms": 172.5295
+              },
+              "candidate": {
+                "median_ms": 112.959,
+                "mean_ms": 113.21325
+              },
+              "candidate_over_baseline": {
+                "median": 0.6550683287084961,
+                "mean": 0.6561964765445909
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 171.9055,
+                "mean_ms": 171.98375
+              },
+              "candidate": {
+                "median_ms": 112.693,
+                "mean_ms": 112.981
+              },
+              "candidate_over_baseline": {
+                "median": 0.655552032948335,
+                "mean": 0.6569283435208269
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 192.568,
+                "mean_ms": 192.801
+              },
+              "candidate": {
+                "median_ms": 133.8155,
+                "mean_ms": 133.77975
+              },
+              "candidate_over_baseline": {
+                "median": 0.6948999833824935,
+                "mean": 0.693874772433753
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 202.118,
+                "mean_ms": 202.4145
+              },
+              "candidate": {
+                "median_ms": 141.9385,
+                "mean_ms": 142.21025
+              },
+              "candidate_over_baseline": {
+                "median": 0.7022556130577188,
+                "mean": 0.7025694799532642
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 164.7215,
+                "mean_ms": 164.949
+              },
+              "candidate": {
+                "median_ms": 106.4665,
+                "mean_ms": 106.5115
+              },
+              "candidate_over_baseline": {
+                "median": 0.646342462884323,
+                "mean": 0.6457238297898138
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 169.1305,
+                "mean_ms": 169.53825
+              },
+              "candidate": {
+                "median_ms": 110.049,
+                "mean_ms": 110.05625
+              },
+              "candidate_over_baseline": {
+                "median": 0.6506750704337775,
+                "mean": 0.6491529197688427
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 168.568,
+                "mean_ms": 168.89725
+              },
+              "candidate": {
+                "median_ms": 108.682,
+                "mean_ms": 109.20275
+              },
+              "candidate_over_baseline": {
+                "median": 0.6447368421052632,
+                "mean": 0.6465632211300065
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 164.2635,
+                "mean_ms": 164.1165
+              },
+              "candidate": {
+                "median_ms": 105.2135,
+                "mean_ms": 105.32175
+              },
+              "candidate_over_baseline": {
+                "median": 0.6405166089849541,
+                "mean": 0.6417499154563984
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 165.5755,
+                "mean_ms": 165.85525
+              },
+              "candidate": {
+                "median_ms": 105.8785,
+                "mean_ms": 105.79475
+              },
+              "candidate_over_baseline": {
+                "median": 0.6394575284386881,
+                "mean": 0.6378739895179683
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 164.663,
+                "mean_ms": 164.68525
+              },
+              "candidate": {
+                "median_ms": 105.3875,
+                "mean_ms": 105.70175
+              },
+              "candidate_over_baseline": {
+                "median": 0.6400193121709188,
+                "mean": 0.641841027050085
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 150.3135,
+                "mean_ms": 150.302
+              },
+              "candidate": {
+                "median_ms": 90.73,
+                "mean_ms": 90.93075
+              },
+              "candidate_over_baseline": {
+                "median": 0.6036051319409101,
+                "mean": 0.6049869595880294
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 130.1115,
+                "mean_ms": 130.4575
+              },
+              "candidate": {
+                "median_ms": 70.4005,
+                "mean_ms": 70.3975
+              },
+              "candidate_over_baseline": {
+                "median": 0.5410782290573855,
+                "mean": 0.5396201828181592
+              }
+            }
+          }
+        },
+        "peak_rss_bytes": {
+          "geomean_median_candidate_over_baseline": 0.993538773344583,
+          "geomean_mean_candidate_over_baseline": 0.9930906870014383,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_MiB": 74.478515625,
+                "mean_MiB": 74.5576171875
+              },
+              "candidate": {
+                "median_MiB": 74.3125,
+                "mean_MiB": 74.267578125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9977709595363596,
+                "mean": 0.9961098667924083
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_MiB": 74.728515625,
+                "mean_MiB": 74.6552734375
+              },
+              "candidate": {
+                "median_MiB": 74.2578125,
+                "mean_MiB": 74.1826171875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9937011578369619,
+                "mean": 0.9936688163041061
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_MiB": 74.845703125,
+                "mean_MiB": 74.8251953125
+              },
+              "candidate": {
+                "median_MiB": 74.25390625,
+                "mean_MiB": 74.1787109375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9920931082174265,
+                "mean": 0.9913600709988123
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_MiB": 75.013671875,
+                "mean_MiB": 75.005859375
+              },
+              "candidate": {
+                "median_MiB": 74.126953125,
+                "mean_MiB": 74.1279296875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9881792381597104,
+                "mean": 0.988295185271984
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_MiB": 74.6328125,
+                "mean_MiB": 74.6396484375
+              },
+              "candidate": {
+                "median_MiB": 73.810546875,
+                "mean_MiB": 73.861328125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9889825185805506,
+                "mean": 0.9895722939644909
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_MiB": 74.634765625,
+                "mean_MiB": 74.5478515625
+              },
+              "candidate": {
+                "median_MiB": 74.025390625,
+                "mean_MiB": 74.05078125
+              },
+              "candidate_over_baseline": {
+                "median": 0.991835239316463,
+                "mean": 0.9933321980166891
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_MiB": 74.470703125,
+                "mean_MiB": 74.4970703125
+              },
+              "candidate": {
+                "median_MiB": 74.201171875,
+                "mean_MiB": 74.146484375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9963807075978913,
+                "mean": 0.9952939634266238
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_MiB": 76.046875,
+                "mean_MiB": 75.998046875
+              },
+              "candidate": {
+                "median_MiB": 75.328125,
+                "mean_MiB": 75.3857421875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9905485925621533,
+                "mean": 0.9919431523219655
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_MiB": 76.087890625,
+                "mean_MiB": 76.185546875
+              },
+              "candidate": {
+                "median_MiB": 75.48828125,
+                "mean_MiB": 75.4189453125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9921195163898657,
+                "mean": 0.9899377034891174
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_MiB": 80.22265625,
+                "mean_MiB": 80.14453125
+              },
+              "candidate": {
+                "median_MiB": 79.5234375,
+                "mean_MiB": 79.5810546875
+              },
+              "candidate_over_baseline": {
+                "median": 0.991284023956761,
+                "mean": 0.9929692450163279
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_MiB": 78.796875,
+                "mean_MiB": 78.7958984375
+              },
+              "candidate": {
+                "median_MiB": 78.05859375,
+                "mean_MiB": 78.0224609375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9906305770374777,
+                "mean": 0.9901842923891085
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_MiB": 74.5859375,
+                "mean_MiB": 74.5537109375
+              },
+              "candidate": {
+                "median_MiB": 74.630859375,
+                "mean_MiB": 74.4990234375
+              },
+              "candidate_over_baseline": {
+                "median": 1.000602283439824,
+                "mean": 0.9992664684384946
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_MiB": 74.861328125,
+                "mean_MiB": 74.9189453125
+              },
+              "candidate": {
+                "median_MiB": 74.408203125,
+                "mean_MiB": 74.3701171875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9939471418508179,
+                "mean": 0.9926743746496866
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_MiB": 74.76953125,
+                "mean_MiB": 74.7373046875
+              },
+              "candidate": {
+                "median_MiB": 74.443359375,
+                "mean_MiB": 74.404296875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9956376364871219,
+                "mean": 0.9955442892422678
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_MiB": 74.54296875,
+                "mean_MiB": 74.5302734375
+              },
+              "candidate": {
+                "median_MiB": 74.166015625,
+                "mean_MiB": 74.130859375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9949431431116701,
+                "mean": 0.99464091510633
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_MiB": 74.830078125,
+                "mean_MiB": 74.8408203125
+              },
+              "candidate": {
+                "median_MiB": 74.224609375,
+                "mean_MiB": 74.1552734375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9919087515986741,
+                "mean": 0.9908399337134804
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_MiB": 74.724609375,
+                "mean_MiB": 74.77734375
+              },
+              "candidate": {
+                "median_MiB": 74.15625,
+                "mean_MiB": 74.1650390625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9923939465223869,
+                "mean": 0.9918116282714308
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_MiB": 72.11328125,
+                "mean_MiB": 72.1787109375
+              },
+              "candidate": {
+                "median_MiB": 71.986328125,
+                "mean_MiB": 71.9267578125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9982395319863496,
+                "mean": 0.9965093152575395
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_MiB": 27.802734375,
+                "mean_MiB": 27.8212890625
+              },
+              "candidate": {
+                "median_MiB": 27.6953125,
+                "mean_MiB": 27.677734375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9961362838075167,
+                "mean": 0.9948401137281055
+              }
+            }
+          }
+        }
+      },
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.6405253739142569,
+          "geomean_mean_candidate_over_baseline": 0.6466773366629419,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 170.016319,
+                "mean_ms": 177.83261075
+              },
+              "candidate": {
+                "median_ms": 110.0257485,
+                "mean_ms": 118.448022
+              },
+              "candidate_over_baseline": {
+                "median": 0.6471481628772353,
+                "mean": 0.6660646857764247
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 168.6282905,
+                "mean_ms": 168.58460775
+              },
+              "candidate": {
+                "median_ms": 108.893892,
+                "mean_ms": 108.850685
+              },
+              "candidate_over_baseline": {
+                "median": 0.645762888760353,
+                "mean": 0.6456739227428074
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 183.2485645,
+                "mean_ms": 183.81521675
+              },
+              "candidate": {
+                "median_ms": 109.2693255,
+                "mean_ms": 117.30574275
+              },
+              "candidate_over_baseline": {
+                "median": 0.5962902126854042,
+                "mean": 0.6381720992639202
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 170.5526835,
+                "mean_ms": 177.75961675
+              },
+              "candidate": {
+                "median_ms": 110.5451655,
+                "mean_ms": 116.45410675
+              },
+              "candidate_over_baseline": {
+                "median": 0.6481584647713854,
+                "mean": 0.6551212748944003
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 170.313023,
+                "mean_ms": 170.21235625
+              },
+              "candidate": {
+                "median_ms": 110.262929,
+                "mean_ms": 110.4735545
+              },
+              "candidate_over_baseline": {
+                "median": 0.6474133748421576,
+                "mean": 0.649033694931886
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 171.561971,
+                "mean_ms": 171.49578275
+              },
+              "candidate": {
+                "median_ms": 111.2649785,
+                "mean_ms": 111.30460125
+              },
+              "candidate_over_baseline": {
+                "median": 0.6485410365214328,
+                "mean": 0.6490223809891326
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 169.2643135,
+                "mean_ms": 178.14052725
+              },
+              "candidate": {
+                "median_ms": 109.7004995,
+                "mean_ms": 117.44939325
+              },
+              "candidate_over_baseline": {
+                "median": 0.648101760091326,
+                "mean": 0.6593075425513539
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 174.55281,
+                "mean_ms": 181.38676225
+              },
+              "candidate": {
+                "median_ms": 113.5624805,
+                "mean_ms": 113.7975145
+              },
+              "candidate_over_baseline": {
+                "median": 0.6505909615548441,
+                "mean": 0.6273749698622232
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 173.6319955,
+                "mean_ms": 173.8597305
+              },
+              "candidate": {
+                "median_ms": 114.101309,
+                "mean_ms": 114.10638375
+              },
+              "candidate_over_baseline": {
+                "median": 0.6571444892482388,
+                "mean": 0.656312899035582
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 193.516365,
+                "mean_ms": 193.5232405
+              },
+              "candidate": {
+                "median_ms": 134.6032925,
+                "mean_ms": 134.70341975
+              },
+              "candidate_over_baseline": {
+                "median": 0.6955654241438444,
+                "mean": 0.6960581034193668
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 200.953074,
+                "mean_ms": 201.010105
+              },
+              "candidate": {
+                "median_ms": 141.988329,
+                "mean_ms": 142.185957
+              },
+              "candidate_over_baseline": {
+                "median": 0.7065745558089845,
+                "mean": 0.7073572594770795
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 168.3352975,
+                "mean_ms": 176.8632515
+              },
+              "candidate": {
+                "median_ms": 107.484723,
+                "mean_ms": 114.5388505
+              },
+              "candidate_over_baseline": {
+                "median": 0.6385156565277107,
+                "mean": 0.6476124889064363
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 171.336977,
+                "mean_ms": 171.19767475
+              },
+              "candidate": {
+                "median_ms": 110.6845895,
+                "mean_ms": 110.76070175
+              },
+              "candidate_over_baseline": {
+                "median": 0.6460052665689322,
+                "mean": 0.6469755030945594
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 170.1193725,
+                "mean_ms": 170.15621025
+              },
+              "candidate": {
+                "median_ms": 110.465929,
+                "mean_ms": 110.674092
+              },
+              "candidate_over_baseline": {
+                "median": 0.6493436189931867,
+                "mean": 0.6504264042869397
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 166.5705525,
+                "mean_ms": 166.71128725
+              },
+              "candidate": {
+                "median_ms": 107.1968405,
+                "mean_ms": 107.554017
+              },
+              "candidate_over_baseline": {
+                "median": 0.643552169883089,
+                "mean": 0.6451513798145662
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 165.907417,
+                "mean_ms": 165.93386
+              },
+              "candidate": {
+                "median_ms": 105.93399,
+                "mean_ms": 105.9078905
+              },
+              "candidate_over_baseline": {
+                "median": 0.638512683251527,
+                "mean": 0.6382536421439241
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 166.155824,
+                "mean_ms": 166.145532
+              },
+              "candidate": {
+                "median_ms": 106.1480215,
+                "mean_ms": 114.23901525
+              },
+              "candidate_over_baseline": {
+                "median": 0.638846228465636,
+                "mean": 0.6875840347605616
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 152.67746,
+                "mean_ms": 153.73090775
+              },
+              "candidate": {
+                "median_ms": 90.7245155,
+                "mean_ms": 91.27167575
+              },
+              "candidate_over_baseline": {
+                "median": 0.5942233745570564,
+                "mean": 0.5937106407933769
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 130.8479835,
+                "mean_ms": 131.03875625
+              },
+              "candidate": {
+                "median_ms": 71.5373815,
+                "mean_ms": 71.47951675
+              },
+              "candidate_over_baseline": {
+                "median": 0.5467213142035162,
+                "mean": 0.5454837850691215
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.6424651457284907,
+          "geomean_mean_candidate_over_baseline": 0.6424703293929722,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_ms": 168.085,
+                "mean_ms": 168.30125
+              },
+              "candidate": {
+                "median_ms": 108.775,
+                "mean_ms": 108.792
+              },
+              "candidate_over_baseline": {
+                "median": 0.647142814647351,
+                "mean": 0.6464123112573436
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_ms": 167.5215,
+                "mean_ms": 167.47575
+              },
+              "candidate": {
+                "median_ms": 107.9055,
+                "mean_ms": 107.918
+              },
+              "candidate_over_baseline": {
+                "median": 0.6441292610202273,
+                "mean": 0.6443798579794389
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_ms": 167.989,
+                "mean_ms": 167.98475
+              },
+              "candidate": {
+                "median_ms": 108.278,
+                "mean_ms": 107.9565
+              },
+              "candidate_over_baseline": {
+                "median": 0.6445541077094333,
+                "mean": 0.6426565506690339
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_ms": 169.387,
+                "mean_ms": 169.377
+              },
+              "candidate": {
+                "median_ms": 109.627,
+                "mean_ms": 109.80575
+              },
+              "candidate_over_baseline": {
+                "median": 0.6471984272700975,
+                "mean": 0.6482919758881076
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_ms": 169.17,
+                "mean_ms": 169.08175
+              },
+              "candidate": {
+                "median_ms": 109.381,
+                "mean_ms": 109.59575
+              },
+              "candidate_over_baseline": {
+                "median": 0.6465744517349412,
+                "mean": 0.6481820184614838
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 170.2885,
+                "mean_ms": 170.29875
+              },
+              "candidate": {
+                "median_ms": 110.245,
+                "mean_ms": 110.344
+              },
+              "candidate_over_baseline": {
+                "median": 0.6474013218743485,
+                "mean": 0.6479436871967645
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_ms": 168.099,
+                "mean_ms": 168.2225
+              },
+              "candidate": {
+                "median_ms": 108.674,
+                "mean_ms": 108.47125
+              },
+              "candidate_over_baseline": {
+                "median": 0.646488081428206,
+                "mean": 0.6448082153100804
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_ms": 172.698,
+                "mean_ms": 172.82025
+              },
+              "candidate": {
+                "median_ms": 112.596,
+                "mean_ms": 112.59475
+              },
+              "candidate_over_baseline": {
+                "median": 0.6519820727512768,
+                "mean": 0.6515136391713355
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_ms": 172.4905,
+                "mean_ms": 172.531
+              },
+              "candidate": {
+                "median_ms": 113.2135,
+                "mean_ms": 113.1775
+              },
+              "candidate_over_baseline": {
+                "median": 0.6563462915348961,
+                "mean": 0.655983562374298
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_ms": 192.1755,
+                "mean_ms": 192.21575
+              },
+              "candidate": {
+                "median_ms": 133.463,
+                "mean_ms": 133.608
+              },
+              "candidate_over_baseline": {
+                "median": 0.6944849889814259,
+                "mean": 0.6950939244052582
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_ms": 199.6115,
+                "mean_ms": 199.7015
+              },
+              "candidate": {
+                "median_ms": 140.9575,
+                "mean_ms": 141.1575
+              },
+              "candidate_over_baseline": {
+                "median": 0.7061592142737267,
+                "mean": 0.7068424623750948
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_ms": 166.224,
+                "mean_ms": 166.2545
+              },
+              "candidate": {
+                "median_ms": 106.5945,
+                "mean_ms": 106.43925
+              },
+              "candidate_over_baseline": {
+                "median": 0.6412702136875541,
+                "mean": 0.640218760995943
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_ms": 170.2015,
+                "mean_ms": 170.048
+              },
+              "candidate": {
+                "median_ms": 109.7805,
+                "mean_ms": 109.81275
+              },
+              "candidate_over_baseline": {
+                "median": 0.6450031286445772,
+                "mean": 0.645775016465939
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 168.9465,
+                "mean_ms": 168.988
+              },
+              "candidate": {
+                "median_ms": 109.555,
+                "mean_ms": 109.72725
+              },
+              "candidate_over_baseline": {
+                "median": 0.6484597194970005,
+                "mean": 0.6493197741851492
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_ms": 165.4565,
+                "mean_ms": 165.623
+              },
+              "candidate": {
+                "median_ms": 106.2335,
+                "mean_ms": 106.5915
+              },
+              "candidate_over_baseline": {
+                "median": 0.6420630195852082,
+                "mean": 0.6435790922758312
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_ms": 164.8195,
+                "mean_ms": 164.858
+              },
+              "candidate": {
+                "median_ms": 105.0735,
+                "mean_ms": 105.00825
+              },
+              "candidate_over_baseline": {
+                "median": 0.6375064843662309,
+                "mean": 0.636961809557316
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_ms": 165.0825,
+                "mean_ms": 165.05575
+              },
+              "candidate": {
+                "median_ms": 105.267,
+                "mean_ms": 105.377
+              },
+              "candidate_over_baseline": {
+                "median": 0.637662986688474,
+                "mean": 0.6384327719573538
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 151.6565,
+                "mean_ms": 152.66675
+              },
+              "candidate": {
+                "median_ms": 89.958,
+                "mean_ms": 90.498
+              },
+              "candidate_over_baseline": {
+                "median": 0.5931694322366664,
+                "mean": 0.5927813358180481
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_ms": 129.9975,
+                "mean_ms": 130.17025
+              },
+              "candidate": {
+                "median_ms": 70.8275,
+                "mean_ms": 70.77475
+              },
+              "candidate_over_baseline": {
+                "median": 0.5448374007192446,
+                "mean": 0.5437091040387493
+              }
+            }
+          }
+        },
+        "peak_rss_bytes": {
+          "geomean_median_candidate_over_baseline": 0.992900809832533,
+          "geomean_mean_candidate_over_baseline": 0.9927334838822505,
+          "cases": {
+            "sort-reverse-128.js": {
+              "baseline": {
+                "median_MiB": 74.4765625,
+                "mean_MiB": 74.5693359375
+              },
+              "candidate": {
+                "median_MiB": 74.224609375,
+                "mean_MiB": 74.173828125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9966170145809294,
+                "mean": 0.9946961065493262
+              }
+            },
+            "sort-reverse-512.js": {
+              "baseline": {
+                "median_MiB": 74.8671875,
+                "mean_MiB": 74.869140625
+              },
+              "candidate": {
+                "median_MiB": 73.98046875,
+                "mean_MiB": 74.029296875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9881561097777314,
+                "mean": 0.9887825111522709
+              }
+            },
+            "sort-sorted-512.js": {
+              "baseline": {
+                "median_MiB": 74.59375,
+                "mean_MiB": 74.66796875
+              },
+              "candidate": {
+                "median_MiB": 74.05859375,
+                "mean_MiB": 74.056640625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9928257226644324,
+                "mean": 0.9918127125294272
+              }
+            },
+            "to-sorted-512.js": {
+              "baseline": {
+                "median_MiB": 75.056640625,
+                "mean_MiB": 75.08984375
+              },
+              "candidate": {
+                "median_MiB": 74.1875,
+                "mean_MiB": 74.1787109375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9884202034921543,
+                "mean": 0.9878660979035531
+              }
+            },
+            "join-1024.js": {
+              "baseline": {
+                "median_MiB": 74.6328125,
+                "mean_MiB": 74.6337890625
+              },
+              "candidate": {
+                "median_MiB": 74.177734375,
+                "mean_MiB": 74.1796875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9939024390243902,
+                "mean": 0.9939156035328753
+              }
+            },
+            "join-4096.js": {
+              "baseline": {
+                "median_MiB": 74.74609375,
+                "mean_MiB": 74.7607421875
+              },
+              "candidate": {
+                "median_MiB": 74.265625,
+                "mean_MiB": 74.2119140625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9935719885027436,
+                "mean": 0.9926588727058977
+              }
+            },
+            "join-mixed-1024.js": {
+              "baseline": {
+                "median_MiB": 74.478515625,
+                "mean_MiB": 74.5615234375
+              },
+              "candidate": {
+                "median_MiB": 74.20703125,
+                "mean_MiB": 74.2080078125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9963548632418116,
+                "mean": 0.9952587392437559
+              }
+            },
+            "numeric-loop-10000.js": {
+              "baseline": {
+                "median_MiB": 75.9453125,
+                "mean_MiB": 75.9970703125
+              },
+              "candidate": {
+                "median_MiB": 75.458984375,
+                "mean_MiB": 75.455078125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9935963378253266,
+                "mean": 0.9928682489302373
+              }
+            },
+            "numeric-loop-50000.js": {
+              "baseline": {
+                "median_MiB": 76.041015625,
+                "mean_MiB": 76.009765625
+              },
+              "candidate": {
+                "median_MiB": 75.515625,
+                "mean_MiB": 75.490234375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9930906942696427,
+                "mean": 0.9931649407713853
+              }
+            },
+            "folded-string-4096.js": {
+              "baseline": {
+                "median_MiB": 80.05078125,
+                "mean_MiB": 80.08203125
+              },
+              "candidate": {
+                "median_MiB": 79.357421875,
+                "mean_MiB": 79.361328125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9913385058312595,
+                "mean": 0.9910004390029755
+              }
+            },
+            "dynamic-string-4096.js": {
+              "baseline": {
+                "median_MiB": 78.69921875,
+                "mean_MiB": 78.6572265625
+              },
+              "candidate": {
+                "median_MiB": 77.94921875,
+                "mean_MiB": 78.0048828125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9904700451680151,
+                "mean": 0.9917064994723447
+              }
+            },
+            "integer.js": {
+              "baseline": {
+                "median_MiB": 74.890625,
+                "mean_MiB": 74.865234375
+              },
+              "candidate": {
+                "median_MiB": 74.208984375,
+                "mean_MiB": 74.22265625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9908981848529105,
+                "mean": 0.9914168688528867
+              }
+            },
+            "objects.js": {
+              "baseline": {
+                "median_MiB": 74.78515625,
+                "mean_MiB": 74.84765625
+              },
+              "candidate": {
+                "median_MiB": 74.53125,
+                "mean_MiB": 74.4306640625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9966048576651867,
+                "mean": 0.9944287876415636
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_MiB": 74.69921875,
+                "mean_MiB": 74.7958984375
+              },
+              "candidate": {
+                "median_MiB": 74.359375,
+                "mean_MiB": 74.3955078125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9954505046279349,
+                "mean": 0.9946468906268361
+              }
+            },
+            "join-empty-1024.js": {
+              "baseline": {
+                "median_MiB": 74.5703125,
+                "mean_MiB": 74.6025390625
+              },
+              "candidate": {
+                "median_MiB": 74.2734375,
+                "mean_MiB": 74.2255859375
+              },
+              "candidate_over_baseline": {
+                "median": 0.9960188580408591,
+                "mean": 0.9949471810244395
+              }
+            },
+            "join-singleton-1024.js": {
+              "baseline": {
+                "median_MiB": 74.947265625,
+                "mean_MiB": 74.9365234375
+              },
+              "candidate": {
+                "median_MiB": 74.142578125,
+                "mean_MiB": 74.166015625
+              },
+              "candidate_over_baseline": {
+                "median": 0.989263284079952,
+                "mean": 0.989717860168111
+              }
+            },
+            "join-small-1024.js": {
+              "baseline": {
+                "median_MiB": 74.748046875,
+                "mean_MiB": 74.6142578125
+              },
+              "candidate": {
+                "median_MiB": 74.33984375,
+                "mean_MiB": 74.34765625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9945389459381777,
+                "mean": 0.9964269354099863
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_MiB": 72.560546875,
+                "mean_MiB": 72.4375
+              },
+              "candidate": {
+                "median_MiB": 72.015625,
+                "mean_MiB": 72.013671875
+              },
+              "candidate_over_baseline": {
+                "median": 0.9924901079378752,
+                "mean": 0.9941490509059534
+              }
+            },
+            "tiny42.js": {
+              "baseline": {
+                "median_MiB": 27.810546875,
+                "mean_MiB": 27.8056640625
+              },
+              "candidate": {
+                "median_MiB": 27.576171875,
+                "mean_MiB": 27.59765625
+              },
+              "candidate_over_baseline": {
+                "median": 0.9915724418849639,
+                "mean": 0.9925192287430197
+              }
+            }
+          }
+        }
+      }
+    ],
+    "run": [
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.9063908158508095,
+          "geomean_mean_candidate_over_baseline": 0.8987056809435712,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 598.937166,
+                "mean_ms": 601.05657425
+              },
+              "candidate": {
+                "median_ms": 562.6710595,
+                "mean_ms": 562.327607
+              },
+              "candidate_over_baseline": {
+                "median": 0.9394492301384416,
+                "mean": 0.9355651881882731
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 626.746961,
+                "mean_ms": 624.0363565
+              },
+              "candidate": {
+                "median_ms": 565.140455,
+                "mean_ms": 557.20544075
+              },
+              "candidate_over_baseline": {
+                "median": 0.9017043402943601,
+                "mean": 0.892905413196066
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 527.3339085,
+                "mean_ms": 526.63882925
+              },
+              "candidate": {
+                "median_ms": 463.5480005,
+                "mean_ms": 457.59980225
+              },
+              "candidate_over_baseline": {
+                "median": 0.8790407615140113,
+                "mean": 0.8689063108044649
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.8838296127875152,
+          "geomean_mean_candidate_over_baseline": 0.8868115305398943,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 567.655,
+                "mean_ms": 565.5155
+              },
+              "candidate": {
+                "median_ms": 500.039,
+                "mean_ms": 500.33975
+              },
+              "candidate_over_baseline": {
+                "median": 0.8808853969400428,
+                "mean": 0.8847498432845784
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 564.9495,
+                "mean_ms": 566.642
+              },
+              "candidate": {
+                "median_ms": 505.859,
+                "mean_ms": 507.631
+              },
+              "candidate_over_baseline": {
+                "median": 0.8954056955533194,
+                "mean": 0.8958584079542286
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 476.2115,
+                "mean_ms": 476.091
+              },
+              "candidate": {
+                "median_ms": 416.837,
+                "mean_ms": 418.91325
+              },
+              "candidate_over_baseline": {
+                "median": 0.8753190546637366,
+                "mean": 0.8799016364518548
+              }
+            }
+          }
+        },
+        "peak_rss_bytes": {
+          "geomean_median_candidate_over_baseline": 1.033265779501723,
+          "geomean_mean_candidate_over_baseline": 1.0286771052827806,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_MiB": 56.322265625,
+                "mean_MiB": 57.1044921875
+              },
+              "candidate": {
+                "median_MiB": 58.203125,
+                "mean_MiB": 58.0380859375
+              },
+              "candidate_over_baseline": {
+                "median": 1.0333945972188507,
+                "mean": 1.0163488670371954
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_MiB": 59.15625,
+                "mean_MiB": 59.0048828125
+              },
+              "candidate": {
+                "median_MiB": 59.28515625,
+                "mean_MiB": 60.125
+              },
+              "candidate_over_baseline": {
+                "median": 1.0021790808240887,
+                "mean": 1.0189834660134722
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_MiB": 52.076171875,
+                "mean_MiB": 52.080078125
+              },
+              "candidate": {
+                "median_MiB": 55.470703125,
+                "mean_MiB": 54.7392578125
+              },
+              "candidate_over_baseline": {
+                "median": 1.0651839627948843,
+                "mean": 1.051059441215076
+              }
+            }
+          }
+        }
+      },
+      {
+        "elapsed_ns": {
+          "geomean_median_candidate_over_baseline": 0.8986753756253154,
+          "geomean_mean_candidate_over_baseline": 0.896553394013153,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 622.8346745,
+                "mean_ms": 622.61856325
+              },
+              "candidate": {
+                "median_ms": 562.984355,
+                "mean_ms": 561.82330825
+              },
+              "candidate_over_baseline": {
+                "median": 0.9039065711168911,
+                "mean": 0.9023555374214102
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 627.8230475,
+                "mean_ms": 624.0218955
+              },
+              "candidate": {
+                "median_ms": 566.9750965,
+                "mean_ms": 560.8166165
+              },
+              "candidate_over_baseline": {
+                "median": 0.9030810492824414,
+                "mean": 0.8987130428342478
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 534.3359615,
+                "mean_ms": 534.66613825
+              },
+              "candidate": {
+                "median_ms": 475.086464,
+                "mean_ms": 475.129969
+              },
+              "candidate_over_baseline": {
+                "median": 0.8891156467671136,
+                "mean": 0.8886479524496051
+              }
+            }
+          }
+        },
+        "total_cpu_ns": {
+          "geomean_median_candidate_over_baseline": 0.888084095632269,
+          "geomean_mean_candidate_over_baseline": 0.887716477661742,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_ms": 559.5525,
+                "mean_ms": 559.60325
+              },
+              "candidate": {
+                "median_ms": 499.5805,
+                "mean_ms": 499.387
+              },
+              "candidate_over_baseline": {
+                "median": 0.892821495748835,
+                "mean": 0.8923947457417376
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_ms": 565.638,
+                "mean_ms": 567.501
+              },
+              "candidate": {
+                "median_ms": 507.8,
+                "mean_ms": 509.832
+              },
+              "candidate_over_baseline": {
+                "median": 0.8977473224924776,
+                "mean": 0.8983807958047652
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_ms": 472.1625,
+                "mean_ms": 472.9055
+              },
+              "candidate": {
+                "median_ms": 412.6055,
+                "mean_ms": 412.648
+              },
+              "candidate_over_baseline": {
+                "median": 0.8738633415402536,
+                "mean": 0.8725802512341261
+              }
+            }
+          }
+        },
+        "peak_rss_bytes": {
+          "geomean_median_candidate_over_baseline": 0.9748591274217292,
+          "geomean_mean_candidate_over_baseline": 0.9676577724373286,
+          "cases": {
+            "join-4096.js": {
+              "baseline": {
+                "median_MiB": 56.330078125,
+                "mean_MiB": 57.1865234375
+              },
+              "candidate": {
+                "median_MiB": 55.845703125,
+                "mean_MiB": 55.8017578125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9914011303352865,
+                "mean": 0.975785105619973
+              }
+            },
+            "retained-objects.js": {
+              "baseline": {
+                "median_MiB": 64.10546875,
+                "mean_MiB": 64.1044921875
+              },
+              "candidate": {
+                "median_MiB": 57.86328125,
+                "mean_MiB": 57.564453125
+              },
+              "candidate_over_baseline": {
+                "median": 0.9026262872463592,
+                "mean": 0.8979784592416556
+              }
+            },
+            "hello.js": {
+              "baseline": {
+                "median_MiB": 51.947265625,
+                "mean_MiB": 51.955078125
+              },
+              "candidate": {
+                "median_MiB": 53.78125,
+                "mean_MiB": 53.724609375
+              },
+              "candidate_over_baseline": {
+                "median": 1.0353047336165733,
+                "mean": 1.0340588699672946
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "aa": {
+    "purpose": "Descriptive identical-binary baseline calibration; no candidate gate or rerun allowance.",
+    "results": {
+      "build-block0": {
+        "elapsed_ns": 1.0128687064140731,
+        "total_cpu_ns": 1.001185921045462,
+        "peak_rss_bytes": 1.004566385091725
+      },
+      "build-block1": {
+        "elapsed_ns": 1.004733694975161,
+        "total_cpu_ns": 0.9997732434806273,
+        "peak_rss_bytes": 1.004730332979553
+      }
+    }
+  },
+  "runtime_invariance": {
+    "status": "verified",
+    "baseline_source_fingerprint": "8f895ff65a60f98bbaded819f6ac75410a707d3ab5d2fe39facb8c0ba0474c2d",
+    "candidate_source_fingerprint": "b11cbfe2a1d92332078b8b7d7f81951dab9b430592d1a4628c9e945a58bd3a4d",
+    "baseline_runtime_build": "target/performance-cold-compiler/candidate/runtime-build",
+    "candidate_runtime_build_dir": "target/release/build/scriptw-runtime-image-1d4fdcd75007dec6/out",
+    "profiles": {
+      "standard": {
+        "runtime_abi": 42,
+        "candidate_runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+        "baseline_runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+        "runtime_wasm_identical": true,
+        "candidate_native_sha256": "2bb695622cacb273cc5f6ece7320d57d936052ca9bfe5d644036704162fcac48",
+        "baseline_native_sha256": "2bb695622cacb273cc5f6ece7320d57d936052ca9bfe5d644036704162fcac48",
+        "native_identical": true,
+        "candidate_package": {
+          "package_sha256": "3e53ccb58155238bc3b62342f8d41560a4647a25b428c832f39c86c721aa5c98",
+          "package_bytes": 39054380,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+          "runtime_wasm_bytes": 39054212
+        },
+        "baseline_package": {
+          "package_sha256": "4fd4b75687a859af63effa0620621b40308497c179b0e0423f14610b4a2a8b78",
+          "package_bytes": 39054380,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "861d6a02ca04976d515197f7576e60b0b3abb0a1aede5ca815ad49bd1a301a11",
+          "runtime_wasm_bytes": 39054212
+        }
+      },
+      "portable": {
+        "runtime_abi": 42,
+        "candidate_runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+        "baseline_runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+        "runtime_wasm_identical": true,
+        "candidate_native_sha256": "786851f96e20eacc5bb52bb08a17485e050538075fa6f3c6c6df617bdd5150b7",
+        "baseline_native_sha256": "786851f96e20eacc5bb52bb08a17485e050538075fa6f3c6c6df617bdd5150b7",
+        "native_identical": true,
+        "candidate_package": {
+          "package_sha256": "2e49e2c22d57dcb05df1a079ad1886003dcd86143ce09850b2087cb54119c22d",
+          "package_bytes": 39052396,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+          "runtime_wasm_bytes": 39052228
+        },
+        "baseline_package": {
+          "package_sha256": "b3d1f76397515495819908969c0d2ba8879fbdb21d1be3aca50ddc78e2c5532d",
+          "package_bytes": 39052396,
+          "runtime_abi": 42,
+          "runtime_wasm_sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+          "runtime_wasm_bytes": 39052228
+        }
+      }
+    }
+  },
+  "runtime_product_producer": {
+    "reason": "build-script-executed",
+    "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-runtime-image#0.1.0",
+    "linked_libs": [
+      "static:-bundle=scriptw_runtime_images"
+    ],
+    "linked_paths": [
+      "native=/home/jacobt/src/scriptw/target/release/build/scriptw-runtime-image-1d4fdcd75007dec6/out"
+    ],
+    "cfgs": [
+      "scriptw_runtime_image"
+    ],
+    "env": [],
+    "out_dir": "/home/jacobt/src/scriptw/target/release/build/scriptw-runtime-image-1d4fdcd75007dec6/out"
+  },
+  "program_invariance": {
+    "source_count": 19,
+    "all_repetitions_equivalent": true,
+    "artifacts": {
+      "baseline": {
+        "sort-reverse-128.js": {
+          "program": {
+            "sha256": "e2a39e6007f91b2d8cefcdb4642f5007d36e853ee9c652b28f859a930be72b05",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-128.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-128.js.runtime.wasm"
+        },
+        "sort-reverse-512.js": {
+          "program": {
+            "sha256": "cfce4751a79e4caffffac24b4708921704addd0b20682aaef15a7776c6170fe6",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-reverse-512.js.runtime.wasm"
+        },
+        "sort-sorted-512.js": {
+          "program": {
+            "sha256": "9190fa76a8269aefb99950892e8c340e7a3b2abea2def9208969a22939a92613",
+            "bytes": 75843
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-sorted-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/sort-sorted-512.js.runtime.wasm"
+        },
+        "to-sorted-512.js": {
+          "program": {
+            "sha256": "5804c3eb1213479a221400b7c3c88596137c4ae86ef7d9cecbbaa510b0d5294e",
+            "bytes": 78547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/to-sorted-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/to-sorted-512.js.runtime.wasm"
+        },
+        "join-1024.js": {
+          "program": {
+            "sha256": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-1024.js.runtime.wasm"
+        },
+        "join-4096.js": {
+          "program": {
+            "sha256": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-4096.js.runtime.wasm"
+        },
+        "join-mixed-1024.js": {
+          "program": {
+            "sha256": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53",
+            "bytes": 74016
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-mixed-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-mixed-1024.js.runtime.wasm"
+        },
+        "numeric-loop-10000.js": {
+          "program": {
+            "sha256": "3c4ce1fd35f223a33de46ca507623878791be7063fe326cd2aa567e784e3dda3",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-10000.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-10000.js.runtime.wasm"
+        },
+        "numeric-loop-50000.js": {
+          "program": {
+            "sha256": "6f710ef09137f122c4faecd89f27685308af09fe11f6e899e06296d5e75f6d31",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-50000.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/numeric-loop-50000.js.runtime.wasm"
+        },
+        "folded-string-4096.js": {
+          "program": {
+            "sha256": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3",
+            "bytes": 66587
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/folded-string-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/folded-string-4096.js.runtime.wasm"
+        },
+        "dynamic-string-4096.js": {
+          "program": {
+            "sha256": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71",
+            "bytes": 64851
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/dynamic-string-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/dynamic-string-4096.js.runtime.wasm"
+        },
+        "integer.js": {
+          "program": {
+            "sha256": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf",
+            "bytes": 67547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/integer.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/integer.js.runtime.wasm"
+        },
+        "objects.js": {
+          "program": {
+            "sha256": "a9d73d0dec49bb793db7b9f75fb23a489cc3445eaeb998bbb06ba26224176dd2",
+            "bytes": 78664
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/objects.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/objects.js.runtime.wasm"
+        },
+        "retained-objects.js": {
+          "program": {
+            "sha256": "089393fcb94e0f8c921ff214671180ce495840b92344988964f2c515af493687",
+            "bytes": 78774
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/retained-objects.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/retained-objects.js.runtime.wasm"
+        },
+        "join-empty-1024.js": {
+          "program": {
+            "sha256": "16061580fbc24c917aa32271e774e1523ce4e804988ec0121e4e7d37a26fbadf",
+            "bytes": 67128
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-empty-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-empty-1024.js.runtime.wasm"
+        },
+        "join-singleton-1024.js": {
+          "program": {
+            "sha256": "aeb9ea1d7e33ccd058db2fb971516df67ea9cf16f749309ca0023052dc43154e",
+            "bytes": 67590
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-singleton-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-singleton-1024.js.runtime.wasm"
+        },
+        "join-small-1024.js": {
+          "program": {
+            "sha256": "b66d815a0582149957e92385902fc1b8437cccf71f62a7d79e7b4a48864e547a",
+            "bytes": 68002
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-small-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/join-small-1024.js.runtime.wasm"
+        },
+        "hello.js": {
+          "program": {
+            "sha256": "7cff66260c0d50f8f002e2a2ac156290269944e050d650d66d9b3e91e7207587",
+            "bytes": 47996
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/hello.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/hello.js.runtime.wasm"
+        },
+        "tiny42.js": {
+          "program": {
+            "sha256": "a07081ac710865be454006443f4c8c5b0804700239a5576c56d28cfaf6d4b0e5",
+            "bytes": 599327
+          },
+          "runtime": null,
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/baseline/tiny42.js",
+          "runtime_path": null
+        }
+      },
+      "candidate": {
+        "sort-reverse-128.js": {
+          "program": {
+            "sha256": "e2a39e6007f91b2d8cefcdb4642f5007d36e853ee9c652b28f859a930be72b05",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-128.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-128.js.runtime.wasm"
+        },
+        "sort-reverse-512.js": {
+          "program": {
+            "sha256": "cfce4751a79e4caffffac24b4708921704addd0b20682aaef15a7776c6170fe6",
+            "bytes": 75824
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-reverse-512.js.runtime.wasm"
+        },
+        "sort-sorted-512.js": {
+          "program": {
+            "sha256": "9190fa76a8269aefb99950892e8c340e7a3b2abea2def9208969a22939a92613",
+            "bytes": 75843
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-sorted-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/sort-sorted-512.js.runtime.wasm"
+        },
+        "to-sorted-512.js": {
+          "program": {
+            "sha256": "5804c3eb1213479a221400b7c3c88596137c4ae86ef7d9cecbbaa510b0d5294e",
+            "bytes": 78547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/to-sorted-512.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/to-sorted-512.js.runtime.wasm"
+        },
+        "join-1024.js": {
+          "program": {
+            "sha256": "468971a1e190f25e71caa025fa20d7715ae3cf2935fbe392e9f752e65a6754a2",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-1024.js.runtime.wasm"
+        },
+        "join-4096.js": {
+          "program": {
+            "sha256": "3981e5a7a0101f43e36056f305a6b889e7669d175461c3f7a1b84c305d97d9f5",
+            "bytes": 78719
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-4096.js.runtime.wasm"
+        },
+        "join-mixed-1024.js": {
+          "program": {
+            "sha256": "8303cd3bcb6d789a6d29540c8612ad5f4f6da6d4535d38815eb206d4789d8c53",
+            "bytes": 74016
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-mixed-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-mixed-1024.js.runtime.wasm"
+        },
+        "numeric-loop-10000.js": {
+          "program": {
+            "sha256": "3c4ce1fd35f223a33de46ca507623878791be7063fe326cd2aa567e784e3dda3",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-10000.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-10000.js.runtime.wasm"
+        },
+        "numeric-loop-50000.js": {
+          "program": {
+            "sha256": "6f710ef09137f122c4faecd89f27685308af09fe11f6e899e06296d5e75f6d31",
+            "bytes": 60292
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-50000.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/numeric-loop-50000.js.runtime.wasm"
+        },
+        "folded-string-4096.js": {
+          "program": {
+            "sha256": "400c205ef1089383b6c9052922fc7fe1be0ec754ba84b89045fcd5912d7e8cf3",
+            "bytes": 66587
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/folded-string-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/folded-string-4096.js.runtime.wasm"
+        },
+        "dynamic-string-4096.js": {
+          "program": {
+            "sha256": "df6661bdce49df09e271201899940dd7ab7a90040ed2ae7ad22365117ca5ab71",
+            "bytes": 64851
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/dynamic-string-4096.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/dynamic-string-4096.js.runtime.wasm"
+        },
+        "integer.js": {
+          "program": {
+            "sha256": "d867e9f4c2b7321724a039d6c9b5aea68ee08c9370caddfb7e39a3426d7ab9cf",
+            "bytes": 67547
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/integer.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/integer.js.runtime.wasm"
+        },
+        "objects.js": {
+          "program": {
+            "sha256": "a9d73d0dec49bb793db7b9f75fb23a489cc3445eaeb998bbb06ba26224176dd2",
+            "bytes": 78664
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/objects.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/objects.js.runtime.wasm"
+        },
+        "retained-objects.js": {
+          "program": {
+            "sha256": "089393fcb94e0f8c921ff214671180ce495840b92344988964f2c515af493687",
+            "bytes": 78774
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/retained-objects.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/retained-objects.js.runtime.wasm"
+        },
+        "join-empty-1024.js": {
+          "program": {
+            "sha256": "16061580fbc24c917aa32271e774e1523ce4e804988ec0121e4e7d37a26fbadf",
+            "bytes": 67128
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-empty-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-empty-1024.js.runtime.wasm"
+        },
+        "join-singleton-1024.js": {
+          "program": {
+            "sha256": "aeb9ea1d7e33ccd058db2fb971516df67ea9cf16f749309ca0023052dc43154e",
+            "bytes": 67590
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-singleton-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-singleton-1024.js.runtime.wasm"
+        },
+        "join-small-1024.js": {
+          "program": {
+            "sha256": "b66d815a0582149957e92385902fc1b8437cccf71f62a7d79e7b4a48864e547a",
+            "bytes": 68002
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-small-1024.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/join-small-1024.js.runtime.wasm"
+        },
+        "hello.js": {
+          "program": {
+            "sha256": "7cff66260c0d50f8f002e2a2ac156290269944e050d650d66d9b3e91e7207587",
+            "bytes": 47996
+          },
+          "runtime": {
+            "sha256": "2e9c686198efbb5ded3118cccd4ae7c2358d1ce530fe18a04d898eb2c2c2bb68",
+            "bytes": 39052228
+          },
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/hello.js",
+          "runtime_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/hello.js.runtime.wasm"
+        },
+        "tiny42.js": {
+          "program": {
+            "sha256": "a07081ac710865be454006443f4c8c5b0804700239a5576c56d28cfaf6d4b0e5",
+            "bytes": 599327
+          },
+          "runtime": null,
+          "program_path": "target/performance-compiler-prefix/runs/baseline-vs-candidate/retained-artifacts/candidate/tiny42.js",
+          "runtime_path": null
+        }
+      }
+    }
+  },
+  "emission_diagnostic": {
+    "status": "intrusive_unscored_debugger_diagnostic",
+    "files": {
+      "gdb-join/spans.json": "dcb82b109f10005c1ee381acdb7b68a392fcb9f4c77d752451314b75c7f014b5",
+      "gdb-catalog/spans.json": "1e8e62f695278747d209cee3524611e788d5f9fd15d565e6a98aa1c8e36dff99",
+      "gdb-candidate/spans.json": "28006f5056a80e8057630fdb3fa9705f1a6a40136a3a5bcf91d3ab02d4ca1d48"
+    },
+    "join": {
+      "CompilerOwnedPool.collect": 124357941,
+      "CompilerOwnedPool.collect_script": 369322,
+      "StringPool.collect": 125265815,
+      "program_imports.compact": 5345520,
+      "emit_script_module_with_factory": 135536796
+    },
+    "catalog": {
+      "regexp_unicode_property_catalog": 114902043,
+      "CompilerOwnedPool.collect": 124025429,
+      "CompilerOwnedPool.collect_script": 341609,
+      "StringPool.collect": 124870293,
+      "program_imports.compact": 5183413,
+      "emit_script_module_with_factory": 134941039
+    },
+    "interpretation": "Nested debugger spans include debugger perturbation and are not additive. The catalog span is inside pool collection; do not add it to whole emit or claim scored compiler time.",
+    "candidate": {
+      "regexp_unicode_property_catalog": 54732185,
+      "CompilerOwnedPool.collect": 63702605,
+      "CompilerOwnedPool.collect_script": 341449,
+      "StringPool.collect": 64547350,
+      "program_imports.compact": 5251742,
+      "emit_script_module_with_factory": 74713814
+    }
+  },
+  "verification": {
+    "native": {
+      "status": "complete",
+      "selected_counts": {
+        "scriptw_ir": 1630,
+        "scriptw_ir_integration": 56,
+        "scriptw_aot_wasm": 587
+      },
+      "selected_test_count": 2273,
+      "scope_count": 6,
+      "scopes": [
+        {
+          "target": "scriptw_ir",
+          "filter": "regexp::catalog_tests::",
+          "selected_count": 2,
+          "skipped_count": 0,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "2",
+              "0",
+              "0",
+              "0",
+              "1628"
+            ]
+          ],
+          "executable_sha256": "33cf84b5de569841c31c64062562c98f960e0f5f070fe5911ba80325ebfbfe3d",
+          "stdout_sha256": "3589d8d733f1271f0adc9626252a31e1d100952c93a91bfb88073b1bc0c0c791",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "target": "scriptw_ir",
+          "filter": "regexp::tests::",
+          "selected_count": 93,
+          "skipped_count": 2,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "93",
+              "0",
+              "0",
+              "0",
+              "1537"
+            ]
+          ],
+          "executable_sha256": "33cf84b5de569841c31c64062562c98f960e0f5f070fe5911ba80325ebfbfe3d",
+          "stdout_sha256": "82f0f2897d43afea94c7080f77d2fcf4b785d9e9d004b5d12313275e999c818f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "target": "scriptw_ir",
+          "filter": null,
+          "selected_count": 1535,
+          "skipped_count": 95,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "1535",
+              "0",
+              "0",
+              "0",
+              "95"
+            ]
+          ],
+          "executable_sha256": "33cf84b5de569841c31c64062562c98f960e0f5f070fe5911ba80325ebfbfe3d",
+          "stdout_sha256": "4245d30e12ddb30bd24d2201931f4184c6bb37e3b1c89d3ee2d9c565c4d4954c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "target": "scriptw_ir_integration",
+          "filter": "regexp",
+          "selected_count": 56,
+          "skipped_count": 0,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "56",
+              "0",
+              "0",
+              "0",
+              "690"
+            ]
+          ],
+          "executable_sha256": "48718cc3eb166c97a054a93c6489225276fe4b32ca971c89c4aa132dc4bb77f3",
+          "stdout_sha256": "dc3ad06f98c068e2a6e355dd89a2780b3bb320f10e02d69df6812c6e86c86d30",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "target": "scriptw_aot_wasm",
+          "filter": "regexp",
+          "selected_count": 17,
+          "skipped_count": 0,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "17",
+              "0",
+              "0",
+              "0",
+              "570"
+            ]
+          ],
+          "executable_sha256": "eef42ec8af1853b1490b78f533e9da53cb684b905b24600a2bcd833ba124f436",
+          "stdout_sha256": "4ab287964460d5d53ae5f77e9b430c5769f636e4bcbc3be377ab10e5f1076982",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "target": "scriptw_aot_wasm",
+          "filter": null,
+          "selected_count": 570,
+          "skipped_count": 17,
+          "passed": true,
+          "exit_code": 0,
+          "summaries": [
+            [
+              "ok",
+              "570",
+              "0",
+              "0",
+              "0",
+              "17"
+            ]
+          ],
+          "executable_sha256": "eef42ec8af1853b1490b78f533e9da53cb684b905b24600a2bcd833ba124f436",
+          "stdout_sha256": "ae5996f2421d0c4812534eb53fc91221e92b5c64660b40aa21ef83964bfdd09f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "boundary": "Full IR lib and AOT backend lib inventories; only regexp-filtered scriptw_ir_integration. No full Engine, IR integration, workspace, release, or Test262 acceptance."
+    },
+    "coverage_boundary": "Full scriptw-ir lib; full scriptw-aot-wasm lib; regexp-filtered scriptw-ir integration target only. No scriptw-engine suite, full IR integration suite, workspace suite, full Test262, or browser coverage is claimed.",
+    "cargo_unit_timings": {
+      "file": "target/performance-compiler-prefix/cargo-unit-timings.json",
+      "sha256": "954738512a6342278f41151d4b90cd6932a83bbbf94ba9840104ad7e02705c73",
+      "commands": [
+        {
+          "label": "ir-lib-test-build",
+          "path": "ir-lib-test-build.timings.html",
+          "sha256": "e994388d63da93fbbf28ad7186adbd9a26be872971207eab10fcb95f3f66e928"
+        },
+        {
+          "label": "ir-integration-test-build",
+          "path": "ir-integration-test-build-target-corrected.timings.html",
+          "sha256": "263e990320944fdc53d597c5314fa0ea72f9b2516e591ee41f5ad8af5924d5c6"
+        },
+        {
+          "label": "aot-lib-test-build",
+          "path": "aot-lib-test-build.timings.html",
+          "sha256": "65934d9a7c94a85f57c99a77b90fe8df91d5e750a0450f9afc6c1a2d669126eb"
+        },
+        {
+          "label": "scriptw-product-build",
+          "path": "scriptw-product-build.timings.html",
+          "sha256": "28f074fa5ffa3da62362565e52db435c70c19fb802def74cc5e4a72278783616"
+        }
+      ],
+      "source_bound_to": {
+        "source_event_sha256": "d47039d8710a64bab01a1f88efd6a2380e0ed563c9d23a80dbfb8ac23578b2be",
+        "build_receipt_sha256": "98a67f773dbc2b92bf7a3a8188ee258cd5cc005f56c4a52b6594193a9b47fbb6"
+      }
+    },
+    "source_guards": 359,
+    "product_graph": "check-no-interpreter-in-product-graph: ok",
+    "unavailable_cache_cli": {
+      "status": "passed",
+      "observations": [
+        {
+          "product": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-cold-compiler/candidate/scriptw",
+            "run",
+            "/home/jacobt/src/scriptw/target/performance-compiler-prefix/sources/hello.js"
+          ],
+          "executable_sha256": "6a60d04c10d08ff467bb279fd0190c52f540eaa1de1dfe4d5f99ee2fd5e624a7",
+          "executable_unchanged": true,
+          "exit_code": 0,
+          "exact_output": true
+        },
+        {
+          "product": "candidate",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-compiler-prefix/candidate/scriptw",
+            "run",
+            "/home/jacobt/src/scriptw/target/performance-compiler-prefix/sources/hello.js"
+          ],
+          "executable_sha256": "42f787fa18d0151dd0247ec153f5b8fb9bd02e8fa0c68b098229a495976cff8e",
+          "executable_unchanged": true,
+          "exit_code": 0,
+          "exact_output": true
+        }
+      ],
+      "performance_claim": false
+    },
+    "build_target_correction": {
+      "path": "build-attempt1-receipt.json",
+      "sha256": "a6cb0d32c42a5e4abc4ea6553f5594a993c520d096229f0b7b8fa407630cc44b",
+      "reason": "Cargo target name is scriptw_ir_integration; integration_cases.rs is its source path. No source changes or successful-build rerun.",
+      "timing_note": "The failed 0.1s target-selection attempt generated no Cargo timing; its stale copied HTML is not a unit measurement."
+    }
+  },
+  "interpretation": {
+    "runtime": "The regexp catalog base data is deduplicated locally during IR regexp preparation. Exact aliases and per-alias Unicode 17 deltas remain unchanged; no retained cache/state was introduced.",
+    "emission": "GDB timing is intrusive, nested and unscored; do not add catalog span to pool/whole-emission spans.",
+    "status_limit": "Independent audit passed for the recorded scopes; full release and Test262 acceptance remain open.",
+    "rss_limit": "Hello control peak-RSS median rose3.395MiB in block0; no repeated >=4MiB median-and-mean veto. Peak RSS is not retained ownership or JS live heap.",
+    "parity_limit": "No new V8/Scriptc execution or frontend compilation comparison. Overall execution/RSS parity and the prior failed append A/A remain open; no parked append prototype is promoted.",
+    "timing_samples": "All build and run source medians and means improve for wall and CPU in both blocks; all raw observations retained without trimming."
+  },
+  "evidence_inputs": {
+    "campaign_plan_sha256": "5b1be87fea954004b8abbb16bd52475c77cde22b844a41378cb923552d1c5fa8",
+    "campaign_driver_sha256": "2c98608a2f6f486d87aad183bbe764c656b0d5eb20eb67b086fb9da25eed8be5",
+    "build_receipt_sha256": "98a67f773dbc2b92bf7a3a8188ee258cd5cc005f56c4a52b6594193a9b47fbb6",
+    "native_receipt_sha256": "ec1b9024fee9b3443d2cd6f8cea2449fb884382192e78493dae739f04172ea1e",
+    "runtime_invariance_sha256": "c51c9e4a7860380cef78adc3867067681b891df50d73476c995fbab9e18a6b49",
+    "source_event_sha256": "d47039d8710a64bab01a1f88efd6a2380e0ed563c9d23a80dbfb8ac23578b2be",
+    "cargo_unit_timings_sha256": "954738512a6342278f41151d4b90cd6932a83bbbf94ba9840104ad7e02705c73"
+  },
+  "evidence": {
+    "archive": "regexp-catalog-20261101-inert.tar.xz",
+    "source_directory": "target/performance-compiler-prefix",
+    "excluded_binary_classes": [
+      "executables",
+      "Wasm/native images",
+      "caches",
+      "raw perf data"
+    ],
+    "archive_sha256": "f09001f4b985b1f42337d7c478aed7b8069f8b2cc2fe283633c6d4ca94a45007",
+    "archive_bytes": 627716,
+    "archive_members": 2149,
+    "expanded_bytes": 70801060
+  },
+  "independent_audit": {
+    "reviewer": "Astra xhigh",
+    "verdict": "PASS",
+    "receipt": "target/performance-compiler-prefix/final-audit.json",
+    "sha256": "57aed5ce23b707142af3d00d20bcbdcb8029e09275a2b1eb8529d04c3e50e898",
+    "counts": {
+      "all_processes": 656,
+      "descriptive_aa": 304,
+      "comparison_build": 304,
+      "separate_run_controls": 48,
+      "native_unique_selected": 2273
+    }
+  }
+}
