@@ -1,0 +1,761 @@
+{
+  "schema": "scriptw-numeric-array-screen-rejection-v1",
+  "date": "2026-11-01",
+  "title": "P162 numeric Array region screen: binding-fix candidate rejected",
+  "decision": {
+    "status": "rejected-screen",
+    "promotion": "P162 remains unpromoted",
+    "candidate_source_fingerprint": "12e1ffe694b36125aa62dadefc558e0033ac3ce4a9a3a4f968876b96222cdf97",
+    "reason": "The predeclared all-four-sort gate failed on sort-reverse-128.js. Block 0 improved, but block 1 regressed: median of invocation medians +1.176% and mean of invocation means +7.783%. No nonsort control met the two-block veto.",
+    "interpretation": "The four sort program Wasm hashes are byte-identical to the preceding positive stage. New derived-kernel gains therefore come from admitted kernel loop shapes, not changed sort programs; they do not offset the failed original-sort screen."
+  },
+  "cohorts": {
+    "baseline": {
+      "source_commit": "ae07c2921d34b65f09e2458ed577bad9a03ae6ff",
+      "source_fingerprint": "a35adbcb61dbc57b4ee44dd1527019358deb137b11ae559de7d0d4b4a860b480",
+      "compiler_precompiled_identity_sha256": "ad1b2c7a4df8639012f0d38693999f8a563cbc6132d877b2246c63f506cbaf4a",
+      "ordinary_runtime_baseline_sha256": "4a882ea53d5de4b762571c22cb6efe0957a6e3a1783f7ed832bc5188316214e1"
+    },
+    "stage4_positive_predecessor": {
+      "source_fingerprint": "45c63b5839160db1b46e86e5b8e2e09bd0c9aa54de51284de95389132db0f6bb",
+      "screen": "target/performance-numeric-array-region/runs/20261031T234529Z-candidate-screen/analysis.json",
+      "full17": "target/performance-numeric-array-region/runs/20261031T234712Z-candidate-full17/analysis.json",
+      "test262": "target/performance-numeric-array-region/test262-receipt.json"
+    },
+    "stage5_rejected_candidate": {
+      "source_commit": "fc32ee6d0863eb941d7c5182306a3d7c4fb1dbfa",
+      "source_fingerprint": "12e1ffe694b36125aa62dadefc558e0033ac3ce4a9a3a4f968876b96222cdf97",
+      "source_patch_sha256": "86c781c8d553ee74b3d0b3eab688c8f82dcb8943a9c2cda606d8d81805fc59c3",
+      "precompiled_identity_sha256": "32ca053ba13b65472c121b99cd3c77d6367f28cbc58e9bf389ac6c4631ec5ebe",
+      "ordinary_runtime_baseline_sha256": "baf3eae280f177bf86f085e3f532cec9501533cb688dd1279c45b4c5901d7ae3",
+      "screen": "target/performance-numeric-array-binding/runs/20261101T010843Z-candidate-screen/analysis.json"
+    }
+  },
+  "ordinary_measurement_boundary": {
+    "executed_host": "runtime_baseline",
+    "source_compilation": "outside entry timing",
+    "timed_boundary": "fresh Store/Realm entry execution and completion",
+    "samples_per_process": 7,
+    "warmups_per_process": 10,
+    "order": "case-local ABBA then BAAB",
+    "experimental_unit": "independent host process; block metrics aggregate two invocation medians and two invocation means",
+    "screen_cases": 7,
+    "screen_host_invocations": 56,
+    "control_veto": "nonsort control must be >=3% slower in both block metrics in both blocks",
+    "identity_note": "candidate/identity.json is the compiler-precompiled source binder/configuration. Ordinary timing provenance is separately bound to runtime_baseline SHA and each raw host report."
+  },
+  "stage5_screen": {
+    "analysis": "target/performance-numeric-array-binding/runs/20261101T010843Z-candidate-screen/analysis.json",
+    "sorts": [
+      {
+        "case": "sort-reverse-128.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_of_invocation_medians_change_percent": -4.754133961309659,
+            "mean_of_invocation_means_change_percent": -5.2967671783525905
+          },
+          {
+            "block": "block1",
+            "median_of_invocation_medians_change_percent": 1.175629848108839,
+            "mean_of_invocation_means_change_percent": 7.783173647247366
+          }
+        ]
+      },
+      {
+        "case": "sort-reverse-512.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_of_invocation_medians_change_percent": -12.741785743117784,
+            "mean_of_invocation_means_change_percent": -12.578737368836112
+          },
+          {
+            "block": "block1",
+            "median_of_invocation_medians_change_percent": -4.823037139728181,
+            "mean_of_invocation_means_change_percent": -7.9762937976344155
+          }
+        ]
+      },
+      {
+        "case": "sort-sorted-512.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_of_invocation_medians_change_percent": -5.960977618429553,
+            "mean_of_invocation_means_change_percent": -6.626557217945594
+          },
+          {
+            "block": "block1",
+            "median_of_invocation_medians_change_percent": -12.304162893597004,
+            "mean_of_invocation_means_change_percent": -12.418240504623412
+          }
+        ]
+      },
+      {
+        "case": "to-sorted-512.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_of_invocation_medians_change_percent": -5.996281189594965,
+            "mean_of_invocation_means_change_percent": -7.490098184015981
+          },
+          {
+            "block": "block1",
+            "median_of_invocation_medians_change_percent": -7.278661189962987,
+            "mean_of_invocation_means_change_percent": -6.744280983510665
+          }
+        ]
+      }
+    ],
+    "gate_failures": [
+      "sort-reverse-128.js"
+    ],
+    "control_vetoes": [],
+    "disposition": "Stage5 full17, V8/Scriptc comparison, and Test262 were intentionally not run after the failed screen."
+  },
+  "stage5_aa": {
+    "analysis": "target/performance-numeric-array-binding/runs/20261101T010701Z-aa-controls4/analysis.json",
+    "cases": 6,
+    "host_invocations": 48,
+    "persistent_control_vetoes": [],
+    "one_block_noise": {
+      "join-empty-1024.js": [
+        {
+          "block": "block0",
+          "median_percent": 4.619794991320458,
+          "mean_percent": 8.829048162449471
+        },
+        {
+          "block": "block1",
+          "median_percent": 0.20730227834839798,
+          "mean_percent": 2.207536005934818
+        }
+      ],
+      "retained-objects.js": [
+        {
+          "block": "block0",
+          "median_percent": 0.6864429015455809,
+          "mean_percent": 0.6741348920751733
+        },
+        {
+          "block": "block1",
+          "median_percent": 2.492899545632832,
+          "mean_percent": 4.111564097086906
+        }
+      ]
+    },
+    "predecessor_aa": "target/performance-numeric-array-binding/predecessor-aa-analysis.json"
+  },
+  "program_wasm_identity": {
+    "source": "candidate runtime_baseline raw reports for the same four original sort sources",
+    "stage4_to_stage5_sort_programs_byte_identical": true,
+    "sort_programs": [
+      {
+        "case": "sort-reverse-128.js",
+        "stage4": {
+          "cohort": "performance-numeric-array-region",
+          "sha256": "a2270bfeb4de2003578153ee180318184a2051c8a67aed7d5434d75fdf47fb30",
+          "bytes": 75232
+        },
+        "stage5": {
+          "cohort": "performance-numeric-array-binding",
+          "sha256": "a2270bfeb4de2003578153ee180318184a2051c8a67aed7d5434d75fdf47fb30",
+          "bytes": 75232
+        },
+        "byte_identical": true
+      },
+      {
+        "case": "sort-reverse-512.js",
+        "stage4": {
+          "cohort": "performance-numeric-array-region",
+          "sha256": "409f1a3a91dc73cc2c5e0e5c1f4e49ec4d61067462998c4d6b16e12543bcc265",
+          "bytes": 75232
+        },
+        "stage5": {
+          "cohort": "performance-numeric-array-binding",
+          "sha256": "409f1a3a91dc73cc2c5e0e5c1f4e49ec4d61067462998c4d6b16e12543bcc265",
+          "bytes": 75232
+        },
+        "byte_identical": true
+      },
+      {
+        "case": "sort-sorted-512.js",
+        "stage4": {
+          "cohort": "performance-numeric-array-region",
+          "sha256": "012d70439f1e480ff9d1851e9fd566b73e4627fb7840e07e0a3d47fa522a5a23",
+          "bytes": 75251
+        },
+        "stage5": {
+          "cohort": "performance-numeric-array-binding",
+          "sha256": "012d70439f1e480ff9d1851e9fd566b73e4627fb7840e07e0a3d47fa522a5a23",
+          "bytes": 75251
+        },
+        "byte_identical": true
+      },
+      {
+        "case": "to-sorted-512.js",
+        "stage4": {
+          "cohort": "performance-numeric-array-region",
+          "sha256": "1eaf698d6d2788193de9995f50c2361bd14b5ad22355db909407f177a68b1751",
+          "bytes": 77927
+        },
+        "stage5": {
+          "cohort": "performance-numeric-array-binding",
+          "sha256": "1eaf698d6d2788193de9995f50c2361bd14b5ad22355db909407f177a68b1751",
+          "bytes": 77927
+        },
+        "byte_identical": true
+      }
+    ]
+  },
+  "stage5_derived_kernels": {
+    "analysis": "target/performance-numeric-array-binding/kernels-run/analysis.json",
+    "large_targets": [
+      "checksum-65.js",
+      "checksum-513.js",
+      "checksum-4096.js"
+    ],
+    "large_targets_improved_in_both_blocks": true,
+    "tiny_control_vetoes": [],
+    "changes": [
+      {
+        "case": "checksum-65.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_change_percent": -19.473478228236274,
+            "mean_change_percent": -18.49667355332739
+          },
+          {
+            "block": "block1",
+            "median_change_percent": -12.677415884751076,
+            "mean_change_percent": -8.054089735687352
+          }
+        ]
+      },
+      {
+        "case": "checksum-513.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_change_percent": -34.753870816514386,
+            "mean_change_percent": -34.46003137903464
+          },
+          {
+            "block": "block1",
+            "median_change_percent": -34.83130025686171,
+            "mean_change_percent": -35.21173517324135
+          }
+        ]
+      },
+      {
+        "case": "checksum-4096.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_change_percent": -37.41966438633154,
+            "mean_change_percent": -37.26066880812973
+          },
+          {
+            "block": "block1",
+            "median_change_percent": -38.006495495019976,
+            "mean_change_percent": -37.93291827975588
+          }
+        ]
+      },
+      {
+        "case": "checksum-0.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_change_percent": -6.244731824512851,
+            "mean_change_percent": -2.5152560190764395
+          },
+          {
+            "block": "block1",
+            "median_change_percent": -10.413952911783497,
+            "mean_change_percent": -13.058100476474577
+          }
+        ]
+      },
+      {
+        "case": "checksum-1.js",
+        "blocks": [
+          {
+            "block": "block0",
+            "median_change_percent": -1.2421888311221818,
+            "mean_change_percent": -2.728414372361232
+          },
+          {
+            "block": "block1",
+            "median_change_percent": -5.012457725252817,
+            "mean_change_percent": -3.337646071282141
+          }
+        ]
+      }
+    ],
+    "interpretation": "Large-kernel block medians improve about 13% to 38%; block means improve about 8% to 38%. Tiny 0 and 1 controls show no persistent veto. These derived cases are separate from original17."
+  },
+  "predecessor_stage4": {
+    "screen": {
+      "cases": 7,
+      "all_sort_gates_passed": true,
+      "control_vetoes": []
+    },
+    "original17": {
+      "cases": 17,
+      "all_sort_gates_passed": true,
+      "control_vetoes": []
+    },
+    "derived_kernels": {
+      "tiny_control_vetoes": [],
+      "not_improved": [
+        "checksum-65.js",
+        "checksum-513.js"
+      ]
+    },
+    "source_identity_note": "All stage4 positive original17 results and negative kernel results belong only to stage4 source identity; they are not stage5 coverage."
+  },
+  "runtime_invariance": {
+    "receipt": "target/performance-numeric-array-binding/runtime-invariance.json",
+    "runtime_abi": 42,
+    "both_runtime_profiles_wasm_unchanged": true,
+    "native_images_unchanged": true,
+    "interpreter_product_graph": "check-no-interpreter-in-product-graph: ok (no-interpreter.log)"
+  },
+  "verification_receipts": {
+    "stage5_source_guards": {
+      "passed": 359,
+      "failed": 0,
+      "receipt": "target/performance-numeric-array-binding/source-guards.log"
+    },
+    "stage4_source_guards": {
+      "passed": 359,
+      "failed": 0,
+      "receipt": "target/performance-numeric-array-region/source-guards.log"
+    },
+    "stage5_native": {
+      "focused": {
+        "scopes": [
+          {
+            "target": "scriptw_aot_wasm",
+            "selected": 14,
+            "passed": 14,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_language",
+            "selected": 14,
+            "passed": 14,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_builtins",
+            "selected": 11,
+            "passed": 11,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_gc_entries",
+            "selected": 12,
+            "passed": 12,
+            "failed": 0,
+            "exit_code": 0
+          }
+        ],
+        "passed": 51
+      },
+      "broad": {
+        "scopes": [
+          {
+            "target": "scriptw_aot_wasm",
+            "selected": 575,
+            "passed": 575,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "structure_language",
+            "selected": 152,
+            "passed": 152,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "emission",
+            "selected": 41,
+            "passed": 41,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_language",
+            "selected": 394,
+            "passed": 394,
+            "failed": 0,
+            "exit_code": 0
+          }
+        ],
+        "passed": 1162
+      },
+      "overlap_test_names": 28,
+      "unique_passed": 1185
+    },
+    "stage4_native": {
+      "focused": {
+        "scopes": [
+          {
+            "target": "scriptw_aot_wasm",
+            "selected": 12,
+            "passed": 12,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_language",
+            "selected": 13,
+            "passed": 13,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_builtins",
+            "selected": 11,
+            "passed": 11,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_gc_entries",
+            "selected": 12,
+            "passed": 12,
+            "failed": 0,
+            "exit_code": 0
+          }
+        ],
+        "passed": 48
+      },
+      "broad": {
+        "scopes": [
+          {
+            "target": "scriptw_aot_wasm",
+            "selected": 573,
+            "passed": 573,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "structure_language",
+            "selected": 152,
+            "passed": 152,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "emission",
+            "selected": 41,
+            "passed": 41,
+            "failed": 0,
+            "exit_code": 0
+          },
+          {
+            "target": "aot_language",
+            "selected": 393,
+            "passed": 393,
+            "failed": 0,
+            "exit_code": 0
+          }
+        ],
+        "passed": 1159
+      },
+      "overlap_test_names": 25,
+      "unique_passed": 1182
+    },
+    "stage4_test262_only": {
+      "passed": 949,
+      "total": 949,
+      "scopes": [
+        {
+          "selection": "language/statements/for",
+          "passed": 758,
+          "total": 758
+        },
+        {
+          "selection": "language/expressions/property-accessors",
+          "passed": 42,
+          "total": 42
+        },
+        {
+          "selection": "built-ins/Array/prototype/sort",
+          "passed": 107,
+          "total": 107
+        },
+        {
+          "selection": "built-ins/Array/prototype/toSorted",
+          "passed": 42,
+          "total": 42
+        }
+      ]
+    },
+    "stage5_test262": "Not run after failed screen; stage4 cases do not transfer.",
+    "fixture_correction": "Initial focused aot_language fixture-size failure, correction build, corrected receipt, and unadmitted product history are preserved."
+  },
+  "history": {
+    "unadmitted_candidate_source_fingerprint": "ea68fbd4aa65b3d339322cea6fa7db77337874785138906e824f1cb84cae2046",
+    "unadmitted_scope": "Retained separately with its own product/runtime provenance; excluded from admitted stage4/stage5 measurements.",
+    "build_costs": {
+      "release_native_build": "11m25s",
+      "product_hosts": "61s",
+      "prior_packaging": "4s"
+    }
+  },
+  "archive_policy": {
+    "included": "Stage4 positive original17 and historical results; negative kernels; fixture correction and unadmitted history; stage5 A/A, failed screen, kernels, source/product/native provenance.",
+    "raw": "Raw A/A, screen and kernel streams plus exact command/resource receipts and fingerprints are retained.",
+    "excluded": "Executables, Wasm/native images, caches, toolchains and full runtime WAT. Curated P program WAT is allowed. CP configuration is preserved as metadata and distinguished from ordinary runtime_baseline timing."
+  },
+  "limitations": [
+    "Stage5 full17, V8/Scriptc comparison, and Test262 are deliberately absent after gate failure.",
+    "949 passing Test262 cases and 1,182 unique native tests are stage4-only; they are not stage5 correctness evidence.",
+    "Local experimental result; no full Test262 or release acceptance claim."
+  ],
+  "evidence": {
+    "archive_path": "docs/rust-rewrite/numeric-array-region-screen-20261101-inert.tar.xz",
+    "archive_sha256": "a02668d79081bb35b209b41b050fdff0b630fa8322de10e6a3fd1e40afecd5db",
+    "archive_bytes": 1815208,
+    "member_count": 1631,
+    "expanded_bytes": 321195556,
+    "receipt_counts": {
+      "source_guards": {
+        "receipt": "source-guards.log",
+        "suites": [
+          {
+            "passed": 149,
+            "failed": 0
+          },
+          {
+            "passed": 135,
+            "failed": 0
+          },
+          {
+            "passed": 72,
+            "failed": 0
+          },
+          {
+            "passed": 3,
+            "failed": 0
+          }
+        ],
+        "passed": 359,
+        "failed": 0
+      },
+      "binding_source_guards": {
+        "receipt": "binding-source-guards.log",
+        "suites": [
+          {
+            "passed": 149,
+            "failed": 0
+          },
+          {
+            "passed": 135,
+            "failed": 0
+          },
+          {
+            "passed": 72,
+            "failed": 0
+          },
+          {
+            "passed": 3,
+            "failed": 0
+          }
+        ],
+        "passed": 359,
+        "failed": 0
+      },
+      "native_focused": {
+        "receipt": "receipt.json",
+        "suites": [
+          {
+            "target": "scriptw_aot_wasm",
+            "passed": 12,
+            "failed": 0,
+            "selected": 12
+          },
+          {
+            "target": "aot_language",
+            "passed": 13,
+            "failed": 0,
+            "selected": 13
+          },
+          {
+            "target": "aot_builtins",
+            "passed": 11,
+            "failed": 0,
+            "selected": 11
+          },
+          {
+            "target": "aot_gc_entries",
+            "passed": 12,
+            "failed": 0,
+            "selected": 12
+          }
+        ],
+        "passed": 48,
+        "failed": 0
+      },
+      "native_broad": {
+        "receipt": "receipt.json",
+        "suites": [
+          {
+            "target": "scriptw_aot_wasm",
+            "passed": 573,
+            "failed": 0,
+            "selected": 573
+          },
+          {
+            "target": "structure_language",
+            "passed": 152,
+            "failed": 0,
+            "selected": 152
+          },
+          {
+            "target": "emission",
+            "passed": 41,
+            "failed": 0,
+            "selected": 41
+          },
+          {
+            "target": "aot_language",
+            "passed": 393,
+            "failed": 0,
+            "selected": 393
+          }
+        ],
+        "passed": 1159,
+        "failed": 0
+      },
+      "test262": {
+        "receipt": "test262-receipt.json",
+        "scopes": [
+          {
+            "selection": "language/statements/for",
+            "passed": 758,
+            "total": 758
+          },
+          {
+            "selection": "language/expressions/property-accessors",
+            "passed": 42,
+            "total": 42
+          },
+          {
+            "selection": "built-ins/Array/prototype/sort",
+            "passed": 107,
+            "total": 107
+          },
+          {
+            "selection": "built-ins/Array/prototype/toSorted",
+            "passed": 42,
+            "total": 42
+          }
+        ],
+        "passed": 949,
+        "total": 949
+      },
+      "binding_stage": {
+        "path": "/home/jacobt/src/scriptw/target/performance-numeric-array-binding",
+        "receipts": {
+          "source_guards": {
+            "receipt": "source-guards.log",
+            "suites": [
+              {
+                "passed": 149,
+                "failed": 0
+              },
+              {
+                "passed": 135,
+                "failed": 0
+              },
+              {
+                "passed": 72,
+                "failed": 0
+              },
+              {
+                "passed": 3,
+                "failed": 0
+              }
+            ],
+            "passed": 359,
+            "failed": 0
+          },
+          "native_focused": {
+            "receipt": "receipt.json",
+            "suites": [
+              {
+                "target": "scriptw_aot_wasm",
+                "passed": 14,
+                "failed": 0,
+                "selected": 14
+              },
+              {
+                "target": "aot_language",
+                "passed": 14,
+                "failed": 0,
+                "selected": 14
+              },
+              {
+                "target": "aot_builtins",
+                "passed": 11,
+                "failed": 0,
+                "selected": 11
+              },
+              {
+                "target": "aot_gc_entries",
+                "passed": 12,
+                "failed": 0,
+                "selected": 12
+              }
+            ],
+            "passed": 51,
+            "failed": 0
+          },
+          "native_broad": {
+            "receipt": "receipt.json",
+            "suites": [
+              {
+                "target": "scriptw_aot_wasm",
+                "passed": 575,
+                "failed": 0,
+                "selected": 575
+              },
+              {
+                "target": "structure_language",
+                "passed": 152,
+                "failed": 0,
+                "selected": 152
+              },
+              {
+                "target": "emission",
+                "passed": 41,
+                "failed": 0,
+                "selected": 41
+              },
+              {
+                "target": "aot_language",
+                "passed": 394,
+                "failed": 0,
+                "selected": 394
+              }
+            ],
+            "passed": 1162,
+            "failed": 0
+          }
+        },
+        "status": "receipts present"
+      }
+    }
+  }
+}

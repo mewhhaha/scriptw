@@ -64,6 +64,10 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   controls. Production remains at ABI 42; retained regression fixtures do not
   imply a production speedup. Continue with the separate architecture questions
   in the performance queue.
+  The [dense Number region screen](numeric-array-region-screen-20261101.json)
+  is also rejected: reverse-128 misses one target block, despite larger-sort and
+  derived-kernel gains. It remains unpromoted; continue with integer induction
+  and bounded scalar-region proofs before measuring another candidate.
   Keep cache filesystems and admission modes explicit.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,
