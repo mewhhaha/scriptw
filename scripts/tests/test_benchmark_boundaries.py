@@ -2,10 +2,13 @@
 import copy
 from pathlib import Path
 import sys
+import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from benchmark_boundaries import validate_cache_identity, validate_calls, validate_child
+from benchmark_boundaries import run, validate_cache_identity, validate_calls, validate_child
 
 
 def calls():
@@ -18,6 +21,24 @@ def calls():
 
 
 class BoundaryEvidenceTests(unittest.TestCase):
+    def test_boundary_child_environment_pins_the_declared_cache_algorithm(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / 'missing-runtime'
+            for requested in [None, 'sha256', 'blake3']:
+                environment = {}
+                if requested is not None:
+                    environment['SCRIPTW_COMPILER_CACHE_IMAGE_HASH'] = requested
+                with (self.subTest(requested=requested),
+                      patch('benchmark_boundaries.require_kernel_budget'),
+                      patch('benchmark_boundaries.os.sched_getaffinity', return_value={0}),
+                      patch('benchmark_boundaries.limited_environment', return_value=environment)):
+                    with self.assertRaisesRegex(ValueError, 'built runner and Node executable'):
+                        run(SimpleNamespace(runner=missing, node=missing))
+                    expected = 'sha256'
+                    if requested is not None:
+                        expected = requested
+                    self.assertEqual(environment['SCRIPTW_COMPILER_CACHE_IMAGE_HASH'], expected)
+
     def test_source_scoreboard_requires_compilation_and_v8_without_cached_data(self):
         node_prepared = dict(node='vX', v8='vY', exec_argv=[])
         node = dict(node_prepared, schema='scriptw-v8-boundaries-child-v1', mode='source',

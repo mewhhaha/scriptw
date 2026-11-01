@@ -113,10 +113,11 @@ def main():
     require_kernel_budget(4096 * 1024**2)
     if (len(os.sched_getaffinity(0)) != 1 or os.environ.get('NODE_OPTIONS')
             or os.environ.get('SCRIPTW_COMPILER_CACHE_IMAGE_HASH', 'sha256') != 'sha256'):
-        parser.error('one inherited CPU, normal Node flags and the default cache-image cohort are required')
+        parser.error('one inherited CPU, normal Node flags and the SHA-256 cache-image control are required')
     output = args.output_dir.resolve(); output.mkdir(parents=True, exist_ok=False)
     fixtures = output / 'fixtures'; fixtures.mkdir()
-    payload_environment = dict(os.environ, SCRIPTW_CACHE_DIR=str(output / 'native-cache'))
+    payload_environment = dict(os.environ, SCRIPTW_CACHE_DIR=str(output / 'native-cache'),
+                               SCRIPTW_COMPILER_CACHE_IMAGE_HASH='sha256')
     selected = [entry for entry in controls() if args.cases is None or entry[0] in args.cases]
     if not selected or (args.cases and {entry[0] for entry in selected} != set(args.cases)):
         parser.error('unknown or empty case selection')

@@ -21,6 +21,12 @@ Offline metadata requires installed dependencies. Linux defaults require `lld`;
 share flags and `target/`. Avoid changing Rustflags when reusing build artifacts:
 a different fingerprint can rebuild the dependency graph.
 
+Freeze production measurements from a CLI-only build (`cargo build --release
+--locked -p scriptw-cli --bin scriptw`). Building the CLI and examples together
+activates dev-dependency features in the CLI. Retain Cargo JSON and compare its
+target dependency features with the baseline; runtime-image host features are a
+separate graph.
+
 Run native builds and tests through the resource wrapper:
 
 ```sh

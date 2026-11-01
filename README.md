@@ -67,6 +67,9 @@ synchronous host work. Unsupported clocks report an explicit reason.
 Wasm emission requests the executable's cache identity only when it needs a
 persistent entry. Embedded runtime admission and compilation without a cache
 avoid that work; persisted entries remain bound to the actual compiler executable.
+Persistent cache identity defaults to serial BLAKE3 over the opened executable;
+`compiler-identity` and execution evidence retain full SHA-256. Explicit
+`SCRIPTW_COMPILER_CACHE_IMAGE_HASH=sha256` uses its separate cache domain.
 Unicode property catalog construction reuses pinned ICU Script ranges across
 aliases; each exact spelling still receives its own Unicode 17 delta.
 Runtime-free primitive programs omit compiler data images and linear memory.
@@ -128,6 +131,14 @@ median P size drops from **599,381 to 7,592 bytes**. These programs keep the
 existing WasmGC representation and omit linear memory/data. All 18 heap-backed
 control P/R outputs and both native runtime profiles stay byte-identical.
 Slower control observations and a one-block 3.9-MiB RSS rise remain recorded.
+
+[Executable cache identity](docs/rust-rewrite/cache-image-20261101.json) lowers
+cold-process median geomeans **17–19% wall** and **19% CPU**, and warm-process
+geomeans **30–31% wall** and **32–33% CPU**, across six sources in both blocks.
+All 37 P/R outputs and both native runtime profiles stay byte-identical. A mixed
+CLI/example build failed the RSS gate and remains rejected; the separately built
+ordinary CLI passes. Its retained-object RSS rises and slower observations remain
+recorded. These startup results do not refresh V8/Scriptc execution comparisons.
 
 [Current work](docs/rust-rewrite/current-inventory.md) tracks unresolved goals.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the

@@ -1,4 +1,4 @@
-//! Explicit cache-image hash cohorts; loaded-executable SHA evidence is separate.
+//! Loaded-executable cache identity; full SHA-256 evidence is separate.
 use crate::compiler_identity::{build_source_fingerprint, with_stable_loaded_executable};
 use crate::{CompilerDigest, CompilerIdentity};
 use sha2::{Digest, Sha256};
@@ -8,8 +8,8 @@ use std::sync::OnceLock;
 
 const HASH_ENV: &str = "SCRIPTW_COMPILER_CACHE_IMAGE_HASH";
 
-/// An opt-in cache identity experiment. Both algorithms hash the actual loaded
-/// executable bytes serially; execution-evidence identity always remains SHA-256.
+/// Both algorithms hash the actual loaded executable bytes serially. BLAKE3 is
+/// the default; execution-evidence identity always remains SHA-256.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompilerCacheImageHashAlgorithm {
     Sha256,
@@ -34,7 +34,7 @@ impl CompilerCacheImageHashAlgorithm {
 
     fn requested(value: Option<&OsStr>) -> Result<Self, String> {
         match value {
-            None => Ok(Self::Sha256),
+            None => Ok(Self::Blake3),
             Some(value) if value == OsStr::new("sha256") => Ok(Self::Sha256),
             Some(value) if value == OsStr::new("blake3") => Ok(Self::Blake3),
             Some(_) => Err(format!(
@@ -167,7 +167,7 @@ mod tests {
     fn cache_algorithm_selection_is_closed_and_invalid_inputs_do_not_fall_back() {
         assert_eq!(
             CompilerCacheImageHashAlgorithm::requested(None).unwrap(),
-            CompilerCacheImageHashAlgorithm::Sha256
+            CompilerCacheImageHashAlgorithm::Blake3
         );
         for algorithm in [
             CompilerCacheImageHashAlgorithm::Sha256,
@@ -186,6 +186,39 @@ mod tests {
                     .contains("caches are disabled")
             );
         }
+    }
+
+    #[test]
+    fn default_cache_identity_hashes_the_opened_loaded_image_and_keeps_sha_evidence_separate() {
+        let default = CompilerCacheIdentity::capture(
+            CompilerCacheImageHashAlgorithm::requested(None).unwrap(),
+        )
+        .unwrap();
+        let actual = with_stable_loaded_executable(|image| {
+            let mut hash = blake3::Hasher::new();
+            hash.update_reader(image)?;
+            Ok(*hash.finalize().as_bytes())
+        })
+        .unwrap();
+        assert_eq!(default.algorithm(), CompilerCacheImageHashAlgorithm::Blake3);
+        assert_eq!(default.image_digest, actual);
+        assert_eq!(
+            *default.fingerprint(),
+            cache_fingerprint(
+                CompilerCacheImageHashAlgorithm::Blake3,
+                build_source_fingerprint().unwrap(),
+                &actual,
+            )
+        );
+
+        let sha = CompilerCacheIdentity::capture(CompilerCacheImageHashAlgorithm::Sha256).unwrap();
+        let evidence = CompilerIdentity::current().unwrap();
+        assert_eq!(sha.image_digest, *evidence.executable_sha256().as_bytes());
+        assert_eq!(
+            *sha.fingerprint(),
+            crate::compiler_identity_cache_fingerprint(evidence)
+        );
+        assert_ne!(default.fingerprint(), sha.fingerprint());
     }
 
     #[test]

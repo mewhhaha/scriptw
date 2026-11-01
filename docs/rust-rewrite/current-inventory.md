@@ -26,11 +26,18 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   [runtime-free primitive programs](standalone-pool-20261101.json). They now
   emit about 7.6-KiB P modules without compiler pools or linear memory; exact
   UTF-16 and Number completions retain the existing WasmGC representation.
-  Determine whether persistent-P identity and lookup cost exceeds recompiling
-  this narrowly admitted class before changing cache policy. Actual persisted
-  entries must retain executable binding; do not substitute a source-only key.
+  The [cache-identity checkpoint](cache-image-20261101.json) promotes full-image
+  BLAKE3 after an ordinary CLI-only comparison. It still reads the whole loaded
+  executable. Attribute remaining hashing, P lookup and Wasmtime loading before
+  changing cache policy; never substitute a source-only key. Diagnose the retained
+  object's RSS rises and slow wall outlier before making further memory claims.
   Broader programs and rooted snapshots still require R. Extending admission is
   separate correctness work, including numeric relation lowering distinctions.
+- Isolate dependency-heavy CLI benchmark examples from the product's Cargo graph.
+  A combined CLI/example build activated Wasmtime async/component features and
+  failed the RSS gate; the ordinary CLI passed with matching dependency features.
+  Preserve host/target feature checks and source-bound native-scope reuse while
+  measuring whether a separate benchmark crate reduces build duplication.
 - Reduce repeated Rust compilation across Cargo graphs using the
   [source-bound unit timings](regexp-catalog-20261101.json). The IR unit-test
   target took about 204 seconds, and its separate ordinary library took about

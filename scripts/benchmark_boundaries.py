@@ -131,6 +131,7 @@ def run(args):
     environment = limited_environment()
     cache_algorithm = environment.get('SCRIPTW_COMPILER_CACHE_IMAGE_HASH', 'sha256')
     require(cache_algorithm in CACHE_DOMAINS, 'unknown explicit compiler cache image hash cohort')
+    environment['SCRIPTW_COMPILER_CACHE_IMAGE_HASH'] = cache_algorithm
     require(not environment.get('NODE_OPTIONS'), 'unset NODE_OPTIONS for ordinary Node flags')
     environment.pop('NODE_COMPILE_CACHE', None)
     environment['NODE_DISABLE_COMPILE_CACHE'] = '1'

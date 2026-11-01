@@ -197,10 +197,9 @@ fn run() -> Result<Value, String> {
         result
     };
     let cache_identity = scriptw_engine::compiler_cache_identity()?;
-    result["requested_compiler_cache_image_hash"] = json!(std::env::var(
-        "SCRIPTW_COMPILER_CACHE_IMAGE_HASH"
-    )
-    .unwrap_or_else(|_| "sha256".into()));
+    result["requested_compiler_cache_image_hash"] =
+        json!(std::env::var("SCRIPTW_COMPILER_CACHE_IMAGE_HASH")
+            .unwrap_or_else(|_| cache_identity.algorithm().as_str().into()));
     result["compiler_cache_identity"] = json!({
         "image_hash_algorithm": cache_identity.algorithm().as_str(),
         "image_digest": cache_identity.image_digest_hex(),

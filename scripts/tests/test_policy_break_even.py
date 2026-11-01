@@ -2,10 +2,13 @@
 import copy
 from pathlib import Path
 import sys
+import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from policy_break_even import controls, observed_break_even, validate
+from policy_break_even import controls, main, observed_break_even, validate
 
 
 POLICY = dict(native_mode='fast', gc_initial_mib=16, register_allocation='single-pass', native_inlining='disabled')
@@ -24,6 +27,29 @@ def observation():
 
 
 class NativePolicyEvidenceTests(unittest.TestCase):
+    def test_policy_child_explicitly_uses_the_sha_control_when_unset_or_requested(self):
+        for requested in [None, 'sha256']:
+            with tempfile.TemporaryDirectory() as temporary, self.subTest(requested=requested):
+                environment = {}
+                if requested is not None:
+                    environment['SCRIPTW_COMPILER_CACHE_IMAGE_HASH'] = requested
+                arguments = ['policy_break_even.py', '--runner', 'unused-runner', '--time', 'unused-time',
+                             '--output-dir', str(Path(temporary) / 'report'), '--case', 'small.js',
+                             '--cohort', 'fast-16-single-pass', '--idle-machine']
+                with (patch.dict('os.environ', environment, clear=True), patch.object(sys, 'argv', arguments),
+                      patch('policy_break_even.require_kernel_budget'),
+                      patch('policy_break_even.os.sched_getaffinity', return_value={0}),
+                      patch('policy_break_even.digest', return_value='a' * 64),
+                      patch('policy_break_even.subprocess.run', return_value=SimpleNamespace(
+                          returncode=0, stdout=b'42\n', stderr=b'')),
+                      patch('policy_break_even.measure_process', side_effect=RuntimeError('launch intercepted')) as measure):
+                    with self.assertRaisesRegex(RuntimeError, 'launch intercepted'):
+                        main()
+                    child_environment = measure.call_args.kwargs['env']
+                    self.assertEqual(child_environment['SCRIPTW_COMPILER_CACHE_IMAGE_HASH'], 'sha256')
+                    self.assertEqual(child_environment['SCRIPTW_CACHE_DIR'],
+                                     str(Path(temporary) / 'report/native-cache'))
+
     def check(self, row):
         return validate(row, POLICY, 'small.js', '42\n', 3, 3)
 
