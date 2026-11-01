@@ -1,4 +1,5 @@
 use super::*;
+use crate::benchmark_thread_cpu;
 use scriptw_engine::{
     EmbeddedRuntime, ExecutionBackend, HostOutputEvent, ObservedCompletion,
     PrecompiledEmbeddedProgram, RealmBuilder,
@@ -112,6 +113,7 @@ pub(super) fn run_with_config(
     report["schema"] = json!("scriptw-precompiled-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
     report["compiler_enabled"] = json!(compiler_enabled);
+    report["thread_cpu_observation_policy"] = json!(benchmark_thread_cpu::POLICY);
     report["native_load_process_memory"] = native_load_process_memory;
     report["image_sha256"] = json!(image_sha256);
     report["image_bytes"] = json!(image_bytes);
@@ -197,7 +199,11 @@ fn collect_observations<const WINDOWS: bool>(
             None
         };
         let started = Instant::now();
-        let outcome = instance.evaluate(&mut store).map_err(|e| e.to_string())?;
+        let entry_caller_cpu_started = benchmark_thread_cpu::start();
+        let (outcome, execution_thread_cpu) = instance
+            .evaluate_profiled(&mut store)
+            .map_err(|e| e.to_string())?;
+        let entry_caller_thread_cpu = benchmark_thread_cpu::finish(entry_caller_cpu_started);
         let execution_ns = started.elapsed().as_nanos();
         #[cfg(feature = "benchmark-module-images")]
         if WINDOWS {
@@ -239,6 +245,14 @@ fn collect_observations<const WINDOWS: bool>(
         barriers.after_store_drop(index)?;
         observations.push(json!({"index": index, "warmup": index < warmups,
             "completion": "normal", "stdout": stdout,
+            "execution_thread_cpu": benchmark_thread_cpu::serialize(
+                &execution_thread_cpu,
+                benchmark_thread_cpu::EXECUTION_SCOPE,
+            ),
+            "entry_caller_thread_cpu": benchmark_thread_cpu::serialize(
+                &entry_caller_thread_cpu,
+                "entry-caller-thread",
+            ),
             "phases_ns": {"state_linker": state_linker_ns, "register": register_ns,
                 "instantiate": instantiate_ns, "execution": execution_ns, "total": total_ns},
             "gc_capacity_before_bytes": gc_before, "gc_capacity_after_bytes": gc_after,

@@ -9,12 +9,13 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [current gap diagnosis](performance-gaps-20261101.json) retains fresh references,
-  the failed 480-process identical-binary A/A and worker-CPU diagnostics.
-  Join4096 spends about 2.40 ms constructing its Array and 0.16 ms consuming it.
-  Qualify measurement reproducibility before building the parked primitive-append
-  region; its source review is not native or performance acceptance. Keep wall
-  time and CPU separate; the new diagnostic does not waive the original veto.
+  [current gap diagnosis](performance-gaps-20261101.json) separates fresh ordinary
+  and precompiled references. The corrected 480-process identical-binary control
+  fails worker CPU on `first-row-proxy.js`; counter windows and within-process
+  variation do not yet identify the cause. Qualify reproducibility before building
+  the parked primitive-append region. Preserve every failed gate and distinguish
+  initialization-worker CPU from caller CPU. Numeric sums and the integer
+  recurrence already use whole-trip kernels; measure their entry/bootstrap floor.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.
@@ -49,8 +50,10 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   complete current-source receipts and bounded verification.
 - Attribute the roughly 2.45 ms P loading span: cache lookup/read/digest,
   deserialization and type registration. Preserve the one-Module/64-MiB cap;
-  counting two Modules as one bundle would bypass it. Intrinsic descriptor
-  templates are a later hypothesis for the roughly 0.22 ms Realm entry floor;
+  counting two Modules as one bundle would bypass it. Measure precompiled R
+  decode/digest and private-file writes separately from ordinary P loading.
+  Intrinsic descriptor templates are a later hypothesis for the roughly 0.22 ms
+  fresh-entry floor; the Realm share is not isolated;
   the [namespace experiment](deferred-namespaces-20261101.json) remains rejected.
 - Continue measuring module function storage after private activation `var`
   bindings and simple parameters in strict ordinary functions. Lexical locals,

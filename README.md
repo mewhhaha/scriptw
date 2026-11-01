@@ -8,6 +8,8 @@ Rust embedders can declare numeric, lossless UTF-16 string and byte foreign
 functions, retain and call JavaScript exports, and settle async host operations
 through their own Wasmtime `Store` and `Linker`. ABI requirements persist in
 source-free Portable bundles. See the [embedding contract and runnable examples](docs/rust-rewrite/contracts/foreign-modules.md).
+`initialize_profiled` and `evaluate_profiled` report initialization-worker CPU
+separately from caller-side work.
 
 Trusted Wasmtime native program images support fresh-process execution with
 the native compiler disabled. Their format is host-specific and requires
@@ -102,13 +104,20 @@ against that checkpoint in both blocks. The separate precompiled control records
 0.8–1.0% and 4.35–4.54% lower medians, without a repeated veto. Both R/native
 profiles and the other 15 original programs stay byte-identical. That checkpoint
 retains its slower sort, join and retained-object reference processes.
-A [fresh gap diagnosis](docs/rust-rewrite/performance-gaps-20261101.json) records
-median and mean wins on 2/17 V8 and 6/17 Scriptc cases with the same accepted
-programs. Array construction dominates several gaps. An identical-binary A/A
-control failed, so the primitive-append prototype remains unbuilt. Worker CPU
-now accompanies wall time and reports complete coverage; noisy observations and
-failed controls remain retained. These local cohorts do not refresh published
-CI results; overall parity remains open.
+The [local gap diagnosis](docs/rust-rewrite/performance-gaps-20261101.json) records
+median and mean wins on 2/17 V8 and 5/17 Scriptc cases in ordinary execution;
+a separate precompiled comparison records 4/17 Scriptc wins. The corrected
+480-process identical-binary control failed its worker-CPU gate, so the
+primitive-append prototype remains unbuilt. Precompiled profiling measures
+initialization-worker CPU separately from caller CPU. Failed controls and all
+observations remain retained; overall parity remains open. These local cohorts
+do not refresh published CI results.
+
+Removing an unnecessary durability flush from unnamed native backing lowers
+precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two
+balanced blocks. Supervised whole-process wall medians fall **3.1–4.5%**.
+All 30 program bodies and both raw/native runtime profiles remain identical;
+live snapshots show transient deferred writeback.
 
 [Cold compilation](docs/rust-rewrite/cold-compiler-20261101.json) records
 **42.7–42.9% lower wall** and **43.1–43.5% lower CPU** geometric means of
@@ -159,6 +168,9 @@ build, debug and verification loop.
 **Measured 2026-10-30 on one GitHub Actions runner**, compiler `aedaa6e4e`.
 The [precompiled workflow](docs/rust-rewrite/contracts/precompiled-comparison.md)
 compares Scriptw and Scriptc in the same Wasmtime executable with compilation disabled.
+Scriptw's local shared-host runs distinguish initialization-worker CPU from
+caller CPU; RSS snapshots stay outside the entry interval.
+Private native backing retains validated bytes without requesting disk durability.
 Separate producers compile the original source; consumers share native runtime settings.
 Both passed the original checksums on **17/17 workloads**. Scriptw's median post-execution RSS ranges from **1.199–1.439× Scriptc's**.
 

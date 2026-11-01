@@ -1,866 +1,437 @@
 {
-  "schema": "scriptw-performance-gap-diagnosis-v1",
+  "schema": "scriptw-performance-gap-diagnosis-v2",
   "date": "2026-11-01",
-  "status": "audited_measurement_tooling; no optimization promoted",
-  "source_parent_commit": "ac96d422a0a05637113077bc97b5b216026f6d5c",
-  "tooling_source_fingerprint": "0937c86e5c61302c9691b42950d6765c740629fe2ec064b68b802ac918dbbc5f",
-  "accepted_kernel_commit": "ac96d422a0a05637113077bc97b5b216026f6d5c",
-  "accepted_reference_source_fingerprint": "51ce1e39064e5b53e6c42b96d64517e884ab44690f230cc3b216ce177a072c97",
-  "interpretation": {
-    "candidate_speedup_claim": false,
-    "append_candidate": "unbuilt parked source; failed A/A veto remains stopped",
-    "overall_v8_scriptc_parity": "open",
-    "promoted": "Execution-worker CPU observations and complete-coverage benchmark reporting only; ordinary execution does not read CPU clocks."
+  "status": "Cohort-specific measurements; hot optimization remains unbuilt. Cold result has its own scope and verdict.",
+  "overall_v8_scriptc_parity": "open",
+  "history": {
+    "previous_committed_checkpoint": {
+      "schema": "scriptw-performance-gap-diagnosis-v1",
+      "status": "audited_measurement_tooling; no optimization promoted",
+      "source_parent_commit": "ac96d422a0a05637113077bc97b5b216026f6d5c",
+      "reference_source_fingerprint": "51ce1e39064e5b53e6c42b96d64517e884ab44690f230cc3b216ce177a072c97",
+      "evidence": {
+        "path": "performance-gaps-20261101-inert.tar.xz",
+        "sha256": "35c9ffb0270b1167c3f351f5a57f64374675ca7e107cfeec707ad5f100b3f15c",
+        "bytes": 2218556,
+        "regular_utf8_members": 2731,
+        "expanded_utf8_bytes": 187049968,
+        "contains_native_or_wasm_images": false,
+        "policy": "Regular inert UTF-8 files and header-bound CSV clock records. Native executables, serialized native/Wasm images and caches are excluded. Every member hash was checked against INDEX.json after archive creation."
+      },
+      "interpretation": "Historical committed checkpoint; fresh cohorts below supersede its current-comparison labels, without changing its data."
+    }
   },
-  "current_references": {
+  "ordinary": {
+    "source_fingerprint": "9f5f333b6d636e51f2fa8fb1660a0c554ea2648fd65d0184cddbbf5484e77ccb",
     "processes": 102,
-    "samples_per_process": 21,
-    "warmups_per_process": 10,
+    "cases": 17,
+    "samples": 21,
+    "warmups": 10,
     "rounds": 2,
-    "median_and_mean_wins": {
-      "v8": 2,
-      "scriptc": 6
+    "frontier": "Default native policy; per-entry compilation/setup separate, fresh Store/Realm bootstrap inside Scriptw execution. V8 and Scriptc adapters differ; compare wall only across runtimes.",
+    "experimental_unit": "Independent process; median of two process medians and mean of their means. All samples retained.",
+    "wins_in_both_median_and_mean": {
+      "v8": {
+        "count": 2,
+        "cases": [
+          "numeric-loop-50000.js",
+          "integer.js"
+        ]
+      },
+      "scriptc": {
+        "count": 5,
+        "cases": [
+          "folded-string-4096.js",
+          "objects.js",
+          "retained-objects.js",
+          "join-empty-1024.js",
+          "join-small-1024.js"
+        ]
+      }
     },
-    "experimental_unit": "Independent process; median of the two process medians and mean of their means. All observations retained.",
-    "frontiers": "Scriptw source/native compilation, Store/linker and instance setup are outside execution; Realm bootstrap is inside. V8 vm.Script/context and Scriptc Wasm/native compilation are separate. RSS is a process endpoint, not live or peak JS heap.",
-    "cases": [
+    "largest_wall_gaps_vs_scriptc": [
       {
-        "file": "sort-reverse-128.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.312754,
-            "mean_ms": 0.31551161904761904,
-            "post_execution_rss_mib": 50.07421875
-          },
-          "v8": {
-            "median_ms": 0.0233645,
-            "mean_ms": 0.023720714285714286,
-            "post_execution_rss_mib": 54.853515625
-          },
-          "scriptc": {
-            "median_ms": 0.1570685,
-            "mean_ms": 0.15828126190476188,
-            "post_execution_rss_mib": 30.00390625
-          }
+        "file": "integer.js",
+        "median_ratio": 3.4723157353963314,
+        "mean_ratio": 3.674034434817634,
+        "scriptw_wall_ms": {
+          "median": 0.287256,
+          "mean": 0.31013285714285715
         },
-        "scriptw_over": {
-          "v8": {
-            "median": 13.385863168482098,
-            "mean": 13.301101107129593,
-            "rss_median": 0.9128716396653017,
-            "rss_mean": 0.9191499459668016
-          },
-          "scriptc": {
-            "median": 1.99119492450746,
-            "mean": 1.9933605232277143,
-            "rss_median": 1.6689233172763962,
-            "rss_mean": 1.6689078183024284
-          }
-        }
-      },
-      {
-        "file": "sort-reverse-512.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.563421,
-            "mean_ms": 0.5861124523809524,
-            "post_execution_rss_mib": 50.28125
-          },
-          "v8": {
-            "median_ms": 0.06837,
-            "mean_ms": 0.0702697142857143,
-            "post_execution_rss_mib": 55.115234375
-          },
-          "scriptc": {
-            "median_ms": 0.490232,
-            "mean_ms": 0.48943904761904755,
-            "post_execution_rss_mib": 29.998046875
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 8.240763492759983,
-            "mean": 8.340897047024255,
-            "rss_median": 0.9122931358304688,
-            "rss_mean": 0.9131786088307827
-          },
-          "scriptc": {
-            "median": 1.1492946196902691,
-            "mean": 1.197518782435091,
-            "rss_median": 1.6761507910671267,
-            "rss_mean": 1.67613838946608
-          }
-        }
-      },
-      {
-        "file": "sort-sorted-512.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.552185,
-            "mean_ms": 0.5671543809523809,
-            "post_execution_rss_mib": 50.15234375
-          },
-          "v8": {
-            "median_ms": 0.070364,
-            "mean_ms": 0.07236926190476191,
-            "post_execution_rss_mib": 55.203125
-          },
-          "scriptc": {
-            "median_ms": 0.493223,
-            "mean_ms": 0.49566688095238093,
-            "post_execution_rss_mib": 29.642578125
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 7.8475498834631345,
-            "mean": 7.836951297068046,
-            "rss_median": 0.9085055193886216,
-            "rss_mean": 0.9094840453971236
-          },
-          "scriptc": {
-            "median": 1.1195443034894967,
-            "mean": 1.1442248872118366,
-            "rss_median": 1.6919022204651775,
-            "rss_mean": 1.6918896701462425
-          }
-        }
-      },
-      {
-        "file": "to-sorted-512.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.5635915,
-            "mean_ms": 0.5772427857142857,
-            "post_execution_rss_mib": 51.7109375
-          },
-          "v8": {
-            "median_ms": 0.07079,
-            "mean_ms": 0.07144228571428571,
-            "post_execution_rss_mib": 55.365234375
-          },
-          "scriptc": {
-            "median_ms": 0.6100745,
-            "mean_ms": 0.6211055238095238,
-            "post_execution_rss_mib": 29.6015625
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 7.9614564203983615,
-            "mean": 8.079847669247505,
-            "rss_median": 0.9339965428440399,
-            "rss_mean": 0.934178138236831
-          },
-          "scriptc": {
-            "median": 0.9238076661129092,
-            "mean": 0.9293795717252554,
-            "rss_median": 1.7468989179202956,
-            "rss_mean": 1.7468863502117657
-          }
-        }
-      },
-      {
-        "file": "join-1024.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.9441195,
-            "mean_ms": 0.9677374047619047,
-            "post_execution_rss_mib": 51.533203125
-          },
-          "v8": {
-            "median_ms": 0.0600685,
-            "mean_ms": 0.10144807142857142,
-            "post_execution_rss_mib": 55.578125
-          },
-          "scriptc": {
-            "median_ms": 0.6366955,
-            "mean_ms": 0.6387106904761906,
-            "post_execution_rss_mib": 28.9765625
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 15.717380990036375,
-            "mean": 9.539239052398143,
-            "rss_median": 0.9272209727298285,
-            "rss_mean": 0.92945904961284
-          },
-          "scriptc": {
-            "median": 1.4828430544899407,
-            "mean": 1.5151420184315507,
-            "rss_median": 1.7784443246157995,
-            "rss_mean": 1.7784411149199502
-          }
-        }
-      },
-      {
-        "file": "join-4096.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 2.943751,
-            "mean_ms": 2.9630417142857146,
-            "post_execution_rss_mib": 51.419921875
-          },
-          "v8": {
-            "median_ms": 0.2387045,
-            "mean_ms": 0.2687295238095238,
-            "post_execution_rss_mib": 59.740234375
-          },
-          "scriptc": {
-            "median_ms": 2.273232,
-            "mean_ms": 2.321342095238095,
-            "post_execution_rss_mib": 29.4921875
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 12.332197340226095,
-            "mean": 11.0261115797084,
-            "rss_median": 0.8607251446693039,
-            "rss_mean": 0.86273943744392
-          },
-          "scriptc": {
-            "median": 1.2949628546492395,
-            "mean": 1.276434748830849,
-            "rss_median": 1.7435099337748345,
-            "rss_mean": 1.7435036266162094
-          }
+        "scriptc_wall_ms": {
+          "median": 0.0827275,
+          "mean": 0.08441207142857142
         }
       },
       {
         "file": "join-mixed-1024.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 1.095813,
-            "mean_ms": 1.1162159285714286,
-            "post_execution_rss_mib": 50.498046875
-          },
-          "v8": {
-            "median_ms": 0.0965635,
-            "mean_ms": 0.1343139761904762,
-            "post_execution_rss_mib": 56.357421875
-          },
-          "scriptc": {
-            "median_ms": 0.3941895,
-            "mean_ms": 0.3967266428571428,
-            "post_execution_rss_mib": 29.181640625
-          }
+        "median_ratio": 2.730302351478318,
+        "mean_ratio": 2.7165303607354345,
+        "scriptw_wall_ms": {
+          "median": 1.2614775,
+          "mean": 1.284877595238095
         },
-        "scriptw_over": {
-          "v8": {
-            "median": 11.34810772186178,
-            "mean": 8.310497241094827,
-            "rss_median": 0.8960318835557096,
-            "rss_mean": 0.9009735707162142
-          },
-          "scriptc": {
-            "median": 2.7799142290700285,
-            "mean": 2.813564323617576,
-            "rss_median": 1.7304731945652903,
-            "rss_mean": 1.7304604460082673
-          }
+        "scriptc_wall_ms": {
+          "median": 0.4620285,
+          "mean": 0.4729848095238095
         }
       },
       {
         "file": "numeric-loop-10000.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.214127,
-            "mean_ms": 0.2178162142857143,
-            "post_execution_rss_mib": 49.3125
-          },
-          "v8": {
-            "median_ms": 0.146328,
-            "mean_ms": 0.1526655,
-            "post_execution_rss_mib": 57.0625
-          },
-          "scriptc": {
-            "median_ms": 0.0862385,
-            "mean_ms": 0.08701757142857142,
-            "post_execution_rss_mib": 24.14453125
-          }
+        "median_ratio": 2.681855778629972,
+        "mean_ratio": 2.890632897119175,
+        "scriptw_wall_ms": {
+          "median": 0.285328,
+          "mean": 0.3100687619047619
         },
-        "scriptw_over": {
-          "v8": {
-            "median": 1.4633357935596742,
-            "mean": 1.4267546648438205,
-            "rss_median": 0.864184008762322,
-            "rss_mean": 0.8650937777886553
-          },
-          "scriptc": {
-            "median": 2.4829629457840756,
-            "mean": 2.5031290888703928,
-            "rss_median": 2.042387963112765,
-            "rss_mean": 2.0423687028605326
-          }
+        "scriptc_wall_ms": {
+          "median": 0.106392,
+          "mean": 0.10726673809523811
+        }
+      },
+      {
+        "file": "sort-reverse-128.js",
+        "median_ratio": 2.202623499860452,
+        "mean_ratio": 2.2543839722506704,
+        "scriptw_wall_ms": {
+          "median": 0.3946,
+          "mean": 0.40948571428571434
+        },
+        "scriptc_wall_ms": {
+          "median": 0.17915,
+          "mean": 0.18163973809523812
         }
       },
       {
         "file": "numeric-loop-50000.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.2201585,
-            "mean_ms": 0.2262752380952381,
-            "post_execution_rss_mib": 49.041015625
-          },
-          "v8": {
-            "median_ms": 0.7405985,
-            "mean_ms": 0.7722224047619047,
-            "post_execution_rss_mib": 62.01953125
-          },
-          "scriptc": {
-            "median_ms": 0.1491435,
-            "mean_ms": 0.14974930952380952,
-            "post_execution_rss_mib": 24.05078125
-          }
+        "median_ratio": 1.6082278336770857,
+        "mean_ratio": 1.6971969128611242,
+        "scriptw_wall_ms": {
+          "median": 0.2822665,
+          "mean": 0.2977520238095238
         },
-        "scriptw_over": {
-          "v8": {
-            "median": 0.2972710584750037,
-            "mean": 0.29301822467195104,
-            "rss_median": 0.7907350255085973,
-            "rss_mean": 0.7898157579388855
-          },
-          "scriptc": {
-            "median": 1.4761521621793776,
-            "mean": 1.5110269210240417,
-            "rss_median": 2.0390612311190517,
-            "rss_mean": 2.0390302945930685
-          }
-        }
-      },
-      {
-        "file": "folded-string-4096.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.5446955,
-            "mean_ms": 0.5863847857142857,
-            "post_execution_rss_mib": 54.841796875
-          },
-          "v8": {
-            "median_ms": 0.124782,
-            "mean_ms": 0.13062664285714284,
-            "post_execution_rss_mib": 57.291015625
-          },
-          "scriptc": {
-            "median_ms": 1.483601,
-            "mean_ms": 1.4854834285714287,
-            "post_execution_rss_mib": 24.248046875
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 4.365176868458592,
-            "mean": 4.489013672008499,
-            "rss_median": 0.957249514199025,
-            "rss_mean": 0.9661391300643432
-          },
-          "scriptc": {
-            "median": 0.36714419847384844,
-            "mean": 0.3947434043597543,
-            "rss_median": 2.261699556987515,
-            "rss_mean": 2.2616842145637954
-          }
-        }
-      },
-      {
-        "file": "dynamic-string-4096.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.7521455,
-            "mean_ms": 0.8364939285714287,
-            "post_execution_rss_mib": 52.15234375
-          },
-          "v8": {
-            "median_ms": 0.1944395,
-            "mean_ms": 0.26146711904761905,
-            "post_execution_rss_mib": 61.533203125
-          },
-          "scriptc": {
-            "median_ms": 0.4091585,
-            "mean_ms": 0.40944604761904757,
-            "post_execution_rss_mib": 23.970703125
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 3.8682752218556415,
-            "mean": 3.199231825471272,
-            "rss_median": 0.8475480082526583,
-            "rss_mean": 0.8607638462483115
-          },
-          "scriptc": {
-            "median": 1.8382741651462697,
-            "mean": 2.0429893839144113,
-            "rss_median": 2.175670170292512,
-            "rss_mean": 2.1756468903865627
-          }
-        }
-      },
-      {
-        "file": "integer.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.2240565,
-            "mean_ms": 0.22552983333333332,
-            "post_execution_rss_mib": 51.015625
-          },
-          "v8": {
-            "median_ms": 2.550725,
-            "mean_ms": 2.5763431190476194,
-            "post_execution_rss_mib": 61.82421875
-          },
-          "scriptc": {
-            "median_ms": 0.0730685,
-            "mean_ms": 0.07365738095238095,
-            "post_execution_rss_mib": 24.220703125
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 0.08784031990904546,
-            "mean": 0.08753874111950721,
-            "rss_median": 0.825172174132811,
-            "rss_mean": 0.8256541019288142
-          },
-          "scriptc": {
-            "median": 3.0663897575562657,
-            "mean": 3.0618769010961304,
-            "rss_median": 2.1062817514716556,
-            "rss_mean": 2.1062817514716556
-          }
-        }
-      },
-      {
-        "file": "objects.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.692597,
-            "mean_ms": 0.7218571666666668,
-            "post_execution_rss_mib": 50.716796875
-          },
-          "v8": {
-            "median_ms": 0.0629755,
-            "mean_ms": 0.07908171428571428,
-            "post_execution_rss_mib": 55.638671875
-          },
-          "scriptc": {
-            "median_ms": 1.024362,
-            "mean_ms": 1.026052880952381,
-            "post_execution_rss_mib": 29.55078125
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 10.99788012798628,
-            "mean": 9.127990878633073,
-            "rss_median": 0.9115385965528136,
-            "rss_mean": 0.9156036811731935
-          },
-          "scriptc": {
-            "median": 0.6761252369767718,
-            "mean": 0.7035282294579592,
-            "rss_median": 1.716259087904825,
-            "rss_mean": 1.716259087904825
-          }
-        }
-      },
-      {
-        "file": "retained-objects.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 12.810395,
-            "mean_ms": 12.83689380952381,
-            "post_execution_rss_mib": 55.47265625
-          },
-          "v8": {
-            "median_ms": 3.6948945,
-            "mean_ms": 3.588255476190476,
-            "post_execution_rss_mib": 78.28515625
-          },
-          "scriptc": {
-            "median_ms": 53.4720595,
-            "mean_ms": 53.528286452380954,
-            "post_execution_rss_mib": 35.9296875
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 3.467052983515497,
-            "mean": 3.5774748745460805,
-            "rss_median": 0.7085973753804701,
-            "rss_mean": 0.7167723002155933
-          },
-          "scriptc": {
-            "median": 0.2395717524214679,
-            "mean": 0.23981514560425127,
-            "rss_median": 1.5439225918677975,
-            "rss_mean": 1.5439225918677975
-          }
-        }
-      },
-      {
-        "file": "join-empty-1024.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.232217,
-            "mean_ms": 0.2362000238095238,
-            "post_execution_rss_mib": 51.1875
-          },
-          "v8": {
-            "median_ms": 0.063045,
-            "mean_ms": 0.06360476190476191,
-            "post_execution_rss_mib": 54.474609375
-          },
-          "scriptc": {
-            "median_ms": 0.374261,
-            "mean_ms": 0.3740017142857143,
-            "post_execution_rss_mib": 29.060546875
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 3.683353160440955,
-            "mean": 3.7135588081155944,
-            "rss_median": 0.9396579541787673,
-            "rss_mean": 0.9348022155526907
-          },
-          "scriptc": {
-            "median": 0.62046806907479,
-            "mean": 0.6315479710049711,
-            "rss_median": 1.761408696821023,
-            "rss_mean": 1.7613894943016524
-          }
-        }
-      },
-      {
-        "file": "join-singleton-1024.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.2323765,
-            "mean_ms": 0.23304347619047622,
-            "post_execution_rss_mib": 51.849609375
-          },
-          "v8": {
-            "median_ms": 0.0977005,
-            "mean_ms": 0.1255472380952381,
-            "post_execution_rss_mib": 55.451171875
-          },
-          "scriptc": {
-            "median_ms": 0.187121,
-            "mean_ms": 0.19257257142857143,
-            "post_execution_rss_mib": 24.20703125
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 2.3784576332772094,
-            "mean": 1.8562214488039412,
-            "rss_median": 0.9350498397379451,
-            "rss_mean": 0.9320912828521125
-          },
-          "scriptc": {
-            "median": 1.2418515292244057,
-            "mean": 1.2101592374328145,
-            "rss_median": 2.1419235113764725,
-            "rss_mean": 2.1419004587473203
-          }
-        }
-      },
-      {
-        "file": "join-small-1024.js",
-        "runtimes": {
-          "scriptw": {
-            "median_ms": 0.23401,
-            "mean_ms": 0.23795780952380952,
-            "post_execution_rss_mib": 49.267578125
-          },
-          "v8": {
-            "median_ms": 0.16838,
-            "mean_ms": 0.2136650714285714,
-            "post_execution_rss_mib": 58.828125
-          },
-          "scriptc": {
-            "median_ms": 0.3200535,
-            "mean_ms": 0.3401953333333333,
-            "post_execution_rss_mib": 24.1640625
-          }
-        },
-        "scriptw_over": {
-          "v8": {
-            "median": 1.389773132200974,
-            "mean": 1.1136954109196047,
-            "rss_median": 0.8374833997343958,
-            "rss_mean": 0.8365866909247116
-          },
-          "scriptc": {
-            "median": 0.7311590093531237,
-            "mean": 0.6994740556615794,
-            "rss_median": 2.0388781118655026,
-            "rss_mean": 2.0388588671808847
-          }
+        "scriptc_wall_ms": {
+          "median": 0.175514,
+          "mean": 0.17543752380952382
         }
       }
     ],
-    "receipt": {
-      "path": "target/performance-gap-diagnosis/current-reference/analysis.json",
-      "sha256": "696839b749017d33c7a54ebd6e9dbd5e66d8e0e16f11ccce50c3010b78d407ef"
-    },
-    "boundary_table": {
-      "path": "target/performance-gap-diagnosis/current-reference/boundary-table.json",
-      "sha256": "b165420bbf60e1c0a3e7472643f4d5cdeef7bcef36e4f7af03844717a7bbf50c"
+    "evidence": {
+      "path": "target/performance-scriptc-hot-20261101/analysis.json",
+      "sha256": "b815d8e2645af39de414d00c12fcdda66a8773e02360d6ef6a1f4c112e60cd17"
     }
   },
-  "ranked_hills": [
-    {
-      "rank": 1,
-      "hill": "Closed primitive array construction regions",
-      "measurement": "Uninjected join4096 construction medians 2.390/2.398 ms; join/checksum 0.160/0.162 ms. Reverse512 construction 0.288/0.288 ms; sort/checksum 0.0159/0.0159 ms.",
-      "mechanism": "Existing fixed-arity push avoids argv creation but still repeats method/prototype admission and decimal-index key work. A bounded callback-free region can reuse canonical indexed publication behind one live proof.",
-      "state": "Source-reviewed draft parked; no candidate build, native tests or performance comparison."
-    },
-    {
-      "rank": 2,
-      "hill": "Attribute cold compiler identity and pool work",
-      "measurement": "Across17, median four Scriptw source-to-Wasm spans 277.985 ms. Join4096 emission 259.58/246.08 ms, preparation 27.43/24.01 ms, unit admission 0.013/0.011 ms, validation 1.38/1.25 ms.",
-      "mechanism": "RuntimeWasmCache construction eagerly reaches full executable SHA-256 before embedded-R selection; ordinary P also rebuilds the compiler-owned pool while native-source emission reuses a sealed exact-R prefix.",
-      "state": "Source mechanism only; hash/pool contributions are not isolated. Moving work outside a named timer alone is no improvement. The lowering field is unit admission; actual IR lowering is within preparation."
-    },
-    {
-      "rank": 3,
-      "hill": "Attribute P loading and the Realm entry floor",
-      "measurement": "Join4096 profile total about5.8 ms includes about2.45 ms module loading. Empty marked invocation is about0.22 ms.",
-      "mechanism": "R is retained, P misses under the one-Module/64MiB limit. Measure lookup/read/digest/deserialization/type-registration before changing ownership; two Modules in one nominal cache entry would bypass the cap.",
-      "state": "Open. Intrinsic descriptor templates are a separate larger hypothesis; no resurrection of rejected namespace deferral."
-    }
-  ],
-  "measurement_quality": {
-    "original_aa_processes": 480,
-    "original_aa_measured": 10080,
-    "original_aa_warmups": 4800,
-    "original_aa_status": "veto; identical accepted binaries",
-    "original_aa_repeated_cases": [
-      "integer.js",
-      "append-zero-and-argument-effects.js"
-    ],
-    "original_aa_receipt": {
-      "path": "target/performance-primitive-append/aa-gate-result.json",
-      "sha256": "bf3da15dca2580973383a19f942d21f05cae544595151f944a204eb48d1f4840"
-    },
-    "new_same_build_processes": 80,
-    "new_measured": 1680,
-    "new_warmups": 800,
-    "new_cpu_sampled": 2480,
-    "new_stability": [
-      {
-        "file": "integer.js",
-        "blocks": [
-          {
-            "block": "block0",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -0.2919179074886813,
-              "wall_mean_of_process_means_ns": 1.0171253191917362,
-              "cpu_median_of_process_medians_ns": -0.28029580152671985,
-              "cpu_mean_of_process_means_ns": 0.7804819514433348
-            }
-          },
-          {
-            "block": "block1",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": 0.042976522085158564,
-              "wall_mean_of_process_means_ns": 9.329688577230112,
-              "cpu_median_of_process_medians_ns": -0.36944656309336743,
-              "cpu_mean_of_process_means_ns": -3.3307684054858067
-            }
-          }
+  "precompiled": {
+    "source_fingerprint": "507a64350887f2bda05f42e0d7c5b58cf24a27928d848a52957b36364ebb6355",
+    "processes": 68,
+    "cases": 17,
+    "samples": 21,
+    "warmups": 10,
+    "rounds": 2,
+    "policy": "Shared SizeOptimized/Backtracking/generic Wasmtime consumer; native compiler disabled. Each version keeps its matching producer/consumer.",
+    "clock_scope": "Scriptw initialization-worker CPU excludes caller observation/output; WASI worker CPU includes _start and pipe reads. These adapter spans differ; no subtraction or single-thread sum.",
+    "wins_in_both_median_and_mean": {
+      "scriptc": {
+        "count": 4,
+        "cases": [
+          "folded-string-4096.js",
+          "objects.js",
+          "retained-objects.js",
+          "join-empty-1024.js"
         ]
+      }
+    },
+    "largest_wall_gaps_vs_scriptc": [
+      {
+        "file": "join-mixed-1024.js",
+        "median_ratio": 3.23213516709617,
+        "mean_ratio": 3.1068268844969777,
+        "scriptw_wall_ms": {
+          "median": 0.9456775,
+          "mean": 0.9585011428571428
+        },
+        "scriptc_wall_ms": {
+          "median": 0.292586,
+          "mean": 0.3085145
+        }
       },
       {
-        "file": "append-zero-and-argument-effects.js",
-        "blocks": [
-          {
-            "block": "block0",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": 3.868832092845631,
-              "wall_mean_of_process_means_ns": -0.029156374604666357,
-              "cpu_median_of_process_medians_ns": 2.9422697080565774,
-              "cpu_mean_of_process_means_ns": 2.0342974737544095
-            }
-          },
-          {
-            "block": "block1",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": 3.935752799736769,
-              "wall_mean_of_process_means_ns": 22.41786349040602,
-              "cpu_median_of_process_medians_ns": 3.4749330011572876,
-              "cpu_mean_of_process_means_ns": 11.215734879423046
-            }
-          }
-        ]
+        "file": "integer.js",
+        "median_ratio": 2.7510908645473986,
+        "mean_ratio": 2.771208959688649,
+        "scriptw_wall_ms": {
+          "median": 0.2077445,
+          "mean": 0.21483507142857142
+        },
+        "scriptc_wall_ms": {
+          "median": 0.0755135,
+          "mean": 0.07752395238095239
+        }
+      },
+      {
+        "file": "sort-reverse-128.js",
+        "median_ratio": 2.1642840342805063,
+        "mean_ratio": 2.1166754194009054,
+        "scriptw_wall_ms": {
+          "median": 0.2944595,
+          "mean": 0.29672180952380955
+        },
+        "scriptc_wall_ms": {
+          "median": 0.136054,
+          "mean": 0.14018295238095238
+        }
+      },
+      {
+        "file": "numeric-loop-10000.js",
+        "median_ratio": 2.1168084464246437,
+        "mean_ratio": 2.1347937260629797,
+        "scriptw_wall_ms": {
+          "median": 0.2069085,
+          "mean": 0.21450554761904764
+        },
+        "scriptc_wall_ms": {
+          "median": 0.0977455,
+          "mean": 0.10048069047619047
+        }
       },
       {
         "file": "join-4096.js",
-        "blocks": [
-          {
-            "block": "block0",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -1.0679380403391225,
-              "wall_mean_of_process_means_ns": -0.4464023431663633,
-              "cpu_median_of_process_medians_ns": -0.9024207620998981,
-              "cpu_mean_of_process_means_ns": -0.5632472444130454
-            }
-          },
-          {
-            "block": "block1",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -1.0925745108464557,
-              "wall_mean_of_process_means_ns": 27.988046703324,
-              "cpu_median_of_process_medians_ns": -1.1446647523306153,
-              "cpu_mean_of_process_means_ns": 0.21453611805906103
-            }
-          }
-        ]
-      },
-      {
-        "file": "retained-objects.js",
-        "blocks": [
-          {
-            "block": "block0",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -0.8635409599983546,
-              "wall_mean_of_process_means_ns": 3.8866565885951054,
-              "cpu_median_of_process_medians_ns": -1.006810383980128,
-              "cpu_mean_of_process_means_ns": 3.694565013215767
-            }
-          },
-          {
-            "block": "block1",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -0.6201630326047702,
-              "wall_mean_of_process_means_ns": 7.5789617641757845,
-              "cpu_median_of_process_medians_ns": -0.9791944726632251,
-              "cpu_mean_of_process_means_ns": -1.4643756134619657
-            }
-          }
-        ]
-      },
-      {
-        "file": "control-empty.js",
-        "blocks": [
-          {
-            "block": "block0",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": 0.0489690721649394,
-              "wall_mean_of_process_means_ns": 0.12768223132353373,
-              "cpu_median_of_process_medians_ns": -0.14067099828964924,
-              "cpu_mean_of_process_means_ns": 0.13730086857026702
-            }
-          },
-          {
-            "block": "block1",
-            "change_percent": {
-              "wall_median_of_process_medians_ns": -1.9442965380688015,
-              "wall_mean_of_process_means_ns": 18.711091039958827,
-              "cpu_median_of_process_medians_ns": -1.7428396181751626,
-              "cpu_mean_of_process_means_ns": -0.5063124732814783
-            }
-          }
-        ]
+        "median_ratio": 1.9739981371289568,
+        "mean_ratio": 1.9126529270735757,
+        "scriptw_wall_ms": {
+          "median": 2.772054,
+          "mean": 2.807987666666667
+        },
+        "scriptc_wall_ms": {
+          "median": 1.404284,
+          "mean": 1.4681114523809524
+        }
       }
     ],
-    "new_diagnostic_is_not_a_promotion_gate": true,
-    "noise_fixed": false,
-    "observation": "Join4096 block1 wall mean +27.988% while CPU mean +0.2145%; off-CPU contribution is supported, cause unknown. Append-zero wall medians +3.869/+3.936% remain despite no repeated joint mean/median threshold.",
-    "original_failed_main_thread_observers": "Guest execution uses a sized-stack worker; main-thread-only preload/perf did not cover guest CPU. Original raw records and all-thread correction remain retained.",
-    "old_new_cohort": {
-      "status": "skipped_precondition_failed",
-      "planned_invocations": 80,
-      "actual_invocations": 0,
-      "reason": "The predeclared old/new cohort required byte-identical standard and Portable native runtime images. Full native byte invariance failed; all differences are compatibility fingerprints, which remain authoritative.",
-      "original_plan": "calibration-plan.json",
-      "original_plan_sha256": "fbc4916208799d9b6f84c95ef80b8e519fd5d58be50aedb703a70c453b2dcae7",
-      "failed_freeze_log_sha256": "bd267a6dcc1ae0a924b2b65498cd7fa6c47c771e550d525f412ac1a049ef361e",
-      "native_section_review_sha256": "12bd013c4b974d27a706b2574035ad9a9fe909f09adb52a40c9271d6a0b4e824",
-      "partial_invariance_sha256": "45e0125b51f5d2fd49987a16f8e6e4e2305e92eb15050297830a920a150639dd",
-      "interpretation": "No old/new instrumentation cost or speedup estimate was collected. The separate same-build 80-process A/A is diagnostic only and does not waive the original 480-process rejection."
+    "evidence": {
+      "path": "target/performance-shared-worker-20261101/runs/20261101T221011Z-same-config-reference-baseline/analysis.json",
+      "sha256": "8bea963f0de2d3e8a17cddf34b36d011f05657987e1a2921794824581090a785"
     }
   },
-  "clock_calibration": {
-    "processes": 5,
-    "pairs_per_process": 10000,
-    "warmup_pairs": 10,
-    "wall_ns_per_pair_range": [
-      902.6391,
-      913.6259
+  "qualification": {
+    "hot_entry_gate": "veto",
+    "raw_processes": 480,
+    "measured_observations": 10080,
+    "warmups": 4800,
+    "vetoes": [
+      {
+        "case": "first-row-proxy.js",
+        "metric": "worker_cpu"
+      }
     ],
-    "cpu_ns_per_pair_range": [
-      891.993,
-      895.7923
+    "independent_reduction": {
+      "path": "target/performance-shared-worker-20261101/astra-aa-reduction.json",
+      "sha256": "067b20d2cc7cebb0f7b1fac44f117dfdec601fd35ac5c1a06cbfa186f44f631c"
+    },
+    "mechanism": "Unknown; real worker CPU regression remains a veto. Unchanged GC capacity does not prove no collections.",
+    "diagnostics": {
+      "path": "target/performance-shared-worker-20261101/astra-aa-mechanism-review.json",
+      "sha256": "11afdf97df54ca50a5b63f973df1bd95988c2857d617f7e585c176426e954db6"
+    },
+    "ordinary_failed_gates": [
+      {
+        "path": "target/performance-primitive-append/aa-gate-result.json",
+        "sha256": "bf3da15dca2580973383a19f942d21f05cae544595151f944a204eb48d1f4840"
+      },
+      {
+        "path": "target/performance-scriptc-hot-20261101/aa-analysis.json",
+        "sha256": "b179b932b0c8e9305ea73ddec1dc20f029d244c832bac2a722d10c6bf53839c3"
+      }
     ],
-    "scope": "Loop plus two reads, timestamp/thread-identity and duration checks. No empty subtraction or isolated syscall estimate.",
-    "receipt": {
-      "path": "target/performance-worker-cpu/clock-calibration.json",
-      "sha256": "91c9fccc710c986d5324a6a7ffca907d3c3101f9fb5dcadc256076f6a82c522f"
+    "withdrawn_caller_cpu_qualification": {
+      "path": "target/performance-shared-entry-20261101/astra-cpu-scope-correction.json",
+      "sha256": "b85e701bef3d4b42cb952ba1fe4cae2050be300745ad0329e84627ab5d4988c7"
+    },
+    "invalid_scope_evidence": {
+      "path": "target/performance-shared-entry-20261101/astra-cpu-scope-evidence.json",
+      "sha256": "54cc09833a6027a87429fdf1555ed162e3a48deae1c7be11479de3e7f9a3c099"
+    }
+  },
+  "append_optimizer": {
+    "status": "parked_uncompiled_untested_unmeasured",
+    "reason": "Fresh genuine-worker A/A veto blocks the optimizer build; no threshold waiver or candidate speedup claim.",
+    "source": {
+      "path": "target/performance-shared-entry-20261101/parked-optimizer-worker-cpu-invalid/manifest.json",
+      "sha256": "955b5c35fed51ca0e3544518e8f833dd683b73853c101bec347f49b9f7189b9b"
     }
   },
   "verification": {
-    "source_guards": 359,
-    "native_selected": 48,
-    "python_unique": 32,
-    "program_wasm_byte_identical": 17,
-    "runtime_abi": 42,
-    "runtime_raw_wasm_identical_profiles": [
-      "standard",
-      "portable"
-    ],
-    "native_container_byte_invariance": false,
-    "native_container_difference": "62 compatibility-fingerprint bytes in .wasmtime.engine per profile; all other bytes and actual code identical. Actual native-test and product Cargo graphs agree. Normal compatibility checks remain authoritative.",
+    "profiling_baseline": {
+      "status": "complete",
+      "evidence": {
+        "path": "target/performance-shared-worker-20261101/native-verification/native-receipt-final.json",
+        "sha256": "970df60fb25acaf17995b3323d575c9a7723e006ac8613052a041a1960dc0a35"
+      },
+      "source_fingerprint": "507a64350887f2bda05f42e0d7c5b58cf24a27928d848a52957b36364ebb6355",
+      "selected_passes": 70,
+      "selected_counts": {
+        "engine-profiled-entry": 4,
+        "engine-embedding-adjacent": 34,
+        "engine-execution-stack": 6,
+        "example-runtime_baseline": 9,
+        "example-compiler_precompiled_baseline": 11,
+        "example-runtime_precompiled": 6
+      },
+      "unit": "binary/test-name pairs; shared tests compiled into distinct examples retain their separate roles"
+    },
+    "reducer_schema_checks": {
+      "passed": 13,
+      "evidence": {
+        "path": "target/performance-shared-worker-20261101/selfcheck.stderr",
+        "sha256": "6718ab614a5b0395addf5d9b5a3ddf49a1a5369ccb94994c0168d60cad83c6bf"
+      }
+    },
+    "worker_role": {
+      "path": "target/performance-shared-worker-20261101/worker-role-proof.json",
+      "sha256": "63b3546f43e6c1c89799e370d38ccab784d043a3f41aede1f0050e90960dedad"
+    },
+    "thirty_programs": {
+      "path": "target/performance-shared-worker-20261101/baseline-program-invariance.json",
+      "sha256": "51108761709bb0267774d977794208989a618bf3e9adaa6965797e2af8235a3c"
+    },
+    "runtime_profiles": {
+      "path": "target/performance-shared-worker-20261101/runtime-invariance-baseline.json",
+      "sha256": "c99934be3b571af7b63f3c54f871f17d4554fc0914e90be096e38f14074dbd99"
+    },
+    "coverage": "Selected native and tooling checks only; full release/workspace and pinned Test262 acceptance remain open. No conformance publication."
+  },
+  "cold_native_backing": {
+    "status": "complete",
+    "planned_processes": 16,
+    "scope": "Cold native-admission/deserialization wall; four independent processes per version/block. Entry samples check output only; filesystem may be warm.",
+    "delta": "Remove sync_data for a validated unnamed process-lifetime native backing; no Array optimizer.",
+    "plan": {
+      "path": "target/performance-native-flush-20261101/study-plan.json",
+      "sha256": "b8c9951671597ed13b95e2f5496b51af459e276b7b3592edbb3d3bb0a9c9e4b5"
+    },
     "native": {
-      "path": "target/performance-worker-cpu/native-receipt.json",
-      "sha256": "e89b19214318066342454e58090b308921431b8b791c650da91bf6014fc0abad"
+      "status": "complete",
+      "evidence": {
+        "path": "target/performance-native-flush-20261101/native-verification/native-receipt-final.json",
+        "sha256": "ca9ccfda81e3c2275e095bab8e5d4b690211d82f08962ee55b4dda652a517450"
+      },
+      "source_fingerprint": "f98b7edc3b5d8d7699a878230b10cbfac13c06271a78db34b32c2561f13dc6c8",
+      "selected_passes": 57,
+      "selected_counts": {
+        "scope-0-embedded_runtime": 13,
+        "scope-1-embedding": 38,
+        "scope-2-execution_stack": 6
+      },
+      "unit": "binary/test-name pairs; shared tests compiled into distinct examples retain their separate roles"
     },
-    "python": {
-      "path": "target/performance-worker-cpu/python-verification.json",
-      "sha256": "9b543cd5d496b8f0d7fe7111fb8af1cc957387e131b42d3a4c07939534ebe2ba"
+    "runtime_invariance": {
+      "path": "target/performance-native-flush-20261101/runtime-invariance.json",
+      "sha256": "6fff852d6a776677aa29800337732e6c70ad66e51a070b327bd0a11f0b44bdb1"
     },
-    "programs": {
-      "path": "target/performance-worker-cpu/product-proof-partial.json",
-      "sha256": "e4988af09e10c4ff2990020323a204f9d9dbfd8a629f61806b3eac05b2601ffa"
+    "dirty_backing_diagnostic": {
+      "path": "target/performance-native-flush-20261101/dirty-diagnostic/receipt.json",
+      "sha256": "0f15245d1982751987ab0c2117eb27a9f83692490aaacf1968a68069a39052f8",
+      "status": "complete",
+      "unscored": true,
+      "processes": 2,
+      "scope": "Cgroup file/dirty/writeback/I/O endpoints with R alive, plus exit. No perf, polling, flush, cache eviction or waiting for a preferred starting state."
     },
-    "runtime": {
-      "path": "target/performance-worker-cpu/runtime-partial-invariance.json",
-      "sha256": "45e0125b51f5d2fd49987a16f8e6e4e2305e92eb15050297830a920a150639dd"
+    "source": {
+      "path": "target/performance-native-flush-20261101/source-event.json",
+      "sha256": "0cfffd865345c66eb413b33bc61bb1b0d6aeeed00f840ab84c5e5e2eca940afa"
     },
-    "product_smoke": {
-      "path": "target/performance-worker-cpu/product-smoke.json",
-      "sha256": "9ffc0cc3da4e6f9d52d290ed0d2bf5deb3921cd3a599ffd71cccac5f62561ea6"
+    "independent_audit": {
+      "path": "target/performance-native-flush-20261101/independent-audit.json",
+      "sha256": "635bfd981321a7211fa7a4a7865a9c138e9c871a0d26faca946f66531db22613",
+      "status": "pass",
+      "verdict": "valid_accepted_cold_load",
+      "correctness_processes": 30,
+      "correctness_entries": 120
     },
-    "unverified": "Full default/all-feature acceptance and full pinned Test262 not rerun. No new conformance publication."
-  },
-  "audit": {
-    "path": "target/performance-worker-cpu/independent-audit.json",
-    "sha256": "4214cb037f023e8f8b53a4985a3388ba7b25d089a8c9588a625f7ae293971198"
-  },
-  "astra": {
-    "path": "target/performance-gap-diagnosis/astra-review.json",
-    "sha256": "ba2d74b9a59e3fa2b667b77b5ac94d5b030cfee99444b00bc83d2b2880b5963f"
+    "ordinary_cli": {
+      "path": "target/performance-native-flush-20261101/ordinary-cli-smoke/receipt.json",
+      "sha256": "fa8d8447cbde6fd98dd95015784fc92d78cc8de5d6f2877d6f98b8d07635d66e",
+      "status": "verified",
+      "checked_cases": 2,
+      "source_fingerprint": "f98b7edc3b5d8d7699a878230b10cbfac13c06271a78db34b32c2561f13dc6c8",
+      "scope": "WasmAot checksum checks only; no ordinary performance qualification"
+    },
+    "verdict": "cold_load_target_passed",
+    "cold_load_target_passed": true,
+    "vetoes": [],
+    "processes": 16,
+    "source_fingerprints": {
+      "baseline": "507a64350887f2bda05f42e0d7c5b58cf24a27928d848a52957b36364ebb6355",
+      "candidate": "f98b7edc3b5d8d7699a878230b10cbfac13c06271a78db34b32c2561f13dc6c8"
+    },
+    "host_sha256": {
+      "baseline": "9b2e8cb5d8cf4ffd7cc3b79010e10908cd7357898946fc9d13a7cd4e1394d248",
+      "candidate": "6420019f4b0a1ab2b86471113201987de188090e8bfb103b7e56422811cdb8e1"
+    },
+    "evidence": {
+      "path": "target/performance-native-flush-20261101/runs/20261101T223331Z-cold/analysis.json",
+      "sha256": "7dc698bdf3ee5df79ca0784122dec34de89e3b4b30c07e82ac2954ff3526449a"
+    },
+    "block_changes": [
+      {
+        "block": "block0",
+        "load_ns": {
+          "median": -0.10452574218923061,
+          "mean": -0.09044410991381824
+        },
+        "process_wall_ns": {
+          "median": -0.04545121458465973,
+          "mean": -0.03378603173679062
+        },
+        "process_cpu_ns": {
+          "median": -0.00783329545791378,
+          "mean": -0.011641043273245222
+        },
+        "peak_rss_bytes": {
+          "median": -245760.0,
+          "mean": -256000
+        }
+      },
+      {
+        "block": "block1",
+        "load_ns": {
+          "median": -0.08448586477545639,
+          "mean": -0.044702965944259376
+        },
+        "process_wall_ns": {
+          "median": -0.03149005863287124,
+          "mean": -0.014898115005951618
+        },
+        "process_cpu_ns": {
+          "median": -0.007850795435492275,
+          "mean": -0.008392186089061893
+        },
+        "peak_rss_bytes": {
+          "median": 116736.0,
+          "mean": -58368
+        }
+      }
+    ],
+    "change_units": "load/process wall/CPU are fractional changes; peak RSS is an absolute byte difference",
+    "limits": [
+      "Filesystem cache warm; no general hot/default gain or total I/O reduction claim.",
+      "Dirty/writeback endpoints may miss pages released before exit; separate bounded barrier diagnostic records live state."
+    ],
+    "claim": "Predeclared cold-load target passed; this does not qualify hot/default execution or general parity."
   },
   "limits": [
-    "Local descriptive cohorts, unlike setup frontiers; no significance or general JavaScript score. Published CI charts remain unchanged.",
-    "Reference lane may overlap twelve tiny Node preflights for about0.28 seconds; exclusive-idle execution is not claimed. Later diagnostic timing had no concurrent agent build or test workload.",
-    "Scriptc compilation_ns in the reused-Wasm reference is Wasmtime native compilation of Scriptc Wasm, not Scriptc JavaScript compilation. Original derived mislabel and correction are retained.",
-    "GC capacity is reserved space; allocation counts, collections, live bytes and GC pauses remain unavailable.",
-    "Native image metadata change prevented the planned old/new cost study. No instrumentation-cost or optimizer-win estimate is inferred.",
-    "All initial failed metadata/preparation attempts and the three GNU-time-prerequisite test errors remain retained. Passing unchanged scopes were reused; no performance samples were trimmed or repeated."
+    "These local snapshots and different execution policies cannot be pooled into an overall JavaScript score.",
+    "Published CI charts remain unchanged. All failed gates, withdrawn scope claims and diagnostic attempts are retained.",
+    "Dirty backing may write back later; endpoint snapshots cannot prove reduced total storage I/O or live heap."
   ],
   "evidence": {
-    "path": "performance-gaps-20261101-inert.tar.xz",
-    "sha256": "35c9ffb0270b1167c3f351f5a57f64374675ca7e107cfeec707ad5f100b3f15c",
-    "bytes": 2218556,
-    "regular_utf8_members": 2731,
-    "expanded_utf8_bytes": 187049968,
+    "path": "performance-gaps-20261101-followup-inert.tar.xz",
+    "sha256": "0b54bffa45f679fefc0bb07e6797a2de2affecbf25ccf2091a2a203c61274200",
+    "bytes": 6518128,
+    "regular_utf8_members": 6056,
+    "expanded_utf8_bytes": 515235543,
+    "index_sha256": "1dbdc5ce555f114d13ab1eaffef7e3e23b3198c0061be5f214efb43c8df40296",
     "contains_native_or_wasm_images": false,
-    "policy": "Regular inert UTF-8 files and header-bound CSV clock records. Native executables, serialized native/Wasm images and caches are excluded. Every member hash was checked against INDEX.json after archive creation."
+    "policy": "Every logical archive member is regular/safe UTF-8 and matches INDEX SHA-256/size; payloads streamed under explicit bounds."
   }
 }

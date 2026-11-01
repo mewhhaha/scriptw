@@ -1,5 +1,7 @@
 //! Private immutable disk backing for admitted Cargo native bytes. It owns no
 //! Module or Engine. Wasmtime owns each independent private executable mapping.
+//! The unnamed backing lasts only for the process; completed file writes are
+//! visible to its mappings without a durability flush.
 use scriptw_aot_wasm::RuntimeSourceCompilationProfile;
 use std::fs::File;
 #[cfg(all(test, target_os = "linux"))]
@@ -30,19 +32,13 @@ impl NativeBacking {
             {
                 return None;
             }
-            return Self::publish(file);
+            return Some(Self(file));
         }
         #[cfg(not(target_os = "linux"))]
         {
             let _ = (profile, expected);
             None
         }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn publish(file: File) -> Option<Self> {
-        file.sync_data().ok()?;
-        Some(Self(file))
     }
 
     #[cfg(target_os = "linux")]
@@ -73,7 +69,7 @@ impl NativeBacking {
         {
             let mut file = Self::private_file()?;
             file.write_all(bytes).ok()?;
-            Self::publish(file)
+            Some(Self(file))
         }
         #[cfg(not(target_os = "linux"))]
         {

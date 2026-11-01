@@ -10,6 +10,7 @@ use scriptw_ir::foreign::{
 
 mod async_operations;
 mod compact_records;
+mod profiled_entry;
 mod reentrant_execution;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {

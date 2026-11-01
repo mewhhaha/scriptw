@@ -1,4 +1,6 @@
 //! Shared benchmark-only host. External native images require trusted producers.
+#[path = "benchmark_common/thread_cpu.rs"]
+mod benchmark_thread_cpu;
 #[path = "runtime_precompiled/callable.rs"]
 mod callable;
 #[path = "runtime_precompiled/consume.rs"]

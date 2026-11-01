@@ -68,6 +68,7 @@ pub(super) fn execute(
     report["schema"] = json!("scriptw-precompiled-wasi-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
     report["compiler_enabled"] = json!(false);
+    report["thread_cpu_observation_policy"] = json!(crate::benchmark_thread_cpu::POLICY);
     report["native_load_process_memory"] = load_memory;
     report["image_sha256"] = json!(image_sha256);
     report["image_bytes"] = json!(image_bytes);

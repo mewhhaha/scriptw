@@ -1,4 +1,6 @@
 //! Benchmark-only WASI host for externally compiled programs; never a product path.
+#[path = "benchmark_common/thread_cpu.rs"]
+mod benchmark_thread_cpu;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{fs, time::Instant};
@@ -61,9 +63,11 @@ fn run() -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         let setup_ns = begin.elapsed().as_nanos();
         let begin = Instant::now();
+        let execution_cpu_started = benchmark_thread_cpu::start();
         let result = start.call(&mut store, ());
         let output = stdout.contents();
         let errors = stderr.contents();
+        let execution_thread_cpu = benchmark_thread_cpu::finish(execution_cpu_started);
         let execution_ns = begin.elapsed().as_nanos();
         let rss_after_bytes = rss()?;
         let completion = match result {
@@ -80,6 +84,10 @@ fn run() -> Result<(), String> {
         let matched = completion == "normal" && output.as_ref() == expected && errors.is_empty();
         observations.push(json!({"warmup": index < warmups,
             "execution_ns": execution_ns, "setup_ns": setup_ns,
+            "execution_thread_cpu": benchmark_thread_cpu::serialize(
+                &execution_thread_cpu,
+                benchmark_thread_cpu::EXECUTION_SCOPE,
+            ),
             "rss_after_bytes": rss_after_bytes, "completion": completion,
             "stdout": String::from_utf8_lossy(&output),
             "stderr": String::from_utf8_lossy(&errors), "matched": matched}));
@@ -90,6 +98,7 @@ fn run() -> Result<(), String> {
     println!(
         "{}",
         json!({"schema": "scriptw-wasi-baseline-v1",
+        "thread_cpu_observation_policy": benchmark_thread_cpu::POLICY,
         "wasmtime_version": "47.0.0", "wasm_sha256": format!("{:x}", Sha256::digest(&bytes)),
         "compilation_ns": compilation_ns, "samples": samples, "warmups": warmups,
         "observations": observations})

@@ -1,4 +1,5 @@
 use super::*;
+use crate::benchmark_thread_cpu;
 use wasmtime::{Linker, Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::{p1, p1::WasiP1Ctx, p2::pipe::MemoryOutputPipe, I32Exit, WasiCtxBuilder};
 
@@ -56,9 +57,11 @@ pub(super) fn observe(
             .get_memory(&mut store, "memory")
             .map(|m| m.data_size(&store));
         let started = Instant::now();
+        let execution_cpu_started = benchmark_thread_cpu::start();
         let result = start.call(&mut store, ());
         let output = stdout.contents();
         let errors = stderr.contents();
+        let execution_thread_cpu = benchmark_thread_cpu::finish(execution_cpu_started);
         let execution_ns = started.elapsed().as_nanos();
         let gc_after = store.gc_heap_capacity();
         let memory_after = instance
@@ -99,6 +102,10 @@ pub(super) fn observe(
         barriers.after_store_drop(index)?;
         observations.push(json!({"index":index, "warmup":index < warmups,
             "completion":"normal", "stdout":output, "stderr":errors, "matched":true,
+            "execution_thread_cpu":benchmark_thread_cpu::serialize(
+                &execution_thread_cpu,
+                benchmark_thread_cpu::EXECUTION_SCOPE,
+            ),
             "phases_ns":{"state_linker":state_linker_ns, "register":register_ns,
                 "instantiate":instantiate_ns, "execution":execution_ns, "total":total_ns},
             "gc_capacity_before_bytes":gc_before, "gc_capacity_after_bytes":gc_after,

@@ -54,10 +54,10 @@ impl CpuPhases {
     fn json(&self) -> Value {
         let scope = "marker-callback-worker-thread";
         json!({
-            "construction": super::thread_cpu_json(&self.construction, scope),
-            "traversal": super::thread_cpu_json(&self.traversal, scope),
-            "combined": super::thread_cpu_json(&self.combined, scope),
-            "middle_callback": super::thread_cpu_json(&self.middle_callback, scope),
+            "construction": super::benchmark_thread_cpu::serialize(&self.construction, scope),
+            "traversal": super::benchmark_thread_cpu::serialize(&self.traversal, scope),
+            "combined": super::benchmark_thread_cpu::serialize(&self.combined, scope),
+            "middle_callback": super::benchmark_thread_cpu::serialize(&self.middle_callback, scope),
         })
     }
 }

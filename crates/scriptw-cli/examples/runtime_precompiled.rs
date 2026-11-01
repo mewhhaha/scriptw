@@ -1,4 +1,6 @@
 //! Independent fresh-process compiler-disabled execution diagnostic.
+#[path = "benchmark_common/thread_cpu.rs"]
+mod benchmark_thread_cpu;
 #[path = "runtime_precompiled/consume.rs"]
 mod consume;
 #[path = "runtime_precompiled/phase_barriers.rs"]

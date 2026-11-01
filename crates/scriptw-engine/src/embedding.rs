@@ -455,33 +455,50 @@ impl EmbeddedInstance {
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<EmbeddedEvaluation, EngineError> {
+        run_on_execution_stack(|| self.initialize_inner(store))
+    }
+
+    /// Initialize with CPU time sampled on the actual execution worker.
+    ///
+    /// The span includes native main, synchronous host/GC work and retaining
+    /// the completion. It excludes dispatch/waiting, subsequent pumps, caller
+    /// observation/output collection and other workers. Clock failures are
+    /// reported without changing execution. Sampling adds two clock reads;
+    /// ordinary [`Self::initialize`] performs none.
+    pub fn initialize_profiled(
+        &mut self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<(EmbeddedEvaluation, WasmThreadCpuObservation), EngineError> {
         run_on_execution_stack(|| {
-            let state = store
-                .data_mut()
-                .embedding
-                .as_mut()
-                .ok_or_else(|| EngineError::new("Store has no embedding authority"))?;
-            if !Arc::ptr_eq(&state.store, &self.store) || state.phase != StorePhase::Instantiated {
-                return Err(EngineError::new(
-                    "instance belongs to a different Store or was already evaluated",
-                ));
-            }
-            state.phase = StorePhase::Evaluated;
-            let mut roots = wasmtime::RootScope::new(store);
-            let completion = match self.main.call(&mut roots, ()) {
-                Ok(completion) => completion,
-                Err(error) => {
-                    roots
-                        .as_context_mut()
-                        .data_mut()
-                        .embedding
-                        .as_mut()
-                        .unwrap()
-                        .phase = StorePhase::Failed;
-                    return Err(embedded_error(error));
-                }
+            let started = WasmThreadCpuInstant::now();
+            let result = self.initialize_inner(store);
+            let cpu = match started {
+                Ok(started) => started.elapsed(),
+                Err(reason) => WasmThreadCpuObservation::Unavailable(reason),
             };
-            if global_script_prelude::failed(&self.program, &mut roots)? {
+            result.map(|evaluation| (evaluation, cpu))
+        })
+    }
+
+    fn initialize_inner(
+        &mut self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<EmbeddedEvaluation, EngineError> {
+        let state = store
+            .data_mut()
+            .embedding
+            .as_mut()
+            .ok_or_else(|| EngineError::new("Store has no embedding authority"))?;
+        if !Arc::ptr_eq(&state.store, &self.store) || state.phase != StorePhase::Instantiated {
+            return Err(EngineError::new(
+                "instance belongs to a different Store or was already evaluated",
+            ));
+        }
+        state.phase = StorePhase::Evaluated;
+        let mut roots = wasmtime::RootScope::new(store);
+        let completion = match self.main.call(&mut roots, ()) {
+            Ok(completion) => completion,
+            Err(error) => {
                 roots
                     .as_context_mut()
                     .data_mut()
@@ -489,22 +506,32 @@ impl EmbeddedInstance {
                     .as_mut()
                     .unwrap()
                     .phase = StorePhase::Failed;
-                return Err(global_script_prelude::completion_error(
-                    &self.roots,
-                    &mut roots,
-                    completion,
-                )?);
+                return Err(embedded_error(error));
             }
-            match read_module_entry_status(&self.program, &mut roots)? {
-                Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
-                Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(
-                    "embedded Module did not reach evaluation completion",
-                )),
-                Some(WasmModuleEvaluationStatus::Settled) | None => Ok(
-                    EmbeddedEvaluation::Settled(retained_completion(&mut roots, completion)?),
-                ),
-            }
-        })
+        };
+        if global_script_prelude::failed(&self.program, &mut roots)? {
+            roots
+                .as_context_mut()
+                .data_mut()
+                .embedding
+                .as_mut()
+                .unwrap()
+                .phase = StorePhase::Failed;
+            return Err(global_script_prelude::completion_error(
+                &self.roots,
+                &mut roots,
+                completion,
+            )?);
+        }
+        match read_module_entry_status(&self.program, &mut roots)? {
+            Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
+            Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(
+                "embedded Module did not reach evaluation completion",
+            )),
+            Some(WasmModuleEvaluationStatus::Settled) | None => Ok(EmbeddedEvaluation::Settled(
+                retained_completion(&mut roots, completion)?,
+            )),
+        }
     }
 
     /// Convenience for a synchronously completing entry and diagnostic output.
@@ -513,7 +540,27 @@ impl EmbeddedInstance {
         mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<ObservedRunOutcome, EngineError> {
-        let completion = match self.initialize(store)? {
+        let evaluation = self.initialize(store)?;
+        Self::finish_evaluation(evaluation, store)
+    }
+
+    /// Evaluate with the actual worker CPU span from [`Self::initialize_profiled`].
+    /// Completion observation and output collection remain on the caller, as
+    /// in [`Self::evaluate`], and are outside this CPU span.
+    pub fn evaluate_profiled(
+        mut self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<(ObservedRunOutcome, WasmThreadCpuObservation), EngineError> {
+        let (evaluation, cpu) = self.initialize_profiled(store)?;
+        let outcome = Self::finish_evaluation(evaluation, store)?;
+        Ok((outcome, cpu))
+    }
+
+    fn finish_evaluation(
+        evaluation: EmbeddedEvaluation,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<ObservedRunOutcome, EngineError> {
+        let completion = match evaluation {
             EmbeddedEvaluation::Pending => {
                 return Err(EngineError::from_execution_failure(
                     EngineExecutionFailure::IncompleteModuleEvaluation,
