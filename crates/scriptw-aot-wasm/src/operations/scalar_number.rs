@@ -1,11 +1,89 @@
 //! Number arithmetic keeps intermediate payloads in scalar Wasm locals.
 //!
-//! Only the same Number proofs used by the ordinary expression emitter select
-//! arithmetic here. Other leaves retain their full expression evaluation,
+//! Ordinary Number proofs and checked private-counter reads select arithmetic
+//! here. Other leaves retain their full expression evaluation,
 //! including coercions and abrupt completion, before their payload is copied.
 use super::*;
+use crate::control_flow::BoundedInductionRead;
+
+/// The literal divisor cannot coerce or run source code. Its constructor also
+/// excludes zero, fractions and values outside the unsigned Wasm operand range.
+enum UnsignedRemainderDivisor {
+    Mask(u32),
+    Remainder(u32),
+}
+
+impl UnsignedRemainderDivisor {
+    fn new(expression: &TypedExpr) -> Option<Self> {
+        let ExprIr::Number(bits) = expression.expr else {
+            return None;
+        };
+        let number = f64::from_bits(bits);
+        if !(1.0..=f64::from(u32::MAX)).contains(&number) || number.fract() != 0.0 {
+            return None;
+        }
+        let divisor = number as u32;
+        if divisor.is_power_of_two() {
+            return Some(Self::Mask(divisor - 1));
+        }
+        Some(Self::Remainder(divisor))
+    }
+
+    fn emit(self, function: &mut Function) {
+        match self {
+            Self::Mask(mask) => {
+                function.instruction(&Instruction::I32Const(mask as i32));
+                function.instruction(&Instruction::I32And);
+            }
+            Self::Remainder(divisor) => {
+                function.instruction(&Instruction::I32Const(divisor as i32));
+                function.instruction(&Instruction::I32RemU);
+            }
+        }
+    }
+}
 
 impl FunctionBuilder<'_> {
+    /// Admission belongs to the ordinary loop's private binding proof. A miss
+    /// occurs before evaluating either operand and retains Number::remainder.
+    pub(super) fn try_compile_bounded_remainder(
+        &mut self,
+        lhs: &TypedExpr,
+        rhs: &TypedExpr,
+        output: I64Local,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let Some(read) = self.bounded_induction_read(lhs) else {
+            return Ok(false);
+        };
+        let Some(divisor) = UnsignedRemainderDivisor::new(rhs) else {
+            return Ok(false);
+        };
+        self.compile_bounded_remainder(read, divisor, output, function)?;
+        Ok(true)
+    }
+
+    fn compile_bounded_remainder(
+        &mut self,
+        read: BoundedInductionRead<'_>,
+        divisor: UnsignedRemainderDivisor,
+        output: I64Local,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        // Keep the canonical binding and its initialized read. The witness
+        // proves this exact expression is a nonnegative integral Number in u32,
+        // so conversion cannot trap and the remainder has positive zero sign.
+        self.compile_number_payload(read.expression(), output, function)?;
+        output.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::I32TruncF64U);
+        divisor.emit(function);
+        function.instruction(&Instruction::F64ConvertI32U);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        output.store(function);
+        Ok(())
+    }
+
     pub(crate) fn compile_number_payload(
         &mut self,
         expression: &TypedExpr,
@@ -96,6 +174,11 @@ impl FunctionBuilder<'_> {
         output: I64Local,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if matches!(op, ArithmeticBinaryOp::Mod)
+            && self.try_compile_bounded_remainder(lhs, rhs, output, function)?
+        {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_i64_local(function);
         let right = schema.reserve_i64_local(function);

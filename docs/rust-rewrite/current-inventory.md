@@ -8,18 +8,31 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
+- Repair Fast native frame/code expansion before a new full conformance run.
+  The pinned `language/expressions/modulus/bigint-arithmetic.js` crashes in strict
+  and sloppy mode on both the accepted compiler and the private-counter candidate;
+  the additional remainder scope is 77/79, not a passing scope. Owner: AOT native
+  compilation policy and source-operation expansion. A 368-local Wasm function
+  expands to about 117 MB of native code and a 33.44 MB frame, exhausting the
+  32-MiB budget during shallow assertion calls. Compare allocation/expansion
+  policies against the retained native prologues; do not increase the stack cap
+  or skip the tests. The [gap diagnosis](performance-gaps-20261101.json) binds both
+  failed snapshots and the exact frame evidence.
 - Every-case V8/Scriptc execution and RSS parity remains open. The
   [gap diagnosis](performance-gaps-20261101.json) separates source-bound reference
-  cohorts, LLVM/final-Wasm inspection and worker-IP diagnostics. Birth layouts
-  pass the 480-process A/A, 30-case screen and both seven-case control cohorts.
-  The latest precompiled reference wins 12/17 cases with median geometric means
-  0.694–0.695× Scriptc. Mixed join remains 2.44–2.46× slower; plain joins are
-  1.40–1.55×, dynamic String is 1.05–1.06×, and reverse-128 sort straddles parity.
-  Next, preserve private bounded numeric facts across ordinary effectful loops:
-  current mixed-join Wasm retains three full remainder kernels where Scriptc
-  uses one mask and branch table. Preserve calls, rounding, captures and abrupt
-  exits. Profile inherited lookup before adding cache invalidation; retain failed
-  historical controls and keep the primitive-append region parked.
+  cohorts, LLVM/final-Wasm inspection and worker-IP diagnostics. Private counter
+  proofs pass the 480-process A/A, 30-case screen and all three separate control
+  cohorts. The latest precompiled reference wins 14/17 cases with median geometric
+  means 0.674–0.680× Scriptc; its fresh accepted-baseline replay wins 13/17.
+  Mixed join remains 2.32–2.43× slower and plain joins 1.38–1.63×; dynamic String
+  is now 0.663–0.671×. RSS geometric means remain 1.134–1.137× Scriptc.
+  Next, test guarded reads of already-observed intrinsic DATA rows: object_read
+  accounts for 26–33% of user-cycle samples in three current mixed-join windows.
+  Reuse complete Array prototype layouts and their existing value cache, with
+  live own-absence/prototype/storage guards and ordinary fallback. Preserve
+  method lookup before arguments. Source literal Strings already use the Program
+  cache; avoid another cache or heap. Retain failed historical controls and keep
+  the primitive-append region parked.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.

@@ -46,6 +46,10 @@ recurrence reduction while preserving Number values at their exits. Fixed positi
 literal trip counts can use one guarded affine transform after the existing
 Number and native-method checks; dirty bindings and the last body completion
 share the ordinary loop exit.
+Ordinary effectful loops also retain body-only unsigned counter proofs for
+remainder by positive integer literals. Private bindings, constant bounds and
+unchanged counters admit masks or unsigned remainder; calls and loop control
+still execute normally. Parameters, captures and dynamic environments decline.
 Read-only loops over dense Number Arrays can borrow one guarded backing and
 keep their counter and arithmetic in primitive locals. Closed row reads resolve
 key slots on the first actual row, then validate each row's shape and Number leaves
@@ -127,16 +131,20 @@ remains unqualified, including slower large-join means.
 The [intrinsic-layout comparisons](docs/rust-rewrite/performance-gaps-20261101.json)
 remove eager property graphs and retain resolved values at their owners.
 Constructor and prototype headers now begin with complete shared layouts.
-The latest 30-case precompiled comparison lowers execution median geometric means
-**28.3–28.5%** against the preceding accepted build, with about **30%** lower
-worker CPU. The original 17-case comparison records median geometric means
-**0.694–0.695× pinned Scriptc** and **12/17 individual wins**. Every-case parity
-remains open; mixed joins remain **2.44–2.46× slower**. The 480-process
-identical-binary control and separate RegExp and constructor/prototype controls
-pass without repeated timing or RSS flags. **1,813 selected native checks** and
-**202 pinned Test262 variants** pass; these are selected scopes. Failed historical
-controls and the initial control-fixture setup remain recorded. These results
-do not refresh ordinary CLI or V8 performance.
+The latest private-counter proofs lower dynamic-String execution medians
+**36.5–36.8%** and mixed joins **5.2–5.6%** against the preceding accepted build.
+The unchanged 30-case precompiled corpus improves **1.5–1.8%** overall by median
+geometric mean. Its original 17 cases record **0.674–0.680× pinned Scriptc** and
+**14/17 individual wall-time wins**. Three joins remain **1.38–2.43× slower**;
+RSS geometric means remain **13–14% higher**. Every-case parity remains open.
+The 480-process identical-binary control and separate RegExp, constructor and
+numeric-effect controls pass without repeated timing or RSS flags.
+**1,825 selected native checks** and **202 pinned Test262 variants** pass.
+An additional remainder subset passes **77/79**: two stack-exhaustion crashes
+reproduce on the accepted compiler and have a measured native-frame
+[owner and follow-up](docs/rust-rewrite/current-inventory.md). These selected
+scopes do not refresh full Test262, ordinary CLI or V8 results. Historical failed
+controls and reporting/setup corrections remain recorded.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two

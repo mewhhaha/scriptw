@@ -44,10 +44,12 @@ mod resumable_array_destructuring;
 mod resumable_sequence;
 mod resumable_sync_for_of_iterator;
 pub(crate) use for_in::FOR_IN_INTRINSICS;
+mod bounded_induction;
 mod repeated_identifier_reads;
 mod resumed_identifier_assignment;
 mod return_position;
 mod scalar_number_loop;
+pub(crate) use bounded_induction::{BoundedInduction, BoundedInductionRead};
 mod statement_completion;
 use for_await_iterator_plan::ForAwaitIteratorPlan;
 use for_await_iterator_symbol::ForAwaitIteratorSymbol;
@@ -6903,6 +6905,8 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(environment) = lexical_environment {
             self.emit_replace_lexical_environment(environment, function)?;
         }
+        let bounded_induction =
+            BoundedInduction::new(self, init, test, update, body, lexical_environment);
         let scalar_plan = lexical_environment
             .is_none()
             .then(|| scalar_number_loop::ScalarNumberLoop::new(self, init, test, update, body))
@@ -6927,6 +6931,7 @@ impl<'a> FunctionBuilder<'a> {
                     lexical_environment,
                     labels,
                     break_frame,
+                    bounded_induction.as_ref(),
                     function,
                 )?;
                 self.pop_control(ControlFrameKind::If);
@@ -6942,6 +6947,7 @@ impl<'a> FunctionBuilder<'a> {
                     lexical_environment,
                     labels,
                     break_frame,
+                    bounded_induction.as_ref(),
                     function,
                 )?;
                 self.pop_control(ControlFrameKind::If);
@@ -6956,6 +6962,7 @@ impl<'a> FunctionBuilder<'a> {
                 lexical_environment,
                 labels,
                 break_frame,
+                bounded_induction.as_ref(),
                 function,
             )?;
         }
@@ -6977,6 +6984,7 @@ impl<'a> FunctionBuilder<'a> {
         lexical_environment: Option<&ForLexicalEnvironmentIr>,
         labels: &[String],
         break_frame: ControlTarget,
+        bounded_induction: Option<&BoundedInduction>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let loop_frame = self.open_frame(ControlFrameKind::Loop, function);
@@ -6986,7 +6994,13 @@ impl<'a> FunctionBuilder<'a> {
         let continue_frame = self.open_frame(ControlFrameKind::Block, function);
         self.loop_stack.push(LoopTargets { continue_frame });
         self.push_labels(labels, break_frame, Some(continue_frame));
-        self.compile_statement(body, function)?;
+        let fact_depth = self.bounded_inductions.len();
+        if let Some(fact) = bounded_induction {
+            self.bounded_inductions.push(*fact);
+        }
+        let body_result = self.compile_statement(body, function);
+        self.bounded_inductions.truncate(fact_depth);
+        body_result?;
         self.pop_labels(labels.len());
         self.loop_stack.pop();
         self.pop_control(ControlFrameKind::Block);

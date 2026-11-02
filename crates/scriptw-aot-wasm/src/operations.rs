@@ -1503,6 +1503,12 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if matches!(op, ArithmeticBinaryOp::Mod)
+            && self.try_compile_bounded_remainder(lhs, rhs, output.scalar(), function)?
+        {
+            output.set_number(output.scalar(), function);
+            return Ok(());
+        }
         if lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number {
             return self.compile_binary_number_to_value(op, lhs, rhs, output, function);
         }

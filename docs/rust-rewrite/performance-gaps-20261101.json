@@ -1,7 +1,7 @@
 {
   "schema": "scriptw-performance-gap-diagnosis-v2",
   "date": "2026-11-02",
-  "status": "Qualified intrinsic birth-layout improvement: 28.3-28.5% lower median geomeans across30 precompiled cases; latest original17 comparison0.694-0.695x pinned Scriptc with12 individual wins. Both seven-case controls pass. Every-case parity remains open; rejected setup and historical controls retained.",
+  "status": "Qualified private-counter improvement: dynamic String medians36.5-36.8% lower and mixed joins5.2-5.6% lower; original17 median geomeans0.674-0.680x pinned Scriptc with14 wall wins. All four A/A gates and all30/separate controls pass. Every-case/RSS/V8 parity remains open. Additional remainder77/79 retains two baseline-confirmed native-frame Crash outcomes.",
   "overall_v8_scriptc_parity": "open",
   "history": {
     "previous_committed_checkpoint": {
@@ -31,7 +31,8 @@
       },
       "measured_gain": null
     },
-    "previous_status_at_85ce": "Qualified intrinsic-layout and RegExp/observed-data improvements. Latest precompiled17median geometric means0.972-0.979x pinnedScriptc, six individual wins; every-case parity remains open. Rejected hot-read regression retained."
+    "previous_status_at_85ce": "Qualified intrinsic-layout and RegExp/observed-data improvements. Latest precompiled17median geometric means0.972-0.979x pinnedScriptc, six individual wins; every-case parity remains open. Rejected hot-read regression retained.",
+    "status_before_private_counter_facts": "Qualified intrinsic birth-layout improvement: 28.3-28.5% lower median geomeans across30 precompiled cases; latest original17 comparison0.694-0.695x pinned Scriptc with12 individual wins. Both seven-case controls pass. Every-case parity remains open; rejected setup and historical controls retained."
   },
   "ordinary": {
     "source_fingerprint": "9f5f333b6d636e51f2fa8fb1660a0c554ea2648fd65d0184cddbbf5484e77ccb",
@@ -5161,6 +5162,484 @@
       "expanded_utf8_bytes": 562519162,
       "contains_native_or_wasm_images": false,
       "verification": "Every indexed regular UTF-8 member checked against its SHA-256 and size; bounded archive, no extraction or execution. Includes rejected admission and failed console fixture setup without relabeling."
+    }
+  },
+  "private_numeric_facts": {
+    "status": "qualified_local_precompiled_improvement; additional remainder subset retains two baseline-confirmed Crash outcomes",
+    "baseline_commit": "0bc2e08830a3a554f95916aeb5b99f30681d0196",
+    "baseline_source_fingerprint": "22a4cfb23b862054cd486903400f318e422b426702a33c75f97c63fc99ee106d",
+    "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+    "source_event": {
+      "path": "source-event-benchmark.json",
+      "sha256": "130dd9f5ae9c91e8000955f95787bee6a7a791d61a5dc836369c55bc9789d7a7"
+    },
+    "source_patch": {
+      "path": "source-benchmark.patch",
+      "sha256": "b10355f71188cc6a69a0b6d6595b225c0a6ed1d6e37d0a82aade74836983b7a9"
+    },
+    "mechanism": {
+      "scope": "Body-only private unsigned Number induction proof, consumed by ordinary remainder lowering. Canonical ValueLocals, evaluation order, calls, append and loop control remain.",
+      "admission": "One var or let initialized with a nonnegative integral literal through u32::MAX, exact same private nonparameter/nonarguments local, literal less-than bound through u32::MAX, increment update excluding BigInt, ordinary function, no runtime lexical environment; bounded recursive body scan rejects writes/shadows/unsupported trees/direct eval.",
+      "lowering": "Positive integer literal divisor through u32::MAX becomes i32 unsigned remainder or power-of-two mask, with ordinary initialized binding read and exact Number result. Fact absent during test/update/exit.",
+      "verification": "Five encoded-Wasm tests and seven Engine regressions; prior selected native scopes, real pinned legacy RegExp48+BigInt154, primary30 correctness, and separate effect controls."
+    },
+    "native": {
+      "unique_selected": 1825,
+      "receipt": {
+        "path": "native-qualified.json",
+        "sha256": "8ccd4b15d275b6ae35a17f432ae8ac805e604bc53224105e0a96533b00aef6a4"
+      },
+      "limits": "Full AOT lib and listed structural targets; selected Engine targets/modules. No full workspace claim."
+    },
+    "pinned_test262_subsets": {
+      "test262-legacy": {
+        "total": 48,
+        "passed": 48,
+        "counts_per_outcome": {
+          "Bug": 0,
+          "Crash": 0,
+          "NotImplemented": 0,
+          "Success": 48
+        },
+        "pinned_revisions": {
+          "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+          "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+        },
+        "snapshot": {
+          "path": "test262-legacy/private-numeric-facts-1661747735578188717.json",
+          "sha256": "92a26611ad3ae3628d22df84de569738939935344d0a9c4af90d5c88626116d5"
+        }
+      },
+      "test262-bigint": {
+        "total": 154,
+        "passed": 154,
+        "counts_per_outcome": {
+          "Bug": 0,
+          "Crash": 0,
+          "NotImplemented": 0,
+          "Success": 154
+        },
+        "pinned_revisions": {
+          "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+          "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+        },
+        "snapshot": {
+          "path": "test262-bigint/private-numeric-facts-bigint-14843755498899749068.json",
+          "sha256": "55018f836616b45eb72a8633193b4e2098b259e8fb8f9aad55028cf9754cb95e"
+        }
+      },
+      "test262-modulus": {
+        "total": 79,
+        "passed": 77,
+        "counts_per_outcome": {
+          "Bug": 0,
+          "Crash": 2,
+          "NotImplemented": 0,
+          "Success": 77
+        },
+        "pinned_revisions": {
+          "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+          "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+        },
+        "snapshot": {
+          "path": "test262-modulus/private-numeric-facts-modulus-2255755118684477284.json",
+          "sha256": "8851fc106926cc32b25ed6ae5b8a71448dc4714c5ed024b5de9ef03e1184072a"
+        }
+      }
+    },
+    "preexisting_conformance_failure": {
+      "status": "continue performance qualification; additional remainder subset remains FAILED",
+      "candidate": {
+        "path": "test262-modulus/private-numeric-facts-modulus-2255755118684477284.json",
+        "sha256": "8851fc106926cc32b25ed6ae5b8a71448dc4714c5ed024b5de9ef03e1184072a",
+        "passed": 77,
+        "total": 79
+      },
+      "baseline": {
+        "path": "baseline-modulus-bigint/baseline-modulus-bigint-8855333286704940040.json",
+        "sha256": "b2420ec7a592335bf974461ca00740978e2a8a35f41c09c054db3135ff08f9e2",
+        "passed": 0,
+        "total": 2
+      },
+      "same_failures": [
+        [
+          "sloppy-script:language/expressions/modulus/bigint-arithmetic.js",
+          "Crash",
+          6919657657215145930
+        ],
+        [
+          "strict-script:language/expressions/modulus/bigint-arithmetic.js",
+          "Crash",
+          12733172523309352316
+        ]
+      ],
+      "owner": "AOT native frame/code expansion and Fast Wasmtime compilation policy",
+      "reason": "Large straight-line BigInt arithmetic test has a 33,442,992-byte native static.script frame; shallow assertion calls consume the remaining 32MiB Wasm stack budget. No for loop/new fact admission in this source; accepted baseline reproduces identical offsets and detail hashes.",
+      "evidence": "modulus-frame-diagnostic/receipt.json",
+      "boundary": "Not a passing Test262 scope, skip or expected failure. Original failed exit and snapshots retained. No production code, deadline or stack cap change; existing successful selected scopes retained."
+    },
+    "aa_gates": {
+      "main": {
+        "aa_gate": "pass",
+        "aa_flags": [],
+        "aa_processes": 480,
+        "aa_evidence": {
+          "path": "paired/aa-candidate/analysis.json",
+          "sha256": "4eb955c8effd3008ef140310d6dad39a3b90c927b68264f561edc43a37857b3b"
+        }
+      },
+      "regexp": {
+        "aa_gate": "pass",
+        "aa_flags": [],
+        "aa_processes": 112,
+        "aa_evidence": {
+          "path": "regexp-controls/aa/analysis.json",
+          "sha256": "30a974dd2ed5135dd664dc5ca77442226af0b9b9dcf6b00e1f5ca54a950d861f"
+        }
+      },
+      "blueprint": {
+        "aa_gate": "pass",
+        "aa_flags": [],
+        "aa_processes": 112,
+        "aa_evidence": {
+          "path": "blueprint-controls-print/aa/analysis.json",
+          "sha256": "d495cb2198708391b9a92fbde96c809111c2993aff8dd0a06231f92e2a543a6d"
+        }
+      },
+      "numeric": {
+        "aa_gate": "pass",
+        "aa_flags": [],
+        "aa_processes": 96,
+        "aa_evidence": {
+          "path": "numeric-effectful-controls/aa/analysis.json",
+          "sha256": "610075a2c7b61e3f67dca6ea3482b64a8c2962fcef49dbe404dbbd842cdf57a5"
+        }
+      }
+    },
+    "main30": {
+      "processes": 480,
+      "flags": [],
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.9850788633582674,
+            "mean": 0.985019516327133
+          },
+          "worker_cpu_ns": {
+            "median": 0.9842518305406371,
+            "mean": 0.9848877449949353
+          },
+          "rss_bytes": {
+            "median": 0.9984910703944936,
+            "mean": 0.9983567829810335
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.9815566378212215,
+            "mean": 0.9874183615640385
+          },
+          "worker_cpu_ns": {
+            "median": 0.9817426359720327,
+            "mean": 0.986341981229744
+          },
+          "rss_bytes": {
+            "median": 0.9960942406757062,
+            "mean": 0.9958172330561119
+          }
+        }
+      ],
+      "changed_cases": {
+        "join-mixed-1024.js": {
+          "wall_ns": {
+            "median": [
+              0.9480088612268579,
+              0.9435797502972741
+            ],
+            "mean": [
+              0.9550466468724441,
+              0.937883740654195
+            ]
+          },
+          "worker_cpu_ns": {
+            "median": [
+              0.9460710417337707,
+              0.9422927221844832
+            ],
+            "mean": [
+              0.9544194355431285,
+              0.9359259303027742
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.0029083294555607,
+              0.9841488628532047
+            ],
+            "mean": [
+              0.9987229349277297,
+              0.9854455502502445
+            ]
+          }
+        },
+        "dynamic-string-4096.js": {
+          "wall_ns": {
+            "median": [
+              0.6347266662705924,
+              0.6318414653424054
+            ],
+            "mean": [
+              0.6362213725940215,
+              0.6355096347738924
+            ]
+          },
+          "worker_cpu_ns": {
+            "median": [
+              0.6245765408463382,
+              0.623212805862084
+            ],
+            "mean": [
+              0.6241870964483477,
+              0.6234370121194436
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              0.9977061451165037,
+              1.0001211387038158
+            ],
+            "mean": [
+              0.9959667710089092,
+              0.9966185616810579
+            ]
+          }
+        }
+      },
+      "evidence": {
+        "path": "paired/screen-candidate/analysis.json",
+        "sha256": "9d7da67ed5144f68e65dd33dd09e1d58322bd5115a527aa7f118718ab04cc64c"
+      }
+    },
+    "separate_control_screens": {
+      "regexp": {
+        "processes": 112,
+        "flags": [],
+        "evidence": {
+          "path": "regexp-controls/screen/analysis.json",
+          "sha256": "65509576bf8e5cbb973b4b795e97d5eb4590b3346fdf84021def3d22d45889c5"
+        }
+      },
+      "blueprint": {
+        "processes": 112,
+        "flags": [],
+        "evidence": {
+          "path": "blueprint-controls-print/screen/analysis.json",
+          "sha256": "09c7da41ea6a92f1301438620761aa70fb109f1da30ceccd788ab333f2010753"
+        }
+      },
+      "numeric": {
+        "processes": 96,
+        "flags": [],
+        "evidence": {
+          "path": "numeric-effectful-controls/screen/analysis.json",
+          "sha256": "d37a5f5be0a87386c88d0b55f8286a07fd8ecbbe4c6ea2c914544b4d1ea4f701"
+        }
+      }
+    },
+    "reference17": {
+      "baseline_processes": 272,
+      "candidate_processes": 272,
+      "fresh_baseline_wins": 13,
+      "candidate_wins": 14,
+      "win_rule": "Wall median and mean below Scriptc in both blocks; baseline replay13/17, candidate14/17. Other28 program Wasm bytes unchanged; borderline sort-win changes are not attributed to this optimizer.",
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.6741393851565602,
+            "mean": 0.671096134354565
+          },
+          "rss_bytes": {
+            "median": 1.133536664217586,
+            "mean": 1.1358522201002343
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.6801930525154923,
+            "mean": 0.670128589389102
+          },
+          "rss_bytes": {
+            "median": 1.1365714429917324,
+            "mean": 1.1369883527640328
+          }
+        }
+      ],
+      "remaining_and_changed_cases": {
+        "join-1024.js": {
+          "wall_ns": {
+            "median": [
+              1.383293531369167,
+              1.4591718271033463
+            ],
+            "mean": [
+              1.3782556597317048,
+              1.4547133744588352
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.1558288630119062,
+              1.1425783790815662
+            ],
+            "mean": [
+              1.1604492315775647,
+              1.1463987473903967
+            ]
+          }
+        },
+        "join-4096.js": {
+          "wall_ns": {
+            "median": [
+              1.5276594851760146,
+              1.6256977675635924
+            ],
+            "mean": [
+              1.4956424758574898,
+              1.5823147074294974
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.1246825799898426,
+              1.1330861672206596
+            ],
+            "mean": [
+              1.126479949077021,
+              1.1321791349900978
+            ]
+          }
+        },
+        "join-mixed-1024.js": {
+          "wall_ns": {
+            "median": [
+              2.324385515204351,
+              2.4349460389588695
+            ],
+            "mean": [
+              2.3409639485165608,
+              2.41746169556517
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.132509530695412,
+              1.1414300736067298
+            ],
+            "mean": [
+              1.1319663512092535,
+              1.1388961892247043
+            ]
+          }
+        },
+        "dynamic-string-4096.js": {
+          "wall_ns": {
+            "median": [
+              0.6630846514394143,
+              0.6705692433905841
+            ],
+            "mean": [
+              0.6636118683798888,
+              0.6696087678799415
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.1494364825379157,
+              1.1364579012857736
+            ],
+            "mean": [
+              1.1510260869565216,
+              1.1362725450901803
+            ]
+          }
+        }
+      },
+      "evidence": {
+        "path": "paired/reference-candidate/analysis.json",
+        "sha256": "9451ad3062915f42e3707467d81d02d76c22dedf0842319e7b2fb48215e65e4b"
+      },
+      "cpu": "Do not compare worker CPU across Scriptc and Scriptw adapters."
+    },
+    "actual_output": {
+      "candidate_wasm_sha256": "dfb68b3c62539e623a5ee78d58feb61ea78288f3dff5690399af890aaf064218",
+      "baseline_bytes": 74079,
+      "candidate_bytes": 71067,
+      "variants": [
+        {
+          "declaration": "(func $js::workload#f0 (;111;) (type 40) (param (ref 110) i32 i64 eqref i32 i64 eqref i64 (ref null 102) (ref 164) (ref 112)) (result i32 i64 eqref i32 i32)",
+          "general_i64_remainder": 0,
+          "mask3": 3,
+          "f64_truncations": 0,
+          "signed_i64_conversions": 0
+        },
+        {
+          "declaration": "(func $js::workload#f0$exact_helper_context$0 (;112;) (type 40) (param (ref 110) i32 i64 eqref i32 i64 eqref i64 (ref null 102) (ref 164) (ref 112)) (result i32 i64 eqref i32 i32)",
+          "general_i64_remainder": 0,
+          "mask3": 3,
+          "f64_truncations": 0,
+          "signed_i64_conversions": 0
+        }
+      ],
+      "scriptc": "Unoptimized LLVM has3 srem i64; pinned finalWasm has1 mask+br_table. Both current physical Scriptw variants have3 masks and0general kernels; original packed append call remains.",
+      "evidence": {
+        "path": "current-output-inspection.json",
+        "sha256": "854e9da04894851fcd6116cdd85a2d2415a630a22a3ad3b5e80bc61b0dc8c64e"
+      }
+    },
+    "worker_profile": {
+      "processes": 3,
+      "samples": [
+        200,
+        148,
+        184
+      ],
+      "object_read_sample_shares": [
+        0.315,
+        0.3310810810810811,
+        0.2554347826086957
+      ],
+      "limits": "Exactly three fresh diagnostic processes, one selected entry each. Sample shares are sampled user-cycle locations, not execution-time percentages or allocation counts. Preserve host, zero-IP, symbol-gap, ambiguous-mapping and unknown samples. No A/A, speedup, acceptance or timing verdict; no retry for preferred results.",
+      "summary": {
+        "path": "profile-summary.json",
+        "sha256": "547e33498cd7522a95a432a3a806b1d6d3883a8ef08e10b3a6dd2e3a97d530d4"
+      }
+    },
+    "next_hills": [
+      {
+        "priority": 1,
+        "owner": "AOT native frame/code expansion and Fast Wasmtime policy",
+        "scope": "Repair large straight-line arithmetic stack exhaustion before a new complete conformance publication; the new optimizer is not admitted in the failing source. Compare native allocation/expansion policy against exact frame receipts; do not raise the stack cap."
+      },
+      {
+        "priority": 2,
+        "owner": "guarded property reads and intrinsic layouts",
+        "scope": "Use measured object_read share to test direct already-observed intrinsic DATA rows, guarded by actual Array/own absence/live prototype/layout/CACHE state. Preserve generic fallback and callee-before-argument order; no new IC/heap/invalidation epoch."
+      }
+    ],
+    "limits": "Precompiled SizeOptimized/Backtracking CPP configuration; original30 and Scriptc17 sources unchanged. No current ordinary Fast CLI/V8 rerun, full-workspace or full-Test262 claim. Worker CPU is compared within Scriptw only. All original means/outliers retained.",
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-private-numeric-facts-20261102-inert.tar.xz",
+      "status": "verified bounded inert archive; every regular UTF8 member checked against INDEX",
+      "cohort_summary_sha256": "8148c44e6c3f1230278138ff3b34b072fd54fd1af568c6aaad56dd66c75630d7",
+      "sha256": "477c6f84991a13f28428a19b3ba975d982f1d96b0be692a41c990e59688f9785",
+      "bytes": 8069900,
+      "regular_utf8_members": 7665,
+      "expanded_utf8_bytes": 336116755,
+      "contains_native_or_wasm_images": false
     }
   }
 }

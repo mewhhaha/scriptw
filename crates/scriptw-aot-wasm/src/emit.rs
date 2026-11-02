@@ -327,6 +327,7 @@ pub(crate) struct FunctionBuilder<'a> {
     direct_eval_context: Option<GcLocal<DirectEvalExecutionContext, Nullable>>,
     completion: CompletionLocals,
     local_bindings: Vec<Option<LocalBindingLocals>>,
+    pub(crate) bounded_inductions: Vec<crate::control_flow::BoundedInduction>,
     body_entry_locals: Option<crate::function_entry::BodyEntryLocals>,
     // Main binds the P published by its initializer; registered helpers bind
     // their required P operand. Callable bodies own theirs in BodyEntryLocals.
@@ -1985,6 +1986,7 @@ impl<'a> FunctionBuilder<'a> {
             direct_eval_context,
             completion,
             local_bindings: Vec::new(),
+            bounded_inductions: Vec::new(),
             body_entry_locals,
             entry_program: None,
             source_activation: None,
