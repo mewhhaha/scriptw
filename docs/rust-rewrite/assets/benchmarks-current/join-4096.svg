@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>join-4096.js</dc:title>
-    <dc:description>{"chart_panels": [["ms", "Entry time · ms", 3], ["rss_mib", "Peak RSS · MiB", 1]], "consumer_identity": {"adapter": "shared", "comparison_cohort": "scriptw-precompiled-comparison-v1", "compiler_identity_scheme": "scriptw-program-cache-compiler-v3", "excluded_from_ordinary_cohorts": true, "executable_sha256": "d5554d4188ad0505bcb95e7da08f4901524562b8ba111990ad738618245ed3f9", "schema": "scriptw-precompiled-shared-host-v1", "scope": "same-executable-precompiled-comparison-identity", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "0bc2e08830a3a554f95916aeb5b99f30681d0196", "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123"}, "finished_at": "2026-11-02", "measured_date": "2026-11-02", "node_identity": {"executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "flags": [], "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs", "harness_sha256": "0e729b593ed9d70695b66eaf17da06dd828be09590ff088a3e15c989f015e34b", "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node", "persistent_compile_cache": false, "versions": {"acorn": "8.15.0", "ada": "3.3.0", "amaro": "1.1.5", "ares": "1.34.5", "brotli": "1.1.0", "cjs_module_lexer": "2.1.0", "cldr": "47.0", "icu": "77.1", "llhttp": "9.3.0", "modules": "137", "napi": "10", "nbytes": "0.1.1", "ncrypto": "0.0.1", "nghttp2": "1.67.1", "node": "24.12.0", "openssl": "3.5.4", "simdjson": "4.1.0", "simdutf": "6.4.0", "sqlite": "3.50.4", "tz": "2025b", "undici": "7.16.0", "unicode": "16.0", "uv": "1.51.0", "uvwasi": "0.0.23", "v8": "13.6.233.17-node.37", "zlib": "1.3.1-470d3a2", "zstd": "1.5.7"}}, "policy": {"aggregation": "Median of eight process medians for time; median of eight GNU-time child peaks for RSS. All process means and both block medians retained.", "execution": "Public-entry comparison: Scriptw and Scriptc Wasm compile before the measured processes; the shared CPP host disables compilation. Timed Wasm entry includes Scriptw Realm/intrinsic bootstrap. V8 parses one vm.Script per process and creates a fresh vm.Context before each invocation outside entry timing, then times runInContext. Lazy compilation, JIT tiering and natural GC may occur inside V8 entry timing. Every warmup and measured entry checks output.", "sampling": "Two balanced blocks, four processes per actor and case per block; 21 measured entries after ten warmups per process. Warmups do not establish optimized steady state.", "source_commit_role": "Publication commit matching the measured Rust source; measured binaries are identified by source_fingerprint.", "v8_context": "Supplemental v8_context_ms is the median of eight process medians for fresh context creation, outside V8 entry timing; excluded from bars and ratios."}, "renderer": {"matplotlib": "3.11.2", "script_sha256": "f61c620e664227cdbf61206921f26048575b73f10d078f95784ba51204694477", "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"}, "row": {"file": "join-4096.js", "runtimes": {"scriptc": {"block_median_ms": [1.3020735, 1.3366495], "mean_ms": 1.3639240238095238, "measured_entries_per_process": 21, "ms": 1.3167765, "processes": 8, "rss_mib": 15.14453125, "status": "ok", "warmups_per_process": 10}, "scriptw": {"block_median_ms": [1.985136, 2.042305], "mean_ms": 2.0274650357142856, "measured_entries_per_process": 21, "ms": 2.0366495, "processes": 8, "rss_mib": 17.0703125, "status": "ok", "warmups_per_process": 10}, "v8": {"block_median_ms": [0.226161, 0.241561], "mean_ms": 0.25651892261904763, "measured_entries_per_process": 21, "ms": 0.2371725, "processes": 8, "rss_mib": 66.923828125, "status": "ok", "v8_context_ms": 0.369199, "warmups_per_process": 10}}}, "runtimes": ["scriptw", "scriptc", "v8"], "schema": "scriptw-three-runtime-charts-v1", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180", "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123", "started_at": null}</dc:description>
+    <dc:description>{"chart_panels": [["ms", "Entry time · ms", 3], ["rss_mib", "Peak RSS · MiB", 1]], "consumer_identity": {"adapter": "shared", "comparison_cohort": "scriptw-precompiled-comparison-v1", "compiler_identity_scheme": "scriptw-program-cache-compiler-v3", "excluded_from_ordinary_cohorts": true, "executable_sha256": "7240d2eca3f05cd7b2fff497be58d573ac936eaaea64f6b46bc92c816f51b0b9", "schema": "scriptw-precompiled-shared-host-v1", "scope": "same-executable-precompiled-comparison-identity", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99", "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5"}, "finished_at": "2026-11-02", "measured_date": "2026-11-02", "node_identity": {"executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "flags": [], "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs", "harness_sha256": "0e729b593ed9d70695b66eaf17da06dd828be09590ff088a3e15c989f015e34b", "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node", "persistent_compile_cache": false, "versions": {"acorn": "8.15.0", "ada": "3.3.0", "amaro": "1.1.5", "ares": "1.34.5", "brotli": "1.1.0", "cjs_module_lexer": "2.1.0", "cldr": "47.0", "icu": "77.1", "llhttp": "9.3.0", "modules": "137", "napi": "10", "nbytes": "0.1.1", "ncrypto": "0.0.1", "nghttp2": "1.67.1", "node": "24.12.0", "openssl": "3.5.4", "simdjson": "4.1.0", "simdutf": "6.4.0", "sqlite": "3.50.4", "tz": "2025b", "undici": "7.16.0", "unicode": "16.0", "uv": "1.51.0", "uvwasi": "0.0.23", "v8": "13.6.233.17-node.37", "zlib": "1.3.1-470d3a2", "zstd": "1.5.7"}}, "policy": {"aggregation": "Median of eight process medians for time; median of eight GNU-time child peaks for RSS. All process means and both block medians retained.", "execution": "Public-entry comparison: Scriptw and Scriptc Wasm compile before the measured processes; the shared CPP host disables compilation. Timed Wasm entry includes Scriptw Realm/intrinsic bootstrap. V8 parses one vm.Script per process and creates a fresh vm.Context before each invocation outside entry timing, then times runInContext. Lazy compilation, JIT tiering and natural GC may occur inside V8 entry timing. Every warmup and measured entry checks output.", "sampling": "Two balanced blocks, four processes per actor and case per block; 21 measured entries after ten warmups per process. Warmups do not establish optimized steady state.", "source_commit_role": "Publication commit matching the measured Rust source; measured binaries are identified by source_fingerprint.", "v8_context": "Supplemental v8_context_ms is the median of eight process medians for fresh context creation, outside V8 entry timing; excluded from bars and ratios."}, "renderer": {"matplotlib": "3.11.2", "script_sha256": "f61c620e664227cdbf61206921f26048575b73f10d078f95784ba51204694477", "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"}, "row": {"file": "join-4096.js", "runtimes": {"scriptc": {"block_median_ms": [1.5474625, 1.547097], "mean_ms": 1.500395494047619, "measured_entries_per_process": 21, "ms": 1.547097, "processes": 8, "rss_mib": 17.833984375, "status": "ok", "warmups_per_process": 10}, "scriptw": {"block_median_ms": [0.699212, 0.6996585], "mean_ms": 0.698482244047619, "measured_entries_per_process": 21, "ms": 0.699212, "processes": 8, "rss_mib": 22.146484375, "status": "ok", "warmups_per_process": 10}, "v8": {"block_median_ms": [0.2332125, 0.232782], "mean_ms": 0.25698148809523813, "measured_entries_per_process": 21, "ms": 0.2332125, "processes": 8, "rss_mib": 67.744140625, "status": "ok", "v8_context_ms": 0.3676335, "warmups_per_process": 10}}}, "runtimes": ["scriptw", "scriptc", "v8"], "schema": "scriptw-three-runtime-charts-v1", "shared_configuration": {"collector": "copying", "consumer_compiler_enabled": false, "epoch_deadline": 9223372036854775807, "gc_initial_bytes": 16777216, "max_wasm_stack_bytes": 33554432, "native_compilation_mode": "size-optimized", "register_allocation": "backtracking", "runtime_policy": "scriptw-required-wasmtime-experimental-v1", "store_memory_limit_bytes": 1073741824, "target": "generic", "target_triple": "x86_64-unknown-linux-gnu", "wasm_backtrace_details": "disable", "wasmtime_version": "47.0.0", "worker_stack_bytes": 67108864}, "source_commit": "77c10017a64937e13de08c7873170772ae15ffab", "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5", "started_at": null}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -73,48 +73,48 @@ L 199.237091 191.232
     </g>
     <g id="ytick_2">
      <g id="line2d_6">
-      <path d="M 39.528 139.019549
-L 199.237091 139.019549
+      <path d="M 39.528 136.244647
+L 199.237091 136.244647
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
      <g id="text_5">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="142.058612" transform="rotate(-0 36.028 142.058612)">1</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="139.283709" transform="rotate(-0 36.028 139.283709)">0.8</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_8">
-      <path d="M 39.528 86.807099
-L 199.237091 86.807099
+      <path d="M 39.528 81.257294
+L 199.237091 81.257294
 " clip-path="url(#p648741f3fb)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_9"/>
      <g id="text_6">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="89.846161" transform="rotate(-0 36.028 89.846161)">2</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="36.028" y="84.296356" transform="rotate(-0 36.028 84.296356)">1.6</text>
      </g>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 52.504364 191.232
 L 86.442545 191.232
-L 86.442545 84.893538
-L 52.504364 84.893538
+L 86.442545 143.172228
+L 52.504364 143.172228
 z
 " clip-path="url(#p648741f3fb)" style="fill: #3378b5"/>
    </g>
    <g id="patch_4">
     <path d="M 102.413455 191.232
 L 136.351636 191.232
-L 136.351636 122.479872
-L 102.413455 122.479872
+L 136.351636 84.893538
+L 102.413455 84.893538
 z
 " clip-path="url(#p648741f3fb)" style="fill: #36835b"/>
    </g>
    <g id="patch_5">
     <path d="M 152.322545 191.232
 L 186.260727 191.232
-L 186.260727 178.848643
-L 152.322545 178.848643
+L 186.260727 175.202327
+L 152.322545 175.202327
 z
 " clip-path="url(#p648741f3fb)" style="fill: #de8b36"/>
    </g>
@@ -124,13 +124,13 @@ L 199.237091 191.232
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_7">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="69.473455" y="77.25096" transform="rotate(-0 69.473455 77.25096)">2.037</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="69.473455" y="135.52965" transform="rotate(-0 69.473455 135.52965)">0.699</text>
    </g>
    <g id="text_8">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="119.382545" y="114.837294" transform="rotate(-0 119.382545 114.837294)">1.317</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="119.382545" y="77.25096" transform="rotate(-0 119.382545 77.25096)">1.547</text>
    </g>
    <g id="text_9">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="169.291636" y="171.206064" transform="rotate(-0 169.291636 171.206064)">0.237</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="169.291636" y="167.559749" transform="rotate(-0 169.291636 167.559749)">0.233</text>
    </g>
    <g id="text_10">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="39.528" y="41.992" transform="rotate(-0 39.528 41.992)">Entry time · ms</text>
@@ -179,40 +179,40 @@ L 426.024 191.232
     </g>
     <g id="ytick_5">
      <g id="line2d_15">
-      <path d="M 266.314909 143.56357
-L 426.024 143.56357
+      <path d="M 266.314909 144.140786
+L 426.024 144.140786
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_15">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="146.602632" transform="rotate(-0 262.814909 146.602632)">30</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="147.179848" transform="rotate(-0 262.814909 147.179848)">30</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_17">
-      <path d="M 266.314909 95.895139
-L 426.024 95.895139
+      <path d="M 266.314909 97.049571
+L 426.024 97.049571
 " clip-path="url(#pf3a1462166)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_18"/>
      <g id="text_16">
-      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="98.934202" transform="rotate(-0 262.814909 98.934202)">60</text>
+      <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #57606a" x="262.814909" y="100.088634" transform="rotate(-0 262.814909 100.088634)">60</text>
      </g>
     </g>
    </g>
    <g id="patch_8">
     <path d="M 279.291273 191.232
 L 313.229455 191.232
-L 313.229455 164.108167
-L 279.291273 164.108167
+L 313.229455 156.468505
+L 279.291273 156.468505
 z
 " clip-path="url(#pf3a1462166)" style="fill: #3378b5"/>
    </g>
    <g id="patch_9">
     <path d="M 329.200364 191.232
 L 363.138545 191.232
-L 363.138545 167.168132
-L 329.200364 167.168132
+L 363.138545 163.237867
+L 329.200364 163.237867
 z
 " clip-path="url(#pf3a1462166)" style="fill: #36835b"/>
    </g>
@@ -230,13 +230,13 @@ L 426.024 191.232
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_17">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="296.260364" y="156.465588" transform="rotate(-0 296.260364 156.465588)">17.1</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="296.260364" y="148.825927" transform="rotate(-0 296.260364 148.825927)">22.1</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="346.169455" y="159.525554" transform="rotate(-0 346.169455 159.525554)">15.1</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="346.169455" y="155.595289" transform="rotate(-0 346.169455 155.595289)">17.8</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="396.078545" y="77.25096" transform="rotate(-0 396.078545 77.25096)">66.9</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #24292f" x="396.078545" y="77.25096" transform="rotate(-0 396.078545 77.25096)">67.7</text>
    </g>
    <g id="text_20">
     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #57606a" x="266.314909" y="41.992" transform="rotate(-0 266.314909 41.992)">Peak RSS · MiB</text>

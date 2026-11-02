@@ -133,22 +133,21 @@ It motivates work on fresh intrinsic dictionaries and property lookup. Literal-k
 cleanup reduces worker instruction counts about 0.9% on two join cases; timing
 remains unqualified, including slower large-join means.
 
-The [intrinsic-layout comparisons](docs/rust-rewrite/performance-gaps-20261101.json)
-remove eager property graphs and retain resolved values at their owners.
-Constructor and prototype headers now begin with complete shared layouts.
-The latest private-counter proofs lower dynamic-String execution medians
-**36.5–36.8%** and mixed joins **5.2–5.6%** against the preceding accepted build.
-The unchanged 30-case precompiled corpus improves **1.5–1.8%** overall by median
-geometric mean. The fresh three-runtime comparison below separately measures
-the original 17 cases against both Scriptc and V8. Every-case parity remains open.
-The 480-process identical-binary control and separate RegExp, constructor and
-numeric-effect controls pass without repeated timing or RSS flags.
-**1,825 selected native checks** and **202 pinned Test262 variants** pass.
-An additional remainder subset passes **77/79**: two stack-exhaustion crashes
-reproduce on the accepted compiler and have a measured native-frame
-[owner and follow-up](docs/rust-rewrite/current-inventory.md). These selected
-scopes do not refresh full Test262 or ordinary CLI results. Historical failed
-controls and reporting/setup corrections remain recorded.
+The [Array/global checkpoint](docs/rust-rewrite/performance-gaps-20261101.json)
+reuses observed intrinsic DATA values after live guards and folds validated
+immutable global reads. The three remaining join cases take **35–43%** of their
+previous execution time in the 30-case precompiled screen. The 480-process
+identical-binary calibration passes; the screen has no repeated wall/worker-CPU
+regression flags. **Peak RSS rises 4.25–5.28 MiB across all 30 cases**, despite
+byte-identical native R images. A zero-trip mapping probe locates about 4.4 MiB
+of added clean host-executable residency; anonymous memory differs by 2 KiB.
+The kernel mechanism and memory parity remain open.
+
+**1,844 selected native checks** and **128 affected pinned Test262 variants**
+pass. These selected scopes do not refresh full Test262 status. The earlier
+remainder subset's two native-frame crashes remain
+[owned](docs/rust-rewrite/current-inventory.md). Historical failed controls and
+source-bound measurements remain in the evidence.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two
@@ -200,11 +199,26 @@ compilation result does not refresh V8/Scriptc execution comparisons.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 build, debug and verification loop.
 
+## Compilation time
+
+**JavaScript → portable Wasm**, measured 2026-11-02 with the same compiler
+fingerprint as the runtime charts. Scriptw is faster in **17/17 workloads**,
+taking **0.524x Scriptc's time** by geometric mean of workload medians.
+
+![JavaScript to portable Wasm compilation time](docs/rust-rewrite/assets/compilation-current.svg)
+
+Four fresh CLI builds per compiler/workload across two balanced blocks
+(**136 processes**). Includes startup and output I/O: Scriptw P plus its shared R
+sidecar; Scriptc standalone WASI. Application caches are fresh; OS and Zig toolchain
+caches remain. Runtime production, Wasm-to-native compilation and execution are
+excluded. [Data and tool identities](docs/rust-rewrite/compilation-current.json) ·
+[Reproduce](CONTRIBUTING.md#benchmark-charts).
+
 ## Runtime comparison
 
-**Measured 2026-11-02 locally**, compiler fingerprint `88dde53a5c8e`.
+**Measured 2026-11-02 locally**, compiler fingerprint `87385fff34d1`.
 V8 **13.6.233.17-node.37**, Node **24.12.0**.
-Scriptw is faster than Scriptc in **14/17 workloads** in both blocks; block execution geometric means are **0.671–0.676× Scriptc**. Scriptw is faster than V8 in **6/17 workloads** in both blocks; block execution geometric means are **1.595–1.604× V8**.
+Scriptw is faster than Scriptc in **17/17 workloads** in both blocks; block execution geometric means are **0.455–0.458× Scriptc**. Scriptw is faster than V8 in **6/17 workloads** in both blocks; block execution geometric means are **1.098–1.106× V8**.
 
 This compares Wasm public entry with V8 `runInContext`. Scriptw and Scriptc compile
 Wasm before the measured processes and share a Wasmtime host with compilation disabled.
@@ -223,39 +237,39 @@ time as a supplemental measurement, excluded from bars and ratios.
 
 <table>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.131 ms, 16.5 MiB RSS; Scriptc: 0.132 ms, 14.6 MiB RSS; V8: 0.024 ms, 58.2 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.296 ms, 16.5 MiB RSS; Scriptc: 0.331 ms, 14.6 MiB RSS; V8: 0.069 ms, 58.5 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.091 ms, 21.6 MiB RSS; Scriptc: 0.133 ms, 17.2 MiB RSS; V8: 0.023 ms, 59.3 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.133 ms, 21.7 MiB RSS; Scriptc: 0.340 ms, 17.5 MiB RSS; V8: 0.069 ms, 59.8 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.295 ms, 16.6 MiB RSS; Scriptc: 0.343 ms, 14.7 MiB RSS; V8: 0.069 ms, 58.5 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.307 ms, 16.7 MiB RSS; Scriptc: 0.375 ms, 14.7 MiB RSS; V8: 0.070 ms, 58.5 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.133 ms, 21.7 MiB RSS; Scriptc: 0.338 ms, 17.2 MiB RSS; V8: 0.070 ms, 59.8 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.143 ms, 21.9 MiB RSS; Scriptc: 0.375 ms, 17.4 MiB RSS; V8: 0.069 ms, 59.7 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.577 ms, 16.9 MiB RSS; Scriptc: 0.408 ms, 14.8 MiB RSS; V8: 0.056 ms, 58.3 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 2.037 ms, 17.1 MiB RSS; Scriptc: 1.317 ms, 15.1 MiB RSS; V8: 0.237 ms, 66.9 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.235 ms, 22.2 MiB RSS; Scriptc: 0.410 ms, 17.5 MiB RSS; V8: 0.055 ms, 59.5 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 0.699 ms, 22.1 MiB RSS; Scriptc: 1.547 ms, 17.8 MiB RSS; V8: 0.233 ms, 67.7 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 0.620 ms, 16.6 MiB RSS; Scriptc: 0.268 ms, 14.6 MiB RSS; V8: 0.096 ms, 59.3 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.068 ms, 15.8 MiB RSS; Scriptc: 0.094 ms, 14.0 MiB RSS; V8: 0.142 ms, 63.8 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 0.269 ms, 21.4 MiB RSS; Scriptc: 0.271 ms, 17.2 MiB RSS; V8: 0.096 ms, 60.5 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.068 ms, 20.9 MiB RSS; Scriptc: 0.095 ms, 16.6 MiB RSS; V8: 0.142 ms, 64.8 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.068 ms, 15.9 MiB RSS; Scriptc: 0.184 ms, 14.0 MiB RSS; V8: 0.712 ms, 65.9 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.171 ms, 16.0 MiB RSS; Scriptc: 0.801 ms, 14.0 MiB RSS; V8: 0.125 ms, 61.3 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.069 ms, 20.7 MiB RSS; Scriptc: 0.184 ms, 16.9 MiB RSS; V8: 0.698 ms, 66.7 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.170 ms, 21.1 MiB RSS; Scriptc: 0.808 ms, 16.4 MiB RSS; V8: 0.126 ms, 60.4 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.187 ms, 15.9 MiB RSS; Scriptc: 0.280 ms, 13.9 MiB RSS; V8: 0.193 ms, 64.6 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/integer.svg" width="440" alt="integer.js; Scriptw: 0.071 ms, 16.4 MiB RSS; Scriptc: 0.073 ms, 13.9 MiB RSS; V8: 2.546 ms, 64.8 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.189 ms, 20.6 MiB RSS; Scriptc: 0.285 ms, 16.7 MiB RSS; V8: 0.193 ms, 65.7 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/integer.svg" width="440" alt="integer.js; Scriptw: 0.070 ms, 21.1 MiB RSS; Scriptc: 0.074 ms, 16.6 MiB RSS; V8: 2.546 ms, 66.0 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/objects.svg" width="440" alt="objects.js; Scriptw: 0.385 ms, 16.6 MiB RSS; Scriptc: 0.683 ms, 14.8 MiB RSS; V8: 0.064 ms, 58.3 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 8.584 ms, 20.6 MiB RSS; Scriptc: 34.081 ms, 20.5 MiB RSS; V8: 3.634 ms, 83.2 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/objects.svg" width="440" alt="objects.js; Scriptw: 0.242 ms, 21.6 MiB RSS; Scriptc: 0.679 ms, 17.5 MiB RSS; V8: 0.067 ms, 59.6 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 6.235 ms, 25.8 MiB RSS; Scriptc: 34.484 ms, 23.4 MiB RSS; V8: 3.584 ms, 84.6 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.078 ms, 16.3 MiB RSS; Scriptc: 0.284 ms, 14.5 MiB RSS; V8: 0.063 ms, 58.2 MiB RSS"></td>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.077 ms, 16.3 MiB RSS; Scriptc: 0.130 ms, 14.0 MiB RSS; V8: 0.097 ms, 59.0 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.077 ms, 21.4 MiB RSS; Scriptc: 0.283 ms, 17.5 MiB RSS; V8: 0.062 ms, 59.4 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.078 ms, 21.3 MiB RSS; Scriptc: 0.130 ms, 16.6 MiB RSS; V8: 0.098 ms, 60.1 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.078 ms, 16.3 MiB RSS; Scriptc: 0.177 ms, 14.1 MiB RSS; V8: 0.167 ms, 58.8 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/benchmarks-current/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.077 ms, 21.4 MiB RSS; Scriptc: 0.178 ms, 16.8 MiB RSS; V8: 0.168 ms, 60.1 MiB RSS"></td>
 <td></td>
 </tr>
 </table>

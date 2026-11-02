@@ -1,18 +1,18 @@
 {
   "schema": "scriptw-three-runtime-charts-v1",
-  "source_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180",
-  "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+  "source_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+  "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
   "finished_at": "2026-11-02",
   "source_analysis": {
     "path": "analysis.json",
-    "sha256": "8c40c0f383adf36cbda9e0de7cce64cb2064f2dc9797886ec62ab0be246e0acc"
+    "sha256": "e6830d7977af6913a12cb528014a2120f6f3c71d90bb76168c64e71b2d6c0e69"
   },
   "consumer_identity": {
     "adapter": "shared",
     "comparison_cohort": "scriptw-precompiled-comparison-v1",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "excluded_from_ordinary_cohorts": true,
-    "executable_sha256": "d5554d4188ad0505bcb95e7da08f4901524562b8ba111990ad738618245ed3f9",
+    "executable_sha256": "7240d2eca3f05cd7b2fff497be58d573ac936eaaea64f6b46bc92c816f51b0b9",
     "schema": "scriptw-precompiled-shared-host-v1",
     "scope": "same-executable-precompiled-comparison-identity",
     "shared_configuration": {
@@ -31,8 +31,8 @@
       "wasmtime_version": "47.0.0",
       "worker_stack_bytes": 67108864
     },
-    "source_commit": "0bc2e08830a3a554f95916aeb5b99f30681d0196",
-    "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123"
+    "source_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99",
+    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5"
   },
   "node_identity": {
     "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node",
@@ -88,11 +88,11 @@
     "worker_stack_bytes": 67108864
   },
   "archive": {
-    "archive": "docs/rust-rewrite/performance-three-runtime-20261102-inert.tar.xz",
-    "sha256": "6a7c2a2c56839529a5903b04d881ea34bb84056bb5fa13187aedaf92661ac7da",
-    "bytes": 965004,
+    "archive": "docs/rust-rewrite/performance-immutable-global-folding-three-runtime-20261102-inert.tar.xz",
+    "sha256": "8360f34fda29be57bbe7e676278412e5a652f199caeb7a622cf77a1eb0f8f160",
+    "bytes": 989844,
     "regular_utf8_members": 1282,
-    "expanded_utf8_bytes": 15306116,
+    "expanded_utf8_bytes": 15355594,
     "contains_native_or_wasm_images": false
   },
   "renderer": {
@@ -125,43 +125,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.1312705,
-          "mean_ms": 0.1332103630952381,
-          "rss_mib": 16.517578125,
+          "ms": 0.091259,
+          "mean_ms": 0.09193547619047618,
+          "rss_mib": 21.568359375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.132052,
-            0.13101
+            0.0912285,
+            0.091259
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.1320165,
-          "mean_ms": 0.13539210714285715,
-          "rss_mib": 14.568359375,
+          "ms": 0.132647,
+          "mean_ms": 0.13366775,
+          "rss_mib": 17.220703125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.133961,
-            0.131491
+            0.133513,
+            0.1318605
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.0235145,
-          "mean_ms": 0.023760625,
-          "rss_mib": 58.208984375,
+          "ms": 0.023304,
+          "mean_ms": 0.023501678571428573,
+          "rss_mib": 59.337890625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0235795,
-            0.0233945
+            0.0234295,
+            0.023209
           ],
-          "v8_context_ms": 0.3545965
+          "v8_context_ms": 0.3523245
         }
       }
     },
@@ -170,43 +170,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.296025,
-          "mean_ms": 0.29838361904761906,
-          "rss_mib": 16.470703125,
+          "ms": 0.132792,
+          "mean_ms": 0.13343751190476189,
+          "rss_mib": 21.689453125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.294462,
-            0.29604
+            0.1325965,
+            0.1330125
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.331242,
-          "mean_ms": 0.3330063214285714,
-          "rss_mib": 14.634765625,
+          "ms": 0.340436,
+          "mean_ms": 0.3441965119047619,
+          "rss_mib": 17.478515625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.330471,
-            0.3316675
+            0.339845,
+            0.340436
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.069418,
-          "mean_ms": 0.13543305357142857,
-          "rss_mib": 58.470703125,
+          "ms": 0.06865,
+          "mean_ms": 0.13741226190476188,
+          "rss_mib": 59.77734375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0683105,
-            0.0694725
+            0.068595,
+            0.0692265
           ],
-          "v8_context_ms": 0.367436
+          "v8_context_ms": 0.363891
         }
       }
     },
@@ -215,43 +215,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.2945265,
-          "mean_ms": 0.3014448571428572,
-          "rss_mib": 16.59375,
+          "ms": 0.132917,
+          "mean_ms": 0.13401056547619047,
+          "rss_mib": 21.732421875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.2907995,
-            0.3020315
+            0.1324515,
+            0.133944
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.3430095,
-          "mean_ms": 0.3410668392857143,
-          "rss_mib": 14.736328125,
+          "ms": 0.3376565,
+          "mean_ms": 0.34095420238095236,
+          "rss_mib": 17.240234375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.333411,
-            0.344167
+            0.3389685,
+            0.3376565
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.069377,
-          "mean_ms": 0.1369939880952381,
-          "rss_mib": 58.53125,
+          "ms": 0.0697775,
+          "mean_ms": 0.13019144047619047,
+          "rss_mib": 59.755859375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0682805,
-            0.0705295
+            0.069322,
+            0.0698775
           ],
-          "v8_context_ms": 0.368763
+          "v8_context_ms": 0.363465
         }
       }
     },
@@ -260,43 +260,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.3065945,
-          "mean_ms": 0.30781932142857144,
-          "rss_mib": 16.7109375,
+          "ms": 0.1430315,
+          "mean_ms": 0.14321347023809525,
+          "rss_mib": 21.85546875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.305718,
-            0.3081325
+            0.14201,
+            0.143397
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.3745895,
-          "mean_ms": 0.3781121845238095,
-          "rss_mib": 14.7109375,
+          "ms": 0.375002,
+          "mean_ms": 0.3806765476190476,
+          "rss_mib": 17.4375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.371739,
-            0.3770595
+            0.383002,
+            0.3710845
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.069773,
-          "mean_ms": 0.07646576785714286,
-          "rss_mib": 58.517578125,
+          "ms": 0.068851,
+          "mean_ms": 0.07042877976190476,
+          "rss_mib": 59.693359375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.069533,
-            0.069838
+            0.0688005,
+            0.0689465
           ],
-          "v8_context_ms": 0.3667495
+          "v8_context_ms": 0.365253
         }
       }
     },
@@ -305,43 +305,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.577181,
-          "mean_ms": 0.6276151666666666,
-          "rss_mib": 16.875,
+          "ms": 0.2353865,
+          "mean_ms": 0.236411875,
+          "rss_mib": 22.16015625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.558766,
-            0.649669
+            0.233698,
+            0.236123
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.4084995,
-          "mean_ms": 0.41223939285714284,
-          "rss_mib": 14.80078125,
+          "ms": 0.4101835,
+          "mean_ms": 0.43122739880952377,
+          "rss_mib": 17.453125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.4046565,
-            0.4150815
+            0.4111055,
+            0.408876
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.056242,
-          "mean_ms": 0.078603625,
-          "rss_mib": 58.306640625,
+          "ms": 0.05541,
+          "mean_ms": 0.07260518452380953,
+          "rss_mib": 59.509765625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0548695,
-            0.0579405
+            0.0549695,
+            0.05556
           ],
-          "v8_context_ms": 0.3564145
+          "v8_context_ms": 0.3538015
         }
       }
     },
@@ -350,43 +350,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 2.0366495,
-          "mean_ms": 2.0274650357142856,
-          "rss_mib": 17.0703125,
+          "ms": 0.699212,
+          "mean_ms": 0.698482244047619,
+          "rss_mib": 22.146484375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            1.985136,
-            2.042305
+            0.699212,
+            0.6996585
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 1.3167765,
-          "mean_ms": 1.3639240238095238,
-          "rss_mib": 15.14453125,
+          "ms": 1.547097,
+          "mean_ms": 1.500395494047619,
+          "rss_mib": 17.833984375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            1.3020735,
-            1.3366495
+            1.5474625,
+            1.547097
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.2371725,
-          "mean_ms": 0.25651892261904763,
-          "rss_mib": 66.923828125,
+          "ms": 0.2332125,
+          "mean_ms": 0.25698148809523813,
+          "rss_mib": 67.744140625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.226161,
-            0.241561
+            0.2332125,
+            0.232782
           ],
-          "v8_context_ms": 0.369199
+          "v8_context_ms": 0.3676335
         }
       }
     },
@@ -395,43 +395,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.620353,
-          "mean_ms": 0.6196949166666667,
-          "rss_mib": 16.58984375,
+          "ms": 0.2685305,
+          "mean_ms": 0.26972210714285716,
+          "rss_mib": 21.36328125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.6199625,
-            0.620353
+            0.2686755,
+            0.26584
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.2679515,
-          "mean_ms": 0.27059060119047623,
-          "rss_mib": 14.609375,
+          "ms": 0.270909,
+          "mean_ms": 0.27736663095238095,
+          "rss_mib": 17.244140625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.2685125,
-            0.26732
+            0.276455,
+            0.2684745
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.0957125,
-          "mean_ms": 0.12542333333333333,
-          "rss_mib": 59.265625,
+          "ms": 0.096313,
+          "mean_ms": 0.12818022023809525,
+          "rss_mib": 60.482421875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0957125,
-            0.0951065
+            0.096769,
+            0.095757
           ],
-          "v8_context_ms": 0.3685785
+          "v8_context_ms": 0.3684295
         }
       }
     },
@@ -440,43 +440,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.0683305,
-          "mean_ms": 0.06853628571428572,
-          "rss_mib": 15.841796875,
+          "ms": 0.0682845,
+          "mean_ms": 0.06864186309523809,
+          "rss_mib": 20.919921875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.067639,
-            0.068571
+            0.0681845,
+            0.0685595
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.0939295,
-          "mean_ms": 0.09486657738095239,
-          "rss_mib": 13.98046875,
+          "ms": 0.094775,
+          "mean_ms": 0.09581139880952382,
+          "rss_mib": 16.603515625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.09431,
-            0.093618
+            0.0958415,
+            0.094184
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.1420765,
-          "mean_ms": 0.15302776785714284,
-          "rss_mib": 63.76953125,
+          "ms": 0.1424055,
+          "mean_ms": 0.15305824404761906,
+          "rss_mib": 64.82421875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.142447,
-            0.14143
+            0.1423355,
+            0.14496
           ],
-          "v8_context_ms": 0.370887
+          "v8_context_ms": 0.3707085
         }
       }
     },
@@ -485,43 +485,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.06844,
-          "mean_ms": 0.06863404166666667,
-          "rss_mib": 15.865234375,
+          "ms": 0.0690665,
+          "mean_ms": 0.06894442261904762,
+          "rss_mib": 20.716796875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.068275,
-            0.0685005
+            0.0692615,
+            0.068179
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.1841715,
-          "mean_ms": 0.18575410714285712,
-          "rss_mib": 13.96484375,
+          "ms": 0.183824,
+          "mean_ms": 0.1868483095238095,
+          "rss_mib": 16.90625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1860695,
-            0.182889
+            0.186394,
+            0.1835185
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.7120485,
-          "mean_ms": 0.7320791488095237,
-          "rss_mib": 65.888671875,
+          "ms": 0.69796,
+          "mean_ms": 0.7203875714285715,
+          "rss_mib": 66.724609375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.7195525,
-            0.6995045
+            0.706316,
+            0.692735
           ],
-          "v8_context_ms": 0.372841
+          "v8_context_ms": 0.3726575
         }
       }
     },
@@ -530,43 +530,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.170505,
-          "mean_ms": 0.17123583333333334,
-          "rss_mib": 16.013671875,
+          "ms": 0.1704185,
+          "mean_ms": 0.17147538095238093,
+          "rss_mib": 21.052734375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1701045,
-            0.1711015
+            0.170649,
+            0.1699125
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.800767,
-          "mean_ms": 0.8094438214285714,
-          "rss_mib": 13.994140625,
+          "ms": 0.807949,
+          "mean_ms": 0.8126698392857143,
+          "rss_mib": 16.435546875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.7988785,
-            0.822714
+            0.803485,
+            0.8133995
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.1252185,
-          "mean_ms": 0.13482364285714288,
-          "rss_mib": 61.345703125,
+          "ms": 0.1263305,
+          "mean_ms": 0.12798188095238094,
+          "rss_mib": 60.37890625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1252185,
-            0.1255795
+            0.1263305,
+            0.1265805
           ],
-          "v8_context_ms": 0.369875
+          "v8_context_ms": 0.37137
         }
       }
     },
@@ -575,43 +575,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.1868165,
-          "mean_ms": 0.18839780952380952,
-          "rss_mib": 15.943359375,
+          "ms": 0.1885175,
+          "mean_ms": 0.18948155952380952,
+          "rss_mib": 20.646484375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1868165,
-            0.1870615
+            0.1874805,
+            0.188773
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.280064,
-          "mean_ms": 0.28213498214285715,
-          "rss_mib": 13.943359375,
+          "ms": 0.2851965,
+          "mean_ms": 0.28889224404761904,
+          "rss_mib": 16.650390625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.280415,
-            0.280064
+            0.281299,
+            0.291243
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.193078,
-          "mean_ms": 0.2638007083333333,
-          "rss_mib": 64.56640625,
+          "ms": 0.192941,
+          "mean_ms": 0.2499403630952381,
+          "rss_mib": 65.693359375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.194356,
-            0.192136
+            0.1918395,
+            0.1977405
           ],
-          "v8_context_ms": 0.3662885
+          "v8_context_ms": 0.3671015
         }
       }
     },
@@ -620,43 +620,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.0711255,
-          "mean_ms": 0.07091431547619047,
-          "rss_mib": 16.400390625,
+          "ms": 0.0701825,
+          "mean_ms": 0.0704970119047619,
+          "rss_mib": 21.107421875,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0716415,
-            0.069633
+            0.069847,
+            0.0707135
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.0726735,
-          "mean_ms": 0.07309354761904761,
-          "rss_mib": 13.92578125,
+          "ms": 0.073525,
+          "mean_ms": 0.0753497261904762,
+          "rss_mib": 16.630859375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0731345,
-            0.072553
+            0.0763495,
+            0.0733145
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 2.545861,
-          "mean_ms": 2.5405206845238095,
-          "rss_mib": 64.80859375,
+          "ms": 2.545959,
+          "mean_ms": 2.506375494047619,
+          "rss_mib": 66.0234375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            2.553816,
-            2.532986
+            2.546955,
+            2.545959
           ],
-          "v8_context_ms": 0.3750255
+          "v8_context_ms": 0.371425
         }
       }
     },
@@ -665,43 +665,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.384513,
-          "mean_ms": 0.38481339285714283,
-          "rss_mib": 16.60546875,
+          "ms": 0.2424555,
+          "mean_ms": 0.24380477976190476,
+          "rss_mib": 21.619140625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.385951,
-            0.382975
+            0.2421545,
+            0.2424555
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.682958,
-          "mean_ms": 0.6877247797619047,
-          "rss_mib": 14.779296875,
+          "ms": 0.678689,
+          "mean_ms": 0.6838560654761905,
+          "rss_mib": 17.478515625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.681335,
-            0.685432
+            0.6813985,
+            0.676965
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.064242,
-          "mean_ms": 0.08081755952380952,
-          "rss_mib": 58.341796875,
+          "ms": 0.0672325,
+          "mean_ms": 0.08089341666666668,
+          "rss_mib": 59.572265625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.064242,
-            0.0642875
+            0.067814,
+            0.0631295
           ],
-          "v8_context_ms": 0.350774
+          "v8_context_ms": 0.3515475
         }
       }
     },
@@ -710,43 +710,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 8.584152,
-          "mean_ms": 8.588186035714285,
-          "rss_mib": 20.619140625,
+          "ms": 6.234697,
+          "mean_ms": 6.313015273809524,
+          "rss_mib": 25.771484375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            8.6257515,
-            8.536215
+            6.3556465,
+            6.2259905
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 34.0807995,
-          "mean_ms": 34.31579658928572,
-          "rss_mib": 20.505859375,
+          "ms": 34.483704,
+          "mean_ms": 34.452244678571425,
+          "rss_mib": 23.4453125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            34.5682355,
-            33.9778375
+            34.224529,
+            34.636792
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 3.6337305,
-          "mean_ms": 3.5082754404761904,
-          "rss_mib": 83.1953125,
+          "ms": 3.583584,
+          "mean_ms": 3.496663773809524,
+          "rss_mib": 84.6484375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            3.614334,
-            3.633936
+            3.6205785,
+            3.557199
           ],
-          "v8_context_ms": 0.3824645
+          "v8_context_ms": 0.3814295
         }
       }
     },
@@ -755,43 +755,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.0775985,
-          "mean_ms": 0.07786444642857143,
-          "rss_mib": 16.30078125,
+          "ms": 0.0772415,
+          "mean_ms": 0.0775827261904762,
+          "rss_mib": 21.376953125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0776225,
-            0.0775985
+            0.076931,
+            0.077302
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.284212,
-          "mean_ms": 0.2878916130952381,
-          "rss_mib": 14.529296875,
+          "ms": 0.283162,
+          "mean_ms": 0.2853268095238095,
+          "rss_mib": 17.4765625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.283055,
-            0.287523
+            0.282521,
+            0.284209
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.0631855,
-          "mean_ms": 0.0651146488095238,
-          "rss_mib": 58.236328125,
+          "ms": 0.0624085,
+          "mean_ms": 0.06469565476190477,
+          "rss_mib": 59.369140625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0633155,
-            0.0626595
+            0.0635655,
+            0.062068
           ],
-          "v8_context_ms": 0.37205
+          "v8_context_ms": 0.3741805
         }
       }
     },
@@ -800,43 +800,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.0774525,
-          "mean_ms": 0.07805388690476191,
-          "rss_mib": 16.33984375,
+          "ms": 0.078003,
+          "mean_ms": 0.0779226130952381,
+          "rss_mib": 21.3359375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0772375,
-            0.0776975
+            0.076816,
+            0.078128
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.130148,
-          "mean_ms": 0.1312443630952381,
-          "rss_mib": 13.966796875,
+          "ms": 0.130363,
+          "mean_ms": 0.13256442261904763,
+          "rss_mib": 16.640625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1297775,
-            0.1304385
+            0.130363,
+            0.132266
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.0971755,
-          "mean_ms": 0.10291905357142857,
-          "rss_mib": 58.953125,
+          "ms": 0.09754,
+          "mean_ms": 0.10381150595238095,
+          "rss_mib": 60.078125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0971755,
-            0.096775
+            0.0976855,
+            0.09754
           ],
-          "v8_context_ms": 0.3709025
+          "v8_context_ms": 0.3678735
         }
       }
     },
@@ -845,43 +845,43 @@
       "runtimes": {
         "scriptw": {
           "status": "ok",
-          "ms": 0.0778485,
-          "mean_ms": 0.07775433333333333,
-          "rss_mib": 16.333984375,
+          "ms": 0.077141,
+          "mean_ms": 0.07832080357142857,
+          "rss_mib": 21.447265625,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.0778485,
-            0.077303
+            0.076811,
+            0.0786195
           ]
         },
         "scriptc": {
           "status": "ok",
-          "ms": 0.176602,
-          "mean_ms": 0.17784290476190476,
-          "rss_mib": 14.064453125,
+          "ms": 0.1779575,
+          "mean_ms": 0.17923780357142857,
+          "rss_mib": 16.7578125,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1767875,
-            0.176266
+            0.1775975,
+            0.178323
           ]
         },
         "v8": {
           "status": "ok",
-          "ms": 0.167289,
-          "mean_ms": 0.21501107142857143,
-          "rss_mib": 58.83203125,
+          "ms": 0.167944,
+          "mean_ms": 0.21072383928571428,
+          "rss_mib": 60.05859375,
           "processes": 8,
           "measured_entries_per_process": 21,
           "warmups_per_process": 10,
           "block_median_ms": [
-            0.1670335,
-            0.168291
+            0.1675685,
+            0.1689105
           ],
-          "v8_context_ms": 0.3632075
+          "v8_context_ms": 0.364818
         }
       }
     }

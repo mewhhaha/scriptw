@@ -125,6 +125,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--node', default='node')
     parser.add_argument('--time', type=Path, required=True)
+    parser.add_argument('--qualification-key', default='private_numeric_facts',
+                        help='Published qualification entry in performance-gaps-20261101.json')
     args = parser.parse_args()
     require_kernel_budget(4 * 1024**3)
     assert len(os.sched_getaffinity(0)) == 1
@@ -149,7 +151,7 @@ def main():
     assert native['status'] == 'complete' and native['source_fingerprint'] == identity['source_fingerprint']
     witness = load(frozen / 'publication-rust-witness.json')
     assert all(digest(ROOT / name) == expected for name, expected in witness['files'].items())
-    authority = load(ROOT / 'docs/rust-rewrite/performance-gaps-20261101.json')['private_numeric_facts']
+    authority = load(ROOT / 'docs/rust-rewrite/performance-gaps-20261101.json')[args.qualification_key]
     publication = authority['publication_commit']
     assert not subprocess.check_output(['git', 'diff', '--name-only', publication, '--', 'crates', 'Cargo.toml', 'Cargo.lock', '.cargo', 'rust-toolchain.toml'], cwd=ROOT)
     assert authority['source_fingerprint'] == identity['source_fingerprint']

@@ -18,22 +18,15 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   policies against the retained native prologues; do not increase the stack cap
   or skip the tests. The [gap diagnosis](performance-gaps-20261101.json) binds both
   failed snapshots and the exact frame evidence.
-- Every-case V8/Scriptc execution and RSS parity remains open. The
-  [gap diagnosis](performance-gaps-20261101.json) separates source-bound reference
-  cohorts, LLVM/final-Wasm inspection and worker-IP diagnostics. Private counter
-  proofs pass the 480-process A/A, 30-case screen and all three separate control
-  cohorts. The fresh 408-process three-runtime entry reference wins 14/17 cases
-  against Scriptc (median geometric means 0.671–0.676×) and 6/17 against V8
-  (1.595–1.604×). V8 context creation is outside its entry timer; Scriptw's
-  bootstrap remains inside. Preserve these API boundaries and supplemental
-  context timings when comparing the remaining sorting, join and object gaps.
-  Next, test guarded reads of already-observed intrinsic DATA rows: object_read
-  accounts for 26–33% of user-cycle samples in three current mixed-join windows.
-  Reuse complete Array prototype layouts and their existing value cache, with
-  live own-absence/prototype/storage guards and ordinary fallback. Preserve
-  method lookup before arguments. Source literal Strings already use the Program
-  cache; avoid another cache or heap. Retain failed historical controls and keep
-  the primitive-append region parked.
+- V8 execution and process-memory parity remain open. The fresh 408-process
+  [reference](performance-gaps-20261101.json) wins 17/17 Scriptc and 6/17 V8
+  cases in both statistics and blocks; mixed join's Scriptc lead is narrow.
+  The calibrated 30-case screen has no repeated wall/worker-CPU flags, but all
+  30 peak-RSS checks regress by roughly 4.25–5.28 MiB. A zero-trip probe locates
+  4.39 MiB of extra clean host-executable residency; anonymous memory differs
+  by 2 KiB and native R backing residency is unchanged. Diagnose the kernel/link
+  layout mechanism and remaining V8 gaps; do not report a passing memory gate
+  or add another heap/cache. Preserve setup boundaries and original workloads.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.

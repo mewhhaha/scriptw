@@ -5646,11 +5646,11 @@
   },
   "execution_three_runtime": {
     "status": "complete descriptive three-runtime public-entry reference; no conformance or significance claim",
-    "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
-    "publication_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180",
-    "measurement_commit": "e218090e7fee7bb2e8195868fbd865e06f40cef0",
-    "started_at": "2026-11-02T14:17:36.948927+00:00",
-    "finished_at": "2026-11-02T14:19:11.743422+00:00",
+    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+    "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+    "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+    "started_at": "2026-11-02T18:05:41.239176+00:00",
+    "finished_at": "2026-11-02T18:07:04.563553+00:00",
     "runtimes": [
       "scriptw",
       "scriptc",
@@ -5733,6 +5733,9 @@
           "sort-reverse-512.js",
           "sort-sorted-512.js",
           "to-sorted-512.js",
+          "join-1024.js",
+          "join-4096.js",
+          "join-mixed-1024.js",
           "numeric-loop-10000.js",
           "numeric-loop-50000.js",
           "folded-string-4096.js",
@@ -5746,12 +5749,12 @@
         ],
         "geomeans": [
           {
-            "median": 0.6711570927088115,
-            "mean": 0.6681511892014439
+            "median": 0.45458540507328443,
+            "mean": 0.4534890752430208
           },
           {
-            "median": 0.6758632637551784,
-            "mean": 0.6768926699886343
+            "median": 0.4581491080888699,
+            "mean": 0.4562953039848942
           }
         ]
       },
@@ -5766,37 +5769,629 @@
         ],
         "geomeans": [
           {
-            "median": 1.5954701612942368,
-            "mean": 1.3279124858973637
+            "median": 1.097800046005074,
+            "mean": 0.938449679107563
           },
           {
-            "median": 1.6041708561533592,
-            "mean": 1.3453981339200196
+            "median": 1.1057537091233103,
+            "mean": 0.9363320119123235
           }
         ]
       }
     },
     "parent_qualification": {
-      "unique_selected": 1825,
+      "unique_selected": 1844,
       "receipt": {
         "path": "native-qualified.json",
-        "sha256": "8ccd4b15d275b6ae35a17f432ae8ac805e604bc53224105e0a96533b00aef6a4"
+        "sha256": "16bca0a79c981fde6454ba782c0f0fdf4cdb2e54551937d28032084e6dfe34fd"
       },
-      "limits": "Full AOT lib and listed structural targets; selected Engine targets/modules. No full workspace claim."
+      "limits": "Full AOT lib and listed structural targets, full Engine builtins/layout target and selected GC/language/structure; no full workspace or Test262 claim. Repeated priority first-demand passes deduplicated."
     },
     "reference17": {
       "evidence": {
         "path": "analysis.json",
-        "sha256": "8c40c0f383adf36cbda9e0de7cce64cb2064f2dc9797886ec62ab0be246e0acc"
+        "sha256": "e6830d7977af6913a12cb528014a2120f6f3c71d90bb76168c64e71b2d6c0e69"
       }
     },
     "evidence": {
-      "archive": "docs/rust-rewrite/performance-three-runtime-20261102-inert.tar.xz",
-      "sha256": "6a7c2a2c56839529a5903b04d881ea34bb84056bb5fa13187aedaf92661ac7da",
-      "bytes": 965004,
+      "archive": "docs/rust-rewrite/performance-immutable-global-folding-three-runtime-20261102-inert.tar.xz",
+      "sha256": "8360f34fda29be57bbe7e676278412e5a652f199caeb7a622cf77a1eb0f8f160",
+      "bytes": 989844,
       "regular_utf8_members": 1282,
-      "expanded_utf8_bytes": 15306116,
+      "expanded_utf8_bytes": 15355594,
       "contains_native_or_wasm_images": false
+    }
+  },
+  "array_global_constants": {
+    "status": "landed speed checkpoint; selected correctness and calibrated timing pass; all30 RSS regression flags fail and remain open",
+    "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+    "baseline_source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+    "implementation": [
+      "Guard observed Array prototype DATA reads using live receiver, own absence, immediate prototype and sealed layout/cache state; miss uses original Get with saved receiver.",
+      "Fold resolved undefined/NaN/Infinity GlobalPropertyRead after validating exact immutable initializer; local, with and eval resolutions keep their owners."
+    ],
+    "runtime_abi": 45,
+    "runtime_images": "Both native R profiles and raw R Wasm payloads byte-identical to baseline; no runtime heap or cache added.",
+    "native": {
+      "unique_selected": 1844,
+      "receipt": {
+        "path": "native-qualified.json",
+        "sha256": "16bca0a79c981fde6454ba782c0f0fdf4cdb2e54551937d28032084e6dfe34fd"
+      },
+      "limits": "Full AOT lib and listed structural targets, full Engine builtins/layout target and selected GC/language/structure; no full workspace or Test262 claim. Repeated priority first-demand passes deduplicated."
+    },
+    "source_event": {
+      "path": "source-event-benchmark.json",
+      "sha256": "352e922a338a8e4a644c4a72e4fd4b80f23804a659b3b7931b723c485c0a6e28"
+    },
+    "source_patch": {
+      "path": "source-benchmark.patch",
+      "sha256": "02c3109e62a08346e13e58cf124aee539327ab3c1067a480be2b055778bf3977"
+    },
+    "aa_gates": {
+      "main": {
+        "aa_gate": "pass",
+        "aa_flags": [],
+        "aa_processes": 480
+      }
+    },
+    "main30": {
+      "processes": 480,
+      "flags": [
+        {
+          "case": "sort-reverse-128.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "sort-reverse-512.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "sort-sorted-512.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "to-sorted-512.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-1024.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-4096.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-mixed-1024.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "numeric-loop-10000.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "numeric-loop-50000.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "folded-string-4096.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "dynamic-string-4096.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "integer.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "objects.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "retained-objects.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-empty-1024.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-singleton-1024.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "join-small-1024.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "late-rowshapechange.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "final-accessor.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "final-proxy.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "one-row.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "zero-trip.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "nested-hole.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "bad-column.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "heterogeneous-shape.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "first-row-accessor.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "first-row-proxy.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "append-live-method.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "append-prototype-effects.js",
+          "metric": "rss_bytes"
+        },
+        {
+          "case": "append-zero-and-argument-effects.js",
+          "metric": "rss_bytes"
+        }
+      ],
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.7988554367903007,
+            "mean": 0.7997865517048387
+          },
+          "worker_cpu_ns": {
+            "median": 0.7921076118792885,
+            "mean": 0.7934666376893215
+          },
+          "rss_bytes": {
+            "median": 1.2802557572515485,
+            "mean": 1.2777447428339475
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.8016066005594208,
+            "mean": 0.8088078653665525
+          },
+          "worker_cpu_ns": {
+            "median": 0.7954026686915259,
+            "mean": 0.8033140490175266
+          },
+          "rss_bytes": {
+            "median": 1.280336802509816,
+            "mean": 1.279163281568574
+          }
+        }
+      ],
+      "source_fingerprints": {
+        "baseline": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+        "candidate": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5"
+      },
+      "evidence": {
+        "path": "target/performance-immutable-global-folding-20261102/paired/screen-candidate/analysis.json",
+        "sha256": "ffde848ff038d4ef638d3cbab937baa2164d3b4c6626a30bdb8b5299f9f30dfc"
+      }
+    },
+    "reference17": {
+      "processes": 272,
+      "flags": [],
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.45903486094241447,
+            "mean": 0.45921434048374554
+          },
+          "rss_bytes": {
+            "median": 1.241027298286212,
+            "mean": 1.2403802688969956
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.4571076886342781,
+            "mean": 0.4604747913374857
+          },
+          "rss_bytes": {
+            "median": 1.2457366689390361,
+            "mean": 1.244430619533957
+          }
+        }
+      ],
+      "source_fingerprints": {
+        "scriptc": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+        "scriptw": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5"
+      },
+      "evidence": {
+        "path": "target/performance-immutable-global-folding-20261102/paired/reference-candidate/analysis.json",
+        "sha256": "246e6036c81c618553421cd46d0a872e6eebaac070d368c0aff71a4d5c59a1ce"
+      },
+      "wall_wins_both_median_and_mean_in_both_blocks": [
+        "sort-reverse-128.js",
+        "sort-reverse-512.js",
+        "sort-sorted-512.js",
+        "to-sorted-512.js",
+        "join-1024.js",
+        "join-4096.js",
+        "join-mixed-1024.js",
+        "numeric-loop-10000.js",
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "dynamic-string-4096.js",
+        "integer.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-singleton-1024.js",
+        "join-small-1024.js"
+      ]
+    },
+    "remaining_cases": {
+      "join-1024.js": {
+        "candidate_over_baseline": {
+          "wall_ns": {
+            "median": [
+              0.4206252023251559,
+              0.41906686966869405
+            ],
+            "mean": [
+              0.42145638964405047,
+              0.46254877354657553
+            ]
+          },
+          "worker_cpu_ns": {
+            "median": [
+              0.4132395954152829,
+              0.41054436768092506
+            ],
+            "mean": [
+              0.4116797323852254,
+              0.4510249177370361
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.300744132799084,
+              1.285241788321168
+            ],
+            "mean": [
+              1.2908519153802174,
+              1.2818860824448373
+            ]
+          }
+        },
+        "candidate_scriptw_over_scriptc": {
+          "wall_ns": {
+            "median": [
+              0.5728861742511083,
+              0.5384145430848392
+            ],
+            "mean": [
+              0.5417832172587785,
+              0.54310364484116
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.272053872053872,
+              1.276674520363514
+            ],
+            "mean": [
+              1.2661665080342646,
+              1.2705092333519865
+            ]
+          }
+        },
+        "baseline_scriptw_over_scriptc_previously_measured": {
+          "wall_ns": {
+            "median": [
+              1.383293531369167,
+              1.4591718271033463
+            ],
+            "mean": [
+              1.3782556597317048,
+              1.4547133744588352
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.1558288630119062,
+              1.1425783790815662
+            ],
+            "mean": [
+              1.1604492315775647,
+              1.1463987473903967
+            ]
+          }
+        }
+      },
+      "join-4096.js": {
+        "candidate_over_baseline": {
+          "wall_ns": {
+            "median": [
+              0.35387736459179453,
+              0.35511880638466
+            ],
+            "mean": [
+              0.35444424174963257,
+              0.4087483014985999
+            ]
+          },
+          "worker_cpu_ns": {
+            "median": [
+              0.3512807408148147,
+              0.3514946276166757
+            ],
+            "mean": [
+              0.35134962811072096,
+              0.4044277147201745
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.2841374601729632,
+              1.295322635711847
+            ],
+            "mean": [
+              1.2874241306937433,
+              1.2932818006138456
+            ]
+          }
+        },
+        "candidate_scriptw_over_scriptc": {
+          "wall_ns": {
+            "median": [
+              0.4556481345405519,
+              0.45519620773054886
+            ],
+            "mean": [
+              0.4786798886259244,
+              0.45729841689040085
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.2604006163328196,
+              1.2347193572901964
+            ],
+            "mean": [
+              1.2586906459041562,
+              1.2343673602433856
+            ]
+          }
+        },
+        "baseline_scriptw_over_scriptc_previously_measured": {
+          "wall_ns": {
+            "median": [
+              1.5276594851760146,
+              1.6256977675635924
+            ],
+            "mean": [
+              1.4956424758574898,
+              1.5823147074294974
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.1246825799898426,
+              1.1330861672206596
+            ],
+            "mean": [
+              1.126479949077021,
+              1.1321791349900978
+            ]
+          }
+        }
+      },
+      "join-mixed-1024.js": {
+        "candidate_over_baseline": {
+          "wall_ns": {
+            "median": [
+              0.4304585542720513,
+              0.43273446796164067
+            ],
+            "mean": [
+              0.43039625365605344,
+              0.42974602773654724
+            ]
+          },
+          "worker_cpu_ns": {
+            "median": [
+              0.4218847456298759,
+              0.42386824292932107
+            ],
+            "mean": [
+              0.4217780573984054,
+              0.42088529972825334
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.3122372723026623,
+              1.2563324384265204
+            ],
+            "mean": [
+              1.3092608822670173,
+              1.2546823035182917
+            ]
+          }
+        },
+        "candidate_scriptw_over_scriptc": {
+          "wall_ns": {
+            "median": [
+              0.9924426014031273,
+              0.9096117208706355
+            ],
+            "mean": [
+              0.9922580760831144,
+              0.9387121026764432
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.2245217585859716,
+              1.2212230215827338
+            ],
+            "mean": [
+              1.2330515590886189,
+              1.2189637770550634
+            ]
+          }
+        },
+        "baseline_scriptw_over_scriptc_previously_measured": {
+          "wall_ns": {
+            "median": [
+              2.324385515204351,
+              2.4349460389588695
+            ],
+            "mean": [
+              2.3409639485165608,
+              2.41746169556517
+            ]
+          },
+          "rss_bytes": {
+            "median": [
+              1.132509530695412,
+              1.1414300736067298
+            ],
+            "mean": [
+              1.1319663512092535,
+              1.1388961892247043
+            ]
+          }
+        }
+      }
+    },
+    "limits": "Descriptive precompiled CPP SizeOptimized/Backtracking timing, not full performance acceptance: all30 RSS flags remain. No full workspace or full pinned Test262 claim. Earlier native-frame conformance crashes remain owned. Fresh three-runtime reference and portable compilation comparison published separately.",
+    "selected_test262": {
+      "passed": 128,
+      "total": 128,
+      "scopes": [
+        "built-ins/undefined",
+        "built-ins/NaN",
+        "built-ins/Infinity",
+        "built-ins/Array/prototype/push",
+        "built-ins/Array/prototype/join"
+      ],
+      "receipt": {
+        "path": "test262-subsets.json",
+        "sha256": "d5a27c026619335f202b9f427e9ebd614292358299d9c2c1f028ac42daca9dc9"
+      },
+      "limits": "Five real pinned affected subsets, no full conformance acceptance. Prior native-frame crashes remain owned."
+    },
+    "memory_attribution": {
+      "status": "all30 screen RSS flags remain failed; unscored phase diagnostic locates added residency",
+      "summary": {
+        "path": "zero-trip-smaps/summary.json",
+        "sha256": "2e18231699d726ff243077d1da2b12a63859a1ed5abd9b7669bef8999968cdb3"
+      },
+      "after_execution_mib": {
+        "total_rss_delta": 4.396484375,
+        "host_elf_rss_delta": 4.390625,
+        "host_private_clean_delta": 4.38671875,
+        "anonymous_delta": 0.001953125,
+        "native_backing_rss_baseline": 2.1796875,
+        "native_backing_rss_candidate": 2.1796875
+      },
+      "limits": "Four unscored ABBA zero-trip processes, 16 phase smaps captures. Attributes extra clean executable residency; does not prove THP, fault-around or linker mechanism; not timing evidence or a passing memory gate."
+    },
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-immutable-global-folding-20261102-inert.tar.xz",
+      "status": "verified bounded inert archive; full selected correctness, raw AA/screen/reference observations, real affected Test262 subsets and unscored smaps attribution retained",
+      "sha256": "2c9592fd33fe6a9c17755f70fc6586d93c065e1fa3751208d687a168c5342aaa",
+      "bytes": 4451656,
+      "regular_utf8_members": 4600,
+      "expanded_utf8_bytes": 241455283,
+      "contains_native_or_wasm_images": false
+    },
+    "tooling_verification": {
+      "tests": 62,
+      "receipt": {
+        "path": "tooling-final-qualified.json",
+        "sha256": "6970ed2e99f933377066c5616abba3379aab85733622bdf7603aaaa0b00117c3"
+      },
+      "rendering": "Compilation footer spacing adjusted after tests; both chart renderers passed byte-exact regeneration checks and PNG visual review."
+    }
+  },
+  "compilation_portable_wasm": {
+    "status": "complete descriptive fresh CLI comparison; successful portable output, no execution or conformance claim",
+    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+    "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+    "embedded_base_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99",
+    "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+    "started_at": "2026-11-02T18:08:14.129882+00:00",
+    "finished_at": "2026-11-02T18:08:49.641003+00:00",
+    "processes": 136,
+    "processes_per_compiler_case": 4,
+    "wins_both_block_medians": [
+      "sort-reverse-128.js",
+      "sort-reverse-512.js",
+      "sort-sorted-512.js",
+      "to-sorted-512.js",
+      "join-1024.js",
+      "join-4096.js",
+      "join-mixed-1024.js",
+      "numeric-loop-10000.js",
+      "numeric-loop-50000.js",
+      "folded-string-4096.js",
+      "dynamic-string-4096.js",
+      "integer.js",
+      "objects.js",
+      "retained-objects.js",
+      "join-empty-1024.js",
+      "join-singleton-1024.js",
+      "join-small-1024.js"
+    ],
+    "pooled_workload_median_geomean": 0.5238891966435311,
+    "report": {
+      "path": "docs/rust-rewrite/compilation-current.json",
+      "sha256": "2dba26dcef7eed09940e270bd3e9d580bb7bdd2d512d39c582fb4762121b9a97"
+    },
+    "evidence": {
+      "path": "docs/rust-rewrite/compilation-comparison.tar.gz",
+      "bytes": 10903710,
+      "sha256": "aeef541d87c00fe1854a6ddf05abe3ff403b6a426e7bf6e4821d150766e8b8e5"
+    },
+    "policy": {
+      "timing": "Parent wall around GNU-time-supervised fresh compiler process; includes startup, source read, parse/lower/codegen/link and Wasm output I/O. No Wasm-to-native compilation, instantiation or JavaScript execution.",
+      "artifacts": "Scriptw build wasm emits P and its Cargo-built Portable shared R sidecar; R extraction/admission/copy/write costs included each process, Rust/Cargo R production excluded. Scriptc links its prebuilt runtime into standalone WASI Wasm; runtime-pack production excluded.",
+      "cache": "Fresh per-process work/source/application cache/tmp/Zig-local directories; Scriptc SCRIPTC_NO_CACHE=1. OS page caches and existing Zig global toolchain cache retained, never flushed. This is cold application/compiler-process startup, not a cold machine/toolchain installation.",
+      "memory": "GNU time compiler-child lifetime high-water RSS, including accounted descendants; not simultaneous aggregate process-tree RSS, runtime RSS or live heap.",
+      "source": "Original17 exact source/expected bytes retained; Scriptc alone receives the canonical print-to-console.log adapter.",
+      "compiler_identity": "Scriptw source_commit is the embedded base Git revision; source_fingerprint and executable SHA identify the measured working-tree compiler. The performance evidence separately binds its source patch and publication.",
+      "statistics": "Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.",
+      "resources": "Sequential children, one CPU, at most4GiB cgroup, no swap, grouped OOM; native/module caches unused by build wasm.",
+      "validation": "Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement."
     }
   }
 }

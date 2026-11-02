@@ -179,13 +179,50 @@ cohort containing its producer receipts and matching native images. The driver
 checks source bytes and images before running the unchanged 17 workloads:
 
 ```sh
-python3 -B scripts/limited_verification.py -- python3 scripts/benchmark-runtime-comparison.py --frozen target/qualified-cohort --output target/new-runtime-reference --time /usr/bin/time
+python3 -B scripts/limited_verification.py -- python3 scripts/benchmark-runtime-comparison.py --frozen target/qualified-cohort --output target/new-runtime-reference --time /usr/bin/time --qualification-key array_global_constants
 ```
 
 Select the installed GNU time binary with `--time`; `--node` selects Node and its
-exact executable/version are recorded. Each actor runs in eight fresh processes
+exact executable/version are recorded. `--qualification-key` selects the source-bound
+authority entry (default `private_numeric_facts`). Each actor runs in eight fresh processes
 per case, with 21 measurements and ten checked warmups per process. V8 context
 creation is captured separately from its public-entry timer.
+
+For JavaScript-to-portable-Wasm compilation, select a frozen ordinary CLI
+(`scriptw`, not a precompiled execution host), Scriptc 0.4.5 and Zig 0.16.0:
+
+```sh
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-compilation.py run \
+  --scriptw target/qualified-cohort/candidate-ordinary/scriptw \
+  --scriptc target/performance-compact-row-entry/tools/scriptc/node_modules/.bin/scriptc \
+  --runtime-pack target/performance-compact-row-entry/tools/scriptc/node_modules/@scriptc/runtime-wasm32-wasi \
+  --zig target/performance-compact-row-entry/tools/zig-x86_64-linux-0.16.0/zig \
+  --time target/performance-worker-cpu/tools/time \
+  --package-lock target/performance-compact-row-entry/tools/scriptc/package-lock.json \
+  --output target/new-compilation-reference
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-compilation.py publish \
+  target/new-compilation-reference/report.json --output target/new-compilation-publication
+python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python -B scripts/benchmark-compilation.py render \
+  target/new-compilation-publication/compilation-comparison.json \
+  --svg target/new-compilation-publication/compilation.svg --png target/new-compilation-publication/compilation.png
+python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python -B scripts/benchmark-compilation.py render \
+  target/new-compilation-publication/compilation-comparison.json \
+  --svg target/new-compilation-publication/compilation.svg --check
+```
+
+Use Matplotlib 3.11.2 in `target/readme-chart-env`. Measurement and publication
+directories must be fresh. The fixed plan measures 136 actual CLI processes:
+four builds per compiler for each original workload, across two balanced blocks. Wall time includes
+compiler startup and output I/O; Wasm-to-native compilation and execution are
+excluded. Scriptw emits P plus its shared R sidecar; Scriptc emits standalone
+WASI Wasm with its prebuilt runtime linked in. Runtime production is excluded;
+Scriptw's R sidecar write is included on every build and retained once by digest.
+
+Each process gets fresh application caches and scratch. Scriptc also sets
+`SCRIPTC_NO_CACHE=1`; existing Zig global toolchain and OS page caches remain.
+Only Scriptc receives the pinned `print` adapter. The checked publication retains
+source/tool hashes, diagnostics, raw wall/child-peak-RSS observations and portable
+artifacts. Compilation success does not verify runtime output or conformance.
 
 ## Artifact reuse
 
