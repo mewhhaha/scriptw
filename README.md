@@ -199,6 +199,87 @@ compilation result does not refresh V8/Scriptc execution comparisons.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the
 build, debug and verification loop.
 
+<!-- application-benchmarks:start -->
+## Application workloads
+
+Measured **2026-11-02**, compiler `87385fff34d1`.
+Six synchronous request/response kernels use plain records, without networking or
+Web APIs. The seventh case bundles real React 19.3.1
+legacy `renderToString` with hooks/context and 32 escaped rows.
+Times cover complete batches: 64 requests for JSON/routing/query/middleware,
+32 HTML requests, 48 nested-result requests, or one 32-row SSR render.
+
+Two balanced blocks, eight fresh processes per available actor/case; each process
+has seven measured entries after three checked warmups. Cards show the median of
+process entry medians and median whole-child peak RSS. Wasm compilation/loading
+and V8 source/context setup stay outside entry timing; Scriptw Realm bootstrap
+stays inside. Failed actors have no timing or memory bar.
+
+Across the **5 completed Scriptc comparisons**, Scriptw batch medians
+are **3.8–9.3× Scriptc**. Failed cases receive no speed score.
+
+<table>
+<tr>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-json-api.svg" width="440" alt="edge-json-api.js; Scriptw: 3.999 ms, 26.4 MiB RSS; Scriptc: 0.793 ms, 17.7 MiB RSS; V8: 0.340 ms, 55.3 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-router.svg" width="440" alt="edge-router.js; Scriptw: 2.637 ms, 25.2 MiB RSS; Scriptc: 0.694 ms, 17.5 MiB RSS; V8: 0.204 ms, 54.6 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-query.svg" width="440" alt="edge-query.js; Scriptw: 6.298 ms, 27.5 MiB RSS; Scriptc: 1.268 ms, 17.6 MiB RSS; V8: 0.653 ms, 55.0 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-middleware.svg" width="440" alt="edge-middleware.js; Scriptw: 2.426 ms, 25.6 MiB RSS; Scriptc: 0.622 ms, 17.8 MiB RSS; V8: 0.170 ms, 54.7 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-html.svg" width="440" alt="edge-html.js; Scriptw: 10.564 ms, 30.8 MiB RSS; Scriptc: 1.142 ms, 17.8 MiB RSS; V8: 1.004 ms, 56.6 MiB RSS"></td>
+<td><img src="docs/rust-rewrite/assets/applications-current/edge-nested-result.svg" width="440" alt="edge-nested-result.js; Scriptw: 7.307 ms, 29.7 MiB RSS; Scriptc: failed (execution); V8: 0.390 ms, 56.0 MiB RSS"></td>
+</tr>
+<tr>
+<td><img src="docs/rust-rewrite/assets/applications-current/react-ssr.svg" width="440" alt="react-ssr.js; Scriptw: failed (timed out); Scriptc: failed (build); V8: 0.762 ms, 56.7 MiB RSS"></td>
+<td></td>
+</tr>
+</table>
+
+Real Server Components separately serialize and consume Flight streams in Node,
+including an async component. Web references use Node's Request/Response/URL APIs.
+The browser cases use real React DOM in Chromium: mount, state update and hydration,
+with commit plus forced layout timed in the page. RSC renders 32 rows, Web API
+cases process 32 requests, and client cases render 64 rows. Setup and golden-output comparisons are
+outside these timers. These host references have different timing boundaries;
+they establish no engine parity. Browser RSS covers all three cases in one process
+and is not assigned to individual cases.
+
+![Node Flight and Web API references](docs/rust-rewrite/assets/applications-current/react-server.svg)
+![Chromium React DOM references](docs/rust-rewrite/assets/applications-current/react-browser.svg)
+
+| Reference | Entry median · ms |
+| --- | ---: |
+| RSC Flight · sync | 0.505 |
+| RSC Flight · async | 0.571 |
+| URL / Request | 2.016 |
+| JSON / Request | 3.797 |
+| React mount | 1.137 |
+| React update | 1.347 |
+| React hydration | 1.945 |
+
+Actual standalone build/execution attempts remain visible, including failures:
+
+| Capability attempt | Scriptw | Scriptc | V8 host reference |
+| --- | --- | --- | --- |
+| RSC Flight · sync | Execution failed | Build failed | Node checked |
+| RSC Flight · async | Execution failed | Build failed | Node checked |
+| URL / Request | Execution failed | Build failed | Node checked |
+| JSON / Request | Execution failed | Build failed | Node checked |
+| React client mount | Timed out (60 s) | Build failed | Chromium checked |
+
+Standalone run timeouts include compilation and startup; they do not isolate
+rendering time. Scriptw's portable build and ordinary NativeHost/Fast run are
+separate probes; the run recompiles source instead of loading the dumped pair.
+The current Scriptw host also lacks DOM, encoding, Web Streams,
+Fetch and URL APIs, as recorded by the separate capability probe.
+
+[Data, identities and diagnostics](docs/rust-rewrite/applications-current.json) ·
+[Inert raw evidence](docs/rust-rewrite/application-benchmarks-20261102-inert.tar.xz) ·
+[Workflow](CONTRIBUTING.md#react-and-edge-benchmarks).
+<!-- application-benchmarks:end -->
+
 ## Compilation time
 
 **JavaScript → portable Wasm**, measured 2026-11-02 with the same compiler

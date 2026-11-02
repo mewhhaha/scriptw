@@ -1,0 +1,747 @@
+{
+  "schema": "scriptw-application-charts-v1",
+  "status": "complete_descriptive_benchmarks_with_explicit_failures",
+  "repository_root": "/home/jacobt/src/scriptw",
+  "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+  "source_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+  "measurement_commit": "a4907b5e09705b193db0b3c37ddb24831a4675b8",
+  "finished_at": "2026-11-02T19:18:59.484251+00:00",
+  "archive": {
+    "file": "application-benchmarks-20261102-inert.tar.xz",
+    "sha256": "f7f93708a675f6ef327497f919d7bb01de38b6669a2272138f00042449dd383d",
+    "bytes": 1337980,
+    "regular_utf8_members": 822,
+    "expanded_utf8_bytes": 37741518
+  },
+  "reports": {
+    "portable": {
+      "path": "target/application-benchmarks-20261102/portable-reference/report.json",
+      "sha256": "746e9b2d1ae4d034c8a064dc78cbaa71ead68f72e674e5f1990a44c79bcc68f8"
+    },
+    "react": {
+      "path": "target/application-benchmarks-20261102/react-reference/report.json",
+      "sha256": "8d6db33cb34af808f4606a16d19028acffb0a52b82e70c0131eca8818e54b6db"
+    }
+  },
+  "analysis": {
+    "path": "target/application-benchmarks-20261102/analysis.json",
+    "sha256": "3ff98eaedccdc7883a27f807d5cf6e1839ed5e076525befe3f4ebed88c8eb98b"
+  },
+  "versions": {
+    "react": {
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "react-server-dom-webpack": "19.3.1",
+      "esbuild": "0.28.2",
+      "playwright": "1.64.1"
+    },
+    "node": {
+      "node": "24.12.0",
+      "acorn": "8.15.0",
+      "ada": "3.3.0",
+      "amaro": "1.1.5",
+      "ares": "1.34.5",
+      "brotli": "1.1.0",
+      "cjs_module_lexer": "2.1.0",
+      "cldr": "47.0",
+      "icu": "77.1",
+      "llhttp": "9.3.0",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.1",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.67.1",
+      "openssl": "3.5.4",
+      "simdjson": "4.1.0",
+      "simdutf": "6.4.0",
+      "sqlite": "3.50.4",
+      "tz": "2025b",
+      "undici": "7.16.0",
+      "unicode": "16.0",
+      "uv": "1.51.0",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.37",
+      "zlib": "1.3.1-470d3a2",
+      "zstd": "1.5.7"
+    },
+    "chromium": "156.0.8078.4"
+  },
+  "portable": [
+    {
+      "file": "edge-json-api.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 3998691.0,
+          "process_wall_ns": 333652894.0,
+          "process_peak_rss_bytes": 27654144.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 4161726.5,
+              "process_peak_rss_bytes": 27842560.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 3967161.5,
+              "process_peak_rss_bytes": 27625472.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 792933.5,
+          "process_wall_ns": 158235770.5,
+          "process_peak_rss_bytes": 18565120.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 779883.5,
+              "process_peak_rss_bytes": 18317312.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 800382.5,
+              "process_peak_rss_bytes": 18636800.0
+            }
+          ]
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 340222.0,
+          "process_wall_ns": 36563252.5,
+          "process_peak_rss_bytes": 57972736.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 339150.0,
+              "process_peak_rss_bytes": 58003456.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 340598.0,
+              "process_peak_rss_bytes": 57968640.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "edge-router.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 2636765.5,
+          "process_wall_ns": 317301179.0,
+          "process_peak_rss_bytes": 26437632.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 2680954.5,
+              "process_peak_rss_bytes": 26347520.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 2589966.0,
+              "process_peak_rss_bytes": 26437632.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 693649.5,
+          "process_wall_ns": 158932221.0,
+          "process_peak_rss_bytes": 18384896.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 696655.0,
+              "process_peak_rss_bytes": 18241536.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 692307.0,
+              "process_peak_rss_bytes": 18464768.0
+            }
+          ]
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 203948.0,
+          "process_wall_ns": 34553389.0,
+          "process_peak_rss_bytes": 57217024.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 204644.0,
+              "process_peak_rss_bytes": 57233408.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 202981.5,
+              "process_peak_rss_bytes": 57190400.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "edge-query.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 6297804.5,
+          "process_wall_ns": 352457141.0,
+          "process_peak_rss_bytes": 28835840.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 6175667.0,
+              "process_peak_rss_bytes": 28598272.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 6345430.0,
+              "process_peak_rss_bytes": 29071360.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 1267551.0,
+          "process_wall_ns": 165685937.5,
+          "process_peak_rss_bytes": 18491392.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 1254260.5,
+              "process_peak_rss_bytes": 18669568.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 1270392.0,
+              "process_peak_rss_bytes": 18278400.0
+            }
+          ]
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 653167.5,
+          "process_wall_ns": 40436714.0,
+          "process_peak_rss_bytes": 57655296.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 638509.5,
+              "process_peak_rss_bytes": 57655296.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 656844.5,
+              "process_peak_rss_bytes": 57653248.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "edge-middleware.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 2426465.5,
+          "process_wall_ns": 310509047.5,
+          "process_peak_rss_bytes": 26863616.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 2445281.0,
+              "process_peak_rss_bytes": 26490880.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 2378830.0,
+              "process_peak_rss_bytes": 26953728.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 621567.5,
+          "process_wall_ns": 156158300.0,
+          "process_peak_rss_bytes": 18612224.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 627233.0,
+              "process_peak_rss_bytes": 18391040.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 612815.5,
+              "process_peak_rss_bytes": 18866176.0
+            }
+          ]
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 170078.5,
+          "process_wall_ns": 33802456.0,
+          "process_peak_rss_bytes": 57405440.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 172899.0,
+              "process_peak_rss_bytes": 57366528.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 166757.5,
+              "process_peak_rss_bytes": 57436160.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "edge-html.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 10564039.0,
+          "process_wall_ns": 403265334.0,
+          "process_peak_rss_bytes": 32292864.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 10532409.0,
+              "process_peak_rss_bytes": 32208896.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 10564039.0,
+              "process_peak_rss_bytes": 32397312.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 1141992.0,
+          "process_wall_ns": 161786706.0,
+          "process_peak_rss_bytes": 18634752.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 1136226.0,
+              "process_peak_rss_bytes": 18579456.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 1144021.5,
+              "process_peak_rss_bytes": 18675712.0
+            }
+          ]
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 1004180.5,
+          "process_wall_ns": 43548774.5,
+          "process_peak_rss_bytes": 59342848.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 997437.5,
+              "process_peak_rss_bytes": 59361280.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 1019158.5,
+              "process_peak_rss_bytes": 59334656.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "edge-nested-result.js",
+      "actors": {
+        "scriptw": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 7307269.5,
+          "process_wall_ns": 374566835.5,
+          "process_peak_rss_bytes": 31127552.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 7311652.5,
+              "process_peak_rss_bytes": 31240192.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 7203898.0,
+              "process_peak_rss_bytes": 30932992.0
+            }
+          ]
+        },
+        "scriptc": {
+          "status": "failed",
+          "stage": "execution",
+          "reason": "application benchmark: application benchmark: child failed or timed out",
+          "attempted_processes": 8,
+          "successful_processes": 0
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 389726.0,
+          "process_wall_ns": 38375744.5,
+          "process_peak_rss_bytes": 58677248.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 384877.0,
+              "process_peak_rss_bytes": 58718208.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 393338.0,
+              "process_peak_rss_bytes": 58664960.0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "react-ssr.js",
+      "actors": {
+        "scriptw": {
+          "status": "failed",
+          "stage": "source-emission-native-preparation",
+          "reason": "application benchmark: application benchmark: child failed or timed out",
+          "attempted_processes": 0,
+          "successful_processes": 0
+        },
+        "scriptc": {
+          "status": "failed",
+          "stage": "source-to-wasm",
+          "reason": "application benchmark: application benchmark: child failed or timed out",
+          "attempted_processes": 0,
+          "successful_processes": 0
+        },
+        "v8": {
+          "status": "sampled",
+          "processes": 8,
+          "entry_wall_ns": 761563.5,
+          "process_wall_ns": 52235016.0,
+          "process_peak_rss_bytes": 59443200.0,
+          "blocks": [
+            {
+              "block": 0,
+              "entry_wall_ns": 761363.5,
+              "process_peak_rss_bytes": 59461632.0
+            },
+            {
+              "block": 1,
+              "entry_wall_ns": 761563.5,
+              "process_peak_rss_bytes": 59410432.0
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "react_reference_medians_ms": {
+    "rsc-sync": 0.505086,
+    "rsc-async": 0.5706905,
+    "web-url": 2.015524,
+    "web-json": 3.796829,
+    "mount": 1.1375,
+    "update": 1.3475,
+    "hydrate": 1.945
+  },
+  "standalone": [
+    {
+      "case": "rsc-sync",
+      "actor": "scriptw",
+      "status": "failed",
+      "stage": "execution",
+      "timed_out": false
+    },
+    {
+      "case": "rsc-sync",
+      "actor": "scriptc",
+      "status": "failed",
+      "stage": "source-to-wasm",
+      "timed_out": false
+    },
+    {
+      "case": "rsc-async",
+      "actor": "scriptw",
+      "status": "failed",
+      "stage": "execution",
+      "timed_out": false
+    },
+    {
+      "case": "rsc-async",
+      "actor": "scriptc",
+      "status": "failed",
+      "stage": "source-to-wasm",
+      "timed_out": false
+    },
+    {
+      "case": "web-url",
+      "actor": "scriptw",
+      "status": "failed",
+      "stage": "execution",
+      "timed_out": false
+    },
+    {
+      "case": "web-url",
+      "actor": "scriptc",
+      "status": "failed",
+      "stage": "source-to-wasm",
+      "timed_out": false
+    },
+    {
+      "case": "web-json",
+      "actor": "scriptw",
+      "status": "failed",
+      "stage": "execution",
+      "timed_out": false
+    },
+    {
+      "case": "web-json",
+      "actor": "scriptc",
+      "status": "failed",
+      "stage": "source-to-wasm",
+      "timed_out": false
+    },
+    {
+      "case": "client-mount",
+      "actor": "scriptw",
+      "status": "failed",
+      "stage": "execution",
+      "timed_out": true
+    },
+    {
+      "case": "client-mount",
+      "actor": "scriptc",
+      "status": "failed",
+      "stage": "source-to-wasm",
+      "timed_out": false
+    }
+  ],
+  "diagnostics": {
+    "scored": false,
+    "compiler_identity": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99"
+      },
+      "executable_sha256": "4dbf188245232aab6eef6df559746e7d7bcff5b4c614dbf2f13290216a887303"
+    },
+    "records": [
+      {
+        "name": "host-capabilities",
+        "argv": [
+          "/home/jacobt/src/scriptw/target/performance-immutable-global-folding-20261102/candidate-ordinary/scriptw",
+          "--jobs",
+          "1",
+          "run",
+          "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/host-capabilities.js"
+        ],
+        "resources": {
+          "exit_code": 0,
+          "elapsed_ns": 391556982,
+          "user_cpu_ns": 326942000,
+          "system_cpu_ns": 51686000,
+          "timed_out": false,
+          "launch_tree_peak_rss_bytes": 65642496,
+          "peak_rss_bytes": 65642496,
+          "child_peak_rss_kib": 64104,
+          "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+          "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+        },
+        "stdout_sha256": "ac9becf729567eba5e5edb2e3c59911fd7babc4688920f044b76f82319dd61f4",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "portable-emission",
+        "argv": [
+          "/home/jacobt/src/scriptw/target/performance-immutable-global-folding-20261102/candidate-ordinary/scriptw",
+          "--jobs",
+          "1",
+          "build",
+          "wasm",
+          "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/react-ssr.js"
+        ],
+        "resources": {
+          "exit_code": 0,
+          "elapsed_ns": 6594847994,
+          "user_cpu_ns": 6526055000,
+          "system_cpu_ns": 45794000,
+          "timed_out": false,
+          "launch_tree_peak_rss_bytes": 151756800,
+          "peak_rss_bytes": 151756800,
+          "child_peak_rss_kib": 148200,
+          "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+          "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+        },
+        "stdout_sha256": "c7b847be3c6f596e189774b60992a041a78b7801736cf44a7c3d41ef4c2be1c8",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "ordinary-fast-execution",
+        "argv": [
+          "/home/jacobt/src/scriptw/target/performance-immutable-global-folding-20261102/candidate-ordinary/scriptw",
+          "--jobs",
+          "1",
+          "run",
+          "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/react-ssr.js"
+        ],
+        "resources": {
+          "exit_code": -9,
+          "elapsed_ns": 60005461824,
+          "user_cpu_ns": 594000,
+          "system_cpu_ns": 0,
+          "timed_out": true,
+          "launch_tree_peak_rss_bytes": 36560896,
+          "peak_rss_bytes": null,
+          "child_peak_rss_kib": null,
+          "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+          "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+        },
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "limits": "Separate single-process phase/capability diagnostics; original60s CPP failure is retained. Portable emission and ordinary NativeHost Fast run differ from CPP configuration."
+  },
+  "host_capabilities": {
+    "document": "undefined",
+    "window": "undefined",
+    "TextEncoder": "undefined",
+    "TextDecoder": "undefined",
+    "ReadableStream": "undefined",
+    "TransformStream": "undefined",
+    "AbortController": "undefined",
+    "MessageChannel": "undefined",
+    "Request": "undefined",
+    "Response": "undefined",
+    "Headers": "undefined",
+    "URL": "undefined",
+    "fetch": "undefined",
+    "crypto": "undefined"
+  },
+  "coverage": {
+    "portable_attempted_processes": 152,
+    "portable_successful_processes": 144,
+    "portable_checked_entries": 1440,
+    "react_server_processes": 32,
+    "server_checked_entries": 320,
+    "browser_processes": 8,
+    "browser_checked_operations": 240,
+    "standalone_attempts": 10,
+    "focused_tooling_tests": 9
+  },
+  "failure_owners": [
+    {
+      "owner": "Scriptw source/native compilation pipeline",
+      "case": "React SSR",
+      "reason": "CPP portable preparation and ordinary NativeHost Fast run hit separate60s deadlines. Portable source-to-Wasm emission completed in6.595s. Neither timeout identifies its active phase; no comparable historical regression claim."
+    },
+    {
+      "owner": "Scriptw host API surface",
+      "case": "RSC and Web API handlers",
+      "reason": "All5 selected bundles emit portable Wasm;4 fail during ordinary execution with ReferenceError/unboundidentifier. Capability probe separately confirms missingDOM,encoding,streams,Fetch andURL globals. Client execution instead timesout before yieldingrenderoutput."
+    },
+    {
+      "owner": "Scriptc compiler/runtime",
+      "case": "React and Web API bundles",
+      "reason": "PinnedScriptc rejectsSSR/RSC/client/WebAPI bundles duringcompilation; nested portable result case compiles butall8WASIexecutions exit1. No timingassigned."
+    }
+  ],
+  "limits": "Fresh-entry portable corpus and retained-Realm genuineWeb/DOM references have different timing boundaries. No pooledratio across them, significance claim, fullReact support, deployededgeplatformthroughput or fullconformance acceptance.",
+  "reproduction": "Compiler publication source77c10017a matches frozen FP8738. Benchmark fixtures/Node modules/driver/binary identities and every warmup output retained in the inert archive. Timed-out child RSS/CPU samples are unavailable, not zero. OrdinaryCLI success outcome decoding corrected after measurement; exact original harness bytes retained and all10 actual capability attempts failed before that successful-output branch.",
+  "workloads": [
+    {
+      "file": "edge-json-api.js",
+      "label": "JSON orders API",
+      "category": "json-api",
+      "operations": 64,
+      "scope": "64 request records: JSON parsing, validation, catalogue lookup, line transformation and response serialization; 8 profiles including invalid JSON and inherited-key rejection."
+    },
+    {
+      "file": "edge-router.js",
+      "label": "Route and method dispatch",
+      "category": "routing",
+      "operations": 64,
+      "scope": "64 request records: static and parameter routes, query/trailing-slash handling, method errors, 404 and HEAD responses; no network or Web Fetch API."
+    },
+    {
+      "file": "edge-query.js",
+      "label": "Percent query normalization",
+      "category": "query-normalization",
+      "operations": 64,
+      "scope": "64 path records: percent/UTF-8 decoding, plus normalization, duplicate fields, sorted tags, bounded numeric limits and malformed encoding rejection."
+    },
+    {
+      "file": "edge-middleware.js",
+      "label": "Authorization and rate middleware",
+      "category": "middleware",
+      "operations": 64,
+      "scope": "64 request records: token-table authorization, read-only policy, preflight and per-user fixed-minute rate buckets; fixed clock and no cryptographic operation."
+    },
+    {
+      "file": "edge-html.js",
+      "label": "Escaped HTML table rendering",
+      "category": "html-template",
+      "operations": 32,
+      "scope": "32 request records with 4 rows each: JSON payload parsing, text/attribute escaping and HTML serialization; no DOM, framework or browser."
+    },
+    {
+      "file": "edge-nested-result.js",
+      "label": "Nested project result shaping",
+      "category": "nested-result-shaping",
+      "operations": 48,
+      "scope": "48 request records: parsed operation selection, project lookup, visibility filtering, pagination, nested member joins and JSON result shaping; no GraphQL parser."
+    },
+    {
+      "file": "react-ssr.js",
+      "label": "React SSR",
+      "category": "react-ssr",
+      "operations": 32,
+      "scope": "Real production React renderToString: hooks/context and32 escaped rows; no DOM or Server Components."
+    }
+  ],
+  "measured_harness": [
+    {
+      "original_input": "scripts/benchmark-react.py",
+      "retained_path": "target/application-benchmarks-20261102/measured-harness/benchmark-react.py",
+      "sha256": "7000b9472bc26f31956ddf40c3eca0452b1b4f2ba330863093708e260e2b4d72"
+    },
+    {
+      "original_input": "scripts/application_benchmarks.py",
+      "retained_path": "target/application-benchmarks-20261102/measured-harness/application_benchmarks.py",
+      "sha256": "a2599e8e4b43a03d122b344cb2f4db793010295ff84830657573c18f0b456db5"
+    }
+  ]
+}

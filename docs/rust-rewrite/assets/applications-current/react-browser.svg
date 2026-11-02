@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="576pt" height="266.4pt" viewBox="0 0 576 266.4" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>Chromium · React DOM</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Chromium · React DOM</dc:title>
+    <dc:description>{"boundary": "Commit + forced layout", "renderer": {"matplotlib": "3.11.2", "script_sha256": "4005e3414636b62104ee7494b72cc352acc701a2ac5f40d2d71c5bfa52160f92", "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"}, "rows": [{"case": "mount", "process_medians_ns": {"maximum": 1565000, "median": 1137500.0, "minimum": 1080000, "p90": 1565000, "p95": 1565000, "samples": [1275000, 1095000, 1120000, 1565000, 1155000, 1215000, 1090000, 1080000]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 4805000, "median": 1275000, "minimum": 1180000, "p90": 4805000, "p95": 4805000, "samples": [1275000, 3200000, 1240000, 1180000, 1240000, 4805000, 3235000]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 1175000, "median": 1095000, "minimum": 1060000, "p90": 1175000, "p95": 1175000, "samples": [1060000, 1080000, 1095000, 1095000, 1175000, 1130000, 1110000]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 2040000, "median": 1120000, "minimum": 1010000, "p90": 2040000, "p95": 2040000, "samples": [1080000, 1010000, 1120000, 1030000, 2040000, 1275000, 1160000]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 5855000, "median": 1565000, "minimum": 1225000, "p90": 5855000, "p95": 5855000, "samples": [5855000, 1475000, 4915000, 4230000, 1345000, 1565000, 1225000]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 3075000, "median": 1155000, "minimum": 1125000, "p90": 3075000, "p95": 3075000, "samples": [1125000, 1150000, 1135000, 1160000, 3075000, 1220000, 1155000]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 3435000, "median": 1215000, "minimum": 1170000, "p90": 3435000, "p95": 3435000, "samples": [3435000, 1280000, 1170000, 1215000, 1205000, 3415000, 1185000]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 1280000, "median": 1090000, "minimum": 990000, "p90": 1280000, "p95": 1280000, "samples": [1280000, 1105000, 1090000, 990000, 1210000, 1060000, 1060000]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 1280000, "median": 1080000, "minimum": 985000, "p90": 1280000, "p95": 1280000, "samples": [1080000, 985000, 1135000, 1280000, 1070000, 1040000, 1125000]}, "process": 3}]}, {"case": "update", "process_medians_ns": {"maximum": 4175000, "median": 1347500.0, "minimum": 1045000, "p90": 4175000, "p95": 4175000, "samples": [2725000, 1145000, 1045000, 1545000, 4175000, 1090000, 1420000, 1275000]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 6395000, "median": 2725000, "minimum": 1120000, "p90": 6395000, "p95": 6395000, "samples": [6395000, 4000000, 1215000, 1955000, 2965000, 2725000, 1120000]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 4805000, "median": 1145000, "minimum": 1065000, "p90": 4805000, "p95": 4805000, "samples": [4805000, 3410000, 1965000, 1065000, 1145000, 1075000, 1120000]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 5720000, "median": 1045000, "minimum": 970000, "p90": 5720000, "p95": 5720000, "samples": [1980000, 1005000, 970000, 1035000, 1045000, 5720000, 1195000]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 10700000, "median": 1545000, "minimum": 1055000, "p90": 10700000, "p95": 10700000, "samples": [1545000, 1080000, 1075000, 2425000, 2960000, 1055000, 10700000]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 5480000, "median": 4175000, "minimum": 1030000, "p90": 5480000, "p95": 5480000, "samples": [5480000, 4175000, 5205000, 3425000, 5330000, 1030000, 2645000]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 1525000, "median": 1090000, "minimum": 1030000, "p90": 1525000, "p95": 1525000, "samples": [1045000, 1230000, 1045000, 1525000, 1090000, 1030000, 1255000]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 7685000, "median": 1420000, "minimum": 1025000, "p90": 7685000, "p95": 7685000, "samples": [1420000, 1040000, 1025000, 1750000, 1055000, 2040000, 7685000]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 4195000, "median": 1275000, "minimum": 1030000, "p90": 4195000, "p95": 4195000, "samples": [4195000, 1900000, 1700000, 1275000, 1135000, 1030000, 1155000]}, "process": 3}]}, {"case": "hydrate", "process_medians_ns": {"maximum": 2675000, "median": 1945000.0, "minimum": 1535000, "p90": 2675000, "p95": 2675000, "samples": [1870000, 2230000, 2675000, 2050000, 1535000, 1535000, 2020000, 1685000]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 5530000, "median": 1870000, "minimum": 1000000, "p90": 5530000, "p95": 5530000, "samples": [1870000, 2025000, 1595000, 1000000, 5530000, 1180000, 3350000]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 15645000, "median": 2230000, "minimum": 1330000, "p90": 15645000, "p95": 15645000, "samples": [1815000, 2230000, 2160000, 3085000, 1330000, 3730000, 15645000]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 10480000, "median": 2675000, "minimum": 1130000, "p90": 10480000, "p95": 10480000, "samples": [4025000, 4320000, 1275000, 1160000, 10480000, 1130000, 2675000]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 3595000, "median": 2050000, "minimum": 1075000, "p90": 3595000, "p95": 3595000, "samples": [2435000, 2065000, 1640000, 1650000, 3595000, 1075000, 2050000]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 3135000, "median": 1535000, "minimum": 1005000, "p90": 3135000, "p95": 3135000, "samples": [1430000, 1795000, 1535000, 1005000, 3135000, 1140000, 1665000]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 19295000, "median": 1535000, "minimum": 1060000, "p90": 19295000, "p95": 19295000, "samples": [1535000, 1160000, 1840000, 1060000, 1060000, 19295000, 3700000]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 6835000, "median": 2020000, "minimum": 1150000, "p90": 6835000, "p95": 6835000, "samples": [6835000, 4430000, 2020000, 1670000, 1165000, 3340000, 1150000]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 6500000, "median": 1685000, "minimum": 1075000, "p90": 6500000, "p95": 6500000, "samples": [1405000, 1075000, 1835000, 1685000, 3590000, 6500000, 1275000]}, "process": 3}]}], "source_commit": "77c10017a64937e13de08c7873170772ae15ffab", "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5"}</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Scriptw application charts</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 266.4
+L 576 266.4
+L 576 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 138.24 218.448
+L 552.96 218.448
+L 552.96 47.952
+L 138.24 47.952
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 138.24 218.448
+L 138.24 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2"/>
+     <g id="text_1">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="138.24" y="234.805422" transform="rotate(-0 138.24 234.805422)">0.0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 220.249096 218.448
+L 220.249096 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_2">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="220.249096" y="234.805422" transform="rotate(-0 220.249096 234.805422)">0.5</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 302.258193 218.448
+L 302.258193 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_3">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="302.258193" y="234.805422" transform="rotate(-0 302.258193 234.805422)">1.0</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 384.267289 218.448
+L 384.267289 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_4">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="384.267289" y="234.805422" transform="rotate(-0 384.267289 234.805422)">1.5</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 466.276385 218.448
+L 466.276385 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10"/>
+     <g id="text_5">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="466.276385" y="234.805422" transform="rotate(-0 466.276385 234.805422)">2.0</text>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_11">
+      <path d="M 548.285482 218.448
+L 548.285482 47.952
+" clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12"/>
+     <g id="text_6">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="548.285482" y="234.805422" transform="rotate(-0 548.285482 234.805422)">2.5</text>
+     </g>
+    </g>
+    <g id="text_7">
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="345.6" y="249.806281" transform="rotate(-0 345.6 249.806281)">Commit + forced layout · ms</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_13"/>
+     <g id="text_8">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="130.24" y="77.764725" transform="rotate(-0 130.24 77.764725)">React mount</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_14"/>
+     <g id="text_9">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="130.24" y="137.379141" transform="rotate(-0 130.24 137.379141)">React update</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_15"/>
+     <g id="text_10">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="130.24" y="196.993127" transform="rotate(-0 130.24 196.993127)">React hydration</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 138.24 55.701818
+L 324.810694 55.701818
+L 324.810694 91.47021
+L 138.24 91.47021
+z
+" clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 138.24 115.315804
+L 359.254515 115.315804
+L 359.254515 151.084196
+L 138.24 151.084196
+z
+" clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 138.24 174.92979
+L 457.255385 174.92979
+L 457.255385 210.698182
+L 138.24 210.698182
+z
+" clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 138.24 218.448
+L 552.96 218.448
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="329.810694" y="76.443436" transform="rotate(-0 329.810694 76.443436)">1.137</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="364.254515" y="136.057422" transform="rotate(-0 364.254515 136.057422)">1.347</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="462.255385" y="195.671408" transform="rotate(-0 462.255385 195.671408)">1.945</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="138.24" y="32.952" transform="rotate(-0 138.24 32.952)">Chromium · React DOM</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p52ee150631">
+   <rect x="138.24" y="47.952" width="414.72" height="170.496"/>
+  </clipPath>
+ </defs>
+</svg>

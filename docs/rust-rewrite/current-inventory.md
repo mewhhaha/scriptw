@@ -8,6 +8,22 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
+- Attribute application-workload gaps using the
+  [React/edge corpus](applications-current.json). Scriptw passes all six portable
+  handlers but takes about 4–9x Scriptc time on their five comparable cases;
+  measure JSON/property/escaping costs before changing machinery. Real RSC and
+  Web API bundles emit Wasm but fail with unbound identifiers; the host surface
+  lacks DOM, encoding, streams, Fetch and URL APIs. Client rendering remains a
+  Chromium reference, not a Scriptw compatibility pass. Owner: explicit product
+  host surface and embedding adapters; retain one heap/backend and the real
+  renderer instead of silently substituting SSR or fake DOM.
+- Diagnose React SSR compilation/startup before claiming rendering parity.
+  Its portable emission completes in about 6.6s, while both CPP preparation and
+  ordinary Fast run hit their separate 60s guards. A completed emission probe
+  does not locate the active phase of either timeout. Owner: AOT compilation
+  pipeline and emitted-program/native expansion; retain the original failures
+  and workload, and profile phases before changing compilation policy.
+
 - Repair Fast native frame/code expansion before a new full conformance run.
   The pinned `language/expressions/modulus/bigint-arithmetic.js` crashes in strict
   and sloppy mode on both the accepted compiler and the private-counter candidate;

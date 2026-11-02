@@ -224,6 +224,57 @@ Only Scriptc receives the pinned `print` adapter. The checked publication retain
 source/tool hashes, diagnostics, raw wall/child-peak-RSS observations and portable
 artifacts. Compilation success does not verify runtime output or conformance.
 
+## React and edge benchmarks
+
+Use a fresh ignored tool directory with exact `react`, `react-dom` and
+`react-server-dom-webpack` 19.3.1, esbuild 0.28.2 and Playwright 1.64.1. Keep its
+package manifest, lockfile and installed package hashes with the results. The
+fixture source lives in `crates/scriptw-cli/tests/fixtures/edge_rendering/`.
+
+```sh
+mkdir -p target/application-tools
+python3 -B scripts/limited_verification.py -- pnpm --dir target/application-tools add --save-exact --ignore-scripts \
+  react@19.3.1 react-dom@19.3.1 react-server-dom-webpack@19.3.1 \
+  esbuild@0.28.2 playwright@1.64.1
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-react.py prepare \
+  --tools target/application-tools --output target/new-application-fixtures --time /path/to/gnu-time
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-applications.py \
+  --fixtures target/new-application-fixtures --frozen target/qualified-cohort \
+  --scriptc /path/to/scriptc --runtime-pack /path/to/runtime-wasm32-wasi \
+  --zig /path/to/zig-0.16.0/zig --time /path/to/gnu-time --timeout 60 --output target/new-application-reference
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-react.py run \
+  --tools target/application-tools --fixtures target/new-application-fixtures \
+  --frozen target/qualified-cohort --scriptc /path/to/scriptc \
+  --runtime-pack /path/to/runtime-wasm32-wasi --zig /path/to/zig-0.16.0/zig \
+  --chromium /path/to/chrome --time /path/to/gnu-time --timeout 60 --output target/new-react-reference
+```
+
+The portable cohort measures fresh Wasm public entry versus V8 `runInContext`,
+with exact response output checked on every warmup and sample. Six edge cases use
+plain request/response records; they do not implement Fetch or a deployed edge
+platform. The additional synchronous React HTML renderer is the unmodified pinned
+legacy production entry, selected explicitly during bundling.
+
+Real RSC benchmarks serialize and fully consume Flight streams. They run with
+Node's genuine Web APIs, initialize modules once per fresh process, and record
+parse/initialization separately from request execution. Client React measures
+real Chromium DOM mount, state update and hydration through commit plus forced
+layout; validation, cleanup, screenshot and initial bundle loading are outside
+that timer. Browser and server reference timings use different boundaries and
+are not cross-engine speed ratios.
+The [Server Components](https://react.dev/reference/rsc/server-components) and
+[client DOM](https://react.dev/reference/react-dom/client) APIs are separate
+scopes; synchronous HTML SSR is a third workload.
+
+Each reference uses two blocks, eight fresh processes and seven measured calls
+after three checked warmups. Record Chromium and Node/V8 identities. Standalone
+Scriptw/Scriptc attempts retain compilation and execution errors explicitly.
+Scriptw's portable build and ordinary NativeHost/Fast run are separate probes,
+and the latter recompiles source rather than executing the dumped portable pair.
+Unsupported host APIs never become zero bars, wins or permanent exclusions. All
+children remain serial under the resource wrapper. No product compiler rebuild
+is needed when the recorded frozen Rust bytes still match.
+
 ## Artifact reuse
 
 Reuse requires exact source, features, dependency graph, runtime/program identities
