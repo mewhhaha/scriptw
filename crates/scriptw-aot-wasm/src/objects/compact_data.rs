@@ -85,6 +85,18 @@ impl FunctionBuilder<'_> {
             &mut f,
         );
         f.instruction(&Instruction::Else);
+        base.is_subtype::<IntrinsicPropertyStorage>(schema, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let intrinsic = schema.reserve_gc_local(&mut f).initialize(
+            base.load(schema, &mut f)
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, &mut f),
+            &mut f,
+        );
+        let converted = self.emit_promote_intrinsic_properties(&p.object, &intrinsic, &mut f)?;
+        result.replace(converted.load(schema, &mut f).nullable(), &mut f);
+        converted.clear(&mut f);
+        intrinsic.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let compact = schema.reserve_gc_local(&mut f).initialize(
             base.load(schema, &mut f)
                 .cast_subtype::<CompactDataStorage>(schema, &mut f),
@@ -176,6 +188,8 @@ impl FunctionBuilder<'_> {
         compact.clear(&mut f);
         schema.release_i32_local(index, &mut f);
         schema.release_i32_local(count, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         result.load(schema, &mut f).require_non_null(&mut f);
@@ -783,6 +797,16 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(slot, f);
         compact.clear(f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<IntrinsicPropertyStorage>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let intrinsic = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, f),
+            f,
+        );
+        self.emit_intrinsic_own_data_value(&intrinsic, key, output, found, f)?;
+        intrinsic.clear(f);
+        f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(object, key, f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
         descriptor.load(schema, f).is_null(f);
@@ -816,6 +840,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         descriptor.clear(f);
         entry.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         base.clear(f);
@@ -954,11 +980,25 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(found, &mut f);
         compact.clear(&mut f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<IntrinsicPropertyStorage>(schema, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let intrinsic = schema.reserve_gc_local(&mut f).initialize(
+            base.load(schema, &mut f)
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, &mut f),
+            &mut f,
+        );
+        let descriptor = self.emit_intrinsic_own_descriptor(&intrinsic, &p.key, &mut f)?;
+        output.replace(descriptor.load(schema, &mut f), &mut f);
+        descriptor.clear(&mut f);
+        intrinsic.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(&p.object, &p.key, &mut f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, &mut f);
         output.replace(descriptor.load(schema, &mut f), &mut f);
         descriptor.clear(&mut f);
         entry.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         output.load(schema, &mut f);

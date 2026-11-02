@@ -22,6 +22,9 @@ An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-c
 can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
+Math, Reflect, JSON, Atomics and the Object, Array and String prototypes use
+complete immutable property layouts with per-Realm value identity. Reads
+materialize individual values; mutation converts the object to ordinary storage.
 Runtime initialization uses compact intrinsic-installation tables and defers
 the Error, Date, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
@@ -107,7 +110,7 @@ profiles and the other 15 original programs stay byte-identical. That checkpoint
 retains its slower sort, join and retained-object reference processes.
 The [local gap diagnosis](docs/rust-rewrite/performance-gaps-20261101.json) records
 median and mean wins on 2/17 V8 and 5/17 Scriptc cases in ordinary execution;
-a separate precompiled comparison records 4/17 Scriptc wins. The corrected
+a separate precompiled comparison records 4/17 Scriptc wins. That cohort's
 480-process identical-binary control failed its worker-CPU gate, so the
 primitive-append prototype remains unbuilt. Precompiled profiling measures
 initialization-worker CPU separately from caller CPU. Failed controls and all
@@ -117,6 +120,16 @@ finds guarded whole-loop shortcuts where Scriptc still executes the loops.
 It motivates work on fresh intrinsic dictionaries and property lookup. Literal-key
 cleanup reduces worker instruction counts about 0.9% on two join cases; timing
 remains unqualified, including slower large-join means.
+
+The [intrinsic-layout comparison](docs/rust-rewrite/performance-gaps-20261101.json)
+replaces eager property graphs with shared immutable layouts and per-Realm value
+caches. Across 30 unchanged workloads, execution median geometric means fall
+**13.8–13.9%** in both balanced orders; every case has lower medians and means.
+Its fresh 480-process identical-binary control passes. The separate original
+17-case precompiled comparison improves from **4/17 to 6/17 Scriptc wins**;
+the median geometric mean remains **1.082–1.084× Scriptc**. Every-case parity
+remains open, including mixed joins at about 2.8×. Peak RSS stays approximately
+flat and R grows; this does not refresh ordinary CLI or V8 results.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two

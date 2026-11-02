@@ -418,8 +418,8 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
         .iter()
         .map(|(_, _, count)| *count as usize)
         .sum::<usize>();
-    assert!(spans.len() >= 40 && total_rows > 400,
-        "the complete Realm graph batches methods across builtin families: {} spans, {total_rows} rows", spans.len());
+    assert!(spans.len() >= 40 && total_rows > 300,
+        "remaining dictionary-backed families retain batched installation after complete intrinsic layouts remove their eager rows: {} spans, {total_rows} rows", spans.len());
     let direct_installs = bootstrap
         .iter()
         .chain(temporal.iter())
@@ -506,9 +506,11 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
             nonwritable += usize::from(words[3] & 1 == 0);
         }
     }
+    // String's iterator now belongs to its complete intrinsic layout. The
+    // remaining dictionary rows must still exercise both encoding domains.
     assert!(
-        symbols >= 4 && nonwritable >= 1,
-        "actual rows exercise Symbol identity and nonuniform writable attributes"
+        symbols > 0 && nonwritable > 0,
+        "remaining rows exercise Symbol identity and nonuniform writable attributes: {symbols} Symbols, {nonwritable} nonwritable rows"
     );
     eprintln!("compact Realm bootstrap: {bootstrap_bytes} encoded body bytes, {total_rows} batched method rows, {direct_installs} direct deferred installations");
 }

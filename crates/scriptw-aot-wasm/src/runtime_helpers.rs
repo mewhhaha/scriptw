@@ -728,7 +728,7 @@ pub(crate) struct RuntimeHelperIntrinsicKeyParameter {
 mod intrinsic_installation_rows;
 pub(crate) use intrinsic_installation_rows::{
     RuntimeHelperInstallationSpanParameter, RuntimeHelperIntrinsicKeyArgument,
-    RuntimeHelperStandardBuiltinArgument,
+    RuntimeHelperPropertyLayoutRow, RuntimeHelperStandardBuiltinArgument,
 };
 impl RuntimeHelperIntrinsicKeyParameter {
     pub(crate) fn is_symbol(&self) -> I32Local {
@@ -1146,6 +1146,8 @@ runtime_helper_domain! {
     ObjectDefineData / ObjectDefineDataArguments / ObjectDefineDataParameters / "object_define_data" { target:Value,key:Key,value:Value,writable:I32,enumerable:I32,configurable:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     OrdinaryPropertyStorageEnsure / OrdinaryPropertyStorageEnsureArguments / OrdinaryPropertyStorageEnsureParameters / "ordinary_property_storage_ensure" { object:(Ref OrdinaryObject NonNullable) } => (Ref OrdinaryPropertyStorage NonNullable);
     OrdinaryOwnDescriptor / OrdinaryOwnDescriptorArguments / OrdinaryOwnDescriptorParameters / "ordinary_own_descriptor" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyDescriptor Nullable);
+    IntrinsicPropertyFind / IntrinsicPropertyFindArguments / IntrinsicPropertyFindParameters / "intrinsic_property_find" { storage:(Ref IntrinsicPropertyStorage NonNullable),key:Key } => I32;
+    IntrinsicPropertyValue / IntrinsicPropertyValueArguments / IntrinsicPropertyValueParameters / "intrinsic_property_value" { storage:(Ref IntrinsicPropertyStorage NonNullable),index:I32,setter:I32 } => (Ref PropertyValue NonNullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
     CompactDataStore / CompactDataStoreArguments / CompactDataStoreParameters / "compact_data_store" { storage:(Ref CompactDataStorage NonNullable),slot:I32,value:Value } => Void;
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
@@ -1322,6 +1324,7 @@ impl RuntimeHelperId {
             Self::ObjectDefineData => HelperOwner::Runtime,
             Self::OrdinaryPropertyStorageEnsure => HelperOwner::Runtime,
             Self::OrdinaryOwnDescriptor => HelperOwner::Runtime,
+            Self::IntrinsicPropertyFind | Self::IntrinsicPropertyValue => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
             Self::CompactDataStore => HelperOwner::Runtime,
             Self::IntrinsicDataPublish => HelperOwner::Runtime,
@@ -1483,6 +1486,7 @@ impl RuntimeHelperId {
             Self::ObjectDefineData => true,
             Self::OrdinaryPropertyStorageEnsure => true,
             Self::OrdinaryOwnDescriptor => true,
+            Self::IntrinsicPropertyFind | Self::IntrinsicPropertyValue => true,
             Self::CompactLiteralAllocate => true,
             Self::CompactDataStore => true,
             Self::IntrinsicDataPublish => true,

@@ -1,6 +1,7 @@
-//! Intrinsic methods preserve their canonical property installation order.
+//! Constructor properties and the complete canonical Array prototype layout.
 
 use super::super::*;
+use super::IntrinsicPropertyLayoutId;
 use super::{IntrinsicInstall, IntrinsicKey};
 use crate::objects::{AccessorDescriptor, AccessorGetter};
 
@@ -24,75 +25,27 @@ impl FunctionBuilder<'_> {
             true,
             function,
         )?;
-        self.emit_install_intrinsic_methods(
-            context.prototype,
-            crate::intrinsics::IntrinsicMethodPlan::ArrayPrototype,
-            context.realm,
-            function,
-        )?;
-        self.emit_install_intrinsic_method_aliases(
-            context.prototype,
-            &[
-                IntrinsicKey::Name("values"),
-                IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Iterator),
-            ],
+        // Internal consumers read these canonical Realm slots before any public
+        // property observation. Their identities remain eager, without descriptors.
+        for builtin in [
+            StandardBuiltinId::TypedArrayPrototypeToString,
             StandardBuiltinId::ArrayPrototypeValues,
-            context.realm,
-            true,
-            true,
-            function,
-        )?;
-        // Arguments objects capture the exact installed canonical values function
-        // through its strong Realm intrinsic slot, without a public property Get.
+        ] {
+            let callable = self.emit_intrinsic_callable(builtin, context.realm, function)?;
+            callable.clear(function);
+        }
         let schema = self.runtime_schema();
-        let unscopables = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(None, function)?,
+        let prototype = schema.reserve_gc_local(function).initialize(
+            self.emit_object_header_projection(context.prototype, function),
             function,
         );
-        let object = schema.reserve_value_local(function);
-        object.set_reference(&unscopables, schema, function);
-        let value = schema.reserve_value_local(function);
-        value.set_scalar(crate::gc_types::ScalarValue::Boolean(true), function);
-        for name in [
-            "at",
-            "copyWithin",
-            "entries",
-            "fill",
-            "find",
-            "findIndex",
-            "findLast",
-            "findLastIndex",
-            "flat",
-            "flatMap",
-            "includes",
-            "keys",
-            "toReversed",
-            "toSorted",
-            "toSpliced",
-            "values",
-        ] {
-            self.emit_install_intrinsic_data(
-                &object,
-                IntrinsicKey::Name(name),
-                &value,
-                true,
-                true,
-                true,
-                function,
-            )?;
-        }
-        self.emit_install_intrinsic_data(
-            context.prototype,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Unscopables),
-            &object,
-            false,
-            false,
-            true,
+        self.emit_install_intrinsic_property_layout(
+            &prototype,
+            IntrinsicPropertyLayoutId::ArrayPrototype,
+            context.realm.realm(),
             function,
         )?;
-        value.clear(function);
-        object.clear(function);
-        unscopables.clear(function);
+        prototype.clear(function);
         Ok(())
     }
 }

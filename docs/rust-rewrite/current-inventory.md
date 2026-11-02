@@ -11,11 +11,14 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 - Every-case V8/Scriptc execution and RSS parity remains open. The
   [gap diagnosis](performance-gaps-20261101.json) separates reference cohorts,
   actual five-case LLVM/final-Wasm differences and limited worker-IP samples.
-  Literal String `GetV` cleanup has source-bound correctness and an instruction
-  diagnostic; it does not qualify a hot speedup. Preserve failed A/A gates and
-  keep the primitive-append region parked. Next, measure a complete fresh
-  intrinsic dictionary recipe that removes duplicate-key probes and growth
-  while preserving per-Realm descriptors, identity and own-key order.
+  Complete shared intrinsic layouts pass the fresh 480-process A/A and 30-case
+  regression screens. The separate precompiled reference wins 6/17 cases;
+  its median geometric mean remains 1.082–1.084× Scriptc. Validate the isolated
+  RegExp demand family next, then remove remaining eager intrinsic dictionaries
+  at object allocation, including constructor headers/statics. Canonical reads
+  must distinguish ready slots from demand-owned slots before extending recipes.
+  Profile current lookup paths before adding prototype-cache invalidation.
+  Preserve failed historical controls and keep the primitive-append region parked.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.

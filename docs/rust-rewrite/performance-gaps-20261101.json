@@ -1,7 +1,7 @@
 {
   "schema": "scriptw-performance-gap-diagnosis-v2",
   "date": "2026-11-02",
-  "status": "Separate historical references, final-output inspection and correctness-qualified literal-key cleanup; no qualified hot speedup.",
+  "status": "Qualified local precompiled intrinsic-layout improvement with passing fresh A/A and 30-case screen; six of17 Scriptc wins, every-case parity open. Historical controls remain distinct.",
   "overall_v8_scriptc_parity": "open",
   "history": {
     "previous_committed_checkpoint": {
@@ -1604,5 +1604,363 @@
       "docs/rust-rewrite/performance-gaps-20261101-followup-inert.tar.xz (untouched)"
     ],
     "verification": "Every logical archive member is regular/safe UTF-8 and matches INDEX SHA-256/size; payloads streamed under explicit bounds."
+  },
+  "intrinsic_layouts": {
+    "status": "qualified_local_precompiled_improvement",
+    "source_fingerprint": "5356de3d64998996d0accb47084fee47591ac0211fec384792ff0ba55c6bf08b",
+    "baseline_source_fingerprint": "f30b53340b4e54d529a7db3e1351a84230326fdf04d5b26c0126f242a2275ce0",
+    "source_event": {
+      "path": "source-event-benchmark.json",
+      "sha256": "87839367041c2f4641bbc4163b21adc7d1482d45ade9eb4c17510cf042b6dad0"
+    },
+    "source_patch": {
+      "path": "source-benchmark.patch",
+      "sha256": "787358ab4c894e997b8ce9577d07cb2b438aca4c39b0d4cac3442d3e23c58157"
+    },
+    "mechanism": "Complete shared immutable intrinsic property layouts; defining-Realm group caches on observation; private one-way dictionary promotion; canonical cold-loop guards and indexed-prototype absence proof.",
+    "native_selected_unique": 1789,
+    "correctness_entries": 120,
+    "aa": {
+      "processes": 480,
+      "quality_gate": "pass",
+      "flags": [],
+      "evidence": {
+        "path": "paired/aa-candidate/analysis.json",
+        "sha256": "5d4f2d803850c485d521ebaa42017a359846cdffbc2694fa784262805edafbee"
+      }
+    },
+    "screen": {
+      "processes": 480,
+      "cases": 30,
+      "every_case_lower_median_and_mean_both_blocks": true,
+      "repeated_regression_flags": [],
+      "geometric_means": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.860689223556485,
+            "mean": 0.8508298343352815
+          },
+          "worker_cpu_ns": {
+            "median": 0.8560015994452467,
+            "mean": 0.8464251128055466
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.8618632207276723,
+            "mean": 0.8632278430822432
+          },
+          "worker_cpu_ns": {
+            "median": 0.8577347827478659,
+            "mean": 0.8586614307511342
+          }
+        }
+      ],
+      "evidence": {
+        "path": "paired/screen-candidate/analysis.json",
+        "sha256": "e32cbe5b59c983ed4c7174f3d2b789b0b6b2b6af46082c4b4c1c5e158e5cec54"
+      }
+    },
+    "original17_reference": {
+      "baseline_wins": [
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js"
+      ],
+      "candidate_wins": [
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-small-1024.js"
+      ],
+      "baseline_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 1.3134954983101108,
+            "mean": 1.3104892496088802
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 1.315063617051646,
+            "mean": 1.3097639673635426
+          }
+        }
+      ],
+      "candidate_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 1.0840613775466577,
+            "mean": 1.0811197962447632
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 1.0815242420027238,
+            "mean": 1.0795642139675063
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "path": "paired/reference-baseline/analysis.json",
+          "sha256": "f8991393fec909685e9a74c1763ebb95ef6a8da51479ed5135cef3dcd278adf1"
+        },
+        {
+          "path": "paired/reference-candidate/analysis.json",
+          "sha256": "1027eb0a7ae0b8007a239dbe0a65cdab19843f6b8534fd94c121d705f9e9f3cd"
+        }
+      ],
+      "limits": "Compare wall only across runtimes; WASI includes _start and stdout/stderr reads, Scriptw includes initialization/native main+completion. Neither score refreshes ordinary CLI/V8 cohorts.",
+      "overall_parity": "open"
+    },
+    "instructions": {
+      "processes": 96,
+      "events_unavailable": 0,
+      "ratios": {
+        "integer.js": [
+          0.7722219665884428,
+          0.7721260308265184
+        ],
+        "numeric-loop-10000.js": [
+          0.766721044045677,
+          0.7667755163983028
+        ],
+        "sort-reverse-128.js": [
+          0.8102057440268209,
+          0.8102144576949593
+        ],
+        "join-4096.js": [
+          0.8596267917712587,
+          0.8596232652034569
+        ],
+        "join-mixed-1024.js": [
+          0.8727382091839148,
+          0.8727527021675531
+        ],
+        "first-row-proxy.js": [
+          0.9825413630060461,
+          0.9825454664462978
+        ]
+      },
+      "evidence": {
+        "path": "entry-counts/analysis.json",
+        "sha256": "4268351e82c91c8a2ff039c6fc32a7f2d78b0823f4f6a9b62e452b5882a542c8"
+      },
+      "limits": "Worker-TID perf window diagnostic; excludes no Realm work but includes dispatch/idle/endpoint fringe. No speed claim from counters."
+    },
+    "runtime_delta": {
+      "path": "runtime-delta.json",
+      "sha256": "7fa1f0cbbeda9b1d7489f64996c4abeed41b81de54d914fa2df5297bac36da72"
+    },
+    "rejected_prototype": {
+      "source_fingerprint": "fa19608ecabb185ff8c483197f9676eb653b0053de522c3bfbc7af11a1be7824",
+      "reason": "Cache/dictionary-only native guard rejected fresh layout and disabled whole-loop integer shortcut; ~30.78x instructions/~20.9x worker CPU. Preserved rejected product/evidence; corrected guard verified by maximal affine regression.",
+      "additional_corrections": "Eliminate repeated sealed-row span checks; skip numeric prototype probes only on validated index-free immutable layouts; remove unnecessary Realm edge from data-only unscopables."
+    },
+    "remaining": "Fixed fresh-Realm floor, inherited method lookup and mixed-join code/dispatch; Astra ranks isolated RegExp demand next, complete remaining eager layout construction next, prototype cache third.",
+    "limitations": [
+      "1789 selected native checks, not full workspace or Test262.",
+      "14 Intl source-identity checks reproduce unchanged at clean HEAD6158; recorded in rejected-cohort baseline audit.",
+      "Peak RSS approximately flat; raw R grows92707B/native400616B on both Cargo graphs.",
+      "All30 P files change; sources/checksums/settings unchanged. No runtime/program-byte invariance claim.",
+      "Old failed controls remain failed in their original cohorts; fresh passing AA does not rewrite them."
+    ],
+    "reference_cases": {
+      "sort-reverse-128.js": {
+        "scriptw_over_scriptc_median": [
+          1.6986359793189623,
+          1.6954752457390208
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.6882598835976868,
+          1.6964433305131803
+        ]
+      },
+      "sort-reverse-512.js": {
+        "scriptw_over_scriptc_median": [
+          1.1981116940326593,
+          1.1807307576064343
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.1925512538126426,
+          1.1823458416619124
+        ]
+      },
+      "sort-sorted-512.js": {
+        "scriptw_over_scriptc_median": [
+          1.179182538377315,
+          1.1936981282927905
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.1688372797753768,
+          1.1868592682271921
+        ]
+      },
+      "to-sorted-512.js": {
+        "scriptw_over_scriptc_median": [
+          1.1000910972423106,
+          1.1027524162177336
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.094623694298506,
+          1.0974901479589725
+        ]
+      },
+      "join-1024.js": {
+        "scriptw_over_scriptc_median": [
+          1.546715335031555,
+          1.5345239478961308
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.5370041776386538,
+          1.542096615688026
+        ]
+      },
+      "join-4096.js": {
+        "scriptw_over_scriptc_median": [
+          1.4377475407212141,
+          1.3897264779170648
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.4993400128281043,
+          1.4155381449460487
+        ]
+      },
+      "join-mixed-1024.js": {
+        "scriptw_over_scriptc_median": [
+          2.8471451809528046,
+          2.8385771647010016
+        ],
+        "scriptw_over_scriptc_mean": [
+          2.8187710401635897,
+          2.7757955469289843
+        ]
+      },
+      "numeric-loop-10000.js": {
+        "scriptw_over_scriptc_median": [
+          1.7259907661925222,
+          1.7370038918826447
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.7212971279099496,
+          1.7200474259165788
+        ]
+      },
+      "numeric-loop-50000.js": {
+        "scriptw_over_scriptc_median": [
+          0.879409867608313,
+          0.90520540744756
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.8790226733216226,
+          0.9017217578589303
+        ]
+      },
+      "folded-string-4096.js": {
+        "scriptw_over_scriptc_median": [
+          0.3389292048051332,
+          0.33705442058773205
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.3302456437518277,
+          0.3403441676896301
+        ]
+      },
+      "dynamic-string-4096.js": {
+        "scriptw_over_scriptc_median": [
+          1.3854250481176515,
+          1.3847067335811516
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.3841473131098563,
+          1.381715072333318
+        ]
+      },
+      "integer.js": {
+        "scriptw_over_scriptc_median": [
+          2.2795508881536133,
+          2.2654480429167494
+        ],
+        "scriptw_over_scriptc_mean": [
+          2.294937523642975,
+          2.252446509185605
+        ]
+      },
+      "objects.js": {
+        "scriptw_over_scriptc_median": [
+          0.7160217400458556,
+          0.7216934964159796
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.7112121870651223,
+          0.7213954240260366
+        ]
+      },
+      "retained-objects.js": {
+        "scriptw_over_scriptc_median": [
+          0.25819283346921146,
+          0.2541691690169399
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.25692349904310574,
+          0.25537135263285093
+        ]
+      },
+      "join-empty-1024.js": {
+        "scriptw_over_scriptc_median": [
+          0.6065351361295069,
+          0.6017594514754594
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.6063574966073118,
+          0.6002397348124756
+        ]
+      },
+      "join-singleton-1024.js": {
+        "scriptw_over_scriptc_median": [
+          1.3159788082935444,
+          1.3226983626477578
+        ],
+        "scriptw_over_scriptc_mean": [
+          1.3105448108342412,
+          1.3119859454469442
+        ]
+      },
+      "join-small-1024.js": {
+        "scriptw_over_scriptc_median": [
+          0.9841459141109843,
+          0.9787652904112858
+        ],
+        "scriptw_over_scriptc_mean": [
+          0.976460898888271,
+          0.973903737254172
+        ]
+      }
+    },
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-intrinsic-layouts-20261102-inert.tar.xz",
+      "sha256": "31c2ad9f1b9c13d421de1655f14c1fb263f05d1d58470ba76e4b115306a93ba5",
+      "bytes": 8789988,
+      "regular_utf8_members": 7786,
+      "expanded_utf8_bytes": 563423508,
+      "index_sha256": "f1a72d8f3ca8205cc45eea293dbdd75949d84b6e99165cce757535ca7600009a",
+      "verification": "Regular safe UTF-8 members streamed and checked against indexed size and SHA-256 after archive creation.",
+      "cohorts": [
+        "performance-first-principles-20261102 (rejected prototype, source fa19608)",
+        "performance-intrinsic-layouts-20261102 (accepted corrected source5356)"
+      ],
+      "excluded": "Native/Wasm images, executables, caches and separate unbuilt RegExp worktree."
+    },
+    "publication_source_boundary": "Benchmark event includes complete42-path pre-build source and patch. Publication changes README/current inventory, this report and inert evidence only; all40 Rust source files retain exact measured hashes. Commit identity is later and is not substituted into frozen products."
   }
 }

@@ -100,9 +100,6 @@ impl JoinedStringArrayLength {
         let prototype_header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(function)
             .initialize_null(s, function);
-        let cached_key = s
-            .reserve_gc_local::<StringValue, Nullable>(function)
-            .initialize_null(s, function);
         let values = s
             .reserve_gc_local::<PackedValueTable, Nullable>(function)
             .initialize_null(s, function);
@@ -217,15 +214,7 @@ impl JoinedStringArrayLength {
         );
         projection.set_reference(&projected, s, function);
         projected.clear(function);
-        let cached = self.key.cached(builder, function);
-        cached_key.replace(cached.load(s, function), function);
-        cached.clear(function);
-        cached_key.load(s, function).is_null(function);
-        builder.emit_branch_if_to_target(decline, function);
-        let key = s.reserve_gc_local(function).initialize(
-            cached_key.load(s, function).require_non_null(function),
-            function,
-        );
+        let key = self.key.resolve(builder, function)?;
         let property = PropertyKeyLocals::from_string(s, &key, function);
         emit_own_native_method_guard(
             builder,
@@ -382,7 +371,6 @@ impl JoinedStringArrayLength {
         string.clear(function);
         stored.clear(function);
         values.clear(function);
-        cached_key.clear(function);
         prototype_header.clear(function);
         prototype.clear(function);
         dictionary.clear(function);

@@ -5,7 +5,7 @@ use crate::gc_types::*;
 use scriptw_runtime::AgentHostOperation;
 mod wait_async_result;
 
-pub(super) const ATOMICS_PUBLICATION_ORDER: [StandardBuiltinId; 14] = [
+pub(crate) const ATOMICS_PUBLICATION_ORDER: [StandardBuiltinId; 14] = [
     StandardBuiltinId::AtomicsAdd,
     StandardBuiltinId::AtomicsAnd,
     StandardBuiltinId::AtomicsCompareExchange,

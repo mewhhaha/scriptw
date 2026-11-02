@@ -5,6 +5,7 @@ const DOMAIN: &str = include_str!("../../src/objects/accessor_descriptor.rs");
 const OBJECTS: &str = include_str!("../../src/objects.rs");
 const DEFINE: &str = include_str!("../../src/objects/define_property.rs");
 const INTRINSICS: &str = include_str!("../../src/intrinsics/mod.rs");
+const INTRINSIC_LAYOUTS: &str = include_str!("../../src/intrinsics/property_layouts.rs");
 const OBJECT_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/object.rs");
 const FUNCTION_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/functions.rs");
 const TYPED_ARRAY_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/typed_array.rs");
@@ -193,7 +194,6 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         ("intrinsics/intl.rs", [0, 1, 0, 0, 0]),
         ("intrinsics/iterator.rs", [2, 0, 0, 0, 0]),
         ("intrinsics/mod.rs", [0, 1, 0, 0, 1]),
-        ("intrinsics/object.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/promise.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/regexp.rs", [2, 0, 0, 0, 0]),
         ("intrinsics/resource_management.rs", [1, 0, 0, 0, 0]),
@@ -209,15 +209,18 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         .collect::<Vec<_>>()
         .join("\n");
     for (role, count) in [
-        ("AccessorGetter::new(", 25),
-        ("AccessorSetter::new(", 4),
+        ("AccessorGetter::new(", 24),
+        ("AccessorSetter::new(", 3),
         ("AccessorGetterLocals::new(", 6),
         ("AccessorSetterLocals::new(", 5),
-        ("AccessorDescriptor::", 25),
+        ("AccessorDescriptor::", 24),
         ("AccessorDescriptorLocals::", 7),
     ] {
         assert_eq!(producers.matches(role).count(), count, "{role}");
     }
+    assert!(normalized(INTRINSIC_LAYOUTS).contains(
+        "plan.accessor(IntrinsicKey::Name(\"__proto__\"),StandardBuiltinId::ObjectPrototypeProtoGetter,StandardBuiltinId::ObjectPrototypeProtoSetter,);"
+    ), "Object.prototype __proto__ accessors remain an explicit typed layout recipe");
 }
 
 #[test]

@@ -2,8 +2,8 @@
 //! receiver/length work. No JavaScript runs inside the validated borrow.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, JavaScriptObject, NumberBitsI64Array,
-    PackedValueTable, ValueArray,
+    ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, IntrinsicPropertyStorage,
+    JavaScriptObject, NumberBitsI64Array, PackedValueTable, ValueArray,
 };
 
 mod fixed_push;
@@ -266,7 +266,8 @@ impl FunctionBuilder<'_> {
 
     /// Bounded and conservative: Array prototypes must have no indexed own
     /// properties; ordinary prototypes must have no descriptor for any append
-    /// key. In particular mutable intrinsic prototypes receive the same checks.
+    /// key, unless sealed intrinsic storage proves there are no Array-index keys.
+    /// Mutation promotes that storage to a dictionary and restores those checks.
     /// Other exotics, proxies and longer chains decline without invoking traps.
     fn emit_packed_push_prototypes_permit_append(
         &mut self,
@@ -346,6 +347,18 @@ impl FunctionBuilder<'_> {
                 .nullable(),
             f,
         );
+        // The validated layout constructor excludes canonical Array-index keys.
+        // Read the actual storage each time: any property mutation promotes it.
+        let properties = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        properties.is_subtype::<IntrinsicPropertyStorage>(s, f);
+        properties.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         start.load(f);
         index.store(f);
         let checked = self.open_frame(ControlFrameKind::Block, f);
@@ -383,6 +396,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

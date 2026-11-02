@@ -741,6 +741,23 @@ finalTest() && Object.is(falseTest(-0),0);
 }
 
 #[test]
+fn scalar_whole_trip_affine_accepts_untouched_intrinsic_layout() {
+    // No earlier Math.imul read may warm the key or materialize its callable.
+    // A dictionary-only guard still computes the same answer, but cannot finish
+    // this maximal admitted affine trip within the execution deadline.
+    assert_scalar_execution(
+        r#"
+function run(value) {
+  "use strict";
+  for(var index=0;index<2147483647;index++) value=(Math.imul(value,1)+1)>>>0;
+  return value===2147483648 && index===2147483647;
+}
+run(1);
+"#,
+    );
+}
+
+#[test]
 fn scalar_whole_trip_affine_literal_counts_match_while_state_and_counter() {
     let mut source = String::from(
         r#"

@@ -7,6 +7,8 @@ pub(crate) use shared_pool_storage::PoolBytes;
 use shared_pool_storage::PoolStringRefs;
 mod compiler_owned_pool;
 mod intrinsic_installations;
+mod intrinsic_property_layouts;
+pub(crate) use intrinsic_property_layouts::{RPropertyLayoutRows, RPropertyLayoutSpan};
 mod runtime_string_descriptors;
 pub(crate) use intrinsic_installations::{RInstallationRows, RInstallationSpan};
 pub(crate) use program_metadata::{
@@ -442,6 +444,8 @@ pub(crate) struct StringPool {
     shared_prefix: Option<std::sync::Arc<CompilerOwnedPool>>,
     runtime_string_descriptors: Option<RuntimeStringDescriptors>,
     runtime_intrinsic_installations: Option<intrinsic_installations::RuntimeIntrinsicInstallations>,
+    runtime_intrinsic_property_layouts:
+        Option<intrinsic_property_layouts::RuntimeIntrinsicPropertyLayouts>,
     intl_supported_values: Option<Result<CompiledSupportedValuesTables, SupportedValuesPoolError>>,
     intl_default_locale: Option<scriptw_intl::CanonicalLocaleId>,
     pub(crate) bytes: PoolBytes,
@@ -2215,8 +2219,10 @@ impl CompilerOwnedPool {
         }
         // Names are complete and R-owned before installation keys are proved.
         // Seal the final static boundary only after appending checked metadata.
+        pool.collect_intrinsic_property_layout_strings()?;
         pool.compiler_owned = pool.boundary();
         pool.append_runtime_intrinsic_installations(function_metas)?;
+        pool.append_runtime_intrinsic_property_layouts(function_metas)?;
         pool.append_runtime_string_descriptors()?;
         pool.compiler_owned = pool.boundary();
         Ok(Self(pool))

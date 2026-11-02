@@ -4,13 +4,14 @@
 use super::*;
 use crate::gc_types::{
     CodeUnitArray, CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability,
-    StringValue, StringValueSchema,
+    PrimitiveBox, PrimitiveBoxSchema, StringValue, StringValueSchema,
 };
 
 impl FunctionBuilder<'_> {
-    /// Plain objects have ordinary data semantics. Callable headers join this
-    /// path only while their own storage is compact native metadata; source or
-    /// promoted callable dictionaries retain legacy reflection handling.
+    /// Plain objects and primitive boxes check ordinary own properties first.
+    /// A boxed String miss retains its virtual character-index lookup; accessors
+    /// retain the original receiver. Callable headers join only while their
+    /// storage is compact native metadata, preserving legacy reflection.
     pub(in crate::objects) fn emit_simple_data_header(
         &mut self,
         target: &ValueLocals,
@@ -33,6 +34,27 @@ impl FunctionBuilder<'_> {
                 .nullable(),
             function,
         );
+        function.instruction(&Instruction::Else);
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<PrimitiveBox>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let boxed = schema.reserve_gc_local(function).initialize(
+            target.cast_reference::<PrimitiveBox>(schema, function),
+            function,
+        );
+        result.replace(
+            schema
+                .field(PrimitiveBoxSchema::OBJECT)
+                .read(&boxed, schema, function)
+                .reference()
+                .nullable(),
+            function,
+        );
+        boxed.clear(function);
         function.instruction(&Instruction::Else);
         target.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
@@ -67,6 +89,8 @@ impl FunctionBuilder<'_> {
         storage.clear(function);
         header.clear(function);
         callable.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);

@@ -52,9 +52,6 @@ impl FunctionBuilder<'_> {
         // Canonical indices live exclusively in ArrayObject. Classify
         // the already-converted key before probing the named-property header.
         // Holes and accessors still leave `handled` false for generic [[Get]].
-        let descriptor = schema
-            .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
-            .initialize_null(schema, function);
         let index = schema.reserve_i32_local(function);
         let indexed = schema.reserve_i32_local(function);
         self.emit_property_key_array_index(key, index, indexed, function)?;
@@ -83,52 +80,17 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let named = self.emit_ordinary_own_descriptor_reference(&header, key, function)?;
-        descriptor.replace(named.load(schema, function), function);
-        named.clear(function);
+        self.emit_ordinary_own_data_value(&header, key, &value, handled, function)?;
+        handled.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        result.set_normal(&value, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         header.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i32_local(indexed, function);
         schema.release_i32_local(index, function);
-        descriptor.load(schema, function).is_null(function);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        let present = schema.reserve_gc_local(function).initialize(
-            descriptor.load(schema, function).require_non_null(function),
-            function,
-        );
-        let flags = schema.reserve_i32_local(function);
-        schema
-            .struct_type::<PropertyDescriptor>()
-            .field(PropertyDescriptorSchema::FLAGS)
-            .read(&present, schema, function)
-            .store(flags, function);
-        flags.load(function);
-        function.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
-        function.instruction(&Instruction::I32And);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<PropertyDescriptor>()
-                .field(PropertyDescriptorSchema::VALUE)
-                .read(&present, schema, function)
-                .reference(),
-            function,
-        );
-        self.emit_property_value_into(&stored, &value, function);
-        result.set_normal(&value, function);
-        function.instruction(&Instruction::I32Const(1));
-        handled.store(function);
-        stored.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        schema.release_i32_local(flags, function);
-        present.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        descriptor.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i32_local(length_key, function);

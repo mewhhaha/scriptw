@@ -74,6 +74,7 @@ struct NativeSnapshot<'a, S: AsContextMut<Data = WasmHostState>> {
     store: &'a mut S,
     witnesses: Vec<(L, HeapType)>,
     resolve_property_value: wasmtime::Func,
+    ensure_property_storage: wasmtime::Func,
     entry: Rooted<EqRef>,
     realms: Vec<Rooted<EqRef>>,
     symbols: Rooted<EqRef>,
@@ -118,9 +119,16 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
                 scriptw_aot_wasm::SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
             )
             .ok_or_else(|| invariant("snapshot property resolver absent"))?;
+        let ensure_property_storage = instance
+            .get_func(
+                &mut *store,
+                scriptw_aot_wasm::SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
+            )
+            .ok_or_else(|| invariant("snapshot property storage resolver absent"))?;
         let mut backend = Self {
             store,
             resolve_property_value,
+            ensure_property_storage,
             witnesses,
             entry,
             realms: Vec::new(),
@@ -889,7 +897,27 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 },
             ));
         }
-        let storage = self.required_reference(header, F::ObjectProperties)?;
+        let mut storage = self.required_reference(header, F::ObjectProperties)?;
+        if self.has_layout(storage, L::IntrinsicStorage)? {
+            let count = match self.field(storage, F::IntrinsicCount)? {
+                WasmtimeVal::I32(count) => count as u32,
+                _ => return Err(invariant("invalid intrinsic property extent")),
+            };
+            if count as usize > remaining.saturating_sub(ordered.len()) {
+                return Err(cap(SnapshotBudgetDimension::Properties));
+            }
+            budget.work(count as usize)?;
+            let mut results = [WasmtimeVal::AnyRef(None)];
+            self.ensure_property_storage
+                .call(
+                    &mut *self.store,
+                    &[WasmtimeVal::AnyRef(Some(header.to_anyref()))],
+                    &mut results,
+                )
+                .map_err(invariant)?;
+            storage = eq_reference(self.store, results[0].clone())?
+                .ok_or_else(|| invariant("property storage resolver returned null"))?;
+        }
         let compact_kind = if self.has_layout(storage, L::ArrayCompactStorage)? {
             Some(NativeCompactStorageKind::Arrays)
         } else if self.has_layout(storage, L::InlineCompactStorage)? {

@@ -1392,6 +1392,8 @@ fn emit_script_module_with_factory(
         register_runtime_helper!(
             OrdinaryPropertyStorageEnsure, compile_ordinary_property_storage_ensure_helper;
             OrdinaryOwnDescriptor, compile_ordinary_own_descriptor_helper;
+            IntrinsicPropertyFind, compile_intrinsic_property_find_helper;
+            IntrinsicPropertyValue, compile_intrinsic_property_value_helper;
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
             CompactDataStore, compile_compact_data_store_helper;
             NativeFunctionAllocate, compile_native_function_allocate_helper;

@@ -1,15 +1,14 @@
-//! Invariant native methods are selected by nonallocating metadata guards.
+//! Invariant native methods use own-data reads and actual code/Realm identity.
 use super::*;
 use crate::data::{PooledLiteralDomain, StringPool};
 use crate::gc_types::{
-    DeferredIntrinsicValue, DeferredIntrinsicValueSchema, ExecutableCodeKind, ExecutableCodeSchema,
-    FunctionContextSchema, FunctionObjectSchema, GcI32Constant, GcNullability,
-    OrdinaryPropertyStorage, PooledStringTable, PropertyValue,
+    ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema, FunctionObjectSchema,
+    GcI32Constant, GcNullability, PooledStringTable,
 };
 use crate::operations::PropertyKeyLocals;
 
 /// Construction proves this ordinal belongs to R, never a Program literal.
-/// Emission reads only an existing cache entry; an absent name declines.
+/// Cache-only consumers may decline; native-method guards can resolve the key.
 #[derive(PartialEq, Eq)]
 pub(super) struct CachedRuntimeName(u32);
 
@@ -43,6 +42,23 @@ impl CachedRuntimeName {
         schema.release_i32_local(index, function);
         table.clear(function);
         cached
+    }
+
+    /// Resolve only the validated primitive name, without a JavaScript read.
+    pub(super) fn resolve(
+        &self,
+        builder: &FunctionBuilder<'_>,
+        function: &mut Function,
+    ) -> Result<GcLocal<StringValue>, EmitError> {
+        let schema = builder.runtime_schema();
+        let index = schema.reserve_i32_local(function);
+        index.set_constant(self.0 as i32, function);
+        let name = schema.reserve_gc_local(function).initialize(
+            schema.resolve_pooled_string_reference(index, builder.runtime_helper_base()?, function),
+            function,
+        );
+        schema.release_i32_local(index, function);
+        Ok(name)
     }
 }
 
@@ -172,23 +188,7 @@ impl InvariantImul {
                 let global = schema.reserve_value_local(function);
                 builder.emit_execution_global_object_to_locals(&global, function);
                 let property = PropertyKeyLocals::from_string(schema, &key, function);
-                let stored = own_data(builder, &global, &property, function)?;
-                stored.is_subtype::<StoredValue>(schema, function);
-                builder.open_frame(ControlFrameKind::If, function);
-                let value = schema.reserve_gc_local(function).initialize(
-                    stored
-                        .load(schema, function)
-                        .cast_subtype::<StoredValue>(schema, function),
-                    function,
-                );
-                schema
-                    .struct_type::<StoredValue>()
-                    .read_into(&value, &receiver, schema, function);
-                accepted.set_constant(1, function);
-                value.clear(function);
-                builder.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                stored.clear(function);
+                own_data(builder, &global, &property, &receiver, accepted, function)?;
                 property.clear(function);
                 global.clear(function);
                 builder.pop_control(ControlFrameKind::If);
@@ -204,14 +204,7 @@ impl InvariantImul {
         accepted.load(function);
         builder.open_frame(ControlFrameKind::If, function);
         accepted.set_constant(0, function);
-        let cached = self.key.cached(builder, function);
-        cached.load(schema, function).is_null(function);
-        function.instruction(&Instruction::I32Eqz);
-        builder.open_frame(ControlFrameKind::If, function);
-        let key = schema.reserve_gc_local(function).initialize(
-            cached.load(schema, function).require_non_null(function),
-            function,
-        );
+        let key = self.key.resolve(builder, function)?;
         let property = PropertyKeyLocals::from_string(schema, &key, function);
         emit_own_native_method_guard(
             builder,
@@ -223,9 +216,6 @@ impl InvariantImul {
         )?;
         property.clear(function);
         key.clear(function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        cached.clear(function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         receiver.clear(function);
@@ -250,7 +240,8 @@ impl PureNativeMethod {
 }
 
 /// The caller supplies an ordinary header and an existing primitive key, with
-/// accepted initially false. This pure peek never resolves a deferred value.
+/// accepted initially false. The shared data-read kernel may materialize a
+/// deferred native value, but never invokes an accessor or a proxy trap.
 pub(super) fn emit_own_native_method_guard(
     builder: &mut FunctionBuilder<'_>,
     target: &ValueLocals,
@@ -260,76 +251,30 @@ pub(super) fn emit_own_native_method_guard(
     function: &mut Function,
 ) -> Result<(), EmitError> {
     let schema = builder.runtime_schema();
-    let stored = own_data(builder, target, key, function)?;
-    stored.is_subtype::<DeferredIntrinsicValue>(schema, function);
-    builder.open_frame(ControlFrameKind::If, function);
-    let recipe = schema.reserve_gc_local(function).initialize(
-        stored
-            .load(schema, function)
-            .cast_subtype::<DeferredIntrinsicValue>(schema, function),
-        function,
-    );
-    let builtin = schema.reserve_i32_local(function);
-    schema
-        .field(DeferredIntrinsicValueSchema::BUILTIN)
-        .read(&recipe, schema, function)
-        .store(builtin, function);
-    builtin.load(function);
-    function.instruction(&Instruction::I32Const(method.builtin().encode()));
-    function.instruction(&Instruction::I32Eq);
-    let realm = schema.reserve_gc_local(function).initialize(
-        schema
-            .field(DeferredIntrinsicValueSchema::REALM)
-            .read(&recipe, schema, function)
-            .reference(),
-        function,
-    );
-    let current = builder.load_current_realm(function);
-    realm.load(schema, function);
-    current.load(schema, function);
-    function.instruction(&Instruction::RefEq);
-    function.instruction(&Instruction::I32And);
-    accepted.store(function);
-    current.clear(function);
-    realm.clear(function);
-    schema.release_i32_local(builtin, function);
-    recipe.clear(function);
-    function.instruction(&Instruction::Else);
-    stored.is_subtype::<StoredValue>(schema, function);
-    builder.open_frame(ControlFrameKind::If, function);
-    let value = schema.reserve_gc_local(function).initialize(
-        stored
-            .load(schema, function)
-            .cast_subtype::<StoredValue>(schema, function),
-        function,
-    );
     let callee = schema.reserve_value_local(function);
-    schema
-        .struct_type::<StoredValue>()
-        .read_into(&value, &callee, schema, function);
+    callee.set_undefined(function);
+    own_data(builder, target, key, &callee, accepted, function)?;
+    accepted.load(function);
+    builder.open_frame(ControlFrameKind::If, function);
     emit_identity(builder, &callee, method, accepted, function);
+    builder.pop_control(ControlFrameKind::If);
+    function.instruction(&Instruction::End);
     callee.clear(function);
-    value.clear(function);
-    builder.pop_control(ControlFrameKind::If);
-    function.instruction(&Instruction::End);
-    builder.pop_control(ControlFrameKind::If);
-    function.instruction(&Instruction::End);
-    stored.clear(function);
     Ok(())
 }
 
-/// Only an existing dictionary descriptor can be returned. Compact storage
-/// declines before the shared helper's descriptor-snapshot allocation arm.
+/// Probe only a concrete ordinary header. Absence and accessors decline without
+/// consulting prototypes; all supported storage states share the semantic read.
 fn own_data(
     builder: &mut FunctionBuilder<'_>,
     target: &ValueLocals,
     key: &PropertyKeyLocals,
+    output: &ValueLocals,
+    found: I32Local,
     function: &mut Function,
-) -> Result<GcLocal<PropertyValue, Nullable>, EmitError> {
+) -> Result<(), EmitError> {
     let schema = builder.runtime_schema();
-    let output = schema
-        .reserve_gc_local::<PropertyValue, Nullable>(function)
-        .initialize_null(schema, function);
+    found.set_constant(0, function);
     target.reference().load(function);
     function.instruction(&Instruction::RefTestNonNull(
         schema
@@ -341,52 +286,11 @@ fn own_data(
         target.cast_reference::<OrdinaryObject>(schema, function),
         function,
     );
-    let storage = schema.reserve_gc_local(function).initialize(
-        schema
-            .field(OrdinaryObjectSchema::PROPERTIES)
-            .read(&object, schema, function)
-            .reference(),
-        function,
-    );
-    storage.is_subtype::<OrdinaryPropertyStorage>(schema, function);
-    builder.open_frame(ControlFrameKind::If, function);
-    let descriptor = builder.emit_ordinary_own_descriptor_reference(&object, key, function)?;
-    descriptor.load(schema, function).is_null(function);
-    function.instruction(&Instruction::I32Eqz);
-    builder.open_frame(ControlFrameKind::If, function);
-    let flags = schema.reserve_i32_local(function);
-    schema
-        .field(PropertyDescriptorSchema::FLAGS)
-        .read(&descriptor, schema, function)
-        .store(flags, function);
-    flags.load(function);
-    function.instruction(&Instruction::I32Const(
-        crate::heap::DescriptorMask::ACCESSOR.as_i32(),
-    ));
-    function.instruction(&Instruction::I32And);
-    function.instruction(&Instruction::I32Eqz);
-    builder.open_frame(ControlFrameKind::If, function);
-    output.replace(
-        schema
-            .field(PropertyDescriptorSchema::VALUE)
-            .read(&descriptor, schema, function)
-            .reference()
-            .nullable(),
-        function,
-    );
-    builder.pop_control(ControlFrameKind::If);
-    function.instruction(&Instruction::End);
-    schema.release_i32_local(flags, function);
-    builder.pop_control(ControlFrameKind::If);
-    function.instruction(&Instruction::End);
-    descriptor.clear(function);
-    builder.pop_control(ControlFrameKind::If);
-    function.instruction(&Instruction::End);
-    storage.clear(function);
+    builder.emit_ordinary_own_data_value(&object, key, output, found, function)?;
     object.clear(function);
     builder.pop_control(ControlFrameKind::If);
     function.instruction(&Instruction::End);
-    Ok(output)
+    Ok(())
 }
 
 fn emit_identity(

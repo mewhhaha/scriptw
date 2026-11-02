@@ -7,7 +7,7 @@ use super::*;
 use std::collections::BTreeSet;
 
 const MAX_PLAIN_DATA_FIELDS: usize = 64;
-const MAX_COMPACT_DATA_FIELDS: usize = 16;
+pub(crate) const MAX_COMPACT_DATA_FIELDS: usize = 16;
 
 struct PlainDataField<'ir> {
     key: &'ir str,

@@ -62,6 +62,8 @@ impl<'a> FunctionBuilder<'a> {
             // prototype explicitly, and descriptor/storage kernels are pure.
             RuntimeHelperId::OrdinaryPropertyStorageEnsure
             | RuntimeHelperId::OrdinaryOwnDescriptor
+            | RuntimeHelperId::IntrinsicPropertyFind
+            | RuntimeHelperId::IntrinsicPropertyValue
             | RuntimeHelperId::CompactLiteralAllocate
             | RuntimeHelperId::CompactDataStore
             | RuntimeHelperId::IntrinsicDataPublish

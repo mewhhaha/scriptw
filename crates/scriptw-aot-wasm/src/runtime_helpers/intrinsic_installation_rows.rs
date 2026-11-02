@@ -183,3 +183,155 @@ impl RuntimeHelperInstallationRow {
         RuntimeHelperIntrinsicKeyArgument::Parameter(&self.key)
     }
 }
+
+/// A row admitted from one exact complete R layout. Its private fields retain
+/// builtin, descriptor and key authority across the runtime representation.
+pub(crate) struct RuntimeHelperPropertyLayoutRow {
+    key: RuntimeHelperIntrinsicKeyParameter,
+    flags: I32Local,
+    group: I32Local,
+    kind: I32Local,
+    payload: [I32Local; 3],
+    raw_key_hash: I64Local,
+}
+impl RuntimeHelperPropertyLayoutRow {
+    pub(crate) fn key(&self) -> &RuntimeHelperIntrinsicKeyParameter {
+        &self.key
+    }
+    pub(crate) fn flags(&self) -> I32Local {
+        self.flags
+    }
+    pub(crate) fn group(&self) -> I32Local {
+        self.group
+    }
+    pub(crate) fn kind(&self) -> I32Local {
+        self.kind
+    }
+    pub(crate) fn payload0(&self) -> I32Local {
+        self.payload[0]
+    }
+    pub(crate) fn payload1(&self) -> I32Local {
+        self.payload[1]
+    }
+    pub(crate) fn payload2(&self) -> I32Local {
+        self.payload[2]
+    }
+    pub(crate) fn raw_key_hash(&self) -> I64Local {
+        self.raw_key_hash
+    }
+
+    /// Kind checking prevents a numeric payload from becoming builtin authority.
+    /// The returned view borrows the row's local; only row.clear retires it.
+    pub(crate) fn method_builtin(
+        &self,
+        setter: bool,
+        f: &mut Function,
+    ) -> RuntimeHelperStandardBuiltinParameter {
+        use crate::intrinsics::property_layouts::IntrinsicPropertyRecipeKind as Kind;
+        self.kind.load(f);
+        f.instruction(&Instruction::I32Const(Kind::Accessor as i32));
+        f.instruction(&Instruction::I32Eq);
+        if !setter {
+            self.kind.load(f);
+            f.instruction(&Instruction::I32Const(Kind::Method as i32));
+            f.instruction(&Instruction::I32Eq);
+            f.instruction(&Instruction::I32Or);
+        }
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        let mut index = 0;
+        if setter {
+            index = 1;
+        }
+        RuntimeHelperStandardBuiltinParameter {
+            local: self.payload[index],
+        }
+    }
+
+    pub(crate) fn clear(self, s: &RuntimeSchema, f: &mut Function) {
+        s.release_i64_local(self.raw_key_hash, f);
+        for local in self.payload.into_iter().rev() {
+            s.release_i32_local(local, f);
+        }
+        s.release_i32_local(self.kind, f);
+        s.release_i32_local(self.group, f);
+        s.release_i32_local(self.flags, f);
+        s.release_i32_local(self.key.ordinal, f);
+        s.release_i32_local(self.key.is_symbol, f);
+    }
+}
+
+impl RuntimeHelperPropertyLayoutRow {
+    /// Only the sealed span constructor creates this storage type. Its immutable
+    /// address/count retain the R-table proof; only a dynamic slot needs checking.
+    pub(crate) fn from_storage(
+        storage: &GcLocal<IntrinsicPropertyStorage>,
+        index: I32Local,
+        s: &RuntimeSchema,
+        f: &mut Function,
+    ) -> Self {
+        let count = s.reserve_i32_local(f);
+        s.field(IntrinsicPropertyStorageSchema::COUNT)
+            .read(storage, s, f)
+            .store(count, f);
+        index.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(count, f);
+        let address = s.reserve_i32_local(f);
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(storage, s, f)
+            .store(address, f);
+        let cursor = s.reserve_i32_local(f);
+        address.load(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(
+            crate::data::RPropertyLayoutRows::ROW_BYTES as i32,
+        ));
+        f.instruction(&Instruction::I32Mul);
+        f.instruction(&Instruction::I32Add);
+        cursor.store(f);
+        let read = |word: u64, f: &mut Function| {
+            let local = s.reserve_i32_local(f);
+            cursor.load(f);
+            f.instruction(&Instruction::I32Load(wasm_encoder::MemArg {
+                offset: word * 4,
+                align: 0,
+                memory_index: 0,
+            }));
+            local.store(f);
+            local
+        };
+        let key = RuntimeHelperIntrinsicKeyParameter {
+            is_symbol: read(0, f),
+            ordinal: read(1, f),
+        };
+        let flags = read(2, f);
+        let group = read(3, f);
+        let kind = read(4, f);
+        let payload = [read(5, f), read(6, f), read(7, f)];
+        let raw_key_hash = s.reserve_i64_local(f);
+        cursor.load(f);
+        f.instruction(&Instruction::I64Load(wasm_encoder::MemArg {
+            offset: 32,
+            align: 0,
+            memory_index: 0,
+        }));
+        raw_key_hash.store(f);
+        s.release_i32_local(cursor, f);
+        s.release_i32_local(address, f);
+        RuntimeHelperPropertyLayoutRow {
+            key,
+            flags,
+            group,
+            kind,
+            payload,
+            raw_key_hash,
+        }
+    }
+}

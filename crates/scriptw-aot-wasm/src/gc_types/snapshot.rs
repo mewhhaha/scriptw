@@ -19,6 +19,7 @@ macro_rules! snapshot_layouts {
 snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String => StringValue, CodeUnits => CodeUnitArray,
     BigInt => BigIntValue, Limbs => BigIntLimbArray, Symbol => SymbolValue,
     Object => OrdinaryObject, PropertyStorage => OrdinaryPropertyStorage,
+    IntrinsicStorage => IntrinsicPropertyStorage,
     CompactStorage => CompactDataStorage, ArrayCompactStorage => ArrayCompactDataStorage,
     InlineCompactStorage => InlineCompactDataStorage, CompactShape => CompactDataShape,
     CompactKeys => CompactShapeKeys, CompactTags => CompactTagArray,
@@ -36,6 +37,8 @@ snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String 
     Promise => PromiseObject, Error => NativeErrorObject);
 
 pub const SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT: &str = "scriptw_snapshot_resolve_property_value";
+pub const SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT: &str =
+    "scriptw_snapshot_ensure_property_storage";
 
 pub const SNAPSHOT_ENTRY_REALM_EXPORT: &str = "scriptw_snapshot_entry_realm";
 pub const SNAPSHOT_REALMS_EXPORT: &str = "scriptw_snapshot_realms";
@@ -58,6 +61,7 @@ snapshot_fields!(StoredTag => Stored, StoredValueSchema::TAG,
     SymbolDescription => Symbol, SymbolValueSchema::DESCRIPTION, SymbolRegistry => Symbol, SymbolValueSchema::REGISTRY_KEY,
     ObjectPrototype => Object, OrdinaryObjectSchema::PROTOTYPE, ObjectProperties => Object, OrdinaryObjectSchema::PROPERTIES,
     ObjectPrivate => Object, OrdinaryObjectSchema::PRIVATE_ELEMENTS, ObjectExtensible => Object, OrdinaryObjectSchema::EXTENSIBLE,
+    IntrinsicCount => IntrinsicStorage, IntrinsicPropertyStorageSchema::COUNT,
     ArrayCompactShape => ArrayCompactStorage, ArrayCompactDataStorageSchema::SHAPE,
     CompactTags => ArrayCompactStorage, ArrayCompactDataStorageSchema::TAGS,
     CompactScalars => ArrayCompactStorage, ArrayCompactDataStorageSchema::SCALARS,
@@ -221,6 +225,11 @@ impl RuntimeSchema {
             SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
             wasm_encoder::ExportKind::Func,
             crate::runtime_helpers::RuntimeHelperId::PropertyValueResolve.index(helpers),
+        );
+        exports.export(
+            SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
+            wasm_encoder::ExportKind::Func,
+            crate::runtime_helpers::RuntimeHelperId::OrdinaryPropertyStorageEnsure.index(helpers),
         );
         for (layout, index) in &roots.witnesses {
             exports.export(

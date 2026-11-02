@@ -2636,6 +2636,15 @@ impl GcOperand<'_, crate::heap::DescriptorWord, NonNullable> {
             shape: PhantomData,
         }
     }
+
+    pub(crate) fn intrinsic_layout_flags(
+        row: &crate::runtime_helpers::RuntimeHelperPropertyLayoutRow,
+    ) -> Self {
+        Self {
+            source: OperandSource::Local(row.flags().index),
+            shape: PhantomData,
+        }
+    }
 }
 pub(crate) trait GcF64Field: sealed::Sealed {}
 impl<V: GcNumericI32Field> GcOperand<'_, V, NonNullable> {

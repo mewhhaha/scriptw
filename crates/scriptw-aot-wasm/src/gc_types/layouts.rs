@@ -929,6 +929,20 @@ gc_layout_registry! {
         // One object model: these sealed GC subtypes are alternate storage
         // states of the same ordinary header. The base cannot be allocated.
         struct ObjectPropertyStorage => ObjectPropertyStorageSchema {}
+        // Complete immutable R recipes replace eager intrinsic descriptor
+        // graphs. Only observed values are retained in the defining Realm.
+        struct IntrinsicPropertyStorage: ObjectPropertyStorage => IntrinsicPropertyStorageSchema {
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            ADDRESS: I32Value, Immutable, NonNullable;
+            COUNT: I32Value, Immutable, NonNullable;
+            GROUP_COUNT: I32Value, Immutable, NonNullable;
+            INDEX_ADDRESS: I32Value, Immutable, NonNullable;
+            INDEX_MASK: I32Value, Immutable, NonNullable;
+            CACHE: GcRef<IntrinsicPropertyValueCache>, Mutable, Nullable;
+        }
+        array IntrinsicPropertyValueCache => IntrinsicPropertyValueCacheSchema {
+            ELEMENT: GcRef<PropertyValue>, Mutable, Nullable;
+        }
         struct CompactDataStorage: ObjectPropertyStorage => CompactDataStorageSchema {
             SHAPE: GcRef<CompactDataShape>, Immutable, NonNullable;
         }

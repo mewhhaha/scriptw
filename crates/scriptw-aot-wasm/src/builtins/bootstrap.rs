@@ -1,8 +1,8 @@
 use super::super::*;
-use super::atomics::ATOMICS_PUBLICATION_ORDER;
 use crate::functions::{NonArrayRealmIntrinsicSlot, RealmFunctionMaterializationContext};
 use crate::gc_types::*;
 use crate::intrinsics::IntrinsicKey;
+use crate::intrinsics::IntrinsicPropertyLayoutId;
 use crate::objects::{
     AccessorDescriptor, AccessorDescriptorLocals, AccessorGetter, AccessorGetterLocals,
     AccessorSetterLocals,
@@ -147,6 +147,14 @@ impl<'a> FunctionBuilder<'a> {
                     builtin.debug_name()
                 ))
             })?;
+        // Complete prototype layouts supply the constructor link after its
+        // canonical Realm slot has been published below.
+        let covered_prototype = matches!(
+            builtin,
+            StandardBuiltinId::ObjectConstructor
+                | StandardBuiltinId::ArrayConstructor
+                | StandardBuiltinId::StringConstructor
+        );
         let schema = self.runtime_schema();
         let constructor = schema
             .reserve_gc_local::<FunctionObject, NonNullable>(function)
@@ -205,7 +213,7 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 );
             stored.clear(function);
-            if builtin != StandardBuiltinId::IteratorConstructor {
+            if builtin != StandardBuiltinId::IteratorConstructor && !covered_prototype {
                 self.emit_install_intrinsic_data(
                     prototype,
                     IntrinsicKey::Name("constructor"),
@@ -450,29 +458,39 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
+    fn emit_bootstrap_intrinsic_namespace(
+        &mut self,
+        layout: IntrinsicPropertyLayoutId,
+        realm: &RealmFunctionMaterializationContext,
+        object_prototype: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<ValueLocals, EmitError> {
+        let schema = self.runtime_schema();
+        let object = schema
+            .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
+            .initialize(
+                self.emit_alloc_plain_object_with_prototype(Some(object_prototype), function)?,
+                function,
+            );
+        self.emit_install_intrinsic_property_layout(&object, layout, realm.realm(), function)?;
+        let value = schema.reserve_value_local(function);
+        value.set_reference(&object, schema, function);
+        object.clear(function);
+        Ok(value)
+    }
+
     pub(crate) fn init_reflect_object(
         &mut self,
         realm: &RealmFunctionMaterializationContext,
         object_prototype: &ValueLocals,
         function: &mut Function,
     ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        self.emit_install_intrinsic_methods(
-            &object,
-            crate::intrinsics::IntrinsicMethodPlan::Reflect,
+        self.emit_bootstrap_intrinsic_namespace(
+            IntrinsicPropertyLayoutId::Reflect,
             realm,
+            object_prototype,
             function,
-        )?;
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            "Reflect",
-            false,
-            false,
-            true,
-            function,
-        )?;
-        Ok(object)
+        )
     }
 
     pub(crate) fn init_math_object(
@@ -481,37 +499,12 @@ impl<'a> FunctionBuilder<'a> {
         object_prototype: &ValueLocals,
         function: &mut Function,
     ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        for (name, value) in [
-            ("E", std::f64::consts::E),
-            ("LN10", std::f64::consts::LN_10),
-            ("LN2", std::f64::consts::LN_2),
-            ("LOG10E", std::f64::consts::LOG10_E),
-            ("LOG2E", std::f64::consts::LOG2_E),
-            ("PI", std::f64::consts::PI),
-            ("SQRT1_2", std::f64::consts::FRAC_1_SQRT_2),
-            ("SQRT2", std::f64::consts::SQRT_2),
-        ] {
-            self.emit_install_intrinsic_number(
-                &object, name, value, false, false, false, function,
-            )?;
-        }
-        self.emit_install_intrinsic_methods(
-            &object,
-            crate::intrinsics::IntrinsicMethodPlan::Math,
+        self.emit_bootstrap_intrinsic_namespace(
+            IntrinsicPropertyLayoutId::Math,
             realm,
+            object_prototype,
             function,
-        )?;
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            "Math",
-            false,
-            false,
-            true,
-            function,
-        )?;
-        Ok(object)
+        )
     }
 
     pub(crate) fn init_json_object(
@@ -520,23 +513,12 @@ impl<'a> FunctionBuilder<'a> {
         object_prototype: &ValueLocals,
         function: &mut Function,
     ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            JSON_NAME,
-            false,
-            false,
-            true,
-            function,
-        )?;
-        self.emit_install_intrinsic_methods(
-            &object,
-            crate::intrinsics::IntrinsicMethodPlan::Json,
+        self.emit_bootstrap_intrinsic_namespace(
+            IntrinsicPropertyLayoutId::Json,
             realm,
+            object_prototype,
             function,
-        )?;
-        Ok(object)
+        )
     }
 
     pub(crate) fn init_atomics_object(
@@ -545,31 +527,12 @@ impl<'a> FunctionBuilder<'a> {
         object_prototype: &ValueLocals,
         function: &mut Function,
     ) -> Result<ValueLocals, EmitError> {
-        let object = self.emit_bootstrap_namespace(object_prototype, function)?;
-        self.emit_install_intrinsic_string(
-            &object,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            ATOMICS_NAME,
-            false,
-            false,
-            true,
+        self.emit_bootstrap_intrinsic_namespace(
+            IntrinsicPropertyLayoutId::Atomics,
+            realm,
+            object_prototype,
             function,
-        )?;
-        for builtin in ATOMICS_PUBLICATION_ORDER {
-            let name = builtin
-                .native_function_name()
-                .ok_or_else(|| EmitError::unsupported("Atomics method has no native name"))?;
-            self.emit_install_intrinsic_method(
-                &object,
-                IntrinsicKey::Name(name),
-                builtin,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        Ok(object)
+        )
     }
 
     fn emit_bootstrap_iterator_prototypes(
@@ -954,7 +917,13 @@ impl<'a> FunctionBuilder<'a> {
             );
         let value = schema.reserve_value_local(function);
         value.set_reference(&object, schema, function);
-        if slot.gc_index() == NonArrayRealmIntrinsicSlot::StringPrototype.gc_index() {
+        // A complete String prototype layout is installed with its constructor.
+        // Partial bootstrap plans still retain the original standalone length.
+        if slot.gc_index() == NonArrayRealmIntrinsicSlot::StringPrototype.gc_index()
+            && !self
+                .runtime_bootstrap_plan
+                .should_initialize_standard_builtin(StandardBuiltinId::StringConstructor)
+        {
             self.emit_install_intrinsic_number(
                 &value, "length", 0.0, false, false, false, function,
             )?;

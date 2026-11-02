@@ -1,8 +1,8 @@
-//! Intrinsic methods preserve their canonical property installation order.
+//! Constructor methods and the complete canonical Object prototype layout.
 
 use super::super::*;
-use super::{IntrinsicInstall, IntrinsicKey};
-use crate::objects::{AccessorDescriptor, AccessorGetter, AccessorSetter};
+use super::IntrinsicInstall;
+use super::IntrinsicPropertyLayoutId;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn install_object_constructor_intrinsics(
@@ -16,29 +16,18 @@ impl FunctionBuilder<'_> {
             context.realm,
             function,
         )?;
-        self.emit_install_intrinsic_methods(
-            context.prototype,
-            crate::intrinsics::IntrinsicMethodPlan::ObjectPrototypeBeforeAccessor,
-            context.realm,
+        let schema = self.runtime_schema();
+        let prototype = schema.reserve_gc_local(function).initialize(
+            self.emit_object_header_projection(context.prototype, function),
+            function,
+        );
+        self.emit_install_intrinsic_property_layout(
+            &prototype,
+            IntrinsicPropertyLayoutId::ObjectPrototype,
+            context.realm.realm(),
             function,
         )?;
-        self.emit_install_intrinsic_accessor(
-            context.prototype,
-            IntrinsicKey::Name("__proto__"),
-            AccessorDescriptor::GetterAndSetter {
-                getter: AccessorGetter::new(StandardBuiltinId::ObjectPrototypeProtoGetter),
-                setter: AccessorSetter::new(StandardBuiltinId::ObjectPrototypeProtoSetter),
-            },
-            context.realm,
-            true,
-            function,
-        )?;
-        self.emit_install_intrinsic_methods(
-            context.prototype,
-            crate::intrinsics::IntrinsicMethodPlan::ObjectPrototypeAfterAccessor,
-            context.realm,
-            function,
-        )?;
+        prototype.clear(function);
         self.emit_install_intrinsic_methods(
             context.constructor,
             crate::intrinsics::IntrinsicMethodPlan::ObjectConstructorRemaining,

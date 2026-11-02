@@ -1,7 +1,8 @@
-//! Fresh intrinsic properties retain completed values and defining Realm.
+//! The complete canonical String prototype includes length and alias identities.
 
 use super::super::*;
-use super::{IntrinsicInstall, IntrinsicKey};
+use super::IntrinsicInstall;
+use super::IntrinsicPropertyLayoutId;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn install_string_constructor_intrinsics(
@@ -9,44 +10,18 @@ impl FunctionBuilder<'_> {
         context: &IntrinsicInstall<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_install_intrinsic_methods(
-            context.prototype,
-            crate::intrinsics::IntrinsicMethodPlan::StringPrototypeBeforeAliases,
-            context.realm,
+        let schema = self.runtime_schema();
+        let prototype = schema.reserve_gc_local(function).initialize(
+            self.emit_object_header_projection(context.prototype, function),
+            function,
+        );
+        self.emit_install_intrinsic_property_layout(
+            &prototype,
+            IntrinsicPropertyLayoutId::StringPrototype,
+            context.realm.realm(),
             function,
         )?;
-        for (keys, builtin) in [
-            (
-                [
-                    IntrinsicKey::Name("trimStart"),
-                    IntrinsicKey::Name("trimLeft"),
-                ],
-                StandardBuiltinId::StringPrototypeTrimStart,
-            ),
-            (
-                [
-                    IntrinsicKey::Name("trimEnd"),
-                    IntrinsicKey::Name("trimRight"),
-                ],
-                StandardBuiltinId::StringPrototypeTrimEnd,
-            ),
-        ] {
-            self.emit_install_intrinsic_method_aliases(
-                context.prototype,
-                &keys,
-                builtin,
-                context.realm,
-                true,
-                true,
-                function,
-            )?;
-        }
-        self.emit_install_intrinsic_methods(
-            context.prototype,
-            crate::intrinsics::IntrinsicMethodPlan::StringPrototypeAfterAliases,
-            context.realm,
-            function,
-        )?;
+        prototype.clear(function);
         Ok(())
     }
 }

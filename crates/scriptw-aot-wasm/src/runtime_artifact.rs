@@ -82,7 +82,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 41 folds indexed backing state into the actual Array record.
 // Version 42 adds defining-Realm Date demand initialization, its state,
 // constructor recipe and typed ensure helper.
-const LAYOUT_VERSION: u32 = 42;
+// Version 43 adds complete intrinsic recipe storage and its observed-value cache.
+const LAYOUT_VERSION: u32 = 43;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

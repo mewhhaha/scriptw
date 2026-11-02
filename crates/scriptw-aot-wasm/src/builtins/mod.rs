@@ -4,6 +4,7 @@ mod async_disposable_stack;
 pub(crate) use async_disposable_stack::AsyncDisposableStackDisposeCompletionKind;
 mod async_iterator;
 mod atomics;
+pub(crate) use atomics::ATOMICS_PUBLICATION_ORDER;
 mod bigint;
 mod binary_data;
 mod boolean;
