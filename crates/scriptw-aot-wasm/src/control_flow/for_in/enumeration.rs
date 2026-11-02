@@ -3,6 +3,9 @@
 use super::*;
 use crate::gc_types::{ForInEnumerationRecord, ForInEnumerationRecordSchema};
 use crate::operations::PropertyKeyLocals;
+use crate::runtime_helpers::{
+    ForInAdvanceArguments, ForInAdvanceParameters, HelperParameters, RuntimeHelperId,
+};
 
 /// Only String keys enter the visited set; its private table never publishes a
 /// JavaScript Array or invokes a user iterator/species operation.
@@ -210,9 +213,57 @@ impl FunctionBuilder<'_> {
         Ok(record)
     }
 
+    /// Source consumers retain their StatementList completion while R advances
+    /// the cursor. Only an abrupt result replaces the caller's completion.
+    pub(crate) fn emit_advance_for_in_enumerator(
+        &mut self,
+        record: &GcLocal<ForInEnumerationRecord>,
+        output: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let realm = self.emit_execution_realm(function);
+        schema
+            .call_helper(
+                ForInAdvanceArguments::new(
+                    record,
+                    &realm,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(output, function);
+        realm.clear(function);
+        output.kind().load(function);
+        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        self.completion().copy_from(output, function);
+        self.emit_propagate_current_throw(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    pub(crate) fn compile_for_in_advance_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::ForInAdvance);
+        let parameters = self.helper_parameters::<ForInAdvanceParameters>(&mut function);
+        self.completion().initialize(&mut function);
+        let output = self.runtime_schema().reserve_completion(&mut function);
+        self.emit_advance_for_in_enumerator_inner(&parameters.record, &output, &mut function)?;
+        output.emit(&mut function);
+        output.clear(&mut function);
+        self.clear_helper_execution_realm(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     /// The sole native enumerator advance. Normal Undefined means completion;
     /// Normal String is the next key. User observations keep their whole Throw.
-    pub(crate) fn emit_advance_for_in_enumerator(
+    fn emit_advance_for_in_enumerator_inner(
         &mut self,
         record: &GcLocal<ForInEnumerationRecord>,
         output: &CompletionLocals,

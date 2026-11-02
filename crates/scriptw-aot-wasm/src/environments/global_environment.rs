@@ -1,15 +1,16 @@
 use super::*;
 use crate::gc_types::{
-    NamedBinding, NamedBindingSchema, NamedBindingTable, RealmRecordSchema, StringValue,
+    NamedBinding, NamedBindingSchema, NamedBindingTable, NativeErrorObject, RealmRecordSchema,
+    StringValue,
 };
+use crate::runtime_helpers::RuntimeErrorForThrowArguments;
 
 // A Global Environment ends the lexical chain and roots its defining Realm.
 // Declarative names retain the same BindingCell identities as captured reads.
-pub(crate) enum GlobalBindingFailure {
+pub(crate) enum GlobalBindingFailure<'a> {
     BeforeInitialization,
     Immutable,
-    Unresolvable,
-    UnresolvableAssignment,
+    Unresolvable(&'a GcLocal<StringValue>),
 }
 
 pub(crate) enum SourceLiteralPrototype {
@@ -575,7 +576,7 @@ impl FunctionBuilder<'_> {
 
     pub(crate) fn emit_throw_global_binding_error(
         &mut self,
-        failure: GlobalBindingFailure,
+        failure: GlobalBindingFailure<'_>,
         error: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
@@ -588,14 +589,51 @@ impl FunctionBuilder<'_> {
                 NativeErrorKind::TypeError,
                 RuntimeErrorMessage::ASSIGNMENT_TO_CONSTANT_BINDING,
             ),
-            GlobalBindingFailure::Unresolvable => (
-                NativeErrorKind::ReferenceError,
-                RuntimeErrorMessage::UNBOUND_IDENTIFIER,
-            ),
-            GlobalBindingFailure::UnresolvableAssignment => (
-                NativeErrorKind::ReferenceError,
-                RuntimeErrorMessage::ASSIGNMENT_TO_UNRESOLVABLE_REFERENCE,
-            ),
+            GlobalBindingFailure::Unresolvable(name) => {
+                let schema = self.runtime_schema();
+                let suffix = schema.reserve_gc_local(function).initialize(
+                    self.emit_runtime_error_message_reference(
+                        RuntimeErrorMessage::IDENTIFIER_IS_NOT_DEFINED_SUFFIX,
+                        function,
+                    )?,
+                    function,
+                );
+                let message = schema.reserve_gc_local(function).initialize(
+                    self.emit_concat_gc_strings(name, &suffix, function),
+                    function,
+                );
+                let realm = self.emit_execution_realm(function);
+                let prototype = schema.reserve_value_local(function);
+                self.emit_load_non_array_realm_intrinsic(
+                    &realm,
+                    NonArrayRealmIntrinsicSlot::ReferenceErrorPrototype,
+                    &prototype,
+                    function,
+                );
+                let thrown = schema
+                    .call_helper(
+                        RuntimeErrorForThrowArguments::new(
+                            NativeErrorKind::ReferenceError,
+                            &prototype,
+                            &message,
+                        ),
+                        self.runtime_helper_base()?,
+                        function,
+                    )
+                    .bind(
+                        schema,
+                        schema.reserve_gc_local::<NativeErrorObject, _>(function),
+                        function,
+                    );
+                error.set_reference(&thrown, schema, function);
+                self.completion().set_throw(error, function);
+                thrown.clear(function);
+                prototype.clear(function);
+                realm.clear(function);
+                message.clear(function);
+                suffix.clear(function);
+                return Ok(());
+            }
         };
         self.emit_environment_native_error(name, message, error, function)
     }

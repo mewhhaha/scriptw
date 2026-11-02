@@ -38,6 +38,57 @@ fn succeeds(source: &str) {
 }
 
 #[test]
+fn unresolved_identifier_messages_retain_exact_read_and_write_names() {
+    succeeds(
+        r#"
+const errors = [];
+try { new TextEncoder(); } catch (error) { errors.push(error); }
+try { missing\u0052untime; } catch (error) { errors.push(error); }
+try { café; } catch (error) { errors.push(error); }
+function strictWrite() { 'use strict'; missingEndpoint = 1; }
+try { strictWrite(); } catch (error) { errors.push(error); }
+globalThis.deletedRuntime = 1;
+function strictDelete() { 'use strict'; deletedRuntime = (delete globalThis.deletedRuntime, 1); }
+try { strictDelete(); } catch (error) { errors.push(error); }
+with ({}) {
+  try { missingInsideWith; } catch (error) { errors.push(error); }
+}
+const expected = ['TextEncoder', 'missingRuntime', 'café', 'missingEndpoint',
+  'deletedRuntime', 'missingInsideWith'];
+errors.length === expected.length && errors.every((error, index) => {
+  const descriptor = Object.getOwnPropertyDescriptor(error, 'message');
+  return error instanceof ReferenceError && error.message === expected[index] + ' is not defined'
+    && descriptor.writable && descriptor.configurable && !descriptor.enumerable;
+}) && typeof TextEncoder === 'undefined' && typeof missingEndpoint === 'undefined';
+"#,
+    );
+}
+
+#[test]
+fn uncaught_reference_diagnostics_name_missing_runtime_capabilities() {
+    for (source, name) in [
+        ("new TextEncoder();", "TextEncoder"),
+        ("'use strict'; missingEndpoint = 1;", "missingEndpoint"),
+    ] {
+        let error = engine()
+            .run_script(source, options(), execution())
+            .expect_err("missing runtime capability must remain a JavaScript exception");
+        assert_eq!(
+            error.wasm_execution_failure_kind(),
+            Some(WasmExecutionFailureKind::JavaScriptException)
+        );
+        assert_eq!(
+            error.wasm_javascript_exception_constructor_name(),
+            Some("ReferenceError")
+        );
+        assert!(
+            error.message().contains(&format!("{name} is not defined")),
+            "{error}"
+        );
+    }
+}
+
+#[test]
 fn pinned_rhs_property_creation_cannot_resolve_an_earlier_strict_reference() {
     let source = concat!(
         "'use strict';\n",

@@ -1275,6 +1275,9 @@ runtime_helper_domain! {
     GlobalIdentifierTypeofStrict / GlobalIdentifierTypeofStrictArguments / GlobalIdentifierTypeofStrictParameters / "global_identifier_typeof_strict" { name:(Ref StringValue NonNullable),global_environment:(Ref Environment NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     LexicalBindingUninitialized / LexicalBindingUninitializedArguments / LexicalBindingUninitializedParameters / "lexical_binding_uninitialized" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => Completion;
     RelationalComparison / RelationalComparisonArguments / RelationalComparisonParameters / "relational_comparison" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    LooseEquality / LooseEqualityArguments / LooseEqualityParameters / "loose_equality" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    BigIntEquality / BigIntEqualityArguments / BigIntEqualityParameters / "bigint_equality" { left:(Ref BigIntValue NonNullable),right:(Ref BigIntValue NonNullable) } => I32;
     PrivateElementAdd / PrivateElementAddArguments / PrivateElementAddParameters / "private_element_add" { receiver:Value,element:(Ref PrivateElement NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
     PrivateFieldDefine / PrivateFieldDefineArguments / PrivateFieldDefineParameters / "private_field_define" { receiver:Value,private_environment:(Ref PrivateEnvironment Nullable),class_scope:I64,name_ordinal:I32,value:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     CompactArrayLiteral / CompactArrayLiteralArguments / CompactArrayLiteralParameters / "compact_array_literal" { offset:I32,bytes:I32,depth:I32,prototype:Value,caller_program:Program } => Completion;
@@ -1376,6 +1379,9 @@ impl RuntimeHelperId {
             Self::CoerciveAdd => HelperOwner::Runtime,
             Self::LexicalBindingUninitialized => HelperOwner::Runtime,
             Self::RelationalComparison => HelperOwner::Runtime,
+            Self::LooseEquality => HelperOwner::Runtime,
+            Self::ForInAdvance => HelperOwner::Runtime,
+            Self::BigIntEquality => HelperOwner::Runtime,
             Self::ObjectGetPrototypeOf => HelperOwner::Runtime,
             Self::ObjectIsExtensible => HelperOwner::Runtime,
             Self::ObjectPreventExtensions => HelperOwner::Runtime,
@@ -1539,6 +1545,9 @@ impl RuntimeHelperId {
             Self::CoerciveAdd => true,
             Self::LexicalBindingUninitialized => true,
             Self::RelationalComparison => true,
+            Self::LooseEquality => true,
+            Self::ForInAdvance => true,
+            Self::BigIntEquality => true,
             Self::ObjectGetPrototypeOf => true,
             Self::ObjectIsExtensible => true,
             Self::ObjectPreventExtensions => true,

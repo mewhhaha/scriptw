@@ -459,7 +459,7 @@ impl FunctionBuilder<'_> {
         match read {
             EnvironmentIdentifierRead::Value => {
                 self.emit_throw_global_binding_error(
-                    GlobalBindingFailure::Unresolvable,
+                    GlobalBindingFailure::Unresolvable(&reference.key),
                     value,
                     function,
                 )?;
@@ -528,7 +528,7 @@ impl FunctionBuilder<'_> {
                 )?;
                 function.instruction(&Instruction::Else);
                 self.emit_throw_global_binding_error(
-                    GlobalBindingFailure::Unresolvable,
+                    GlobalBindingFailure::Unresolvable(&reference.key),
                     value,
                     function,
                 )?;
@@ -618,7 +618,7 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, function);
             self.emit_throw_global_binding_error(
-                GlobalBindingFailure::UnresolvableAssignment,
+                GlobalBindingFailure::Unresolvable(&reference.key),
                 &error,
                 function,
             )?;
@@ -652,7 +652,7 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I64Eqz);
             self.open_frame(ControlFrameKind::If, function);
             self.emit_throw_global_binding_error(
-                GlobalBindingFailure::UnresolvableAssignment,
+                GlobalBindingFailure::Unresolvable(&reference.key),
                 &error,
                 function,
             )?;

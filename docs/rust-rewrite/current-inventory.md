@@ -17,24 +17,15 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   Chromium reference, not a Scriptw compatibility pass. Owner: explicit product
   host surface and embedding adapters; retain one heap/backend and the real
   renderer instead of silently substituting SSR or fake DOM.
-- Diagnose React SSR compilation/startup before claiming rendering parity.
-  Its portable emission completes in about 6.6s, while both CPP preparation and
-  ordinary NativeHost run hit their separate 60s guards. The exact NativeHost P
-  contains a 2,014,440-byte function, exceeding the 1-MiB size-optimization
-  threshold. A debugger snapshot at 20s is inside Cranelift's Egraph optimizer.
-  Owner: AOT code size and native compilation. Attribute the costly functions
-  and passes before changing policy; retain original deadlines and failures.
-
-- Repair Fast native frame/code expansion before a new full conformance run.
-  The pinned `language/expressions/modulus/bigint-arithmetic.js` crashes in strict
-  and sloppy mode on both the accepted compiler and the private-counter candidate;
-  the additional remainder scope is 77/79, not a passing scope. Owner: AOT native
-  compilation policy and source-operation expansion. A 368-local Wasm function
-  expands to about 117 MB of native code and a 33.44 MB frame, exhausting the
-  32-MiB budget during shallow assertion calls. Compare allocation/expansion
-  policies against the retained native prologues; do not increase the stack cap
-  or skip the tests. The [gap diagnosis](performance-gaps-20261101.json) binds both
-  failed snapshots and the exact frame evidence.
+- Reduce React's remaining native compilation cost. The
+  [shared-kernel checkpoint](react-codegen-20261102.json) renders correctly within
+  the original 60s limits, but native preparation still takes about 50s and its
+  largest source function remains 1,110,482 Wasm bytes. Owner: AOT code size and
+  native compilation. Profile identical frozen Wasm and compiler settings;
+  preserve generated-code identity when testing compiler implementation changes.
+- Requalify affected operators before a new full conformance publication.
+  The [shared-kernel checkpoint](react-codegen-20261102.json) passes all 79 pinned
+  modulus variants; the complete pinned Test262 matrix remains a separate gate.
 - V8 execution and process-memory parity remain open. The fresh 408-process
   [reference](performance-gaps-20261101.json) wins 17/17 Scriptc and 6/17 V8
   cases in both statistics and blocks; mixed join's Scriptc lead is narrow.

@@ -36,9 +36,12 @@ created equal Strings retain the ordinary lazy hash path. Linked-module caching
 keeps an admitted runtime resident when its program cannot share the configured
 entry or image-byte budget. Programs still execute in fresh Stores and Realms.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 45
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 46
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
+Abstract equality, BigInt equality and for-in advancement share compiled Wasm
+kernels. Missing identifier errors retain the exact name, such as
+`TextEncoder is not defined`.
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
 other values retain the full coercion path. Closed scalar loops retain proven
 32-bit integers in integer locals, with bounded unrolling and exact integer
@@ -286,6 +289,15 @@ compilation; a debugger sample finds Cranelift optimization active at 20 seconds
 [Inert raw evidence](docs/rust-rewrite/application-benchmarks-20261102-inert.tar.xz) ·
 [Workflow](CONTRIBUTING.md#react-and-edge-benchmarks).
 <!-- application-benchmarks:end -->
+
+The [shared-kernel replay](docs/rust-rewrite/react-codegen-20261102.json) reduces
+SSR's largest function from 2,014,440 to 1,110,482 Wasm bytes. All three ordinary
+runs render correctly in 41.2–41.9 seconds; benchmark preparation finishes in
+56.6 seconds under its original 60-second limit, followed by ten checked renders.
+All 79 pinned modulus variants pass, including the previously crashing BigInt case.
+RSC still needs `TextEncoder` and related Web APIs; Request-based handlers need
+`Request`. The client case still times out. These replays do not replace the
+dated cross-engine benchmark results above.
 
 ## Compilation time
 

@@ -1,0 +1,106 @@
+{
+  "schema": "scriptw-react-codegen-evidence-v1",
+  "date": "2026-11-02",
+  "scope": "Captured React SSR compiler-fix evidence; source and runners are frozen at source-a61d, not the mutable checkout.",
+  "source": {
+    "fingerprint": "a61d7e85319c6c98194c6d4e6bd8a14838a9de5c954add7b025c9b9e6b70e9e8",
+    "commit": "8f5d44820bac0103aa04698e5cac3d9b6e895889",
+    "snapshot": "target/react-compile-fix-20261102/source-a61d.json",
+    "captured_file_count": 17
+  },
+  "prior_application_baseline": {
+    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+    "portable_report": "target/application-benchmarks-20261102/portable-reference/report.json",
+    "ssr_size_diagnostic_report": "target/application-benchmarks-20261102/ssr-diagnostic/report.json",
+    "react_ssr_sha256": "f517a8935ea328afddb55207c69dfb21f75b43a20a20415cfb1f59f3d0675b77"
+  },
+  "ssr_portable": {
+    "wasm_bytes_before": 15118073,
+    "wasm_bytes_after": 11600481,
+    "wasm_sha256_after": "b1ae21dd1561ba12ca94e683de4546228b27f64eff7c1d445d0ba184e1b35e4a",
+    "largest_function_body_bytes_before": 2014440,
+    "largest_function_body_bytes_after": 1110482,
+    "cli_correct_runs_seconds": [
+      41.654042567,
+      41.214495727,
+      41.870741441
+    ]
+  },
+  "precompiled_cpp": {
+    "prepare_seconds": 56.582308285,
+    "deadline_seconds": 60,
+    "checked_renders": 10,
+    "execution_seconds": 0.664974561,
+    "configuration": "frozen shared-host comparison identity; excluded from ordinary cohorts"
+  },
+  "portable_edge_cases": {
+    "passed": [
+      "edge-json-api",
+      "edge-router",
+      "edge-query",
+      "edge-middleware",
+      "edge-html",
+      "edge-nested-result"
+    ],
+    "failed_or_timed_out": [
+      "rsc-sync",
+      "rsc-async",
+      "web-url",
+      "web-json",
+      "client-mount"
+    ],
+    "failure_reasons": {
+      "rsc-sync": "TextEncoder unavailable",
+      "rsc-async": "TextEncoder unavailable",
+      "web-url": "Request unavailable",
+      "web-json": "Request unavailable",
+      "client-mount": "60-second timeout"
+    }
+  },
+  "focused_native_tests": {
+    "unique_passed": 1075,
+    "counts": {
+      "language": 418,
+      "realms": 440,
+      "bigint": 23,
+      "structure-language": 153,
+      "emission": 41
+    },
+    "excluded_duplicate": "tests-for-in-refresh 80KB result is superseded/duplicate; not counted in the new maximum of 114175 bytes",
+    "superseded_for_in": "Original tests-for-in result (80,043-byte bound) is superseded by tests-for-in-refresh (114,175-byte bound); do not add it as a separate test count. The final 418-test language refresh includes the new replay."
+  },
+  "archive": {
+    "file": "react-codegen-20261102-inert.tar.xz",
+    "sha256": "00379a957f5c7daa6ec2e31b47cc78fccf5eb85348ac212f50efb066f7ce76e3",
+    "bytes": 365176,
+    "index_sha256": "fb90a22196640d781cf07cb74670ae2c001fa5afc19f76bdef7c6886d56ca341",
+    "members": 71,
+    "contents": "UTF-8 source, React license, captured compiler patch/snapshot, runner identities/producers, baseline reports, test receipts, pinned Test262 case and 79-case subset identity/results/logs, and probe stdout/stderr; no Wasm, ELF, .swpc, executable, cache, or image files."
+  },
+  "test262_replay": {
+    "case_directory": "language/expressions/modulus/",
+    "selected_case_variants": 79,
+    "result": "79/79 Success; 0 Crash",
+    "scope_note": "A 79-case modulus subset of pinned Test262, not a full Test262 run.",
+    "execution_backend": "wasm-aot",
+    "pinned_revisions": {
+      "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+      "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+    },
+    "manifest_hash": 2255755118684477284,
+    "compiler_identity": {
+      "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+      "source_fingerprint": "a61d7e85319c6c98194c6d4e6bd8a14838a9de5c954add7b025c9b9e6b70e9e8",
+      "source_revision": {
+        "kind": "git-commit",
+        "commit": "8f5d44820bac0103aa04698e5cac3d9b6e895889"
+      },
+      "executable_sha256": "b6d63752dc4e2bc8e7aac6041eb6b713b4673b0f4b5042cd2d0410d007aa34af"
+    },
+    "two_case_replay": {
+      "result": "2/2 Success; 0 Crash",
+      "relationship": "Both test262-modulus replay IDs occur in the completed 79-case run; nested subset, deduplicated, not 81."
+    },
+    "receipt": "test262/full-suite-identity-and-results.json"
+  }
+}

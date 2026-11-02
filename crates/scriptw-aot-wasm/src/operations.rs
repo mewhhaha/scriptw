@@ -11,10 +11,12 @@ use crate::runtime_helpers::RuntimeHelperPropertyKeyParameter;
 use scriptw_ir::NativeErrorKind;
 use scriptw_ir::StaticRegExpCompilation;
 
+mod bigint_equality;
 mod coercive_add;
 mod has_instance;
 mod intrinsic_installation_key;
 pub(crate) use intrinsic_installation_key::IntrinsicInstallationKey;
+mod loose_equality;
 mod number_remainder;
 mod number_to_string;
 mod property_key_hash;
@@ -3626,7 +3628,7 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    pub(crate) fn emit_loose_tagged_equality_i32(
+    fn emit_loose_tagged_equality_kernel_i32(
         &mut self,
         lhs: &ValueLocals,
         rhs: &ValueLocals,
@@ -6385,7 +6387,7 @@ impl<'a> FunctionBuilder<'a> {
             right.cast_reference::<BigIntValue>(schema, function),
             function,
         );
-        self.emit_bigint_equality_i32(&left_bigint, &right_bigint, function);
+        self.emit_bigint_equality_i32(&left_bigint, &right_bigint, function)?;
         right_bigint.clear(function);
         left_bigint.clear(function);
         function.instruction(&Instruction::Else);
@@ -6420,95 +6422,18 @@ impl<'a> FunctionBuilder<'a> {
         left: &GcLocal<BigIntValue>,
         right: &GcLocal<BigIntValue>,
         function: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let left_sign = schema.reserve_i32_local(function);
-        let right_sign = schema.reserve_i32_local(function);
-        let bigint = schema.struct_type::<BigIntValue>();
-        bigint
-            .field(BigIntValueSchema::NEGATIVE)
-            .read(left, schema, function)
-            .store(left_sign, function);
-        bigint
-            .field(BigIntValueSchema::NEGATIVE)
-            .read(right, schema, function)
-            .store(right_sign, function);
-        let left_limbs_slot = schema.reserve_gc_local(function);
-        let left_limbs = left_limbs_slot.initialize(
-            bigint
-                .field(BigIntValueSchema::LIMBS)
-                .read(left, schema, function)
-                .reference(),
-            function,
-        );
-        let right_limbs_slot = schema.reserve_gc_local(function);
-        let right_limbs = right_limbs_slot.initialize(
-            bigint
-                .field(BigIntValueSchema::LIMBS)
-                .read(right, schema, function)
-                .reference(),
-            function,
-        );
-        let left_length = schema.reserve_i32_local(function);
-        let right_length = schema.reserve_i32_local(function);
-        let index = schema.reserve_i32_local(function);
-        let equal = schema.reserve_i32_local(function);
-        let left_limb = schema.reserve_i64_local(function);
-        let right_limb = schema.reserve_i64_local(function);
-        let limbs = schema.array_type::<BigIntLimbArray>();
-        limbs.length(&left_limbs, schema, function);
-        left_length.store(function);
-        limbs.length(&right_limbs, schema, function);
-        right_length.store(function);
-        left_sign.load(function);
-        right_sign.load(function);
-        function.instruction(&Instruction::I32Eq);
-        left_length.load(function);
-        right_length.load(function);
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::I32And);
-        equal.store(function);
-        equal.load(function);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::I32Const(0));
-        index.store(function);
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        index.load(function);
-        left_length.load(function);
-        function.instruction(&Instruction::I32GeU);
-        function.instruction(&Instruction::BrIf(1));
-        limbs
-            .read(&left_limbs, index, schema, function)
-            .store_i64(left_limb, function);
-        limbs
-            .read(&right_limbs, index, schema, function)
-            .store_i64(right_limb, function);
-        left_limb.load(function);
-        right_limb.load(function);
-        function.instruction(&Instruction::I64Eq);
-        equal.store(function);
-        equal.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::BrIf(1));
-        index.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        index.store(function);
-        function.instruction(&Instruction::Br(0));
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        equal.load(function);
-        schema.release_i64_local(right_limb, function);
-        schema.release_i64_local(left_limb, function);
-        schema.release_i32_local(equal, function);
-        schema.release_i32_local(index, function);
-        schema.release_i32_local(right_length, function);
-        schema.release_i32_local(left_length, function);
-        right_limbs.clear(function);
-        left_limbs.clear(function);
-        schema.release_i32_local(right_sign, function);
-        schema.release_i32_local(left_sign, function);
+        let result = schema.reserve_i32_local(function);
+        schema
+            .call_helper(
+                crate::runtime_helpers::BigIntEqualityArguments::new(left, right),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(result, function);
+        result.load(function);
+        schema.release_i32_local(result, function);
+        Ok(())
     }
 }

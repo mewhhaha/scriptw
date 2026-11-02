@@ -85,7 +85,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 43 adds complete intrinsic recipe storage and its observed-value cache.
 // Version 44 adds defining-Realm RegExp demand initialization, its state,
 // constructor recipe and typed ensure helper.
-const LAYOUT_VERSION: u32 = 45;
+// Version 46 shares abstract equality, BigInt equality and for-in advancement
+// through typed runtime kernels instead of expanding them at each source site.
+const LAYOUT_VERSION: u32 = 46;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

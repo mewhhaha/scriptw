@@ -1800,7 +1800,7 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         let error = schema.reserve_value_local(function);
         self.emit_throw_global_binding_error(
-            GlobalBindingFailure::UnresolvableAssignment,
+            GlobalBindingFailure::Unresolvable(&key),
             &error,
             function,
         )?;

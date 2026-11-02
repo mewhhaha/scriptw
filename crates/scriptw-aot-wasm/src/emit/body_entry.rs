@@ -133,6 +133,9 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::CoerciveAdd
             | RuntimeHelperId::LexicalBindingUninitialized
             | RuntimeHelperId::RelationalComparison
+            | RuntimeHelperId::LooseEquality
+            | RuntimeHelperId::ForInAdvance
+            | RuntimeHelperId::BigIntEquality
             | RuntimeHelperId::RegExpMatcher
             | RuntimeHelperId::RegExpCompiler
             | RuntimeHelperId::ModuleInitialize

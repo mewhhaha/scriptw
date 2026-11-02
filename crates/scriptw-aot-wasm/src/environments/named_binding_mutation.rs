@@ -160,7 +160,7 @@ impl FunctionBuilder<'_> {
         match strictness {
             Strictness::Strict => {
                 self.emit_throw_global_binding_error(
-                    GlobalBindingFailure::UnresolvableAssignment,
+                    GlobalBindingFailure::Unresolvable(key),
                     value,
                     function,
                 )?;
