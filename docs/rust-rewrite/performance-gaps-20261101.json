@@ -1,7 +1,7 @@
 {
   "schema": "scriptw-performance-gap-diagnosis-v2",
   "date": "2026-11-02",
-  "status": "Qualified private-counter improvement: dynamic String medians36.5-36.8% lower and mixed joins5.2-5.6% lower; original17 median geomeans0.674-0.680x pinned Scriptc with14 wall wins. All four A/A gates and all30/separate controls pass. Every-case/RSS/V8 parity remains open. Additional remainder77/79 retains two baseline-confirmed native-frame Crash outcomes.",
+  "status": "Current fresh408-process three-runtime reference: Scriptw14/17 wall wins versus pinnedScriptc (median geomeans0.671-0.676x),6/17 versus Node24.12/V8 13.6 (1.595-1.604x). Public-entry setup differences and whole-child peakRSS retained explicitly. Runtime source matches qualified private-counter checkpoint; complete parity remains open and baseline-confirmed conformance frame failures remain owned.",
   "overall_v8_scriptc_parity": "open",
   "history": {
     "previous_committed_checkpoint": {
@@ -32,7 +32,8 @@
       "measured_gain": null
     },
     "previous_status_at_85ce": "Qualified intrinsic-layout and RegExp/observed-data improvements. Latest precompiled17median geometric means0.972-0.979x pinnedScriptc, six individual wins; every-case parity remains open. Rejected hot-read regression retained.",
-    "status_before_private_counter_facts": "Qualified intrinsic birth-layout improvement: 28.3-28.5% lower median geomeans across30 precompiled cases; latest original17 comparison0.694-0.695x pinned Scriptc with12 individual wins. Both seven-case controls pass. Every-case parity remains open; rejected setup and historical controls retained."
+    "status_before_private_counter_facts": "Qualified intrinsic birth-layout improvement: 28.3-28.5% lower median geomeans across30 precompiled cases; latest original17 comparison0.694-0.695x pinned Scriptc with12 individual wins. Both seven-case controls pass. Every-case parity remains open; rejected setup and historical controls retained.",
+    "status_before_three_runtime_comparison": "Qualified private-counter improvement: dynamic String medians36.5-36.8% lower and mixed joins5.2-5.6% lower; original17 median geomeans0.674-0.680x pinned Scriptc with14 wall wins. All four A/A gates and all30/separate controls pass. Every-case/RSS/V8 parity remains open. Additional remainder77/79 retains two baseline-confirmed native-frame Crash outcomes."
   },
   "ordinary": {
     "source_fingerprint": "9f5f333b6d636e51f2fa8fb1660a0c554ea2648fd65d0184cddbbf5484e77ccb",
@@ -5642,5 +5643,160 @@
       "contains_native_or_wasm_images": false
     },
     "publication_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180"
+  },
+  "execution_three_runtime": {
+    "status": "complete descriptive three-runtime public-entry reference; no conformance or significance claim",
+    "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+    "publication_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180",
+    "measurement_commit": "e218090e7fee7bb2e8195868fbd865e06f40cef0",
+    "started_at": "2026-11-02T14:17:36.948927+00:00",
+    "finished_at": "2026-11-02T14:19:11.743422+00:00",
+    "runtimes": [
+      "scriptw",
+      "scriptc",
+      "v8"
+    ],
+    "node_identity": {
+      "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node",
+      "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+      "versions": {
+        "node": "24.12.0",
+        "acorn": "8.15.0",
+        "ada": "3.3.0",
+        "amaro": "1.1.5",
+        "ares": "1.34.5",
+        "brotli": "1.1.0",
+        "cjs_module_lexer": "2.1.0",
+        "cldr": "47.0",
+        "icu": "77.1",
+        "llhttp": "9.3.0",
+        "modules": "137",
+        "napi": "10",
+        "nbytes": "0.1.1",
+        "ncrypto": "0.0.1",
+        "nghttp2": "1.67.1",
+        "openssl": "3.5.4",
+        "simdjson": "4.1.0",
+        "simdutf": "6.4.0",
+        "sqlite": "3.50.4",
+        "tz": "2025b",
+        "undici": "7.16.0",
+        "unicode": "16.0",
+        "uv": "1.51.0",
+        "uvwasi": "0.0.23",
+        "v8": "13.6.233.17-node.37",
+        "zlib": "1.3.1-470d3a2",
+        "zstd": "1.5.7"
+      },
+      "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs",
+      "harness_sha256": "0e729b593ed9d70695b66eaf17da06dd828be09590ff088a3e15c989f015e34b",
+      "flags": [],
+      "persistent_compile_cache": false
+    },
+    "shared_configuration": {
+      "collector": "copying",
+      "consumer_compiler_enabled": false,
+      "epoch_deadline": 9223372036854775807,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_compilation_mode": "size-optimized",
+      "register_allocation": "backtracking",
+      "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+      "store_memory_limit_bytes": 1073741824,
+      "target": "generic",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "wasm_backtrace_details": "disable",
+      "wasmtime_version": "47.0.0",
+      "worker_stack_bytes": 67108864
+    },
+    "processes": 408,
+    "processes_per_actor_case": 8,
+    "measured_entries_per_process": 21,
+    "warmups_per_process": 10,
+    "preflight": {
+      "processes": 9,
+      "checked_entries": 36
+    },
+    "policy": {
+      "execution": "Public-entry wall: Scriptw evaluate entry, Scriptc WASI _start/output capture, V8 runInContext/print capture.",
+      "setup": "Wasm image loading and Store/instance setup excluded; Scriptw Realm/intrinsic bootstrap remains inside entry. V8 vm.Script eager parse and vm.Context creation outside entry; context_ns retained separately.",
+      "v8": "Normal V8 lazy compilation, JIT tiering and natural GC may occur inside entry. Ten warmups do not assert steady-state optimized code.",
+      "memory": "GNU-time whole-child peak RSS includes each process runtime, setup, warmups and code history. Node includes its source compilation/JIT; Wasm images were prepared in separate earlier processes. No live-heap interpretation.",
+      "statistics": "Fresh process is the unit; four process medians/means per actor/block, eight overall; retain every observation and both blocks. No cross-runtime CPU ratio or significance claim.",
+      "resources": "One CPU, 4GiB cgroup, no swap, grouped OOM; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.",
+      "source": "Original17 bytes shared by Scriptw and V8; Scriptc derived print-wrapper source and pinned0.4.5/Zig0.16 provenance retained in producer receipt."
+    },
+    "comparisons": {
+      "scriptc": {
+        "wins_in_both_statistics_and_blocks": [
+          "sort-reverse-128.js",
+          "sort-reverse-512.js",
+          "sort-sorted-512.js",
+          "to-sorted-512.js",
+          "numeric-loop-10000.js",
+          "numeric-loop-50000.js",
+          "folded-string-4096.js",
+          "dynamic-string-4096.js",
+          "integer.js",
+          "objects.js",
+          "retained-objects.js",
+          "join-empty-1024.js",
+          "join-singleton-1024.js",
+          "join-small-1024.js"
+        ],
+        "geomeans": [
+          {
+            "median": 0.6711570927088115,
+            "mean": 0.6681511892014439
+          },
+          {
+            "median": 0.6758632637551784,
+            "mean": 0.6768926699886343
+          }
+        ]
+      },
+      "v8": {
+        "wins_in_both_statistics_and_blocks": [
+          "numeric-loop-10000.js",
+          "numeric-loop-50000.js",
+          "dynamic-string-4096.js",
+          "integer.js",
+          "join-singleton-1024.js",
+          "join-small-1024.js"
+        ],
+        "geomeans": [
+          {
+            "median": 1.5954701612942368,
+            "mean": 1.3279124858973637
+          },
+          {
+            "median": 1.6041708561533592,
+            "mean": 1.3453981339200196
+          }
+        ]
+      }
+    },
+    "parent_qualification": {
+      "unique_selected": 1825,
+      "receipt": {
+        "path": "native-qualified.json",
+        "sha256": "8ccd4b15d275b6ae35a17f432ae8ac805e604bc53224105e0a96533b00aef6a4"
+      },
+      "limits": "Full AOT lib and listed structural targets; selected Engine targets/modules. No full workspace claim."
+    },
+    "reference17": {
+      "evidence": {
+        "path": "analysis.json",
+        "sha256": "8c40c0f383adf36cbda9e0de7cce64cb2064f2dc9797886ec62ab0be246e0acc"
+      }
+    },
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-three-runtime-20261102-inert.tar.xz",
+      "sha256": "6a7c2a2c56839529a5903b04d881ea34bb84056bb5fa13187aedaf92661ac7da",
+      "bytes": 965004,
+      "regular_utf8_members": 1282,
+      "expanded_utf8_bytes": 15306116,
+      "contains_native_or_wasm_images": false
+    }
   }
 }

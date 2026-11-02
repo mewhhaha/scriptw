@@ -162,12 +162,30 @@ version to reproduce the committed SVGs:
 ```sh
 python3 -m venv target/chart-env
 target/chart-env/bin/python -m pip install matplotlib==3.11.2
-python3 -B scripts/limited_verification.py -- target/chart-env/bin/python scripts/render-paired-precompiled.py --check
+python3 -B scripts/limited_verification.py -- target/chart-env/bin/python scripts/render-runtime-comparison.py --check
 ```
 
 Omit `--check` to regenerate; add `--preview-dir target/chart-previews` for PNGs.
-The three-runtime V8 charts retain their own dated evidence and ordinary runtime
+The renderer reads `execution_three_runtime` in
+`docs/rust-rewrite/performance-gaps-20261101.json`, validates the three-runtime
+schedule and process samples, and writes `execution-current.json`, the
+`assets/benchmarks-current/` cards and the README runtime comparison. The data
+retains the exact Wasmtime host and Node/V8 identities and timing policy.
+The older CI comparison retains its dated evidence and ordinary runtime
 configuration in `docs/rust-rewrite/compiler-comparison.md`.
+
+For a fresh three-runtime reference, reuse a locally built, qualified frozen
+cohort containing its producer receipts and matching native images. The driver
+checks source bytes and images before running the unchanged 17 workloads:
+
+```sh
+python3 -B scripts/limited_verification.py -- python3 scripts/benchmark-runtime-comparison.py --frozen target/qualified-cohort --output target/new-runtime-reference --time /usr/bin/time
+```
+
+Select the installed GNU time binary with `--time`; `--node` selects Node and its
+exact executable/version are recorded. Each actor runs in eight fresh processes
+per case, with 21 measurements and ten checked warmups per process. V8 context
+creation is captured separately from its public-entry timer.
 
 ## Artifact reuse
 

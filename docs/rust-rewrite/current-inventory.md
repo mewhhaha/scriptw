@@ -22,10 +22,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   [gap diagnosis](performance-gaps-20261101.json) separates source-bound reference
   cohorts, LLVM/final-Wasm inspection and worker-IP diagnostics. Private counter
   proofs pass the 480-process A/A, 30-case screen and all three separate control
-  cohorts. The latest precompiled reference wins 14/17 cases with median geometric
-  means 0.674–0.680× Scriptc; its fresh accepted-baseline replay wins 13/17.
-  Mixed join remains 2.32–2.43× slower and plain joins 1.38–1.63×; dynamic String
-  is now 0.663–0.671×. RSS geometric means remain 1.134–1.137× Scriptc.
+  cohorts. The fresh 408-process three-runtime entry reference wins 14/17 cases
+  against Scriptc (median geometric means 0.671–0.676×) and 6/17 against V8
+  (1.595–1.604×). V8 context creation is outside its entry timer; Scriptw's
+  bootstrap remains inside. Preserve these API boundaries and supplemental
+  context timings when comparing the remaining sorting, join and object gaps.
   Next, test guarded reads of already-observed intrinsic DATA rows: object_read
   accounts for 26–33% of user-cycle samples in three current mixed-join windows.
   Reuse complete Array prototype layouts and their existing value cache, with

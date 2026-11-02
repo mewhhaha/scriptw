@@ -1,0 +1,889 @@
+{
+  "schema": "scriptw-three-runtime-charts-v1",
+  "source_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180",
+  "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123",
+  "finished_at": "2026-11-02",
+  "source_analysis": {
+    "path": "analysis.json",
+    "sha256": "8c40c0f383adf36cbda9e0de7cce64cb2064f2dc9797886ec62ab0be246e0acc"
+  },
+  "consumer_identity": {
+    "adapter": "shared",
+    "comparison_cohort": "scriptw-precompiled-comparison-v1",
+    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+    "excluded_from_ordinary_cohorts": true,
+    "executable_sha256": "d5554d4188ad0505bcb95e7da08f4901524562b8ba111990ad738618245ed3f9",
+    "schema": "scriptw-precompiled-shared-host-v1",
+    "scope": "same-executable-precompiled-comparison-identity",
+    "shared_configuration": {
+      "collector": "copying",
+      "consumer_compiler_enabled": false,
+      "epoch_deadline": 9223372036854775807,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_compilation_mode": "size-optimized",
+      "register_allocation": "backtracking",
+      "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+      "store_memory_limit_bytes": 1073741824,
+      "target": "generic",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "wasm_backtrace_details": "disable",
+      "wasmtime_version": "47.0.0",
+      "worker_stack_bytes": 67108864
+    },
+    "source_commit": "0bc2e08830a3a554f95916aeb5b99f30681d0196",
+    "source_fingerprint": "88dde53a5c8e7ced1f6889e112b01666dd024de1771a36db3213ea55229e9123"
+  },
+  "node_identity": {
+    "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node",
+    "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+    "versions": {
+      "node": "24.12.0",
+      "acorn": "8.15.0",
+      "ada": "3.3.0",
+      "amaro": "1.1.5",
+      "ares": "1.34.5",
+      "brotli": "1.1.0",
+      "cjs_module_lexer": "2.1.0",
+      "cldr": "47.0",
+      "icu": "77.1",
+      "llhttp": "9.3.0",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.1",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.67.1",
+      "openssl": "3.5.4",
+      "simdjson": "4.1.0",
+      "simdutf": "6.4.0",
+      "sqlite": "3.50.4",
+      "tz": "2025b",
+      "undici": "7.16.0",
+      "unicode": "16.0",
+      "uv": "1.51.0",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.37",
+      "zlib": "1.3.1-470d3a2",
+      "zstd": "1.5.7"
+    },
+    "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs",
+    "harness_sha256": "0e729b593ed9d70695b66eaf17da06dd828be09590ff088a3e15c989f015e34b",
+    "flags": [],
+    "persistent_compile_cache": false
+  },
+  "shared_configuration": {
+    "collector": "copying",
+    "consumer_compiler_enabled": false,
+    "epoch_deadline": 9223372036854775807,
+    "gc_initial_bytes": 16777216,
+    "max_wasm_stack_bytes": 33554432,
+    "native_compilation_mode": "size-optimized",
+    "register_allocation": "backtracking",
+    "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+    "store_memory_limit_bytes": 1073741824,
+    "target": "generic",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "wasm_backtrace_details": "disable",
+    "wasmtime_version": "47.0.0",
+    "worker_stack_bytes": 67108864
+  },
+  "archive": {
+    "archive": "docs/rust-rewrite/performance-three-runtime-20261102-inert.tar.xz",
+    "sha256": "6a7c2a2c56839529a5903b04d881ea34bb84056bb5fa13187aedaf92661ac7da",
+    "bytes": 965004,
+    "regular_utf8_members": 1282,
+    "expanded_utf8_bytes": 15306116,
+    "contains_native_or_wasm_images": false
+  },
+  "renderer": {
+    "matplotlib": "3.11.2",
+    "script_sha256": "f61c620e664227cdbf61206921f26048575b73f10d078f95784ba51204694477",
+    "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"
+  },
+  "chart_panels": [
+    [
+      "ms",
+      "Entry time · ms",
+      3
+    ],
+    [
+      "rss_mib",
+      "Peak RSS · MiB",
+      1
+    ]
+  ],
+  "policy": {
+    "execution": "Public-entry comparison: Scriptw and Scriptc Wasm compile before the measured processes; the shared CPP host disables compilation. Timed Wasm entry includes Scriptw Realm/intrinsic bootstrap. V8 parses one vm.Script per process and creates a fresh vm.Context before each invocation outside entry timing, then times runInContext. Lazy compilation, JIT tiering and natural GC may occur inside V8 entry timing. Every warmup and measured entry checks output.",
+    "aggregation": "Median of eight process medians for time; median of eight GNU-time child peaks for RSS. All process means and both block medians retained.",
+    "sampling": "Two balanced blocks, four processes per actor and case per block; 21 measured entries after ten warmups per process. Warmups do not establish optimized steady state.",
+    "v8_context": "Supplemental v8_context_ms is the median of eight process medians for fresh context creation, outside V8 entry timing; excluded from bars and ratios.",
+    "source_commit_role": "Publication commit matching the measured Rust source; measured binaries are identified by source_fingerprint."
+  },
+  "rows": [
+    {
+      "file": "sort-reverse-128.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.1312705,
+          "mean_ms": 0.1332103630952381,
+          "rss_mib": 16.517578125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.132052,
+            0.13101
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.1320165,
+          "mean_ms": 0.13539210714285715,
+          "rss_mib": 14.568359375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.133961,
+            0.131491
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.0235145,
+          "mean_ms": 0.023760625,
+          "rss_mib": 58.208984375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0235795,
+            0.0233945
+          ],
+          "v8_context_ms": 0.3545965
+        }
+      }
+    },
+    {
+      "file": "sort-reverse-512.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.296025,
+          "mean_ms": 0.29838361904761906,
+          "rss_mib": 16.470703125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.294462,
+            0.29604
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.331242,
+          "mean_ms": 0.3330063214285714,
+          "rss_mib": 14.634765625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.330471,
+            0.3316675
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.069418,
+          "mean_ms": 0.13543305357142857,
+          "rss_mib": 58.470703125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0683105,
+            0.0694725
+          ],
+          "v8_context_ms": 0.367436
+        }
+      }
+    },
+    {
+      "file": "sort-sorted-512.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.2945265,
+          "mean_ms": 0.3014448571428572,
+          "rss_mib": 16.59375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.2907995,
+            0.3020315
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.3430095,
+          "mean_ms": 0.3410668392857143,
+          "rss_mib": 14.736328125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.333411,
+            0.344167
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.069377,
+          "mean_ms": 0.1369939880952381,
+          "rss_mib": 58.53125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0682805,
+            0.0705295
+          ],
+          "v8_context_ms": 0.368763
+        }
+      }
+    },
+    {
+      "file": "to-sorted-512.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.3065945,
+          "mean_ms": 0.30781932142857144,
+          "rss_mib": 16.7109375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.305718,
+            0.3081325
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.3745895,
+          "mean_ms": 0.3781121845238095,
+          "rss_mib": 14.7109375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.371739,
+            0.3770595
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.069773,
+          "mean_ms": 0.07646576785714286,
+          "rss_mib": 58.517578125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.069533,
+            0.069838
+          ],
+          "v8_context_ms": 0.3667495
+        }
+      }
+    },
+    {
+      "file": "join-1024.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.577181,
+          "mean_ms": 0.6276151666666666,
+          "rss_mib": 16.875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.558766,
+            0.649669
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.4084995,
+          "mean_ms": 0.41223939285714284,
+          "rss_mib": 14.80078125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.4046565,
+            0.4150815
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.056242,
+          "mean_ms": 0.078603625,
+          "rss_mib": 58.306640625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0548695,
+            0.0579405
+          ],
+          "v8_context_ms": 0.3564145
+        }
+      }
+    },
+    {
+      "file": "join-4096.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 2.0366495,
+          "mean_ms": 2.0274650357142856,
+          "rss_mib": 17.0703125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            1.985136,
+            2.042305
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 1.3167765,
+          "mean_ms": 1.3639240238095238,
+          "rss_mib": 15.14453125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            1.3020735,
+            1.3366495
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.2371725,
+          "mean_ms": 0.25651892261904763,
+          "rss_mib": 66.923828125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.226161,
+            0.241561
+          ],
+          "v8_context_ms": 0.369199
+        }
+      }
+    },
+    {
+      "file": "join-mixed-1024.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.620353,
+          "mean_ms": 0.6196949166666667,
+          "rss_mib": 16.58984375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.6199625,
+            0.620353
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.2679515,
+          "mean_ms": 0.27059060119047623,
+          "rss_mib": 14.609375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.2685125,
+            0.26732
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.0957125,
+          "mean_ms": 0.12542333333333333,
+          "rss_mib": 59.265625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0957125,
+            0.0951065
+          ],
+          "v8_context_ms": 0.3685785
+        }
+      }
+    },
+    {
+      "file": "numeric-loop-10000.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.0683305,
+          "mean_ms": 0.06853628571428572,
+          "rss_mib": 15.841796875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.067639,
+            0.068571
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.0939295,
+          "mean_ms": 0.09486657738095239,
+          "rss_mib": 13.98046875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.09431,
+            0.093618
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.1420765,
+          "mean_ms": 0.15302776785714284,
+          "rss_mib": 63.76953125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.142447,
+            0.14143
+          ],
+          "v8_context_ms": 0.370887
+        }
+      }
+    },
+    {
+      "file": "numeric-loop-50000.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.06844,
+          "mean_ms": 0.06863404166666667,
+          "rss_mib": 15.865234375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.068275,
+            0.0685005
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.1841715,
+          "mean_ms": 0.18575410714285712,
+          "rss_mib": 13.96484375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1860695,
+            0.182889
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.7120485,
+          "mean_ms": 0.7320791488095237,
+          "rss_mib": 65.888671875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.7195525,
+            0.6995045
+          ],
+          "v8_context_ms": 0.372841
+        }
+      }
+    },
+    {
+      "file": "folded-string-4096.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.170505,
+          "mean_ms": 0.17123583333333334,
+          "rss_mib": 16.013671875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1701045,
+            0.1711015
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.800767,
+          "mean_ms": 0.8094438214285714,
+          "rss_mib": 13.994140625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.7988785,
+            0.822714
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.1252185,
+          "mean_ms": 0.13482364285714288,
+          "rss_mib": 61.345703125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1252185,
+            0.1255795
+          ],
+          "v8_context_ms": 0.369875
+        }
+      }
+    },
+    {
+      "file": "dynamic-string-4096.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.1868165,
+          "mean_ms": 0.18839780952380952,
+          "rss_mib": 15.943359375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1868165,
+            0.1870615
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.280064,
+          "mean_ms": 0.28213498214285715,
+          "rss_mib": 13.943359375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.280415,
+            0.280064
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.193078,
+          "mean_ms": 0.2638007083333333,
+          "rss_mib": 64.56640625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.194356,
+            0.192136
+          ],
+          "v8_context_ms": 0.3662885
+        }
+      }
+    },
+    {
+      "file": "integer.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.0711255,
+          "mean_ms": 0.07091431547619047,
+          "rss_mib": 16.400390625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0716415,
+            0.069633
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.0726735,
+          "mean_ms": 0.07309354761904761,
+          "rss_mib": 13.92578125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0731345,
+            0.072553
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 2.545861,
+          "mean_ms": 2.5405206845238095,
+          "rss_mib": 64.80859375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            2.553816,
+            2.532986
+          ],
+          "v8_context_ms": 0.3750255
+        }
+      }
+    },
+    {
+      "file": "objects.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.384513,
+          "mean_ms": 0.38481339285714283,
+          "rss_mib": 16.60546875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.385951,
+            0.382975
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.682958,
+          "mean_ms": 0.6877247797619047,
+          "rss_mib": 14.779296875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.681335,
+            0.685432
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.064242,
+          "mean_ms": 0.08081755952380952,
+          "rss_mib": 58.341796875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.064242,
+            0.0642875
+          ],
+          "v8_context_ms": 0.350774
+        }
+      }
+    },
+    {
+      "file": "retained-objects.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 8.584152,
+          "mean_ms": 8.588186035714285,
+          "rss_mib": 20.619140625,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            8.6257515,
+            8.536215
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 34.0807995,
+          "mean_ms": 34.31579658928572,
+          "rss_mib": 20.505859375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            34.5682355,
+            33.9778375
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 3.6337305,
+          "mean_ms": 3.5082754404761904,
+          "rss_mib": 83.1953125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            3.614334,
+            3.633936
+          ],
+          "v8_context_ms": 0.3824645
+        }
+      }
+    },
+    {
+      "file": "join-empty-1024.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.0775985,
+          "mean_ms": 0.07786444642857143,
+          "rss_mib": 16.30078125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0776225,
+            0.0775985
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.284212,
+          "mean_ms": 0.2878916130952381,
+          "rss_mib": 14.529296875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.283055,
+            0.287523
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.0631855,
+          "mean_ms": 0.0651146488095238,
+          "rss_mib": 58.236328125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0633155,
+            0.0626595
+          ],
+          "v8_context_ms": 0.37205
+        }
+      }
+    },
+    {
+      "file": "join-singleton-1024.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.0774525,
+          "mean_ms": 0.07805388690476191,
+          "rss_mib": 16.33984375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0772375,
+            0.0776975
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.130148,
+          "mean_ms": 0.1312443630952381,
+          "rss_mib": 13.966796875,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1297775,
+            0.1304385
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.0971755,
+          "mean_ms": 0.10291905357142857,
+          "rss_mib": 58.953125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0971755,
+            0.096775
+          ],
+          "v8_context_ms": 0.3709025
+        }
+      }
+    },
+    {
+      "file": "join-small-1024.js",
+      "runtimes": {
+        "scriptw": {
+          "status": "ok",
+          "ms": 0.0778485,
+          "mean_ms": 0.07775433333333333,
+          "rss_mib": 16.333984375,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.0778485,
+            0.077303
+          ]
+        },
+        "scriptc": {
+          "status": "ok",
+          "ms": 0.176602,
+          "mean_ms": 0.17784290476190476,
+          "rss_mib": 14.064453125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1767875,
+            0.176266
+          ]
+        },
+        "v8": {
+          "status": "ok",
+          "ms": 0.167289,
+          "mean_ms": 0.21501107142857143,
+          "rss_mib": 58.83203125,
+          "processes": 8,
+          "measured_entries_per_process": 21,
+          "warmups_per_process": 10,
+          "block_median_ms": [
+            0.1670335,
+            0.168291
+          ],
+          "v8_context_ms": 0.3632075
+        }
+      }
+    }
+  ]
+}

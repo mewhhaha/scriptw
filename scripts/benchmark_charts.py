@@ -37,6 +37,9 @@ def render(report, row, runtimes, *, preview=None):
         metadata['chart_panels'] = panels
         metadata['source_fingerprint'] = report['source_fingerprint']
         metadata['renderer'] = report['renderer']
+        for key in ('node_identity', 'consumer_identity'):
+            if key in report:
+                metadata[key] = report[key]
     with plt.rc_context({
         'font.family': 'DejaVu Sans', 'font.size': 10,
         'text.color': '#24292f', 'text.usetex': False, 'text.parse_math': False,
