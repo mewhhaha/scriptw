@@ -5640,6 +5640,7 @@
       "regular_utf8_members": 7665,
       "expanded_utf8_bytes": 336116755,
       "contains_native_or_wasm_images": false
-    }
+    },
+    "publication_commit": "715d44d1b29dab5060c929ca53f3a47f69d3d180"
   }
 }

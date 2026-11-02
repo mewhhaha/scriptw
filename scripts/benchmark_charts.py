@@ -31,6 +31,12 @@ def render(report, row, runtimes, *, preview=None):
         'runtimes': runtimes,
         'row': row,
     }
+    panels = PANELS
+    if 'chart_panels' in report:
+        panels = report['chart_panels']
+        metadata['chart_panels'] = panels
+        metadata['source_fingerprint'] = report['source_fingerprint']
+        metadata['renderer'] = report['renderer']
     with plt.rc_context({
         'font.family': 'DejaVu Sans', 'font.size': 10,
         'text.color': '#24292f', 'text.usetex': False, 'text.parse_math': False,
@@ -41,7 +47,7 @@ def render(report, row, runtimes, *, preview=None):
         try:
             fig.subplots_adjust(left=.09, right=.97, top=.77, bottom=.17, wspace=.42)
             fig.suptitle(filename, x=.055, y=.95, ha='left', fontsize=15, fontweight='bold')
-            for ax, (field, title, decimals) in zip(axes, PANELS):
+            for ax, (field, title, decimals) in zip(axes, panels):
                 values = [row['runtimes'][runtime][field] for runtime in runtimes
                           if row['runtimes'][runtime]['status'] == 'ok']
                 maximum = max(values, default=0) or 1

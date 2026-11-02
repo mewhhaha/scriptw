@@ -153,6 +153,22 @@ crash and bug outcomes are non-passing; retain all four documented upstream
 disagreements as ordinary failures. A new complete publication is required to
 replace the [published full-suite result](docs/rust-rewrite/test262-current.md).
 
+## Benchmark charts
+
+The current README cards read the verified inert performance archive. Rendering
+executes no JavaScript, Wasm or native program images. Use the recorded plotting
+version to reproduce the committed SVGs:
+
+```sh
+python3 -m venv target/chart-env
+target/chart-env/bin/python -m pip install matplotlib==3.11.2
+python3 -B scripts/limited_verification.py -- target/chart-env/bin/python scripts/render-paired-precompiled.py --check
+```
+
+Omit `--check` to regenerate; add `--preview-dir target/chart-previews` for PNGs.
+The three-runtime V8 charts retain their own dated evidence and ordinary runtime
+configuration in `docs/rust-rewrite/compiler-comparison.md`.
+
 ## Artifact reuse
 
 Reuse requires exact source, features, dependency graph, runtime/program identities
