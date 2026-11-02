@@ -66,7 +66,12 @@ Guarded Number loops and packed Array
 push/join kernels avoid repeated conversion, dispatch and allocation when their
 semantic checks pass. Guarded fixed-arity push calls avoid temporary argument
 lists; own-data reads retain immutable lookup metadata within an invocation and
-check live storage and shape before loading a slot. Property reads reject impossible length keys before
+check live storage and shape before loading a slot. Static named Array reads
+check the live receiver and immediate prototype before loading an already-resolved
+intrinsic DATA value; cold caches, shadows, mutations and proxies use ordinary Get.
+Validated reads of immutable globals `undefined`, `NaN` and `Infinity` emit
+constants. Local, `with` and eval bindings retain their own resolution and TDZ checks.
+Property reads reject impossible length keys before
 resolving the canonical name; literal String keys reuse their evaluated value after
 receiver boxing. Guarded join calls reuse explicit String separators.
 Exact static `.length` reads use actual String or Array storage; computed keys

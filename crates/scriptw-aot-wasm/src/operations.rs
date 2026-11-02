@@ -392,6 +392,9 @@ impl<'a> FunctionBuilder<'a> {
         if self.try_compile_concat_length_get_v(operation, operands, output, function)? {
             return Ok(());
         }
+        if self.try_compile_intrinsic_array_get_v(operation, operands, output, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let mut inputs = Vec::with_capacity(operands.len());
         for operand in operands {

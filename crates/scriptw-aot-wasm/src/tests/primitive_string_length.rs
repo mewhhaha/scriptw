@@ -147,8 +147,8 @@ fn validate_program(artifact: &WasmArtifact) {
 fn literal_getv_keys_skip_only_property_key_conversion_in_every_source_variant() {
     for (source, function_name, converts_key) in [
         (
-            include_str!("../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/join-4096.js"),
-            "workload",
+            "function read(){var value=[];return value['notAnIntrinsic'];} read();",
+            "read",
             false,
         ),
         (

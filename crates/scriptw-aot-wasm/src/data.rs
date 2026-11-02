@@ -8,7 +8,9 @@ use shared_pool_storage::PoolStringRefs;
 mod compiler_owned_pool;
 mod intrinsic_installations;
 mod intrinsic_property_layouts;
-pub(crate) use intrinsic_property_layouts::{RPropertyLayoutRows, RPropertyLayoutSpan};
+pub(crate) use intrinsic_property_layouts::{
+    RNamedDataProperty, RPropertyLayoutRows, RPropertyLayoutSpan,
+};
 mod runtime_string_descriptors;
 pub(crate) use intrinsic_installations::{RInstallationRows, RInstallationSpan};
 pub(crate) use program_metadata::{

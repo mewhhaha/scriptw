@@ -15,6 +15,7 @@ mod eval_declaration_instantiation;
 mod function_body_environment;
 mod global_declaration_instantiation;
 pub(crate) mod global_environment;
+mod immutable_global_read;
 mod lexical_binding_uninitialized;
 mod named_binding_mutation;
 pub(crate) mod named_environment;
@@ -1642,6 +1643,9 @@ impl<'a> FunctionBuilder<'a> {
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.emit_immutable_global_read(name, value, function) {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)

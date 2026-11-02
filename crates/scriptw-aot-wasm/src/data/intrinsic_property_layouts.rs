@@ -1,8 +1,8 @@
 //! Sealed packed R rows for complete intrinsic property layouts.
 use super::*;
 use crate::intrinsics::property_layouts::{
-    IntrinsicCallableRecipe, IntrinsicPropertyLayoutId, IntrinsicPropertyRecipe,
-    IntrinsicPropertySpec,
+    IntrinsicCallableRecipe, IntrinsicIdentityGroup, IntrinsicPropertyLayoutId,
+    IntrinsicPropertyRecipe, IntrinsicPropertySpec,
 };
 use crate::intrinsics::{DeferredIntrinsicMethod, IntrinsicKey};
 
@@ -59,6 +59,23 @@ impl RPropertyLayoutRows {
 #[derive(Debug)]
 pub(super) struct RuntimeIntrinsicPropertyLayouts {
     rows: RPropertyLayoutRows,
+    named_data_groups:
+        BTreeMap<IntrinsicPropertyLayoutId, BTreeMap<&'static str, IntrinsicIdentityGroup>>,
+}
+
+/// A named DATA identity group belonging to this exact complete R layout.
+#[derive(Clone, Copy)]
+pub(crate) struct RNamedDataProperty {
+    span: RPropertyLayoutSpan,
+    group: IntrinsicIdentityGroup,
+}
+impl RNamedDataProperty {
+    pub(crate) fn span(self) -> RPropertyLayoutSpan {
+        self.span
+    }
+    pub(crate) fn group(self) -> IntrinsicIdentityGroup {
+        self.group
+    }
 }
 
 fn raw_key_hash(key: IntrinsicKey<'_>) -> u64 {
@@ -232,6 +249,7 @@ impl StringPool {
     ) -> Result<(), EmitError> {
         let error = || EmitError::unsupported("intrinsic property layouts exceed R static bounds");
         let mut spans = [None; IntrinsicPropertyLayoutId::ALL.len()];
+        let mut named_data_groups = BTreeMap::new();
         let mut bytes = Vec::new();
         let address = u32::try_from(self.bytes.len())
             .ok()
@@ -297,10 +315,25 @@ impl StringPool {
                 index_address,
                 index_capacity,
             });
+            let groups = plan
+                .properties()
+                .iter()
+                .filter_map(|property| {
+                    let IntrinsicKey::Name(name) = property.key else {
+                        return None;
+                    };
+                    if matches!(property.recipe, IntrinsicPropertyRecipe::Accessor { .. }) {
+                        return None;
+                    }
+                    Some((name, property.group))
+                })
+                .collect();
+            named_data_groups.insert(id, groups);
         }
         self.bytes.extend_from_slice(&bytes);
         self.runtime_intrinsic_property_layouts = Some(RuntimeIntrinsicPropertyLayouts {
             rows: RPropertyLayoutRows { spans },
+            named_data_groups,
         });
         Ok(())
     }
@@ -334,6 +367,19 @@ impl StringPool {
         id: IntrinsicPropertyLayoutId,
     ) -> Result<RPropertyLayoutSpan, EmitError> {
         self.runtime_intrinsic_property_layouts()?.rows.span(id)
+    }
+
+    pub(crate) fn intrinsic_named_data_property(
+        &self,
+        id: IntrinsicPropertyLayoutId,
+        name: &str,
+    ) -> Option<RNamedDataProperty> {
+        let layouts = self.runtime_intrinsic_property_layouts().ok()?;
+        let group = *layouts.named_data_groups.get(&id)?.get(name)?;
+        Some(RNamedDataProperty {
+            span: layouts.rows.spans[id as usize]?,
+            group,
+        })
     }
 }
 

@@ -35,6 +35,7 @@ mod dense_array_index;
 mod descriptor_object;
 mod has_property;
 mod header_projection;
+mod intrinsic_array_read;
 mod intrinsic_properties;
 mod module_namespace;
 mod native_constructor;
@@ -1026,6 +1027,11 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         if self.try_compile_static_length(target, key, receiver, output, function)? {
+            return Ok(());
+        }
+        if self
+            .try_compile_intrinsic_array_property_read(target, key, receiver, output, function)?
+        {
             return Ok(());
         }
         self.compile_ordinary_property_read_from_locals(target, key, receiver, output, function)
