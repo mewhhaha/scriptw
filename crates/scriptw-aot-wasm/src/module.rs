@@ -557,6 +557,7 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         | StandardBuiltinId::ArrayPrototypeValues
         | StandardBuiltinId::ArrayIteratorNext
         | StandardBuiltinId::ArrayIteratorIdentity
+        | StandardBuiltinId::AsyncIteratorIdentity
         | StandardBuiltinId::StringIteratorNext
         | StandardBuiltinId::RegExpStringIteratorNext
         | StandardBuiltinId::GeneratorPrototypeNext

@@ -1,10 +1,15 @@
 //! Complete initial ordinary-property layouts. These are compiler metadata,
 //! not JavaScript instructions; mutation leaves them for the ordinary dictionary.
+use super::DeferredIntrinsicMethod;
 use super::{IntrinsicKey, IntrinsicMethodPlan, IntrinsicMethodSpec};
+use crate::emitted_function::FunctionIdentity;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::heap::{DescriptorWord, StoredPropertyAttributes};
+use crate::planning::WasmFunctionMeta;
 use crate::EmitError;
-use scriptw_ir::{StandardBuiltinId, WellKnownSymbol};
+use scriptw_ir::{FunctionId, HostBuiltinId, StandardBuiltinId, WellKnownSymbol};
+
+mod eager;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -18,10 +23,64 @@ pub(crate) enum IntrinsicPropertyLayoutId {
     ArrayPrototype,
     StringPrototype,
     ArrayUnscopables,
+    FunctionConstructor,
+    ObjectConstructor,
+    AbstractModuleSourceConstructor,
+    ShadowRealmConstructor,
+    ProxyConstructor,
+    IteratorConstructor,
+    ArrayConstructor,
+    NumberConstructor,
+    StringConstructor,
+    BooleanConstructor,
+    PromiseConstructor,
+    MapConstructor,
+    WeakMapConstructor,
+    WeakRefConstructor,
+    FinalizationRegistryConstructor,
+    WeakSetConstructor,
+    AsyncDisposableStackConstructor,
+    DisposableStackConstructor,
+    SetConstructor,
+    SymbolConstructor,
+    BigIntConstructor,
+    GeneratorFunctionConstructor,
+    AsyncFunctionConstructor,
+    AsyncGeneratorFunctionConstructor,
+    FunctionPrototype,
+    NumberPrototype,
+    BooleanPrototype,
+    BigIntPrototype,
+    SymbolPrototype,
+    PromisePrototype,
+    MapPrototype,
+    SetPrototype,
+    WeakMapPrototype,
+    WeakSetPrototype,
+    WeakRefPrototype,
+    FinalizationRegistryPrototype,
+    DisposableStackPrototype,
+    AsyncDisposableStackPrototype,
+    IteratorPrototype,
+    IteratorHelperPrototype,
+    IteratorFromWrapperPrototype,
+    ArrayIteratorPrototype,
+    StringIteratorPrototype,
+    RegExpStringIteratorPrototype,
+    MapIteratorPrototype,
+    SetIteratorPrototype,
+    GeneratorPrototype,
+    AsyncGeneratorPrototype,
+    AsyncIteratorPrototype,
+    GeneratorFunctionPrototype,
+    AsyncFunctionPrototype,
+    AsyncGeneratorFunctionPrototype,
+    AbstractModuleSourcePrototype,
+    ShadowRealmPrototype,
 }
 
 impl IntrinsicPropertyLayoutId {
-    pub(crate) const ALL: [Self; 8] = [
+    pub(crate) const ALL: [Self; 62] = [
         Self::Reflect,
         Self::Math,
         Self::Json,
@@ -30,7 +89,190 @@ impl IntrinsicPropertyLayoutId {
         Self::ArrayPrototype,
         Self::StringPrototype,
         Self::ArrayUnscopables,
+        Self::FunctionConstructor,
+        Self::ObjectConstructor,
+        Self::AbstractModuleSourceConstructor,
+        Self::ShadowRealmConstructor,
+        Self::ProxyConstructor,
+        Self::IteratorConstructor,
+        Self::ArrayConstructor,
+        Self::NumberConstructor,
+        Self::StringConstructor,
+        Self::BooleanConstructor,
+        Self::PromiseConstructor,
+        Self::MapConstructor,
+        Self::WeakMapConstructor,
+        Self::WeakRefConstructor,
+        Self::FinalizationRegistryConstructor,
+        Self::WeakSetConstructor,
+        Self::AsyncDisposableStackConstructor,
+        Self::DisposableStackConstructor,
+        Self::SetConstructor,
+        Self::SymbolConstructor,
+        Self::BigIntConstructor,
+        Self::GeneratorFunctionConstructor,
+        Self::AsyncFunctionConstructor,
+        Self::AsyncGeneratorFunctionConstructor,
+        Self::FunctionPrototype,
+        Self::NumberPrototype,
+        Self::BooleanPrototype,
+        Self::BigIntPrototype,
+        Self::SymbolPrototype,
+        Self::PromisePrototype,
+        Self::MapPrototype,
+        Self::SetPrototype,
+        Self::WeakMapPrototype,
+        Self::WeakSetPrototype,
+        Self::WeakRefPrototype,
+        Self::FinalizationRegistryPrototype,
+        Self::DisposableStackPrototype,
+        Self::AsyncDisposableStackPrototype,
+        Self::IteratorPrototype,
+        Self::IteratorHelperPrototype,
+        Self::IteratorFromWrapperPrototype,
+        Self::ArrayIteratorPrototype,
+        Self::StringIteratorPrototype,
+        Self::RegExpStringIteratorPrototype,
+        Self::MapIteratorPrototype,
+        Self::SetIteratorPrototype,
+        Self::GeneratorPrototype,
+        Self::AsyncGeneratorPrototype,
+        Self::AsyncIteratorPrototype,
+        Self::GeneratorFunctionPrototype,
+        Self::AsyncFunctionPrototype,
+        Self::AsyncGeneratorFunctionPrototype,
+        Self::AbstractModuleSourcePrototype,
+        Self::ShadowRealmPrototype,
     ];
+
+    fn native_identity(self) -> Option<FunctionIdentity> {
+        match self {
+            Self::FunctionConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::FunctionConstructor,
+            )),
+            Self::ObjectConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::ObjectConstructor,
+            )),
+            Self::AbstractModuleSourceConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::AbstractModuleSourceConstructor,
+            )),
+            Self::ShadowRealmConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::ShadowRealmConstructor,
+            )),
+            Self::ProxyConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::ProxyConstructor,
+            )),
+            Self::IteratorConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::IteratorConstructor,
+            )),
+            Self::ArrayConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::ArrayConstructor,
+            )),
+            Self::NumberConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::NumberConstructor,
+            )),
+            Self::StringConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::StringConstructor,
+            )),
+            Self::BooleanConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::BooleanConstructor,
+            )),
+            Self::PromiseConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::PromiseConstructor,
+            )),
+            Self::MapConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::MapConstructor,
+            )),
+            Self::WeakMapConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::WeakMapConstructor,
+            )),
+            Self::WeakRefConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::WeakRefConstructor,
+            )),
+            Self::FinalizationRegistryConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::FinalizationRegistryConstructor,
+            )),
+            Self::WeakSetConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::WeakSetConstructor,
+            )),
+            Self::AsyncDisposableStackConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::AsyncDisposableStackConstructor,
+            )),
+            Self::DisposableStackConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::DisposableStackConstructor,
+            )),
+            Self::SetConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::SetConstructor,
+            )),
+            Self::SymbolConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::SymbolConstructor,
+            )),
+            Self::BigIntConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::BigIntConstructor,
+            )),
+            Self::GeneratorFunctionConstructor => Some(FunctionIdentity::HostBuiltin(
+                HostBuiltinId::GeneratorFunctionConstructor,
+            )),
+            Self::AsyncFunctionConstructor => Some(FunctionIdentity::HostBuiltin(
+                HostBuiltinId::AsyncFunctionConstructor,
+            )),
+            Self::AsyncGeneratorFunctionConstructor => Some(FunctionIdentity::HostBuiltin(
+                HostBuiltinId::AsyncGeneratorFunctionConstructor,
+            )),
+            Self::FunctionPrototype => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::FunctionPrototype,
+            )),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn native_function_id(self) -> Option<FunctionId> {
+        match self.native_identity()? {
+            FunctionIdentity::StandardBuiltin(builtin) => Some(builtin.function_id()),
+            FunctionIdentity::HostBuiltin(builtin) => Some(builtin.function_id()),
+            _ => unreachable!("native layout identity is a native builtin"),
+        }
+    }
+
+    pub(crate) fn validate_native_metadata(self, meta: &WasmFunctionMeta) -> Result<(), EmitError> {
+        let expected = self.native_identity().ok_or_else(|| {
+            EmitError::unsupported("property layout does not own native metadata")
+        })?;
+        let metadata_matches = match &expected {
+            FunctionIdentity::StandardBuiltin(builtin) => {
+                meta.standard_builtin == Some(*builtin) && meta.host_builtin.is_none()
+            }
+            FunctionIdentity::HostBuiltin(builtin) => {
+                meta.host_builtin == Some(*builtin) && meta.standard_builtin.is_none()
+            }
+            _ => unreachable!("closed native layout identity"),
+        };
+        if meta.entry.identity() != expected
+            || !metadata_matches
+            || !meta.strict
+            || !meta.length_name_configurable
+        {
+            return Err(EmitError::unsupported(
+                "complete native layout metadata differs from its admitted native identity",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn for_constructor(meta: &WasmFunctionMeta) -> Result<Option<Self>, EmitError> {
+        for id in Self::ALL {
+            if id != Self::FunctionPrototype && id.native_identity() == Some(meta.entry.identity())
+            {
+                id.validate_native_metadata(meta)?;
+                return Ok(Some(id));
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn for_prototype(slot: NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        eager::prototype_layout(slot)
+    }
 
     pub(crate) fn layout(self) -> Result<ValidatedIntrinsicPropertyLayout, EmitError> {
         let mut plan = LayoutBuilder::default();
@@ -76,31 +318,31 @@ impl IntrinsicPropertyLayoutId {
                         builtin,
                         writable: true,
                         configurable: true,
-                    });
+                    })?;
                 }
             }
             Self::ObjectPrototype => {
-                plan.constructor(NonArrayRealmIntrinsicSlot::ObjectConstructor);
+                plan.constructor(NonArrayRealmIntrinsicSlot::ObjectConstructor)?;
                 plan.methods(IntrinsicMethodPlan::ObjectPrototypeBeforeAccessor)?;
                 plan.accessor(
                     IntrinsicKey::Name("__proto__"),
-                    StandardBuiltinId::ObjectPrototypeProtoGetter,
-                    StandardBuiltinId::ObjectPrototypeProtoSetter,
+                    IntrinsicCallableRecipe::method(StandardBuiltinId::ObjectPrototypeProtoGetter)?,
+                    IntrinsicCallableRecipe::method(StandardBuiltinId::ObjectPrototypeProtoSetter)?,
                 );
                 plan.methods(IntrinsicMethodPlan::ObjectPrototypeAfterAccessor)?;
             }
             Self::ArrayPrototype => {
                 // Array length remains in the Array exotic storage.
-                plan.constructor(NonArrayRealmIntrinsicSlot::ArrayConstructor);
+                plan.constructor(NonArrayRealmIntrinsicSlot::ArrayConstructor)?;
                 plan.methods(IntrinsicMethodPlan::ArrayPrototype)?;
                 plan.aliases(
                     &[
                         IntrinsicKey::Name("values"),
                         IntrinsicKey::Symbol(WellKnownSymbol::Iterator),
                     ],
-                    IntrinsicPropertyRecipe::RealmIntrinsic(
+                    IntrinsicPropertyRecipe::ready(
                         NonArrayRealmIntrinsicSlot::ArrayPrototypeValues,
-                    ),
+                    )?,
                 );
                 plan.data(
                     IntrinsicKey::Symbol(WellKnownSymbol::Unscopables),
@@ -119,7 +361,7 @@ impl IntrinsicPropertyLayoutId {
                     false,
                     false,
                 );
-                plan.constructor(NonArrayRealmIntrinsicSlot::StringConstructor);
+                plan.constructor(NonArrayRealmIntrinsicSlot::StringConstructor)?;
                 plan.methods(IntrinsicMethodPlan::StringPrototypeBeforeAliases)?;
                 for (names, builtin) in [
                     (
@@ -166,8 +408,290 @@ impl IntrinsicPropertyLayoutId {
                     );
                 }
             }
+            Self::FunctionConstructor
+            | Self::ObjectConstructor
+            | Self::AbstractModuleSourceConstructor
+            | Self::ShadowRealmConstructor
+            | Self::ProxyConstructor
+            | Self::IteratorConstructor
+            | Self::ArrayConstructor
+            | Self::NumberConstructor
+            | Self::StringConstructor
+            | Self::BooleanConstructor
+            | Self::PromiseConstructor
+            | Self::MapConstructor
+            | Self::WeakMapConstructor
+            | Self::WeakRefConstructor
+            | Self::FinalizationRegistryConstructor
+            | Self::WeakSetConstructor
+            | Self::AsyncDisposableStackConstructor
+            | Self::DisposableStackConstructor
+            | Self::SetConstructor
+            | Self::SymbolConstructor
+            | Self::BigIntConstructor
+            | Self::GeneratorFunctionConstructor
+            | Self::AsyncFunctionConstructor
+            | Self::AsyncGeneratorFunctionConstructor
+            | Self::FunctionPrototype
+            | Self::NumberPrototype
+            | Self::BooleanPrototype
+            | Self::BigIntPrototype
+            | Self::SymbolPrototype
+            | Self::PromisePrototype
+            | Self::MapPrototype
+            | Self::SetPrototype
+            | Self::WeakMapPrototype
+            | Self::WeakSetPrototype
+            | Self::WeakRefPrototype
+            | Self::FinalizationRegistryPrototype
+            | Self::DisposableStackPrototype
+            | Self::AsyncDisposableStackPrototype
+            | Self::IteratorPrototype
+            | Self::IteratorHelperPrototype
+            | Self::IteratorFromWrapperPrototype
+            | Self::ArrayIteratorPrototype
+            | Self::StringIteratorPrototype
+            | Self::RegExpStringIteratorPrototype
+            | Self::MapIteratorPrototype
+            | Self::SetIteratorPrototype
+            | Self::GeneratorPrototype
+            | Self::AsyncGeneratorPrototype
+            | Self::AsyncIteratorPrototype
+            | Self::GeneratorFunctionPrototype
+            | Self::AsyncFunctionPrototype
+            | Self::AsyncGeneratorFunctionPrototype
+            | Self::AbstractModuleSourcePrototype
+            | Self::ShadowRealmPrototype => eager::populate(self, &mut plan)?,
         }
         ValidatedIntrinsicPropertyLayout::new(plan.properties, plan.groups)
+    }
+}
+
+/// Only eagerly completed canonical slots can be cached without a demand gate.
+#[derive(Clone, Copy)]
+pub(crate) struct ReadyRealmSlot(NonArrayRealmIntrinsicSlot);
+impl ReadyRealmSlot {
+    fn new(slot: NonArrayRealmIntrinsicSlot) -> Result<Self, EmitError> {
+        use NonArrayRealmIntrinsicSlot as Slot;
+        match slot {
+            Slot::ShadowRealmConstructor
+            | Slot::ShadowRealmPrototype
+            | Slot::AbstractModuleSourceConstructor
+            | Slot::AbstractModuleSourcePrototype
+            | Slot::ModuleSourcePrototype
+            | Slot::ArrayPrototypeValues
+            | Slot::ThrowTypeError
+            | Slot::PromisePrototype
+            | Slot::FunctionPrototype
+            | Slot::PromiseConstructor
+            | Slot::AsyncDisposableStackPrototype
+            | Slot::DisposableStackPrototype
+            | Slot::GeneratorFunctionConstructor
+            | Slot::AsyncFunctionConstructor
+            | Slot::AsyncGeneratorFunctionConstructor
+            | Slot::ObjectPrototype
+            | Slot::ArrayIteratorPrototype
+            | Slot::StringIteratorPrototype
+            | Slot::RegExpStringIteratorPrototype
+            | Slot::MapIteratorPrototype
+            | Slot::SetIteratorPrototype
+            | Slot::IteratorHelperPrototype
+            | Slot::IteratorPrototype
+            | Slot::IteratorFromWrapperPrototype
+            | Slot::GeneratorPrototype
+            | Slot::GeneratorFunctionPrototype
+            | Slot::AsyncIteratorPrototype
+            | Slot::AsyncFunctionPrototype
+            | Slot::AsyncGeneratorPrototype
+            | Slot::AsyncGeneratorFunctionPrototype
+            | Slot::NumberPrototype
+            | Slot::StringPrototype
+            | Slot::BooleanPrototype
+            | Slot::SymbolPrototype
+            | Slot::BigIntPrototype
+            | Slot::MapPrototype
+            | Slot::SetPrototype
+            | Slot::WeakMapPrototype
+            | Slot::WeakSetPrototype
+            | Slot::WeakRefPrototype
+            | Slot::FinalizationRegistryPrototype
+            | Slot::ObjectConstructor
+            | Slot::FunctionConstructor
+            | Slot::ProxyConstructor
+            | Slot::IteratorConstructor
+            | Slot::ArrayConstructor
+            | Slot::NumberConstructor
+            | Slot::StringConstructor
+            | Slot::BooleanConstructor
+            | Slot::SymbolConstructor
+            | Slot::BigIntConstructor
+            | Slot::MapConstructor
+            | Slot::SetConstructor
+            | Slot::WeakMapConstructor
+            | Slot::WeakSetConstructor
+            | Slot::WeakRefConstructor
+            | Slot::FinalizationRegistryConstructor
+            | Slot::AsyncDisposableStackConstructor
+            | Slot::DisposableStackConstructor
+            | Slot::TypedArrayPrototypeToString
+            | Slot::ParseInt
+            | Slot::ParseFloat => Ok(Self(slot)),
+            _ => Err(EmitError::unsupported(
+                "intrinsic layout requires an eagerly completed Realm slot",
+            )),
+        }
+    }
+    pub(crate) fn gc_index(self) -> u32 {
+        self.0.gc_index()
+    }
+    pub(crate) fn function_id(self) -> Option<FunctionId> {
+        use NonArrayRealmIntrinsicSlot as Slot;
+        match self.0 {
+            Slot::ShadowRealmConstructor => {
+                Some(StandardBuiltinId::ShadowRealmConstructor.function_id())
+            }
+            Slot::AbstractModuleSourceConstructor => {
+                Some(StandardBuiltinId::AbstractModuleSourceConstructor.function_id())
+            }
+            Slot::PromiseConstructor => Some(StandardBuiltinId::PromiseConstructor.function_id()),
+            Slot::GeneratorFunctionConstructor => {
+                Some(HostBuiltinId::GeneratorFunctionConstructor.function_id())
+            }
+            Slot::AsyncFunctionConstructor => {
+                Some(HostBuiltinId::AsyncFunctionConstructor.function_id())
+            }
+            Slot::AsyncGeneratorFunctionConstructor => {
+                Some(HostBuiltinId::AsyncGeneratorFunctionConstructor.function_id())
+            }
+            Slot::ObjectConstructor => Some(StandardBuiltinId::ObjectConstructor.function_id()),
+            Slot::FunctionConstructor => Some(StandardBuiltinId::FunctionConstructor.function_id()),
+            Slot::ProxyConstructor => Some(StandardBuiltinId::ProxyConstructor.function_id()),
+            Slot::IteratorConstructor => Some(StandardBuiltinId::IteratorConstructor.function_id()),
+            Slot::ArrayConstructor => Some(StandardBuiltinId::ArrayConstructor.function_id()),
+            Slot::NumberConstructor => Some(StandardBuiltinId::NumberConstructor.function_id()),
+            Slot::StringConstructor => Some(StandardBuiltinId::StringConstructor.function_id()),
+            Slot::BooleanConstructor => Some(StandardBuiltinId::BooleanConstructor.function_id()),
+            Slot::SymbolConstructor => Some(StandardBuiltinId::SymbolConstructor.function_id()),
+            Slot::BigIntConstructor => Some(StandardBuiltinId::BigIntConstructor.function_id()),
+            Slot::MapConstructor => Some(StandardBuiltinId::MapConstructor.function_id()),
+            Slot::SetConstructor => Some(StandardBuiltinId::SetConstructor.function_id()),
+            Slot::WeakMapConstructor => Some(StandardBuiltinId::WeakMapConstructor.function_id()),
+            Slot::WeakSetConstructor => Some(StandardBuiltinId::WeakSetConstructor.function_id()),
+            Slot::WeakRefConstructor => Some(StandardBuiltinId::WeakRefConstructor.function_id()),
+            Slot::FinalizationRegistryConstructor => {
+                Some(StandardBuiltinId::FinalizationRegistryConstructor.function_id())
+            }
+            Slot::AsyncDisposableStackConstructor => {
+                Some(StandardBuiltinId::AsyncDisposableStackConstructor.function_id())
+            }
+            Slot::DisposableStackConstructor => {
+                Some(StandardBuiltinId::DisposableStackConstructor.function_id())
+            }
+            Slot::FunctionPrototype => Some(StandardBuiltinId::FunctionPrototype.function_id()),
+            Slot::ArrayPrototypeValues => {
+                Some(StandardBuiltinId::ArrayPrototypeValues.function_id())
+            }
+            Slot::ThrowTypeError => Some(StandardBuiltinId::ThrowTypeError.function_id()),
+            Slot::TypedArrayPrototypeToString => {
+                Some(StandardBuiltinId::TypedArrayPrototypeToString.function_id())
+            }
+            Slot::ParseInt => Some(HostBuiltinId::ParseInt.function_id()),
+            Slot::ParseFloat => Some(HostBuiltinId::ParseFloat.function_id()),
+            _ => None,
+        }
+    }
+}
+
+/// Accessor values additionally require a canonical callable, never an object.
+#[derive(Clone, Copy)]
+pub(crate) struct ReadyRealmCallableSlot(ReadyRealmSlot);
+impl ReadyRealmCallableSlot {
+    fn new(slot: NonArrayRealmIntrinsicSlot) -> Result<Self, EmitError> {
+        use NonArrayRealmIntrinsicSlot as Slot;
+        match slot {
+            Slot::ShadowRealmConstructor
+            | Slot::AbstractModuleSourceConstructor
+            | Slot::PromiseConstructor
+            | Slot::GeneratorFunctionConstructor
+            | Slot::AsyncFunctionConstructor
+            | Slot::AsyncGeneratorFunctionConstructor
+            | Slot::ObjectConstructor
+            | Slot::FunctionConstructor
+            | Slot::ProxyConstructor
+            | Slot::IteratorConstructor
+            | Slot::ArrayConstructor
+            | Slot::NumberConstructor
+            | Slot::StringConstructor
+            | Slot::BooleanConstructor
+            | Slot::SymbolConstructor
+            | Slot::BigIntConstructor
+            | Slot::MapConstructor
+            | Slot::SetConstructor
+            | Slot::WeakMapConstructor
+            | Slot::WeakSetConstructor
+            | Slot::WeakRefConstructor
+            | Slot::FinalizationRegistryConstructor
+            | Slot::AsyncDisposableStackConstructor
+            | Slot::DisposableStackConstructor
+            | Slot::FunctionPrototype
+            | Slot::ArrayPrototypeValues
+            | Slot::ThrowTypeError
+            | Slot::TypedArrayPrototypeToString
+            | Slot::ParseInt
+            | Slot::ParseFloat => Ok(Self(ReadyRealmSlot::new(slot)?)),
+            _ => Err(EmitError::unsupported(
+                "intrinsic accessor requires an eagerly completed callable slot",
+            )),
+        }
+    }
+    pub(crate) fn gc_index(self) -> u32 {
+        self.0.gc_index()
+    }
+    pub(crate) fn function_id(self) -> FunctionId {
+        self.0
+            .function_id()
+            .expect("callable ready slots own native function identities")
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u32)]
+pub(crate) enum IntrinsicCallableRecipeKind {
+    Undefined,
+    Method,
+    Ready,
+}
+impl IntrinsicCallableRecipeKind {
+    pub(crate) const ALL: [Self; 3] = [Self::Undefined, Self::Method, Self::Ready];
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum IntrinsicCallableRecipe {
+    Undefined,
+    Method(DeferredIntrinsicMethod),
+    Ready(ReadyRealmCallableSlot),
+}
+impl IntrinsicCallableRecipe {
+    pub(crate) fn method(builtin: StandardBuiltinId) -> Result<Self, EmitError> {
+        DeferredIntrinsicMethod::new(builtin)
+            .map(Self::Method)
+            .ok_or_else(|| {
+                EmitError::unsupported("intrinsic accessor method must be a noncanonical native")
+            })
+    }
+    pub(crate) fn ready(slot: NonArrayRealmIntrinsicSlot) -> Result<Self, EmitError> {
+        Ok(Self::Ready(ReadyRealmCallableSlot::new(slot)?))
+    }
+    pub(crate) fn words(self) -> (IntrinsicCallableRecipeKind, u32) {
+        match self {
+            Self::Undefined => (IntrinsicCallableRecipeKind::Undefined, 0),
+            Self::Method(method) => (IntrinsicCallableRecipeKind::Method, method.builtin() as u32),
+            Self::Ready(slot) => (IntrinsicCallableRecipeKind::Ready, slot.gc_index()),
+        }
+    }
+    fn identity(self) -> u64 {
+        let (kind, payload) = self.words();
+        (u64::from(kind as u32) << 32) | u64::from(payload)
     }
 }
 
@@ -179,19 +703,23 @@ pub(crate) enum IntrinsicPropertyRecipeKind {
     Boolean,
     String,
     Method,
-    RealmIntrinsic,
+    ReadyRealmSlot,
     Accessor,
     LayoutObject,
+    ArrayPrototype,
+    WellKnownSymbol,
 }
 impl IntrinsicPropertyRecipeKind {
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 9] = [
         Self::Number,
         Self::Boolean,
         Self::String,
         Self::Method,
-        Self::RealmIntrinsic,
+        Self::ReadyRealmSlot,
         Self::Accessor,
         Self::LayoutObject,
+        Self::ArrayPrototype,
+        Self::WellKnownSymbol,
     ];
 }
 
@@ -201,36 +729,57 @@ pub(crate) enum IntrinsicPropertyRecipe {
     Boolean(bool),
     String(&'static str),
     Method(StandardBuiltinId),
-    RealmIntrinsic(NonArrayRealmIntrinsicSlot),
+    ReadyRealmSlot(ReadyRealmSlot),
     Accessor {
-        getter: StandardBuiltinId,
-        setter: StandardBuiltinId,
+        getter: IntrinsicCallableRecipe,
+        setter: IntrinsicCallableRecipe,
     },
     LayoutObject(IntrinsicPropertyLayoutId),
+    ArrayPrototype,
+    WellKnownSymbol(WellKnownSymbol),
+    // Compiler-only metadata references seal to the existing Number/String rows.
+    NativeLength(IntrinsicPropertyLayoutId),
+    NativeName(IntrinsicPropertyLayoutId),
 }
 impl IntrinsicPropertyRecipe {
+    pub(crate) fn ready(slot: NonArrayRealmIntrinsicSlot) -> Result<Self, EmitError> {
+        Ok(Self::ReadyRealmSlot(ReadyRealmSlot::new(slot)?))
+    }
     pub(crate) fn kind(self) -> IntrinsicPropertyRecipeKind {
         match self {
-            Self::Number(_) => IntrinsicPropertyRecipeKind::Number,
+            Self::Number(_) | Self::NativeLength(_) => IntrinsicPropertyRecipeKind::Number,
             Self::Boolean(_) => IntrinsicPropertyRecipeKind::Boolean,
-            Self::String(_) => IntrinsicPropertyRecipeKind::String,
+            Self::String(_) | Self::NativeName(_) => IntrinsicPropertyRecipeKind::String,
             Self::Method(_) => IntrinsicPropertyRecipeKind::Method,
-            Self::RealmIntrinsic(_) => IntrinsicPropertyRecipeKind::RealmIntrinsic,
+            Self::ReadyRealmSlot(_) => IntrinsicPropertyRecipeKind::ReadyRealmSlot,
             Self::Accessor { .. } => IntrinsicPropertyRecipeKind::Accessor,
             Self::LayoutObject(_) => IntrinsicPropertyRecipeKind::LayoutObject,
+            Self::ArrayPrototype => IntrinsicPropertyRecipeKind::ArrayPrototype,
+            Self::WellKnownSymbol(_) => IntrinsicPropertyRecipeKind::WellKnownSymbol,
         }
     }
     fn identity(self) -> (u32, u64, u64) {
+        let mut kind = self.kind() as u32;
         let (first, second) = match self {
             Self::Number(bits) => (bits, 0),
             Self::Boolean(value) => (u64::from(value), 0),
             Self::String(_) => (0, 0),
             Self::Method(builtin) => (builtin as u64, 0),
-            Self::RealmIntrinsic(slot) => (u64::from(slot.gc_index()), 0),
-            Self::Accessor { getter, setter } => (getter as u64, setter as u64),
+            Self::ReadyRealmSlot(slot) => (u64::from(slot.gc_index()), 0),
+            Self::Accessor { getter, setter } => (getter.identity(), setter.identity()),
             Self::LayoutObject(layout) => (layout as u64, 0),
+            Self::ArrayPrototype => (0, 0),
+            Self::WellKnownSymbol(symbol) => (symbol as u64, 0),
+            Self::NativeLength(layout) => {
+                kind = u32::MAX;
+                (layout as u64, 0)
+            }
+            Self::NativeName(layout) => {
+                kind = u32::MAX - 1;
+                (layout as u64, 0)
+            }
         };
-        (self.kind() as u32, first, second)
+        (kind, first, second)
     }
 }
 
@@ -265,6 +814,14 @@ impl ValidatedIntrinsicPropertyLayout {
         let mut symbols = BTreeSet::new();
         let mut groups = BTreeMap::new();
         for property in &properties {
+            if let IntrinsicPropertyRecipe::Method(builtin) = property.recipe {
+                if DeferredIntrinsicMethod::new(builtin).is_none() {
+                    return Err(EmitError::unsupported(format!(
+                        "complete intrinsic layout method {} requires its canonical recipe",
+                        builtin.debug_name(),
+                    )));
+                }
+            }
             let unique = match property.key {
                 IntrinsicKey::Name(name) => {
                     let units = scriptw_ir::decode_js_string_utf16(name);
@@ -348,9 +905,9 @@ impl LayoutBuilder {
             .descriptor_word(),
         });
     }
-    fn method(&mut self, method: IntrinsicMethodSpec) {
+    fn method(&mut self, method: IntrinsicMethodSpec) -> Result<(), EmitError> {
         let recipe = match crate::module::standard_builtin_function_realm_slot(method.builtin) {
-            Some(slot) => IntrinsicPropertyRecipe::RealmIntrinsic(slot),
+            Some(slot) => IntrinsicPropertyRecipe::ready(slot)?,
             None => IntrinsicPropertyRecipe::Method(method.builtin),
         };
         self.data(
@@ -360,10 +917,11 @@ impl LayoutBuilder {
             false,
             method.configurable,
         );
+        Ok(())
     }
     fn methods(&mut self, plan: IntrinsicMethodPlan) -> Result<(), EmitError> {
         for &method in plan.methods()?.iter() {
-            self.method(method);
+            self.method(method)?;
         }
         Ok(())
     }
@@ -376,14 +934,29 @@ impl LayoutBuilder {
             true,
         );
     }
-    fn constructor(&mut self, slot: NonArrayRealmIntrinsicSlot) {
+    fn constructor(&mut self, slot: NonArrayRealmIntrinsicSlot) -> Result<(), EmitError> {
         self.data(
             IntrinsicKey::Name("constructor"),
-            IntrinsicPropertyRecipe::RealmIntrinsic(slot),
+            IntrinsicPropertyRecipe::ready(slot)?,
             true,
             false,
             true,
         );
+        Ok(())
+    }
+    fn native_metadata(&mut self, id: IntrinsicPropertyLayoutId) -> Result<(), EmitError> {
+        if id.native_identity().is_none() {
+            return Err(EmitError::unsupported(
+                "native metadata requires its complete callable layout",
+            ));
+        }
+        for (name, recipe) in [
+            ("length", IntrinsicPropertyRecipe::NativeLength(id)),
+            ("name", IntrinsicPropertyRecipe::NativeName(id)),
+        ] {
+            self.data(IntrinsicKey::Name(name), recipe, false, false, true);
+        }
+        Ok(())
     }
     fn aliases(&mut self, keys: &[IntrinsicKey<'static>], recipe: IntrinsicPropertyRecipe) {
         let group = IntrinsicIdentityGroup(self.groups);
@@ -405,8 +978,8 @@ impl LayoutBuilder {
     fn accessor(
         &mut self,
         key: IntrinsicKey<'static>,
-        getter: StandardBuiltinId,
-        setter: StandardBuiltinId,
+        getter: IntrinsicCallableRecipe,
+        setter: IntrinsicCallableRecipe,
     ) {
         let group = IntrinsicIdentityGroup(self.groups);
         self.groups += 2;
@@ -426,6 +999,36 @@ impl LayoutBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ready_recipes_require_eager_producers_and_accessors_require_callables() {
+        use NonArrayRealmIntrinsicSlot as Slot;
+        for slot in [
+            Slot::RegExpConstructor,
+            Slot::DateConstructor,
+            Slot::TypeErrorPrototype,
+            Slot::ArrayBufferConstructor,
+            Slot::IntlLocaleConstructor,
+            Slot::TemporalInstantConstructor,
+        ] {
+            assert!(IntrinsicPropertyRecipe::ready(slot).is_err());
+            assert!(IntrinsicCallableRecipe::ready(slot).is_err());
+        }
+        assert!(IntrinsicPropertyRecipe::ready(Slot::ObjectPrototype).is_ok());
+        assert!(IntrinsicCallableRecipe::ready(Slot::ObjectPrototype).is_err());
+        assert!(IntrinsicCallableRecipe::ready(Slot::ThrowTypeError).is_ok());
+        assert!(IntrinsicCallableRecipe::method(StandardBuiltinId::ThrowTypeError).is_err());
+        assert!(IntrinsicCallableRecipe::method(StandardBuiltinId::MapSpeciesGetter).is_ok());
+        assert_eq!(
+            IntrinsicCallableRecipe::Undefined.words(),
+            (IntrinsicCallableRecipeKind::Undefined, 0)
+        );
+        let (kind, slot) = IntrinsicCallableRecipe::ready(Slot::ThrowTypeError)
+            .unwrap()
+            .words();
+        assert_eq!(kind, IntrinsicCallableRecipeKind::Ready);
+        assert_eq!(slot, Slot::ThrowTypeError.gc_index());
+    }
+
     #[test]
     fn complete_layouts_keep_seed_order_and_explicit_alias_identity() {
         for id in IntrinsicPropertyLayoutId::ALL {
@@ -463,7 +1066,7 @@ mod tests {
             .unwrap();
         assert_eq!(values.group, iterator.group);
         assert!(
-            matches!(values.recipe, IntrinsicPropertyRecipe::RealmIntrinsic(slot) if slot.gc_index() == NonArrayRealmIntrinsicSlot::ArrayPrototypeValues.gc_index())
+            matches!(values.recipe, IntrinsicPropertyRecipe::ReadyRealmSlot(slot) if slot.gc_index() == NonArrayRealmIntrinsicSlot::ArrayPrototypeValues.gc_index())
         );
     }
     #[test]

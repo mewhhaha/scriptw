@@ -3,8 +3,7 @@
 use super::*;
 use crate::gc_types::{
     BuiltinClosureCapture, FunctionObject, FunctionObjectSchema, GcLocal, GcOperand,
-    GcStackReference, Nullable, OrdinaryObject, RealmRecord, StoredValue, TemplateSource,
-    ValueLocals,
+    GcStackReference, Nullable, RealmRecord, TemplateSource, ValueLocals,
 };
 
 impl FunctionBuilder<'_> {
@@ -245,109 +244,6 @@ impl FunctionBuilder<'_> {
             function,
         );
         value.clear(function);
-    }
-
-    pub(crate) fn emit_define_realm_function_prototype_data(
-        &mut self,
-        context: &RealmFunctionMaterializationContext,
-        key: &crate::operations::PropertyKeyLocals,
-        value: &ValueLocals,
-        writable: bool,
-        configurable: bool,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let header = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<FunctionObject>()
-                .field(FunctionObjectSchema::OBJECT)
-                .read(&context.function_prototype, schema, function)
-                .reference(),
-            function,
-        );
-        self.emit_object_append_data_property_with_flags(
-            &header,
-            key,
-            value,
-            writable,
-            false,
-            configurable,
-            function,
-        )?;
-        header.clear(function);
-        Ok(())
-    }
-
-    pub(crate) fn emit_bind_realm_function_constructor_prototype(
-        &mut self,
-        constructor: &GcLocal<FunctionObject>,
-        context: &RealmFunctionMaterializationContext,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let constructor_header = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<FunctionObject>()
-                .field(FunctionObjectSchema::OBJECT)
-                .read(constructor, schema, function)
-                .reference(),
-            function,
-        );
-        let prototype_header = schema
-            .reserve_gc_local::<OrdinaryObject, _>(function)
-            .initialize(
-                schema
-                    .struct_type::<FunctionObject>()
-                    .field(FunctionObjectSchema::OBJECT)
-                    .read(&context.function_prototype, schema, function)
-                    .reference(),
-                function,
-            );
-        let value = schema.reserve_value_local(function);
-        value.set_reference(&context.function_prototype, schema, function);
-        let key = self.emit_function_string_key("prototype", function)?;
-        self.emit_object_append_data_property_with_flags(
-            &constructor_header,
-            &key,
-            &value,
-            false,
-            false,
-            false,
-            function,
-        )?;
-        key.clear(function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&value, function),
-            function,
-        );
-        schema
-            .struct_type::<FunctionObject>()
-            .field(FunctionObjectSchema::PUBLIC_PROTOTYPE_CACHE)
-            .write(
-                constructor,
-                GcOperand::reference(&stored, schema),
-                schema,
-                function,
-            );
-        stored.clear(function);
-        value.set_reference(constructor, schema, function);
-        let key = self.emit_function_string_key("constructor", function)?;
-        self.emit_object_append_data_property_with_flags(
-            &prototype_header,
-            &key,
-            &value,
-            true,
-            false,
-            true,
-            function,
-        )?;
-        key.clear(function);
-        value.clear(function);
-        prototype_header.clear(function);
-        constructor_header.clear(function);
-        Ok(())
     }
 
     pub(crate) fn release_realm_function_materialization_context(

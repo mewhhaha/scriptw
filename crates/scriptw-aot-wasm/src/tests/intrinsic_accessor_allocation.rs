@@ -1,8 +1,8 @@
 //! Inspect the shared physical R allocation owner and its actual bootstrap callers.
 use super::*;
 use crate::gc_types::{
-    ExecutableCode, FunctionContext, FunctionObject, GcHeapType, GcNullability, GlobalLedger,
-    OrdinaryObject, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
+    DeferredIntrinsicValue, ExecutableCode, FunctionContext, FunctionObject, GcHeapType,
+    GcNullability, GlobalLedger, OrdinaryObject, RealmRecord, RuntimeModuleTypes, RuntimeSchema,
 };
 
 fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -34,7 +34,7 @@ fn body(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
 }
 
 #[test]
-fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail() {
+fn layout_accessors_are_deferred_and_demand_accessors_keep_the_shared_typed_tail() {
     let artifact =
         emit_script("Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get;")
             .unwrap();
@@ -125,19 +125,90 @@ fn eager_accessor_allocation_shares_the_actual_typed_context_and_function_tail()
             )
             .count()
     };
-    assert!(
-        calls(allocate) > 1,
-        "actual Realm initialization shares this physical R helper"
+    assert_eq!(
+        calls(allocate),
+        0,
+        "complete layouts do not allocate accessor functions at Realm birth"
     );
     assert!(
-        calls(header) >= calls(allocate),
-        "eager callers still construct independent native headers"
+        calls(header) > 0,
+        "canonical ordinary native callables retain compact headers"
     );
     assert_eq!(
         calls(metadata),
         1,
         "only the thrower's non-extensibility still needs metadata publication"
     );
+
+    let binary = body(bytes, named("helper::realm_ensure_binary_data"));
+    let accessor_calls = binary
+        .iter()
+        .filter(|op| {
+            matches!(op,
+        Operator::Call { function_index } if *function_index == allocate)
+        })
+        .count();
+    assert!(
+        accessor_calls > 1,
+        "demand-family accessors still share this physical allocation tail"
+    );
+    assert!(
+        binary
+            .iter()
+            .filter(|op| matches!(op,
+        Operator::Call { function_index } if *function_index == header))
+            .count()
+            >= accessor_calls,
+        "each demand accessor retains its independent native metadata header"
+    );
+
+    let materialize = body(bytes, named("helper::property_value_resolve"));
+    let layout_value = body(bytes, named("helper::intrinsic_property_value"));
+    assert!(
+        layout_value.iter().any(|op| matches!(op,
+        Operator::StructNew { struct_type_index }
+        if *struct_type_index == type_index::<DeferredIntrinsicValue>(schema))),
+        "observing an accessor layout creates the ordinary deferred native recipe"
+    );
+    assert!(
+        !layout_value.iter().any(|op| matches!(op,
+        Operator::Call { function_index } if *function_index == allocate)),
+        "layout observation does not reenter the eager accessor factory"
+    );
+    for builtin in [
+        StandardBuiltinId::ArraySpeciesGetter,
+        StandardBuiltinId::PromiseSpeciesGetter,
+        StandardBuiltinId::MapSpeciesGetter,
+        StandardBuiltinId::SetSpeciesGetter,
+        StandardBuiltinId::MapPrototypeSizeGetter,
+        StandardBuiltinId::SetPrototypeSizeGetter,
+        StandardBuiltinId::AsyncDisposableStackPrototypeDisposedGetter,
+        StandardBuiltinId::DisposableStackPrototypeDisposedGetter,
+        StandardBuiltinId::SymbolPrototypeDescriptionGetter,
+        StandardBuiltinId::IteratorPrototypeConstructorGetter,
+        StandardBuiltinId::IteratorPrototypeConstructorSetter,
+        StandardBuiltinId::IteratorPrototypeToStringTagGetter,
+        StandardBuiltinId::IteratorPrototypeToStringTagSetter,
+        StandardBuiltinId::AbstractModuleSourcePrototypeToStringTagGetter,
+    ] {
+        let entry = named(&format!("builtin::{}", builtin.debug_name()));
+        assert!(
+            !bootstrap.iter().any(|op| matches!(op,
+            Operator::RefFunc { function_index } if *function_index == entry)),
+            "{} stays outside eager Realm allocation",
+            builtin.debug_name()
+        );
+        assert_eq!(
+            materialize
+                .iter()
+                .filter(|op| matches!(op,
+            Operator::RefFunc { function_index } if *function_index == entry))
+                .count(),
+            1,
+            "{} retains its exact native executable in deferred selection",
+            builtin.debug_name()
+        );
+    }
 
     // Validate the physical helper's declared ABI using actual R exports and
     // registered GC identities, rather than assuming compact P import indices.

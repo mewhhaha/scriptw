@@ -2,8 +2,8 @@
 //! rather than allocating an entry, descriptor, or deferred cell per row.
 use super::*;
 use crate::gc_types::{
-    GcHeapType, GcNullability, GlobalLedger, IntrinsicPropertyStorage, RuntimeModuleTypes,
-    RuntimeSchema,
+    DeferredIntrinsicValue, GcHeapType, GcNullability, GlobalLedger, IntrinsicPropertyStorage,
+    OrdinaryObject, PropertyDescriptor, PropertyEntry, RuntimeModuleTypes, RuntimeSchema,
 };
 
 fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -58,8 +58,52 @@ fn fresh_intrinsic_bootstrap_allocates_layout_records_not_per_property_records()
             .iter()
             .filter(|operator| matches!(operator, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<IntrinsicPropertyStorage>(schema)))
             .count(),
-        7,
-        "the four namespaces and three prototypes each install one fresh storage record; Array unscopables is nested and remains unmaterialized"
+        61,
+        "four namespaces, three original prototypes, 24 constructors and 30 newly covered prototypes are born with complete storage; nested Array unscopables remains unmaterialized"
+    );
+    for (position, operator) in operators.iter().enumerate() {
+        if !matches!(operator, Operator::StructNew { struct_type_index }
+            if *struct_type_index == type_index::<IntrinsicPropertyStorage>(schema))
+        {
+            continue;
+        }
+        assert!(
+            matches!(operators[position - 1], Operator::RefNull { .. }),
+            "each birth layout starts without an observation cache"
+        );
+        assert!(
+            operators[position + 1..]
+                .iter()
+                .find_map(|op| match op {
+                    Operator::StructNew { struct_type_index }
+                        if *struct_type_index == type_index::<IntrinsicPropertyStorage>(schema) =>
+                        Some(false),
+                    Operator::StructNew { struct_type_index }
+                        if *struct_type_index == type_index::<OrdinaryObject>(schema) =>
+                        Some(true),
+                    _ => None,
+                })
+                .expect("each storage has its ordinary header"),
+            "a complete storage is constructed before its owning header"
+        );
+    }
+    for ty in [
+        type_index::<DeferredIntrinsicValue>(schema),
+        type_index::<PropertyDescriptor>(schema),
+        type_index::<PropertyEntry>(schema),
+    ] {
+        assert!(
+            !operators.iter().any(|op| matches!(op,
+            Operator::StructNew { struct_type_index } if *struct_type_index == ty)),
+            "Realm birth allocates no per-property recipes, descriptors or entries"
+        );
+    }
+    assert!(
+        !operators.iter().any(|op| matches!(op,
+        Operator::StructSet { struct_type_index, field_index }
+        if *struct_type_index == type_index::<OrdinaryObject>(schema)
+            && *field_index == crate::gc_types::GcSnapshotField::ObjectProperties.index())),
+        "complete layouts are supplied at birth, never attached over transient storage"
     );
 }
 

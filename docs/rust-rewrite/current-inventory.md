@@ -9,16 +9,17 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [gap diagnosis](performance-gaps-20261101.json) separates reference cohorts,
-  actual five-case LLVM/final-Wasm differences and limited worker-IP samples.
-  Shared layouts, RegExp demand and observed-value reuse pass the fresh
-  480-process A/A, 30-case screen and seven-case RegExp controls. The latest
-  precompiled reference wins 6/17 cases with median geometric means
-  0.972–0.979× Scriptc; mixed joins remain 2.5–2.7× slower. Remove remaining
-  eager dictionaries at object allocation, including constructor headers/statics. Canonical reads
-  must distinguish ready slots from demand-owned slots before extending recipes.
-  Profile current lookup paths before adding prototype-cache invalidation.
-  Preserve failed historical controls and keep the primitive-append region parked.
+  [gap diagnosis](performance-gaps-20261101.json) separates source-bound reference
+  cohorts, LLVM/final-Wasm inspection and worker-IP diagnostics. Birth layouts
+  pass the 480-process A/A, 30-case screen and both seven-case control cohorts.
+  The latest precompiled reference wins 12/17 cases with median geometric means
+  0.694–0.695× Scriptc. Mixed join remains 2.44–2.46× slower; plain joins are
+  1.40–1.55×, dynamic String is 1.05–1.06×, and reverse-128 sort straddles parity.
+  Next, preserve private bounded numeric facts across ordinary effectful loops:
+  current mixed-join Wasm retains three full remainder kernels where Scriptc
+  uses one mask and branch table. Preserve calls, rounding, captures and abrupt
+  exits. Profile inherited lookup before adding cache invalidation; retain failed
+  historical controls and keep the primitive-append region parked.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.

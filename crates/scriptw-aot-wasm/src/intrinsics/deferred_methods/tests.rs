@@ -57,3 +57,38 @@ fn deferred_method_descriptors_are_fresh_in_one_shared_publication_body() {
             }
         }).unwrap().join().unwrap();
 }
+
+#[test]
+fn owner_names_do_not_turn_bigint_methods_into_global_bindings() {
+    use super::DeferredIntrinsicMethod;
+    use scriptw_ir::StandardBuiltinId as Builtin;
+    for builtin in [
+        Builtin::BigIntAsIntN,
+        Builtin::BigIntAsUintN,
+        Builtin::BigIntPrototypeToString,
+        Builtin::BigIntPrototypeToLocaleString,
+        Builtin::BigIntPrototypeValueOf,
+    ] {
+        assert_eq!(builtin.global_name(), Some("BigInt"));
+        assert!(!Builtin::all_globals().contains(&builtin));
+        assert!(
+            DeferredIntrinsicMethod::new(builtin).is_some(),
+            "{}",
+            builtin.debug_name()
+        );
+    }
+    for builtin in [
+        Builtin::EvalFunction,
+        Builtin::BigIntConstructor,
+        Builtin::FunctionPrototype,
+        Builtin::ArrayPrototypeValues,
+        Builtin::TypedArrayPrototypeToString,
+        Builtin::ThrowTypeError,
+    ] {
+        assert!(
+            DeferredIntrinsicMethod::new(builtin).is_none(),
+            "{}",
+            builtin.debug_name()
+        );
+    }
+}

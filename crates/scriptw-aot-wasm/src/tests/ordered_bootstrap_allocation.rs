@@ -2,8 +2,8 @@
 use super::*;
 use crate::gc_types::{
     DeferredIntrinsicValue, Environment, ExecutableCode, FunctionContext, FunctionObject,
-    GcHeapType, GcNullability, GlobalLedger, OrdinaryObject, PropertyValue, RealmRecord,
-    RuntimeModuleTypes, RuntimeSchema, StoredValue, StringValue,
+    GcHeapType, GcNullability, GlobalLedger, IntrinsicPropertyStorage, OrdinaryObject,
+    PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema, StoredValue, StringValue,
 };
 
 fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -35,7 +35,7 @@ fn body(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
 }
 
 #[test]
-fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
+fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
     let artifact = emit_script("new Uint16Array(1); Set.prototype.keys;").unwrap();
     expect_valid_module(&artifact, 1);
     let bytes = artifact.runtime().unwrap().bytes();
@@ -81,17 +81,33 @@ fn ordered_realm_bootstrap_shares_real_recipe_and_constructor_allocation() {
     }).collect::<Vec<_>>()
     };
     assert!(
-        calls(&bootstrap, install).len() > 1 && calls(&bootstrap, constructor).len() > 1,
-        "the executed Realm initializer must call both actual shared bodies"
+        calls(&bootstrap, install).is_empty(),
+        "complete fresh layouts need no deferred property installation"
     );
-    let header_calls = calls(&bootstrap, constructor_header);
+    assert!(
+        calls(&bootstrap, batch).is_empty(),
+        "imperative method runs belong to demand installers"
+    );
+    assert!(
+        calls(&bootstrap, constructor_header).is_empty(),
+        "eager constructors never allocate dictionary metadata headers"
+    );
     let constructor_calls = calls(&bootstrap, constructor);
-    assert_eq!(header_calls.len(), constructor_calls.len());
-    for (position, (&header, &callable)) in header_calls.iter().zip(&constructor_calls).enumerate()
-    {
+    assert_eq!(
+        constructor_calls.len(),
+        24,
+        "all eager constructors retain the shared Context/FunctionObject cycle"
+    );
+    let layouts = allocations(&bootstrap, type_index::<IntrinsicPropertyStorage>(schema));
+    for (position, &callable) in constructor_calls.iter().enumerate() {
+        let header = *layouts
+            .iter()
+            .rev()
+            .find(|&&index| index < callable)
+            .expect("constructor has a birth layout");
         assert!(
             header < callable && (position == 0 || constructor_calls[position - 1] < header),
-            "each eager constructor builds its own dictionary header before its context/callable tail"
+            "each eager constructor allocates its own sealed storage before the shared context/callable tail"
         );
     }
     assert!(
@@ -418,8 +434,14 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
         .iter()
         .map(|(_, _, count)| *count as usize)
         .sum::<usize>();
-    assert!(spans.len() >= 40 && total_rows > 300,
-        "remaining dictionary-backed families retain batched installation after complete intrinsic layouts remove their eager rows: {} spans, {total_rows} rows", spans.len());
+    assert_eq!((spans.len(), total_rows), (24, 226),
+        "inspected Temporal, Date and binary-data demand owners retain every remaining sealed method run");
+    assert!(
+        !bootstrap.iter().any(|op| matches!(op,
+            Operator::Call { function_index } if *function_index == batch
+        )),
+        "fresh eager owners do not execute demand installation rows"
+    );
     let direct_installs = bootstrap
         .iter()
         .chain(temporal.iter())
@@ -488,7 +510,9 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
                 .iter()
                 .find(|id| **id as u32 == words[0])
                 .expect("encoded rows retain an actual StandardBuiltinId");
-            assert!(!builtin.constructable() && builtin.global_name().is_none());
+            assert!(
+                !builtin.constructable() && !StandardBuiltinId::all_globals().contains(&builtin)
+            );
             assert_eq!(
                 builtin.debug_name().starts_with("Temporal."),
                 is_temporal,

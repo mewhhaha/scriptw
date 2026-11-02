@@ -6652,6 +6652,13 @@ standard_builtin_catalog! {
         installer: None,
         native: "join",
     }
+    AsyncIteratorIdentity {
+        function: FunctionOrdinal(910) => "$builtin.AsyncIteratorPrototype.identity",
+        debug: "Async Iterator.prototype [Symbol.asyncIterator]",
+        flags: [],
+        installer: None,
+        native: "[Symbol.asyncIterator]",
+    }
 }
 
 // Native metadata supplies both the initial public name and its frozen source

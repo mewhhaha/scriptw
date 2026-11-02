@@ -742,23 +742,6 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_alloc_array_payload_with_valid_length_and_prototype(length, prototype, function)
     }
 
-    /// Bootstrap's Array.prototype has a statically valid zero length. It must
-    /// not emit a JavaScript completion return into a reference-result helper.
-    pub(crate) fn emit_alloc_empty_array_with_prototype(
-        &mut self,
-        prototype: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<GcStackReference<crate::gc_types::ArrayObject>, EmitError> {
-        let schema = self.runtime_schema();
-        let length = schema.reserve_i64_local(function);
-        length.set_constant(0, function);
-        let array = self.emit_alloc_array_payload_with_valid_length_and_prototype(
-            length, prototype, function,
-        )?;
-        schema.release_i64_local(length, function);
-        Ok(array)
-    }
-
     fn emit_alloc_array_payload_with_valid_length_and_prototype(
         &mut self,
         length: I64Local,

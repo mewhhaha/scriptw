@@ -6188,12 +6188,14 @@ impl<'a> ScriptLowerer<'a> {
                 None,
                 ValueInfo::undefined(),
             ),
-            StandardBuiltinId::ArrayIteratorIdentity => (
-                ValueKind::Object,
-                KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
-                ValueInfo::undefined(),
-            ),
+            StandardBuiltinId::ArrayIteratorIdentity | StandardBuiltinId::AsyncIteratorIdentity => {
+                (
+                    ValueKind::Object,
+                    KindSet::from_kind(ValueKind::Object),
+                    Some(Box::new(Self::empty_object_shape())),
+                    ValueInfo::undefined(),
+                )
+            }
             StandardBuiltinId::ArrayBufferConstructor => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),

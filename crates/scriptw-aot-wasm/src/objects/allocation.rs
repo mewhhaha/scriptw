@@ -25,10 +25,28 @@ impl FunctionBuilder<'_> {
     }
 
     pub(crate) fn emit_alloc_immutable_prototype_object(
-        &self,
+        &mut self,
+        realm: &GcLocal<crate::gc_types::RealmRecord>,
         function: &mut Function,
     ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        self.emit_allocate_object_header(None, ObjectPrototypeMutability::Immutable, function)
+        let layout = crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype;
+        if !self.runtime_bootstrap_plan.full_standard_globals
+            && !self.strings.has_intrinsic_property_layout(layout)?
+        {
+            return self.emit_allocate_object_header(
+                None,
+                ObjectPrototypeMutability::Immutable,
+                function,
+            );
+        }
+        let schema = self.runtime_schema();
+        let prototype = schema.reserve_value_local(function);
+        prototype.set_scalar(ScalarValue::Null, function);
+        let object = self.emit_alloc_intrinsic_layout_header_with_mutability(
+            &prototype, layout, realm, true, function,
+        )?;
+        prototype.clear(function);
+        Ok(object)
     }
 
     fn emit_allocate_object_header(

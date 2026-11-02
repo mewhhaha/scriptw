@@ -2171,6 +2171,7 @@ impl RuntimeBootstrapPlan {
                     .insert(StandardBuiltinId::RegExpConstructor);
             }
             StandardBuiltinId::ArrayIteratorIdentity
+            | StandardBuiltinId::AsyncIteratorIdentity
             | StandardBuiltinId::IteratorFrom
             | StandardBuiltinId::IteratorConcat
             | StandardBuiltinId::IteratorZip
@@ -6117,7 +6118,7 @@ pub(crate) fn standard_builtin_length(builtin: StandardBuiltinId) -> u64 {
         StandardBuiltinId::ArrayPrototypeEntries => 0,
         StandardBuiltinId::ArrayPrototypeValues => 0,
         StandardBuiltinId::ArrayIteratorNext => 0,
-        StandardBuiltinId::ArrayIteratorIdentity => 0,
+        StandardBuiltinId::ArrayIteratorIdentity | StandardBuiltinId::AsyncIteratorIdentity => 0,
         StandardBuiltinId::StringIteratorNext => 0,
         StandardBuiltinId::RegExpStringIteratorNext => 0,
         StandardBuiltinId::GeneratorPrototypeNext

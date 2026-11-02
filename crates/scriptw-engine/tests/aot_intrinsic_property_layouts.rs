@@ -305,3 +305,197 @@ print('ok');
 "#,
     );
 }
+
+#[test]
+fn eager_constructor_and_prototype_layouts_keep_metadata_cycles_and_exact_keys() {
+    check(
+        r#"
+function assert(value, message) { if (!value) throw new Error(message); }
+var generatorFunction = (function*() {}).constructor;
+var asyncFunction = (async function() {}).constructor;
+var asyncGeneratorFunction = (async function*() {}).constructor;
+var constructors = [
+  [Function, 3], [Object, 26], [ShadowRealm, 3], [Proxy, 3], [Iterator, 7],
+  [Array, 8], [Number, 17], [String, 6], [Boolean, 3], [Promise, 14],
+  [Map, 5], [WeakMap, 3], [WeakRef, 3], [FinalizationRegistry, 3], [WeakSet, 3],
+  [AsyncDisposableStack, 3], [DisposableStack, 3], [Set, 4], [Symbol, 20], [BigInt, 5],
+  [generatorFunction, 3], [asyncFunction, 3], [asyncGeneratorFunction, 3]
+];
+for (var pair of constructors) {
+  var constructor = pair[0];
+  var keys = Reflect.ownKeys(constructor);
+  assert(keys.length === pair[1] && keys[0] === 'length' && keys[1] === 'name',
+    'complete constructor key order ' + constructor.name);
+  for (var name of ['length', 'name']) {
+    var metadata = Object.getOwnPropertyDescriptor(constructor, name);
+    assert(!metadata.writable && !metadata.enumerable && metadata.configurable &&
+      metadata.value === constructor[name], 'native metadata descriptor ' + constructor.name);
+    metadata.value = null;
+    assert(constructor[name] !== null, 'metadata snapshot does not mutate constructor');
+  }
+  if (constructor === Proxy) {
+    assert(!Object.hasOwn(constructor, 'prototype'), 'Proxy omits public prototype');
+  } else {
+    var descriptor = Object.getOwnPropertyDescriptor(constructor, 'prototype');
+    assert(keys[2] === 'prototype' && descriptor.value === constructor.prototype &&
+      !descriptor.writable && !descriptor.enumerable && !descriptor.configurable,
+      'public prototype descriptor ' + constructor.name);
+    assert(constructor.prototype.constructor === constructor,
+      'canonical constructor and prototype cycle ' + constructor.name);
+  }
+}
+assert(Object.getPrototypeOf(generatorFunction) === Function &&
+  Object.getPrototypeOf(asyncFunction) === Function &&
+  Object.getPrototypeOf(asyncGeneratorFunction) === Function,
+  'dynamic constructor inheritance');
+assert(Number.parseInt === parseInt && Number.parseFloat === parseFloat &&
+  Number.parseInt('12', 10) === 12 && Number.parseFloat('1.5') === 1.5,
+  'canonical host aliases retain executable entries');
+assert(Symbol.iterator === Object.getOwnPropertyDescriptor(Symbol, 'iterator').value &&
+  !Object.getOwnPropertyDescriptor(Symbol, 'iterator').writable,
+  'well-known Symbol value recipes');
+
+var prototypes = [
+  [Function.prototype, 10], [Number.prototype, 7], [Boolean.prototype, 3],
+  [BigInt.prototype, 5], [Promise.prototype, 5], [Map.prototype, 15],
+  [WeakMap.prototype, 8], [WeakSet.prototype, 5], [WeakRef.prototype, 3],
+  [FinalizationRegistry.prototype, 4], [AsyncDisposableStack.prototype, 9],
+  [DisposableStack.prototype, 9], [Set.prototype, 19], [Symbol.prototype, 6],
+  [Iterator.prototype, 19], [ShadowRealm.prototype, 4],
+  [generatorFunction.prototype, 3], [asyncFunction.prototype, 2],
+  [asyncGeneratorFunction.prototype, 3]
+];
+for (var pair of prototypes) {
+  assert(Reflect.ownKeys(pair[0]).length === pair[1], 'complete prototype property count');
+}
+assert(Object.getOwnPropertyNames(Function.prototype).join(',') ===
+  'length,name,constructor,call,apply,bind,toString,arguments,caller',
+  'Function prototype string key order');
+assert(Object.getOwnPropertyNames(Map.prototype).join(',') ===
+  'constructor,clear,delete,forEach,get,getOrInsert,getOrInsertComputed,has,keys,set,values,entries,size',
+  'Map prototype string key order');
+assert(Object.getOwnPropertyNames(Iterator.prototype).join(',') ===
+  'toArray,includes,join,forEach,every,some,find,reduce,map,filter,flatMap,take,drop,chunks,windows,constructor',
+  'Iterator constructor accessor follows methods');
+var hasInstance = Object.getOwnPropertyDescriptor(Function.prototype, Symbol.hasInstance);
+assert(!hasInstance.writable && !hasInstance.enumerable && !hasInstance.configurable,
+  'Function hasInstance fixed descriptor');
+
+var arrayIteratorPrototype = Object.getPrototypeOf([][Symbol.iterator]());
+var stringIteratorPrototype = Object.getPrototypeOf(''[Symbol.iterator]());
+var mapIteratorPrototype = Object.getPrototypeOf(new Map().entries());
+var setIteratorPrototype = Object.getPrototypeOf(new Set().values());
+assert(Reflect.ownKeys(arrayIteratorPrototype).length === 3 &&
+  Reflect.ownKeys(stringIteratorPrototype).length === 2 &&
+  Reflect.ownKeys(mapIteratorPrototype).length === 2 &&
+  Reflect.ownKeys(setIteratorPrototype).length === 2,
+  'iterator native layouts');
+assert(arrayIteratorPrototype[Symbol.iterator] !== Iterator.prototype[Symbol.iterator] &&
+  arrayIteratorPrototype[Symbol.iterator].call(arrayIteratorPrototype) === arrayIteratorPrototype,
+  'separate installations of identity builtin remain distinct');
+var generatorPrototype = Object.getPrototypeOf(generatorFunction.prototype.prototype);
+assert(generatorPrototype === Iterator.prototype, 'generator instance prototype parent');
+var asyncIteratorPrototype = Object.getPrototypeOf(asyncGeneratorFunction.prototype.prototype);
+var asyncIdentity = asyncIteratorPrototype[Symbol.asyncIterator];
+assert(asyncIdentity.name === '[Symbol.asyncIterator]' && asyncIdentity.length === 0 &&
+  asyncIdentity.call(asyncIteratorPrototype) === asyncIteratorPrototype &&
+  Function.prototype.toString.call(asyncIdentity) ===
+    'function [Symbol.asyncIterator]() { [native code] }',
+  'async iterator distinct native metadata and code');
+print('ok');
+"#,
+    );
+}
+
+#[test]
+fn eager_layout_accessors_aliases_and_mutation_retain_identity_across_realms_and_gc() {
+    check(
+        r#"
+function assert(value, message) { if (!value) throw new Error(message); }
+var foreign = __scriptwCreateRealm().global;
+var map = new Map([[1, 2]]);
+var size = Object.getOwnPropertyDescriptor(Map.prototype, 'size');
+var otherSize = Object.getOwnPropertyDescriptor(foreign.Map.prototype, 'size');
+assert(size.get.name === 'get size' && size.get.length === 0 && size.set === undefined &&
+  !size.enumerable && size.configurable && size.get.call(map) === 1,
+  'getter-only accessor has native metadata and absent setter');
+assert(otherSize.get !== size.get &&
+  Object.getPrototypeOf(otherSize.get) === foreign.Function.prototype &&
+  otherSize.get.call(map) === 1, 'accessor native belongs to defining Realm');
+var caught = false;
+try { otherSize.get.call({}); } catch (error) { caught = error instanceof foreign.TypeError; }
+assert(caught, 'accessor errors use defining Realm');
+var species = Object.getOwnPropertyDescriptor(Set, Symbol.species);
+var token = {};
+assert(species.set === undefined && species.get.call(token) === token &&
+  species.get.name === 'get [Symbol.species]', 'species getter preserves receiver');
+var iteratorConstructor = Object.getOwnPropertyDescriptor(foreign.Iterator.prototype, 'constructor');
+var iteratorTag = Object.getOwnPropertyDescriptor(foreign.Iterator.prototype, Symbol.toStringTag);
+assert(iteratorConstructor.get.call(null) === foreign.Iterator &&
+  typeof iteratorConstructor.set === 'function' && iteratorTag.get.call(null) === 'Iterator' &&
+  typeof iteratorTag.set === 'function', 'plain accessors resolve defining Realm without captured public values');
+var caller = Object.getOwnPropertyDescriptor(Function.prototype, 'caller');
+var args = Object.getOwnPropertyDescriptor(Function.prototype, 'arguments');
+var otherCaller = Object.getOwnPropertyDescriptor(foreign.Function.prototype, 'caller');
+assert(caller.get === caller.set && caller.get === args.get && args.get === args.set &&
+  otherCaller.get !== caller.get && !Object.isExtensible(caller.get),
+  'poison accessors share exactly one canonical Realm thrower');
+
+var entries = Map.prototype.entries;
+var values = Set.prototype.values;
+var dispose = DisposableStack.prototype.dispose;
+var disposeAsync = AsyncDisposableStack.prototype.disposeAsync;
+assert(entries === Map.prototype[Symbol.iterator] &&
+  values === Set.prototype.keys && values === Set.prototype[Symbol.iterator] &&
+  dispose === DisposableStack.prototype[Symbol.dispose] &&
+  disposeAsync === AsyncDisposableStack.prototype[Symbol.asyncDispose], 'local alias groups');
+assert(entries !== foreign.Map.prototype.entries &&
+  values !== foreign.Set.prototype.values && dispose !== foreign.DisposableStack.prototype.dispose,
+  'aliases are local to one defining Realm');
+var methodSnapshot = Object.getOwnPropertyDescriptor(Set.prototype, 'keys');
+methodSnapshot.value = null;
+assert(Set.prototype.keys === values, 'data descriptor snapshots are independent');
+
+// Attribute-only definitions promote whole layouts without forcing sibling identities to change.
+Object.defineProperty(Map.prototype, 'entries', { writable: false });
+Object.defineProperty(Set.prototype, 'keys', { value: token });
+Object.defineProperty(DisposableStack.prototype, 'dispose', {
+  get: function() { return this; }, configurable: true
+});
+assert(Map.prototype.entries === entries && Map.prototype[Symbol.iterator] === entries &&
+  !Object.getOwnPropertyDescriptor(Map.prototype, 'entries').writable,
+  'attribute mutation retains shared original alias identity');
+assert(Set.prototype.keys === token && Set.prototype.values === values &&
+  Set.prototype[Symbol.iterator] === values, 'alias replacement leaves sibling descriptors independent');
+assert(DisposableStack.prototype.dispose === DisposableStack.prototype &&
+  DisposableStack.prototype[Symbol.dispose] === dispose, 'accessor replacement preserves receiver and old alias');
+assert(delete Number.isFinite, 'constructor own member deletion');
+Number.isFinite = token;
+var keys = Object.getOwnPropertyNames(Number);
+assert(keys[keys.length - 1] === 'isFinite' &&
+  Object.getOwnPropertyDescriptor(Number, 'isFinite').enumerable,
+  'constructor deletion and reinsertion uses ordinary property order and attributes');
+var oldName = Promise.name;
+Object.defineProperty(Promise, 'name', { value: 'ChangedPromise' });
+assert(oldName === 'Promise' && Promise.name === 'ChangedPromise' &&
+  new Promise(function(resolve) { resolve(1); }) instanceof Promise,
+  'native metadata changes do not change executable identity');
+Object.freeze(WeakMap.prototype);
+Object.seal(BigInt.prototype);
+gc();
+assert(Object.isFrozen(WeakMap.prototype) && Object.isSealed(BigInt.prototype) &&
+  new WeakMap().set(token, 9).get(token) === 9 && BigInt.prototype.toString.call(12n) === '12',
+  'freeze and seal preserve native behavior after promotion and GC');
+assert(entries.call(map).next().value[1] === 2 &&
+  values.call(new Set([3])).next().value === 3 &&
+  foreign.Number.isFinite(3) && foreign.Promise.name === 'Promise' &&
+  foreign.Set.prototype.keys === foreign.Set.prototype.values,
+  'saved callables and foreign layouts survive local promotion and GC');
+assert(Object.getOwnPropertyDescriptor(Map.prototype, 'size').get === size.get &&
+  Object.getOwnPropertyDescriptor(foreign.Map.prototype, 'size').get === otherSize.get &&
+  iteratorConstructor.get.call(null) === foreign.Iterator,
+  'accessor identities remain stable through snapshots, mutation and GC');
+print('ok');
+"#,
+    );
+}

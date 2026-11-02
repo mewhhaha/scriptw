@@ -1,16 +1,12 @@
 use super::*;
-use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, GcLocal, GcLocalSlot,
-    GcOperand, StoredValue, ValueLocals,
-};
-use crate::operations::PropertyKeyLocals;
+use crate::gc_types::{ArrayObject, GcLocal, GcLocalSlot, ValueLocals};
 
 /// Bootstrap cannot publish this storage before ArrayCreate initializes it.
 #[must_use]
 pub(crate) struct ReservedRealmArrayPrototypeLocal(GcLocalSlot<ArrayObject>);
 
 /// The completed Array exotic prototype remains rooted until Realm bootstrap
-/// has installed its methods and constructor link.
+/// has published its canonical Realm slot.
 #[must_use]
 pub(crate) struct RealmArrayPrototypeLocal(GcLocal<ArrayObject>);
 
@@ -32,116 +28,32 @@ impl FunctionBuilder<'_> {
         &mut self,
         reserved: ReservedRealmArrayPrototypeLocal,
         object_prototype: &ValueLocals,
+        realm: &GcLocal<crate::gc_types::RealmRecord>,
         function: &mut Function,
     ) -> Result<RealmArrayPrototypeLocal, EmitError> {
-        let prototype = reserved.0.initialize(
-            self.emit_alloc_empty_array_with_prototype(object_prototype, function)?,
-            function,
-        );
-        Ok(RealmArrayPrototypeLocal(prototype))
-    }
-
-    pub(crate) fn emit_define_realm_array_prototype_data_with_flags(
-        &mut self,
-        prototype: &RealmArrayPrototypeLocal,
-        name: &str,
-        value: &ValueLocals,
-        writable: bool,
-        enumerable: bool,
-        configurable: bool,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let header = schema.reserve_gc_local(function).initialize(
+        let layout = crate::intrinsics::IntrinsicPropertyLayoutId::ArrayPrototype;
+        let header_value = if self.runtime_bootstrap_plan.full_standard_globals
+            || self.strings.has_intrinsic_property_layout(layout)?
+        {
+            self.emit_alloc_intrinsic_layout_header(object_prototype, layout, realm, function)?
+        } else {
+            self.emit_alloc_plain_object_with_prototype(Some(object_prototype), function)?
+        };
+        let header = schema
+            .reserve_gc_local(function)
+            .initialize(header_value, function);
+        let length = schema.reserve_i64_local(function);
+        length.set_constant(0, function);
+        let prototype = reserved.0.initialize(
             schema
                 .struct_type::<ArrayObject>()
-                .field(ArrayObjectSchema::OBJECT)
-                .read(prototype.array(), schema, function)
-                .reference(),
+                .with_empty_index_storage(&header, length, true, schema, function),
             function,
         );
-        let key = if name.starts_with("Symbol.") {
-            let symbol = scriptw_ir::WellKnownSymbol::ALL
-                .into_iter()
-                .find(|symbol| symbol.description() == name)
-                .ok_or_else(|| EmitError::unsupported("unknown bootstrap well-known symbol"))?;
-            let symbol = schema.reserve_gc_local(function).initialize(
-                self.emit_well_known_symbol_reference(symbol, function)?,
-                function,
-            );
-            let key = PropertyKeyLocals::from_symbol(schema, &symbol, function);
-            symbol.clear(function);
-            key
-        } else {
-            self.emit_function_string_key(name, function)?
-        };
-        self.emit_object_append_data_property_with_flags(
-            &header,
-            &key,
-            value,
-            writable,
-            enumerable,
-            configurable,
-            function,
-        )?;
-        key.clear(function);
+        schema.release_i64_local(length, function);
         header.clear(function);
-        Ok(())
-    }
-
-    /// Install the public data links and callable prototype cache with the
-    /// completed Array value, preserving the intrinsic attributes.
-    pub(crate) fn emit_bind_realm_array_constructor_prototype(
-        &mut self,
-        constructor: &GcLocal<FunctionObject>,
-        prototype: &RealmArrayPrototypeLocal,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let header = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<FunctionObject>()
-                .field(FunctionObjectSchema::OBJECT)
-                .read(constructor, schema, function)
-                .reference(),
-            function,
-        );
-        let value = schema.reserve_value_local(function);
-        value.set_reference(prototype.array(), schema, function);
-        let key = self.emit_function_string_key("prototype", function)?;
-        self.emit_object_append_data_property_with_flags(
-            &header, &key, &value, false, false, false, function,
-        )?;
-        key.clear(function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&value, function),
-            function,
-        );
-        schema
-            .struct_type::<FunctionObject>()
-            .field(FunctionObjectSchema::PUBLIC_PROTOTYPE_CACHE)
-            .write(
-                constructor,
-                GcOperand::reference(&stored, schema),
-                schema,
-                function,
-            );
-        stored.clear(function);
-        value.set_reference(constructor, schema, function);
-        self.emit_define_realm_array_prototype_data_with_flags(
-            prototype,
-            "constructor",
-            &value,
-            true,
-            false,
-            true,
-            function,
-        )?;
-        value.clear(function);
-        header.clear(function);
-        Ok(())
+        Ok(RealmArrayPrototypeLocal(prototype))
     }
 
     pub(crate) fn release_realm_array_prototype_local(

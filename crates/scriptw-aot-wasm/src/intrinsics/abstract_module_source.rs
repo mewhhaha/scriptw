@@ -1,10 +1,9 @@
 //! The actual abstract constructor and prototype belong to their defining Realm.
 
 use super::super::*;
-use super::IntrinsicKey;
+use super::IntrinsicPropertyLayoutId;
 use crate::functions::{NonArrayRealmIntrinsicSlot, RealmFunctionMaterializationContext};
 use crate::gc_types::*;
-use crate::objects::{AccessorDescriptor, AccessorGetter};
 
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_initialize_abstract_module_source_intrinsic(
@@ -15,7 +14,12 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let object = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(Some(object_prototype), function)?,
+            self.emit_alloc_intrinsic_layout_header(
+                object_prototype,
+                IntrinsicPropertyLayoutId::AbstractModuleSourcePrototype,
+                realm.realm(),
+                function,
+            )?,
             function,
         );
         let prototype = schema.reserve_value_local(function);
@@ -30,16 +34,6 @@ impl FunctionBuilder<'_> {
             StandardBuiltinId::AbstractModuleSourceConstructor,
             realm,
             &prototype,
-            function,
-        )?;
-        self.emit_install_intrinsic_accessor(
-            &prototype,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-            AccessorDescriptor::Getter(AccessorGetter::new(
-                StandardBuiltinId::AbstractModuleSourcePrototypeToStringTagGetter,
-            )),
-            realm,
-            true,
             function,
         )?;
         // The host source kind has one stable prototype in this defining Realm.

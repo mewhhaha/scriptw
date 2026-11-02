@@ -22,8 +22,9 @@ An experimental [precompiled consumer](docs/rust-rewrite/contracts/precompiled-c
 can exclude dynamic-source compilation callbacks from its host. The existing
 Portable embedding API remains available; static compiler dependencies remain.
 
-Math, Reflect, JSON, Atomics and the Object, Array and String prototypes use
-complete immutable property layouts with per-Realm value identity. Reads
+Math, Reflect, JSON, Atomics and eager intrinsic constructors and prototypes use
+complete immutable property layouts with per-Realm value identity. Constructor
+name, length and static properties share the layout from allocation. Reads
 materialize individual values; mutation converts the object to ordinary storage.
 Data-property reads retain the resolved value after first observation.
 Runtime initialization uses compact intrinsic-installation tables and defers
@@ -35,7 +36,7 @@ created equal Strings retain the ordinary lazy hash path. Linked-module caching
 keeps an admitted runtime resident when its program cannot share the configured
 entry or image-byte budget. Programs still execute in fresh Stores and Realms.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 42
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 45
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Actual Number tags admit direct Wasm addition, comparisons and numeric updates;
@@ -123,17 +124,19 @@ It motivates work on fresh intrinsic dictionaries and property lookup. Literal-k
 cleanup reduces worker instruction counts about 0.9% on two join cases; timing
 remains unqualified, including slower large-join means.
 
-The [intrinsic-layout and observed-value comparisons](docs/rust-rewrite/performance-gaps-20261101.json)
-remove eager property graphs and retain resolved data values at their owners.
-Across 30 unchanged workloads, separate source-bound batches lower execution
-median geometric means **13.8–13.9%**, then another **9.6–9.9%**.
-The latest original 17-case precompiled comparison records median geometric means
-**0.972–0.979× pinned Scriptc** and **6/17 individual wins**. Every-case parity
-remains open; mixed joins remain about **2.5–2.7× slower**. The fresh 480-process
-identical-binary control and separate 112-process RegExp control pass. A rejected
-prototype's 12–13% hot-read regression remains recorded; resolved-value reuse
-fixes it. Peak RSS and slower controls remain in the record. These results do
-not refresh ordinary CLI or V8 performance.
+The [intrinsic-layout comparisons](docs/rust-rewrite/performance-gaps-20261101.json)
+remove eager property graphs and retain resolved values at their owners.
+Constructor and prototype headers now begin with complete shared layouts.
+The latest 30-case precompiled comparison lowers execution median geometric means
+**28.3–28.5%** against the preceding accepted build, with about **30%** lower
+worker CPU. The original 17-case comparison records median geometric means
+**0.694–0.695× pinned Scriptc** and **12/17 individual wins**. Every-case parity
+remains open; mixed joins remain **2.44–2.46× slower**. The 480-process
+identical-binary control and separate RegExp and constructor/prototype controls
+pass without repeated timing or RSS flags. **1,813 selected native checks** and
+**202 pinned Test262 variants** pass; these are selected scopes. Failed historical
+controls and the initial control-fixture setup remain recorded. These results
+do not refresh ordinary CLI or V8 performance.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two

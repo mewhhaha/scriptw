@@ -6,6 +6,9 @@ const OBJECTS: &str = include_str!("../../src/objects.rs");
 const DEFINE: &str = include_str!("../../src/objects/define_property.rs");
 const INTRINSICS: &str = include_str!("../../src/intrinsics/mod.rs");
 const INTRINSIC_LAYOUTS: &str = include_str!("../../src/intrinsics/property_layouts.rs");
+const EAGER_INTRINSIC_LAYOUTS: &str =
+    include_str!("../../src/intrinsics/property_layouts/eager.rs");
+const BOOTSTRAP: &str = include_str!("../../src/builtins/bootstrap.rs");
 const OBJECT_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/object.rs");
 const FUNCTION_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/functions.rs");
 const TYPED_ARRAY_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/typed_array.rs");
@@ -178,7 +181,6 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         })
         .collect::<BTreeMap<_, _>>();
     let expected = BTreeMap::from([
-        ("builtins/bootstrap.rs", [0, 1, 0, 0, 0]),
         (
             "builtins/bootstrap/binary_data_initialization.rs",
             [3, 0, 0, 0, 0],
@@ -186,18 +188,11 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         ("builtins/string/regexp_legacy.rs", [0, 1, 0, 0, 0]),
         ("functions/arguments_object.rs", [0, 0, 1, 0, 0]),
         ("functions/throw_type_error.rs", [0, 0, 1, 0, 0]),
-        ("intrinsics/abstract_module_source.rs", [1, 0, 0, 0, 0]),
-        ("intrinsics/array.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/binary_data.rs", [5, 0, 0, 0, 0]),
-        ("intrinsics/collections.rs", [5, 0, 0, 0, 0]),
         ("intrinsics/errors.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/intl.rs", [0, 1, 0, 0, 0]),
-        ("intrinsics/iterator.rs", [2, 0, 0, 0, 0]),
         ("intrinsics/mod.rs", [0, 1, 0, 0, 1]),
-        ("intrinsics/promise.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/regexp.rs", [2, 0, 0, 0, 0]),
-        ("intrinsics/resource_management.rs", [1, 0, 0, 0, 0]),
-        ("intrinsics/symbol.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/temporal/members.rs", [1, 0, 0, 0, 0]),
         ("objects/object_literal_property.rs", [0, 0, 0, 2, 0]),
     ]);
@@ -209,18 +204,123 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         .collect::<Vec<_>>()
         .join("\n");
     for (role, count) in [
-        ("AccessorGetter::new(", 24),
-        ("AccessorSetter::new(", 3),
-        ("AccessorGetterLocals::new(", 6),
-        ("AccessorSetterLocals::new(", 5),
-        ("AccessorDescriptor::", 24),
-        ("AccessorDescriptorLocals::", 7),
+        ("AccessorGetter::new(", 12),
+        ("AccessorSetter::new(", 1),
+        ("AccessorGetterLocals::new(", 5),
+        ("AccessorSetterLocals::new(", 4),
+        ("AccessorDescriptor::", 12),
+        ("AccessorDescriptorLocals::", 6),
     ] {
         assert_eq!(producers.matches(role).count(), count, "{role}");
     }
     assert!(normalized(INTRINSIC_LAYOUTS).contains(
-        "plan.accessor(IntrinsicKey::Name(\"__proto__\"),StandardBuiltinId::ObjectPrototypeProtoGetter,StandardBuiltinId::ObjectPrototypeProtoSetter,);"
+        "plan.accessor(IntrinsicKey::Name(\"__proto__\"),IntrinsicCallableRecipe::method(StandardBuiltinId::ObjectPrototypeProtoGetter)?,IntrinsicCallableRecipe::method(StandardBuiltinId::ObjectPrototypeProtoSetter)?,);"
     ), "Object.prototype __proto__ accessors remain an explicit typed layout recipe");
+}
+
+#[test]
+fn retired_family_installers_are_owned_by_complete_birth_layouts() {
+    for retired in [
+        "collections",
+        "function",
+        "iterator",
+        "numeric",
+        "object",
+        "proxy",
+        "resource_management",
+        "string",
+        "symbol",
+    ] {
+        assert!(
+            !INTRINSICS.contains(&format!("mod {retired};")),
+            "retired installer {retired}"
+        );
+    }
+    assert!(INTRINSICS.contains("pub(crate) mod property_layouts;"));
+    for layout in [
+        "FunctionConstructor",
+        "ObjectConstructor",
+        "AbstractModuleSourceConstructor",
+        "ShadowRealmConstructor",
+        "ProxyConstructor",
+        "IteratorConstructor",
+        "ArrayConstructor",
+        "NumberConstructor",
+        "StringConstructor",
+        "BooleanConstructor",
+        "PromiseConstructor",
+        "MapConstructor",
+        "WeakMapConstructor",
+        "WeakRefConstructor",
+        "FinalizationRegistryConstructor",
+        "WeakSetConstructor",
+        "AsyncDisposableStackConstructor",
+        "DisposableStackConstructor",
+        "SetConstructor",
+        "SymbolConstructor",
+        "BigIntConstructor",
+        "GeneratorFunctionConstructor",
+        "AsyncFunctionConstructor",
+        "AsyncGeneratorFunctionConstructor",
+        "FunctionPrototype",
+        "NumberPrototype",
+        "BooleanPrototype",
+        "BigIntPrototype",
+        "SymbolPrototype",
+        "PromisePrototype",
+        "MapPrototype",
+        "SetPrototype",
+        "WeakMapPrototype",
+        "WeakSetPrototype",
+        "WeakRefPrototype",
+        "FinalizationRegistryPrototype",
+        "DisposableStackPrototype",
+        "AsyncDisposableStackPrototype",
+        "IteratorPrototype",
+        "IteratorHelperPrototype",
+        "IteratorFromWrapperPrototype",
+        "ArrayIteratorPrototype",
+        "StringIteratorPrototype",
+        "RegExpStringIteratorPrototype",
+        "MapIteratorPrototype",
+        "SetIteratorPrototype",
+        "GeneratorPrototype",
+        "AsyncGeneratorPrototype",
+        "AsyncIteratorPrototype",
+        "GeneratorFunctionPrototype",
+        "AsyncFunctionPrototype",
+        "AsyncGeneratorFunctionPrototype",
+        "AbstractModuleSourcePrototype",
+        "ShadowRealmPrototype",
+    ] {
+        assert!(
+            INTRINSIC_LAYOUTS.contains(&format!("Self::{layout}")),
+            "missing layout id {layout}"
+        );
+        assert!(
+            EAGER_INTRINSIC_LAYOUTS.contains(&format!("Layout::{layout}")),
+            "missing eager owner {layout}"
+        );
+    }
+    let constructor = normalized(bounded(
+        BOOTSTRAP,
+        "fn emit_builtin_constructor_shell_with_parent(",
+        "fn emit_bootstrap_namespace(",
+    ));
+    assert!(constructor
+        .contains("letcovered=IntrinsicPropertyLayoutId::for_constructor(&meta)?.is_some();"));
+    assert!(constructor.contains("if!covered{self.emit_install_intrinsic_data("));
+    assert!(constructor.contains("FunctionObjectSchema::PUBLIC_PROTOTYPE_CACHE"));
+    let array = normalized(bounded(
+        include_str!("../../src/functions/created_realm_array_prototype.rs"),
+        "pub(crate) fn emit_initialize_realm_array_prototype(",
+        "pub(crate) fn release_realm_array_prototype_local(",
+    ));
+    assert!(array.contains("IntrinsicPropertyLayoutId::ArrayPrototype"));
+    assert!(array.contains(
+        "self.emit_alloc_intrinsic_layout_header(object_prototype,layout,realm,function)?"
+    ));
+    assert!(array.contains("with_empty_index_storage(&header,length,true,schema,function)"));
 }
 
 #[test]

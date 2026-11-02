@@ -34,6 +34,10 @@ enum PropertyValueOwner<'a> {
 pub(crate) struct DeferredIntrinsicMethod(StandardBuiltinId);
 
 impl DeferredIntrinsicMethod {
+    pub(crate) fn builtin(self) -> StandardBuiltinId {
+        self.0
+    }
+
     pub(crate) fn validated(
         builtin: StandardBuiltinId,
         meta: &WasmFunctionMeta,
@@ -48,7 +52,7 @@ impl DeferredIntrinsicMethod {
     pub(super) fn new(builtin: StandardBuiltinId) -> Option<Self> {
         (crate::module::standard_builtin_function_realm_slot(builtin).is_none()
             && !builtin.constructable()
-            && builtin.global_name().is_none())
+            && !StandardBuiltinId::all_globals().contains(&builtin))
         .then_some(Self(builtin))
     }
 }

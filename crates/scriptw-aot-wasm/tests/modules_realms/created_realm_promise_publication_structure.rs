@@ -1,4 +1,5 @@
 const MAIN_REALM_SOURCE: &str = include_str!("../../src/intrinsics/promise.rs");
+const EAGER_LAYOUTS: &str = include_str!("../../src/intrinsics/property_layouts/eager.rs");
 const CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/functions.rs");
 const CLI_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_promise_created_realm.js");
@@ -9,14 +10,14 @@ fn promise_publication_catalogs_are_complete() {
         .split_once("pub(crate) const PROMISE_PROTOTYPE_METHOD_PUBLICATIONS")
         .expect("Promise prototype catalog")
         .1
-        .split_once("pub(crate) const PROMISE_STATIC_METHOD_PUBLICATIONS")
+        .split_once("];")
         .expect("Promise prototype catalog end")
         .0;
     let static_catalog = MAIN_REALM_SOURCE
         .split_once("pub(crate) const PROMISE_STATIC_METHOD_PUBLICATIONS")
         .expect("Promise static catalog")
         .1
-        .split_once("impl FunctionBuilder<'_>")
+        .split_once("];")
         .expect("Promise static catalog end")
         .0;
     for builtin in [
@@ -48,6 +49,10 @@ fn promise_publication_catalogs_are_complete() {
     }
     assert!(MAIN_REALM_SOURCE.contains("[StandardBuiltinId; 3]"));
     assert!(MAIN_REALM_SOURCE.contains("[StandardBuiltinId; 10]"));
+    assert!(EAGER_LAYOUTS.contains("Layout::PromisePrototype =>"));
+    assert!(EAGER_LAYOUTS.contains("plan.methods(IntrinsicMethodPlan::PromisePrototype)?;"));
+    assert!(EAGER_LAYOUTS.contains("Layout::PromiseConstructor =>"));
+    assert!(EAGER_LAYOUTS.contains("plan.methods(IntrinsicMethodPlan::PromiseConstructor)?;"));
 }
 
 #[test]

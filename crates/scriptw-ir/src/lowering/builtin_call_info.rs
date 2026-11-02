@@ -1332,12 +1332,14 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::AsyncIteratorPrototypeAsyncDisposeFulfilled => {
                 Some(ValueInfo::undefined())
             }
-            StandardBuiltinId::ArrayIteratorIdentity => Some(ValueInfo {
-                kind: ValueKind::Object,
-                possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
-                function_targets: FunctionTargetKnowledge::unknown(),
-            }),
+            StandardBuiltinId::ArrayIteratorIdentity | StandardBuiltinId::AsyncIteratorIdentity => {
+                Some(ValueInfo {
+                    kind: ValueKind::Object,
+                    possible_kinds: KindSet::from_kind(ValueKind::Object),
+                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    function_targets: FunctionTargetKnowledge::unknown(),
+                })
+            }
             StandardBuiltinId::ArrayBufferConstructor => Some(Self::value_info_from_shape(Some(
                 Self::array_buffer_instance_shape(),
             ))),

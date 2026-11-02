@@ -107,7 +107,7 @@ impl StringPool {
         let error = || EmitError::unsupported("intrinsic installation rows exceed R static bounds");
         let mut plans = BTreeMap::new();
         let mut rows = Vec::new();
-        for plan in IntrinsicMethodPlan::all() {
+        for plan in IntrinsicMethodPlan::all().filter(|plan| plan.uses_installation_rows()) {
             let mut ordinals = Vec::new();
             for &method in plan.methods()?.iter() {
                 let row = InstallationRow::new(method, self, functions)?;

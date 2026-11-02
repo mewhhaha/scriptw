@@ -1923,6 +1923,19 @@ impl RuntimeSchema {
         self.array_type::<WellKnownSymbolTable>().emit_get(function);
         GcStackReference::new()
     }
+    /// A sealed value row retains the same Agent-wide Symbol identity as keys.
+    pub(crate) fn property_layout_symbol_reference(
+        &self,
+        row: &crate::runtime_helpers::RuntimeHelperPropertyLayoutRow,
+        function: &mut Function,
+    ) -> GcStackReference<SymbolValue> {
+        emit_root_get(function, self.well_known_symbols);
+        function.instruction(&Instruction::RefAsNonNull);
+        row.emit_well_known_symbol_ordinal(function);
+        self.array_type::<WellKnownSymbolTable>().emit_get(function);
+        GcStackReference::new()
+    }
+
     /// Actual caller identity at the current source-call boundary. Opaque
     /// native entries install their own barrier identity; prepared Scripts and
     /// forwarding intrinsics remain transparent. Null denotes no active call.

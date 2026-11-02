@@ -87,6 +87,53 @@ intrinsic_method_plans! {
    TypedArrayConstructor => bootstrap::TYPED_ARRAY_CONSTRUCTOR,
 }
 
+impl IntrinsicMethodPlan {
+    /// Only demand-family installers still consume ordered imperative runs.
+    pub(crate) fn uses_installation_rows(self) -> bool {
+        match self {
+            Self::TemporalConstructor(_)
+            | Self::TemporalPrototype(_)
+            | Self::RegExpSymbols
+            | Self::RegExpPrototypeBeforeAccessors
+            | Self::ArrayBufferPrototypeMutable
+            | Self::DataViewPrototype
+            | Self::DateConstructor
+            | Self::DatePrototype
+            | Self::TypedArrayPrototypeBeforeAliases
+            | Self::TypedArrayPrototypeAfterAliases
+            | Self::TypedArrayPrototypeAfterToString
+            | Self::TypedArrayConstructor => true,
+            Self::NumberPrototype
+            | Self::NumberConstructor
+            | Self::PromisePrototype
+            | Self::PromiseConstructor
+            | Self::StringPrototypeBeforeAliases
+            | Self::StringPrototypeAfterAliases
+            | Self::ArrayConstructor
+            | Self::ArrayPrototype
+            | Self::MapPrototype
+            | Self::WeakMapPrototype
+            | Self::WeakSetPrototype
+            | Self::AsyncDisposableStackPrototype
+            | Self::SetPrototype
+            | Self::FunctionPrototype
+            | Self::IteratorConstructor
+            | Self::IteratorPrototype
+            | Self::BigIntPrototype
+            | Self::BigIntConstructor
+            | Self::BooleanPrototype
+            | Self::ObjectConstructorInitial
+            | Self::ObjectPrototypeBeforeAccessor
+            | Self::ObjectPrototypeAfterAccessor
+            | Self::ObjectConstructorRemaining
+            | Self::DisposableStackPrototype
+            | Self::Reflect
+            | Self::Math
+            | Self::Json => false,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct IntrinsicMethodSpec {
     pub(crate) key: IntrinsicKey<'static>,

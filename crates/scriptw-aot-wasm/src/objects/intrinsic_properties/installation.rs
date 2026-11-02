@@ -7,25 +7,19 @@ use crate::gc_types::{
     DeferredIntrinsicValue, GcHeapType, GcNullability, PropertyDescriptor, PropertyEntry,
     RuntimeModuleTypes,
 };
-use crate::gc_types::{
-    GcLocal, GcOperand, IntrinsicPropertyStorage, OrdinaryObject, OrdinaryObjectSchema,
-    RealmRecord, RuntimeSchema,
-};
-use crate::EmitError;
+use crate::gc_types::{GcLocal, GcOperand, IntrinsicPropertyStorage, RealmRecord, RuntimeSchema};
 #[cfg(test)]
 use wasm_encoder::{Encode, Instruction, ValType};
 #[cfg(test)]
 use wasmparser::{FunctionBody as ParsedFunctionBody, Operator};
 
-/// Install one sealed layout by replacing only the header's storage reference.
-/// Row recipes stay in R until observation; no per-property object is built here.
-pub(crate) fn emit_intrinsic_layout_storage(
+/// Construct the sealed storage before its owning header is allocated.
+pub(super) fn emit_intrinsic_layout_storage_record(
     span: RPropertyLayoutSpan,
-    object: &GcLocal<OrdinaryObject>,
     realm: &GcLocal<RealmRecord>,
     schema: &RuntimeSchema,
     function: &mut Function,
-) -> Result<(), EmitError> {
+) -> GcLocal<IntrinsicPropertyStorage> {
     let storage = schema.reserve_gc_local(function).initialize(
         schema.struct_type::<IntrinsicPropertyStorage>().construct(
             (
@@ -41,14 +35,7 @@ pub(crate) fn emit_intrinsic_layout_storage(
         ),
         function,
     );
-    schema.field(OrdinaryObjectSchema::PROPERTIES).write(
-        object,
-        GcOperand::subtype_reference(&storage, schema),
-        schema,
-        function,
-    );
-    storage.clear(function);
-    Ok(())
+    storage
 }
 
 #[cfg(test)]
@@ -88,17 +75,14 @@ mod tests {
         let schema = registered.globals().schema();
         let mut function = Function::with_parameters(
             LocalDeclarations::from_types([]),
-            vec![
-                ValType::Ref(schema.reference_type::<OrdinaryObject>(GcNullability::NonNullable)),
-                ValType::Ref(schema.reference_type::<RealmRecord>(GcNullability::NonNullable)),
-            ],
+            vec![ValType::Ref(
+                schema.reference_type::<RealmRecord>(GcNullability::NonNullable),
+            )],
         );
-        let object =
-            schema.parameter_gc::<OrdinaryObject, crate::gc_types::NonNullable>(0, &mut function);
         let realm =
-            schema.parameter_gc::<RealmRecord, crate::gc_types::NonNullable>(1, &mut function);
-        emit_intrinsic_layout_storage(span, &object, &realm, schema, &mut function).unwrap();
-        object.clear(&mut function);
+            schema.parameter_gc::<RealmRecord, crate::gc_types::NonNullable>(0, &mut function);
+        let storage = emit_intrinsic_layout_storage_record(span, &realm, schema, &mut function);
+        storage.clear(&mut function);
         realm.clear(&mut function);
         function.instruction(&Instruction::End);
 

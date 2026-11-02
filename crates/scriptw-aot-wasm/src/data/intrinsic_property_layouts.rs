@@ -1,7 +1,8 @@
 //! Sealed packed R rows for complete intrinsic property layouts.
 use super::*;
 use crate::intrinsics::property_layouts::{
-    IntrinsicPropertyLayoutId, IntrinsicPropertyRecipe, IntrinsicPropertySpec,
+    IntrinsicCallableRecipe, IntrinsicPropertyLayoutId, IntrinsicPropertyRecipe,
+    IntrinsicPropertySpec,
 };
 use crate::intrinsics::{DeferredIntrinsicMethod, IntrinsicKey};
 
@@ -80,11 +81,37 @@ fn admitted_method(
         return Ok(false);
     };
     if DeferredIntrinsicMethod::validated(builtin, meta)?.is_none() {
-        return Err(EmitError::unsupported(
-            "intrinsic layout method lacks deferred native authority",
-        ));
+        return Err(EmitError::unsupported(format!(
+            "intrinsic layout method {} lacks deferred native authority",
+            builtin.debug_name(),
+        )));
     }
     Ok(true)
+}
+
+fn admitted_callable(
+    recipe: IntrinsicCallableRecipe,
+    functions: &BTreeMap<FunctionId, WasmFunctionMeta>,
+) -> Result<bool, EmitError> {
+    match recipe {
+        IntrinsicCallableRecipe::Undefined => Ok(true),
+        IntrinsicCallableRecipe::Method(method) => admitted_method(method.builtin(), functions),
+        IntrinsicCallableRecipe::Ready(slot) => Ok(functions.contains_key(&slot.function_id())),
+    }
+}
+
+fn native_metadata(
+    id: IntrinsicPropertyLayoutId,
+    functions: &BTreeMap<FunctionId, WasmFunctionMeta>,
+) -> Result<Option<&WasmFunctionMeta>, EmitError> {
+    let function_id = id.native_function_id().ok_or_else(|| {
+        EmitError::unsupported("native metadata recipe requires a callable layout")
+    })?;
+    let Some(meta) = functions.get(&function_id) else {
+        return Ok(None);
+    };
+    id.validate_native_metadata(meta)?;
+    Ok(Some(meta))
 }
 
 fn runtime_string_ordinal(strings: &StringPool, name: &str) -> Result<u32, EmitError> {
@@ -100,6 +127,7 @@ fn runtime_string_ordinal(strings: &StringPool, name: &str) -> Result<u32, EmitE
 fn encode_row(
     property: &IntrinsicPropertySpec,
     strings: &StringPool,
+    functions: &BTreeMap<FunctionId, WasmFunctionMeta>,
 ) -> Result<[u32; 10], EmitError> {
     let key = crate::operations::IntrinsicInstallationKey::new(property.key, strings)?;
     let [key_kind, key_ordinal] = key.words();
@@ -114,12 +142,36 @@ fn encode_row(
             payload[0] = runtime_string_ordinal(strings, text)?
         }
         IntrinsicPropertyRecipe::Method(builtin) => payload[0] = builtin as u32,
-        IntrinsicPropertyRecipe::RealmIntrinsic(slot) => payload[0] = slot.gc_index(),
+        IntrinsicPropertyRecipe::ReadyRealmSlot(slot) => payload[0] = slot.gc_index(),
         IntrinsicPropertyRecipe::Accessor { getter, setter } => {
-            payload[0] = getter as u32;
-            payload[1] = setter as u32;
+            let (getter_kind, getter_payload) = getter.words();
+            let (setter_kind, setter_payload) = setter.words();
+            payload[0] = getter_payload;
+            payload[1] = setter_payload;
+            payload[2] = (getter_kind as u32) | ((setter_kind as u32) << 2);
         }
         IntrinsicPropertyRecipe::LayoutObject(layout) => payload[0] = layout as u32,
+        IntrinsicPropertyRecipe::ArrayPrototype => {}
+        IntrinsicPropertyRecipe::WellKnownSymbol(symbol) => {
+            payload[0] = scriptw_ir::WellKnownSymbol::ALL
+                .iter()
+                .position(|candidate| *candidate == symbol)
+                .expect("closed well-known Symbol row") as u32
+        }
+        IntrinsicPropertyRecipe::NativeLength(id) => {
+            let meta = native_metadata(id, functions)?.ok_or_else(|| {
+                EmitError::unsupported("native length recipe has no planned metadata")
+            })?;
+            let bits = (meta.length as f64).to_bits();
+            payload[0] = bits as u32;
+            payload[1] = (bits >> 32) as u32;
+        }
+        IntrinsicPropertyRecipe::NativeName(id) => {
+            let meta = native_metadata(id, functions)?.ok_or_else(|| {
+                EmitError::unsupported("native name recipe has no planned metadata")
+            })?;
+            payload[0] = runtime_string_ordinal(strings, meta.runtime_name())?;
+        }
     }
     let hash = raw_key_hash(property.key);
     Ok([
@@ -194,13 +246,22 @@ impl StringPool {
                         admitted_method(builtin, functions)?
                     }
                     IntrinsicPropertyRecipe::Accessor { getter, setter } => {
-                        admitted_method(getter, functions)? && admitted_method(setter, functions)?
+                        admitted_callable(getter, functions)?
+                            && admitted_callable(setter, functions)?
                     }
                     IntrinsicPropertyRecipe::Number(_)
                     | IntrinsicPropertyRecipe::Boolean(_)
                     | IntrinsicPropertyRecipe::String(_)
-                    | IntrinsicPropertyRecipe::RealmIntrinsic(_)
-                    | IntrinsicPropertyRecipe::LayoutObject(_) => true,
+                    | IntrinsicPropertyRecipe::LayoutObject(_)
+                    | IntrinsicPropertyRecipe::ArrayPrototype
+                    | IntrinsicPropertyRecipe::WellKnownSymbol(_) => true,
+                    IntrinsicPropertyRecipe::ReadyRealmSlot(slot) => slot
+                        .function_id()
+                        .is_none_or(|id| functions.contains_key(&id)),
+                    IntrinsicPropertyRecipe::NativeLength(id)
+                    | IntrinsicPropertyRecipe::NativeName(id) => {
+                        native_metadata(id, functions)?.is_some()
+                    }
                 };
                 present &= ready;
             }
@@ -222,7 +283,7 @@ impl StringPool {
                 .and_then(|length| index_address.checked_add(length))
                 .ok_or_else(error)?;
             for property in plan.properties() {
-                for word in encode_row(property, self)? {
+                for word in encode_row(property, self, functions)? {
                     bytes.extend_from_slice(&word.to_le_bytes());
                 }
             }
@@ -261,6 +322,13 @@ impl StringPool {
     ) -> Result<RPropertyLayoutRows, EmitError> {
         Ok(self.runtime_intrinsic_property_layouts()?.rows)
     }
+    pub(crate) fn has_intrinsic_property_layout(
+        &self,
+        id: IntrinsicPropertyLayoutId,
+    ) -> Result<bool, EmitError> {
+        Ok(self.runtime_intrinsic_property_layouts()?.rows.spans[id as usize].is_some())
+    }
+
     pub(crate) fn intrinsic_property_layout_span(
         &self,
         id: IntrinsicPropertyLayoutId,
@@ -272,6 +340,115 @@ impl StringPool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn array_metadata() -> WasmFunctionMeta {
+        let builtin = scriptw_ir::StandardBuiltinId::ArrayConstructor;
+        WasmFunctionMeta {
+            constant_leaf: None,
+            numeric_leaf: None,
+            async_generator_resume_environment_plan: None,
+            template_source: None,
+            name: "Planned Array Name".into(),
+            to_string_value: "function Array() { [native code] }".into(),
+            standard_builtin: Some(builtin),
+            host_builtin: None,
+            length: 37,
+            length_name_configurable: true,
+            entry: crate::function_entry::PlannedFunctionEntry::standard(builtin, 17),
+            strict: true,
+            is_named_expression: false,
+            class_element_execution_kind: scriptw_ir::ClassElementExecutionKind::None,
+            class_heritage_kind: scriptw_ir::ClassHeritageKind::None,
+            is_static_class_member: false,
+            is_derived_constructor: false,
+            is_synthetic_default_derived_constructor: false,
+            class_instance_element_plan: None,
+            uses_super: false,
+            this_before_super: false,
+            captures_private_environment: false,
+            needs_active_function_identity: false,
+        }
+    }
+
+    #[test]
+    fn native_metadata_rows_seal_actual_names_lengths_and_reject_wrong_identity() {
+        let id = IntrinsicPropertyLayoutId::ArrayConstructor;
+        let plan = id.layout().unwrap();
+        let meta = array_metadata();
+        let mut pool = StringPool::default();
+        pool.collect_intrinsic_property_layout_strings().unwrap();
+        pool.intern_string(meta.runtime_name());
+        pool.compiler_owned = pool.boundary();
+        let mut functions = BTreeMap::from([(id.native_function_id().unwrap(), meta)]);
+        let length = encode_row(&plan.properties()[0], &pool, &functions).unwrap();
+        assert_eq!(
+            length[4],
+            crate::intrinsics::IntrinsicPropertyRecipeKind::Number as u32
+        );
+        assert_eq!(
+            u64::from(length[5]) | (u64::from(length[6]) << 32),
+            37.0f64.to_bits()
+        );
+        let name = encode_row(&plan.properties()[1], &pool, &functions).unwrap();
+        assert_eq!(
+            name[4],
+            crate::intrinsics::IntrinsicPropertyRecipeKind::String as u32
+        );
+        assert_eq!(
+            name[5],
+            runtime_string_ordinal(&pool, "Planned Array Name").unwrap()
+        );
+        let meta = functions
+            .get_mut(&id.native_function_id().unwrap())
+            .unwrap();
+        meta.entry = crate::function_entry::PlannedFunctionEntry::standard(
+            scriptw_ir::StandardBuiltinId::ObjectConstructor,
+            17,
+        );
+        assert!(encode_row(&plan.properties()[0], &pool, &functions).is_err());
+        assert!(native_metadata(id, &BTreeMap::new()).unwrap().is_none());
+    }
+
+    #[test]
+    fn accessor_wire_preserves_absence_and_canonical_identity_separately_from_methods() {
+        use crate::intrinsics::property_layouts::{
+            IntrinsicCallableRecipeKind as Side, IntrinsicPropertyRecipeKind as Kind,
+        };
+        let mut pool = StringPool::default();
+        pool.collect_intrinsic_property_layout_strings().unwrap();
+        pool.compiler_owned = pool.boundary();
+        let map = IntrinsicPropertyLayoutId::MapConstructor.layout().unwrap();
+        let getter = encode_row(map.properties().last().unwrap(), &pool, &BTreeMap::new()).unwrap();
+        assert_eq!(getter[4], Kind::Accessor as u32);
+        assert_eq!(
+            getter[5],
+            scriptw_ir::StandardBuiltinId::MapSpeciesGetter as u32
+        );
+        assert_eq!(getter[6], 0);
+        assert_eq!(
+            getter[7],
+            (Side::Method as u32) | ((Side::Undefined as u32) << 2)
+        );
+        let function = IntrinsicPropertyLayoutId::FunctionPrototype
+            .layout()
+            .unwrap();
+        let thrower = encode_row(
+            function.properties().last().unwrap(),
+            &pool,
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            thrower[5],
+            crate::functions::NonArrayRealmIntrinsicSlot::ThrowTypeError.gc_index()
+        );
+        assert_eq!(thrower[5], thrower[6]);
+        assert_eq!(
+            thrower[7],
+            (Side::Ready as u32) | ((Side::Ready as u32) << 2)
+        );
+        assert_eq!(RPropertyLayoutRows::ROW_BYTES, 40);
+    }
+
     #[test]
     fn packed_rows_preserve_symbol_domain_exact_numbers_and_utf16_hashes() {
         let mut pool = StringPool::default();
@@ -283,7 +460,7 @@ mod tests {
             .iter()
             .find(|p| matches!(p.key, IntrinsicKey::Name("PI")))
             .unwrap();
-        let row = encode_row(pi, &pool).unwrap();
+        let row = encode_row(pi, &pool, &BTreeMap::new()).unwrap();
         assert_eq!(
             u64::from(row[5]) | (u64::from(row[6]) << 32),
             std::f64::consts::PI.to_bits()
@@ -294,7 +471,7 @@ mod tests {
             tag.key,
             IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag)
         ));
-        let symbol = encode_row(tag, &pool).unwrap();
+        let symbol = encode_row(tag, &pool, &BTreeMap::new()).unwrap();
         assert_eq!(symbol[0], 1);
         assert_eq!(&symbol[8..], &[0, 0]);
         assert_eq!(raw_key_hash(IntrinsicKey::Name("a")), 0xaf63dc4c8601ec8c);

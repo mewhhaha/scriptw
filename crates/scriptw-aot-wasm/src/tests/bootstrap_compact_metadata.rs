@@ -35,7 +35,7 @@ fn named_body<'a>(bytes: &'a [u8], index: u32) -> Vec<Operator<'a>> {
 }
 
 #[test]
-fn native_bootstrap_keeps_method_metadata_compact_and_constructor_metadata_in_dictionaries() {
+fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_native_metadata() {
     let artifact = emit_script("Math.max.name;").unwrap();
     let runtime = artifact.runtime().unwrap();
     let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
@@ -84,22 +84,27 @@ fn native_bootstrap_keeps_method_metadata_compact_and_constructor_metadata_in_di
         .iter()
         .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == allocate))
         .count();
-    assert!(
-        inline_callables > 0 && shared_accessors > 0 && shared_constructors > 0,
-        "inspect the inline, accessor and constructor bootstrap paths"
+    assert!(inline_callables > 0 && native_headers > 0);
+    assert_eq!(
+        shared_accessors, 0,
+        "layout accessors remain unobserved at Realm birth"
     );
     assert_eq!(
-        native_headers,
-        inline_callables + shared_accessors,
-        "ordinary native callables and accessors keep their own compact headers"
+        shared_constructors, 24,
+        "every eager constructor shares the typed allocation tail"
+    );
+    assert_eq!(
+        inline_callables,
+        native_headers + 1,
+        "Function.prototype has its complete layout; the other eager native callables keep compact metadata headers"
     );
     assert_eq!(
         bootstrap
             .iter()
             .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == constructor_header))
             .count(),
-        shared_constructors,
-        "each eager constructor gets its own direct dictionary header"
+        0,
+        "the 24 covered constructor births never allocate a transient dictionary header"
     );
     let allocator = named_body(runtime.bytes(), allocate);
     assert_eq!(
@@ -140,6 +145,15 @@ fn native_bootstrap_keeps_method_metadata_compact_and_constructor_metadata_in_di
         stored_values(&compact_allocator),
         0,
         "typed prototype references and compact metadata allocate no value boxes"
+    );
+    // Demand-owned constructor families retain the original dictionary path.
+    // Cover that fallback independently rather than deleting its invariants
+    // when it disappears from fresh-Realm execution.
+    let demand = named_body(runtime.bytes(), index("helper::realm_ensure_binary_data"));
+    assert!(
+        demand.iter().any(|op| matches!(op,
+        Operator::Call { function_index } if *function_index == constructor_header)),
+        "binary-data constructors still reach the dictionary header owner"
     );
     let dictionary_allocator = named_body(runtime.bytes(), constructor_header);
     for (dictionary_type, expected) in [

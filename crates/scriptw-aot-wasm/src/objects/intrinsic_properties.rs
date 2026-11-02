@@ -7,15 +7,38 @@ use crate::runtime_helpers::*;
 mod installation;
 
 impl FunctionBuilder<'_> {
-    pub(crate) fn emit_install_intrinsic_property_layout(
+    /// The complete intrinsic layout is the header's first property storage.
+    pub(crate) fn emit_alloc_intrinsic_layout_header(
         &mut self,
-        object: &GcLocal<OrdinaryObject>,
+        prototype: &ValueLocals,
         id: crate::intrinsics::IntrinsicPropertyLayoutId,
         realm: &GcLocal<RealmRecord>,
         f: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
+        self.emit_alloc_intrinsic_layout_header_with_mutability(prototype, id, realm, false, f)
+    }
+
+    pub(super) fn emit_alloc_intrinsic_layout_header_with_mutability(
+        &mut self,
+        prototype: &ValueLocals,
+        id: crate::intrinsics::IntrinsicPropertyLayoutId,
+        realm: &GcLocal<RealmRecord>,
+        immutable: bool,
+        f: &mut Function,
+    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
         let span = self.strings.intrinsic_property_layout_span(id)?;
-        installation::emit_intrinsic_layout_storage(span, object, realm, self.runtime_schema(), f)
+        let s = self.runtime_schema();
+        let properties = installation::emit_intrinsic_layout_storage_record(span, realm, s, f);
+        let storage = s
+            .reserve_gc_local(f)
+            .initialize(properties.load(s, f).upcast(), f);
+        let mutable = s.reserve_i32_local(f);
+        mutable.set_constant(i32::from(immutable), f);
+        let object = self.emit_alloc_object_header_with_storage(prototype, mutable, &storage, f);
+        s.release_i32_local(mutable, f);
+        storage.clear(f);
+        properties.clear(f);
+        Ok(object)
     }
 
     pub(super) fn emit_intrinsic_property_row(

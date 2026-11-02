@@ -761,7 +761,7 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )?;
             }
-            StandardBuiltinId::ArrayIteratorIdentity => {
+            StandardBuiltinId::ArrayIteratorIdentity | StandardBuiltinId::AsyncIteratorIdentity => {
                 let receiver = self.runtime_schema().reserve_value_local(function);
                 self.compile_this_to_locals(&receiver, function)?;
                 self.completion().set_normal(&receiver, function);

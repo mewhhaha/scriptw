@@ -1,19 +1,5 @@
-//! Per-family realm bootstrap and property-descriptor installation.
-//!
-//! This is the `intrinsics/` boundary named by T02. It exists to break up
-//! `builtins/bootstrap.rs::init_builtin_constructor_object`, formerly a single
-//! ~4,760-line function and the worst merge point in the backend. Per-family
-//! bodies live here, while the mandatory catalog `StandardBuiltinInstaller`
-//! classification now routes its 36 productive roots without naming every
-//! other builtin in a no-op tail.
-//!
-//! Each family consumes borrowed completed Realm/constructor/prototype values.
-//! Fresh property installation retains strong GC edges and the same method
-//! ordering and alias identity as the canonical native bootstrap.
-//!
-//! Property installation order is observable through `Object.keys`, so arms
-//! must keep their internal ordering and the dispatch in `bootstrap.rs` must
-//! keep calling them in the same order it always did.
+//! Complete eager layouts and demand-family intrinsic graph installation.
+//! Property order, alias identities and defining Realm ownership are explicit.
 
 use super::*;
 use crate::objects::{AccessorDescriptor, AccessorDescriptorLocals};
@@ -22,7 +8,6 @@ mod abstract_module_source;
 mod accessor_allocation;
 pub(crate) mod array;
 pub(crate) mod binary_data;
-pub(crate) mod collections;
 pub(crate) mod date;
 mod deferred_methods;
 pub(crate) use deferred_methods::DeferredIntrinsicMethod;
@@ -30,23 +15,15 @@ mod method_plans;
 pub(crate) use method_plans::{IntrinsicMethodPlan, IntrinsicMethodSpec};
 pub(crate) mod eager_accessors;
 pub(crate) mod errors;
-pub(crate) mod function;
 pub(crate) mod intl;
 pub(crate) mod intl_segmenter;
-pub(crate) mod iterator;
-pub(crate) mod numeric;
-pub(crate) mod object;
 pub(crate) mod promise;
 pub(crate) mod property_layouts;
 mod property_publication;
 pub(crate) use property_layouts::{IntrinsicPropertyLayoutId, IntrinsicPropertyRecipeKind};
 mod property_layout_values;
-pub(crate) mod proxy;
 pub(crate) mod regexp;
-pub(crate) mod resource_management;
 pub(crate) mod shadow_realm;
-pub(crate) mod string;
-pub(crate) mod symbol;
 pub(crate) mod temporal;
 
 /// The completed Realm and public values borrowed by one family installer.

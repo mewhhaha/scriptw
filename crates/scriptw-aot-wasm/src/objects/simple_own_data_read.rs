@@ -4,14 +4,14 @@
 use super::*;
 use crate::gc_types::{
     CodeUnitArray, CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability,
-    PrimitiveBox, PrimitiveBoxSchema, StringValue, StringValueSchema,
+    IntrinsicPropertyStorage, PrimitiveBox, PrimitiveBoxSchema, StringValue, StringValueSchema,
 };
 
 impl FunctionBuilder<'_> {
     /// Plain objects and primitive boxes check ordinary own properties first.
     /// A boxed String miss retains its virtual character-index lookup; accessors
     /// retain the original receiver. Callable headers join only while their
-    /// storage is compact native metadata, preserving legacy reflection.
+    /// storage is sealed native metadata, preserving legacy reflection.
     pub(in crate::objects) fn emit_simple_data_header(
         &mut self,
         target: &ValueLocals,
@@ -82,6 +82,8 @@ impl FunctionBuilder<'_> {
             function,
         );
         storage.is_subtype::<CompactDataStorage>(schema, function);
+        storage.is_subtype::<IntrinsicPropertyStorage>(schema, function);
+        function.instruction(&Instruction::I32Or);
         self.open_frame(ControlFrameKind::If, function);
         result.replace(header.load(schema, function).nullable(), function);
         self.pop_control(ControlFrameKind::If);

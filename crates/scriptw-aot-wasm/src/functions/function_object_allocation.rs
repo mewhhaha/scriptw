@@ -575,8 +575,25 @@ impl FunctionBuilder<'_> {
                         function,
                     )?,
                 crate::gc_types::ExecutableCodeKind::StandardBuiltin
-                | crate::gc_types::ExecutableCodeKind::HostBuiltin => self
-                    .emit_alloc_native_function_header(meta, inputs.internal_prototype, function)?,
+                | crate::gc_types::ExecutableCodeKind::HostBuiltin => {
+                    if meta.standard_builtin == Some(StandardBuiltinId::FunctionPrototype) {
+                        let layout =
+                            crate::intrinsics::IntrinsicPropertyLayoutId::FunctionPrototype;
+                        layout.validate_native_metadata(meta)?;
+                        self.emit_alloc_intrinsic_layout_header(
+                            inputs.internal_prototype,
+                            layout,
+                            inputs.realm,
+                            function,
+                        )?
+                    } else {
+                        self.emit_alloc_native_function_header(
+                            meta,
+                            inputs.internal_prototype,
+                            function,
+                        )?
+                    }
+                }
             },
             function,
         );

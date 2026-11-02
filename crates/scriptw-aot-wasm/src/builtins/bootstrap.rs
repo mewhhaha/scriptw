@@ -158,62 +158,30 @@ impl<'a> FunctionBuilder<'a> {
         };
         match builtin.intrinsic_installer() {
             StandardBuiltinInstaller::None => {}
-            StandardBuiltinInstaller::ShadowRealm => {
-                self.install_shadow_realm_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Function => {
-                self.install_function_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Promise => {
-                self.install_promise_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Map => {
-                self.install_map_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakMap => {
-                self.install_weak_map_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakSet => {
-                self.install_weak_set_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakRef => {
-                self.install_weak_ref_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::FinalizationRegistry => self
-                .install_finalization_registry_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::AsyncDisposableStack => self
-                .install_async_disposable_stack_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::DisposableStack => {
-                self.install_disposable_stack_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Set => {
-                self.install_set_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Object => {
-                self.install_object_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Proxy => {
-                self.install_proxy_constructor_intrinsics(&intrinsic_context, function)?
-            }
+            StandardBuiltinInstaller::ShadowRealm
+            | StandardBuiltinInstaller::Function
+            | StandardBuiltinInstaller::Promise
+            | StandardBuiltinInstaller::Map
+            | StandardBuiltinInstaller::WeakMap
+            | StandardBuiltinInstaller::WeakSet
+            | StandardBuiltinInstaller::WeakRef
+            | StandardBuiltinInstaller::FinalizationRegistry
+            | StandardBuiltinInstaller::AsyncDisposableStack
+            | StandardBuiltinInstaller::DisposableStack
+            | StandardBuiltinInstaller::Set
+            | StandardBuiltinInstaller::Object
+            | StandardBuiltinInstaller::Proxy
+            | StandardBuiltinInstaller::Iterator
+            | StandardBuiltinInstaller::Array
+            | StandardBuiltinInstaller::String
+            | StandardBuiltinInstaller::BigInt
+            | StandardBuiltinInstaller::Symbol
+            | StandardBuiltinInstaller::Number
+            | StandardBuiltinInstaller::Boolean => {}
             StandardBuiltinInstaller::RegExp => {
                 return Err(EmitError::unsupported(
                     "RegExp family installation requires its build capability",
                 ));
-            }
-            StandardBuiltinInstaller::Iterator => {
-                self.install_iterator_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Array => {
-                self.install_array_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::String => {
-                self.install_string_constructor_intrinsics(&intrinsic_context, function)?
             }
             StandardBuiltinInstaller::ArrayBuffer => {
                 self.install_array_buffer_constructor_intrinsics(&intrinsic_context, function)?
@@ -288,18 +256,6 @@ impl<'a> FunctionBuilder<'a> {
             StandardBuiltinInstaller::Error => {
                 self.install_error_constructor_intrinsics(&intrinsic_context, function)?
             }
-            StandardBuiltinInstaller::BigInt => {
-                self.install_big_int_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Symbol => {
-                self.install_symbol_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Number => {
-                self.install_number_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Boolean => {
-                self.install_boolean_constructor_intrinsics(&intrinsic_context, function)?
-            }
         }
 
         constructor_value.clear(function);
@@ -326,14 +282,7 @@ impl<'a> FunctionBuilder<'a> {
                     builtin.debug_name()
                 ))
             })?;
-        // Complete prototype layouts supply the constructor link after its
-        // canonical Realm slot has been published below.
-        let covered_prototype = matches!(
-            builtin,
-            StandardBuiltinId::ObjectConstructor
-                | StandardBuiltinId::ArrayConstructor
-                | StandardBuiltinId::StringConstructor
-        );
+        let covered = IntrinsicPropertyLayoutId::for_constructor(&meta)?.is_some();
         let schema = self.runtime_schema();
         let constructor = schema
             .reserve_gc_local::<FunctionObject, NonNullable>(function)
@@ -365,15 +314,17 @@ impl<'a> FunctionBuilder<'a> {
             stored.clear(function);
         }
         if builtin != StandardBuiltinId::ProxyConstructor {
-            self.emit_install_intrinsic_data(
-                &constructor_value,
-                IntrinsicKey::Name("prototype"),
-                prototype,
-                false,
-                false,
-                false,
-                function,
-            )?;
+            if !covered {
+                self.emit_install_intrinsic_data(
+                    &constructor_value,
+                    IntrinsicKey::Name("prototype"),
+                    prototype,
+                    false,
+                    false,
+                    false,
+                    function,
+                )?;
+            }
             let stored = schema
                 .reserve_gc_local::<StoredValue, NonNullable>(function)
                 .initialize(
@@ -392,7 +343,7 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 );
             stored.clear(function);
-            if builtin != StandardBuiltinId::IteratorConstructor && !covered_prototype {
+            if builtin != StandardBuiltinId::IteratorConstructor && !covered {
                 self.emit_install_intrinsic_data(
                     prototype,
                     IntrinsicKey::Name("constructor"),
@@ -462,27 +413,8 @@ impl<'a> FunctionBuilder<'a> {
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
         let thrower =
             self.emit_intrinsic_callable(StandardBuiltinId::ThrowTypeError, realm, function)?;
-        let value = schema.reserve_value_local(function);
-        value.set_reference(&thrower, schema, function);
-        let prototype = schema.reserve_value_local(function);
-        prototype.set_reference(realm.function_prototype(), schema, function);
-        for name in ["arguments", "caller"] {
-            self.emit_install_intrinsic_accessor_values(
-                &prototype,
-                IntrinsicKey::Name(name),
-                AccessorDescriptorLocals::GetterAndSetter {
-                    getter: AccessorGetterLocals::new(&value),
-                    setter: AccessorSetterLocals::new(&value),
-                },
-                true,
-                function,
-            )?;
-        }
-        prototype.clear(function);
-        value.clear(function);
         thrower.clear(function);
         Ok(())
     }
@@ -498,10 +430,14 @@ impl<'a> FunctionBuilder<'a> {
         let object = schema
             .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
             .initialize(
-                self.emit_alloc_plain_object_with_prototype(Some(object_prototype), function)?,
+                self.emit_alloc_intrinsic_layout_header(
+                    object_prototype,
+                    layout,
+                    realm.realm(),
+                    function,
+                )?,
                 function,
             );
-        self.emit_install_intrinsic_property_layout(&object, layout, realm.realm(), function)?;
         let value = schema.reserve_value_local(function);
         value.set_reference(&object, schema, function);
         object.clear(function);
@@ -564,205 +500,27 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
-    fn emit_bootstrap_iterator_prototypes(
-        &mut self,
-        realm: &RealmFunctionMaterializationContext,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let prototype = schema.reserve_value_local(function);
-        for (slot, next, tag) in [
-            (
-                NonArrayRealmIntrinsicSlot::ArrayIteratorPrototype,
-                StandardBuiltinId::ArrayIteratorNext,
-                "Array Iterator",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::StringIteratorPrototype,
-                StandardBuiltinId::StringIteratorNext,
-                "String Iterator",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::RegExpStringIteratorPrototype,
-                StandardBuiltinId::RegExpStringIteratorNext,
-                "RegExp String Iterator",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::MapIteratorPrototype,
-                StandardBuiltinId::MapIteratorNext,
-                "Map Iterator",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::SetIteratorPrototype,
-                StandardBuiltinId::SetIteratorNext,
-                "Set Iterator",
-            ),
-        ] {
-            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &prototype, function);
-            self.emit_install_intrinsic_method(
-                &prototype,
-                IntrinsicKey::Name("next"),
-                next,
-                realm,
-                true,
-                true,
-                function,
-            )?;
-            if matches!(slot, NonArrayRealmIntrinsicSlot::ArrayIteratorPrototype) {
-                self.emit_install_intrinsic_method(
-                    &prototype,
-                    IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Iterator),
-                    StandardBuiltinId::ArrayIteratorIdentity,
-                    realm,
-                    true,
-                    true,
-                    function,
-                )?;
-            }
-            self.emit_install_intrinsic_string(
-                &prototype,
-                IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-                tag,
-                false,
-                false,
-                true,
-                function,
-            )?;
-        }
-        let value = schema.reserve_value_local(function);
-        for (slot, constructor_slot, next, return_method, throw_method, tag) in [
-            (
-                NonArrayRealmIntrinsicSlot::GeneratorPrototype,
-                NonArrayRealmIntrinsicSlot::GeneratorFunctionPrototype,
-                StandardBuiltinId::GeneratorPrototypeNext,
-                StandardBuiltinId::GeneratorPrototypeReturn,
-                StandardBuiltinId::GeneratorPrototypeThrow,
-                "Generator",
-            ),
-            (
-                NonArrayRealmIntrinsicSlot::AsyncGeneratorPrototype,
-                NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionPrototype,
-                StandardBuiltinId::AsyncGeneratorPrototypeNext,
-                StandardBuiltinId::AsyncGeneratorPrototypeReturn,
-                StandardBuiltinId::AsyncGeneratorPrototypeThrow,
-                "AsyncGenerator",
-            ),
-        ] {
-            self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &prototype, function);
-            self.emit_load_non_array_realm_intrinsic(
-                realm.realm(),
-                constructor_slot,
-                &value,
-                function,
-            );
-            self.emit_install_intrinsic_data(
-                &prototype,
-                IntrinsicKey::Name("constructor"),
-                &value,
-                false,
-                false,
-                true,
-                function,
-            )?;
-            for (name, builtin) in [
-                ("next", next),
-                ("return", return_method),
-                ("throw", throw_method),
-            ] {
-                self.emit_install_intrinsic_method(
-                    &prototype,
-                    IntrinsicKey::Name(name),
-                    builtin,
-                    realm,
-                    true,
-                    true,
-                    function,
-                )?;
-            }
-            self.emit_install_intrinsic_string(
-                &prototype,
-                IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-                tag,
-                false,
-                false,
-                true,
-                function,
-            )?;
-        }
-        value.clear(function);
-        self.emit_load_non_array_realm_intrinsic(
-            realm.realm(),
-            NonArrayRealmIntrinsicSlot::AsyncIteratorPrototype,
-            &prototype,
-            function,
-        );
-        let mut identity_meta = self
-            .functions
-            .get(&StandardBuiltinId::ArrayIteratorIdentity.function_id())
-            .cloned()
-            .ok_or_else(|| EmitError::unsupported("missing async iterator identity entry"))?;
-        identity_meta.name = "[Symbol.asyncIterator]".to_owned();
-        identity_meta.to_string_value =
-            "function [Symbol.asyncIterator]() { [native code] }".to_owned();
-        let identity = schema
-            .reserve_gc_local::<FunctionObject, NonNullable>(function)
-            .initialize(
-                self.emit_function_value_payload_in_realm(&identity_meta, realm, function)?,
-                function,
-            );
-        let value = schema.reserve_value_local(function);
-        value.set_reference(&identity, schema, function);
-        self.emit_install_intrinsic_data(
-            &prototype,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::AsyncIterator),
-            &value,
-            true,
-            false,
-            true,
-            function,
-        )?;
-        value.clear(function);
-        identity.clear(function);
-        self.emit_install_intrinsic_method(
-            &prototype,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::AsyncDispose),
-            StandardBuiltinId::AsyncIteratorPrototypeAsyncDispose,
-            realm,
-            true,
-            true,
-            function,
-        )?;
-        prototype.clear(function);
-        Ok(())
-    }
-
     fn emit_bootstrap_dynamic_function_intrinsics(
         &mut self,
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        for (builtin, prototype_slot, constructor_slot, instance_slot, tag) in [
+        for (builtin, prototype_slot, constructor_slot) in [
             (
                 HostBuiltinId::GeneratorFunctionConstructor,
                 NonArrayRealmIntrinsicSlot::GeneratorFunctionPrototype,
                 NonArrayRealmIntrinsicSlot::GeneratorFunctionConstructor,
-                Some(NonArrayRealmIntrinsicSlot::GeneratorPrototype),
-                "GeneratorFunction",
             ),
             (
                 HostBuiltinId::AsyncFunctionConstructor,
                 NonArrayRealmIntrinsicSlot::AsyncFunctionPrototype,
                 NonArrayRealmIntrinsicSlot::AsyncFunctionConstructor,
-                None,
-                "AsyncFunction",
             ),
             (
                 HostBuiltinId::AsyncGeneratorFunctionConstructor,
                 NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionPrototype,
                 NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionConstructor,
-                Some(NonArrayRealmIntrinsicSlot::AsyncGeneratorPrototype),
-                "AsyncGeneratorFunction",
             ),
         ] {
             let meta = self
@@ -819,15 +577,6 @@ impl<'a> FunctionBuilder<'a> {
             parent.clear(function);
             function_constructor.clear(function);
             header.clear(function);
-            self.emit_install_intrinsic_data(
-                &constructor_value,
-                IntrinsicKey::Name("prototype"),
-                &prototype,
-                false,
-                false,
-                false,
-                function,
-            )?;
             let stored = schema
                 .reserve_gc_local::<StoredValue, NonNullable>(function)
                 .initialize(
@@ -852,43 +601,6 @@ impl<'a> FunctionBuilder<'a> {
                 &constructor_value,
                 function,
             );
-            if let Some(instance_slot) = instance_slot {
-                let instance = schema.reserve_value_local(function);
-                self.emit_load_non_array_realm_intrinsic(
-                    realm.realm(),
-                    instance_slot,
-                    &instance,
-                    function,
-                );
-                self.emit_install_intrinsic_data(
-                    &prototype,
-                    IntrinsicKey::Name("prototype"),
-                    &instance,
-                    false,
-                    false,
-                    true,
-                    function,
-                )?;
-                instance.clear(function);
-            }
-            self.emit_install_intrinsic_data(
-                &prototype,
-                IntrinsicKey::Name("constructor"),
-                &constructor_value,
-                false,
-                false,
-                true,
-                function,
-            )?;
-            self.emit_install_intrinsic_string(
-                &prototype,
-                IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::ToStringTag),
-                tag,
-                false,
-                false,
-                true,
-                function,
-            )?;
             constructor_value.clear(function);
             constructor.clear(function);
             prototype.clear(function);
@@ -903,7 +615,20 @@ impl<'a> FunctionBuilder<'a> {
         parent: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let value = self.emit_bootstrap_namespace(parent, function)?;
+        let layout = match IntrinsicPropertyLayoutId::for_prototype(slot) {
+            Some(layout)
+                if self.runtime_bootstrap_plan.full_standard_globals
+                    || self.strings.has_intrinsic_property_layout(layout)? =>
+            {
+                Some(layout)
+            }
+            _ => None,
+        };
+        let value = if let Some(layout) = layout {
+            self.emit_bootstrap_intrinsic_namespace(layout, realm, parent, function)?
+        } else {
+            self.emit_bootstrap_namespace(parent, function)?
+        };
         self.emit_store_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
         value.clear(function);
         Ok(())
@@ -918,12 +643,24 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        let layout = IntrinsicPropertyLayoutId::for_prototype(slot);
+        let layout = match layout {
+            Some(layout)
+                if self.runtime_bootstrap_plan.full_standard_globals
+                    || self.strings.has_intrinsic_property_layout(layout)? =>
+            {
+                Some(layout)
+            }
+            _ => None,
+        };
+        let header_value = if let Some(layout) = layout {
+            self.emit_alloc_intrinsic_layout_header(parent, layout, realm.realm(), function)?
+        } else {
+            self.emit_alloc_plain_object_with_prototype(Some(parent), function)?
+        };
         let header = schema
             .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
-            .initialize(
-                self.emit_alloc_plain_object_with_prototype(Some(parent), function)?,
-                function,
-            );
+            .initialize(header_value, function);
         let stored = schema
             .reserve_gc_local::<StoredValue, NonNullable>(function)
             .initialize(
@@ -946,12 +683,9 @@ impl<'a> FunctionBuilder<'a> {
             );
         let value = schema.reserve_value_local(function);
         value.set_reference(&object, schema, function);
-        // A complete String prototype layout is installed with its constructor.
-        // Partial bootstrap plans still retain the original standalone length.
+        // Narrow pools retain String's standalone virtual length.
         if slot.gc_index() == NonArrayRealmIntrinsicSlot::StringPrototype.gc_index()
-            && !self
-                .runtime_bootstrap_plan
-                .should_initialize_standard_builtin(StandardBuiltinId::StringConstructor)
+            && layout.is_none()
         {
             self.emit_install_intrinsic_number(
                 &value, "length", 0.0, false, false, false, function,
@@ -990,7 +724,7 @@ impl<'a> FunctionBuilder<'a> {
         let object = schema
             .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
             .initialize(
-                self.emit_alloc_immutable_prototype_object(function)?,
+                self.emit_alloc_immutable_prototype_object(realm, function)?,
                 function,
             );
         let object_prototype = schema.reserve_value_local(function);
@@ -1011,8 +745,12 @@ impl<'a> FunctionBuilder<'a> {
         let function_prototype = schema.reserve_value_local(function);
         function_prototype.set_reference(context.function_prototype(), schema, function);
         let reserved = self.reserve_realm_array_prototype_local(function);
-        let array =
-            self.emit_initialize_realm_array_prototype(reserved, &object_prototype, function)?;
+        let array = self.emit_initialize_realm_array_prototype(
+            reserved,
+            &object_prototype,
+            realm,
+            function,
+        )?;
         self.emit_store_realm_array_prototype(realm, array.array(), function);
         self.release_realm_array_prototype_local(array, function);
         self.emit_bootstrap_plain_prototype(
@@ -1117,6 +855,13 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         self.init_throw_type_error_intrinsic(&context, function)?;
+        for builtin in [HostBuiltinId::ParseInt, HostBuiltinId::ParseFloat] {
+            if self.functions.get(&builtin.function_id()).is_some() {
+                let callable =
+                    self.emit_intrinsic_canonical_host_callable(builtin, &context, function)?;
+                callable.clear(function);
+            }
+        }
         self.emit_bootstrap_dynamic_function_intrinsics(&context, function)?;
         self.emit_bootstrap_constructor_from_slot(
             StandardBuiltinId::ObjectConstructor,
@@ -1175,11 +920,11 @@ impl<'a> FunctionBuilder<'a> {
                 &prototype,
                 function,
             )?;
+            self.emit_initialize_array_canonical_callables(&context, function)?;
             constructor.clear(function);
             prototype.clear(function);
             array.clear(function);
         }
-        self.emit_bootstrap_iterator_prototypes(&context, function)?;
         for (builtin, slot) in [
             (
                 StandardBuiltinId::NumberConstructor,
@@ -1243,31 +988,6 @@ impl<'a> FunctionBuilder<'a> {
                 .should_initialize_standard_builtin(builtin)
             {
                 self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
-                if builtin == StandardBuiltinId::StringConstructor {
-                    let constructor = schema.reserve_value_local(function);
-                    self.emit_load_non_array_realm_intrinsic(
-                        realm,
-                        NonArrayRealmIntrinsicSlot::StringConstructor,
-                        &constructor,
-                        function,
-                    );
-                    for (name, method) in [
-                        ("fromCharCode", StandardBuiltinId::StringFromCharCode),
-                        ("fromCodePoint", StandardBuiltinId::StringFromCodePoint),
-                        ("raw", StandardBuiltinId::StringRaw),
-                    ] {
-                        self.emit_install_intrinsic_method(
-                            &constructor,
-                            IntrinsicKey::Name(name),
-                            method,
-                            &context,
-                            true,
-                            true,
-                            function,
-                        )?;
-                    }
-                    constructor.clear(function);
-                }
             }
         }
         parent.clear(function);

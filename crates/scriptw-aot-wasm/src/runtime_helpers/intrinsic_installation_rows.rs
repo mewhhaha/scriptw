@@ -220,6 +220,31 @@ impl RuntimeHelperPropertyLayoutRow {
         self.raw_key_hash
     }
 
+    /// Side tags belong to the sealed Accessor row. Data methods use their
+    /// separate row kind; no absent or canonical side can become a builtin ID.
+    pub(crate) fn emit_callable_kind(&self, setter: bool, f: &mut Function) {
+        self.payload[2].load(f);
+        if setter {
+            f.instruction(&Instruction::I32Const(2));
+            f.instruction(&Instruction::I32ShrU);
+        }
+        f.instruction(&Instruction::I32Const(3));
+        f.instruction(&Instruction::I32And);
+    }
+
+    pub(crate) fn emit_well_known_symbol_ordinal(&self, f: &mut Function) {
+        self.kind.load(f);
+        f.instruction(&Instruction::I32Const(
+            crate::intrinsics::property_layouts::IntrinsicPropertyRecipeKind::WellKnownSymbol
+                as i32,
+        ));
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        self.payload[0].load(f);
+    }
+
     /// Kind checking prevents a numeric payload from becoming builtin authority.
     /// The returned view borrows the row's local; only row.clear retires it.
     pub(crate) fn method_builtin(
@@ -231,6 +256,12 @@ impl RuntimeHelperPropertyLayoutRow {
         self.kind.load(f);
         f.instruction(&Instruction::I32Const(Kind::Accessor as i32));
         f.instruction(&Instruction::I32Eq);
+        self.emit_callable_kind(setter, f);
+        f.instruction(&Instruction::I32Const(
+            crate::intrinsics::property_layouts::IntrinsicCallableRecipeKind::Method as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
         if !setter {
             self.kind.load(f);
             f.instruction(&Instruction::I32Const(Kind::Method as i32));

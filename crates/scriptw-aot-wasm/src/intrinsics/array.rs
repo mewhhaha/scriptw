@@ -1,51 +1,22 @@
-//! Constructor properties and the complete canonical Array prototype layout.
+//! Canonical internal identities precede the complete Array prototype layout.
 
 use super::super::*;
-use super::IntrinsicPropertyLayoutId;
-use super::{IntrinsicInstall, IntrinsicKey};
-use crate::objects::{AccessorDescriptor, AccessorGetter};
+use crate::functions::RealmFunctionMaterializationContext;
 
 impl FunctionBuilder<'_> {
-    pub(crate) fn install_array_constructor_intrinsics(
+    pub(crate) fn emit_initialize_array_canonical_callables(
         &mut self,
-        context: &IntrinsicInstall<'_>,
+        realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_install_intrinsic_methods(
-            context.constructor,
-            crate::intrinsics::IntrinsicMethodPlan::ArrayConstructor,
-            context.realm,
-            function,
-        )?;
-        self.emit_install_intrinsic_accessor(
-            context.constructor,
-            IntrinsicKey::Symbol(scriptw_ir::WellKnownSymbol::Species),
-            AccessorDescriptor::Getter(AccessorGetter::new(StandardBuiltinId::ArraySpeciesGetter)),
-            context.realm,
-            true,
-            function,
-        )?;
-        // Internal consumers read these canonical Realm slots before any public
-        // property observation. Their identities remain eager, without descriptors.
+        // Internal consumers require these identities before public observation.
         for builtin in [
             StandardBuiltinId::TypedArrayPrototypeToString,
             StandardBuiltinId::ArrayPrototypeValues,
         ] {
-            let callable = self.emit_intrinsic_callable(builtin, context.realm, function)?;
+            let callable = self.emit_intrinsic_callable(builtin, realm, function)?;
             callable.clear(function);
         }
-        let schema = self.runtime_schema();
-        let prototype = schema.reserve_gc_local(function).initialize(
-            self.emit_object_header_projection(context.prototype, function),
-            function,
-        );
-        self.emit_install_intrinsic_property_layout(
-            &prototype,
-            IntrinsicPropertyLayoutId::ArrayPrototype,
-            context.realm.realm(),
-            function,
-        )?;
-        prototype.clear(function);
         Ok(())
     }
 }
