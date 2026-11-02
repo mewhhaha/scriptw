@@ -822,17 +822,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let stored = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(PropertyDescriptorSchema::VALUE)
-                .read(&descriptor, schema, f)
-                .reference(),
-            f,
-        );
-        self.emit_property_value_into(&stored, output, f);
+        self.emit_descriptor_data_value_into(&descriptor, output, f);
         f.instruction(&Instruction::I32Const(1));
         found.store(f);
-        stored.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(flags, f);

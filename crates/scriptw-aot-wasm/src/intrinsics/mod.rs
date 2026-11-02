@@ -183,12 +183,15 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let value = schema.reserve_value_local(function);
         value.set_undefined(function);
-        if builtin == StandardBuiltinId::DateConstructor {
-            // The demand gate either publishes the canonical constructor or
-            // traps; no independent, incomplete constructor fallback exists.
+        let slot = crate::module::standard_builtin_function_realm_slot(builtin);
+        if builtin == StandardBuiltinId::DateConstructor
+            || slot.is_some_and(|slot| slot.is_regexp())
+        {
+            // The demand gate either publishes the canonical callable or
+            // traps; no independent, incomplete family fallback exists.
             self.emit_load_non_array_realm_intrinsic(
                 realm.realm(),
-                crate::functions::NonArrayRealmIntrinsicSlot::DateConstructor,
+                slot.expect("demanded native callable has a canonical Realm slot"),
                 &value,
                 function,
             );
@@ -199,7 +202,6 @@ impl FunctionBuilder<'_> {
             value.clear(function);
             return Ok(callable);
         }
-        let slot = crate::module::standard_builtin_function_realm_slot(builtin);
         if let Some(slot) = slot {
             if slot.is_temporal() || slot.is_intl() || slot.is_binary_data() || slot.is_error() {
                 self.emit_load_non_array_realm_intrinsic(realm.realm(), slot, &value, function);

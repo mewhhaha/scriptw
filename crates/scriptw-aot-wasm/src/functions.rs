@@ -376,6 +376,17 @@ impl NonArrayRealmIntrinsicSlot {
         matches!(self, Self::DateConstructor | Self::DatePrototype)
     }
 
+    pub(crate) const fn is_regexp(self) -> bool {
+        matches!(
+            self,
+            Self::RegExpConstructor
+                | Self::RegExpPrototype
+                | Self::RegExpPrototypeSymbolMatch
+                | Self::RegExpPrototypeSymbolMatchAll
+                | Self::RegExpPrototypeSymbolSearch
+        )
+    }
+
     pub(crate) const fn is_error(self) -> bool {
         matches!(
             self,
@@ -758,6 +769,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::constant(crate::heap::BinaryDataInitializationState::Dormant),
                 GcOperand::constant(crate::heap::ErrorInitializationState::Dormant),
                 GcOperand::constant(crate::heap::DateInitializationState::Dormant),
+                GcOperand::constant(crate::heap::RegExpInitializationState::Dormant),
             ),
             function,
         );

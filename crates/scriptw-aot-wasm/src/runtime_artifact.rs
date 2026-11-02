@@ -83,7 +83,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 42 adds defining-Realm Date demand initialization, its state,
 // constructor recipe and typed ensure helper.
 // Version 43 adds complete intrinsic recipe storage and its observed-value cache.
-const LAYOUT_VERSION: u32 = 43;
+// Version 44 adds defining-Realm RegExp demand initialization, its state,
+// constructor recipe and typed ensure helper.
+const LAYOUT_VERSION: u32 = 44;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

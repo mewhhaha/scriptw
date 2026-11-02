@@ -11,11 +11,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 - Every-case V8/Scriptc execution and RSS parity remains open. The
   [gap diagnosis](performance-gaps-20261101.json) separates reference cohorts,
   actual five-case LLVM/final-Wasm differences and limited worker-IP samples.
-  Complete shared intrinsic layouts pass the fresh 480-process A/A and 30-case
-  regression screens. The separate precompiled reference wins 6/17 cases;
-  its median geometric mean remains 1.082–1.084× Scriptc. Validate the isolated
-  RegExp demand family next, then remove remaining eager intrinsic dictionaries
-  at object allocation, including constructor headers/statics. Canonical reads
+  Shared layouts, RegExp demand and observed-value reuse pass the fresh
+  480-process A/A, 30-case screen and seven-case RegExp controls. The latest
+  precompiled reference wins 6/17 cases with median geometric means
+  0.972–0.979× Scriptc; mixed joins remain 2.5–2.7× slower. Remove remaining
+  eager dictionaries at object allocation, including constructor headers/statics. Canonical reads
   must distinguish ready slots from demand-owned slots before extending recipes.
   Profile current lookup paths before adding prototype-cache invalidation.
   Preserve failed historical controls and keep the primitive-append region parked.

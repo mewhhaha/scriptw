@@ -1,7 +1,7 @@
 {
   "schema": "scriptw-performance-gap-diagnosis-v2",
   "date": "2026-11-02",
-  "status": "Qualified local precompiled intrinsic-layout improvement with passing fresh A/A and 30-case screen; six of17 Scriptc wins, every-case parity open. Historical controls remain distinct.",
+  "status": "Qualified intrinsic-layout and RegExp/observed-data improvements. Latest precompiled17median geometric means0.972-0.979x pinnedScriptc, six individual wins; every-case parity remains open. Rejected hot-read regression retained.",
   "overall_v8_scriptc_parity": "open",
   "history": {
     "previous_committed_checkpoint": {
@@ -1962,5 +1962,650 @@
       "excluded": "Native/Wasm images, executables, caches and separate unbuilt RegExp worktree."
     },
     "publication_source_boundary": "Benchmark event includes complete42-path pre-build source and patch. Publication changes README/current inventory, this report and inert evidence only; all40 Rust source files retain exact measured hashes. Commit identity is later and is not substituted into frozen products."
+  },
+  "regexp_demand_intermediate": {
+    "status": "not_promoted_hot_global_read_regression",
+    "source_fingerprint": "6c66b199655c97f022332b369c7e8ae8bc26647d773dfab24002e54c7ffcf9a8",
+    "baseline_source_fingerprint": "5356de3d64998996d0accb47084fee47591ac0211fec384792ff0ba55c6bf08b",
+    "source_event": {
+      "path": "source-event-benchmark.json",
+      "sha256": "d0c79b88c93bc6e88197570ebe3a45c438d7c121bd30514761b0a2fb1b0f8ab1"
+    },
+    "source_patch": {
+      "path": "source-benchmark.patch",
+      "sha256": "da3dac59370289dd2ca93b553f604ff89eb4ada789c15d7c77c2ff4f3120cc41"
+    },
+    "mechanism": "Defining-Realm five-slot RegExp Dormant/Building/Ready owner; deferred ordinary global data recipe. Matcher, legacy state and StringIterator prototype retained.",
+    "native_selected_unique": 1794,
+    "native": {
+      "path": "native-qualified.json",
+      "sha256": "9bb6f66950d53bbc13f2e8ed4866aec12f45c24b9e8ab17dc342e55ef7c8c727"
+    },
+    "pinned_test262_subset": {
+      "files": 24,
+      "variants": 48,
+      "passed": 48,
+      "unsupported": 0,
+      "snapshot": {
+        "path": "test262-legacy/regexp-demand-1661747735578188717.json",
+        "sha256": "0418872eb0fc49e71db08a25425f207c9c5d3d90a107f410e98c0ee6e7843491"
+      },
+      "pinned_revisions": {
+        "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+        "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+      },
+      "scope": "Real legacy-accessor subset only; not full Test262."
+    },
+    "aa": {
+      "processes": 480,
+      "gate": "pass",
+      "flags": [],
+      "evidence": {
+        "path": "paired/aa-candidate/analysis.json",
+        "sha256": "cd79a9065965419b872e32ef5e7dba1203f06b1bea481092cd0e34c8a45220c9"
+      }
+    },
+    "screen": {
+      "processes": 480,
+      "cases": 30,
+      "regression_flags": [],
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.9080465100651101,
+            "mean": 0.9146995238341273
+          },
+          "worker_cpu_ns": {
+            "median": 0.9040292443057906,
+            "mean": 0.9111962524156139
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.9132788840548185,
+            "mean": 0.9076397520251223
+          },
+          "worker_cpu_ns": {
+            "median": 0.9086646743478505,
+            "mean": 0.9031444616687542
+          }
+        }
+      ],
+      "evidence": {
+        "path": "paired/screen-candidate/analysis.json",
+        "sha256": "526abb710af74f56664f62757b5b58dad0b481331d8e1a06c7688cf793a991c5"
+      },
+      "observations": "Large joins and retained objects slightly slower; several proxy/accessor controls flat/slower; objects mean+5.6% in block1. All observations retained; no repeated main30 veto."
+    },
+    "original17_reference": {
+      "baseline_wins": [
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-small-1024.js"
+      ],
+      "candidate_wins": [
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-small-1024.js"
+      ],
+      "baseline_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 1.074648313012266,
+            "mean": 1.1081173708038348
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 1.0896687366377884,
+            "mean": 1.0854550312677418
+          }
+        }
+      ],
+      "candidate_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 0.984189747521374,
+            "mean": 0.9991899558547008
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 0.9850153613341032,
+            "mean": 1.000993619628936
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "path": "paired/reference-baseline/analysis.json",
+          "sha256": "f70e1486d6dc01b9ded807b74e73d6c0969195a78ce4007032573c39c3fe2f7b"
+        },
+        {
+          "path": "paired/reference-candidate/analysis.json",
+          "sha256": "3f5b6ee9a305751d6768a0cf69180976f204c684386b98f8a625e74d9325fd12"
+        }
+      ],
+      "interpretation": "Median geometric mean within about2% of Scriptc; mean geometric means straddle1.0. Six of17 individual wins; every-case parity remains open. Different Scriptw/WASI setup/stdio boundaries; compare wall only, no V8/ordinary refresh."
+    },
+    "instruction_ratios": {
+      "integer.js": [
+        0.8258149822347433,
+        0.825804434602822
+      ],
+      "numeric-loop-10000.js": [
+        0.823709168928978,
+        0.8261748545826816
+      ],
+      "sort-reverse-128.js": [
+        0.8950531270246882,
+        0.8950470144464063
+      ],
+      "join-4096.js": [
+        0.9957756381784547,
+        0.9957749911186042
+      ],
+      "join-mixed-1024.js": [
+        0.9785998529666433,
+        0.9785852609575753
+      ],
+      "first-row-proxy.js": [
+        0.9928175565549122,
+        0.9928137235251993
+      ]
+    },
+    "counter_evidence": {
+      "path": "entry-counts/analysis.json",
+      "sha256": "d8775cb0f2e6d1d2d309fc841aaa9d886f4409a60382dfd7fdc6e60a85176a41"
+    },
+    "extra_regexp_controls": {
+      "separate_from_original30_and17": true,
+      "cases": 7,
+      "aa_processes": 112,
+      "screen_processes": 112,
+      "aa_gate": "pass",
+      "repeated_regression_flags": [
+        {
+          "case": "repeated-global-read-10000.js",
+          "metric": "wall_ns"
+        },
+        {
+          "case": "repeated-global-read-10000.js",
+          "metric": "worker_cpu_ns"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "regexp-controls/aa/analysis.json",
+          "sha256": "9c4d4924d9a40e5946cc56e8e009de01ede7b4e9bc7dba33b8ad50bd34ecc135"
+        },
+        {
+          "path": "regexp-controls/screen/analysis.json",
+          "sha256": "3689c06056c0bfc41896a3a44542f54352fc2d27454c6b98f77aa27a5c3d734f"
+        }
+      ],
+      "scope": "Fresh-entry initialization remains inside. Repeated1000matches/10000globalreads reuse within entry; no retained-API timing claim.",
+      "hot_global_read": {
+        "wall_ns": {
+          "median": [
+            1.1253422754147286,
+            1.1306984585801112
+          ],
+          "mean": [
+            1.093409080080786,
+            1.19033623637976
+          ]
+        },
+        "worker_cpu_ns": {
+          "median": [
+            1.1237067160962841,
+            1.1325242363966923
+          ],
+          "mean": [
+            1.0949817218385798,
+            1.1913498186656022
+          ]
+        }
+      }
+    },
+    "decision": "Do not push this measured prototype unchanged. After first observation, reuse existing DATA descriptor.VALUE/intrinsic group cache to retain canonical StoredValue and remove recurring recipe/Ready-gate work. New complete source epoch is measured separately.",
+    "next_proposal": {
+      "path": "astra-property-value-writeback-proposal.json",
+      "sha256": "532807c74af7fd48cc69d9863ed978730d120ceedcd62624e948d92ab1788da7"
+    },
+    "limits": [
+      "1794 selected native checks, not full workspace.",
+      "Two new test-only probe errors were corrected and retained; full latest602backend tests pass.",
+      "Historical14Intl source identity failures reproduce unchanged in clean6158 baseline; unrelated source inputs unchanged.",
+      "Old failed calibration cohorts are not rewritten by fresh passing controls."
+    ],
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-regexp-demand-20261102-inert.tar.xz",
+      "sha256": "03ae1bcf5d96386168da8345d266829ae1c3d5a9572e610a19ece72fd441a0e8",
+      "bytes": 6727172,
+      "regular_utf8_members": 6205,
+      "expanded_utf8_bytes": 394178575,
+      "verification": "Every safe regular UTF-8 member streamed and checked against INDEX.json size/SHA256 after creation. Native/Wasm images, binaries, caches and worktrees excluded."
+    }
+  },
+  "observed_data_values": {
+    "status": "qualified_local_precompiled_improvement",
+    "source_fingerprint": "2f7e69f939edd788b7b9b0bb9c54644d60d96a4906fd2f667fa60bbd4e2c8a4e",
+    "baseline_source_fingerprint": "5356de3d64998996d0accb47084fee47591ac0211fec384792ff0ba55c6bf08b",
+    "source_event": {
+      "path": "source-event-benchmark.json",
+      "sha256": "bbe4f85bc92961ce28b880e426e17e8cc55fd5a369902b7b3feac704eeb09b8f"
+    },
+    "source_patch": {
+      "path": "source-benchmark.patch",
+      "sha256": "b27f12d0053357957f1142eefa377d1c667922f3696632dfe0cbc778d46c8a82"
+    },
+    "mechanism": "RegExp five-slot defining-Realm demand initialization plus actual DATA-observation writeback of exact canonical StoredValue into existing descriptor.VALUE/intrinsic group cache; StoredValue fast path unchanged. No new heap/type/helper/ABI for writeback; inherited RegExp ABI44.",
+    "native_selected_unique": 1799,
+    "native": {
+      "path": "native-qualified.json",
+      "sha256": "405546c72b6acc68e81fac40999b670a32a80d7df62621fed1726f9d53ce6c3f"
+    },
+    "pinned_test262_subset": {
+      "files": 24,
+      "variants": 48,
+      "passed": 48,
+      "unsupported": 0,
+      "snapshot": {
+        "path": "test262-legacy/property-value-writeback-1661747735578188717.json",
+        "sha256": "ab8efdb5458449ba95b52cf9c00e101a71a915e54d34ff6a6d3d1d013c4fd18c"
+      },
+      "pinned_revisions": {
+        "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+        "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+      },
+      "scope": "Real legacy-accessor subset, not full Test262."
+    },
+    "aa": {
+      "processes": 480,
+      "gate": "pass",
+      "flags": [],
+      "evidence": {
+        "path": "paired/aa-candidate/analysis.json",
+        "sha256": "30ddcee5e1d35de9bf00d6b9ff1c269e932430e717be1796ef810d4a6e167d79"
+      }
+    },
+    "screen": {
+      "processes": 480,
+      "cases": 30,
+      "regression_flags": [],
+      "geomeans": [
+        {
+          "block": 0,
+          "wall_ns": {
+            "median": 0.9013195722006413,
+            "mean": 0.9065741316369269
+          },
+          "worker_cpu_ns": {
+            "median": 0.8964239108520546,
+            "mean": 0.9015611817243522
+          }
+        },
+        {
+          "block": 1,
+          "wall_ns": {
+            "median": 0.9040724207470382,
+            "mean": 0.905036096143312
+          },
+          "worker_cpu_ns": {
+            "median": 0.8987777448344839,
+            "mean": 0.9005024759329588
+          }
+        }
+      ],
+      "evidence": {
+        "path": "paired/screen-candidate/analysis.json",
+        "sha256": "0aa496fe9cc996b938e301a48831cd3f99586df30dc16d0797afcd2c70f30f76"
+      },
+      "notes": "Retained-object, first-accessor and some row/proxy observations are slightly slower; full raw medians/means remain in archive."
+    },
+    "original17_reference": {
+      "baseline_wins": [
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-small-1024.js"
+      ],
+      "candidate_wins": [
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-small-1024.js"
+      ],
+      "baseline_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 1.0781796701171442,
+            "mean": 1.0794496051743179
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 1.07287112718587,
+            "mean": 1.0786121057115157
+          }
+        }
+      ],
+      "candidate_geomeans": [
+        {
+          "block": 0,
+          "wall_ratio": {
+            "median": 0.9792180017664445,
+            "mean": 0.9792070700037981
+          }
+        },
+        {
+          "block": 1,
+          "wall_ratio": {
+            "median": 0.9717014145424212,
+            "mean": 0.9613208536835782
+          }
+        }
+      ],
+      "cases": {
+        "sort-reverse-128.js": {
+          "median": [
+            1.4861742837166292,
+            1.4435872675250359
+          ],
+          "mean": [
+            1.4819944676844525,
+            1.4154553511938759
+          ]
+        },
+        "sort-reverse-512.js": {
+          "median": [
+            1.0934240878764245,
+            1.0697376951772968
+          ],
+          "mean": [
+            1.0918443523963597,
+            1.0503297085626064
+          ]
+        },
+        "sort-sorted-512.js": {
+          "median": [
+            1.0690755443103825,
+            1.0712393168001657
+          ],
+          "mean": [
+            1.0595751769165174,
+            1.06210088803643
+          ]
+        },
+        "to-sorted-512.js": {
+          "median": [
+            1.01133222293539,
+            0.9927933121937158
+          ],
+          "mean": [
+            1.0178961491776701,
+            0.989707753547354
+          ]
+        },
+        "join-1024.js": {
+          "median": [
+            1.5716053167226622,
+            1.539205065443863
+          ],
+          "mean": [
+            1.5524811882828193,
+            1.4213398956296668
+          ]
+        },
+        "join-4096.js": {
+          "median": [
+            1.5928782988244357,
+            1.571973761932647
+          ],
+          "mean": [
+            1.5941934902293413,
+            1.5048225783983278
+          ]
+        },
+        "join-mixed-1024.js": {
+          "median": [
+            2.7194850473562533,
+            2.5123343563643252
+          ],
+          "mean": [
+            2.7256893876421158,
+            2.566637086469082
+          ]
+        },
+        "numeric-loop-10000.js": {
+          "median": [
+            1.4270971648307291,
+            1.4139787587318118
+          ],
+          "mean": [
+            1.4271838322649713,
+            1.4429261023621562
+          ]
+        },
+        "numeric-loop-50000.js": {
+          "median": [
+            0.7223313473466294,
+            0.7189017517617688
+          ],
+          "mean": [
+            0.7272617891709838,
+            0.723149850217865
+          ]
+        },
+        "folded-string-4096.js": {
+          "median": [
+            0.297787971781371,
+            0.2914127976426534
+          ],
+          "mean": [
+            0.29800390087162987,
+            0.2966324838494057
+          ]
+        },
+        "dynamic-string-4096.js": {
+          "median": [
+            1.2858117241683968,
+            1.2681992586541873
+          ],
+          "mean": [
+            1.2833225862015845,
+            1.21630264083222
+          ]
+        },
+        "integer.js": {
+          "median": [
+            1.8785945308209193,
+            1.976949113285712
+          ],
+          "mean": [
+            1.8728693890234454,
+            1.9709352917509304
+          ]
+        },
+        "objects.js": {
+          "median": [
+            0.6680636890576623,
+            0.6811927268624457
+          ],
+          "mean": [
+            0.667158696825225,
+            0.6695077517153428
+          ]
+        },
+        "retained-objects.js": {
+          "median": [
+            0.25588283561519426,
+            0.26140599602168985
+          ],
+          "mean": [
+            0.25926745090941206,
+            0.26001394799513794
+          ]
+        },
+        "join-empty-1024.js": {
+          "median": [
+            0.4990361750437748,
+            0.5066099318552912
+          ],
+          "mean": [
+            0.4965528506070662,
+            0.5049164733860809
+          ]
+        },
+        "join-singleton-1024.js": {
+          "median": [
+            1.1287133612485725,
+            1.1188889528303696
+          ],
+          "mean": [
+            1.1324027125736067,
+            1.1101790157058091
+          ]
+        },
+        "join-small-1024.js": {
+          "median": [
+            0.8193961553128014,
+            0.820206155746049
+          ],
+          "mean": [
+            0.8218667116000441,
+            0.8232845684859014
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "path": "paired/reference-baseline/analysis.json",
+          "sha256": "dced9523105fa8eda39aa77e94915f39c0a6be52f62d76cfe4449370004dc9f2"
+        },
+        {
+          "path": "paired/reference-candidate/analysis.json",
+          "sha256": "5adae2dd18373712f103d7e99525f0358fa74ddee5204f751184783377506e5c"
+        }
+      ],
+      "interpretation": "Median geometric means0.972-0.979x pinnedScriptc; mean geometric means0.961-0.979x. Six of17 individual wins; every-case parity remains open. Different Scriptw/WASI setup/stdio boundaries; compare wall only. No V8/ordinary refresh; no universal JS score or statistical-significance claim."
+    },
+    "instruction_ratios": {
+      "integer.js": [
+        0.8257469999745239,
+        0.825791844456603
+      ],
+      "numeric-loop-10000.js": [
+        0.8238572967481455,
+        0.823854752003601
+      ],
+      "sort-reverse-128.js": [
+        0.8807935298506278,
+        0.8807779940165703
+      ],
+      "join-4096.js": [
+        0.9614470371421273,
+        0.9614468466598002
+      ],
+      "join-mixed-1024.js": [
+        0.9519846368137066,
+        0.9520048582601986
+      ],
+      "first-row-proxy.js": [
+        0.989913196890799,
+        0.9899176074644344
+      ]
+    },
+    "counter_evidence": {
+      "path": "entry-counts/analysis.json",
+      "sha256": "93577014745408c14de12fbc99e5be5338a3022255b0f246e88a55c3c7cee231"
+    },
+    "runtime_delta": {
+      "path": "runtime-delta.json",
+      "sha256": "e6bfd4d66e6a8cbde61769499235915c507faf7db8d4b8b691181792cc98c023"
+    },
+    "extra_regexp_controls": {
+      "separate_from_original30_and17": true,
+      "cases": 7,
+      "aa_processes": 112,
+      "screen_processes": 112,
+      "aa_gate": "pass",
+      "repeated_regression_flags": [],
+      "evidence": [
+        {
+          "path": "regexp-controls/aa/analysis.json",
+          "sha256": "61ff0c3ebc91254efaac5933a91e418a2fb42d17097a1e90a254d9bd0e3d98e0"
+        },
+        {
+          "path": "regexp-controls/screen/analysis.json",
+          "sha256": "a751be5dd7768350c2a5ad952ea6883c75ee9edbe9fdeb792b0bf16d7892c415"
+        }
+      ],
+      "scope": "Fresh entry including first demand; repeated1000matches/10000globalreads reuse within entry, not retained-API timing.",
+      "outliers": "Hot-read mean in block1 is+4.95% while its median/CPU medians improve; no repeated regression veto. First constructor/repeated-test observations about0-2%slower are retained.",
+      "hot_global_read": {
+        "wall_ns": {
+          "median": [
+            0.9622937640908429,
+            0.9569654371911949
+          ],
+          "mean": [
+            0.9636937606992009,
+            1.049508892050873
+          ]
+        },
+        "worker_cpu_ns": {
+          "median": [
+            0.962046110673826,
+            0.9592609202854997
+          ],
+          "mean": [
+            0.963078577863989,
+            1.050278423058661
+          ]
+        }
+      }
+    },
+    "rejected_intermediate": {
+      "source_fingerprint": "6c66b199655c97f022332b369c7e8ae8bc26647d773dfab24002e54c7ffcf9a8",
+      "reason": "Passing main30screen concealed12-13% repeated-global-read regression; seven additional controls caught it. Preserve complete intermediate cohort and corrected epoch separately.",
+      "evidence": "target/performance-regexp-demand-20261102/cohort-summary.json"
+    },
+    "limits": [
+      "1799selected native checks; no full workspace/Test262 claim.",
+      "Original earlier failed A/A cohorts remain failed; fresh passing calibrations do not rewrite history.",
+      "Historical14Intl source identities reproduce unchanged at clean6158; unrelated source inputs unchanged.",
+      "Both raw/native R profiles and all30 P files may change; no byte-invariance claim. Ordinary CLI/V8 performance remains its own earlier cohort.",
+      "The comparison measures fresh-Realm execution in a shared precompiled Wasmtime47host, not end-to-end CLI/compiler time."
+    ],
+    "evidence": {
+      "archive": "docs/rust-rewrite/performance-property-value-writeback-20261102-inert.tar.xz",
+      "sha256": "e8a75fe056958f8dc42ac693c7472e8b108bc5c94a18c87381b6b0cd4a417afd",
+      "bytes": 6335292,
+      "regular_utf8_members": 6187,
+      "expanded_utf8_bytes": 305720463,
+      "verification": "Every safe regular UTF-8 member streamed and checked against INDEX.json size/SHA256 after creation. Native/Wasm images, binaries, caches and worktrees excluded."
+    },
+    "publication_source_boundary": "Complete26-path pre-build source and patch are retained. Publication changes README/current inventory, this report and inert archives only. All24 Rust source hashes retain exact measured bytes; later Git identity is not substituted into frozen products.",
+    "next_hill": "Remove remaining eager intrinsic dictionaries at allocation, including constructor headers/statics. Distinguish ready canonical slots from demand-owned slots before extending recipes; profile current lookup before adding invalidation machinery."
   }
 }

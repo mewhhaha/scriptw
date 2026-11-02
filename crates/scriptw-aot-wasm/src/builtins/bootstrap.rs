@@ -13,6 +13,8 @@ mod error_initialization;
 pub(crate) use error_initialization::ErrorIntrinsicBuild;
 mod date_initialization;
 pub(crate) use date_initialization::DateIntrinsicBuild;
+mod regexp_initialization;
+pub(crate) use regexp_initialization::RegExpIntrinsicBuild;
 mod binary_data_initialization;
 pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod intl_initialization;
@@ -130,6 +132,183 @@ impl<'a> FunctionBuilder<'a> {
     // Lazy-family builders pass completed parents explicitly. An ordinary
     // canonical parent read here would reenter their Building state.
     fn init_builtin_constructor_object_with_parent(
+        &mut self,
+        builtin: StandardBuiltinId,
+        realm: &RealmFunctionMaterializationContext,
+        prototype: &ValueLocals,
+        parent: Option<&ValueLocals>,
+        function: &mut Function,
+    ) -> Result<GcLocal<FunctionObject>, EmitError> {
+        if builtin == StandardBuiltinId::RegExpConstructor {
+            return Err(EmitError::unsupported(
+                "RegExp family installation requires its build capability",
+            ));
+        }
+        let constructor = self.emit_builtin_constructor_shell_with_parent(
+            builtin, realm, prototype, parent, function,
+        )?;
+        let schema = self.runtime_schema();
+        let constructor_value = schema.reserve_value_local(function);
+        constructor_value.set_reference(&constructor, schema, function);
+        let intrinsic_context = IntrinsicInstall {
+            builtin,
+            realm,
+            constructor: &constructor_value,
+            prototype,
+        };
+        match builtin.intrinsic_installer() {
+            StandardBuiltinInstaller::None => {}
+            StandardBuiltinInstaller::ShadowRealm => {
+                self.install_shadow_realm_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Function => {
+                self.install_function_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Promise => {
+                self.install_promise_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Map => {
+                self.install_map_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::WeakMap => {
+                self.install_weak_map_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::WeakSet => {
+                self.install_weak_set_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::WeakRef => {
+                self.install_weak_ref_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::FinalizationRegistry => self
+                .install_finalization_registry_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::AsyncDisposableStack => self
+                .install_async_disposable_stack_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::DisposableStack => {
+                self.install_disposable_stack_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Set => {
+                self.install_set_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Object => {
+                self.install_object_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Proxy => {
+                self.install_proxy_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::RegExp => {
+                return Err(EmitError::unsupported(
+                    "RegExp family installation requires its build capability",
+                ));
+            }
+            StandardBuiltinInstaller::Iterator => {
+                self.install_iterator_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Array => {
+                self.install_array_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::String => {
+                self.install_string_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::ArrayBuffer => {
+                self.install_array_buffer_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::DataView => {
+                self.install_data_view_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Uint8Array => {
+                self.install_uint8_array_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::TemporalInstant => {
+                self.install_temporal_instant_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::TemporalZonedDateTime => self
+                .install_temporal_zoned_date_time_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::TemporalPlainDate => self
+                .install_temporal_plain_date_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::TemporalDuration => {
+                self.install_temporal_duration_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::TemporalPlainTime => self
+                .install_temporal_plain_time_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::TemporalPlainDateTime => self
+                .install_temporal_plain_date_time_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::TemporalPlainYearMonth => self
+                .install_temporal_plain_year_month_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::TemporalPlainMonthDay => self
+                .install_temporal_plain_month_day_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::IntlLocale => {
+                self.install_intl_locale_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::IntlDateTimeFormat => self
+                .install_intl_date_time_format_constructor_intrinsics(
+                    &intrinsic_context,
+                    function,
+                )?,
+            StandardBuiltinInstaller::IntlNumberFormat => self
+                .install_intl_number_format_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::IntlPluralRules => {
+                self.install_intl_plural_rules_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::IntlListFormat => {
+                self.install_intl_list_format_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::IntlCollator => {
+                self.install_intl_collator_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::IntlDisplayNames => self
+                .install_intl_display_names_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::IntlRelativeTimeFormat => self
+                .install_intl_relative_time_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::IntlSegmenter => {
+                self.install_intl_segmenter_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::IntlDurationFormat => self
+                .install_intl_durationformat_constructor_intrinsics(&intrinsic_context, function)?,
+            StandardBuiltinInstaller::Date => {
+                self.install_date_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Error => {
+                self.install_error_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::BigInt => {
+                self.install_big_int_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Symbol => {
+                self.install_symbol_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Number => {
+                self.install_number_constructor_intrinsics(&intrinsic_context, function)?
+            }
+            StandardBuiltinInstaller::Boolean => {
+                self.install_boolean_constructor_intrinsics(&intrinsic_context, function)?
+            }
+        }
+
+        constructor_value.clear(function);
+        Ok(constructor)
+    }
+
+    // Build and root the canonical constructor/prototype cycle without invoking
+    // a family installer. Lazy families supply their own installation capability.
+    fn emit_builtin_constructor_shell_with_parent(
         &mut self,
         builtin: StandardBuiltinId,
         realm: &RealmFunctionMaterializationContext,
@@ -255,156 +434,6 @@ impl<'a> FunctionBuilder<'a> {
             &constructor_value,
             function,
         );
-        let intrinsic_context = IntrinsicInstall {
-            builtin,
-            realm,
-            constructor: &constructor_value,
-            prototype,
-        };
-        match builtin.intrinsic_installer() {
-            StandardBuiltinInstaller::None => {}
-            StandardBuiltinInstaller::ShadowRealm => {
-                self.install_shadow_realm_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Function => {
-                self.install_function_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Promise => {
-                self.install_promise_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Map => {
-                self.install_map_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakMap => {
-                self.install_weak_map_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakSet => {
-                self.install_weak_set_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::WeakRef => {
-                self.install_weak_ref_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::FinalizationRegistry => self
-                .install_finalization_registry_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::AsyncDisposableStack => self
-                .install_async_disposable_stack_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::DisposableStack => {
-                self.install_disposable_stack_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Set => {
-                self.install_set_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Object => {
-                self.install_object_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Proxy => {
-                self.install_proxy_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::RegExp => {
-                self.install_regexp_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Iterator => {
-                self.install_iterator_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Array => {
-                self.install_array_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::String => {
-                self.install_string_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::ArrayBuffer => {
-                self.install_array_buffer_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::DataView => {
-                self.install_data_view_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Uint8Array => {
-                self.install_uint8_array_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::TemporalInstant => {
-                self.install_temporal_instant_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::TemporalZonedDateTime => self
-                .install_temporal_zoned_date_time_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::TemporalPlainDate => self
-                .install_temporal_plain_date_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::TemporalDuration => {
-                self.install_temporal_duration_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::TemporalPlainTime => self
-                .install_temporal_plain_time_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::TemporalPlainDateTime => self
-                .install_temporal_plain_date_time_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::TemporalPlainYearMonth => self
-                .install_temporal_plain_year_month_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::TemporalPlainMonthDay => self
-                .install_temporal_plain_month_day_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::IntlLocale => {
-                self.install_intl_locale_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::IntlDateTimeFormat => self
-                .install_intl_date_time_format_constructor_intrinsics(
-                    &intrinsic_context,
-                    function,
-                )?,
-            StandardBuiltinInstaller::IntlNumberFormat => self
-                .install_intl_number_format_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::IntlPluralRules => {
-                self.install_intl_plural_rules_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::IntlListFormat => {
-                self.install_intl_list_format_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::IntlCollator => {
-                self.install_intl_collator_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::IntlDisplayNames => self
-                .install_intl_display_names_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::IntlRelativeTimeFormat => self
-                .install_intl_relative_time_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::IntlSegmenter => {
-                self.install_intl_segmenter_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::IntlDurationFormat => self
-                .install_intl_durationformat_constructor_intrinsics(&intrinsic_context, function)?,
-            StandardBuiltinInstaller::Date => {
-                self.install_date_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Error => {
-                self.install_error_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::BigInt => {
-                self.install_big_int_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Symbol => {
-                self.install_symbol_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Number => {
-                self.install_number_constructor_intrinsics(&intrinsic_context, function)?
-            }
-            StandardBuiltinInstaller::Boolean => {
-                self.install_boolean_constructor_intrinsics(&intrinsic_context, function)?
-            }
-        }
-
         header.clear(function);
         constructor_value.clear(function);
         Ok(constructor)
@@ -1048,7 +1077,6 @@ impl<'a> FunctionBuilder<'a> {
             NonArrayRealmIntrinsicSlot::SetPrototype,
             NonArrayRealmIntrinsicSlot::SymbolPrototype,
             NonArrayRealmIntrinsicSlot::BigIntPrototype,
-            NonArrayRealmIntrinsicSlot::RegExpPrototype,
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
         }
@@ -1152,17 +1180,6 @@ impl<'a> FunctionBuilder<'a> {
             array.clear(function);
         }
         self.emit_bootstrap_iterator_prototypes(&context, function)?;
-        if self
-            .runtime_bootstrap_plan
-            .should_initialize_standard_builtin(StandardBuiltinId::RegExpConstructor)
-        {
-            self.emit_bootstrap_constructor_from_slot(
-                StandardBuiltinId::RegExpConstructor,
-                &context,
-                NonArrayRealmIntrinsicSlot::RegExpPrototype,
-                function,
-            )?;
-        }
         for (builtin, slot) in [
             (
                 StandardBuiltinId::NumberConstructor,
@@ -1531,6 +1548,15 @@ impl<'a> FunctionBuilder<'a> {
                     continue;
                 }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
+                    if *builtin == StandardBuiltinId::RegExpConstructor {
+                        self.emit_install_deferred_regexp_constructor(
+                            &object,
+                            &binding.name,
+                            &bootstrap.realm,
+                            function,
+                        )?;
+                        continue;
+                    }
                     if *builtin == StandardBuiltinId::DateConstructor {
                         self.emit_install_deferred_date_constructor(
                             &object,

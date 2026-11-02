@@ -468,6 +468,7 @@ enum_i32_codec!(crate::heap::TemporalInitializationState; Dormant => 0, Building
 enum_i32_codec!(crate::heap::IntlInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::ErrorInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::DateInitializationState; Dormant => 0, Building => 1, Ready => 2);
+enum_i32_codec!(crate::heap::RegExpInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::ErrorIntrinsicConstructor; Error => 0, EvalError => 1, AggregateError => 2, SuppressedError => 3, RangeError => 4, SyntaxError => 5, TypeError => 6, URIError => 7, ReferenceError => 8);
 enum_i32_codec!(crate::heap::BinaryDataInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::BinaryDataConstructor; ArrayBuffer => 0, SharedArrayBuffer => 1, DataView => 2, Float64Array => 3, Float32Array => 4, Float16Array => 5, Int32Array => 6, Int16Array => 7, Int8Array => 8, Uint32Array => 9, Uint16Array => 10, Uint8Array => 11, Uint8ClampedArray => 12, BigInt64Array => 13, BigUint64Array => 14);

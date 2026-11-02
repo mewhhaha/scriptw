@@ -11,7 +11,7 @@ mod boolean;
 mod bootstrap;
 pub(crate) use bootstrap::{
     created_realm_global_bindings, BinaryDataIntrinsicBuild, BootstrapRealm, DateIntrinsicBuild,
-    ErrorIntrinsicBuild, IntlIntrinsicBuild, TemporalIntrinsicBuild,
+    ErrorIntrinsicBuild, IntlIntrinsicBuild, RegExpIntrinsicBuild, TemporalIntrinsicBuild,
 };
 mod collections;
 mod data_view_access;

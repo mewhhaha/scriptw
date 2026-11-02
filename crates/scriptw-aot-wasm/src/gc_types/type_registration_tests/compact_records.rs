@@ -39,6 +39,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredDateConstructor>()
         .type_index()
         .raw();
+    let regexp_index = schema
+        .struct_type::<DeferredRegExpConstructor>()
+        .type_index()
+        .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
     let reference = |index, nullable| {
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
@@ -77,6 +81,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         binary_index,
         error_index,
         date_index,
+        regexp_index,
     ];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
@@ -144,7 +149,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         );
     }
 
-    for recipe_index in [temporal_index, intl_index, date_index] {
+    for recipe_index in [temporal_index, intl_index, date_index, regexp_index] {
         let CompositeInnerType::Struct(recipe) = &types[recipe_index as usize].composite_type.inner
         else {
             panic!("deferred family recipe must be a registered struct");
@@ -169,6 +174,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         RealmRecordSchema::BINARY_DATA_STATE.ordinal(),
         RealmRecordSchema::ERROR_STATE.ordinal(),
         RealmRecordSchema::DATE_STATE.ordinal(),
+        RealmRecordSchema::REGEXP_STATE.ordinal(),
     ] {
         let state = &realm.fields[field.raw() as usize];
         assert!(state.mutable);
@@ -298,11 +304,8 @@ fn date_recipe_and_realm_fit_the_actual_copying_collector_records() {
     let realm = collector_layout(schema.struct_type::<RealmRecord>().type_index().raw());
     assert_eq!(realm.size, 96);
     assert_eq!(realm.align, 16);
-    assert_eq!(realm.fields.len(), 17);
-    assert_eq!(
-        realm.fields[RealmRecordSchema::DATE_STATE.ordinal().raw() as usize].offset,
-        88,
-    );
+    assert_eq!(realm.fields.len(), 18);
+    assert_eq!(realm.fields.len(), RealmRecord::FIELD_COUNT as usize);
     assert_eq!(
         realm.fields.iter().filter(|field| field.is_gc_ref).count(),
         10

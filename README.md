@@ -25,8 +25,10 @@ Portable embedding API remains available; static compiler dependencies remain.
 Math, Reflect, JSON, Atomics and the Object, Array and String prototypes use
 complete immutable property layouts with per-Realm value identity. Reads
 materialize individual values; mutation converts the object to ordinary storage.
+Data-property reads retain the resolved value after first observation.
 Runtime initialization uses compact intrinsic-installation tables and defers
-the Error, Date, Temporal, Intl and binary-data intrinsic graphs until their first observable or internal use.
+the Error, Date, RegExp, Temporal, Intl and binary-data intrinsic graphs until
+their first observable or internal use.
 Each Realm retains its own canonical constructors, prototypes and descriptors.
 Immutable runtime String descriptors carry exact UTF-16 key hashes; separately
 created equal Strings retain the ordinary lazy hash path. Linked-module caching
@@ -121,15 +123,17 @@ It motivates work on fresh intrinsic dictionaries and property lookup. Literal-k
 cleanup reduces worker instruction counts about 0.9% on two join cases; timing
 remains unqualified, including slower large-join means.
 
-The [intrinsic-layout comparison](docs/rust-rewrite/performance-gaps-20261101.json)
-replaces eager property graphs with shared immutable layouts and per-Realm value
-caches. Across 30 unchanged workloads, execution median geometric means fall
-**13.8–13.9%** in both balanced orders; every case has lower medians and means.
-Its fresh 480-process identical-binary control passes. The separate original
-17-case precompiled comparison improves from **4/17 to 6/17 Scriptc wins**;
-the median geometric mean remains **1.082–1.084× Scriptc**. Every-case parity
-remains open, including mixed joins at about 2.8×. Peak RSS stays approximately
-flat and R grows; this does not refresh ordinary CLI or V8 results.
+The [intrinsic-layout and observed-value comparisons](docs/rust-rewrite/performance-gaps-20261101.json)
+remove eager property graphs and retain resolved data values at their owners.
+Across 30 unchanged workloads, separate source-bound batches lower execution
+median geometric means **13.8–13.9%**, then another **9.6–9.9%**.
+The latest original 17-case precompiled comparison records median geometric means
+**0.972–0.979× pinned Scriptc** and **6/17 individual wins**. Every-case parity
+remains open; mixed joins remain about **2.5–2.7× slower**. The fresh 480-process
+identical-binary control and separate 112-process RegExp control pass. A rejected
+prototype's 12–13% hot-read regression remains recorded; resolved-value reuse
+fixes it. Peak RSS and slower controls remain in the record. These results do
+not refresh ordinary CLI or V8 performance.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two

@@ -1179,6 +1179,7 @@ runtime_helper_domain! {
     RealmEnsureBinaryData / RealmEnsureBinaryDataArguments / RealmEnsureBinaryDataParameters / "realm_ensure_binary_data" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureErrors / RealmEnsureErrorsArguments / RealmEnsureErrorsParameters / "realm_ensure_errors" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureDate / RealmEnsureDateArguments / RealmEnsureDateParameters / "realm_ensure_date" { realm:(Ref RealmRecord NonNullable) } => Void;
+    RealmEnsureRegExp / RealmEnsureRegExpArguments / RealmEnsureRegExpParameters / "realm_ensure_regexp" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureIntl / RealmEnsureIntlArguments / RealmEnsureIntlParameters / "realm_ensure_intl" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     ArrayIteratorStepValue / ArrayIteratorStepValueArguments / ArrayIteratorStepValueParameters / "array_iterator_step_value" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ArrayIteratorElision / ArrayIteratorElisionArguments / ArrayIteratorElisionParameters / "array_iterator_elision" { iterator:(Ref IteratorRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1357,6 +1358,7 @@ impl RuntimeHelperId {
             Self::RealmEnsureBinaryData => HelperOwner::Runtime,
             Self::RealmEnsureErrors => HelperOwner::Runtime,
             Self::RealmEnsureDate => HelperOwner::Runtime,
+            Self::RealmEnsureRegExp => HelperOwner::Runtime,
             Self::RealmEnsureIntl => HelperOwner::Runtime,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision
@@ -1519,6 +1521,7 @@ impl RuntimeHelperId {
             Self::RealmEnsureBinaryData => true,
             Self::RealmEnsureErrors => true,
             Self::RealmEnsureDate => true,
+            Self::RealmEnsureRegExp => true,
             Self::RealmEnsureIntl => true,
             Self::ArrayIteratorStepValue
             | Self::ArrayIteratorElision

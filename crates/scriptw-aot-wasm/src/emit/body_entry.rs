@@ -109,6 +109,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RealmEnsureBinaryData
             | RuntimeHelperId::RealmEnsureErrors
             | RuntimeHelperId::RealmEnsureDate
+            | RuntimeHelperId::RealmEnsureRegExp
             | RuntimeHelperId::RealmEnsureIntl
             | RuntimeHelperId::FunctionCall
             | RuntimeHelperId::ProxyCall

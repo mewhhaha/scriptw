@@ -251,7 +251,7 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(f))
     }
 
-    pub(super) fn emit_intrinsic_property_value(
+    pub(crate) fn emit_intrinsic_property_value(
         &self,
         storage: &GcLocal<IntrinsicPropertyStorage>,
         index: I32Local,
@@ -329,10 +329,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let recipe = self.emit_intrinsic_property_value(storage, index, false, f)?;
-        self.emit_property_value_into(&recipe, output, f);
+        self.emit_intrinsic_data_value_into(storage, index, &row, output, f)?;
         found.set_constant(1, f);
-        recipe.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         row.clear(s, f);

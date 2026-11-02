@@ -11,12 +11,24 @@ use crate::gc_types::*;
 use crate::runtime_helpers::{
     DeferredIntrinsicInstallArguments, HelperParameters, IntrinsicDataPublishArguments,
     RealmEnsureIntlArguments, RealmEnsureTemporalArguments, RuntimeHelperId,
+    RuntimeHelperPropertyLayoutRow,
 };
 
 mod installation;
 mod installation_runs;
 mod materialization;
 use materialization::{MethodPlan, Selection};
+
+/// Only actual data observations retain an owner to normalize. Descriptor
+/// snapshots, promotion and accessor invocation results keep the unowned path.
+enum PropertyValueOwner<'a> {
+    None,
+    DescriptorValue(&'a GcLocal<PropertyDescriptor, Nullable>),
+    IntrinsicDataGroup {
+        storage: &'a GcLocal<IntrinsicPropertyStorage>,
+        row: &'a RuntimeHelperPropertyLayoutRow,
+    },
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct DeferredIntrinsicMethod(StandardBuiltinId);
@@ -129,6 +141,61 @@ impl FunctionBuilder<'_> {
         out: &ValueLocals,
         f: &mut Function,
     ) {
+        self.emit_property_value_into_with_owner(value, out, PropertyValueOwner::None, f);
+    }
+
+    /// The caller has established a present DATA descriptor. Reading its own
+    /// VALUE here keeps the recipe and writeback location bound together.
+    pub(crate) fn emit_descriptor_data_value_into(
+        &self,
+        descriptor: &GcLocal<PropertyDescriptor, Nullable>,
+        out: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let value = s.reserve_gc_local(f).initialize(
+            s.field(PropertyDescriptorSchema::VALUE)
+                .read(descriptor, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_property_value_into_with_owner(
+            &value,
+            out,
+            PropertyValueOwner::DescriptorValue(descriptor),
+            f,
+        );
+        value.clear(f);
+    }
+
+    /// The validated row is the caller's present DATA row at `index` in this
+    /// storage. Recipe creation remains lazy; only this observation resolves it.
+    pub(crate) fn emit_intrinsic_data_value_into(
+        &self,
+        storage: &GcLocal<IntrinsicPropertyStorage>,
+        index: I32Local,
+        row: &RuntimeHelperPropertyLayoutRow,
+        out: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let value = self.emit_intrinsic_property_value(storage, index, false, f)?;
+        self.emit_property_value_into_with_owner(
+            &value,
+            out,
+            PropertyValueOwner::IntrinsicDataGroup { storage, row },
+            f,
+        );
+        value.clear(f);
+        Ok(())
+    }
+
+    fn emit_property_value_into_with_owner(
+        &self,
+        value: &GcLocal<PropertyValue>,
+        out: &ValueLocals,
+        owner: PropertyValueOwner<'_>,
+        f: &mut Function,
+    ) {
         let s = self.runtime_schema();
         value.is_subtype::<StoredValue>(s, f);
         f.instruction(&Instruction::If(BlockType::Empty));
@@ -150,6 +217,45 @@ impl FunctionBuilder<'_> {
             f,
         );
         s.struct_type::<StoredValue>().read_into(&stored, out, s, f);
+        // The resolver invokes no JavaScript or provider callbacks. The owner
+        // cannot be replaced during resolution, so publish the exact completed
+        // record without a lookup or mutation guard. Other aliases may still
+        // retain the old recipe; its cache/canonical Realm slot owns this same
+        // immutable value. Frozen DATA attributes do not prevent normalization.
+        match owner {
+            PropertyValueOwner::None => {}
+            PropertyValueOwner::DescriptorValue(descriptor) => {
+                s.field(PropertyDescriptorSchema::VALUE).write(
+                    descriptor,
+                    GcOperand::subtype_reference(&stored, s),
+                    s,
+                    f,
+                );
+            }
+            PropertyValueOwner::IntrinsicDataGroup { storage, row } => {
+                // IntrinsicPropertyValue has already established this cache.
+                // Keep these extra reads and roots out of the StoredValue arm.
+                let cache = s.reserve_gc_local(f).initialize(
+                    s.field(IntrinsicPropertyStorageSchema::CACHE)
+                        .read(storage, s, f)
+                        .reference()
+                        .require_non_null(f),
+                    f,
+                );
+                let resolved = s
+                    .reserve_gc_local(f)
+                    .initialize(stored.load(s, f).upcast::<PropertyValue>(), f);
+                s.array_type::<IntrinsicPropertyValueCache>().write(
+                    &cache,
+                    row.group(),
+                    GcOperand::nullable_reference(&resolved, s),
+                    s,
+                    f,
+                );
+                resolved.clear(f);
+                cache.clear(f);
+            }
+        }
         stored.clear(f);
         f.instruction(&Instruction::End);
     }
@@ -189,6 +295,35 @@ impl FunctionBuilder<'_> {
         let stored = self.emit_load_non_array_realm_intrinsic_stored(
             &realm,
             NonArrayRealmIntrinsicSlot::DateConstructor,
+            &mut f,
+        );
+        stored.load(s, &mut f);
+        stored.clear(&mut f);
+        realm.clear(&mut f);
+        recipe.clear(&mut f);
+        f.instruction(&Instruction::Return);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
+            .is_subtype::<DeferredRegExpConstructor>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredRegExpConstructor>(s, &mut f),
+            &mut f,
+        );
+        let realm = s.reserve_gc_local(&mut f).initialize(
+            s.field(DeferredRegExpConstructorSchema::REALM)
+                .read(&recipe, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let stored = self.emit_load_non_array_realm_intrinsic_stored(
+            &realm,
+            NonArrayRealmIntrinsicSlot::RegExpConstructor,
             &mut f,
         );
         stored.load(s, &mut f);

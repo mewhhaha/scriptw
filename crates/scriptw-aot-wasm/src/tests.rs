@@ -26,6 +26,8 @@ mod packed_push_intrinsic_layout;
 mod plain_data_literals;
 mod primitive_string_length;
 mod program_cache_pages;
+mod property_value_writeback;
+mod regexp_demand_initialization;
 mod regexp_programs;
 mod runtime_error_for_throw;
 mod scalar_predicates;

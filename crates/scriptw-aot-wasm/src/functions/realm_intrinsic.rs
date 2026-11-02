@@ -3,7 +3,7 @@
 use super::*;
 use crate::builtins::{
     BinaryDataIntrinsicBuild, DateIntrinsicBuild, ErrorIntrinsicBuild, IntlIntrinsicBuild,
-    TemporalIntrinsicBuild,
+    RegExpIntrinsicBuild, TemporalIntrinsicBuild,
 };
 use crate::gc_types::{
     ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcStackReference, IntrinsicTable,
@@ -83,6 +83,15 @@ impl FunctionBuilder<'_> {
         slot: NonArrayRealmIntrinsicSlot,
         function: &mut Function,
     ) -> GcLocal<StoredValue> {
+        if slot.is_regexp() {
+            let schema = self.runtime_schema();
+            schema.call_helper(
+                crate::runtime_helpers::RealmEnsureRegExpArguments::new(realm),
+                self.runtime_helper_base()
+                    .expect("RegExp intrinsic reads require registered runtime helpers"),
+                function,
+            );
+        }
         if slot.is_date() {
             let schema = self.runtime_schema();
             schema.call_helper(
@@ -148,6 +157,26 @@ impl FunctionBuilder<'_> {
         assert!(
             slot.is_date(),
             "Date build capability used for another family"
+        );
+        self.emit_load_realm_intrinsic_at_index(
+            building.realm(),
+            slot.gc_index(),
+            result,
+            function,
+        );
+    }
+
+    /// Only the RegExp builder may read completed RegExp slots while Building.
+    pub(crate) fn emit_load_building_regexp_intrinsic(
+        &mut self,
+        building: &RegExpIntrinsicBuild<'_>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        function: &mut Function,
+    ) {
+        assert!(
+            slot.is_regexp(),
+            "RegExp build capability used for another family"
         );
         self.emit_load_realm_intrinsic_at_index(
             building.realm(),
