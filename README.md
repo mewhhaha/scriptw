@@ -57,7 +57,8 @@ push/join kernels avoid repeated conversion, dispatch and allocation when their
 semantic checks pass. Guarded fixed-arity push calls avoid temporary argument
 lists; own-data reads retain immutable lookup metadata within an invocation and
 check live storage and shape before loading a slot. Property reads reject impossible length keys before
-resolving the canonical name; guarded join calls reuse explicit String separators.
+resolving the canonical name; literal String keys reuse their evaluated value after
+receiver boxing. Guarded join calls reuse explicit String separators.
 Exact static `.length` reads use actual String or Array storage; computed keys
 and other receivers retain ordinary lookup. Guarded constant-return
 calls eliminate temporary objects and call setup. Pure numeric sort callbacks
@@ -111,7 +112,11 @@ a separate precompiled comparison records 4/17 Scriptc wins. The corrected
 primitive-append prototype remains unbuilt. Precompiled profiling measures
 initialization-worker CPU separately from caller CPU. Failed controls and all
 observations remain retained; overall parity remains open. These local cohorts
-do not refresh published CI results.
+do not refresh published CI results. The five-case LLVM/final-Wasm inspection
+finds guarded whole-loop shortcuts where Scriptc still executes the loops.
+It motivates work on fresh intrinsic dictionaries and property lookup. Literal-key
+cleanup reduces worker instruction counts about 0.9% on two join cases; timing
+remains unqualified, including slower large-join means.
 
 Removing an unnecessary durability flush from unnamed native backing lowers
 precompiled native-load medians **8.4–10.5%** across 16 fresh processes in two

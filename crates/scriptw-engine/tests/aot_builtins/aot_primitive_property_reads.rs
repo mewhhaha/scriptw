@@ -34,6 +34,78 @@ fn assert_modes(source: &str, expected: &str) {
 }
 
 #[test]
+fn literal_getv_keys_preserve_receiver_abrupt_and_argument_order() {
+    assert_modes(
+        r#"
+        function check(value, label) { if (!value) throw label; }
+        let log = '', gets = 0;
+        const receiver = {};
+        Object.defineProperty(receiver, 'opaque', {
+            get() {
+                check(this === receiver, 'object-getter-this');
+                gets++;
+                log += 'get;';
+                return function (value) {
+                    check(this === receiver, 'method-this');
+                    log += 'call;';
+                    return value;
+                };
+            }
+        });
+        function argument() { log += 'arg;'; return 17; }
+        check(receiver.opaque(argument()) === 17, 'method-result');
+        check(gets === 1 && log === 'get;arg;call;', 'get-before-argument-once');
+
+        Object.defineProperty(Number.prototype, 'opaque', {
+            configurable: true,
+            get() { 'use strict'; check(this === 7, 'primitive-getter-this'); return 19; }
+        });
+        check((7).opaque === 19, 'primitive-lookup');
+        check('abc'.length === 3 && ''.length === 0, 'string-lookup');
+
+        let argumentsRun = 0, failures = 0;
+        function forbidden() { argumentsRun++; return 1; }
+        for (const value of [null, undefined]) {
+            try { value.opaque(forbidden()); }
+            catch (error) { check(error instanceof TypeError, 'nullish-error'); failures++; }
+        }
+        const marker = {};
+        Object.defineProperty(receiver, 'fail', { get() { throw marker; } });
+        try { receiver.fail(forbidden()); }
+        catch (error) { check(error === marker, 'getter-error'); failures++; }
+        check(failures === 3 && argumentsRun === 0, 'abrupt-prevents-arguments');
+
+        let keyGets = 0;
+        const unusual = {};
+        Object.defineProperty(unusual, '\u0000\uD800', {
+            get() { check(this === unusual, 'code-unit-getter-this'); keyGets++; return 23; }
+        });
+        unusual['\u0000\uDC00'] = 29;
+        check(unusual['\u0000\uD800'] === 23 && unusual['\u0000\uDC00'] === 29,
+              'exact-code-unit-keys');
+        check(keyGets === 1, 'code-unit-getter-once');
+
+        const symbol = Symbol('key');
+        let conversions = 0;
+        const key = {
+            [Symbol.toPrimitive](hint) {
+                check(hint === 'string', 'key-hint');
+                conversions++;
+                return symbol;
+            }
+        };
+        Object.defineProperty(unusual, symbol, {
+            get() { check(this === unusual, 'symbol-getter-this'); return 31; }
+        });
+        check(unusual[key] === 31 && conversions === 1, 'dynamic-symbol-key-once');
+        print('literal-getv:ok');
+        262;
+        "#,
+        "literal-getv:ok",
+    );
+}
+
+#[test]
 fn bare_primitive_gets_observe_prototype_getter_effects() {
     assert_modes(
         r#"

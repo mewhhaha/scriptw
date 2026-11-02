@@ -665,7 +665,17 @@ impl<'a> FunctionBuilder<'a> {
                         schema.release_i32_local(found, function);
                         self.emit_branch_if_to_target(property_exit, function);
                     }
-                    self.emit_value_to_property_key_completion(&inputs[1], &key_result, function)?;
+                    if operation == SpecOperationIr::GetV
+                        && matches!(&operands[1].expr, ExprIr::String(_))
+                    {
+                        key_result.set_normal(&inputs[1], function);
+                    } else {
+                        self.emit_value_to_property_key_completion(
+                            &inputs[1],
+                            &key_result,
+                            function,
+                        )?;
+                    }
                     key_result.kind().load(function);
                     function
                         .instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));

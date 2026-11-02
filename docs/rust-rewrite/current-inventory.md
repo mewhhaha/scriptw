@@ -9,13 +9,13 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 ## Next work
 
 - Every-case V8/Scriptc execution and RSS parity remains open. The
-  [current gap diagnosis](performance-gaps-20261101.json) separates fresh ordinary
-  and precompiled references. The corrected 480-process identical-binary control
-  fails worker CPU on `first-row-proxy.js`; counter windows and within-process
-  variation do not yet identify the cause. Qualify reproducibility before building
-  the parked primitive-append region. Preserve every failed gate and distinguish
-  initialization-worker CPU from caller CPU. Numeric sums and the integer
-  recurrence already use whole-trip kernels; measure their entry/bootstrap floor.
+  [gap diagnosis](performance-gaps-20261101.json) separates reference cohorts,
+  actual five-case LLVM/final-Wasm differences and limited worker-IP samples.
+  Literal String `GetV` cleanup has source-bound correctness and an instruction
+  diagnostic; it does not qualify a hot speedup. Preserve failed A/A gates and
+  keep the primitive-append region parked. Next, measure a complete fresh
+  intrinsic dictionary recipe that removes duplicate-key probes and growth
+  while preserving per-Realm descriptors, identity and own-key order.
 - Attribute remaining cold compiler emission before changing P type generation.
   The [catalog checkpoint](regexp-catalog-20261101.json) removes repeated ICU
   Script-range enumeration after the earlier executable-identity removal.

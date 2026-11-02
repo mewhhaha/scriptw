@@ -144,6 +144,69 @@ fn validate_program(artifact: &WasmArtifact) {
 }
 
 #[test]
+fn literal_getv_keys_skip_only_property_key_conversion_in_every_source_variant() {
+    for (source, function_name, converts_key) in [
+        (
+            include_str!("../../../scriptw-cli/tests/fixtures/v8_execution_hotpaths/join-4096.js"),
+            "workload",
+            false,
+        ),
+        (
+            "function read(value,key){return value[key];} read(globalThis.value,globalThis.key);",
+            "read",
+            true,
+        ),
+    ] {
+        let artifact = emit_script(source).expect("actual property-read consumer emits");
+        validate_program(&artifact);
+        let to_object = imported_helper(&artifact, "helper::value_to_object")
+            .expect("GetV retains receiver conversion");
+        let object_read = imported_helper(&artifact, "helper::object_read")
+            .expect("GetV retains the actual property read");
+        let to_key = imported_helper(&artifact, "helper::value_to_property_key");
+        let variants = function_names(&artifact)
+            .into_iter()
+            .filter_map(|(index, name)| {
+                name.starts_with(&format!("js::{function_name}#"))
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            variants.len(),
+            2,
+            "ordinary and exact-context source bodies"
+        );
+        let mut index = imported_function_count(&artifact);
+        let mut checked = 0;
+        for payload in Parser::new(0).parse_all(&artifact.bytes) {
+            if let Payload::CodeSectionEntry(body) = payload.unwrap() {
+                if variants.contains(&index) {
+                    let calls = body
+                        .get_operators_reader()
+                        .unwrap()
+                        .into_iter()
+                        .filter_map(|operator| match operator.unwrap() {
+                            Operator::Call { function_index } => Some(function_index),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    assert!(calls.contains(&to_object), "receiver conversion: {source}");
+                    assert!(calls.contains(&object_read), "live property read: {source}");
+                    assert_eq!(
+                        to_key.is_some_and(|helper| calls.contains(&helper)),
+                        converts_key,
+                        "only a literal String skips key conversion: {source}"
+                    );
+                    checked += 1;
+                }
+                index += 1;
+            }
+        }
+        assert_eq!(checked, variants.len());
+    }
+}
+
+#[test]
 fn whole_function_local_concat_length_elides_only_the_single_unobserved_value() {
     for declaration in ["const joined=left+right;", "let joined=left+right;"] {
         let source = format!("function read(left,right){{{declaration}return joined.length;}} read(globalThis.left,globalThis.right);");
