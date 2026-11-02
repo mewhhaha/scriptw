@@ -1,0 +1,116 @@
+{
+  "schema": "scriptw-native-compiler-probes-v1",
+  "date": "2026-11-03",
+  "scope": "Two rejected Cranelift production-code experiments measured against one frozen React SSR Wasm input. No native image or executable is included.",
+  "input": {
+    "wasm_bytes": 11600481,
+    "wasm_sha256": "b1ae21dd1561ba12ca94e683de4546228b27f64eff7c1d445d0ba184e1b35e4a",
+    "source_fingerprint": "a61d7e85319c6c98194c6d4e6bd8a14838a9de5c954add7b025c9b9e6b70e9e8"
+  },
+  "measurement": "Compile-only frozen Wasm native-image preparation; same Wasmtime 47.0.0, generic x86_64-unknown-linux-gnu, size-optimized native compilation, backtracking register allocation. Timed value is native_compilation phase; process wall time is separately retained. There was one compile-only process per candidate; percentages are descriptive, not statistical regression claims, and neither candidate establishes application speedup.",
+  "toolchain": {
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo_profile": "release, opt-level 3, line-tables-only debuginfo, overflow checks off",
+    "source": "archived Cargo artifact and timing reports"
+  },
+  "results": {
+    "baseline": {
+      "native_compile_seconds": 49.42355979,
+      "process_seconds": 49.751597107,
+      "program_wasm_bytes": 11600481,
+      "program_wasm_sha256": "b1ae21dd1561ba12ca94e683de4546228b27f64eff7c1d445d0ba184e1b35e4a",
+      "source_fingerprint": "a61d7e85319c6c98194c6d4e6bd8a14838a9de5c954add7b025c9b9e6b70e9e8",
+      "source_commit": "8f5d44820bac0103aa04698e5cac3d9b6e895889",
+      "executable_sha256": "5364c5df791ad33b60a3c7317e8020882801731085d2d6c16be0619e10f2b845",
+      "text_bytes": 67416064,
+      "text_sha256": "34e0ac08afd2a97007f465e63f64ad2de84915e707600b2043b8b028751b10b5",
+      "configuration": {
+        "collector": "copying",
+        "consumer_compiler_enabled": false,
+        "epoch_deadline": 9223372036854775807,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_compilation_mode": "size-optimized",
+        "register_allocation": "backtracking",
+        "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+        "store_memory_limit_bytes": 1073741824,
+        "target": "generic",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "wasm_backtrace_details": "disable",
+        "wasmtime_version": "47.0.0",
+        "worker_stack_bytes": 67108864
+      }
+    },
+    "depth": {
+      "native_compile_seconds": 50.826681997,
+      "process_seconds": 51.653664782,
+      "program_wasm_bytes": 11600481,
+      "program_wasm_sha256": "b1ae21dd1561ba12ca94e683de4546228b27f64eff7c1d445d0ba184e1b35e4a",
+      "source_fingerprint": "5c638d38f03e47b04e4dff397702249ecf99752d60d92855979f3626e28497c5",
+      "source_commit": "8f5d44820bac0103aa04698e5cac3d9b6e895889",
+      "executable_sha256": "50b7c4a9279695233c9f8314c6af73d7597136b8baf8ec0ed57a43d9e3ec25cd",
+      "text_bytes": 67416064,
+      "text_sha256": "34e0ac08afd2a97007f465e63f64ad2de84915e707600b2043b8b028751b10b5",
+      "configuration": {
+        "collector": "copying",
+        "consumer_compiler_enabled": false,
+        "epoch_deadline": 9223372036854775807,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_compilation_mode": "size-optimized",
+        "register_allocation": "backtracking",
+        "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+        "store_memory_limit_bytes": 1073741824,
+        "target": "generic",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "wasm_backtrace_details": "disable",
+        "wasmtime_version": "47.0.0",
+        "worker_stack_bytes": 67108864
+      }
+    },
+    "hash": {
+      "native_compile_seconds": 49.647174121,
+      "process_seconds": 50.06601161,
+      "program_wasm_bytes": 11600481,
+      "program_wasm_sha256": "b1ae21dd1561ba12ca94e683de4546228b27f64eff7c1d445d0ba184e1b35e4a",
+      "source_fingerprint": "4f46abbe4ccf416225ed15efa0e0f20e2d154776e9fc7e2dd1ed0e145afe293d",
+      "source_commit": "bd645b13a7d4053978ee4ed4f40a60d83183b602",
+      "executable_sha256": "9683b0470f569168feb1c0fd8cd72cf196d700951afc94c4780b79290ebcfd5d",
+      "text_bytes": 67416064,
+      "text_sha256": "34e0ac08afd2a97007f465e63f64ad2de84915e707600b2043b8b028751b10b5",
+      "configuration": {
+        "collector": "copying",
+        "consumer_compiler_enabled": false,
+        "epoch_deadline": 9223372036854775807,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_compilation_mode": "size-optimized",
+        "register_allocation": "backtracking",
+        "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+        "store_memory_limit_bytes": 1073741824,
+        "target": "generic",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "wasm_backtrace_details": "disable",
+        "wasmtime_version": "47.0.0",
+        "worker_stack_bytes": 67108864
+      }
+    }
+  },
+  "decision": {
+    "depth": "rejected; +2.84% native compilation time; source removed from product. One compile-only process; descriptive timing, not a statistical regression claim.",
+    "hash": "rejected; +0.45% native compilation time; source removed from product. One compile-only process; descriptive timing, not a statistical regression claim.",
+    "native_text": "All three output .text sections are identical: 67,416,064 bytes, SHA-256 34e0ac08afd2a97007f465e63f64ad2de84915e707600b2043b8b028751b10b5.",
+    "depth_unit_tests": "Not invoked after the negative application probe. Attempts to use workspace-level `cargo test -p` were rejected because the vendor crate is not a workspace member (feature/dev-dependency errors are archived); the isolated depth unit copy was prepared but never tested.",
+    "hash_unit_tests": "186 upstream Cranelift unit tests passed; 4 isolated candidate tests passed. These are unit correctness evidence, not an application performance result.",
+    "synthetic_hash_probe": "For a synthetic 127-key same-initial-bucket cohort only, raw predicates fell 8,128 to 127; one absent-tag lookup 127 to 0. This is not an application or React performance win.",
+    "application_speedup": "Neither experiment establishes application speedup."
+  },
+  "archive": {
+    "file": "native-compiler-probes-20261103-inert.tar.xz",
+    "bytes": 89204,
+    "sha256": "38652682bded75471424b79e94fcde0bc4cb6c1b3d67e5c2b725fd5359eb693a",
+    "index_sha256": "a6040a5348dc85a95dd2a9eca1dcfb1e2a1985afc666bf9fff07382a4388a60c",
+    "members": 44,
+    "contents": "Only UTF-8 source, patches, configuration/identity receipts, build timing HTML, probe result JSON/stdout/stderr, and unit-test logs. No Wasm, ELF/native image, executable, .swpc, cache, or image."
+  }
+}

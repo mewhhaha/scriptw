@@ -298,6 +298,8 @@ All 79 pinned modulus variants pass, including the previously crashing BigInt ca
 RSC still needs `TextEncoder` and related Web APIs; Request-based handlers need
 `Request`. The client case still times out. These replays do not replace the
 dated cross-engine benchmark results above.
+Two [native compiler experiments](docs/rust-rewrite/native-compiler-probes-20261103.json)
+left compilation near 50 seconds with identical machine code; both were reverted.
 
 ## Compilation time
 
