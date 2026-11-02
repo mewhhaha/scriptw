@@ -12,4 +12,4 @@ function Catalog() {
 globalThis.applicationRun = function () {
   return {react:React.version, rows:32, html:renderToString(e(Theme.Provider, {value:'dark'}, e(Catalog)))};
 };
-print(JSON.stringify(applicationRun()));
+print(JSON.stringify(globalThis.applicationRun()));

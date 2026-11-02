@@ -269,8 +269,10 @@ scopes; synchronous HTML SSR is a third workload.
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone
 Scriptw/Scriptc attempts retain compilation and execution errors explicitly.
-Scriptw's portable build and ordinary NativeHost/Fast run are separate probes,
+Scriptw's portable build and ordinary NativeHost run are separate probes,
 and the latter recompiles source rather than executing the dumped portable pair.
+The ordinary CLI selects native compilation automatically; large function bodies
+can select size-optimized compilation instead of Fast.
 Unsupported host APIs never become zero bars, wins or permanent exclusions. All
 children remain serial under the resource wrapper. No product compiler rebuild
 is needed when the recorded frozen Rust bytes still match.

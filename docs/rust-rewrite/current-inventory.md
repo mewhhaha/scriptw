@@ -19,10 +19,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   renderer instead of silently substituting SSR or fake DOM.
 - Diagnose React SSR compilation/startup before claiming rendering parity.
   Its portable emission completes in about 6.6s, while both CPP preparation and
-  ordinary Fast run hit their separate 60s guards. A completed emission probe
-  does not locate the active phase of either timeout. Owner: AOT compilation
-  pipeline and emitted-program/native expansion; retain the original failures
-  and workload, and profile phases before changing compilation policy.
+  ordinary NativeHost run hit their separate 60s guards. The exact NativeHost P
+  contains a 2,014,440-byte function, exceeding the 1-MiB size-optimization
+  threshold. A debugger snapshot at 20s is inside Cranelift's Egraph optimizer.
+  Owner: AOT code size and native compilation. Attribute the costly functions
+  and passes before changing policy; retain original deadlines and failures.
 
 - Repair Fast native frame/code expansion before a new full conformance run.
   The pinned `language/expressions/modulus/bigint-arithmetic.js` crashes in strict

@@ -270,10 +270,17 @@ Actual standalone build/execution attempts remain visible, including failures:
 | React client mount | Timed out (60 s) | Build failed | Chromium checked |
 
 Standalone run timeouts include compilation and startup; they do not isolate
-rendering time. Scriptw's portable build and ordinary NativeHost/Fast run are
+rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
 The current Scriptw host also lacks DOM, encoding, Web Streams,
 Fetch and URL APIs, as recorded by the separate capability probe.
+
+The [failure diagnosis](docs/rust-rewrite/applications-current.json) identifies
+missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
+reach `SC3002` (WASI API admission), and its nested-result case reports `SC2020`
+(dynamic `Array.slice` end unsupported). React bundles retain type-check errors.
+Scriptw's SSR output has a 2-MB function, triggering size-optimized native
+compilation; a debugger sample finds Cranelift optimization active at 20 seconds.
 
 [Data, identities and diagnostics](docs/rust-rewrite/applications-current.json) ·
 [Inert raw evidence](docs/rust-rewrite/application-benchmarks-20261102-inert.tar.xz) ·

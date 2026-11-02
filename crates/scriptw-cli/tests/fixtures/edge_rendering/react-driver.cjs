@@ -73,7 +73,7 @@ async function build(tools, sources, output) {
   support.expected['client-mount']=JSON.stringify({react:version,mode:'mount',rows:64,count:0,checked:true})+'\n';
   for (const name of [...cases,'client-mount']) {
     const [kind,mode]=name.split('-');
-    const suffix='\napplicationRun('+JSON.stringify(mode)+').then(result=>{delete result.elapsed_ns;print(JSON.stringify(result));});\n';
+    const suffix='\nglobalThis.applicationRun('+JSON.stringify(mode)+').then(result=>{delete result.elapsed_ns;print(JSON.stringify(result));});\n';
     fs.writeFileSync(path.join(output,'capability-'+name+'.js'),read(path.join(output,kind+'.js'))+suffix);
   }
   for (const name of ['react','react-dom','react-server-dom-webpack','esbuild','playwright']) support.versions[name]=use(name+'/package.json').version;
@@ -135,7 +135,7 @@ async function browser(tools,directory,chromium,index,screenshot) {
     const observations=[];
     const version=use('react/package.json').version;
     for (const mode of order) for(let iteration=0;iteration<10;iteration++) {
-      const result=await page.evaluate(mode=>applicationRun(mode),mode);
+      const result=await page.evaluate(mode=>globalThis.applicationRun(mode),mode);
       const elapsed_ns=result.elapsed_ns;
       delete result.elapsed_ns;
       let count=0;
