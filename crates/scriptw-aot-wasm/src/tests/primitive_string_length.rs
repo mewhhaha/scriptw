@@ -80,12 +80,39 @@ fn then_branch<'a>(operators: &'a [Operator<'a>], start: usize) -> &'a [Operator
     panic!("String guard has a complete structured branch");
 }
 
-fn primitive_length_branches<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Operator<'a>]> {
+fn primitive_length_branches<'a>(
+    artifact: &WasmArtifact,
+    operators: &'a [Operator<'a>],
+) -> Vec<&'a [Operator<'a>]> {
+    use crate::gc_types::{GcNullability, GlobalLedger, RuntimeModuleTypes, StringValue};
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Program(
+        artifact
+            .runtime()
+            .expect("actual String consumers retain R"),
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(string) = registered
+        .globals()
+        .schema()
+        .reference_type::<StringValue>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("the actual String guard uses its registered concrete type");
+    };
+    let units = crate::GcSnapshotField::StringUnits.index();
     operators.windows(4).enumerate().filter_map(|(i, window)| match window {
         [Operator::LocalGet { .. }, Operator::I32Const { value }, Operator::I32Eq, Operator::If { .. }]
             if *value == WasmRuntimeValueTag::String as i32 => {
                 let branch = then_branch(operators, i + 4);
-                branch.iter().any(|op| matches!(op, Operator::ArrayLen)).then_some(branch)
+                // ArrayLen also bounds packed storage and compact shape keys.
+                // Only this actual String's rooted UTF-16 units prove length.
+                branch.windows(6).any(|ops| matches!(ops,
+                    [Operator::StructGet { struct_type_index, field_index },
+                     Operator::LocalSet { local_index: stored },
+                     Operator::LocalGet { local_index: loaded }, Operator::RefAsNonNull,
+                     Operator::ArrayLen, Operator::I64ExtendI32U]
+                    if *struct_type_index == string && *field_index == units && stored == loaded
+                )).then_some(branch)
             }
         _ => None,
     }).collect()
@@ -272,7 +299,7 @@ fn static_and_canonical_get_v_length_read_actual_strings_and_arrays_before_looku
         let artifact = emit_script(source).unwrap();
         validate_program(&artifact);
         let operators = source_body(&artifact, "read");
-        let branches = primitive_length_branches(&operators);
+        let branches = primitive_length_branches(&artifact, &operators);
         assert!(
             !branches.is_empty(),
             "the real read consumer reaches an actual-tag String branch: {source}"
@@ -323,18 +350,30 @@ fn static_and_canonical_get_v_length_read_actual_strings_and_arrays_before_looku
             "the guarded concrete Array read precedes boxing/lookup"
         );
     }
-    for source in [
-        "function read(value,key) { return value[key]; } read(globalThis.value,globalThis.key);",
-        "function read(value) { return value.size; } read(globalThis.value);",
+    for (source, fallbacks) in [
+        (
+            "function read(value,key) { return value[key]; } read(globalThis.value,globalThis.key);",
+            &["helper::value_to_object", "helper::value_to_property_key", "helper::object_read"][..],
+        ),
+        (
+            "function read(value) { return value.size; } read(globalThis.value);",
+            &["helper::cached_property_read"][..],
+        ),
     ] {
         let artifact = emit_script(source).unwrap();
         validate_program(&artifact);
         let operators = source_body(&artifact, "read");
         assert!(
-            primitive_length_branches(&operators).is_empty()
+            primitive_length_branches(&artifact, &operators).is_empty()
                 && array_length_branches(&artifact, &operators).is_empty(),
             "computed or other keys cannot acquire a static length proof"
         );
+        for fallback in fallbacks {
+            let helper = imported_helper(&artifact, fallback).expect("full property fallback remains imported");
+            assert!(operators.iter().any(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == helper
+            )), "the source consumer retains its complete property fallback: {source}");
+        }
     }
 }
 
@@ -392,7 +431,7 @@ fn concat_length_has_two_actual_tag_guards_no_allocation_and_one_saved_operand_f
         "the miss retains exactly one call to the original coercion owner with saved operands"
     );
     assert!(
-        !primitive_length_branches(&operators).is_empty(),
+        !primitive_length_branches(&artifact, &operators).is_empty(),
         "fallback length lookup still distinguishes an actual String result from Number/BigInt"
     );
 }
@@ -425,7 +464,7 @@ fn original_string_and_join_shapes_reach_real_primitive_consumers() {
         let artifact = emit_script(source).unwrap();
         validate_program(&artifact);
         assert!(
-            !primitive_length_branches(&source_body(&artifact, "workload")).is_empty(),
+            !primitive_length_branches(&artifact, &source_body(&artifact, "workload")).is_empty(),
             "the unchanged call-result consumer reaches the primitive String branch"
         );
     }

@@ -33,7 +33,7 @@ fn initialization_and_constructor_linking_consume_only_typed_states() {
     assert!(OWNER_SOURCE.contains("struct RealmArrayPrototypeLocal(GcLocal<ArrayObject>)"));
     assert!(OWNER_SOURCE.contains("reserved: ReservedRealmArrayPrototypeLocal,"));
     assert!(OWNER_SOURCE.contains("Result<RealmArrayPrototypeLocal, EmitError>"));
-    assert!(OWNER_SOURCE.contains("prototype: &RealmArrayPrototypeLocal,"));
+    assert!(OWNER_SOURCE.contains("fn array(&self) -> &GcLocal<ArrayObject>"));
     assert!(OWNER_SOURCE.contains("prototype: RealmArrayPrototypeLocal,"));
     assert!(!OWNER_SOURCE.contains("pub(crate) struct ReservedRealmArrayPrototypeLocal(pub"));
     assert!(!OWNER_SOURCE.contains("pub(crate) struct RealmArrayPrototypeLocal(pub"));

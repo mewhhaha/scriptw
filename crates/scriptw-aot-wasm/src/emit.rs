@@ -22,6 +22,7 @@ mod async_generator_admission;
 mod body_compilation;
 mod body_entry;
 mod completion_exit;
+mod local_arguments_adapter;
 mod module_assembly;
 pub(crate) mod runtime_requirement;
 pub(crate) use body_compilation::{CompletedProgramInitializeBody, ProgramInitializeCompilation};
@@ -183,9 +184,11 @@ impl<'a> FunctionModuleState<'a> {
         match self {
             Self::Main(_, _) => StaticSignature::Main.parameter_count(),
             Self::ProgramInitialize => StaticSignature::ProgramInitialize.parameter_count(),
-            Self::Internal(entry) | Self::PreparedScript(_, entry) => {
-                entry.signature().parameter_count()
-            }
+            Self::Internal(entry) => entry.local_arguments().map_or_else(
+                || entry.signature().parameter_count(),
+                |local| local.signature().parameter_count(),
+            ),
+            Self::PreparedScript(_, entry) => entry.signature().parameter_count(),
             Self::RuntimeOperation(helper) => helper.parameter_types().len(),
         }
     }
@@ -1903,8 +1906,12 @@ impl<'a> FunctionBuilder<'a> {
             FunctionModuleState::ProgramInitialize => {
                 schema.signature(StaticSignature::ProgramInitialize)
             }
-            FunctionModuleState::PreparedScript(_, entry)
-            | FunctionModuleState::Internal(entry) => schema.signature(entry.signature()),
+            FunctionModuleState::PreparedScript(_, entry) => schema.signature(entry.signature()),
+            FunctionModuleState::Internal(entry) => schema.signature(
+                entry
+                    .local_arguments()
+                    .map_or_else(|| entry.signature(), |local| local.signature()),
+            ),
             FunctionModuleState::RuntimeOperation(helper) => helper.definition(schema.layouts()),
         }
         .parameters()
@@ -1946,9 +1953,14 @@ impl<'a> FunctionBuilder<'a> {
             .initialize_null(schema, &mut owned_body);
         let completion = schema.reserve_completion(&mut owned_body);
         completion.initialize(&mut owned_body);
-        let body_entry_locals = module_state
-            .planned_body_entry()
-            .map(|entry| entry.materialize(schema, &mut owned_body));
+        let body_entry_locals = module_state.planned_body_entry().map(|entry| {
+            if let FunctionModuleState::Internal(source) = &module_state {
+                if let Some(local) = source.local_arguments() {
+                    return entry.materialize_local_arguments(local, schema, &mut owned_body);
+                }
+            }
+            entry.materialize(schema, &mut owned_body)
+        });
         if let Some(entry) = &body_entry_locals {
             current_environment.replace(
                 entry.lexical_environment().load(schema, &mut owned_body),
@@ -2067,7 +2079,11 @@ impl<'a> FunctionBuilder<'a> {
             {
                 // Retain the planned-source proof even though table slots no
                 // longer encode the callable's Wasm index.
-                entry.source_site_owner()?;
+                if let Some(local) = entry.local_arguments() {
+                    local.source_site_owner()?;
+                } else {
+                    entry.source_site_owner()?;
+                }
             }
             FunctionModuleState::PreparedScript(_, _)
             | FunctionModuleState::Internal(_)

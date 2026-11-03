@@ -83,17 +83,16 @@ fn function_module_state_is_the_exact_private_no_capability_domain() {
     let declaration = normalized_code(declaration);
     assert!(declaration.contains("Self::Main(_,_)=>StaticSignature::Main.parameter_count()"));
     assert!(declaration.contains(
-        "Self::Internal(entry)|Self::PreparedScript(_,entry)=>{entry.signature().parameter_count()}"
+        "Self::Internal(entry)=>entry.local_arguments().map_or_else(||entry.signature().parameter_count(),|local|local.signature().parameter_count(),)"
     ));
+    assert!(
+        declaration.contains("Self::PreparedScript(_,entry)=>entry.signature().parameter_count()")
+    );
     assert!(declaration.contains("Self::RuntimeOperation(helper)=>helper.parameter_types().len()"));
-    assert!(
-        declaration
-            .contains("Self::Internal(entry)|Self::PreparedScript(_,entry)=>Some(entry.body())")
-    );
-    assert!(
-        declaration
-            .contains("Self::Main(_,_)|Self::RuntimeOperation(_)|Self::ProgramInitialize=>None")
-    );
+    assert!(declaration
+        .contains("Self::Internal(entry)|Self::PreparedScript(_,entry)=>Some(entry.body())"));
+    assert!(declaration
+        .contains("Self::Main(_,_)|Self::RuntimeOperation(_)|Self::ProgramInitialize=>None"));
     assert!(!declaration.contains("#["));
     let normalized_source = normalized_code(SOURCE_FAMILY);
     for capability in ["Clone", "Copy", "Debug", "PartialEq", "Eq", "Default"] {
@@ -119,7 +118,7 @@ fn function_module_state_is_the_exact_private_no_capability_domain() {
         SOURCE_FAMILY
             .matches("FunctionModuleState::Internal")
             .count(),
-        13
+        14
     );
 }
 
@@ -237,7 +236,8 @@ fn module_state_storage_and_anchor_projections_are_borrowed_and_exhaustive() {
         concat!(
             "FunctionModuleState::Main(_,_)=>schema.signature(StaticSignature::Main),",
             "FunctionModuleState::ProgramInitialize=>{schema.signature(StaticSignature::ProgramInitialize)}",
-            "FunctionModuleState::PreparedScript(_,entry)|FunctionModuleState::Internal(entry)=>schema.signature(entry.signature()),",
+            "FunctionModuleState::PreparedScript(_,entry)=>schema.signature(entry.signature()),",
+            "FunctionModuleState::Internal(entry)=>schema.signature(entry.local_arguments().map_or_else(||entry.signature(),|local|local.signature()),),",
             "FunctionModuleState::RuntimeOperation(helper)=>helper.definition(schema.layouts()),}.parameters().to_vec();"
         )
     );
@@ -281,10 +281,8 @@ fn module_state_storage_and_anchor_projections_are_borrowed_and_exhaustive() {
     ] {
         assert!(clear.contains(retained_root));
     }
-    assert!(
-        normalized_code(clear)
-            .contains("self.current_private_environment.set_null(self.schema,function)")
-    );
+    assert!(normalized_code(clear)
+        .contains("self.current_private_environment.set_null(self.schema,function)"));
     assert_eq!(
         COMPILATION
             .matches("self.clear_body_entry_roots(&mut function);")
@@ -385,10 +383,8 @@ fn only_the_main_export_selects_the_host_rejection_policy() {
 
 #[test]
 fn program_initialize_has_a_distinct_nonnull_result_and_never_enters_javascript() {
-    assert!(
-        normalized_code(SIGNATURES)
-            .contains("ProgramInitialize=>([],[Gc(GcLayout::ProgramInstance,NonNullable)])")
-    );
+    assert!(normalized_code(SIGNATURES)
+        .contains("ProgramInitialize=>([],[Gc(GcLayout::ProgramInstance,NonNullable)])"));
     let constructor = bounded(
         SOURCE,
         "    pub(super) fn new_program_initialize(",

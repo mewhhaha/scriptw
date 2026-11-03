@@ -52,13 +52,26 @@ pub(crate) enum ResumableEntryLocals<'a> {
 
 /// Owned rooted copies of the declared parameters. A body keeps this owner;
 /// callers borrow semantic roles rather than rematerializing physical locals.
+enum BodyArguments {
+    Vector {
+        values: GcLocal<ValueArray>,
+        count: I64Local,
+    },
+    Locals([ValueLocals; 2]),
+}
+
+#[derive(Clone, Copy)]
+enum ArgumentLayout<'a> {
+    Vector,
+    Locals(&'a PlannedLocalArgumentsEntry),
+}
+
 pub(crate) struct BodyEntryLocals {
     role: EntryRoleLocals,
     program: ProgramInstanceLocals,
     this_value: ValueLocals,
     new_target: ValueLocals,
-    arguments: GcLocal<ValueArray>,
-    argument_count: I64Local,
+    arguments: BodyArguments,
     lexical_environment: GcLocal<Environment, Nullable>,
     private_environment: GcLocal<PrivateEnvironment, Nullable>,
 }
@@ -157,11 +170,39 @@ impl PlannedBodyEntry<'_> {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) -> BodyEntryLocals {
+        self.materialize_arguments(ArgumentLayout::Vector, schema, function)
+    }
+
+    pub(crate) fn materialize_local_arguments(
+        &self,
+        entry: &PlannedLocalArgumentsEntry,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> BodyEntryLocals {
+        assert!(
+            matches!(self, Self::Ordinary(_)),
+            "local arguments require an ordinary body"
+        );
+        self.materialize_arguments(ArgumentLayout::Locals(entry), schema, function)
+    }
+
+    fn materialize_arguments(
+        &self,
+        arguments_layout: ArgumentLayout<'_>,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> BodyEntryLocals {
         let this_value = schema.parameter_value(1, function);
         let role = match self {
             Self::Ordinary(_) => EntryRoleLocals::Ordinary {
                 callable: callable_locals(schema, function),
-                caller_realm: schema.parameter_gc::<RealmRecord, NonNullable>(9, function),
+                caller_realm: schema.parameter_gc::<RealmRecord, NonNullable>(
+                    match arguments_layout {
+                        ArgumentLayout::Vector => 9,
+                        ArgumentLayout::Locals(_) => 13,
+                    },
+                    function,
+                ),
             },
             Self::Generator(_) => {
                 let callable = callable_locals(schema, function);
@@ -248,8 +289,12 @@ impl PlannedBodyEntry<'_> {
                 },
             },
         };
-        let program_parameter = schema
-            .parameter_gc::<ProgramInstance, NonNullable>(self.program_parameter_index(), function);
+        let program_index = match arguments_layout {
+            ArgumentLayout::Vector => self.program_parameter_index(),
+            ArgumentLayout::Locals(_) => 14,
+        };
+        let program_parameter =
+            schema.parameter_gc::<ProgramInstance, NonNullable>(program_index, function);
         let calling_program =
             ProgramInstanceLocals::bind(schema, program_parameter.load(schema, function), function);
         program_parameter.clear(function);
@@ -270,13 +315,24 @@ impl PlannedBodyEntry<'_> {
             EntryRoleLocals::PreparedScript { .. } => calling_program,
         };
         program.mark_native_context(schema, function);
-        let (arguments, argument_count) = match &role {
-            EntryRoleLocals::Ordinary { .. } | EntryRoleLocals::PreparedScript { .. } => {
-                normalize_arguments(schema, 7, 8, function)
+        let arguments = match arguments_layout {
+            ArgumentLayout::Vector => {
+                let (values, count) = match &role {
+                    EntryRoleLocals::Ordinary { .. } | EntryRoleLocals::PreparedScript { .. } => {
+                        normalize_arguments(schema, 7, 8, function)
+                    }
+                    EntryRoleLocals::Generator { .. }
+                    | EntryRoleLocals::Async { .. }
+                    | EntryRoleLocals::AsyncGenerator { .. } => {
+                        normalize_arguments(schema, 5, 6, function)
+                    }
+                };
+                BodyArguments::Vector { values, count }
             }
-            EntryRoleLocals::Generator { .. }
-            | EntryRoleLocals::Async { .. }
-            | EntryRoleLocals::AsyncGenerator { .. } => normalize_arguments(schema, 5, 6, function),
+            ArgumentLayout::Locals(_entry) => BodyArguments::Locals([
+                schema.parameter_value(7, function),
+                schema.parameter_value(10, function),
+            ]),
         };
         let new_target = match &role {
             EntryRoleLocals::Ordinary { .. } | EntryRoleLocals::PreparedScript { .. } => {
@@ -335,7 +391,6 @@ impl PlannedBodyEntry<'_> {
             this_value,
             new_target,
             arguments,
-            argument_count,
             lexical_environment,
             private_environment,
         }
@@ -362,10 +417,38 @@ impl BodyEntryLocals {
         &self.new_target
     }
     pub(crate) fn arguments(&self) -> &GcLocal<ValueArray> {
-        &self.arguments
+        match &self.arguments {
+            BodyArguments::Vector { values, .. } => values,
+            BodyArguments::Locals(_) => {
+                unreachable!("validated local-arguments body cannot observe its vector")
+            }
+        }
     }
     pub(crate) fn argument_count(&self) -> I64Local {
-        self.argument_count
+        match &self.arguments {
+            BodyArguments::Vector { count, .. } => *count,
+            BodyArguments::Locals(_) => {
+                unreachable!("validated local-arguments body cannot observe its count")
+            }
+        }
+    }
+
+    /// Entry values remain immutable roots while parameter bindings are assigned.
+    /// Missing incoming arguments were padded by the caller or vector adapter.
+    pub(crate) fn copy_local_argument(
+        &self,
+        index: usize,
+        destination: &ValueLocals,
+        function: &mut Function,
+    ) -> bool {
+        let BodyArguments::Locals(values) = &self.arguments else {
+            return false;
+        };
+        let value = values
+            .get(index)
+            .expect("validated local-argument formal is one of the two declared slots");
+        destination.copy_from(value, function);
+        true
     }
     pub(crate) fn lexical_environment(&self) -> &GcLocal<Environment, Nullable> {
         &self.lexical_environment
@@ -455,8 +538,17 @@ impl BodyEntryLocals {
     pub(crate) fn clear(self, schema: &RuntimeSchema, function: &mut Function) {
         self.private_environment.clear(function);
         self.lexical_environment.clear(function);
-        schema.release_i64_local(self.argument_count, function);
-        self.arguments.clear(function);
+        match self.arguments {
+            BodyArguments::Vector { values, count } => {
+                schema.release_i64_local(count, function);
+                values.clear(function);
+            }
+            BodyArguments::Locals(values) => {
+                for value in values {
+                    value.clear(function);
+                }
+            }
+        }
         self.new_target.clear(function);
         self.this_value.clear(function);
         match self.role {

@@ -12,22 +12,27 @@ Use the [13 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Reduce call transport in the compact/control-flow programs. Ordinary calls
-  still construct argument vectors and stored values after eligible arguments
-  objects and synthetic activation cells have been removed. Measure guarded
-  direct calls through the existing ABI before adding fixed-arity entries;
-  preserve callee identity, Realm, captures, receiver, depth and abrupt completion.
-  Owner: AOT function call dispatch and argument-vector construction.
-- Remove repeated property conversions. The property programs exercise `GetV`,
-  including packed-array indexing, through `ValueToObject`, `ValueToPropertyKey`
-  and `ObjectRead`. Test moving the existing guarded packed-array probe ahead of
-  `ToObject`; misses must preserve accessors, prototypes, proxies, key conversion
-  and exception order. Owner: AOT operations and object-read machinery.
-- Re-profile RSC on the latest [recorded compiler](rsc-current.json). The
-  [earlier instruction/caller diagnosis](react-attribution-current.json) belongs
-  to its own build, before global-start selection and activation pruning; its
-  instruction counts and StringEquality shares are not current measurements.
-  Attribute remaining semantic work before adding caches or representations.
+- Measure remaining call transport after canonical local-argument entries and
+  guarded direct calls. Attribute executed entry coverage, argument vectors and
+  activation allocation before widening the two-formal admission or inlining
+  larger source bodies. React's five-formal `vn`/`ft` helpers are outside that
+  transport bound; exclusion alone does not establish their cost. Preserve
+  callee identity, Realm, captures, receiver, depth and abrupt completion.
+  Owner: IR/AOT source-call planning and dispatch.
+- Reduce repeated property selection after the raw Number-array and computed
+  String own-data probes. Measure name-to-slot lookup and representation checks
+  within the [property scores](situations-current.json); retain live mutation,
+  accessors, prototypes, proxies and coercion/exception order on misses.
+  Owner: AOT operations and the existing object model.
+- Attribute current RSC semantic work. The [fresh instruction counts](react-attribution-current.json)
+  use 100 checked requests in three fresh processes per engine/mode; they are
+  unscored user-thread counters, not causal cost percentages. Re-sample the name
+  resolver and remaining call/property paths on the [recorded compiler](rsc-current.json)
+  before adding caches, changing environment addressing or broadening inlining.
+  The existing direct-cell proof rejects Module activation owners; validate
+  canonical Module frame/slot identity and lifecycle before extending it across
+  that boundary. Reuse its live-cell/alias/TDZ operations; add no parallel cache.
+  Earlier sampled caller profiles remain in their Git-bound archive.
   Owner: IR/AOT lowering and runtime lookup/property machinery; retain one heap.
 - Bound native code, spills and cold preparation. The focused control-flow
   programs now use guarded dense jump tables, but code/image growth remains

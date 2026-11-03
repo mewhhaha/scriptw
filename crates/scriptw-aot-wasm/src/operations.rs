@@ -598,6 +598,27 @@ impl<'a> FunctionBuilder<'a> {
                         schema.release_i32_local(found, function);
                         self.emit_branch_if_to_target(property_exit, function);
                     }
+                    // Both operands are saved. Concrete own-data probes neither
+                    // coerce a key nor invoke user code, so a hit needs no boxing.
+                    // A miss retains the original ToObject -> ToPropertyKey order.
+                    if operands[1].possible_kinds.contains(ValueKind::Number) {
+                        let found = self.emit_raw_numeric_array_own_data_read(
+                            &inputs[0], &inputs[1], &pending, function,
+                        );
+                        found.load(function);
+                        schema.release_i32_local(found, function);
+                        self.emit_branch_if_to_target(property_exit, function);
+                    }
+                    if operands[1].possible_kinds.contains(ValueKind::String)
+                        && !matches!(&operands[1].expr, ExprIr::String(_))
+                    {
+                        let found = self.emit_raw_string_own_data_read(
+                            &inputs[0], &inputs[1], &pending, function,
+                        )?;
+                        found.load(function);
+                        schema.release_i32_local(found, function);
+                        self.emit_branch_if_to_target(property_exit, function);
+                    }
                 }
                 // Source operands already completed in order. A static String
                 // key needs no observable coercion, and the guarded own-data
@@ -656,19 +677,6 @@ impl<'a> FunctionBuilder<'a> {
                             lookup.copy_from(&inputs[0], function);
                         }
                         _ => unreachable!("closed property group"),
-                    }
-                    if operation == SpecOperationIr::GetV
-                        && operands[1].possible_kinds.contains(ValueKind::Number)
-                    {
-                        // Source computed reads commonly lower to GetV. Both
-                        // operands and ToObject have completed; a primitive Number
-                        // key has no observable conversion before an own data read.
-                        let found = self.emit_raw_numeric_array_own_data_read(
-                            &lookup, &inputs[1], &pending, function,
-                        );
-                        found.load(function);
-                        schema.release_i32_local(found, function);
-                        self.emit_branch_if_to_target(property_exit, function);
                     }
                     if operation == SpecOperationIr::GetV
                         && matches!(&operands[1].expr, ExprIr::String(_))

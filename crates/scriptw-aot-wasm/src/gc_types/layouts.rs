@@ -561,7 +561,8 @@ macro_rules! callable_roles {
     )+ };
 }
 callable_roles!(OrdinaryCallable => JavaScriptFunction, GeneratorCallable => GeneratorFunction,
-    AsyncCallable => AsyncFunction, AsyncGeneratorCallable => AsyncGeneratorFunction);
+    AsyncCallable => AsyncFunction, AsyncGeneratorCallable => AsyncGeneratorFunction,
+    LocalArgumentsCallable => LocalArgumentsFunction);
 
 /// A scalar attempt has no Completion ABI and cannot pass through call_entry.
 pub(crate) enum BinaryNumericCallback {}
@@ -1052,6 +1053,7 @@ gc_layout_registry! {
             ASYNC_ENTRY: GcFunctionRef<AsyncCallable>, Immutable, Nullable;
             ASYNC_GENERATOR_ENTRY: GcFunctionRef<AsyncGeneratorCallable>, Immutable, Nullable;
             BINARY_NUMERIC_ENTRY: GcFunctionRef<BinaryNumericCallback>, Immutable, Nullable;
+            LOCAL_ARGUMENTS_ENTRY: GcFunctionRef<LocalArgumentsCallable>, Immutable, Nullable;
         }
         struct FunctionObject: JavaScriptObject => FunctionObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;

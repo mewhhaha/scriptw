@@ -8,22 +8,28 @@
     "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/report.json": "93d9ab0cc54e331ef4e58d34fc397cc0569be1974a4ad50f205010f2809e10f5",
     "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/compiler_precompiled_baseline-producer.json": "d5c56fb921d8b90e6f4d9a0accf7ae1e877e8108d4e8277b3cbb21f12daffe0d",
     "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline": "fe9cf940aef8bc0b04cb8c5dfb775b9a962d6fd51246dd939a27fd68d4fbb627",
     "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline-producer.json": "6662bb9afffbb37b11eda54f142b4918dc0cabd0099092364385ba7aef5aade3",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measure_rsc.py": "327ecb85a1a0151202b3107241fe6680f129ea0d2e79c10d178fcf51c0b7e001",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/crates/scriptw-aot-wasm/src/arguments_protocol/unobserved_strict.rs": "88268b0329adc4d7f2f0519024cb85aaa83b06b60b0d34e829d1299e3198601c",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/crates/scriptw-aot-wasm/src/control_flow/dense_switch.rs": "46e947d2f78d973be8cf8aa1bd3259ad33d0d7a225ee976676496cac9c9cd9ee",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/crates/scriptw-aot-wasm/src/tests/dense_switch.rs": "ba4d54be9b7185ff80bd15d15420bcaf9739d5edfa9909328a4796d534a402e2",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/crates/scriptw-aot-wasm/src/tests/module_synthetic_storage.rs": "6c3c1f5648123775d079af9ab6174ffc091b086d4ef876a6f70c89e1a0b312b3",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/crates/scriptw-engine/tests/aot_language/aot_dense_switch.rs": "9294975c9aa3371374c4452ec1511ae11708ab020798d7541097a91050247704",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/manifest.json": "21c43a292e9232e84df699330bf2dfd43169bd7e7368335a2bafa40c594fc0ed",
-    "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/measured-source/tracked.patch": "6ede791a81f1e6c90e294a3ae95765eea76e117aa926f982bfc6ab84f59e160d",
-    "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63",
-    "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/candidate-fast-0.json": "eaffa9a5ad3a82b0af9efbdd785aadc077d5a72adcea2530162de3461e3f5223",
-    "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/cli-producer.json": "a3d01a6888432f83285f925bb93f888e57da1f3f5ef5519f7e866c2904187f8b",
-    "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc-producer.json": "89d049ba66741a0996bb41e3230deed2e02e2096c1d25beacc5ef174d1767705",
-    "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39"
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/compiler_precompiled_baseline-producer.json": "9cddbc784a1f4bbdf1fdbfcb919673a99369c820536818de2436d333f4190131",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline-producer.json": "dafd5fd77bcd9a7237652d54cf8bb61a0b5ab4306d764cb1dfcbb51648283773",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measure_rsc.py": "df8ea430deef5ab8abfdc78944b6546e6720ae7fb32727ed88c9462a31239efd",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/emit/local_arguments_adapter.rs": "7a2267621b7d9bfd7aee809723a05046557d84f14af865f9e6852db691093b54",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/function_entry/local_argument_inputs.rs": "b9ddb29cd7e8117318a6e0f92190fa4b9707eca3d2b8d11fdfa46ade764fee32",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/function_entry/local_arguments.rs": "c0cc32927bef44a2a36fc9caff5fe20ed0acd62f5aa4f72eed6c810818e91960",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/functions/local_argument_call.rs": "589b5417f331099ab1b10cd0592abdedcc128666effa5ef1d529e7f7d37d20a0",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/tests/local_argument_calls.rs": "283df2228cee64283e218cab3d188e75b89fe6a6c21a5bcb0bbc263a653d375f",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-aot-wasm/src/tests/raw_key_own_data.rs": "4d06ee5ceb9564054c5146698fc5ea515485b1589503724dac338f9677a60505",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-engine/tests/aot_language/aot_local_argument_calls.rs": "030fc416e1fdb0b747972cc0b33e6145fbfa8073ddee7a28a6f16063afc60278",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-engine/tests/aot_language/aot_raw_key_own_data.rs": "4d057f08a23cbd56d4281020a9937a4cddc021366bd77ac602cb8e7c2fa7085c",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/crates/scriptw-ir/tests/captured_function_candidates.rs": "3f51f34fd552a65224b56e9674d13b1d8a5f12093ee6bca445a85c6f9cf0d6ca",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/docs/rust-rewrite/contracts/local-arguments-call-entry.md": "9c47756a8d453d704c8325e657277a1fcc212805f45cc6c166b484215730a084",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/docs/rust-rewrite/contracts/raw-key-own-data-read.md": "fa7848d3c44a5da271541c8f24c6bd03559b4a467aebaf65a8405211d094cac3",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/manifest.json": "f3f942cdc71498f73e102588f5c001908f9e3ad59070b06b19397815554fd233",
+    "/home/jacobt/src/scriptw/target/performance-specialize-20261103/measured-source/tracked.patch": "712f46f10e2a2f0c06ee85054c5e77494568b6e2618f80029bc78ce210ac2b0e",
+    "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"
   },
   "measurement": {
     "blocks": 2,
@@ -48,707 +54,70 @@
         "baseline"
       ]
     ],
-    "campaign": "target/performance-climb-env-20261103/fast-comparison-campaign/campaign.json",
-    "campaign_sha256": "7c47b6cb118e0a4a5e7f38e43764bd26382a5b0f652559aa93401196be6a5205"
+    "campaign": "target/performance-specialize-20261103/fast-comparison-campaign/campaign.json",
+    "campaign_sha256": "85034f8bc12ed25339faa0d3e1bd042c88a78dd13e42a5289addc645503a3e39"
   },
   "caveat": "Prior and current candidate binaries are compared under the same actual Fast/SinglePass Wasmtime settings against one retained Node 24 module. The source revision and binary identities bind each build; the difference is descriptive and is not isolated causal evidence for any single source change. Process medians are units; no significance claim.",
   "source_identity": {
     "git_revision_role": "base commit only; compiler fingerprint and executable/program/runtime hashes identify measured builds",
-    "full_baseline_source_snapshot_preserved": true,
     "baseline_source": {
-      "public_report_git_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
-      "public_report": "docs/rust-rewrite/rsc-current.json",
-      "public_report_sha256": "1a05ae9ba0e10e64989c38681819731c47512ebe12da20539e9ffdfdb22b9b07",
+      "public_reports": {
+        "situations-current.json": {
+          "git_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+          "path": "docs/rust-rewrite/situations-current.json",
+          "sha256": "802680ae3fa67b8225cc4863801ceaf3ffbd407a8ae3cf2e93d03da29a136971",
+          "bytes": 335997
+        },
+        "rsc-current.json": {
+          "git_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+          "path": "docs/rust-rewrite/rsc-current.json",
+          "sha256": "b29809221321da9dfe166b503b7f81632973e12448ef8d72e1b7f0080bbd9ebe",
+          "bytes": 102720
+        },
+        "rsc-wasm-size-current.json": {
+          "git_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+          "path": "docs/rust-rewrite/rsc-wasm-size-current.json",
+          "sha256": "fc7698d014adce520bf10dc586a07251fbe92084f78478f724b1dc741f0fb6e0",
+          "bytes": 66590
+        },
+        "react-attribution-current.json": {
+          "git_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+          "path": "docs/rust-rewrite/react-attribution-current.json",
+          "sha256": "7d79c1646240e34f251d6b5d476428a0842bf0221af00b423792d2a891d79b7f",
+          "bytes": 155791
+        }
+      },
       "evidence_archive": {
-        "bytes": 1153336,
-        "expanded_utf8_bytes": 197870409,
-        "file": "docs/rust-rewrite/rsc-final-evidence-2026-11-03.tar.xz",
-        "over_5mb": false,
-        "regular_utf8_members": 387,
-        "sha256": "556ac5d8e1ce970019002434f3506140da268a9f15c4356511b7ed87372c2c4c"
+        "file": "docs/rust-rewrite/situations-evidence-2026-11-03.tar.xz",
+        "sha256": "a1e59cc501d016fd6ab7aa3d492f2438ed0907a1b5218e14ea76ded2da607cfa",
+        "bytes": 956192,
+        "regular_utf8_members": 2281,
+        "expanded_utf8_bytes": 28654360,
+        "over_5mb": false
       },
       "measured_source": {
         "archive_prefix": "source/final-measured/",
-        "base_commit": "dfb66a61bacae73657dfd5694c5d3e4290eeb83a",
-        "files": 4,
-        "manifest_sha256": "1c02e4963b1093fbf88ad16f2ac72c30f0696842bfcf6eb6237cefcb3644f143",
-        "role": "Final private-local-promotion candidate; apply tracked patch then new files to base. Earlier inline-cell candidate remains frozen as a separate diagnostic."
+        "base_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
+        "manifest_sha256": "21c43a292e9232e84df699330bf2dfd43169bd7e7368335a2bafa40c594fc0ed",
+        "tracked_patch_sha256": "6ede791a81f1e6c90e294a3ae95765eea76e117aa926f982bfc6ab84f59e160d",
+        "new_files": 5
       },
-      "note": "Verified prior public candidate identity, archive hash/size and source manifest; raw aggregate retains its original stale filename string."
+      "preservation": "Hash-verified prior source reconstruction in the prior published archive; old histories are not nested."
     },
     "candidate_measured_source": {
-      "archive_prefix": "source/final-measured/",
-      "base_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
-      "manifest_sha256": "21c43a292e9232e84df699330bf2dfd43169bd7e7368335a2bafa40c594fc0ed",
-      "tracked_patch_sha256": "6ede791a81f1e6c90e294a3ae95765eea76e117aa926f982bfc6ab84f59e160d",
-      "new_files": 5
+      "archive_prefix": "source/measured/",
+      "base_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+      "manifest_sha256": "f3f942cdc71498f73e102588f5c001908f9e3ad59070b06b19397815554fd233",
+      "tracked_patch_sha256": "712f46f10e2a2f0c06ee85054c5e77494568b6e2618f80029bc78ce210ac2b0e",
+      "new_files": 11
     },
     "evidence_script": "measure_fast_comparison.py",
-    "evidence_driver": "react-driver.cjs"
+    "evidence_driver": "react-driver.cjs",
+    "baseline_source_preservation": "Hash-verified prior source reconstruction in the prior published archive; old histories are not nested."
   },
   "engines": {
     "baseline": {
       "label": "Scriptw prior candidate (Fast)",
-      "identity": {
-        "source_fingerprint": "083d9dd79f512925074b1089f3966d404c8faf75d9c118cd4dd299a4f61da9d5",
-        "source_commit": "dfb66a61bacae73657dfd5694c5d3e4290eeb83a",
-        "executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
-        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-        "toolchain": {
-          "opt_level": "3",
-          "profile": "release",
-          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-          "target": "x86_64-unknown-linux-gnu"
-        },
-        "configuration": {
-          "collector": "Copying",
-          "compilation_jobs": 1,
-          "cranelift_opt_level": "None",
-          "driver_worker_stack_bytes": 67108864,
-          "epoch_deadline_ticks": 6000,
-          "epoch_interruption": true,
-          "epoch_tick_ms": 5,
-          "gc_initial_bytes": 16777216,
-          "max_wasm_stack_bytes": 33554432,
-          "native_parallel_compilation": false,
-          "pending_deadline_ms": 30000,
-          "register_allocation": "SinglePass",
-          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-          "target": "x86_64-unknown-linux-gnu",
-          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-          "wasmtime": "47.0.0",
-          "wasmtime_async_stack_bytes": 67108864
-        },
-        "program_wasm_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
-        "runtime": {
-          "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
-          "wasm_bytes": 39380016,
-          "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
-        },
-        "inputs": {
-          "adapted_source_bytes": 64946,
-          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-          "source_bytes": 64835,
-          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-          "versions": {
-            "esbuild": "0.28.2",
-            "playwright": "1.64.1",
-            "react": "19.3.1",
-            "react-dom": "19.3.1",
-            "react-server-dom-webpack": "19.3.1"
-          },
-          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        }
-      },
-      "cases": {
-        "rsc-sync": [
-          19724627,
-          19857228,
-          19950055,
-          19958318,
-          19554769,
-          19623578,
-          20503194,
-          20303232
-        ],
-        "rsc-async": [
-          20914986,
-          21117060,
-          22554429,
-          21567926,
-          20822395,
-          20846368,
-          21769538,
-          21592299
-        ]
-      },
-      "process_receipts": [
-        {
-          "block": 0,
-          "process": 0,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 22169\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-0-0-baseline/report.json",
-          "stdout": "block-0-0-baseline/stdout",
-          "stderr": "block-0-0-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16904147092,
-            "user_cpu_ns": 16218505000,
-            "system_cpu_ns": 377614000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 558514176,
-            "peak_rss_bytes": 558514176,
-            "child_peak_rss_kib": 545424,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "e02d56688fc5e4d97c27c9a828043686344ee81ba0cb829a903a57a14f32f17e",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19724627,
-            "rsc-async": 20914986
-          },
-          "report_sha256": "1108f0ba152cd2eaabe120d54ca971d5b4bcbf6b670202eb6d0002b2c5b5d178"
-        },
-        {
-          "block": 0,
-          "process": 1,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-0-1-baseline/report.json",
-          "stdout": "block-0-1-baseline/stdout",
-          "stderr": "block-0-1-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16183891448,
-            "user_cpu_ns": 15839521000,
-            "system_cpu_ns": 237598000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 541679616,
-            "peak_rss_bytes": 541679616,
-            "child_peak_rss_kib": 528984,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "69f55ac64321f0a279b8bd8c135f049d57e42a797c22979eaa7e81e33e45e9eb",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19857228,
-            "rsc-async": 21117060
-          },
-          "report_sha256": "232114dc6cafcbf34700709c0bb000b61e0ae20c6cbe150628b7a70328233a5c"
-        },
-        {
-          "block": 0,
-          "process": 2,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-0-2-baseline/report.json",
-          "stdout": "block-0-2-baseline/stdout",
-          "stderr": "block-0-2-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16304335168,
-            "user_cpu_ns": 15938039000,
-            "system_cpu_ns": 240511000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 539279360,
-            "peak_rss_bytes": 539279360,
-            "child_peak_rss_kib": 526640,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "e0a383ec4aa335b485d35f37ab8ef8312f04c672e8220147045fd9541d464686",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19950055,
-            "rsc-async": 22554429
-          },
-          "report_sha256": "c7237d2af776babcce98c9f57c1dcfcfa89a38f9bcd2ea2522094f9ce78b6286"
-        },
-        {
-          "block": 0,
-          "process": 3,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-0-3-baseline/report.json",
-          "stdout": "block-0-3-baseline/stdout",
-          "stderr": "block-0-3-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16528012330,
-            "user_cpu_ns": 16070441000,
-            "system_cpu_ns": 233400000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 573390848,
-            "peak_rss_bytes": 573390848,
-            "child_peak_rss_kib": 559952,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "fca7e04632a5c0ac660a733ab23e0233d8bdfaa12655bd796a0a62000480d376",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19958318,
-            "rsc-async": 21567926
-          },
-          "report_sha256": "ace5ac717a262febcef010cd1d2d8e0096b0741696510502d965d6b93f3fdaab"
-        },
-        {
-          "block": 1,
-          "process": 0,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-1-0-baseline/report.json",
-          "stdout": "block-1-0-baseline/stdout",
-          "stderr": "block-1-0-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16218441950,
-            "user_cpu_ns": 15881694000,
-            "system_cpu_ns": 225273000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 543502336,
-            "peak_rss_bytes": 543502336,
-            "child_peak_rss_kib": 530764,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "be6a4a1300ede8fba568af65e141ddc03c6da339c64ebc2a9241638270eb3f06",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19554769,
-            "rsc-async": 20822395
-          },
-          "report_sha256": "88baa85e0ca6b12ee91fe92fe070f5a29a700e22a40e077910b9bb713ed01d9c"
-        },
-        {
-          "block": 1,
-          "process": 1,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-1-1-baseline/report.json",
-          "stdout": "block-1-1-baseline/stdout",
-          "stderr": "block-1-1-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16446207088,
-            "user_cpu_ns": 16078364000,
-            "system_cpu_ns": 232307000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 557772800,
-            "peak_rss_bytes": 557772800,
-            "child_peak_rss_kib": 544700,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "41a328fe768d44705c8e4e13107cc9bbb24b2eb8d10d6875d760d2c01c8594c8",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 19623578,
-            "rsc-async": 20846368
-          },
-          "report_sha256": "c77099f6f827a60c9f95167fd6698e9ecd1be8a802df53c06375c6694cffecc6"
-        },
-        {
-          "block": 1,
-          "process": 2,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-1-2-baseline/report.json",
-          "stdout": "block-1-2-baseline/stdout",
-          "stderr": "block-1-2-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16807812873,
-            "user_cpu_ns": 16396134000,
-            "system_cpu_ns": 283539000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 576897024,
-            "peak_rss_bytes": 576897024,
-            "child_peak_rss_kib": 563376,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "aeba6d53fc39f19ae3f63fb3c496ba73f03b74205d40fc0076e87e3f3bcda103",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 20503194,
-            "rsc-async": 21769538
-          },
-          "report_sha256": "8edbbf9ce3ef3ca0aefb4d443622c849b95af6489ca7325bae9958747ccd7040"
-        },
-        {
-          "block": 1,
-          "process": 3,
-          "engine": "baseline",
-          "argv": [
-            "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-baseline/report.json",
-            "7",
-            "3"
-          ],
-          "environment": {
-            "NODE_ENV": "production",
-            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
-            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-baseline/tmp",
-            "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-baseline/cache",
-            "SCRIPTW_JOBS": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
-            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
-          },
-          "resources_before": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "report": "block-1-3-baseline/report.json",
-          "stdout": "block-1-3-baseline/stdout",
-          "stderr": "block-1-3-baseline/stderr",
-          "status": "complete",
-          "resources": {
-            "exit_code": 0,
-            "elapsed_ns": 16823764007,
-            "user_cpu_ns": 16435600000,
-            "system_cpu_ns": 255976000,
-            "timed_out": false,
-            "launch_tree_peak_rss_bytes": 533106688,
-            "peak_rss_bytes": 533106688,
-            "child_peak_rss_kib": 520612,
-            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
-            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
-          },
-          "resources_after": {
-            "memory.max": "4294967296",
-            "memory.swap.max": "0",
-            "memory.oom.group": "1",
-            "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
-          },
-          "stdout_sha256": "58ebfbe9960a92a46498434218fe1e05c7c0034c434c2172f4ae17cb673dbc73",
-          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "process_medians_ns": {
-            "rsc-sync": 20303232,
-            "rsc-async": 21592299
-          },
-          "report_sha256": "9fb3ca8d307e544b3b6240a34eb3fd67432fbe535b684a631135c829a4ce2c6b"
-        }
-      ],
-      "block_medians": [
-        {
-          "block": 0,
-          "cases": {
-            "rsc-sync": 19903641.5,
-            "rsc-async": 21342493.0
-          }
-        },
-        {
-          "block": 1,
-          "cases": {
-            "rsc-sync": 19963405.0,
-            "rsc-async": 21219333.5
-          }
-        }
-      ],
-      "phase_processes": [
-        {
-          "engine_setup": 50707,
-          "front_and_lower": 2621043483,
-          "module_initialization": 2634101,
-          "native_preparation": 13069512257,
-          "realm_and_instantiation": 578303,
-          "source_to_wasm": 3234620736,
-          "wasm_emission": 613577253
-        },
-        {
-          "engine_setup": 81395,
-          "front_and_lower": 2675092925,
-          "module_initialization": 2616427,
-          "native_preparation": 12278664581,
-          "realm_and_instantiation": 598420,
-          "source_to_wasm": 3306923569,
-          "wasm_emission": 631830644
-        },
-        {
-          "engine_setup": 50126,
-          "front_and_lower": 2735739190,
-          "module_initialization": 2668366,
-          "native_preparation": 12336362964,
-          "realm_and_instantiation": 595215,
-          "source_to_wasm": 3358391791,
-          "wasm_emission": 622652601
-        },
-        {
-          "engine_setup": 51809,
-          "front_and_lower": 2680197789,
-          "module_initialization": 2633409,
-          "native_preparation": 12613392816,
-          "realm_and_instantiation": 567181,
-          "source_to_wasm": 3311059881,
-          "wasm_emission": 630862092
-        },
-        {
-          "engine_setup": 47661,
-          "front_and_lower": 2669115978,
-          "module_initialization": 2584175,
-          "native_preparation": 12335236556,
-          "realm_and_instantiation": 593992,
-          "source_to_wasm": 3291540516,
-          "wasm_emission": 622424538
-        },
-        {
-          "engine_setup": 52210,
-          "front_and_lower": 2721165451,
-          "module_initialization": 2620133,
-          "native_preparation": 12485108319,
-          "realm_and_instantiation": 606917,
-          "source_to_wasm": 3362584518,
-          "wasm_emission": 641419067
-        },
-        {
-          "engine_setup": 53442,
-          "front_and_lower": 2764836518,
-          "module_initialization": 2678624,
-          "native_preparation": 12798038529,
-          "realm_and_instantiation": 587310,
-          "source_to_wasm": 3392968743,
-          "wasm_emission": 628132225
-        },
-        {
-          "engine_setup": 51198,
-          "front_and_lower": 2783910651,
-          "module_initialization": 2653106,
-          "native_preparation": 12790208275,
-          "realm_and_instantiation": 585656,
-          "source_to_wasm": 3421955448,
-          "wasm_emission": 638044797
-        }
-      ]
-    },
-    "candidate": {
-      "label": "Scriptw current candidate (Fast)",
       "identity": {
         "source_fingerprint": "95406a463ea5257413ccacdc0ab928f10569538149ca45d8ede4d0f4cde5e17e",
         "source_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
@@ -806,24 +175,684 @@
       },
       "cases": {
         "rsc-sync": [
-          17376461,
-          17578074,
-          17245519,
-          17182117,
-          17198729,
-          17218605,
-          17638195,
-          18346013
+          17349161,
+          17702773,
+          17674146,
+          17236520,
+          17027752,
+          17380246,
+          16882138,
+          17447642
         ],
         "rsc-async": [
-          18420020,
-          18275855,
-          18219316,
-          18233081,
-          18231888,
-          18272244,
-          19692730,
-          19491004
+          18011592,
+          18922649,
+          18224549,
+          18280511,
+          18050074,
+          18309505,
+          17851363,
+          18033726
+        ]
+      },
+      "process_receipts": [
+        {
+          "block": 0,
+          "process": 0,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 30848\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-0-0-baseline/report.json",
+          "stdout": "block-0-0-baseline/stdout",
+          "stderr": "block-0-0-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15496415427,
+            "user_cpu_ns": 15015809000,
+            "system_cpu_ns": 362402000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 525869056,
+            "peak_rss_bytes": 525869056,
+            "child_peak_rss_kib": 513544,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32076\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "ae3bef943464ff9642c6f06b109b70dd781736ac8e99cab0788ab7a44911a32b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17349161,
+            "rsc-async": 18011592
+          },
+          "report_sha256": "c71461eef3effb8a4776e4531f664a8f2ebd6f08fe6115e61dd81e6f95f9d0a6"
+        },
+        {
+          "block": 0,
+          "process": 1,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-0-1-baseline/report.json",
+          "stdout": "block-0-1-baseline/stdout",
+          "stderr": "block-0-1-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15346205073,
+            "user_cpu_ns": 14989655000,
+            "system_cpu_ns": 255028000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 500609024,
+            "peak_rss_bytes": 500609024,
+            "child_peak_rss_kib": 488876,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "23e8466a9c5496e64aee94bd587d9335526f7484abe4b8d34748100625c21dec",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17702773,
+            "rsc-async": 18922649
+          },
+          "report_sha256": "598f2ce871f48d26f727e33d1b388f84707b976374f5e1ab8dc8bf52acb03b1a"
+        },
+        {
+          "block": 0,
+          "process": 2,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-0-2-baseline/report.json",
+          "stdout": "block-0-2-baseline/stdout",
+          "stderr": "block-0-2-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15291427543,
+            "user_cpu_ns": 14959648000,
+            "system_cpu_ns": 227642000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 515104768,
+            "peak_rss_bytes": 515104768,
+            "child_peak_rss_kib": 503032,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "e53e4832ad5d6b4567430dd27a7c3060c549b0b14520b58ffc4d4a785e7e3a0c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17674146,
+            "rsc-async": 18224549
+          },
+          "report_sha256": "327b59b74f23a09d4d1f8dd94bc3e70b1ed3b30118267b75d9021333b93c998e"
+        },
+        {
+          "block": 0,
+          "process": 3,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-0-3-baseline/report.json",
+          "stdout": "block-0-3-baseline/stdout",
+          "stderr": "block-0-3-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15404036778,
+            "user_cpu_ns": 15081758000,
+            "system_cpu_ns": 210426000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 525848576,
+            "peak_rss_bytes": 525848576,
+            "child_peak_rss_kib": 513524,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "823a07106d0be25b3e7476694d48e593998dde45d6bda848a862dc2fa23ad3e7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17236520,
+            "rsc-async": 18280511
+          },
+          "report_sha256": "a1feb0509a85f204515a5d8f755ddee83788eca234881f381885aee6dc6fac2a"
+        },
+        {
+          "block": 1,
+          "process": 0,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-1-0-baseline/report.json",
+          "stdout": "block-1-0-baseline/stdout",
+          "stderr": "block-1-0-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15199760150,
+            "user_cpu_ns": 14854349000,
+            "system_cpu_ns": 224468000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 519368704,
+            "peak_rss_bytes": 519368704,
+            "child_peak_rss_kib": 507196,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "014e9d13e5dea76fca7b085273381a95822c7433f017c655b2ff3e6dd161c399",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17027752,
+            "rsc-async": 18050074
+          },
+          "report_sha256": "94f5ccb2ed3b19eddd4502d304424ba6f8b5e287aea8be0fa106d67f2a404a2c"
+        },
+        {
+          "block": 1,
+          "process": 1,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-1-1-baseline/report.json",
+          "stdout": "block-1-1-baseline/stdout",
+          "stderr": "block-1-1-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15330004895,
+            "user_cpu_ns": 14990111000,
+            "system_cpu_ns": 239525000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 524935168,
+            "peak_rss_bytes": 524935168,
+            "child_peak_rss_kib": 512632,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "383fd8080afca1d368c7c43ea4d528ff342df9be473a708476bb76d7bd7641c2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17380246,
+            "rsc-async": 18309505
+          },
+          "report_sha256": "9215b130b1ae922160556a5e70d745d85590dcb8397f41201fc7aca5a9788fb3"
+        },
+        {
+          "block": 1,
+          "process": 2,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-1-2-baseline/report.json",
+          "stdout": "block-1-2-baseline/stdout",
+          "stderr": "block-1-2-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15232686122,
+            "user_cpu_ns": 14893343000,
+            "system_cpu_ns": 230760000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 519417856,
+            "peak_rss_bytes": 519417856,
+            "child_peak_rss_kib": 507244,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "4002098a20390862015126edcbc397e7d1f9d1e8295dc5e4748ba3a455416968",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 16882138,
+            "rsc-async": 17851363
+          },
+          "report_sha256": "4932ea255163f6576e2cb8c57f3a419ebd98ed956f4f0e78341577d3eba700d8"
+        },
+        {
+          "block": 1,
+          "process": 3,
+          "engine": "baseline",
+          "argv": [
+            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-baseline/report.json",
+            "7",
+            "3"
+          ],
+          "environment": {
+            "NODE_ENV": "production",
+            "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
+            "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-baseline/tmp",
+            "NODE_DISABLE_COMPILE_CACHE": "1",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-baseline/cache",
+            "SCRIPTW_JOBS": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
+            "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
+          },
+          "resources_before": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "report": "block-1-3-baseline/report.json",
+          "stdout": "block-1-3-baseline/stdout",
+          "stderr": "block-1-3-baseline/stderr",
+          "status": "complete",
+          "resources": {
+            "exit_code": 0,
+            "elapsed_ns": 15265358435,
+            "user_cpu_ns": 14931547000,
+            "system_cpu_ns": 223713000,
+            "timed_out": false,
+            "launch_tree_peak_rss_bytes": 509698048,
+            "peak_rss_bytes": 509698048,
+            "child_peak_rss_kib": 497752,
+            "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
+            "cpu_scope": "gnu-time-supervisor-and-runtime-child"
+          },
+          "resources_after": {
+            "memory.max": "4294967296",
+            "memory.swap.max": "0",
+            "memory.oom.group": "1",
+            "cpu.max": "max 100000",
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+          },
+          "stdout_sha256": "3252d13b4e28f7cf8fb20d77cde1ce14f6314b8812e0e3da8f103be8590b39c8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "process_medians_ns": {
+            "rsc-sync": 17447642,
+            "rsc-async": 18033726
+          },
+          "report_sha256": "7bfa0cde929e994d7d48cb15fa0c698ae4352a19c8af6138d338a146df688dcd"
+        }
+      ],
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 17511653.5,
+            "rsc-async": 18252530.0
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 17203999.0,
+            "rsc-async": 18041900.0
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "engine_setup": 73407,
+          "front_and_lower": 2577129755,
+          "module_initialization": 2649964,
+          "native_preparation": 11794874219,
+          "realm_and_instantiation": 590817,
+          "source_to_wasm": 3155680840,
+          "wasm_emission": 578551085
+        },
+        {
+          "engine_setup": 73508,
+          "front_and_lower": 2585430349,
+          "module_initialization": 3041893,
+          "native_preparation": 11628771026,
+          "realm_and_instantiation": 644678,
+          "source_to_wasm": 3164123177,
+          "wasm_emission": 578692828
+        },
+        {
+          "engine_setup": 71875,
+          "front_and_lower": 2573512413,
+          "module_initialization": 2665652,
+          "native_preparation": 11591267638,
+          "realm_and_instantiation": 615865,
+          "source_to_wasm": 3152142810,
+          "wasm_emission": 578630397
+        },
+        {
+          "engine_setup": 73207,
+          "front_and_lower": 2590043890,
+          "module_initialization": 2603129,
+          "native_preparation": 11690038984,
+          "realm_and_instantiation": 590589,
+          "source_to_wasm": 3172999667,
+          "wasm_emission": 582955777
+        },
+        {
+          "engine_setup": 73478,
+          "front_and_lower": 2563545926,
+          "module_initialization": 2603175,
+          "native_preparation": 11520379159,
+          "realm_and_instantiation": 592293,
+          "source_to_wasm": 3142278372,
+          "wasm_emission": 578732446
+        },
+        {
+          "engine_setup": 73268,
+          "front_and_lower": 2569055708,
+          "module_initialization": 2677958,
+          "native_preparation": 11638330310,
+          "realm_and_instantiation": 598476,
+          "source_to_wasm": 3147994505,
+          "wasm_emission": 578938797
+        },
+        {
+          "engine_setup": 68769,
+          "front_and_lower": 2572242190,
+          "module_initialization": 2632655,
+          "native_preparation": 11551073244,
+          "realm_and_instantiation": 597634,
+          "source_to_wasm": 3148913994,
+          "wasm_emission": 576671804
+        },
+        {
+          "engine_setup": 72516,
+          "front_and_lower": 2576933665,
+          "module_initialization": 2860999,
+          "native_preparation": 11566543716,
+          "realm_and_instantiation": 656306,
+          "source_to_wasm": 3154733942,
+          "wasm_emission": 577800277
+        }
+      ]
+    },
+    "candidate": {
+      "label": "Scriptw current candidate (Fast)",
+      "identity": {
+        "source_fingerprint": "9dd31eafb905f7a203c525096d1c274d3d6eaf764a6b6cb72e25db226c10ba32",
+        "source_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+        "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
+        },
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_sha256": "9d5f2104a7e1fb30f9d4050f4f4b75ccbfd1c8c38ed0614a491e794a45d87a66",
+        "runtime": {
+          "key": "0bef8ee58b989c2f6409c7800985dab63f8df08be6d6d85ac46ac3fd33e1ebe5",
+          "wasm_bytes": 39382946,
+          "wasm_sha256": "194958918606fa929a197f8cabc3c1f9bd39bc4f884c53eb2bafa3a738b6097f"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        }
+      },
+      "cases": {
+        "rsc-sync": [
+          17811352,
+          17301003,
+          17189078,
+          17611937,
+          17472587,
+          17232379,
+          17170782,
+          17432435
+        ],
+        "rsc-async": [
+          18887650,
+          18297672,
+          18197793,
+          18605624,
+          18457338,
+          18251344,
+          18288677,
+          18481900
         ]
       },
       "process_receipts": [
@@ -832,10 +861,10 @@
           "process": 0,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-candidate/report.json",
             "7",
             "3"
           ],
@@ -843,9 +872,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -855,7 +884,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32076\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-0-candidate/report.json",
           "stdout": "block-0-0-candidate/stdout",
@@ -863,13 +892,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15666496869,
-            "user_cpu_ns": 15328523000,
-            "system_cpu_ns": 205752000,
+            "elapsed_ns": 15956846913,
+            "user_cpu_ns": 15596130000,
+            "system_cpu_ns": 259591000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 550879232,
-            "peak_rss_bytes": 550879232,
-            "child_peak_rss_kib": 537968,
+            "launch_tree_peak_rss_bytes": 541773824,
+            "peak_rss_bytes": 541773824,
+            "child_peak_rss_kib": 529076,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -878,25 +907,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "32d20103b97acb25153139061bc1fe51037fe53a34fedee6ab3f8f12886caa86",
+          "stdout_sha256": "dbbe316fcb40ae9ea781a678b6a2a0a44742e0200faa4b78883c70f2a7781f69",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17376461,
-            "rsc-async": 18420020
+            "rsc-sync": 17811352,
+            "rsc-async": 18887650
           },
-          "report_sha256": "93d9ab0cc54e331ef4e58d34fc397cc0569be1974a4ad50f205010f2809e10f5"
+          "report_sha256": "789cb8a1226fadf1f10417e05c3169aa41e5d89930e30dd39ea1996738425079"
         },
         {
           "block": 0,
           "process": 1,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-candidate/report.json",
             "7",
             "3"
           ],
@@ -904,9 +933,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -916,7 +945,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-1-candidate/report.json",
           "stdout": "block-0-1-candidate/stdout",
@@ -924,13 +953,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15653869997,
-            "user_cpu_ns": 15298038000,
-            "system_cpu_ns": 223161000,
+            "elapsed_ns": 16027037059,
+            "user_cpu_ns": 15680651000,
+            "system_cpu_ns": 227779000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 501723136,
-            "peak_rss_bytes": 501723136,
-            "child_peak_rss_kib": 489964,
+            "launch_tree_peak_rss_bytes": 531365888,
+            "peak_rss_bytes": 531365888,
+            "child_peak_rss_kib": 518912,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -939,25 +968,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "882101c49df1d17fbb5c358e778d9ed09620d2569134d3aad4c83ddfff98c37f",
+          "stdout_sha256": "d393793ae276c92f10bafed4ba2c04e7b047cee028b7ac12867ed4cb1aaf5be2",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17578074,
-            "rsc-async": 18275855
+            "rsc-sync": 17301003,
+            "rsc-async": 18297672
           },
-          "report_sha256": "ae9fc0e7cbdbd2bb3bdd57ff83dd9e96f567d4b5d28190a54682dad7e4208164"
+          "report_sha256": "aac430c3fbc70786e3e20f7460714a1b223b50db7715110afdfef4e6f9e6079a"
         },
         {
           "block": 0,
           "process": 2,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-candidate/report.json",
             "7",
             "3"
           ],
@@ -965,9 +994,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -977,7 +1006,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-2-candidate/report.json",
           "stdout": "block-0-2-candidate/stdout",
@@ -985,13 +1014,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15609932991,
-            "user_cpu_ns": 15264058000,
-            "system_cpu_ns": 220631000,
+            "elapsed_ns": 16471600419,
+            "user_cpu_ns": 15664277000,
+            "system_cpu_ns": 234789000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 516812800,
-            "peak_rss_bytes": 516812800,
-            "child_peak_rss_kib": 504700,
+            "launch_tree_peak_rss_bytes": 530923520,
+            "peak_rss_bytes": 530923520,
+            "child_peak_rss_kib": 518480,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1000,25 +1029,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "9515b622883797efa40eea63fbbf0f3e21d7eca54f4113d5779e7d72f2272506",
+          "stdout_sha256": "40b6dab42b2f44e84e2f069afe57d294bd3e3e74b9fe2fa94c9758ffa15b7c91",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17245519,
-            "rsc-async": 18219316
+            "rsc-sync": 17189078,
+            "rsc-async": 18197793
           },
-          "report_sha256": "eb4b11d46556057389a3e61ab7d2c7e2b6a23c7fd8fd3c97af05ec6c7150600a"
+          "report_sha256": "5e49ef46846279e950ecb626bde4cb42f4f764b75bf72a8ff1dd322dd6bac9e6"
         },
         {
           "block": 0,
           "process": 3,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-candidate/report.json",
             "7",
             "3"
           ],
@@ -1026,9 +1055,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1038,7 +1067,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-3-candidate/report.json",
           "stdout": "block-0-3-candidate/stdout",
@@ -1046,13 +1075,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15568799599,
-            "user_cpu_ns": 15224229000,
-            "system_cpu_ns": 219655000,
+            "elapsed_ns": 15980706275,
+            "user_cpu_ns": 15654812000,
+            "system_cpu_ns": 247678000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 519032832,
-            "peak_rss_bytes": 519032832,
-            "child_peak_rss_kib": 506868,
+            "launch_tree_peak_rss_bytes": 533286912,
+            "peak_rss_bytes": 533286912,
+            "child_peak_rss_kib": 520788,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1061,25 +1090,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "2a12acd02e949754f71639a0657d6a4f5e6b0ceb650aee63d293cce56604b3f0",
+          "stdout_sha256": "6f2ca8171eb4971fca6bb5415e69dc7b263d72faecf127bad2be1d88f1032361",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17182117,
-            "rsc-async": 18233081
+            "rsc-sync": 17611937,
+            "rsc-async": 18605624
           },
-          "report_sha256": "f91a03e4ecd12a78bed6882305a10fb45e1ee3d6674a93e0f941b4e34e030747"
+          "report_sha256": "7dbe85b3bb0fb9e0dc5e6e0a5743fa5ec95ea431f00606c25e72a40a067302d7"
         },
         {
           "block": 1,
           "process": 0,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-candidate/report.json",
             "7",
             "3"
           ],
@@ -1087,9 +1116,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1099,7 +1128,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-0-candidate/report.json",
           "stdout": "block-1-0-candidate/stdout",
@@ -1107,13 +1136,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15758060744,
-            "user_cpu_ns": 15376191000,
-            "system_cpu_ns": 215197000,
+            "elapsed_ns": 16113966283,
+            "user_cpu_ns": 15558682000,
+            "system_cpu_ns": 349221000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 545624064,
-            "peak_rss_bytes": 545624064,
-            "child_peak_rss_kib": 532836,
+            "launch_tree_peak_rss_bytes": 540778496,
+            "peak_rss_bytes": 540778496,
+            "child_peak_rss_kib": 528104,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1122,25 +1151,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "ac53e9aff9ff6f20d646264428fb7827cd0de2da2e847dbf5fdfe846a9c2fd52",
+          "stdout_sha256": "d24b9a8399cec0d0b8e4aeace2fe0d41ff823fa22f50c0b4ab406c3448f8c51d",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17198729,
-            "rsc-async": 18231888
+            "rsc-sync": 17472587,
+            "rsc-async": 18457338
           },
-          "report_sha256": "8ed05a64c3918e2bae66d12ffbe5ca34083a5b1d7c073dbe17c6b00f3bd77955"
+          "report_sha256": "258e163482f572c2d39e792af25db6e91c8232d064a5e2d0b5a4de3b40155516"
         },
         {
           "block": 1,
           "process": 1,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-candidate/report.json",
             "7",
             "3"
           ],
@@ -1148,9 +1177,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1160,7 +1189,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-1-candidate/report.json",
           "stdout": "block-1-1-candidate/stdout",
@@ -1168,13 +1197,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 15822611508,
-            "user_cpu_ns": 15402632000,
-            "system_cpu_ns": 217170000,
+            "elapsed_ns": 15966923827,
+            "user_cpu_ns": 15640813000,
+            "system_cpu_ns": 215718000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 520966144,
-            "peak_rss_bytes": 520966144,
-            "child_peak_rss_kib": 508756,
+            "launch_tree_peak_rss_bytes": 541171712,
+            "peak_rss_bytes": 541171712,
+            "child_peak_rss_kib": 528488,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1183,25 +1212,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "e72a694a6456d46a21ebb7fb17168386cbd1e7f47781ef6d39f10ac9634b72ed",
+          "stdout_sha256": "38ed3ad41571015753757695add073feb8e6088de69dd5e06ed732a84830623d",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17218605,
-            "rsc-async": 18272244
+            "rsc-sync": 17232379,
+            "rsc-async": 18251344
           },
-          "report_sha256": "40c4b68593a9caec73b30d303931ff02d658cf9eaabe1949521f79131082064d"
+          "report_sha256": "0eef8c39bb0ab371dad17cbc7829edc089aebd5512ac3700371a53b1f4340555"
         },
         {
           "block": 1,
           "process": 2,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-candidate/report.json",
             "7",
             "3"
           ],
@@ -1209,9 +1238,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1221,7 +1250,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-2-candidate/report.json",
           "stdout": "block-1-2-candidate/stdout",
@@ -1229,13 +1258,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 16033744405,
-            "user_cpu_ns": 15642543000,
-            "system_cpu_ns": 243968000,
+            "elapsed_ns": 15984831850,
+            "user_cpu_ns": 15638515000,
+            "system_cpu_ns": 238707000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 509411328,
-            "peak_rss_bytes": 509411328,
-            "child_peak_rss_kib": 497472,
+            "launch_tree_peak_rss_bytes": 535793664,
+            "peak_rss_bytes": 535793664,
+            "child_peak_rss_kib": 523236,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1244,25 +1273,25 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "364196fd2af8b975078a94aa587ef07f0f9cc33bd462e5064e582f492090c933",
+          "stdout_sha256": "4926fb6e12c929301045e17f4bf0743c9b630744e0b109bb854f6d81340fdafb",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 17638195,
-            "rsc-async": 19692730
+            "rsc-sync": 17170782,
+            "rsc-async": 18288677
           },
-          "report_sha256": "fc8f68452be8ab3069a6390bb0d42e6ae112cf58505f0d71c34fd963046651f0"
+          "report_sha256": "bef5a4aad2835593113ef62ed48f3567e55147390d0ec903055c57060cbe849a"
         },
         {
           "block": 1,
           "process": 3,
           "engine": "candidate",
           "argv": [
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/frozen/rsc_baseline",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
             "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-            "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-candidate/report.json",
+            "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-candidate/report.json",
             "7",
             "3"
           ],
@@ -1270,9 +1299,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-candidate/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-candidate/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-candidate/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-candidate/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1282,7 +1311,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-3-candidate/report.json",
           "stdout": "block-1-3-candidate/stdout",
@@ -1290,13 +1319,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 16732718660,
-            "user_cpu_ns": 16309131000,
-            "system_cpu_ns": 246438000,
+            "elapsed_ns": 16017376897,
+            "user_cpu_ns": 15669043000,
+            "system_cpu_ns": 233651000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 536862720,
-            "peak_rss_bytes": 536862720,
-            "child_peak_rss_kib": 524280,
+            "launch_tree_peak_rss_bytes": 534765568,
+            "peak_rss_bytes": 534765568,
+            "child_peak_rss_kib": 522232,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1305,105 +1334,105 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "10e046f113e06975eaa9dbf5fb28bf1971970a36e6837a0e953edb71b7c0a484",
+          "stdout_sha256": "eb16fb7e801cc599e9897a7137f12cc9b9b27fdf62b99a5396757844692bdacf",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 18346013,
-            "rsc-async": 19491004
+            "rsc-sync": 17432435,
+            "rsc-async": 18481900
           },
-          "report_sha256": "e72cbb8fd30eef64281d00039ced68dbc8aab5cdc70e4c7bf822064a8899a723"
+          "report_sha256": "5375c628a7e938c7a9ec30aa766b089bd001ea678a3b850bafb67950251bacbc"
         }
       ],
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 17310990.0,
-            "rsc-async": 18254468.0
+            "rsc-sync": 17456470.0,
+            "rsc-async": 18451648.0
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 17428400.0,
-            "rsc-async": 18881624.0
+            "rsc-sync": 17332407.0,
+            "rsc-async": 18373007.5
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 82757,
-          "front_and_lower": 2600508377,
-          "module_initialization": 2630694,
-          "native_preparation": 11934004412,
-          "realm_and_instantiation": 623118,
-          "source_to_wasm": 3188766908,
-          "wasm_emission": 588258531
+          "engine_setup": 49764,
+          "front_and_lower": 2695663518,
+          "module_initialization": 2666046,
+          "native_preparation": 12113390209,
+          "realm_and_instantiation": 575760,
+          "source_to_wasm": 3291952069,
+          "wasm_emission": 596288551
         },
         {
-          "engine_setup": 81105,
-          "front_and_lower": 2606197341,
-          "module_initialization": 2672614,
-          "native_preparation": 11910117820,
-          "realm_and_instantiation": 614161,
-          "source_to_wasm": 3200700186,
-          "wasm_emission": 594502845
+          "engine_setup": 57919,
+          "front_and_lower": 2750543577,
+          "module_initialization": 2653117,
+          "native_preparation": 12133046571,
+          "realm_and_instantiation": 567985,
+          "source_to_wasm": 3354476138,
+          "wasm_emission": 603932561
         },
         {
-          "engine_setup": 81585,
-          "front_and_lower": 2605061959,
-          "module_initialization": 2622809,
-          "native_preparation": 11878099980,
-          "realm_and_instantiation": 597408,
-          "source_to_wasm": 3190250234,
-          "wasm_emission": 585188275
+          "engine_setup": 43101,
+          "front_and_lower": 2699242364,
+          "module_initialization": 2650475,
+          "native_preparation": 12635370982,
+          "realm_and_instantiation": 572214,
+          "source_to_wasm": 3300244867,
+          "wasm_emission": 601002503
         },
         {
-          "engine_setup": 83419,
-          "front_and_lower": 2601442641,
-          "module_initialization": 2589195,
-          "native_preparation": 11843122643,
-          "realm_and_instantiation": 599913,
-          "source_to_wasm": 3186010170,
-          "wasm_emission": 584567529
+          "engine_setup": 54292,
+          "front_and_lower": 2700036378,
+          "module_initialization": 2622156,
+          "native_preparation": 12138392988,
+          "realm_and_instantiation": 584879,
+          "source_to_wasm": 3300288991,
+          "wasm_emission": 600252613
         },
         {
-          "engine_setup": 79942,
-          "front_and_lower": 2620904601,
-          "module_initialization": 2666542,
-          "native_preparation": 12010777993,
-          "realm_and_instantiation": 610874,
-          "source_to_wasm": 3205201047,
-          "wasm_emission": 584296446
+          "engine_setup": 46337,
+          "front_and_lower": 2723608521,
+          "module_initialization": 2666421,
+          "native_preparation": 12031383328,
+          "realm_and_instantiation": 581302,
+          "source_to_wasm": 3320981259,
+          "wasm_emission": 597372738
         },
         {
-          "engine_setup": 81645,
-          "front_and_lower": 2602496794,
-          "module_initialization": 2643708,
-          "native_preparation": 12092290047,
-          "realm_and_instantiation": 626774,
-          "source_to_wasm": 3187027006,
-          "wasm_emission": 584530212
+          "engine_setup": 45586,
+          "front_and_lower": 2696581548,
+          "module_initialization": 2597515,
+          "native_preparation": 12135490658,
+          "realm_and_instantiation": 568459,
+          "source_to_wasm": 3295938334,
+          "wasm_emission": 599356786
         },
         {
-          "engine_setup": 80633,
-          "front_and_lower": 2644106986,
-          "module_initialization": 2782803,
-          "native_preparation": 12228986365,
-          "realm_and_instantiation": 626324,
-          "source_to_wasm": 3240385500,
-          "wasm_emission": 596278514
+          "engine_setup": 48802,
+          "front_and_lower": 2705650550,
+          "module_initialization": 2622676,
+          "native_preparation": 12140136077,
+          "realm_and_instantiation": 573870,
+          "source_to_wasm": 3309594193,
+          "wasm_emission": 603943643
         },
         {
-          "engine_setup": 85794,
-          "front_and_lower": 2679134026,
-          "module_initialization": 2690828,
-          "native_preparation": 12870635652,
-          "realm_and_instantiation": 606376,
-          "source_to_wasm": 3290333216,
-          "wasm_emission": 611199190
+          "engine_setup": 50986,
+          "front_and_lower": 2731033178,
+          "module_initialization": 2656422,
+          "native_preparation": 12139660102,
+          "realm_and_instantiation": 581335,
+          "source_to_wasm": 3332470554,
+          "wasm_emission": 601437376
         }
       ]
     },
@@ -1442,24 +1471,24 @@
       },
       "cases": {
         "rsc-sync": [
-          508980,
-          497538,
-          506786,
-          454536,
-          643036,
-          477009,
-          502738,
-          513308
+          480149,
+          481303,
+          490711,
+          486605,
+          479761,
+          479752,
+          903340,
+          491245
         ],
         "rsc-async": [
-          391526,
-          403068,
-          395223,
-          395885,
-          506004,
-          409140,
-          406204,
-          404131
+          458860,
+          378480,
+          392627,
+          395003,
+          373522,
+          384893,
+          401926,
+          409651
         ]
       },
       "process_receipts": [
@@ -1479,9 +1508,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1491,7 +1520,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-0-v8/report.json",
           "stdout": "block-0-0-v8/stdout",
@@ -1499,13 +1528,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 65809568,
-            "user_cpu_ns": 49108000,
-            "system_cpu_ns": 15844000,
+            "elapsed_ns": 63627321,
+            "user_cpu_ns": 47937000,
+            "system_cpu_ns": 14801000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 67485696,
-            "peak_rss_bytes": 67485696,
-            "child_peak_rss_kib": 65904,
+            "launch_tree_peak_rss_bytes": 67125248,
+            "peak_rss_bytes": 67125248,
+            "child_peak_rss_kib": 65552,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1514,15 +1543,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "1e99937fdd1f3606f8e74e680246cdb3685c59f3e0251f0b550b272d71007371",
+          "stdout_sha256": "b3e6fe63b1d833a9d4a2ec46faa510f4cfaf44489be1405ed8bb94880618415a",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 508980,
-            "rsc-async": 391526
+            "rsc-sync": 480149,
+            "rsc-async": 458860
           },
-          "report_sha256": "1b3db1db4006a6c46d0846d5b79a5a8bbb627638201fdfd1eb87fd340021a6d6"
+          "report_sha256": "e56ca22aa9f3f840374cc81e371697932bc024dce2b8d56764246b6bd869f253"
         },
         {
           "block": 0,
@@ -1540,9 +1569,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-1-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-1-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1552,7 +1581,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-1-v8/report.json",
           "stdout": "block-0-1-v8/stdout",
@@ -1560,13 +1589,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 65169404,
-            "user_cpu_ns": 48765000,
-            "system_cpu_ns": 15530000,
+            "elapsed_ns": 62940825,
+            "user_cpu_ns": 52692000,
+            "system_cpu_ns": 9524000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 67563520,
-            "peak_rss_bytes": 67563520,
-            "child_peak_rss_kib": 65980,
+            "launch_tree_peak_rss_bytes": 67825664,
+            "peak_rss_bytes": 67825664,
+            "child_peak_rss_kib": 66236,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1575,15 +1604,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "ebee01d739a55d8f32d1192899647fad26d8df952f97bcf3e3f995941b7aa3ac",
+          "stdout_sha256": "b83f25d282eac930ea84853e0a6913c45bb783a78123e65822dd999620774675",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 497538,
-            "rsc-async": 403068
+            "rsc-sync": 481303,
+            "rsc-async": 378480
           },
-          "report_sha256": "d085fc57ff516683965abb175aca50870d7944474fa8d7d9304d8cdc2f9e09c6"
+          "report_sha256": "668e6fa5990777999e7707e0a2adb5d18f26b4df9308632744b8e10593499eb4"
         },
         {
           "block": 0,
@@ -1601,9 +1630,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-2-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-2-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1613,7 +1642,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-2-v8/report.json",
           "stdout": "block-0-2-v8/stdout",
@@ -1621,13 +1650,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 63820539,
-            "user_cpu_ns": 52221000,
-            "system_cpu_ns": 10919000,
+            "elapsed_ns": 63031780,
+            "user_cpu_ns": 47748000,
+            "system_cpu_ns": 14553000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 66842624,
-            "peak_rss_bytes": 66842624,
-            "child_peak_rss_kib": 65276,
+            "launch_tree_peak_rss_bytes": 67104768,
+            "peak_rss_bytes": 67104768,
+            "child_peak_rss_kib": 65532,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1636,15 +1665,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23702\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "f2e003fdc431f30faffa66b212374695e38ede61d9e523928c5cc468a802ff4a",
+          "stdout_sha256": "52b4cfb4625293e2460577d07a824176fb98768b7314abf6d4d8b838283092ec",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 506786,
-            "rsc-async": 395223
+            "rsc-sync": 490711,
+            "rsc-async": 392627
           },
-          "report_sha256": "7d2547b2d30ed969ec4c8935ed38dc6187fbd687aae890c414f8f794d2b31b2d"
+          "report_sha256": "5b961e2da042a2c5b03bdc1d7c67a4b5b1daa0f3f72c471cf3fc54d460f66c18"
         },
         {
           "block": 0,
@@ -1662,9 +1691,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-3-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-3-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1674,7 +1703,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-0-3-v8/report.json",
           "stdout": "block-0-3-v8/stdout",
@@ -1682,13 +1711,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 63038776,
-            "user_cpu_ns": 51365000,
-            "system_cpu_ns": 10937000,
+            "elapsed_ns": 63041677,
+            "user_cpu_ns": 43810000,
+            "system_cpu_ns": 18521000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 66670592,
-            "peak_rss_bytes": 66670592,
-            "child_peak_rss_kib": 65108,
+            "launch_tree_peak_rss_bytes": 67719168,
+            "peak_rss_bytes": 67719168,
+            "child_peak_rss_kib": 66132,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1697,15 +1726,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "c4d806560961421208e420be25ed35f0cefaba9adc9c0631ed5ccd00f5f80b6d",
+          "stdout_sha256": "56b727ebb9a5bcf1eb7e06037549314ee7d55394c17c257b8a5ed9bf83fddb60",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 454536,
-            "rsc-async": 395885
+            "rsc-sync": 486605,
+            "rsc-async": 395003
           },
-          "report_sha256": "7e14ba58598d3290379e1d53b962f8b32b0020bb288510d61e6ddb374409f982"
+          "report_sha256": "bf8b244f37f77fb53822493ca57ea8c536bcccdd3660aec41a895ba656d31324"
         },
         {
           "block": 1,
@@ -1723,9 +1752,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-0-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-0-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1735,7 +1764,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-0-v8/report.json",
           "stdout": "block-1-0-v8/stdout",
@@ -1743,13 +1772,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 62656948,
-            "user_cpu_ns": 47100000,
-            "system_cpu_ns": 14827000,
+            "elapsed_ns": 62323198,
+            "user_cpu_ns": 43888000,
+            "system_cpu_ns": 17728000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 66998272,
-            "peak_rss_bytes": 66998272,
-            "child_peak_rss_kib": 65428,
+            "launch_tree_peak_rss_bytes": 67141632,
+            "peak_rss_bytes": 67141632,
+            "child_peak_rss_kib": 65568,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1758,15 +1787,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32107\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "6fb2f5a6ba377188ce414ff7598dd29c7db1eb48ff73143b10a54f23c127c2c6",
+          "stdout_sha256": "90c35352e48ebfaa130ed4f2bdf615a78845e9f16afd577d65c52634404d4354",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 643036,
-            "rsc-async": 506004
+            "rsc-sync": 479761,
+            "rsc-async": 373522
           },
-          "report_sha256": "6880e32da1c26fc1bf872241b18567675041a19cf413656e806313d8c0bb4a35"
+          "report_sha256": "358aa396824764c39a191f66f913f654f0912b3d1b85484b463e9eed6d68eb06"
         },
         {
           "block": 1,
@@ -1784,9 +1813,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-1-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-1-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1796,7 +1825,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-1-v8/report.json",
           "stdout": "block-1-1-v8/stdout",
@@ -1804,13 +1833,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 63240928,
-            "user_cpu_ns": 50783000,
-            "system_cpu_ns": 11812000,
+            "elapsed_ns": 63122643,
+            "user_cpu_ns": 50419000,
+            "system_cpu_ns": 11956000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 67756032,
-            "peak_rss_bytes": 67756032,
-            "child_peak_rss_kib": 66168,
+            "launch_tree_peak_rss_bytes": 67903488,
+            "peak_rss_bytes": 67903488,
+            "child_peak_rss_kib": 66312,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1819,15 +1848,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32109\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "f438be78eced6623aa4c56c73df067f9d8d82b0c40a32c2e1c4a368aa45316f4",
+          "stdout_sha256": "7df2a9629e8cf8e5397a2c7efc195925f0065217c0f2f2342f6573f35852f06c",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 477009,
-            "rsc-async": 409140
+            "rsc-sync": 479752,
+            "rsc-async": 384893
           },
-          "report_sha256": "114fe52b51267aa96d818bf7cfa94974e061f65dc77397bf7c453f2d54900556"
+          "report_sha256": "6c7151443a689b83aeaf3a163b18556d37cd5c91ddca697c3f4788916e738d4f"
         },
         {
           "block": 1,
@@ -1845,9 +1874,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-2-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-2-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1857,7 +1886,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-2-v8/report.json",
           "stdout": "block-1-2-v8/stdout",
@@ -1865,13 +1894,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 64527086,
-            "user_cpu_ns": 52095000,
-            "system_cpu_ns": 11604000,
+            "elapsed_ns": 62757052,
+            "user_cpu_ns": 39693000,
+            "system_cpu_ns": 22398000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 66703360,
-            "peak_rss_bytes": 66703360,
-            "child_peak_rss_kib": 65140,
+            "launch_tree_peak_rss_bytes": 67825664,
+            "peak_rss_bytes": 67825664,
+            "child_peak_rss_kib": 66236,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1880,15 +1909,15 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23770\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "18f29b84a0b7e414aefa2debb7c8f38c160a8f10863978c5d2f3056e1ca0f60e",
+          "stdout_sha256": "aa853dc1cdc69282169319ce3da47f2aa33fe6d1894c057b64a0d0bbc4d91873",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 502738,
-            "rsc-async": 406204
+            "rsc-sync": 903340,
+            "rsc-async": 401926
           },
-          "report_sha256": "a49d408aac2977488e53d82eff23917cf92159c186a7b9a8d8c866e0bb13b400"
+          "report_sha256": "1d6777c4544f0b5363f619a7237beee97ec5adc5e92ea8fa11a88cf38393f2c3"
         },
         {
           "block": 1,
@@ -1906,9 +1935,9 @@
             "NODE_ENV": "production",
             "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "e7fc907079d6797973cb63f97d2562c965aad8d33f52fb726005bf6702f30afc",
             "NODE_REPL_TRUSTED_CODE_PATHS": "/home/jacobt/.codex:/usr/lib/chatgpt/resources/cua_node/lib/node_modules",
-            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-v8/tmp",
+            "TMPDIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-v8/tmp",
             "NODE_DISABLE_COMPILE_CACHE": "1",
-            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-1-3-v8/cache",
+            "SCRIPTW_CACHE_DIR": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-1-3-v8/cache",
             "SCRIPTW_JOBS": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES": "1",
             "SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES": "67108864"
@@ -1918,7 +1947,7 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
           "report": "block-1-3-v8/report.json",
           "stdout": "block-1-3-v8/stdout",
@@ -1926,13 +1955,13 @@
           "status": "complete",
           "resources": {
             "exit_code": 0,
-            "elapsed_ns": 65957599,
-            "user_cpu_ns": 56643000,
-            "system_cpu_ns": 8536000,
+            "elapsed_ns": 63256795,
+            "user_cpu_ns": 50702000,
+            "system_cpu_ns": 11803000,
             "timed_out": false,
-            "launch_tree_peak_rss_bytes": 68464640,
-            "peak_rss_bytes": 68464640,
-            "child_peak_rss_kib": 66860,
+            "launch_tree_peak_rss_bytes": 67850240,
+            "peak_rss_bytes": 67850240,
+            "child_peak_rss_kib": 66260,
             "memory_scope": "runtime-child-lifetime-high-water-rss;excludes-python-launcher",
             "cpu_scope": "gnu-time-supervisor-and-runtime-child"
           },
@@ -1941,149 +1970,79 @@
             "memory.swap.max": "0",
             "memory.oom.group": "1",
             "cpu.max": "max 100000",
-            "memory.events": "low 0\nhigh 0\nmax 23786\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
+            "memory.events": "low 0\nhigh 0\nmax 32121\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0"
           },
-          "stdout_sha256": "39c22835b5103957190f33acf8ba0e888e36d50036d1a1a6b926e66546c185b0",
+          "stdout_sha256": "7837ba1cd84f55b2cec52ac86c3df4e5d93e91b73db5daf4d0f25b128f370d65",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "process_medians_ns": {
-            "rsc-sync": 513308,
-            "rsc-async": 404131
+            "rsc-sync": 491245,
+            "rsc-async": 409651
           },
-          "report_sha256": "fcd1ba7b4ff647f2d2372831aa422ac19146a2baa87edb13294d25e1d3b43c8e"
+          "report_sha256": "f77ac180890410b7160ae030b062523750bc613f5110a2bc3cf38dbfe2b09269"
         }
       ],
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 502162.0,
-            "rsc-async": 395554.0
+            "rsc-sync": 483954.0,
+            "rsc-async": 393815.0
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 508023.0,
-            "rsc-async": 407672.0
+            "rsc-sync": 485503.0,
+            "rsc-async": 393409.5
           }
         }
       ],
       "phase_processes": [
         {
-          "realm_creation_ns": 17659861,
-          "source_module_parse_ns": 1538343,
-          "module_link_and_initialization_ns": 2470499
+          "realm_creation_ns": 16579804,
+          "source_module_parse_ns": 1504951,
+          "module_link_and_initialization_ns": 2371885
         },
         {
-          "realm_creation_ns": 17482432,
-          "source_module_parse_ns": 1551687,
-          "module_link_and_initialization_ns": 2459147
+          "realm_creation_ns": 16585000,
+          "source_module_parse_ns": 1498622,
+          "module_link_and_initialization_ns": 2397518
         },
         {
-          "realm_creation_ns": 16711462,
-          "source_module_parse_ns": 1516590,
-          "module_link_and_initialization_ns": 2508170
+          "realm_creation_ns": 16669684,
+          "source_module_parse_ns": 1517940,
+          "module_link_and_initialization_ns": 2697845
         },
         {
-          "realm_creation_ns": 16950366,
-          "source_module_parse_ns": 1505800,
-          "module_link_and_initialization_ns": 2500615
+          "realm_creation_ns": 16482316,
+          "source_module_parse_ns": 1496492,
+          "module_link_and_initialization_ns": 2534632
         },
         {
-          "realm_creation_ns": 16791603,
-          "source_module_parse_ns": 1509647,
-          "module_link_and_initialization_ns": 2390597
+          "realm_creation_ns": 16572645,
+          "source_module_parse_ns": 1489358,
+          "module_link_and_initialization_ns": 2372477
         },
         {
-          "realm_creation_ns": 16970583,
-          "source_module_parse_ns": 1542850,
-          "module_link_and_initialization_ns": 2535011
+          "realm_creation_ns": 16397107,
+          "source_module_parse_ns": 1493078,
+          "module_link_and_initialization_ns": 2387218
         },
         {
-          "realm_creation_ns": 16789357,
-          "source_module_parse_ns": 1528163,
-          "module_link_and_initialization_ns": 2634791
+          "realm_creation_ns": 16390695,
+          "source_module_parse_ns": 1517986,
+          "module_link_and_initialization_ns": 2372093
         },
         {
-          "realm_creation_ns": 17682328,
-          "source_module_parse_ns": 1534554,
-          "module_link_and_initialization_ns": 2463595
+          "realm_creation_ns": 16612471,
+          "source_module_parse_ns": 1514551,
+          "module_link_and_initialization_ns": 2352789
         }
       ]
     }
   },
   "producer_receipts": {
     "baseline": {
-      "target/react-performance-20261103/promoted/frozen/cli-producer.json": {
-        "reason": "compiler-artifact",
-        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-        "target": {
-          "kind": [
-            "bin"
-          ],
-          "crate_types": [
-            "bin"
-          ],
-          "name": "scriptw",
-          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/src/bin/scriptw.rs",
-          "edition": "2021",
-          "doc": true,
-          "doctest": false,
-          "test": true
-        },
-        "profile": {
-          "opt_level": "3",
-          "debuginfo": "line-tables-only",
-          "debug_assertions": false,
-          "overflow_checks": false,
-          "test": false
-        },
-        "features": [],
-        "filenames": [
-          "/home/jacobt/src/scriptw/target/release/scriptw"
-        ],
-        "executable": "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/scriptw",
-        "fresh": false,
-        "source_executable": "/home/jacobt/src/scriptw/target/release/scriptw",
-        "frozen_executable_sha256": "66dd729ea503b764cf9ce62f4d51c10e14d0024841746658d371fd7b2b0f8196"
-      },
-      "target/react-performance-20261103/promoted/frozen/rsc-producer.json": {
-        "reason": "compiler-artifact",
-        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-        "target": {
-          "kind": [
-            "example"
-          ],
-          "crate_types": [
-            "bin"
-          ],
-          "name": "rsc_baseline",
-          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-          "edition": "2021",
-          "doc": false,
-          "doctest": false,
-          "test": false
-        },
-        "profile": {
-          "opt_level": "3",
-          "debuginfo": "line-tables-only",
-          "debug_assertions": false,
-          "overflow_checks": false,
-          "test": false
-        },
-        "features": [],
-        "filenames": [
-          "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-        ],
-        "executable": "/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline",
-        "fresh": false,
-        "source_executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-        "frozen_executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39"
-      }
-    },
-    "candidate": {
       "target/performance-climb-env-20261103/frozen/compiler_precompiled_baseline-producer.json": {
         "reason": "compiler-artifact",
         "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
@@ -2152,27 +2111,103 @@
         "source_executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
         "frozen_executable_sha256": "fe9cf940aef8bc0b04cb8c5dfb775b9a962d6fd51246dd939a27fd68d4fbb627"
       }
+    },
+    "candidate": {
+      "target/performance-specialize-20261103/frozen/compiler_precompiled_baseline-producer.json": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
+        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "compiler_precompiled_baseline",
+          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/compiler_precompiled_baseline.rs",
+          "edition": "2021",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": "line-tables-only",
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/home/jacobt/src/scriptw/target/release/examples/compiler_precompiled_baseline"
+        ],
+        "executable": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/compiler_precompiled_baseline",
+        "fresh": false,
+        "source_executable": "/home/jacobt/src/scriptw/target/release/examples/compiler_precompiled_baseline",
+        "frozen_executable_sha256": "45258440ac298c5852da1d974916c0f06779f59f59e833b78f2cb01c414d52c2"
+      },
+      "target/performance-specialize-20261103/frozen/rsc_baseline-producer.json": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
+        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "rsc_baseline",
+          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
+          "edition": "2021",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": "line-tables-only",
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
+        ],
+        "executable": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/frozen/rsc_baseline",
+        "fresh": false,
+        "source_executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
+        "frozen_executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05"
+      }
     }
   },
   "static_program_size": {
-    "path": "additional-evidence/target/performance-climb-env-20261103/size/attribution.json",
-    "sha256": "fc7698d014adce520bf10dc586a07251fbe92084f78478f724b1dc741f0fb6e0",
-    "program_wasm_bytes": 6071770,
-    "program_wasm_sha256": "81c25514f3d9168718cc5c9fa75610f341200112909354a0d4c2aaa4441fe71b",
-    "limits": "Static encoded-byte accounting; not runtime cost shares or allocation counts."
+    "path": "additional-evidence/target/performance-specialize-20261103/size/attribution.json",
+    "sha256": "b5239e95f48a5dd27391f7c6df831938478e44f38d3638b8f96b02d0d5bc8f2c",
+    "program_wasm_bytes": 6168997,
+    "program_wasm_sha256": "9d5f2104a7e1fb30f9d4050f4f4b75ccbfd1c8c38ed0614a491e794a45d87a66",
+    "limits": "Static section and function-body sizes only. Data payloads and function bodies are included in enclosing section totals; not runtime shares or allocation counts. Categories describe this candidate and do not attribute a before/after change."
   },
   "publication": {
     "date": "2026-11-03",
-    "prior_public_report_git_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
-    "coverage_reference": "reports/full-report.json",
-    "limits": "No full workspace CI or pinned Test262 rerun. Focused scopes overlap broad scopes and must not be summed. Four failing AOT library tests remain failures, never counted as passes."
+    "measured_source": {
+      "archive_prefix": "source/measured/",
+      "base_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+      "manifest_sha256": "f3f942cdc71498f73e102588f5c001908f9e3ad59070b06b19397815554fd233",
+      "tracked_patch_sha256": "712f46f10e2a2f0c06ee85054c5e77494568b6e2618f80029bc78ce210ac2b0e",
+      "new_files": 11
+    },
+    "coverage_reference": "reports/full-situations-report.json",
+    "limits": "No full workspace CI or pinned Test262 rerun. Focused scopes may overlap broader scopes and must not be summed. All Engine scopes ran on identical current product inputs with preserved source qualification; four preexisting AOT library failures remain failures."
   },
   "evidence_archive": {
     "file": "docs/rust-rewrite/situations-evidence-2026-11-03.tar.xz",
-    "sha256": "a1e59cc501d016fd6ab7aa3d492f2438ed0907a1b5218e14ea76ded2da607cfa",
-    "bytes": 956192,
-    "regular_utf8_members": 2281,
-    "expanded_utf8_bytes": 28654360,
+    "sha256": "a9ec8f21fde4e43821e388e9cbd173164073d74ed2bb19738c15bc073f9deba4",
+    "bytes": 1012596,
+    "regular_utf8_members": 1485,
+    "expanded_utf8_bytes": 28685146,
     "over_5mb": false
   }
 }

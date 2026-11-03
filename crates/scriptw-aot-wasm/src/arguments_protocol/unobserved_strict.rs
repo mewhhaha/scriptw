@@ -7,10 +7,10 @@ use scriptw_ir::{
     ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, TypedExpr, LEXICAL_ARGUMENTS_NAME,
 };
 
-pub(super) struct UnobservedStrictArguments<'a>(&'a FunctionIr);
+pub(crate) struct UnobservedStrictArguments<'a>(&'a FunctionIr);
 
 impl<'a> UnobservedStrictArguments<'a> {
-    pub(super) fn admit(function: &'a FunctionIr) -> Option<Self> {
+    pub(crate) fn admit(function: &'a FunctionIr) -> Option<Self> {
         if !function.strict
             || function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
             || function.class_element_execution_kind != ClassElementExecutionKind::None

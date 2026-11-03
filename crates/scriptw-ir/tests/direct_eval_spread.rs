@@ -45,6 +45,7 @@ fn an_empty_leading_spread_keeps_the_following_source_and_runtime_spread() {
     let EnvironmentIdentifierOperationIr::Call {
         args,
         direct_eval: Some(_),
+        ..
     } = &identifier.operation
     else {
         panic!("direct eval context remains on the original call");

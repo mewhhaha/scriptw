@@ -13,6 +13,10 @@ mod body_entry_locals;
 mod call_inputs;
 mod executable_code;
 pub(crate) use binary_numeric::PlannedBinaryNumericEntry;
+mod local_argument_inputs;
+mod local_arguments;
+pub(crate) use local_argument_inputs::LocalArgumentCallInputs;
+pub(crate) use local_arguments::{LocalArgumentsPlan, PlannedLocalArgumentsEntry};
 mod runtime_dispatch;
 mod saved_activation_call;
 pub(crate) use body_entry_locals::{BodyEntryLocals, ResumableEntryLocals};
@@ -32,6 +36,7 @@ enum EntryOrigin {
         name: String,
         protocol: FunctionProtocolIr,
         binary_numeric: Option<PlannedBinaryNumericEntry>,
+        local_arguments: Option<PlannedLocalArgumentsEntry>,
     },
     PreparedScript {
         id: FunctionId,
@@ -54,8 +59,12 @@ impl PlannedFunctionEntry {
         source: &FunctionIr,
         wasm_index: u32,
         binary_numeric: Option<PlannedBinaryNumericEntry>,
+        local_arguments: Option<PlannedLocalArgumentsEntry>,
     ) -> Self {
         if let Some(entry) = &binary_numeric {
+            entry.require_source(source);
+        }
+        if let Some(entry) = &local_arguments {
             entry.require_source(source);
         }
         Self {
@@ -64,6 +73,7 @@ impl PlannedFunctionEntry {
                 name: source.name.clone(),
                 protocol: source.protocol,
                 binary_numeric,
+                local_arguments,
             },
             wasm_index,
         }
@@ -76,6 +86,24 @@ impl PlannedFunctionEntry {
             | EntryOrigin::StandardBuiltin(_)
             | EntryOrigin::HostBuiltin(_) => None,
         }
+    }
+
+    pub(crate) fn local_arguments(&self) -> Option<&PlannedLocalArgumentsEntry> {
+        match &self.origin {
+            EntryOrigin::User {
+                local_arguments, ..
+            } => local_arguments.as_ref(),
+            EntryOrigin::PreparedScript { .. }
+            | EntryOrigin::StandardBuiltin(_)
+            | EntryOrigin::HostBuiltin(_) => None,
+        }
+    }
+
+    pub(crate) fn local_arguments_adapter_identity(&self) -> FunctionIdentity {
+        let entry = self
+            .local_arguments()
+            .expect("vector adapter requires a local arguments body");
+        entry.adapter_identity()
     }
 
     pub(crate) fn prepared(source: &PreparedScriptUnit, wasm_index: u32) -> Self {

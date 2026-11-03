@@ -32,9 +32,11 @@ impl<'a> FunctionBuilder<'a> {
             .expect("source callable builder owns a planned entry")
             .clone();
         let body = self.compile()?;
-        Ok(EmittedFunction::from_completed_callable(
-            CompletedCallableBody { entry, body },
-        ))
+        let body = CompletedCallableBody { entry, body };
+        if body.entry.local_arguments().is_some() {
+            return Ok(EmittedFunction::from_completed_local_arguments(body));
+        }
+        Ok(EmittedFunction::from_completed_callable(body))
     }
 
     pub(super) fn compile_builtin_callable(&mut self) -> Result<EmittedFunction, EmitError> {

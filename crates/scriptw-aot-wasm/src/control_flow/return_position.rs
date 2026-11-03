@@ -2,6 +2,12 @@ use super::*;
 use crate::functions::CallContinuation;
 
 impl FunctionBuilder<'_> {
+    pub(crate) fn emit_retire_tail_call_activation(&mut self, function: &mut Function) {
+        self.emit_retire_abandoned_identifier_references(function);
+        self.emit_unwind_environment_depth(self.environment_depth, function);
+        self.emit_leave_source_activation(function);
+    }
+
     /// All observable operand work is complete before this activation retires.
     /// Preserve its Realm and Environment even after lexical unwind.
     pub(crate) fn emit_prepared_tail_call(
@@ -17,11 +23,9 @@ impl FunctionBuilder<'_> {
         let caller_environment = schema
             .reserve_gc_local(function)
             .initialize(self.current_environment().load(schema, function), function);
-        self.emit_retire_abandoned_identifier_references(function);
-        self.emit_unwind_environment_depth(self.environment_depth, function);
         // Proper tail calls retire the actual caller before dispatching the
         // target. Operand conversion and all user effects above precede this.
-        self.emit_leave_source_activation(function);
+        self.emit_retire_tail_call_activation(function);
         schema.return_call_helper(
             crate::runtime_helpers::ProxyCallArguments::new(
                 callee,

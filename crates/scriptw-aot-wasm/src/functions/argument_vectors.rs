@@ -660,6 +660,12 @@ impl FunctionBuilder<'_> {
         destination: &ValueLocals,
         function: &mut Function,
     ) {
+        let entry = self
+            .body_entry_locals()
+            .expect("callable owns its declared entry");
+        if entry.copy_local_argument(index, destination, function) {
+            return;
+        }
         let schema = self.runtime_schema();
         let index = u32::try_from(index).expect("builtin argument index fits a GC array");
         let index_local = schema.reserve_i32_local(function);

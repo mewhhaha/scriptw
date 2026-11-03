@@ -97,6 +97,7 @@ impl<'a> NumericCallRun<'a> {
                 EnvironmentIdentifierOperationIr::Call {
                     args,
                     direct_eval: None,
+                    ..
                 } => (
                     NumericCallReference::Environment(identifier),
                     args.as_slice(),

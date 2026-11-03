@@ -287,6 +287,9 @@ pub enum EnvironmentIdentifierOperationIr {
     Call {
         args: Vec<TypedExpr>,
         direct_eval: Option<crate::DirectEvalContextIr>,
+        /// Speculative original callees for guarded code selection only. This
+        /// says nothing about the live Reference's value or the Call result.
+        callee_targets: crate::FunctionTargetKnowledge,
     },
 }
 

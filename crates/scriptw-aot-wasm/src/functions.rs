@@ -59,6 +59,7 @@ mod indirect_call;
 mod instance_elements_hook;
 mod iterator_close;
 mod legacy_activation;
+mod local_argument_call;
 pub(crate) use legacy_activation::SourceActivation;
 mod intl_fallback_symbol;
 mod proxy_creation_execution_realm;
@@ -1341,6 +1342,45 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    pub(crate) fn try_emit_known_leaf_call_from_locals(
+        &mut self,
+        meta: &WasmFunctionMeta,
+        callee: &crate::gc_types::ValueLocals,
+        receiver: &crate::gc_types::ValueLocals,
+        arguments: &[TypedExpr],
+        continuation: &CallContinuation,
+        output: &crate::gc_types::ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        if let Some(plan) = &meta.constant_leaf {
+            if self.try_emit_constant_leaf_call(
+                meta,
+                plan,
+                callee,
+                receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )? {
+                return Ok(true);
+            }
+        }
+        if let Some(plan) = &meta.numeric_leaf {
+            return self.try_emit_numeric_leaf_call(
+                meta,
+                plan,
+                callee,
+                receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            );
+        }
+        Ok(false)
+    }
+
     pub(crate) fn emit_indirect_call_from_locals(
         &mut self,
         callee: &crate::gc_types::ValueLocals,
@@ -1350,11 +1390,44 @@ impl FunctionBuilder<'_> {
         output: &crate::gc_types::ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_indirect_call_from_locals_with_known_target(
+            callee,
+            this_value,
+            arguments,
+            None,
+            continuation,
+            output,
+            function,
+        )
+    }
+
+    pub(super) fn emit_indirect_call_from_locals_with_known_target(
+        &mut self,
+        callee: &crate::gc_types::ValueLocals,
+        this_value: Option<&crate::gc_types::ValueLocals>,
+        arguments: &[TypedExpr],
+        known_target: Option<&WasmFunctionMeta>,
+        continuation: &CallContinuation,
+        output: &crate::gc_types::ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let receiver = schema.reserve_value_local(function);
         match this_value {
             Some(value) => receiver.copy_from(value, function),
             None => receiver.set_undefined(function),
+        }
+        if self.try_emit_local_argument_call(
+            callee,
+            &receiver,
+            arguments,
+            known_target,
+            continuation,
+            output,
+            function,
+        )? {
+            receiver.clear(function);
+            return Ok(());
         }
         let list = self.emit_call_args_vector(arguments, function)?;
         self.emit_indirect_call_with_argv_to_value(

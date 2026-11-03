@@ -12,7 +12,7 @@ observation into a current acceptance result.
 Keep current invariants with their owning domain. Git retains superseded
 designs; dated checkpoints retain their own source and verification scope.
 
-844 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
+846 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
 
 ## A
 
@@ -456,6 +456,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [lexical-declaration-context](<lexical-declaration-context.md>)
 - [lexical-scope-instantiated-frame](<lexical-scope-instantiated-frame.md>)
 - [literal-dynamic-import-runtime-attributes](<literal-dynamic-import-runtime-attributes.md>)
+- [local-arguments-call-entry](<local-arguments-call-entry.md>)
 - [local-declaration-authority](<local-declaration-authority.md>)
 - [logical-assignment-await-reference-ownership](<logical-assignment-await-reference-ownership.md>)
 - [logical-assignment-reachability](<logical-assignment-reachability.md>)
@@ -661,6 +662,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [public-host-module-request-identity](<public-host-module-request-identity.md>)
 ## R
 
+- [raw-key-own-data-read](<raw-key-own-data-read.md>)
 - [raw-regexp-utf16-source](<raw-regexp-utf16-source.md>)
 - [realm-id-allocation](<realm-id-allocation.md>)
 - [realm-record-heap-slot-authority](<realm-record-heap-slot-authority.md>)

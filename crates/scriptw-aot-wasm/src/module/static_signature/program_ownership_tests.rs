@@ -10,6 +10,12 @@ fn callable_entry_program_operands_are_nonnull_and_follow_existing_semantic_slot
             GcLayout::RealmRecord,
         ),
         (
+            StaticSignature::LocalArgumentsFunction,
+            14,
+            13,
+            GcLayout::RealmRecord,
+        ),
+        (
             StaticSignature::GeneratorFunction,
             7,
             4,

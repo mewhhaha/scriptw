@@ -5806,6 +5806,7 @@ pub(crate) fn build_function_metas<'a>(
                     function,
                     wasm_index,
                     source.binary_numeric_entry(function, layout),
+                    source.local_arguments_entry(function, layout),
                 ),
                 strict: function.strict,
                 is_named_expression: function.is_named_expression,

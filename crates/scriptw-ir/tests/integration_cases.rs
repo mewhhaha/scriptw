@@ -54,6 +54,8 @@ mod borrowed_eval_loop_heads;
 mod builtin_getter_receiver_provenance_structure;
 #[path = "bytes_modules.rs"]
 mod bytes_modules;
+#[path = "captured_function_candidates.rs"]
+mod captured_function_candidates;
 #[path = "catch_pattern_owners.rs"]
 mod catch_pattern_owners;
 #[path = "class_computed_name_suspension.rs"]

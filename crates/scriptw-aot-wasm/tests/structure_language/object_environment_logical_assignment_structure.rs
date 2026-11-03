@@ -198,7 +198,7 @@ fn with_selection_and_global_start_consume_one_selected_reference() {
     let logical = bounded(
         ENVIRONMENT_EMITTER,
         "                    Operation::LogicalCompound { operation, rhs } => {",
-        "                    Operation::Call { args, direct_eval } => {",
+        "                    Operation::Call {",
     );
     assert_before(
         logical,

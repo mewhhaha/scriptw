@@ -13,6 +13,35 @@ enum LoweredFunctionBody {
     Inferred(super::function_inference::InferenceBodySummary),
 }
 
+/// A declaration on this exact captured cell supplies a possible callee, never
+/// a value fact. Block shadows and source/storage aliases cannot borrow the
+/// activation owner's same-spelled declaration.
+fn captured_declaration_target(
+    analysis: &Analysis<'_>,
+    storage_name: &str,
+    capture: &CaptureBindingPlan,
+) -> Option<FunctionId> {
+    if storage_name != capture.source_name {
+        return None;
+    }
+    let owner = analysis.owner_plans.get(&capture.owner_id)?;
+    let declaration_environment = owner
+        .body_environment_id
+        .unwrap_or(owner.activation_environment_id);
+    if capture.environment_id != declaration_environment {
+        return None;
+    }
+    let environment = analysis.environment_plans.get(&capture.environment_id)?;
+    if environment.owner_id != capture.owner_id
+        || environment.owned_env_slots.get(storage_name) != Some(&capture.slot)
+    {
+        return None;
+    }
+    let function_id = owner.function_bindings.get(&capture.source_name)?;
+    analysis.function_plans.get(function_id)?;
+    Some(function_id.clone())
+}
+
 impl<'a> ScriptLowerer<'a> {
     pub(super) fn lower_function(
         &mut self,
@@ -374,12 +403,11 @@ impl<'a> ScriptLowerer<'a> {
             let source_name = capture.source_name.as_str();
             let mode = capture.mode;
             let info = if mode != BindingMode::Const {
-                ValueInfo {
-                    kind: ValueKind::Dynamic,
-                    possible_kinds: KindSet::all_runtime_tags(),
-                    heap_shape: None,
-                    function_targets: FunctionTargetKnowledge::unknown(),
+                let mut info = unknown_runtime_value_info();
+                if let Some(target) = captured_declaration_target(lowerer.analysis, name, capture) {
+                    info.function_targets = FunctionTargetKnowledge::Open(BTreeSet::from([target]));
                 }
+                info
             } else if name != source_name || TdzPlaceholderName::names_a_placeholder(name) {
                 ValueInfo {
                     kind: ValueKind::Dynamic,

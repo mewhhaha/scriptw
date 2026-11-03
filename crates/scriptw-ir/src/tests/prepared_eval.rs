@@ -266,6 +266,7 @@ eval(1);
     let EnvironmentIdentifierOperationIr::Call {
         args,
         direct_eval: Some(_),
+        ..
     } = &call.operation
     else {
         panic!("bare call keeps context");

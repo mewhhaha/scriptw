@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use scriptw_aot_wasm::{
     emit, emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy,
-    SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT, SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
-    SNAPSHOT_SYMBOLS_EXPORT,
+    SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT, SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT,
+    SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT, SNAPSHOT_SYMBOLS_EXPORT,
 };
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
@@ -110,12 +110,13 @@ fn snapshot_exports_have_actual_gc_roots_witnesses_and_a_typed_resolver() {
             SNAPSHOT_REALMS_EXPORT,
             SNAPSHOT_SYMBOLS_EXPORT,
             SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
+            SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
         ])
         .collect::<BTreeSet<_>>();
     assert_eq!(
         snapshot_export_names(&runtime_exports),
         expected,
-        "R exports three roots, declaration-derived witnesses and the value resolver"
+        "R exports three roots, declaration-derived witnesses and both property projections"
     );
     for name in expected {
         assert_eq!(
@@ -129,19 +130,27 @@ fn snapshot_exports_have_actual_gc_roots_witnesses_and_a_typed_resolver() {
             .iter()
             .find(|(export, _, _)| export == name)
             .unwrap();
-        if name == SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT {
+        if name == SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT
+            || name == SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT
+        {
             assert_eq!(*kind, ExternalKind::Func, "{name}");
             let signature = exported_function_type(runtime.bytes(), *index);
-            assert_eq!(signature.params().len(), 1, "one property value input");
+            assert_eq!(signature.params().len(), 1, "one property projection input");
             assert_eq!(
                 signature.results().len(),
                 1,
-                "one immutable snapshot result"
+                "one property projection result"
             );
-            for (actual, layout) in [
-                (signature.params()[0], GcSnapshotLayout::PropertyValue),
-                (signature.results()[0], GcSnapshotLayout::Stored),
-            ] {
+            let layouts = match name {
+                SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT => {
+                    [GcSnapshotLayout::Object, GcSnapshotLayout::PropertyStorage]
+                }
+                _ => [GcSnapshotLayout::PropertyValue, GcSnapshotLayout::Stored],
+            };
+            for (actual, layout) in [signature.params()[0], signature.results()[0]]
+                .into_iter()
+                .zip(layouts)
+            {
                 let (_, kind, index) = runtime_exports
                     .iter()
                     .find(|(name, _, _)| name == layout.witness_export())

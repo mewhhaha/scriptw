@@ -27,6 +27,7 @@ fn no_source_eval_preserves_runtime_reference_identity_and_arguments() {
         let EnvironmentIdentifierOperationIr::Call {
             args,
             direct_eval: Some(context),
+            ..
         } = &identifier.operation
         else {
             panic!("{source}: bare eval needs a guarded direct context");

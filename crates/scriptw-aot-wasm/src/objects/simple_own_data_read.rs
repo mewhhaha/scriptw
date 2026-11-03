@@ -8,6 +8,39 @@ use crate::gc_types::{
 };
 
 impl FunctionBuilder<'_> {
+    /// An actual String is already a PropertyKey. Probe only own data on a
+    /// concrete simple header; nullish values, proxies, accessors and absence
+    /// miss without effects, leaving the original raw operands to full GetV.
+    pub(crate) fn emit_raw_string_own_data_read(
+        &mut self,
+        target: &ValueLocals,
+        raw_key: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let found = schema.reserve_i32_local(function);
+        found.set_constant(0, function);
+        raw_key.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        let text = schema.reserve_gc_local(function).initialize(
+            raw_key.cast_reference::<StringValue>(schema, function),
+            function,
+        );
+        let key = PropertyKeyLocals::from_string(schema, &text, function);
+        let handled = self.emit_ordinary_own_data_read(target, &key, result, function)?;
+        handled.load(function);
+        found.store(function);
+        schema.release_i32_local(handled, function);
+        key.clear(function);
+        text.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(found)
+    }
+
     /// Plain objects and primitive boxes check ordinary own properties first.
     /// A boxed String miss retains its virtual character-index lookup; accessors
     /// retain the original receiver. Callable headers join only while their

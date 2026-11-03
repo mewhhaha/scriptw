@@ -165,7 +165,14 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
     let mut phase_writes = 0;
     let mut reference_reads = 0;
     let mut reference_writes = 0;
-    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+    // Shared cursor helpers live in R; source activation edges live in P.
+    let runtime = artifact
+        .runtime()
+        .expect("enumeration links the shared runtime");
+    for payload in Parser::new(0)
+        .parse_all(&artifact.bytes)
+        .chain(Parser::new(0).parse_all(runtime.bytes()))
+    {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             for instruction in body.get_operators_reader().unwrap() {
                 match instruction.unwrap() {

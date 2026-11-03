@@ -7,6 +7,7 @@ use crate::EmitError;
 mod unobservable_leaf;
 mod unobserved_strict;
 pub(crate) use unobservable_leaf::UserFunctionActivationPlan;
+pub(crate) use unobserved_strict::UnobservedStrictArguments;
 
 /// Whether this invocation needs a materialized arguments object, and the only legal
 /// construction protocol when it does.

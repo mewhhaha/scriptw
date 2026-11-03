@@ -88,38 +88,18 @@ impl FunctionBuilder<'_> {
             None => receiver.set_undefined(function),
         }
         let targets = callee_expression.function_targets.known_targets();
-        let constant_leaf = (targets.len() == 1)
-            .then(|| targets.iter().next().and_then(|id| self.functions.get(id)))
-            .flatten()
-            .filter(|meta| meta.constant_leaf.is_some())
-            .cloned();
-        if let Some(meta) = constant_leaf {
-            if self.try_emit_constant_leaf_call(
-                &meta,
-                meta.constant_leaf
-                    .as_ref()
-                    .expect("selected immutable-return leaf plan"),
-                &callee,
-                &receiver,
-                arguments,
-                continuation,
-                output,
-                function,
-            )? {
-                receiver.clear(function);
-                callee.clear(function);
-                return Ok(());
-            }
-        }
-        let numeric_leaf = (targets.len() == 1)
-            .then(|| targets.iter().next().and_then(|id| self.functions.get(id)))
-            .flatten()
-            .filter(|meta| meta.numeric_leaf.is_some())
-            .cloned();
-        if let Some(meta) = numeric_leaf {
-            if self.try_emit_numeric_leaf_call(
-                &meta,
-                meta.numeric_leaf.as_ref().expect("selected pure leaf plan"),
+        let known_target = if targets.len() == 1 {
+            targets
+                .iter()
+                .next()
+                .and_then(|id| self.functions.get(id))
+                .cloned()
+        } else {
+            None
+        };
+        if let Some(meta) = &known_target {
+            if self.try_emit_known_leaf_call_from_locals(
+                meta,
                 &callee,
                 &receiver,
                 arguments,
@@ -183,10 +163,11 @@ impl FunctionBuilder<'_> {
                 function,
             )?
         {
-            self.emit_indirect_call_from_locals(
+            self.emit_indirect_call_from_locals_with_known_target(
                 &callee,
                 Some(&receiver),
                 arguments,
+                known_target.as_ref(),
                 continuation,
                 output,
                 function,

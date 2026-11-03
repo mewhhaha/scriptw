@@ -323,6 +323,7 @@ fn emit_script_module_with_factory(
         runtime_helper_count,
         source.program.len() + script.prepared_script_units().count(),
         source.binary_numeric_count(),
+        source.local_arguments_count(),
         program_helper_count,
         kind,
         if factory.is_some() {
@@ -460,6 +461,7 @@ fn emit_script_module_with_factory(
     // the push order is the planned index order.
     let mut compiled_functions: Vec<EmittedFunction> = Vec::new();
     let mut program_functions: Vec<EmittedFunction> = Vec::new();
+    let mut local_argument_functions = Vec::new();
     for (compiled_here, functions, destination) in [
         (
             compile_runtime,
@@ -485,7 +487,19 @@ fn emit_script_module_with_factory(
                 runtime_bootstrap_plan.clone(),
                 runtime_helper_base,
             )?;
-            destination.push(builder.compile_callable()?);
+            let entry = &function_metas
+                .get(&function.id)
+                .expect("source function has planned metadata")
+                .entry;
+            if entry.local_arguments().is_some() {
+                destination.push(local_arguments_adapter::compile(
+                    entry,
+                    module_package.schema(),
+                )?);
+                local_argument_functions.push(builder.compile_callable()?);
+            } else {
+                destination.push(builder.compile_callable()?);
+            }
         }
     }
     for unit in script.prepared_script_units().filter(|_| compile_program) {
@@ -512,6 +526,7 @@ fn emit_script_module_with_factory(
             ));
         }
     }
+    program_functions.extend(local_argument_functions);
     for builtin in compiled_standard_builtins
         .iter()
         .filter(|_| compile_runtime)

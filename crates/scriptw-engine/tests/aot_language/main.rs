@@ -62,3 +62,7 @@ mod aot_unobserved_arguments;
 mod aot_utf16_property_keys;
 mod aot_with_has_binding;
 mod aot_with_var_hoisting;
+
+mod aot_raw_key_own_data;
+
+mod aot_local_argument_calls;

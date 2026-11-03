@@ -9,7 +9,8 @@
 //! Runtime callables are the compiler-owned source bodies, every standard
 //! builtin and every host builtin. Program callables are the script's own
 //! functions followed by its prepared script units. Validated scalar callback
-//! entries follow those callables and precede all program helpers, which are the
+//! entries and canonical local-arguments bodies follow those callables and
+//! precede all program helpers, which are the
 //! helper bodies generated from the script (module operations and the runtime
 //! hooks, see `HelperOwner`). Every index is derived
 //! Native factory modules have an initializer prefix; ordinary programs also
@@ -71,11 +72,17 @@ pub(crate) struct SourceFunctions<'a> {
     pub(crate) program: Vec<&'a FunctionIr>,
     numeric_leaves: BTreeMap<FunctionId, crate::functions::NumericLeafPlan>,
     binary_numeric: Vec<BinaryNumericSource<'a>>,
+    local_arguments: Vec<LocalArgumentsSource<'a>>,
 }
 
 struct BinaryNumericSource<'a> {
     function: &'a FunctionIr,
     proof: crate::functions::BinaryNumericLeafPlan,
+}
+
+struct LocalArgumentsSource<'a> {
+    function: &'a FunctionIr,
+    proof: crate::function_entry::LocalArgumentsPlan,
 }
 
 impl<'a> SourceFunctions<'a> {
@@ -101,11 +108,19 @@ impl<'a> SourceFunctions<'a> {
                     .map(|proof| BinaryNumericSource { function, proof })
             })
             .collect();
+        let local_arguments = program
+            .iter()
+            .filter_map(|function| {
+                crate::function_entry::LocalArgumentsPlan::for_function(function)
+                    .map(|proof| LocalArgumentsSource { function, proof })
+            })
+            .collect();
         Self {
             runtime_owned,
             program,
             numeric_leaves,
             binary_numeric,
+            local_arguments,
         }
     }
 
@@ -118,6 +133,30 @@ impl<'a> SourceFunctions<'a> {
 
     pub(crate) fn binary_numeric_count(&self) -> usize {
         self.binary_numeric.len()
+    }
+
+    pub(crate) fn local_arguments_count(&self) -> usize {
+        self.local_arguments.len()
+    }
+
+    pub(crate) fn local_arguments_entry(
+        &self,
+        function: &FunctionIr,
+        layout: &FunctionIndexLayout,
+    ) -> Option<crate::function_entry::PlannedLocalArgumentsEntry> {
+        self.local_arguments
+            .iter()
+            .enumerate()
+            .find_map(|(position, source)| {
+                if source.function.id != function.id {
+                    return None;
+                }
+                Some(crate::function_entry::PlannedLocalArgumentsEntry::new(
+                    source.function,
+                    source.proof.clone(),
+                    layout.local_arguments_index(position),
+                ))
+            })
     }
 
     pub(crate) fn binary_numeric_entry(
@@ -152,6 +191,32 @@ impl BinaryNumericFunctionIndex {
     }
 }
 
+/// Only the complete P plan can name the canonical local-arguments body.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LocalArgumentsFunctionIndex(u32);
+impl LocalArgumentsFunctionIndex {
+    pub(crate) fn emit_ref_func(self, function: &mut crate::code_sink::Function) {
+        function.instruction(&wasm_encoder::Instruction::RefFunc(self.0));
+    }
+    pub(crate) fn emit_call(self, function: &mut crate::code_sink::Function) {
+        function.instruction(&wasm_encoder::Instruction::Call(self.0));
+    }
+    pub(crate) fn emit_return_call(self, function: &mut crate::code_sink::Function) {
+        function.instruction(&wasm_encoder::Instruction::ReturnCall(self.0));
+    }
+    pub(crate) fn assert_body_index(self, actual: u32) {
+        assert_eq!(
+            self.0, actual,
+            "local arguments body uses its planned index"
+        );
+    }
+    pub(crate) fn source_site_owner(self) -> Result<u32, crate::EmitError> {
+        self.0
+            .checked_add(1)
+            .ok_or_else(|| crate::EmitError::unsupported("source-site owner exceeds u32"))
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct FunctionIndexLayout {
     imported: u32,
@@ -164,6 +229,7 @@ pub(crate) struct FunctionIndexLayout {
     program_initialize: bool,
     program_callables: u32,
     program_binary_numeric: u32,
+    program_local_arguments: u32,
     program_helpers: u32,
 }
 
@@ -180,6 +246,7 @@ impl FunctionIndexLayout {
         runtime_helpers: usize,
         program_callables: usize,
         program_binary_numeric: usize,
+        program_local_arguments: usize,
         program_helpers: usize,
         kind: ModuleKind<'_>,
         entry_role: ModuleEntryRole,
@@ -207,6 +274,7 @@ impl FunctionIndexLayout {
             program_initialize: matches!(kind, ModuleKind::Program(_)),
             program_callables: count(program_callables),
             program_binary_numeric: count(program_binary_numeric),
+            program_local_arguments: count(program_local_arguments),
             program_helpers: count(program_helpers),
         };
         // Fails here, once, if the whole space does not fit.
@@ -277,7 +345,7 @@ impl FunctionIndexLayout {
     pub(crate) fn helper_base(&self) -> RuntimeHelperFunctionBase {
         RuntimeHelperFunctionBase::at(
             self.runtime_helper_first(),
-            self.program_binary_numeric_end(),
+            self.program_local_arguments_end(),
         )
     }
 
@@ -358,8 +426,23 @@ impl FunctionIndexLayout {
         Self::add(self.program_callable_end(), self.program_binary_numeric)
     }
 
+    pub(crate) fn local_arguments_index(&self, position: usize) -> LocalArgumentsFunctionIndex {
+        assert!(position < self.program_local_arguments as usize);
+        LocalArgumentsFunctionIndex(Self::add(
+            self.program_binary_numeric_end(),
+            count(position),
+        ))
+    }
+
+    fn program_local_arguments_end(&self) -> u32 {
+        Self::add(
+            self.program_binary_numeric_end(),
+            self.program_local_arguments,
+        )
+    }
+
     fn program_helper_end(&self) -> u32 {
-        Self::add(self.program_binary_numeric_end(), self.program_helpers)
+        Self::add(self.program_local_arguments_end(), self.program_helpers)
     }
 
     /// Every defined function: what `ref.func` may name, for the declarative

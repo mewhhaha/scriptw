@@ -327,36 +327,76 @@ impl FunctionBuilder<'_> {
                         self.pop_control(ControlFrameKind::If);
                         function.instruction(&Instruction::End);
                     }
-                    Operation::Call { args, direct_eval } => {
+                    Operation::Call {
+                        args,
+                        direct_eval,
+                        callee_targets,
+                    } => {
                         let receiver = schema.reserve_value_local(function);
                         self.emit_environment_identifier_call_base(&reference, &receiver, function);
-                        self.push_scope();
-                        let (callee, callee_id) = self.retain_expression_operand(
-                            "\0environment.callee",
-                            &value,
-                            function,
-                        );
-                        let (this, this_id) = self.retain_expression_operand(
-                            "\0environment.receiver",
-                            &receiver,
-                            function,
-                        );
-                        let result = (|| {
-                            self.emit_indirect_call(
-                                &callee,
-                                Some(&this),
-                                args,
-                                None,
-                                direct_eval.as_ref(),
-                                continuation,
+                        if direct_eval.is_none() {
+                            let targets = callee_targets.known_targets();
+                            let known_target = if targets.len() == 1 {
+                                targets
+                                    .iter()
+                                    .next()
+                                    .and_then(|id| self.functions.get(id))
+                                    .cloned()
+                            } else {
+                                None
+                            };
+                            let handled = match known_target.as_ref() {
+                                Some(meta) => self.try_emit_known_leaf_call_from_locals(
+                                    meta,
+                                    &value,
+                                    &receiver,
+                                    args,
+                                    continuation,
+                                    &value,
+                                    function,
+                                )?,
+                                None => false,
+                            };
+                            if !handled {
+                                self.emit_indirect_call_from_locals_with_known_target(
+                                    &value,
+                                    Some(&receiver),
+                                    args,
+                                    known_target.as_ref(),
+                                    continuation,
+                                    &value,
+                                    function,
+                                )?;
+                            }
+                        } else {
+                            self.push_scope();
+                            let (callee, callee_id) = self.retain_expression_operand(
+                                "\0environment.callee",
                                 &value,
                                 function,
-                            )
-                        })();
-                        self.pop_scope();
-                        self.release_local_binding(this_id, function);
-                        self.release_local_binding(callee_id, function);
-                        result?;
+                            );
+                            let (this, this_id) = self.retain_expression_operand(
+                                "\0environment.receiver",
+                                &receiver,
+                                function,
+                            );
+                            let result = (|| {
+                                self.emit_indirect_call(
+                                    &callee,
+                                    Some(&this),
+                                    args,
+                                    None,
+                                    direct_eval.as_ref(),
+                                    continuation,
+                                    &value,
+                                    function,
+                                )
+                            })();
+                            self.pop_scope();
+                            self.release_local_binding(this_id, function);
+                            self.release_local_binding(callee_id, function);
+                            result?;
+                        }
                         receiver.clear(function);
                     }
                     Operation::Assign { .. }

@@ -41,6 +41,7 @@ fn bare_eval_retains_a_runtime_reference_and_prepares_both_identity_branches() {
     let EnvironmentIdentifierOperationIr::Call {
         args,
         direct_eval: Some(context),
+        ..
     } = &identifier.operation
     else {
         panic!("bare syntax carries context");

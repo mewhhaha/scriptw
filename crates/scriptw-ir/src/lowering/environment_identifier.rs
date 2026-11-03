@@ -314,6 +314,13 @@ impl ScriptLowerer<'_> {
         {
             return None;
         }
+        let mut callee_targets = self
+            .lookup_binding(&name)
+            .map(|binding| binding.function_targets.clone())
+            .unwrap_or_else(FunctionTargetKnowledge::unknown);
+        // The live Reference is still selected and read before arguments. A
+        // binding's declaration is only a candidate, including after effects.
+        callee_targets.widen_for_possible_replacement();
         let direct_eval = (name == "eval").then(|| self.direct_eval_context());
         if let Some(context) = &direct_eval {
             self.register_direct_eval_source(context, arguments);
@@ -323,7 +330,11 @@ impl ScriptLowerer<'_> {
             .into_arguments_without_predecessor();
         Some(self.environment_identifier(
             name,
-            EnvironmentIdentifierOperationIr::Call { args, direct_eval },
+            EnvironmentIdentifierOperationIr::Call {
+                args,
+                direct_eval,
+                callee_targets,
+            },
         ))
     }
 

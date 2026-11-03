@@ -793,6 +793,7 @@ impl GcStructType<ExecutableCode> {
         self,
         entry: ExecutableCodeEntry<'_>,
         binary_numeric: Option<&FunctionLocal<BinaryNumericCallback>>,
+        local_arguments: Option<&FunctionLocal<LocalArgumentsCallable>>,
         metadata: ExecutableCodeMetadata,
         function: &mut Function,
     ) -> Result<GcStackReference<ExecutableCode>, crate::EmitError> {
@@ -820,6 +821,12 @@ impl GcStructType<ExecutableCode> {
             || (binary_numeric.is_some()
                 && (metadata.kind != ExecutableCodeKind::JavaScript
                     || entry_execution != scriptw_ir::FunctionExecutionKind::Ordinary))
+            || (local_arguments.is_some()
+                && (metadata.kind != ExecutableCodeKind::JavaScript
+                    || metadata.protocol
+                        != scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
+                    || metadata.class_element_execution
+                        != scriptw_ir::ClassElementExecutionKind::None))
         {
             return Err(crate::EmitError::unsupported(
                 "executable metadata disagrees with its registered entry",
@@ -864,6 +871,10 @@ impl GcStructType<ExecutableCode> {
                 asynchronous,
                 async_generator,
                 match binary_numeric {
+                    Some(entry) => GcOperand::function_reference(entry),
+                    None => GcOperand::null_function(),
+                },
+                match local_arguments {
                     Some(entry) => GcOperand::function_reference(entry),
                     None => GcOperand::null_function(),
                 },
@@ -2114,6 +2125,15 @@ impl RuntimeSchema {
         FunctionStackReference { shape: PhantomData }
     }
 
+    pub(crate) fn reference_local_arguments_entry(
+        &self,
+        entry: &crate::function_entry::PlannedLocalArgumentsEntry,
+        function: &mut Function,
+    ) -> FunctionStackReference<LocalArgumentsCallable> {
+        entry.emit_ref_func(function);
+        FunctionStackReference { shape: PhantomData }
+    }
+
     /// This scalar role owns its two-result order; it has no Completion route.
     pub(crate) fn call_binary_numeric_reference(
         &self,
@@ -2138,6 +2158,14 @@ impl RuntimeSchema {
     pub(crate) fn call_entry(
         &self,
         entry: &crate::function_entry::PlannedFunctionEntry,
+        function: &mut Function,
+    ) -> GcCallResult {
+        entry.emit_direct_call_instruction(function);
+        GcCallResult::emitted()
+    }
+    pub(crate) fn call_local_arguments_entry(
+        &self,
+        entry: &crate::function_entry::PlannedLocalArgumentsEntry,
         function: &mut Function,
     ) -> GcCallResult {
         entry.emit_direct_call_instruction(function);

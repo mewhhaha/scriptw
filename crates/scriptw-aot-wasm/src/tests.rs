@@ -4261,3 +4261,7 @@ fn dense_literals_avoid_sparse_bookkeeping_and_sparse_writes_share_one_body() {
         "896 literal elements added {added_bytes} bytes"
     );
 }
+
+mod raw_key_own_data;
+
+mod local_argument_calls;

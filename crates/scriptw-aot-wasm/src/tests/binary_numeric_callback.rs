@@ -148,17 +148,19 @@ fn optional_callback_field_is_typed_immutable_and_native_code_publishes_null() {
     let CompositeInnerType::Struct(record) = &types[code as usize].composite_type.inner else {
         panic!("actual ExecutableCode record");
     };
-    let callback = record.fields.last().expect("optional scalar entry");
-    assert!(!callback.mutable);
     let heap = wasmparser::HeapType::Concrete(UnpackedIndex::Module(
         StaticSignature::BinaryNumericCallback.type_index(),
     ));
-    assert_eq!(
-        callback.element_type,
-        StorageType::Val(wasmparser::ValType::Ref(
-            wasmparser::RefType::new(true, heap).unwrap()
-        ))
-    );
+    let callback_type = StorageType::Val(wasmparser::ValType::Ref(
+        wasmparser::RefType::new(true, heap).unwrap(),
+    ));
+    let callback_ordinal = record
+        .fields
+        .iter()
+        .position(|field| field.element_type == callback_type)
+        .expect("actual optional scalar entry field");
+    assert!(!record.fields[callback_ordinal].mutable);
+    let publication_width = record.fields.len() - callback_ordinal + 1;
     let has_null_publication = |bytes: &[u8]| {
         Parser::new(0).parse_all(bytes).any(|payload| {
             let Payload::CodeSectionEntry(body) = payload.expect("module decodes") else {
@@ -170,10 +172,13 @@ fn optional_callback_field_is_typed_immutable_and_native_code_publishes_null() {
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
-            operators.windows(2).any(|pair| {
-                matches!(pair,
-                [Operator::RefNull { hty }, Operator::StructNew { struct_type_index }]
-                if *hty == heap && *struct_type_index == code)
+            operators.windows(publication_width).any(|publication| {
+                matches!(publication.first(), Some(Operator::RefNull { hty }) if *hty == heap)
+                    && publication[1..publication.len() - 1]
+                        .iter()
+                        .all(|op| matches!(op, Operator::RefNull { .. }))
+                    && matches!(publication.last(), Some(Operator::StructNew { struct_type_index })
+                        if *struct_type_index == code)
             })
         })
     };

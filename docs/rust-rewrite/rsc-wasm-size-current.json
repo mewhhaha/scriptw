@@ -1,29 +1,23 @@
 {
   "schema": "scriptw-rsc-wasm-size-current-v1",
   "date": "2026-11-03",
-  "evidence": {
-    "archive": "situations-evidence-2026-11-03.tar.xz",
-    "archive_member_prefix": "additional-evidence/target/performance-climb-env-20261103/size/",
-    "measured_campaign": "rsc-current.json",
-    "reproduction": "Reconstruct the final archived source snapshot and Cargo producer; link the archived diagnostic against that Engine library, then validate emitted bytes against the measured campaign. Binary payloads are excluded."
-  },
-  "measurement": "static encoded-byte accounting for final current RSC raw P",
+  "measurement": "static encoded-byte accounting for the measured candidate RSC raw P",
   "aggregate": {
-    "path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/aggregate.json",
-    "sha256": "45ea0ca41feb109f80d4c4599f6ef0f6dba4a8151920e39579446b75576bcb0f",
-    "campaign_path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/campaign.json",
-    "campaign_sha256": "7c47b6cb118e0a4a5e7f38e43764bd26382a5b0f652559aa93401196be6a5205"
+    "path": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/aggregate.json",
+    "sha256": "cfa700f8ea60bd80fff36e7a04250e2e1acc22c514266edee5f10c01cfe565f6",
+    "campaign_path": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/campaign.json",
+    "campaign_sha256": "85034f8bc12ed25339faa0d3e1bd042c88a78dd13e42a5289addc645503a3e39"
   },
   "first_candidate_process": {
-    "path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/report.json",
-    "report_sha256": "93d9ab0cc54e331ef4e58d34fc397cc0569be1974a4ad50f205010f2809e10f5",
-    "program_wasm_bytes": 6071770,
-    "program_wasm_sha256": "81c25514f3d9168718cc5c9fa75610f341200112909354a0d4c2aaa4441fe71b"
+    "path": "/home/jacobt/src/scriptw/target/performance-specialize-20261103/fast-comparison-campaign/block-0-0-candidate/report.json",
+    "report_sha256": "789cb8a1226fadf1f10417e05c3169aa41e5d89930e30dd39ea1996738425079",
+    "program_wasm_bytes": 6168997,
+    "program_wasm_sha256": "9d5f2104a7e1fb30f9d4050f4f4b75ccbfd1c8c38ed0614a491e794a45d87a66"
   },
   "compiler": {
-    "source_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
-    "source_fingerprint": "95406a463ea5257413ccacdc0ab928f10569538149ca45d8ede4d0f4cde5e17e",
-    "executable_sha256": "fe9cf940aef8bc0b04cb8c5dfb775b9a962d6fd51246dd939a27fd68d4fbb627",
+    "source_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
+    "source_fingerprint": "9dd31eafb905f7a203c525096d1c274d3d6eaf764a6b6cb72e25db226c10ba32",
+    "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -69,76 +63,76 @@
     },
     "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
   },
-  "runtime_key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
-  "runtime_wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61",
-  "runtime_wasm_bytes": 39380016,
-  "program_wasm_bytes": 6071770,
-  "program_wasm_sha256": "81c25514f3d9168718cc5c9fa75610f341200112909354a0d4c2aaa4441fe71b",
+  "runtime_key": "0bef8ee58b989c2f6409c7800985dab63f8df08be6d6d85ac46ac3fd33e1ebe5",
+  "runtime_wasm_sha256": "194958918606fa929a197f8cabc3c1f9bd39bc4f884c53eb2bafa3a738b6097f",
+  "runtime_wasm_bytes": 39382946,
+  "program_wasm_bytes": 6168997,
+  "program_wasm_sha256": "9d5f2104a7e1fb30f9d4050f4f4b75ccbfd1c8c38ed0614a491e794a45d87a66",
   "wasm_header_bytes": 8,
-  "sections_total_bytes": 6071762,
-  "accounted_program_bytes": 6071770,
+  "sections_total_bytes": 6168989,
+  "accounted_program_bytes": 6168997,
   "sections": [
     {
       "id": 1,
       "start": 8,
-      "payload_bytes": 7207,
+      "payload_bytes": 7239,
       "section_header_bytes": 3,
-      "total_bytes": 7210
+      "total_bytes": 7242
     },
     {
       "id": 2,
-      "start": 7218,
-      "payload_bytes": 4341,
+      "start": 7250,
+      "payload_bytes": 4416,
       "section_header_bytes": 3,
-      "total_bytes": 4344
+      "total_bytes": 4419
     },
     {
       "id": 3,
-      "start": 11562,
-      "payload_bytes": 342,
+      "start": 11669,
+      "payload_bytes": 430,
       "section_header_bytes": 3,
-      "total_bytes": 345
+      "total_bytes": 433
     },
     {
       "id": 6,
-      "start": 11907,
+      "start": 12102,
       "payload_bytes": 1,
       "section_header_bytes": 2,
       "total_bytes": 3
     },
     {
       "id": 7,
-      "start": 11910,
+      "start": 12105,
       "payload_bytes": 282,
       "section_header_bytes": 3,
       "total_bytes": 285
     },
     {
       "id": 9,
-      "start": 12195,
-      "payload_bytes": 734,
+      "start": 12390,
+      "payload_bytes": 916,
       "section_header_bytes": 3,
-      "total_bytes": 737
+      "total_bytes": 919
     },
     {
       "id": 12,
-      "start": 12932,
+      "start": 13309,
       "payload_bytes": 1,
       "section_header_bytes": 2,
       "total_bytes": 3
     },
     {
       "id": 10,
-      "start": 12935,
-      "payload_bytes": 5529582,
+      "start": 13312,
+      "payload_bytes": 5623642,
       "section_header_bytes": 5,
-      "total_bytes": 5529587,
-      "function_bodies": 328,
-      "function_body_bytes": 5528837
+      "total_bytes": 5623647,
+      "function_bodies": 416,
+      "function_body_bytes": 5622721
     },
     {
       "id": 11,
-      "start": 5542522,
+      "start": 5636959,
       "payload_bytes": 490224,
       "section_header_bytes": 4,
       "total_bytes": 490228,
@@ -147,7 +141,7 @@
     },
     {
       "id": 0,
-      "start": 6032750,
+      "start": 6127187,
       "payload_bytes": 39,
       "section_header_bytes": 2,
       "total_bytes": 41,
@@ -155,15 +149,15 @@
     },
     {
       "id": 0,
-      "start": 6032791,
-      "payload_bytes": 4656,
+      "start": 6127228,
+      "payload_bytes": 7446,
       "section_header_bytes": 3,
-      "total_bytes": 4659,
+      "total_bytes": 7449,
       "name": "name"
     },
     {
       "id": 0,
-      "start": 6037450,
+      "start": 6134677,
       "payload_bytes": 34316,
       "section_header_bytes": 4,
       "total_bytes": 34320,
@@ -174,3140 +168,3940 @@
     {
       "index": 0,
       "flags": 1,
-      "offset": 5542531,
+      "offset": 5636968,
       "bytes": 143192
     },
     {
       "index": 1,
       "flags": 1,
-      "offset": 5685727,
+      "offset": 5780164,
       "bytes": 335174
     },
     {
       "index": 2,
       "flags": 1,
-      "offset": 6020904,
+      "offset": 6115341,
       "bytes": 11844
     },
     {
       "index": 3,
       "flags": 1,
-      "offset": 6032750,
+      "offset": 6127187,
       "bytes": 0
     }
   ],
   "data_segment_payload_bytes": 490210,
-  "defined_functions": 328,
-  "imported_functions": 132,
-  "function_body_bytes": 5528837,
+  "defined_functions": 416,
+  "imported_functions": 135,
+  "function_body_bytes": 5622721,
   "categories": {
     "script": {
       "functions": 308,
-      "body_bytes": 5421335
+      "body_bytes": 5487467
     },
     "main": {
       "functions": 1,
-      "body_bytes": 37475
+      "body_bytes": 37503
     },
     "runtime-helper": {
       "functions": 18,
-      "body_bytes": 69328
+      "body_bytes": 69332
     },
     "program-initialize": {
       "functions": 1,
       "body_bytes": 699
+    },
+    "arguments-adapter": {
+      "functions": 88,
+      "body_bytes": 27720
     }
+  },
+  "arguments_adapter": {
+    "functions": 88,
+    "body_bytes": 27720
   },
   "functions": [
     {
-      "index": 132,
-      "bytes": 37475,
+      "index": 135,
+      "bytes": 37503,
       "locals": 161,
       "kind": "main",
       "name": "scriptw::main",
       "ordinal": 0,
-      "start": 12945
+      "start": 13322
     },
     {
-      "index": 133,
+      "index": 136,
       "bytes": 699,
       "locals": 24,
       "kind": "program-initialize",
       "name": "scriptw::program_init",
       "ordinal": 1,
-      "start": 50422
+      "start": 50827
     },
     {
-      "index": 134,
+      "index": 137,
       "bytes": 1348,
       "locals": 59,
       "kind": "script",
       "name": "js::f4",
       "ordinal": 2,
-      "start": 51123
+      "start": 51528
     },
     {
-      "index": 135,
+      "index": 138,
       "bytes": 1348,
       "locals": 59,
       "kind": "script",
       "name": "js::f5",
       "ordinal": 3,
-      "start": 52473
+      "start": 52878
     },
     {
-      "index": 136,
-      "bytes": 9748,
-      "locals": 161,
+      "index": 139,
+      "bytes": 9458,
+      "locals": 152,
       "kind": "script",
       "name": "js::f11",
       "ordinal": 4,
-      "start": 53823
+      "start": 54228
     },
     {
-      "index": 137,
-      "bytes": 2228,
+      "index": 140,
+      "bytes": 2230,
       "locals": 74,
       "kind": "script",
       "name": "js::on#f10",
       "ordinal": 5,
-      "start": 63573
-    },
-    {
-      "index": 138,
-      "bytes": 1979,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::get#f13",
-      "ordinal": 6,
-      "start": 65803
-    },
-    {
-      "index": 139,
-      "bytes": 19911,
-      "locals": 218,
-      "kind": "script",
-      "name": "js::Gr#f12",
-      "ordinal": 7,
-      "start": 67785
-    },
-    {
-      "index": 140,
-      "bytes": 11160,
-      "locals": 169,
-      "kind": "script",
-      "name": "js::bt#f14",
-      "ordinal": 8,
-      "start": 87698
+      "start": 63688
     },
     {
       "index": 141,
-      "bytes": 4254,
-      "locals": 125,
+      "bytes": 3432,
+      "locals": 119,
       "kind": "script",
-      "name": "js::f31",
-      "ordinal": 9,
-      "start": 98860
+      "name": "js::get#f13",
+      "ordinal": 6,
+      "start": 65920
     },
     {
       "index": 142,
-      "bytes": 4551,
-      "locals": 123,
+      "bytes": 19562,
+      "locals": 202,
       "kind": "script",
-      "name": "js::forEach#f30",
-      "ordinal": 10,
-      "start": 103116
+      "name": "js::Gr#f12",
+      "ordinal": 7,
+      "start": 69355
     },
     {
       "index": 143,
-      "bytes": 1580,
-      "locals": 69,
+      "bytes": 10397,
+      "locals": 159,
       "kind": "script",
-      "name": "js::f33",
-      "ordinal": 11,
-      "start": 107669
+      "name": "js::bt#f14",
+      "ordinal": 8,
+      "start": 88919
     },
     {
       "index": 144,
-      "bytes": 4422,
-      "locals": 123,
+      "bytes": 4466,
+      "locals": 128,
       "kind": "script",
-      "name": "js::count#f32",
-      "ordinal": 12,
-      "start": 109251
+      "name": "js::f31",
+      "ordinal": 9,
+      "start": 99318
     },
     {
       "index": 145,
-      "bytes": 886,
-      "locals": 43,
+      "bytes": 4227,
+      "locals": 109,
       "kind": "script",
-      "name": "js::f35",
-      "ordinal": 13,
-      "start": 113675
+      "name": "js::forEach#f30",
+      "ordinal": 10,
+      "start": 103786
     },
     {
       "index": 146,
-      "bytes": 4352,
-      "locals": 126,
-      "kind": "script",
-      "name": "js::toArray#f34",
-      "ordinal": 14,
-      "start": 114563
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f33",
+      "ordinal": 11,
+      "start": 108015
     },
     {
       "index": 147,
-      "bytes": 5635,
-      "locals": 123,
+      "bytes": 4101,
+      "locals": 110,
       "kind": "script",
-      "name": "js::only#f36",
-      "ordinal": 15,
-      "start": 118917
+      "name": "js::count#f32",
+      "ordinal": 12,
+      "start": 108332
     },
     {
       "index": 148,
-      "bytes": 53558,
-      "locals": 185,
-      "kind": "script",
-      "name": "js::f38",
-      "ordinal": 16,
-      "start": 124555
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f35",
+      "ordinal": 13,
+      "start": 112435
     },
     {
       "index": 149,
-      "bytes": 3161,
+      "bytes": 4036,
+      "locals": 113,
+      "kind": "script",
+      "name": "js::toArray#f34",
+      "ordinal": 14,
+      "start": 112752
+    },
+    {
+      "index": 150,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::only#f36",
+      "ordinal": 15,
+      "start": 116790
+    },
+    {
+      "index": 151,
+      "bytes": 56983,
+      "locals": 195,
+      "kind": "script",
+      "name": "js::f38",
+      "ordinal": 16,
+      "start": 117108
+    },
+    {
+      "index": 152,
+      "bytes": 3163,
       "locals": 85,
       "kind": "script",
       "name": "js::f37",
       "ordinal": 17,
-      "start": 178115
-    },
-    {
-      "index": 150,
-      "bytes": 4154,
-      "locals": 119,
-      "kind": "script",
-      "name": "js::f39",
-      "ordinal": 18,
-      "start": 181278
-    },
-    {
-      "index": 151,
-      "bytes": 718,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::f40",
-      "ordinal": 19,
-      "start": 185434
-    },
-    {
-      "index": 152,
-      "bytes": 36233,
-      "locals": 208,
-      "kind": "script",
-      "name": "js::f41",
-      "ordinal": 20,
-      "start": 186155
+      "start": 174093
     },
     {
       "index": 153,
-      "bytes": 31216,
-      "locals": 200,
-      "kind": "script",
-      "name": "js::f42",
-      "ordinal": 21,
-      "start": 222391
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f39",
+      "ordinal": 18,
+      "start": 177258
     },
     {
       "index": 154,
-      "bytes": 1369,
-      "locals": 60,
-      "kind": "script",
-      "name": "js::f43",
-      "ordinal": 22,
-      "start": 253609
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f40",
+      "ordinal": 19,
+      "start": 177575
     },
     {
       "index": 155,
-      "bytes": 1914,
-      "locals": 72,
+      "bytes": 38967,
+      "locals": 223,
       "kind": "script",
-      "name": "js::f44",
-      "ordinal": 23,
-      "start": 254980
+      "name": "js::f41",
+      "ordinal": 20,
+      "start": 177893
     },
     {
       "index": 156,
-      "bytes": 3003,
-      "locals": 84,
+      "bytes": 37181,
+      "locals": 215,
       "kind": "script",
-      "name": "js::f45",
-      "ordinal": 24,
-      "start": 256896
+      "name": "js::f42",
+      "ordinal": 21,
+      "start": 216863
     },
     {
       "index": 157,
-      "bytes": 3608,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f43",
+      "ordinal": 22,
+      "start": 254046
+    },
+    {
+      "index": 158,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f44",
+      "ordinal": 23,
+      "start": 254363
+    },
+    {
+      "index": 159,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f45",
+      "ordinal": 24,
+      "start": 254680
+    },
+    {
+      "index": 160,
+      "bytes": 3612,
       "locals": 105,
       "kind": "script",
       "name": "js::f46",
       "ordinal": 25,
-      "start": 259901
-    },
-    {
-      "index": 158,
-      "bytes": 3930,
-      "locals": 116,
-      "kind": "script",
-      "name": "js::f47",
-      "ordinal": 26,
-      "start": 263511
-    },
-    {
-      "index": 159,
-      "bytes": 4228,
-      "locals": 122,
-      "kind": "script",
-      "name": "js::f48",
-      "ordinal": 27,
-      "start": 267443
-    },
-    {
-      "index": 160,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::f49",
-      "ordinal": 28,
-      "start": 271673
+      "start": 254997
     },
     {
       "index": 161,
-      "bytes": 3720,
-      "locals": 113,
-      "kind": "script",
-      "name": "js::f50",
-      "ordinal": 29,
-      "start": 272323
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f47",
+      "ordinal": 26,
+      "start": 258611
     },
     {
       "index": 162,
-      "bytes": 4228,
-      "locals": 122,
-      "kind": "script",
-      "name": "js::f51",
-      "ordinal": 30,
-      "start": 276045
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f48",
+      "ordinal": 27,
+      "start": 258928
     },
     {
       "index": 163,
-      "bytes": 12158,
-      "locals": 193,
-      "kind": "script",
-      "name": "js::Qn#f16",
-      "ordinal": 31,
-      "start": 280275
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f49",
+      "ordinal": 28,
+      "start": 259245
     },
     {
       "index": 164,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::$t#f17",
-      "ordinal": 32,
-      "start": 292435
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f50",
+      "ordinal": 29,
+      "start": 259562
     },
     {
       "index": 165,
-      "bytes": 7371,
-      "locals": 136,
-      "kind": "script",
-      "name": "js::ni#f18",
-      "ordinal": 33,
-      "start": 293085
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f51",
+      "ordinal": 30,
+      "start": 259879
     },
     {
       "index": 166,
-      "bytes": 5432,
+      "bytes": 13511,
+      "locals": 205,
+      "kind": "script",
+      "name": "js::Qn#f16",
+      "ordinal": 31,
+      "start": 260196
+    },
+    {
+      "index": 167,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::$t#f17",
+      "ordinal": 32,
+      "start": 273709
+    },
+    {
+      "index": 168,
+      "bytes": 8918,
+      "locals": 154,
+      "kind": "script",
+      "name": "js::ni#f18",
+      "ordinal": 33,
+      "start": 274026
+    },
+    {
+      "index": 169,
+      "bytes": 5437,
       "locals": 143,
       "kind": "script",
       "name": "js::jn#f19",
       "ordinal": 34,
-      "start": 300458
+      "start": 282946
     },
     {
-      "index": 167,
-      "bytes": 4722,
-      "locals": 143,
-      "kind": "script",
-      "name": "js::ri#f20",
+      "index": 170,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::ri#f20",
       "ordinal": 35,
-      "start": 305892
+      "start": 288385
     },
     {
-      "index": 168,
-      "bytes": 5432,
+      "index": 171,
+      "bytes": 5436,
       "locals": 128,
       "kind": "script",
       "name": "js::kn#f21",
       "ordinal": 36,
-      "start": 310616
-    },
-    {
-      "index": 169,
-      "bytes": 1888,
-      "locals": 81,
-      "kind": "script",
-      "name": "js::f52",
-      "ordinal": 37,
-      "start": 316050
-    },
-    {
-      "index": 170,
-      "bytes": 6625,
-      "locals": 165,
-      "kind": "script",
-      "name": "js::ii#f22",
-      "ordinal": 38,
-      "start": 317940
-    },
-    {
-      "index": 171,
-      "bytes": 9825,
-      "locals": 180,
-      "kind": "script",
-      "name": "js::Zn#f23",
-      "ordinal": 39,
-      "start": 324567
+      "start": 288702
     },
     {
       "index": 172,
-      "bytes": 6092,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f52",
+      "ordinal": 37,
+      "start": 294140
+    },
+    {
+      "index": 173,
+      "bytes": 6849,
+      "locals": 166,
+      "kind": "script",
+      "name": "js::ii#f22",
+      "ordinal": 38,
+      "start": 294457
+    },
+    {
+      "index": 174,
+      "bytes": 9529,
+      "locals": 166,
+      "kind": "script",
+      "name": "js::Zn#f23",
+      "ordinal": 39,
+      "start": 301308
+    },
+    {
+      "index": 175,
+      "bytes": 6096,
       "locals": 127,
       "kind": "script",
       "name": "js::f53",
       "ordinal": 40,
-      "start": 334394
+      "start": 310839
     },
     {
-      "index": 173,
-      "bytes": 6092,
+      "index": 176,
+      "bytes": 6096,
       "locals": 127,
       "kind": "script",
       "name": "js::f54",
       "ordinal": 41,
-      "start": 340488
-    },
-    {
-      "index": 174,
-      "bytes": 26596,
-      "locals": 163,
-      "kind": "script",
-      "name": "js::oi#f24",
-      "ordinal": 42,
-      "start": 346583
-    },
-    {
-      "index": 175,
-      "bytes": 886,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::f55",
-      "ordinal": 43,
-      "start": 373181
-    },
-    {
-      "index": 176,
-      "bytes": 75875,
-      "locals": 294,
-      "kind": "script",
-      "name": "js::en#f25",
-      "ordinal": 44,
-      "start": 374070
+      "start": 316937
     },
     {
       "index": 177,
-      "bytes": 4080,
-      "locals": 124,
+      "bytes": 26933,
+      "locals": 164,
       "kind": "script",
-      "name": "js::f56",
-      "ordinal": 45,
-      "start": 449947
+      "name": "js::oi#f24",
+      "ordinal": 42,
+      "start": 323036
     },
     {
       "index": 178,
-      "bytes": 6343,
-      "locals": 135,
-      "kind": "script",
-      "name": "js::Tn#f26",
-      "ordinal": 46,
-      "start": 454029
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f55",
+      "ordinal": 43,
+      "start": 349971
     },
     {
       "index": 179,
-      "bytes": 12277,
+      "bytes": 75302,
+      "locals": 287,
+      "kind": "script",
+      "name": "js::en#f25",
+      "ordinal": 44,
+      "start": 350289
+    },
+    {
+      "index": 180,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f56",
+      "ordinal": 45,
+      "start": 425593
+    },
+    {
+      "index": 181,
+      "bytes": 5988,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::Tn#f26",
+      "ordinal": 46,
+      "start": 425910
+    },
+    {
+      "index": 182,
+      "bytes": 12286,
       "locals": 132,
       "kind": "script",
       "name": "js::f57",
       "ordinal": 47,
-      "start": 460374
+      "start": 431900
     },
     {
-      "index": 180,
-      "bytes": 12278,
+      "index": 183,
+      "bytes": 12287,
       "locals": 132,
       "kind": "script",
       "name": "js::f58",
       "ordinal": 48,
-      "start": 472653
-    },
-    {
-      "index": 181,
-      "bytes": 21602,
-      "locals": 162,
-      "kind": "script",
-      "name": "js::ei#f27",
-      "ordinal": 49,
-      "start": 484934
-    },
-    {
-      "index": 182,
-      "bytes": 1008,
-      "locals": 49,
-      "kind": "script",
-      "name": "js::fi#f28",
-      "ordinal": 50,
-      "start": 506538
-    },
-    {
-      "index": 183,
-      "bytes": 1631,
-      "locals": 65,
-      "kind": "script",
-      "name": "js::Jn#f29",
-      "ordinal": 51,
-      "start": 507548
+      "start": 444188
     },
     {
       "index": 184,
-      "bytes": 101329,
-      "locals": 224,
+      "bytes": 21928,
+      "locals": 163,
       "kind": "script",
-      "name": "js::f15",
-      "ordinal": 52,
-      "start": 509182
+      "name": "js::ei#f27",
+      "ordinal": 49,
+      "start": 456478
     },
     {
       "index": 185,
-      "bytes": 3497,
-      "locals": 89,
-      "kind": "script",
-      "name": "js::f59",
-      "ordinal": 53,
-      "start": 610513
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::fi#f28",
+      "ordinal": 50,
+      "start": 478408
     },
     {
       "index": 186,
-      "bytes": 3253,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::r#f63",
-      "ordinal": 54,
-      "start": 614012
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::Jn#f29",
+      "ordinal": 51,
+      "start": 478725
     },
     {
       "index": 187,
-      "bytes": 9532,
-      "locals": 144,
+      "bytes": 104523,
+      "locals": 227,
       "kind": "script",
-      "name": "js::f64",
-      "ordinal": 55,
-      "start": 617267
+      "name": "js::f15",
+      "ordinal": 52,
+      "start": 479043
     },
     {
       "index": 188,
-      "bytes": 6048,
-      "locals": 136,
+      "bytes": 3421,
+      "locals": 84,
       "kind": "script",
-      "name": "js::f65",
-      "ordinal": 56,
-      "start": 626801
+      "name": "js::f59",
+      "ordinal": 53,
+      "start": 583568
     },
     {
       "index": 189,
-      "bytes": 33259,
-      "locals": 204,
-      "kind": "script",
-      "name": "js::f66",
-      "ordinal": 57,
-      "start": 632852
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::r#f63",
+      "ordinal": 54,
+      "start": 586991
     },
     {
       "index": 190,
-      "bytes": 29951,
-      "locals": 191,
+      "bytes": 9752,
+      "locals": 147,
       "kind": "script",
-      "name": "js::f67",
-      "ordinal": 58,
-      "start": 666114
+      "name": "js::f64",
+      "ordinal": 55,
+      "start": 587308
     },
     {
       "index": 191,
-      "bytes": 43678,
+      "bytes": 6259,
+      "locals": 139,
+      "kind": "script",
+      "name": "js::f65",
+      "ordinal": 56,
+      "start": 597062
+    },
+    {
+      "index": 192,
+      "bytes": 33182,
+      "locals": 210,
+      "kind": "script",
+      "name": "js::f66",
+      "ordinal": 57,
+      "start": 603324
+    },
+    {
+      "index": 193,
+      "bytes": 30142,
+      "locals": 197,
+      "kind": "script",
+      "name": "js::f67",
+      "ordinal": 58,
+      "start": 636509
+    },
+    {
+      "index": 194,
+      "bytes": 43339,
       "locals": 206,
       "kind": "script",
       "name": "js::f68",
       "ordinal": 59,
-      "start": 696068
+      "start": 666654
     },
     {
-      "index": 192,
-      "bytes": 31126,
-      "locals": 197,
+      "index": 195,
+      "bytes": 31311,
+      "locals": 203,
       "kind": "script",
       "name": "js::f69",
       "ordinal": 60,
-      "start": 739749
+      "start": 709996
     },
     {
-      "index": 193,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::G#f61",
+      "index": 196,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::G#f61",
       "ordinal": 61,
-      "start": 770877
+      "start": 741309
     },
     {
-      "index": 194,
-      "bytes": 3906,
+      "index": 197,
+      "bytes": 3910,
       "locals": 80,
       "kind": "script",
       "name": "js::bn#f62",
       "ordinal": 62,
-      "start": 771527
+      "start": 741626
     },
     {
-      "index": 195,
-      "bytes": 25661,
+      "index": 198,
+      "bytes": 25880,
       "locals": 153,
       "kind": "script",
       "name": "js::f60",
       "ordinal": 63,
-      "start": 775436
-    },
-    {
-      "index": 196,
-      "bytes": 3497,
-      "locals": 89,
-      "kind": "script",
-      "name": "js::f70",
-      "ordinal": 64,
-      "start": 801099
-    },
-    {
-      "index": 197,
-      "bytes": 6342,
-      "locals": 123,
-      "kind": "script",
-      "name": "js::f199",
-      "ordinal": 65,
-      "start": 804598
-    },
-    {
-      "index": 198,
-      "bytes": 759,
-      "locals": 44,
-      "kind": "script",
-      "name": "js::value#f200",
-      "ordinal": 66,
-      "start": 810942
+      "start": 745539
     },
     {
       "index": 199,
-      "bytes": 26423,
-      "locals": 242,
+      "bytes": 3421,
+      "locals": 84,
       "kind": "script",
-      "name": "js::get#f201",
-      "ordinal": 67,
-      "start": 811704
+      "name": "js::f70",
+      "ordinal": 64,
+      "start": 771421
     },
     {
       "index": 200,
-      "bytes": 3253,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::set#f202",
-      "ordinal": 68,
-      "start": 838129
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f199",
+      "ordinal": 65,
+      "start": 774844
     },
     {
       "index": 201,
-      "bytes": 2007,
-      "locals": 87,
-      "kind": "script",
-      "name": "js::get#f203",
-      "ordinal": 69,
-      "start": 841384
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::value#f200",
+      "ordinal": 66,
+      "start": 775161
     },
     {
       "index": 202,
-      "bytes": 8194,
-      "locals": 147,
+      "bytes": 28945,
+      "locals": 224,
       "kind": "script",
-      "name": "js::getOwnPropertyDescriptor#f204",
-      "ordinal": 70,
-      "start": 843393
+      "name": "js::get#f201",
+      "ordinal": 67,
+      "start": 775479
     },
     {
       "index": 203,
-      "bytes": 999,
-      "locals": 49,
-      "kind": "script",
-      "name": "js::getPrototypeOf#f205",
-      "ordinal": 71,
-      "start": 851589
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::set#f202",
+      "ordinal": 68,
+      "start": 804426
     },
     {
       "index": 204,
-      "bytes": 3253,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::set#f206",
-      "ordinal": 72,
-      "start": 852590
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::get#f203",
+      "ordinal": 69,
+      "start": 804743
     },
     {
       "index": 205,
-      "bytes": 16684,
-      "locals": 186,
-      "kind": "script",
-      "name": "js::get#f207",
-      "ordinal": 73,
-      "start": 855846
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::getOwnPropertyDescriptor#f204",
+      "ordinal": 70,
+      "start": 805060
     },
     {
       "index": 206,
-      "bytes": 3253,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::set#f208",
-      "ordinal": 74,
-      "start": 872532
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::getPrototypeOf#f205",
+      "ordinal": 71,
+      "start": 805377
     },
     {
       "index": 207,
-      "bytes": 886,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::useCallback#f209",
-      "ordinal": 75,
-      "start": 875787
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::set#f206",
+      "ordinal": 72,
+      "start": 805694
     },
     {
       "index": 208,
-      "bytes": 1079,
-      "locals": 54,
+      "bytes": 19308,
+      "locals": 174,
       "kind": "script",
-      "name": "js::useMemo#f210",
-      "ordinal": 76,
-      "start": 876675
+      "name": "js::get#f207",
+      "ordinal": 73,
+      "start": 806012
     },
     {
       "index": 209,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::useDebugValue#f211",
-      "ordinal": 77,
-      "start": 877756
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::set#f208",
+      "ordinal": 74,
+      "start": 825322
     },
     {
       "index": 210,
-      "bytes": 4889,
-      "locals": 109,
-      "kind": "script",
-      "name": "js::useMemoCache#f212",
-      "ordinal": 78,
-      "start": 878406
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::useCallback#f209",
+      "ordinal": 75,
+      "start": 825639
     },
     {
       "index": 211,
-      "bytes": 1001,
-      "locals": 49,
-      "kind": "script",
-      "name": "js::useCacheRefresh#f213",
-      "ordinal": 79,
-      "start": 883297
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::useMemo#f210",
+      "ordinal": 76,
+      "start": 825956
     },
     {
       "index": 212,
-      "bytes": 9308,
-      "locals": 147,
-      "kind": "script",
-      "name": "js::getCacheForType#f214",
-      "ordinal": 80,
-      "start": 884300
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::useDebugValue#f211",
+      "ordinal": 77,
+      "start": 826273
     },
     {
       "index": 213,
-      "bytes": 4253,
-      "locals": 114,
+      "bytes": 4804,
+      "locals": 103,
       "kind": "script",
-      "name": "js::cacheSignal#f215",
-      "ordinal": 81,
-      "start": 893610
+      "name": "js::useMemoCache#f212",
+      "ordinal": 78,
+      "start": 826590
     },
     {
       "index": 214,
-      "bytes": 42220,
-      "locals": 192,
-      "kind": "script",
-      "name": "js::value#f216",
-      "ordinal": 82,
-      "start": 897866
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::useCacheRefresh#f213",
+      "ordinal": 79,
+      "start": 831396
     },
     {
       "index": 215,
-      "bytes": 718,
-      "locals": 43,
+      "bytes": 9895,
+      "locals": 150,
       "kind": "script",
-      "name": "js::f217",
-      "ordinal": 83,
-      "start": 940088
+      "name": "js::getCacheForType#f214",
+      "ordinal": 80,
+      "start": 831713
     },
     {
       "index": 216,
-      "bytes": 3170,
-      "locals": 98,
-      "kind": "script",
-      "name": "js::f218",
-      "ordinal": 84,
-      "start": 940808
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::cacheSignal#f215",
+      "ordinal": 81,
+      "start": 841610
     },
     {
       "index": 217,
-      "bytes": 1008,
-      "locals": 49,
+      "bytes": 43312,
+      "locals": 194,
       "kind": "script",
-      "name": "js::f219",
-      "ordinal": 85,
-      "start": 943980
+      "name": "js::value#f216",
+      "ordinal": 82,
+      "start": 841928
     },
     {
       "index": 218,
-      "bytes": 9439,
-      "locals": 136,
-      "kind": "script",
-      "name": "js::f221",
-      "ordinal": 86,
-      "start": 944990
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f217",
+      "ordinal": 83,
+      "start": 885242
     },
     {
       "index": 219,
-      "bytes": 2902,
-      "locals": 116,
-      "kind": "script",
-      "name": "js::f222",
-      "ordinal": 87,
-      "start": 954431
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f218",
+      "ordinal": 84,
+      "start": 885559
     },
     {
       "index": 220,
-      "bytes": 25759,
-      "locals": 205,
-      "kind": "script",
-      "name": "js::f220",
-      "ordinal": 88,
-      "start": 957336
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f219",
+      "ordinal": 85,
+      "start": 885876
     },
     {
       "index": 221,
-      "bytes": 3460,
-      "locals": 128,
-      "kind": "script",
-      "name": "js::f224",
-      "ordinal": 89,
-      "start": 983097
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f221",
+      "ordinal": 86,
+      "start": 886193
     },
     {
       "index": 222,
-      "bytes": 6150,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f222",
+      "ordinal": 87,
+      "start": 886510
+    },
+    {
+      "index": 223,
+      "bytes": 26346,
+      "locals": 207,
+      "kind": "script",
+      "name": "js::f220",
+      "ordinal": 88,
+      "start": 886828
+    },
+    {
+      "index": 224,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f224",
+      "ordinal": 89,
+      "start": 913176
+    },
+    {
+      "index": 225,
+      "bytes": 6155,
       "locals": 150,
       "kind": "script",
       "name": "js::f225",
       "ordinal": 90,
-      "start": 986559
-    },
-    {
-      "index": 223,
-      "bytes": 25243,
-      "locals": 192,
-      "kind": "script",
-      "name": "js::f223",
-      "ordinal": 91,
-      "start": 992712
-    },
-    {
-      "index": 224,
-      "bytes": 12375,
-      "locals": 178,
-      "kind": "script",
-      "name": "js::f226",
-      "ordinal": 92,
-      "start": 1017957
-    },
-    {
-      "index": 225,
-      "bytes": 41970,
-      "locals": 212,
-      "kind": "script",
-      "name": "js::i#f228",
-      "ordinal": 93,
-      "start": 1030335
+      "start": 913493
     },
     {
       "index": 226,
-      "bytes": 9763,
-      "locals": 145,
+      "bytes": 26482,
+      "locals": 194,
       "kind": "script",
-      "name": "js::o#f229",
-      "ordinal": 94,
-      "start": 1072307
+      "name": "js::f223",
+      "ordinal": 91,
+      "start": 919651
     },
     {
       "index": 227,
-      "bytes": 17537,
-      "locals": 190,
+      "bytes": 11990,
+      "locals": 167,
       "kind": "script",
-      "name": "js::f227",
-      "ordinal": 95,
-      "start": 1082073
+      "name": "js::f226",
+      "ordinal": 92,
+      "start": 946135
     },
     {
       "index": 228,
-      "bytes": 2162,
-      "locals": 85,
+      "bytes": 43812,
+      "locals": 219,
       "kind": "script",
-      "name": "js::pull#f233",
-      "ordinal": 96,
-      "start": 1099612
+      "name": "js::i#f228",
+      "ordinal": 93,
+      "start": 958128
     },
     {
       "index": 229,
-      "bytes": 4182,
-      "locals": 98,
+      "bytes": 9908,
+      "locals": 148,
       "kind": "script",
-      "name": "js::cancel#f234",
-      "ordinal": 97,
-      "start": 1101776
+      "name": "js::o#f229",
+      "ordinal": 94,
+      "start": 1001942
     },
     {
       "index": 230,
-      "bytes": 6357,
-      "locals": 124,
+      "bytes": 18979,
+      "locals": 193,
       "kind": "script",
-      "name": "js::f232",
-      "ordinal": 98,
-      "start": 1105960
+      "name": "js::f227",
+      "ordinal": 95,
+      "start": 1011853
     },
     {
       "index": 231,
-      "bytes": 17046,
-      "locals": 182,
-      "kind": "script",
-      "name": "js::f231",
-      "ordinal": 99,
-      "start": 1112320
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::pull#f233",
+      "ordinal": 96,
+      "start": 1030834
     },
     {
       "index": 232,
-      "bytes": 4024,
+      "bytes": 3902,
+      "locals": 90,
+      "kind": "script",
+      "name": "js::cancel#f234",
+      "ordinal": 97,
+      "start": 1031151
+    },
+    {
+      "index": 233,
+      "bytes": 6261,
+      "locals": 121,
+      "kind": "script",
+      "name": "js::f232",
+      "ordinal": 98,
+      "start": 1035055
+    },
+    {
+      "index": 234,
+      "bytes": 16412,
+      "locals": 168,
+      "kind": "script",
+      "name": "js::f231",
+      "ordinal": 99,
+      "start": 1041319
+    },
+    {
+      "index": 235,
+      "bytes": 4026,
       "locals": 99,
       "kind": "script",
       "name": "js::f230",
       "ordinal": 100,
-      "start": 1129368
-    },
-    {
-      "index": 233,
-      "bytes": 2931,
-      "locals": 117,
-      "kind": "script",
-      "name": "js::f235",
-      "ordinal": 101,
-      "start": 1133394
-    },
-    {
-      "index": 234,
-      "bytes": 10654,
-      "locals": 166,
-      "kind": "script",
-      "name": "js::f236",
-      "ordinal": 102,
-      "start": 1136327
-    },
-    {
-      "index": 235,
-      "bytes": 1911,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::start#f238",
-      "ordinal": 103,
-      "start": 1146983
+      "start": 1057733
     },
     {
       "index": 236,
-      "bytes": 2144,
-      "locals": 85,
+      "bytes": 2641,
+      "locals": 103,
       "kind": "script",
-      "name": "js::pull#f239",
-      "ordinal": 104,
-      "start": 1148896
+      "name": "js::f235",
+      "ordinal": 101,
+      "start": 1061761
     },
     {
       "index": 237,
-      "bytes": 4164,
-      "locals": 98,
+      "bytes": 10926,
+      "locals": 172,
       "kind": "script",
-      "name": "js::cancel#f240",
-      "ordinal": 105,
-      "start": 1151042
+      "name": "js::f236",
+      "ordinal": 102,
+      "start": 1064404
     },
     {
       "index": 238,
-      "bytes": 17884,
-      "locals": 193,
-      "kind": "script",
-      "name": "js::f237",
-      "ordinal": 106,
-      "start": 1155209
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::start#f238",
+      "ordinal": 103,
+      "start": 1075332
     },
     {
       "index": 239,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::b#f72",
-      "ordinal": 107,
-      "start": 1173095
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::pull#f239",
+      "ordinal": 104,
+      "start": 1075649
     },
     {
       "index": 240,
-      "bytes": 7375,
-      "locals": 136,
+      "bytes": 3884,
+      "locals": 90,
       "kind": "script",
-      "name": "js::rr#f73",
-      "ordinal": 108,
-      "start": 1173745
+      "name": "js::cancel#f240",
+      "ordinal": 105,
+      "start": 1075966
     },
     {
       "index": 241,
-      "bytes": 2682,
-      "locals": 69,
+      "bytes": 17541,
+      "locals": 180,
       "kind": "script",
-      "name": "js::f241",
-      "ordinal": 109,
-      "start": 1181122
+      "name": "js::f237",
+      "ordinal": 106,
+      "start": 1079853
     },
     {
       "index": 242,
-      "bytes": 3743,
-      "locals": 116,
-      "kind": "script",
-      "name": "js::mi#f74",
-      "ordinal": 110,
-      "start": 1183806
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::b#f72",
+      "ordinal": 107,
+      "start": 1097396
     },
     {
       "index": 243,
-      "bytes": 38341,
-      "locals": 205,
+      "bytes": 8922,
+      "locals": 154,
       "kind": "script",
-      "name": "js::or#f75",
-      "ordinal": 111,
-      "start": 1187552
+      "name": "js::rr#f73",
+      "ordinal": 108,
+      "start": 1097713
     },
     {
       "index": 244,
-      "bytes": 2267,
-      "locals": 89,
-      "kind": "script",
-      "name": "js::hn#f76",
-      "ordinal": 112,
-      "start": 1225895
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f241",
+      "ordinal": 109,
+      "start": 1106637
     },
     {
       "index": 245,
-      "bytes": 2847,
-      "locals": 115,
+      "bytes": 3657,
+      "locals": 104,
       "kind": "script",
-      "name": "js::C#f77",
-      "ordinal": 113,
-      "start": 1228164
+      "name": "js::mi#f74",
+      "ordinal": 110,
+      "start": 1106954
     },
     {
       "index": 246,
-      "bytes": 2099,
-      "locals": 96,
+      "bytes": 40147,
+      "locals": 208,
       "kind": "script",
-      "name": "js::dt#f78",
-      "ordinal": 114,
-      "start": 1231013
+      "name": "js::or#f75",
+      "ordinal": 111,
+      "start": 1110614
     },
     {
       "index": 247,
-      "bytes": 7325,
-      "locals": 129,
-      "kind": "script",
-      "name": "js::er#f79",
-      "ordinal": 115,
-      "start": 1233114
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::hn#f76",
+      "ordinal": 112,
+      "start": 1150763
     },
     {
       "index": 248,
-      "bytes": 6172,
-      "locals": 136,
-      "kind": "script",
-      "name": "js::fn#f80",
-      "ordinal": 116,
-      "start": 1240441
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::C#f77",
+      "ordinal": 113,
+      "start": 1151080
     },
     {
       "index": 249,
-      "bytes": 21152,
-      "locals": 174,
-      "kind": "script",
-      "name": "js::fr#f81",
-      "ordinal": 117,
-      "start": 1246616
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::dt#f78",
+      "ordinal": 114,
+      "start": 1151397
     },
     {
       "index": 250,
-      "bytes": 3989,
-      "locals": 109,
+      "bytes": 7750,
+      "locals": 132,
       "kind": "script",
-      "name": "js::f242",
-      "ordinal": 118,
-      "start": 1267770
+      "name": "js::er#f79",
+      "ordinal": 115,
+      "start": 1151714
     },
     {
       "index": 251,
-      "bytes": 3251,
-      "locals": 117,
+      "bytes": 6396,
+      "locals": 142,
       "kind": "script",
-      "name": "js::f243",
-      "ordinal": 119,
-      "start": 1271761
+      "name": "js::fn#f80",
+      "ordinal": 116,
+      "start": 1159466
     },
     {
       "index": 252,
-      "bytes": 6703,
-      "locals": 165,
+      "bytes": 22049,
+      "locals": 177,
       "kind": "script",
-      "name": "js::f244",
-      "ordinal": 120,
-      "start": 1275014
+      "name": "js::fr#f81",
+      "ordinal": 117,
+      "start": 1165865
     },
     {
       "index": 253,
-      "bytes": 59164,
-      "locals": 243,
-      "kind": "script",
-      "name": "js::Lt#f82",
-      "ordinal": 121,
-      "start": 1281720
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f242",
+      "ordinal": 118,
+      "start": 1187916
     },
     {
       "index": 254,
-      "bytes": 12988,
-      "locals": 155,
-      "kind": "script",
-      "name": "js::Ti#f83",
-      "ordinal": 122,
-      "start": 1340886
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f243",
+      "ordinal": 119,
+      "start": 1188233
     },
     {
       "index": 255,
-      "bytes": 16240,
-      "locals": 168,
-      "kind": "script",
-      "name": "js::Ai#f84",
-      "ordinal": 123,
-      "start": 1353876
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f244",
+      "ordinal": 120,
+      "start": 1188550
     },
     {
       "index": 256,
-      "bytes": 28038,
-      "locals": 187,
+      "bytes": 62224,
+      "locals": 236,
       "kind": "script",
-      "name": "js::$n#f85",
-      "ordinal": 124,
-      "start": 1370119
+      "name": "js::Lt#f82",
+      "ordinal": 121,
+      "start": 1188868
     },
     {
       "index": 257,
-      "bytes": 15886,
-      "locals": 164,
+      "bytes": 13387,
+      "locals": 158,
       "kind": "script",
-      "name": "js::ur#f86",
-      "ordinal": 125,
-      "start": 1398159
+      "name": "js::Ti#f83",
+      "ordinal": 122,
+      "start": 1251094
     },
     {
       "index": 258,
-      "bytes": 19964,
-      "locals": 176,
+      "bytes": 16445,
+      "locals": 169,
       "kind": "script",
-      "name": "js::bi#f87",
-      "ordinal": 126,
-      "start": 1414048
+      "name": "js::Ai#f84",
+      "ordinal": 123,
+      "start": 1264484
     },
     {
       "index": 259,
-      "bytes": 15945,
-      "locals": 164,
+      "bytes": 27737,
+      "locals": 190,
       "kind": "script",
-      "name": "js::Ri#f88",
-      "ordinal": 127,
-      "start": 1434014
+      "name": "js::$n#f85",
+      "ordinal": 124,
+      "start": 1280932
     },
     {
       "index": 260,
-      "bytes": 15886,
-      "locals": 164,
+      "bytes": 15771,
+      "locals": 163,
       "kind": "script",
-      "name": "js::$i#f89",
-      "ordinal": 128,
-      "start": 1449961
+      "name": "js::ur#f86",
+      "ordinal": 125,
+      "start": 1308671
     },
     {
       "index": 261,
-      "bytes": 6803,
-      "locals": 130,
+      "bytes": 19377,
+      "locals": 170,
       "kind": "script",
-      "name": "js::pn#f90",
-      "ordinal": 129,
-      "start": 1465849
+      "name": "js::bi#f87",
+      "ordinal": 126,
+      "start": 1324445
     },
     {
       "index": 262,
-      "bytes": 94419,
-      "locals": 241,
+      "bytes": 15813,
+      "locals": 163,
       "kind": "script",
-      "name": "js::Ii#f91",
-      "ordinal": 130,
-      "start": 1472655
+      "name": "js::Ri#f88",
+      "ordinal": 127,
+      "start": 1343824
     },
     {
       "index": 263,
-      "bytes": 3253,
-      "locals": 80,
+      "bytes": 15771,
+      "locals": 163,
       "kind": "script",
-      "name": "js::f245",
-      "ordinal": 131,
-      "start": 1567076
+      "name": "js::$i#f89",
+      "ordinal": 128,
+      "start": 1359639
     },
     {
       "index": 264,
-      "bytes": 8995,
-      "locals": 159,
+      "bytes": 10072,
+      "locals": 166,
       "kind": "script",
-      "name": "js::Pi#f92",
-      "ordinal": 132,
-      "start": 1570331
+      "name": "js::pn#f90",
+      "ordinal": 129,
+      "start": 1375412
     },
     {
       "index": 265,
-      "bytes": 5809,
+      "bytes": 92549,
+      "locals": 229,
+      "kind": "script",
+      "name": "js::Ii#f91",
+      "ordinal": 130,
+      "start": 1385487
+    },
+    {
+      "index": 266,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f245",
+      "ordinal": 131,
+      "start": 1478038
+    },
+    {
+      "index": 267,
+      "bytes": 9443,
+      "locals": 162,
+      "kind": "script",
+      "name": "js::Pi#f92",
+      "ordinal": 132,
+      "start": 1478355
+    },
+    {
+      "index": 268,
+      "bytes": 5812,
       "locals": 125,
       "kind": "script",
       "name": "js::f246",
       "ordinal": 133,
-      "start": 1579328
+      "start": 1487800
     },
     {
-      "index": 266,
-      "bytes": 5809,
+      "index": 269,
+      "bytes": 5812,
       "locals": 125,
       "kind": "script",
       "name": "js::f247",
       "ordinal": 134,
-      "start": 1585139
-    },
-    {
-      "index": 267,
-      "bytes": 38598,
-      "locals": 190,
-      "kind": "script",
-      "name": "js::Mi#f93",
-      "ordinal": 135,
-      "start": 1590951
-    },
-    {
-      "index": 268,
-      "bytes": 5525,
-      "locals": 101,
-      "kind": "script",
-      "name": "js::ar#f94",
-      "ordinal": 136,
-      "start": 1629551
-    },
-    {
-      "index": 269,
-      "bytes": 2240,
-      "locals": 82,
-      "kind": "script",
-      "name": "js::sr#f95",
-      "ordinal": 137,
-      "start": 1635078
+      "start": 1493614
     },
     {
       "index": 270,
-      "bytes": 3253,
-      "locals": 80,
+      "bytes": 40720,
+      "locals": 196,
       "kind": "script",
-      "name": "js::E#f96",
-      "ordinal": 138,
-      "start": 1637320
+      "name": "js::Mi#f93",
+      "ordinal": 135,
+      "start": 1499429
     },
     {
       "index": 271,
-      "bytes": 3253,
-      "locals": 80,
+      "bytes": 5444,
+      "locals": 97,
       "kind": "script",
-      "name": "js::zi#f97",
-      "ordinal": 139,
-      "start": 1640575
+      "name": "js::ar#f94",
+      "ordinal": 136,
+      "start": 1540151
     },
     {
       "index": 272,
-      "bytes": 3253,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::rt#f98",
-      "ordinal": 140,
-      "start": 1643830
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::sr#f95",
+      "ordinal": 137,
+      "start": 1545597
     },
     {
       "index": 273,
-      "bytes": 11251,
-      "locals": 179,
-      "kind": "script",
-      "name": "js::Ni#f99",
-      "ordinal": 141,
-      "start": 1647085
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::E#f96",
+      "ordinal": 138,
+      "start": 1545914
     },
     {
       "index": 274,
-      "bytes": 25722,
-      "locals": 187,
-      "kind": "script",
-      "name": "js::xi#f100",
-      "ordinal": 142,
-      "start": 1658339
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::zi#f97",
+      "ordinal": 139,
+      "start": 1546231
     },
     {
       "index": 275,
-      "bytes": 9357,
-      "locals": 144,
-      "kind": "script",
-      "name": "js::dr#f101",
-      "ordinal": 143,
-      "start": 1684063
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::rt#f98",
+      "ordinal": 140,
+      "start": 1546548
     },
     {
       "index": 276,
-      "bytes": 21673,
-      "locals": 179,
+      "bytes": 11212,
+      "locals": 182,
       "kind": "script",
-      "name": "js::Wt#f102",
-      "ordinal": 144,
-      "start": 1693423
+      "name": "js::Ni#f99",
+      "ordinal": 141,
+      "start": 1546865
     },
     {
       "index": 277,
-      "bytes": 16946,
-      "locals": 165,
+      "bytes": 25073,
+      "locals": 168,
       "kind": "script",
-      "name": "js::On#f103",
-      "ordinal": 145,
-      "start": 1715099
+      "name": "js::xi#f100",
+      "ordinal": 142,
+      "start": 1558080
     },
     {
       "index": 278,
-      "bytes": 60134,
-      "locals": 235,
-      "kind": "script",
-      "name": "js::j#f104",
-      "ordinal": 146,
-      "start": 1732048
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::dr#f101",
+      "ordinal": 143,
+      "start": 1583155
     },
     {
       "index": 279,
-      "bytes": 2773,
-      "locals": 113,
+      "bytes": 21940,
+      "locals": 182,
       "kind": "script",
-      "name": "js::Fi#f105",
-      "ordinal": 147,
-      "start": 1792184
+      "name": "js::Wt#f102",
+      "ordinal": 144,
+      "start": 1583473
     },
     {
       "index": 280,
-      "bytes": 54678,
-      "locals": 257,
+      "bytes": 16235,
+      "locals": 154,
       "kind": "script",
-      "name": "js::hr#f106",
-      "ordinal": 148,
-      "start": 1794960
+      "name": "js::On#f103",
+      "ordinal": 145,
+      "start": 1605415
     },
     {
       "index": 281,
-      "bytes": 4398,
-      "locals": 121,
+      "bytes": 64082,
+      "locals": 229,
       "kind": "script",
-      "name": "js::L#f107",
-      "ordinal": 149,
-      "start": 1849640
+      "name": "js::j#f104",
+      "ordinal": 146,
+      "start": 1621653
     },
     {
       "index": 282,
-      "bytes": 6093,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::Fi#f105",
+      "ordinal": 147,
+      "start": 1685737
+    },
+    {
+      "index": 283,
+      "bytes": 54381,
+      "locals": 260,
+      "kind": "script",
+      "name": "js::hr#f106",
+      "ordinal": 148,
+      "start": 1686055
+    },
+    {
+      "index": 284,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::L#f107",
+      "ordinal": 149,
+      "start": 1740438
+    },
+    {
+      "index": 285,
+      "bytes": 6097,
       "locals": 127,
       "kind": "script",
       "name": "js::f248",
       "ordinal": 150,
-      "start": 1854040
+      "start": 1740755
     },
     {
-      "index": 283,
-      "bytes": 6093,
+      "index": 286,
+      "bytes": 6097,
       "locals": 127,
       "kind": "script",
       "name": "js::f249",
       "ordinal": 151,
-      "start": 1860135
-    },
-    {
-      "index": 284,
-      "bytes": 4430,
-      "locals": 98,
-      "kind": "script",
-      "name": "js::f250",
-      "ordinal": 152,
-      "start": 1866230
-    },
-    {
-      "index": 285,
-      "bytes": 6584,
-      "locals": 135,
-      "kind": "script",
-      "name": "js::f251",
-      "ordinal": 153,
-      "start": 1870662
-    },
-    {
-      "index": 286,
-      "bytes": 62657,
-      "locals": 213,
-      "kind": "script",
-      "name": "js::Ht#f108",
-      "ordinal": 154,
-      "start": 1877249
+      "start": 1746854
     },
     {
       "index": 287,
-      "bytes": 42439,
-      "locals": 194,
+      "bytes": 4151,
+      "locals": 90,
       "kind": "script",
-      "name": "js::i#f252",
-      "ordinal": 155,
-      "start": 1939909
+      "name": "js::f250",
+      "ordinal": 152,
+      "start": 1752953
     },
     {
       "index": 288,
-      "bytes": 15508,
-      "locals": 154,
+      "bytes": 5954,
+      "locals": 130,
       "kind": "script",
-      "name": "js::o#f253",
-      "ordinal": 156,
-      "start": 1982350
+      "name": "js::f251",
+      "ordinal": 153,
+      "start": 1757106
     },
     {
       "index": 289,
-      "bytes": 23841,
-      "locals": 152,
+      "bytes": 60134,
+      "locals": 201,
       "kind": "script",
-      "name": "js::e#f254",
-      "ordinal": 157,
-      "start": 1997861
+      "name": "js::Ht#f108",
+      "ordinal": 154,
+      "start": 1763063
     },
     {
       "index": 290,
-      "bytes": 48253,
-      "locals": 243,
+      "bytes": 41791,
+      "locals": 191,
       "kind": "script",
-      "name": "js::Ui#f109",
-      "ordinal": 158,
-      "start": 2021705
+      "name": "js::i#f252",
+      "ordinal": 155,
+      "start": 1823200
     },
     {
       "index": 291,
-      "bytes": 49764,
-      "locals": 218,
+      "bytes": 15556,
+      "locals": 157,
       "kind": "script",
-      "name": "js::o#f255",
-      "ordinal": 159,
-      "start": 2069961
+      "name": "js::o#f253",
+      "ordinal": 156,
+      "start": 1864993
     },
     {
       "index": 292,
-      "bytes": 17913,
-      "locals": 156,
+      "bytes": 23539,
+      "locals": 155,
       "kind": "script",
-      "name": "js::e#f256",
-      "ordinal": 160,
-      "start": 2119728
+      "name": "js::e#f254",
+      "ordinal": 157,
+      "start": 1880552
     },
     {
       "index": 293,
-      "bytes": 27454,
-      "locals": 175,
+      "bytes": 49456,
+      "locals": 245,
       "kind": "script",
-      "name": "js::f#f257",
-      "ordinal": 161,
-      "start": 2137644
+      "name": "js::Ui#f109",
+      "ordinal": 158,
+      "start": 1904094
     },
     {
       "index": 294,
-      "bytes": 39366,
-      "locals": 224,
+      "bytes": 48533,
+      "locals": 207,
       "kind": "script",
-      "name": "js::Yi#f110",
-      "ordinal": 162,
-      "start": 2165101
+      "name": "js::o#f255",
+      "ordinal": 159,
+      "start": 1953553
     },
     {
       "index": 295,
-      "bytes": 8383,
-      "locals": 166,
+      "bytes": 17996,
+      "locals": 159,
       "kind": "script",
-      "name": "js::_#f111",
-      "ordinal": 163,
-      "start": 2204469
+      "name": "js::e#f256",
+      "ordinal": 160,
+      "start": 2002089
     },
     {
       "index": 296,
-      "bytes": 9246,
+      "bytes": 27037,
+      "locals": 164,
+      "kind": "script",
+      "name": "js::f#f257",
+      "ordinal": 161,
+      "start": 2020088
+    },
+    {
+      "index": 297,
+      "bytes": 39756,
+      "locals": 226,
+      "kind": "script",
+      "name": "js::Yi#f110",
+      "ordinal": 162,
+      "start": 2047128
+    },
+    {
+      "index": 298,
+      "bytes": 8140,
+      "locals": 157,
+      "kind": "script",
+      "name": "js::_#f111",
+      "ordinal": 163,
+      "start": 2086886
+    },
+    {
+      "index": 299,
+      "bytes": 9251,
       "locals": 124,
       "kind": "script",
       "name": "js::Li#f112",
       "ordinal": 164,
-      "start": 2212854
+      "start": 2095028
     },
     {
-      "index": 297,
-      "bytes": 6093,
+      "index": 300,
+      "bytes": 6097,
       "locals": 127,
       "kind": "script",
       "name": "js::f258",
       "ordinal": 165,
-      "start": 2222102
+      "start": 2104281
     },
     {
-      "index": 298,
-      "bytes": 6093,
+      "index": 301,
+      "bytes": 6097,
       "locals": 127,
       "kind": "script",
       "name": "js::f259",
       "ordinal": 166,
-      "start": 2228197
-    },
-    {
-      "index": 299,
-      "bytes": 14668,
-      "locals": 172,
-      "kind": "script",
-      "name": "js::Bi#f113",
-      "ordinal": 167,
-      "start": 2234292
-    },
-    {
-      "index": 300,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::Gt#f114",
-      "ordinal": 168,
-      "start": 2248962
-    },
-    {
-      "index": 301,
-      "bytes": 2934,
-      "locals": 111,
-      "kind": "script",
-      "name": "js::f260",
-      "ordinal": 169,
-      "start": 2249612
+      "start": 2110380
     },
     {
       "index": 302,
-      "bytes": 2402,
-      "locals": 90,
+      "bytes": 14864,
+      "locals": 173,
       "kind": "script",
-      "name": "js::f261",
-      "ordinal": 170,
-      "start": 2252548
+      "name": "js::Bi#f113",
+      "ordinal": 167,
+      "start": 2116479
     },
     {
       "index": 303,
-      "bytes": 24095,
-      "locals": 169,
-      "kind": "script",
-      "name": "js::Wi#f115",
-      "ordinal": 171,
-      "start": 2254953
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::Gt#f114",
+      "ordinal": 168,
+      "start": 2131345
     },
     {
       "index": 304,
-      "bytes": 32798,
-      "locals": 182,
-      "kind": "script",
-      "name": "js::Vt#f116",
-      "ordinal": 172,
-      "start": 2279051
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f260",
+      "ordinal": 169,
+      "start": 2131662
     },
     {
       "index": 305,
-      "bytes": 9834,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f261",
+      "ordinal": 170,
+      "start": 2131979
+    },
+    {
+      "index": 306,
+      "bytes": 25361,
+      "locals": 187,
+      "kind": "script",
+      "name": "js::Wi#f115",
+      "ordinal": 171,
+      "start": 2132297
+    },
+    {
+      "index": 307,
+      "bytes": 32452,
+      "locals": 178,
+      "kind": "script",
+      "name": "js::Vt#f116",
+      "ordinal": 172,
+      "start": 2157661
+    },
+    {
+      "index": 308,
+      "bytes": 9843,
       "locals": 156,
       "kind": "script",
       "name": "js::Xt#f117",
       "ordinal": 173,
-      "start": 2311851
-    },
-    {
-      "index": 306,
-      "bytes": 12226,
-      "locals": 156,
-      "kind": "script",
-      "name": "js::Zt#f118",
-      "ordinal": 174,
-      "start": 2321687
-    },
-    {
-      "index": 307,
-      "bytes": 62820,
-      "locals": 214,
-      "kind": "script",
-      "name": "js::et#f119",
-      "ordinal": 175,
-      "start": 2333916
-    },
-    {
-      "index": 308,
-      "bytes": 1887,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::f262",
-      "ordinal": 176,
-      "start": 2396738
+      "start": 2190115
     },
     {
       "index": 309,
-      "bytes": 1887,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::f263",
-      "ordinal": 177,
-      "start": 2398627
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::Zt#f118",
+      "ordinal": 174,
+      "start": 2199960
     },
     {
       "index": 310,
-      "bytes": 17873,
-      "locals": 177,
+      "bytes": 61135,
+      "locals": 203,
       "kind": "script",
-      "name": "js::Sn#f120",
-      "ordinal": 178,
-      "start": 2400517
+      "name": "js::et#f119",
+      "ordinal": 175,
+      "start": 2200278
     },
     {
       "index": 311,
-      "bytes": 5616,
-      "locals": 148,
-      "kind": "script",
-      "name": "js::P#f121",
-      "ordinal": 179,
-      "start": 2418392
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f262",
+      "ordinal": 176,
+      "start": 2261415
     },
     {
       "index": 312,
-      "bytes": 2208,
-      "locals": 81,
-      "kind": "script",
-      "name": "js::ping#f264",
-      "ordinal": 180,
-      "start": 2424010
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f263",
+      "ordinal": 177,
+      "start": 2261732
     },
     {
       "index": 313,
-      "bytes": 16982,
-      "locals": 206,
+      "bytes": 17937,
+      "locals": 179,
       "kind": "script",
-      "name": "js::Hi#f122",
-      "ordinal": 181,
-      "start": 2426221
+      "name": "js::Sn#f120",
+      "ordinal": 178,
+      "start": 2262050
     },
     {
       "index": 314,
-      "bytes": 96719,
-      "locals": 250,
+      "bytes": 5148,
+      "locals": 134,
       "kind": "script",
-      "name": "js::ft#f123",
-      "ordinal": 182,
-      "start": 2443206
+      "name": "js::P#f121",
+      "ordinal": 179,
+      "start": 2279989
     },
     {
       "index": 315,
-      "bytes": 3135,
-      "locals": 120,
-      "kind": "script",
-      "name": "js::g#f124",
-      "ordinal": 183,
-      "start": 2539927
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::ping#f264",
+      "ordinal": 180,
+      "start": 2285139
     },
     {
       "index": 316,
-      "bytes": 3165,
-      "locals": 121,
+      "bytes": 17475,
+      "locals": 204,
       "kind": "script",
-      "name": "js::q#f125",
-      "ordinal": 184,
-      "start": 2543064
+      "name": "js::Hi#f122",
+      "ordinal": 181,
+      "start": 2285457
     },
     {
       "index": 317,
-      "bytes": 6022,
-      "locals": 162,
+      "bytes": 97025,
+      "locals": 256,
       "kind": "script",
-      "name": "js::gr#f126",
-      "ordinal": 185,
-      "start": 2546231
+      "name": "js::ft#f123",
+      "ordinal": 182,
+      "start": 2302935
     },
     {
       "index": 318,
-      "bytes": 81032,
-      "locals": 246,
-      "kind": "script",
-      "name": "js::Jt#f127",
-      "ordinal": 186,
-      "start": 2552256
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::g#f124",
+      "ordinal": 183,
+      "start": 2399962
     },
     {
       "index": 319,
-      "bytes": 6623,
-      "locals": 159,
-      "kind": "script",
-      "name": "js::k#f128",
-      "ordinal": 187,
-      "start": 2633290
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::q#f125",
+      "ordinal": 184,
+      "start": 2400279
     },
     {
       "index": 320,
-      "bytes": 7226,
-      "locals": 115,
+      "bytes": 6007,
+      "locals": 167,
       "kind": "script",
-      "name": "js::p#f129",
-      "ordinal": 188,
-      "start": 2639915
+      "name": "js::gr#f126",
+      "ordinal": 185,
+      "start": 2400596
     },
     {
       "index": 321,
-      "bytes": 20281,
-      "locals": 161,
+      "bytes": 84289,
+      "locals": 255,
       "kind": "script",
-      "name": "js::r#f265",
-      "ordinal": 189,
-      "start": 2647144
+      "name": "js::Jt#f127",
+      "ordinal": 186,
+      "start": 2406606
     },
     {
       "index": 322,
-      "bytes": 15508,
-      "locals": 154,
+      "bytes": 6004,
+      "locals": 145,
       "kind": "script",
-      "name": "js::i#f266",
-      "ordinal": 190,
-      "start": 2667427
+      "name": "js::k#f128",
+      "ordinal": 187,
+      "start": 2490897
     },
     {
       "index": 323,
-      "bytes": 23843,
-      "locals": 152,
+      "bytes": 6982,
+      "locals": 114,
       "kind": "script",
-      "name": "js::o#f267",
-      "ordinal": 191,
-      "start": 2682938
+      "name": "js::p#f129",
+      "ordinal": 188,
+      "start": 2496903
     },
     {
       "index": 324,
-      "bytes": 31455,
-      "locals": 205,
+      "bytes": 21112,
+      "locals": 164,
       "kind": "script",
-      "name": "js::Gi#f130",
-      "ordinal": 192,
-      "start": 2706784
+      "name": "js::r#f265",
+      "ordinal": 189,
+      "start": 2503888
     },
     {
       "index": 325,
-      "bytes": 2782,
+      "bytes": 15556,
+      "locals": 157,
+      "kind": "script",
+      "name": "js::i#f266",
+      "ordinal": 190,
+      "start": 2525002
+    },
+    {
+      "index": 326,
+      "bytes": 23541,
+      "locals": 155,
+      "kind": "script",
+      "name": "js::o#f267",
+      "ordinal": 191,
+      "start": 2540561
+    },
+    {
+      "index": 327,
+      "bytes": 32069,
+      "locals": 193,
+      "kind": "script",
+      "name": "js::Gi#f130",
+      "ordinal": 192,
+      "start": 2564105
+    },
+    {
+      "index": 328,
+      "bytes": 2785,
       "locals": 73,
       "kind": "script",
       "name": "js::mn#f131",
       "ordinal": 193,
-      "start": 2738241
-    },
-    {
-      "index": 326,
-      "bytes": 28766,
-      "locals": 250,
-      "kind": "script",
-      "name": "js::Pn#f132",
-      "ordinal": 194,
-      "start": 2741026
-    },
-    {
-      "index": 327,
-      "bytes": 341345,
-      "locals": 324,
-      "kind": "script",
-      "name": "js::vn#f133",
-      "ordinal": 195,
-      "start": 2769795
-    },
-    {
-      "index": 328,
-      "bytes": 13086,
-      "locals": 168,
-      "kind": "script",
-      "name": "js::B#f134",
-      "ordinal": 196,
-      "start": 3111142
+      "start": 2596176
     },
     {
       "index": 329,
-      "bytes": 15421,
-      "locals": 173,
+      "bytes": 28485,
+      "locals": 239,
       "kind": "script",
-      "name": "js::Cn#f135",
-      "ordinal": 197,
-      "start": 3124230
+      "name": "js::Pn#f132",
+      "ordinal": 194,
+      "start": 2598964
     },
     {
       "index": 330,
-      "bytes": 10378,
-      "locals": 176,
+      "bytes": 334947,
+      "locals": 316,
       "kind": "script",
-      "name": "js::Yn#f136",
-      "ordinal": 198,
-      "start": 3139653
+      "name": "js::vn#f133",
+      "ordinal": 195,
+      "start": 2627452
     },
     {
       "index": 331,
-      "bytes": 5540,
-      "locals": 104,
+      "bytes": 13155,
+      "locals": 166,
       "kind": "script",
-      "name": "js::Vi#f137",
-      "ordinal": 199,
-      "start": 3150033
+      "name": "js::B#f134",
+      "ordinal": 196,
+      "start": 2962401
     },
     {
       "index": 332,
-      "bytes": 37799,
-      "locals": 190,
+      "bytes": 15361,
+      "locals": 164,
       "kind": "script",
-      "name": "js::lt#f138",
-      "ordinal": 200,
-      "start": 3155576
+      "name": "js::Cn#f135",
+      "ordinal": 197,
+      "start": 2975558
     },
     {
       "index": 333,
-      "bytes": 8608,
-      "locals": 170,
+      "bytes": 10579,
+      "locals": 181,
       "kind": "script",
-      "name": "js::yr#f139",
-      "ordinal": 201,
-      "start": 3193377
+      "name": "js::Yn#f136",
+      "ordinal": 198,
+      "start": 2990921
     },
     {
       "index": 334,
-      "bytes": 37795,
-      "locals": 223,
+      "bytes": 4983,
+      "locals": 91,
       "kind": "script",
-      "name": "js::S#f140",
-      "ordinal": 202,
-      "start": 3201988
+      "name": "js::Vi#f137",
+      "ordinal": 199,
+      "start": 3001502
     },
     {
       "index": 335,
-      "bytes": 21429,
-      "locals": 198,
+      "bytes": 40753,
+      "locals": 197,
       "kind": "script",
-      "name": "js::mr#f141",
-      "ordinal": 203,
-      "start": 3239786
+      "name": "js::lt#f138",
+      "ordinal": 200,
+      "start": 3006488
     },
     {
       "index": 336,
-      "bytes": 62784,
-      "locals": 177,
+      "bytes": 8913,
+      "locals": 175,
       "kind": "script",
-      "name": "js::Er#f142",
-      "ordinal": 204,
-      "start": 3261218
+      "name": "js::yr#f139",
+      "ordinal": 201,
+      "start": 3047243
     },
     {
       "index": 337,
-      "bytes": 10886,
-      "locals": 165,
+      "bytes": 38314,
+      "locals": 226,
       "kind": "script",
-      "name": "js::W#f143",
-      "ordinal": 205,
-      "start": 3324004
+      "name": "js::S#f140",
+      "ordinal": 202,
+      "start": 3056159
     },
     {
       "index": 338,
-      "bytes": 59434,
-      "locals": 226,
+      "bytes": 21506,
+      "locals": 201,
       "kind": "script",
-      "name": "js::Sr#f144",
-      "ordinal": 206,
-      "start": 3334893
+      "name": "js::mr#f141",
+      "ordinal": 203,
+      "start": 3094476
     },
     {
       "index": 339,
-      "bytes": 5365,
-      "locals": 162,
+      "bytes": 57759,
+      "locals": 166,
       "kind": "script",
-      "name": "js::_r#f145",
-      "ordinal": 207,
-      "start": 3394329
+      "name": "js::Er#f142",
+      "ordinal": 204,
+      "start": 3115985
     },
     {
       "index": 340,
-      "bytes": 19391,
-      "locals": 183,
+      "bytes": 10230,
+      "locals": 154,
       "kind": "script",
-      "name": "js::zn#f146",
-      "ordinal": 208,
-      "start": 3399697
+      "name": "js::W#f143",
+      "ordinal": 205,
+      "start": 3173746
     },
     {
       "index": 341,
-      "bytes": 4550,
+      "bytes": 57282,
+      "locals": 218,
+      "kind": "script",
+      "name": "js::Sr#f144",
+      "ordinal": 206,
+      "start": 3183979
+    },
+    {
+      "index": 342,
+      "bytes": 5061,
+      "locals": 148,
+      "kind": "script",
+      "name": "js::_r#f145",
+      "ordinal": 207,
+      "start": 3241263
+    },
+    {
+      "index": 343,
+      "bytes": 19644,
+      "locals": 191,
+      "kind": "script",
+      "name": "js::zn#f146",
+      "ordinal": 208,
+      "start": 3246327
+    },
+    {
+      "index": 344,
+      "bytes": 4552,
       "locals": 120,
       "kind": "script",
       "name": "js::St#f147",
       "ordinal": 209,
-      "start": 3419090
+      "start": 3265973
     },
     {
-      "index": 342,
-      "bytes": 10895,
-      "locals": 182,
+      "index": 345,
+      "bytes": 10794,
+      "locals": 171,
       "kind": "script",
       "name": "js::_t#f148",
       "ordinal": 210,
-      "start": 3423642
+      "start": 3270527
     },
     {
-      "index": 343,
-      "bytes": 4550,
+      "index": 346,
+      "bytes": 4552,
       "locals": 120,
       "kind": "script",
       "name": "js::an#f149",
       "ordinal": 211,
-      "start": 3434539
+      "start": 3281323
     },
     {
-      "index": 344,
-      "bytes": 5170,
+      "index": 347,
+      "bytes": 5172,
       "locals": 126,
       "kind": "script",
       "name": "js::sn#f150",
       "ordinal": 212,
-      "start": 3439091
-    },
-    {
-      "index": 345,
-      "bytes": 76057,
-      "locals": 228,
-      "kind": "script",
-      "name": "js::dn#f151",
-      "ordinal": 213,
-      "start": 3444264
-    },
-    {
-      "index": 346,
-      "bytes": 3605,
-      "locals": 114,
-      "kind": "script",
-      "name": "js::f268",
-      "ordinal": 214,
-      "start": 3520323
-    },
-    {
-      "index": 347,
-      "bytes": 1887,
-      "locals": 80,
-      "kind": "script",
-      "name": "js::f269",
-      "ordinal": 215,
-      "start": 3523930
+      "start": 3285877
     },
     {
       "index": 348,
-      "bytes": 4815,
+      "bytes": 86468,
+      "locals": 237,
+      "kind": "script",
+      "name": "js::dn#f151",
+      "ordinal": 213,
+      "start": 3291052
+    },
+    {
+      "index": 349,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f268",
+      "ordinal": 214,
+      "start": 3377522
+    },
+    {
+      "index": 350,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f269",
+      "ordinal": 215,
+      "start": 3377839
+    },
+    {
+      "index": 351,
+      "bytes": 4817,
       "locals": 122,
       "kind": "script",
       "name": "js::f270",
       "ordinal": 216,
-      "start": 3525819
+      "start": 3378156
     },
     {
-      "index": 349,
-      "bytes": 9631,
-      "locals": 157,
+      "index": 352,
+      "bytes": 9565,
+      "locals": 159,
       "kind": "script",
       "name": "js::pr#f152",
       "ordinal": 217,
-      "start": 3530636
+      "start": 3382975
     },
     {
-      "index": 350,
-      "bytes": 4178,
-      "locals": 97,
+      "index": 353,
+      "bytes": 3897,
+      "locals": 89,
       "kind": "script",
       "name": "js::f271",
       "ordinal": 218,
-      "start": 3540269
+      "start": 3392542
     },
     {
-      "index": 351,
-      "bytes": 12788,
+      "index": 354,
+      "bytes": 12704,
       "locals": 155,
       "kind": "script",
       "name": "js::R#f153",
       "ordinal": 219,
-      "start": 3544449
-    },
-    {
-      "index": 352,
-      "bytes": 6346,
-      "locals": 126,
-      "kind": "script",
-      "name": "js::Ln#f154",
-      "ordinal": 220,
-      "start": 3557239
-    },
-    {
-      "index": 353,
-      "bytes": 15977,
-      "locals": 165,
-      "kind": "script",
-      "name": "js::vr#f155",
-      "ordinal": 221,
-      "start": 3563587
-    },
-    {
-      "index": 354,
-      "bytes": 2120,
-      "locals": 85,
-      "kind": "script",
-      "name": "js::f272",
-      "ordinal": 222,
-      "start": 3579566
+      "start": 3396441
     },
     {
       "index": 355,
-      "bytes": 11755,
-      "locals": 153,
+      "bytes": 6562,
+      "locals": 129,
       "kind": "script",
-      "name": "js::Xi#f156",
-      "ordinal": 223,
-      "start": 3581688
+      "name": "js::Ln#f154",
+      "ordinal": 220,
+      "start": 3409147
     },
     {
       "index": 356,
-      "bytes": 2439,
-      "locals": 86,
+      "bytes": 14631,
+      "locals": 151,
       "kind": "script",
-      "name": "js::f273",
-      "ordinal": 224,
-      "start": 3593445
+      "name": "js::vr#f155",
+      "ordinal": 221,
+      "start": 3415711
     },
     {
       "index": 357,
-      "bytes": 12131,
-      "locals": 154,
-      "kind": "script",
-      "name": "js::Zi#f157",
-      "ordinal": 225,
-      "start": 3595886
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f272",
+      "ordinal": 222,
+      "start": 3430344
     },
     {
       "index": 358,
-      "bytes": 3545,
-      "locals": 135,
+      "bytes": 11227,
+      "locals": 152,
       "kind": "script",
-      "name": "js::f274",
-      "ordinal": 226,
-      "start": 3608019
+      "name": "js::Xi#f156",
+      "ordinal": 223,
+      "start": 3430661
     },
     {
       "index": 359,
-      "bytes": 12901,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f273",
+      "ordinal": 224,
+      "start": 3441890
+    },
+    {
+      "index": 360,
+      "bytes": 11610,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::Zi#f157",
+      "ordinal": 225,
+      "start": 3442207
+    },
+    {
+      "index": 361,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f274",
+      "ordinal": 226,
+      "start": 3453819
+    },
+    {
+      "index": 362,
+      "bytes": 12651,
       "locals": 178,
       "kind": "script",
       "name": "js::Cr#f158",
       "ordinal": 227,
-      "start": 3611566
-    },
-    {
-      "index": 360,
-      "bytes": 2120,
-      "locals": 85,
-      "kind": "script",
-      "name": "js::f275",
-      "ordinal": 228,
-      "start": 3624469
-    },
-    {
-      "index": 361,
-      "bytes": 2209,
-      "locals": 81,
-      "kind": "script",
-      "name": "js::f276",
-      "ordinal": 229,
-      "start": 3626591
-    },
-    {
-      "index": 362,
-      "bytes": 2439,
-      "locals": 86,
-      "kind": "script",
-      "name": "js::f277",
-      "ordinal": 230,
-      "start": 3628802
+      "start": 3454136
     },
     {
       "index": 363,
-      "bytes": 2528,
-      "locals": 82,
-      "kind": "script",
-      "name": "js::f278",
-      "ordinal": 231,
-      "start": 3631243
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f275",
+      "ordinal": 228,
+      "start": 3466789
     },
     {
       "index": 364,
-      "bytes": 43831,
-      "locals": 190,
-      "kind": "script",
-      "name": "js::Nn#f159",
-      "ordinal": 232,
-      "start": 3633774
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f276",
+      "ordinal": 229,
+      "start": 3467106
     },
     {
       "index": 365,
-      "bytes": 24731,
-      "locals": 179,
-      "kind": "script",
-      "name": "js::wr#f160",
-      "ordinal": 233,
-      "start": 3677608
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f277",
+      "ordinal": 230,
+      "start": 3467423
     },
     {
       "index": 366,
-      "bytes": 4047,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f278",
+      "ordinal": 231,
+      "start": 3467740
+    },
+    {
+      "index": 367,
+      "bytes": 43069,
+      "locals": 192,
+      "kind": "script",
+      "name": "js::Nn#f159",
+      "ordinal": 232,
+      "start": 3468058
+    },
+    {
+      "index": 368,
+      "bytes": 28034,
+      "locals": 186,
+      "kind": "script",
+      "name": "js::wr#f160",
+      "ordinal": 233,
+      "start": 3511130
+    },
+    {
+      "index": 369,
+      "bytes": 4050,
       "locals": 85,
       "kind": "script",
       "name": "js::f279",
       "ordinal": 234,
-      "start": 3702341
+      "start": 3539166
     },
     {
-      "index": 367,
-      "bytes": 4047,
+      "index": 370,
+      "bytes": 4050,
       "locals": 85,
       "kind": "script",
       "name": "js::f280",
       "ordinal": 235,
-      "start": 3706390
-    },
-    {
-      "index": 368,
-      "bytes": 11155,
-      "locals": 153,
-      "kind": "script",
-      "name": "js::Qt#f161",
-      "ordinal": 236,
-      "start": 3710439
-    },
-    {
-      "index": 369,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::Ji#f162",
-      "ordinal": 237,
-      "start": 3721596
-    },
-    {
-      "index": 370,
-      "bytes": 2027,
-      "locals": 87,
-      "kind": "script",
-      "name": "js::f281",
-      "ordinal": 238,
-      "start": 3722246
+      "start": 3543218
     },
     {
       "index": 371,
-      "bytes": 37080,
-      "locals": 194,
+      "bytes": 11340,
+      "locals": 154,
       "kind": "script",
-      "name": "js::Tr#f163",
-      "ordinal": 239,
-      "start": 3724276
+      "name": "js::Qt#f161",
+      "ordinal": 236,
+      "start": 3547270
     },
     {
       "index": 372,
-      "bytes": 20274,
-      "locals": 159,
-      "kind": "script",
-      "name": "js::En#f164",
-      "ordinal": 240,
-      "start": 3761359
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::Ji#f162",
+      "ordinal": 237,
+      "start": 3558612
     },
     {
       "index": 373,
-      "bytes": 37529,
-      "locals": 182,
-      "kind": "script",
-      "name": "js::ct#f165",
-      "ordinal": 241,
-      "start": 3781636
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f281",
+      "ordinal": 238,
+      "start": 3558929
     },
     {
       "index": 374,
-      "bytes": 5544,
-      "locals": 132,
+      "bytes": 41648,
+      "locals": 203,
       "kind": "script",
-      "name": "js::Ar#f166",
-      "ordinal": 242,
-      "start": 3819167
+      "name": "js::Tr#f163",
+      "ordinal": 239,
+      "start": 3559247
     },
     {
       "index": 375,
-      "bytes": 4758,
+      "bytes": 21753,
+      "locals": 168,
+      "kind": "script",
+      "name": "js::En#f164",
+      "ordinal": 240,
+      "start": 3600898
+    },
+    {
+      "index": 376,
+      "bytes": 40713,
+      "locals": 190,
+      "kind": "script",
+      "name": "js::ct#f165",
+      "ordinal": 241,
+      "start": 3622654
+    },
+    {
+      "index": 377,
+      "bytes": 5763,
+      "locals": 135,
+      "kind": "script",
+      "name": "js::Ar#f166",
+      "ordinal": 242,
+      "start": 3663369
+    },
+    {
+      "index": 378,
+      "bytes": 4761,
       "locals": 90,
       "kind": "script",
       "name": "js::m#f167",
       "ordinal": 243,
-      "start": 3824713
-    },
-    {
-      "index": 376,
-      "bytes": 9273,
-      "locals": 179,
-      "kind": "script",
-      "name": "js::Wn#f168",
-      "ordinal": 244,
-      "start": 3829473
-    },
-    {
-      "index": 377,
-      "bytes": 8974,
-      "locals": 174,
-      "kind": "script",
-      "name": "js::pt#f169",
-      "ordinal": 245,
-      "start": 3838748
-    },
-    {
-      "index": 378,
-      "bytes": 13769,
-      "locals": 150,
-      "kind": "script",
-      "name": "js::Hn#f170",
-      "ordinal": 246,
-      "start": 3847724
+      "start": 3669134
     },
     {
       "index": 379,
-      "bytes": 5177,
+      "bytes": 10597,
+      "locals": 178,
+      "kind": "script",
+      "name": "js::Wn#f168",
+      "ordinal": 244,
+      "start": 3673897
+    },
+    {
+      "index": 380,
+      "bytes": 10296,
+      "locals": 173,
+      "kind": "script",
+      "name": "js::pt#f169",
+      "ordinal": 245,
+      "start": 3684496
+    },
+    {
+      "index": 381,
+      "bytes": 13746,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::Hn#f170",
+      "ordinal": 246,
+      "start": 3694794
+    },
+    {
+      "index": 382,
+      "bytes": 5182,
       "locals": 113,
       "kind": "script",
       "name": "js::$r#f171",
       "ordinal": 247,
-      "start": 3861495
+      "start": 3708542
     },
     {
-      "index": 380,
-      "bytes": 48994,
-      "locals": 212,
+      "index": 383,
+      "bytes": 51947,
+      "locals": 215,
       "kind": "script",
       "name": "js::xn#f172",
       "ordinal": 248,
-      "start": 3866675
+      "start": 3713727
     },
     {
-      "index": 381,
-      "bytes": 5922,
+      "index": 384,
+      "bytes": 5927,
       "locals": 117,
       "kind": "script",
       "name": "js::Kt#f173",
       "ordinal": 249,
-      "start": 3915671
-    },
-    {
-      "index": 382,
-      "bytes": 3315,
-      "locals": 125,
-      "kind": "script",
-      "name": "js::qn#f174",
-      "ordinal": 250,
-      "start": 3921595
-    },
-    {
-      "index": 383,
-      "bytes": 31201,
-      "locals": 240,
-      "kind": "script",
-      "name": "js::f283",
-      "ordinal": 251,
-      "start": 3924913
-    },
-    {
-      "index": 384,
-      "bytes": 9970,
-      "locals": 140,
-      "kind": "script",
-      "name": "js::o#f282",
-      "ordinal": 252,
-      "start": 3956116
+      "start": 3765676
     },
     {
       "index": 385,
-      "bytes": 56922,
-      "locals": 218,
+      "bytes": 2994,
+      "locals": 111,
       "kind": "script",
-      "name": "js::Qi#f175",
-      "ordinal": 253,
-      "start": 3966089
+      "name": "js::qn#f174",
+      "ordinal": 250,
+      "start": 3771605
     },
     {
       "index": 386,
-      "bytes": 46091,
-      "locals": 233,
+      "bytes": 29995,
+      "locals": 215,
       "kind": "script",
-      "name": "js::ut#f176",
-      "ordinal": 254,
-      "start": 4023014
+      "name": "js::f283",
+      "ordinal": 251,
+      "start": 3774602
     },
     {
       "index": 387,
-      "bytes": 9406,
-      "locals": 153,
+      "bytes": 9399,
+      "locals": 138,
       "kind": "script",
-      "name": "js::F#f177",
-      "ordinal": 255,
-      "start": 4069107
+      "name": "js::o#f282",
+      "ordinal": 252,
+      "start": 3804599
     },
     {
       "index": 388,
-      "bytes": 45596,
-      "locals": 206,
+      "bytes": 57294,
+      "locals": 222,
       "kind": "script",
-      "name": "js::Gn#f178",
-      "ordinal": 256,
-      "start": 4078516
+      "name": "js::Qi#f175",
+      "ordinal": 253,
+      "start": 3814001
     },
     {
       "index": 389,
-      "bytes": 14172,
-      "locals": 149,
+      "bytes": 48893,
+      "locals": 238,
       "kind": "script",
-      "name": "js::f284",
-      "ordinal": 257,
-      "start": 4124114
+      "name": "js::ut#f176",
+      "ordinal": 254,
+      "start": 3871298
     },
     {
       "index": 390,
-      "bytes": 9280,
-      "locals": 146,
+      "bytes": 9349,
+      "locals": 156,
       "kind": "script",
-      "name": "js::Ir#f179",
-      "ordinal": 258,
-      "start": 4138288
+      "name": "js::F#f177",
+      "ordinal": 255,
+      "start": 3920193
     },
     {
       "index": 391,
-      "bytes": 19729,
-      "locals": 167,
+      "bytes": 48437,
+      "locals": 215,
       "kind": "script",
-      "name": "js::wn#f180",
-      "ordinal": 259,
-      "start": 4147571
+      "name": "js::Gn#f178",
+      "ordinal": 256,
+      "start": 3929545
     },
     {
       "index": 392,
-      "bytes": 60061,
-      "locals": 257,
+      "bytes": 14121,
+      "locals": 152,
       "kind": "script",
-      "name": "js::Or#f181",
-      "ordinal": 260,
-      "start": 4167303
+      "name": "js::f284",
+      "ordinal": 257,
+      "start": 3977984
     },
     {
       "index": 393,
-      "bytes": 25244,
-      "locals": 187,
+      "bytes": 9494,
+      "locals": 148,
       "kind": "script",
-      "name": "js::at#f182",
-      "ordinal": 261,
-      "start": 4227367
+      "name": "js::Ir#f179",
+      "ordinal": 258,
+      "start": 3992107
     },
     {
       "index": 394,
-      "bytes": 11843,
+      "bytes": 20168,
+      "locals": 170,
+      "kind": "script",
+      "name": "js::wn#f180",
+      "ordinal": 259,
+      "start": 4001604
+    },
+    {
+      "index": 395,
+      "bytes": 62971,
+      "locals": 264,
+      "kind": "script",
+      "name": "js::Or#f181",
+      "ordinal": 260,
+      "start": 4021775
+    },
+    {
+      "index": 396,
+      "bytes": 24928,
+      "locals": 173,
+      "kind": "script",
+      "name": "js::at#f182",
+      "ordinal": 261,
+      "start": 4084749
+    },
+    {
+      "index": 397,
+      "bytes": 11581,
       "locals": 145,
       "kind": "script",
       "name": "js::Fn#f183",
       "ordinal": 262,
-      "start": 4252613
-    },
-    {
-      "index": 395,
-      "bytes": 93606,
-      "locals": 265,
-      "kind": "script",
-      "name": "js::gn#f184",
-      "ordinal": 263,
-      "start": 4264459
-    },
-    {
-      "index": 396,
-      "bytes": 11752,
-      "locals": 139,
-      "kind": "script",
-      "name": "js::Ki#f185",
-      "ordinal": 264,
-      "start": 4358067
-    },
-    {
-      "index": 397,
-      "bytes": 11752,
-      "locals": 139,
-      "kind": "script",
-      "name": "js::ji#f186",
-      "ordinal": 265,
-      "start": 4369821
+      "start": 4109679
     },
     {
       "index": 398,
-      "bytes": 13948,
-      "locals": 156,
+      "bytes": 95117,
+      "locals": 271,
       "kind": "script",
-      "name": "js::ki#f187",
-      "ordinal": 266,
-      "start": 4381575
+      "name": "js::gn#f184",
+      "ordinal": 263,
+      "start": 4121263
     },
     {
       "index": 399,
-      "bytes": 3711,
+      "bytes": 11494,
+      "locals": 137,
+      "kind": "script",
+      "name": "js::Ki#f185",
+      "ordinal": 264,
+      "start": 4216382
+    },
+    {
+      "index": 400,
+      "bytes": 11494,
+      "locals": 137,
+      "kind": "script",
+      "name": "js::ji#f186",
+      "ordinal": 265,
+      "start": 4227878
+    },
+    {
+      "index": 401,
+      "bytes": 15433,
+      "locals": 170,
+      "kind": "script",
+      "name": "js::ki#f187",
+      "ordinal": 266,
+      "start": 4239374
+    },
+    {
+      "index": 402,
+      "bytes": 3714,
       "locals": 92,
       "kind": "script",
       "name": "js::qi#f188",
       "ordinal": 267,
-      "start": 4395525
-    },
-    {
-      "index": 400,
-      "bytes": 32050,
-      "locals": 180,
-      "kind": "script",
-      "name": "js::f286",
-      "ordinal": 268,
-      "start": 4399239
-    },
-    {
-      "index": 401,
-      "bytes": 12311,
-      "locals": 139,
-      "kind": "script",
-      "name": "js::l#f285",
-      "ordinal": 269,
-      "start": 4431291
-    },
-    {
-      "index": 402,
-      "bytes": 33403,
-      "locals": 224,
-      "kind": "script",
-      "name": "js::v#f189",
-      "ordinal": 270,
-      "start": 4443605
+      "start": 4254809
     },
     {
       "index": 403,
-      "bytes": 23904,
-      "locals": 183,
+      "bytes": 30970,
+      "locals": 166,
       "kind": "script",
-      "name": "js::Pr#f190",
-      "ordinal": 271,
-      "start": 4477011
+      "name": "js::f286",
+      "ordinal": 268,
+      "start": 4258526
     },
     {
       "index": 404,
-      "bytes": 1246,
-      "locals": 58,
+      "bytes": 12029,
+      "locals": 138,
       "kind": "script",
-      "name": "js::start#f288",
-      "ordinal": 272,
-      "start": 4500917
+      "name": "js::l#f285",
+      "ordinal": 269,
+      "start": 4289498
     },
     {
       "index": 405,
-      "bytes": 4953,
-      "locals": 99,
+      "bytes": 33751,
+      "locals": 217,
       "kind": "script",
-      "name": "js::f290",
-      "ordinal": 273,
-      "start": 4502165
+      "name": "js::v#f189",
+      "ordinal": 270,
+      "start": 4301530
     },
     {
       "index": 406,
-      "bytes": 21036,
+      "bytes": 26571,
+      "locals": 191,
+      "kind": "script",
+      "name": "js::Pr#f190",
+      "ordinal": 271,
+      "start": 4335284
+    },
+    {
+      "index": 407,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::start#f288",
+      "ordinal": 272,
+      "start": 4361857
+    },
+    {
+      "index": 408,
+      "bytes": 4666,
+      "locals": 87,
+      "kind": "script",
+      "name": "js::f290",
+      "ordinal": 273,
+      "start": 4362174
+    },
+    {
+      "index": 409,
+      "bytes": 20759,
       "locals": 171,
       "kind": "script",
       "name": "js::enqueueModel#f289",
       "ordinal": 274,
-      "start": 4507121
-    },
-    {
-      "index": 407,
-      "bytes": 2609,
-      "locals": 111,
-      "kind": "script",
-      "name": "js::f292",
-      "ordinal": 275,
-      "start": 4528159
-    },
-    {
-      "index": 408,
-      "bytes": 8414,
-      "locals": 146,
-      "kind": "script",
-      "name": "js::close#f291",
-      "ordinal": 276,
-      "start": 4530770
-    },
-    {
-      "index": 409,
-      "bytes": 2952,
-      "locals": 111,
-      "kind": "script",
-      "name": "js::f294",
-      "ordinal": 277,
-      "start": 4539186
+      "start": 4366843
     },
     {
       "index": 410,
-      "bytes": 9309,
-      "locals": 149,
-      "kind": "script",
-      "name": "js::error#f293",
-      "ordinal": 278,
-      "start": 4542140
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f292",
+      "ordinal": 275,
+      "start": 4387604
     },
     {
       "index": 411,
-      "bytes": 9858,
+      "bytes": 8861,
+      "locals": 148,
+      "kind": "script",
+      "name": "js::close#f291",
+      "ordinal": 276,
+      "start": 4387921
+    },
+    {
+      "index": 412,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f294",
+      "ordinal": 277,
+      "start": 4396784
+    },
+    {
+      "index": 413,
+      "bytes": 9728,
+      "locals": 151,
+      "kind": "script",
+      "name": "js::error#f293",
+      "ordinal": 278,
+      "start": 4397101
+    },
+    {
+      "index": 414,
+      "bytes": 10399,
       "locals": 149,
       "kind": "script",
       "name": "js::i#f287",
       "ordinal": 279,
-      "start": 4551451
+      "start": 4406831
     },
     {
-      "index": 412,
-      "bytes": 22254,
-      "locals": 207,
+      "index": 415,
+      "bytes": 22199,
+      "locals": 195,
       "kind": "script",
       "name": "js::jt#f191",
       "ordinal": 280,
-      "start": 4561312
+      "start": 4417233
     },
     {
-      "index": 413,
-      "bytes": 2698,
+      "index": 416,
+      "bytes": 2699,
       "locals": 76,
       "kind": "script",
       "name": "js::vt#f192",
       "ordinal": 281,
-      "start": 4583568
+      "start": 4439434
     },
     {
-      "index": 414,
-      "bytes": 12917,
-      "locals": 145,
+      "index": 417,
+      "bytes": 14329,
+      "locals": 159,
       "kind": "script",
       "name": "js::f296",
       "ordinal": 282,
-      "start": 4586268
+      "start": 4442135
     },
     {
-      "index": 415,
-      "bytes": 3506,
+      "index": 418,
+      "bytes": 3509,
       "locals": 96,
       "kind": "script",
       "name": "js::f295",
       "ordinal": 283,
-      "start": 4599187
-    },
-    {
-      "index": 416,
-      "bytes": 10678,
-      "locals": 162,
-      "kind": "script",
-      "name": "js::enqueueModel#f297",
-      "ordinal": 284,
-      "start": 4602695
-    },
-    {
-      "index": 417,
-      "bytes": 17126,
-      "locals": 169,
-      "kind": "script",
-      "name": "js::close#f298",
-      "ordinal": 285,
-      "start": 4613376
-    },
-    {
-      "index": 418,
-      "bytes": 12606,
-      "locals": 163,
-      "kind": "script",
-      "name": "js::error#f299",
-      "ordinal": 286,
-      "start": 4630504
+      "start": 4456466
     },
     {
       "index": 419,
-      "bytes": 22857,
-      "locals": 214,
+      "bytes": 11546,
+      "locals": 170,
       "kind": "script",
-      "name": "js::kt#f193",
-      "ordinal": 287,
-      "start": 4643113
+      "name": "js::enqueueModel#f297",
+      "ordinal": 284,
+      "start": 4459977
     },
     {
       "index": 420,
-      "bytes": 137724,
-      "locals": 256,
+      "bytes": 19235,
+      "locals": 176,
       "kind": "script",
-      "name": "js::no#f194",
-      "ordinal": 288,
-      "start": 4665973
+      "name": "js::close#f298",
+      "ordinal": 285,
+      "start": 4471526
     },
     {
       "index": 421,
-      "bytes": 17272,
-      "locals": 199,
+      "bytes": 13727,
+      "locals": 169,
       "kind": "script",
-      "name": "js::Ct#f195",
-      "ordinal": 289,
-      "start": 4803700
+      "name": "js::error#f299",
+      "ordinal": 286,
+      "start": 4490763
     },
     {
       "index": 422,
-      "bytes": 2739,
-      "locals": 117,
+      "bytes": 24376,
+      "locals": 211,
       "kind": "script",
-      "name": "js::wt#f196",
-      "ordinal": 290,
-      "start": 4820974
+      "name": "js::kt#f193",
+      "ordinal": 287,
+      "start": 4504493
     },
     {
       "index": 423,
-      "bytes": 13480,
-      "locals": 184,
+      "bytes": 133885,
+      "locals": 259,
       "kind": "script",
-      "name": "js::f300",
-      "ordinal": 291,
-      "start": 4823715
+      "name": "js::no#f194",
+      "ordinal": 288,
+      "start": 4528872
     },
     {
       "index": 424,
-      "bytes": 1885,
-      "locals": 80,
+      "bytes": 17671,
+      "locals": 202,
       "kind": "script",
-      "name": "js::f301",
-      "ordinal": 292,
-      "start": 4837197
+      "name": "js::Ct#f195",
+      "ordinal": 289,
+      "start": 4662760
     },
     {
       "index": 425,
-      "bytes": 23444,
-      "locals": 178,
-      "kind": "script",
-      "name": "js::qt#f197",
-      "ordinal": 293,
-      "start": 4839085
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::wt#f196",
+      "ordinal": 290,
+      "start": 4680433
     },
     {
       "index": 426,
-      "bytes": 648,
-      "locals": 43,
-      "kind": "script",
-      "name": "js::f302",
-      "ordinal": 294,
-      "start": 4862531
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f300",
+      "ordinal": 291,
+      "start": 4680750
     },
     {
       "index": 427,
-      "bytes": 14484,
-      "locals": 170,
-      "kind": "script",
-      "name": "js::Mr#f198",
-      "ordinal": 295,
-      "start": 4863181
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f301",
+      "ordinal": 292,
+      "start": 4681067
     },
     {
       "index": 428,
-      "bytes": 361733,
-      "locals": 596,
+      "bytes": 23610,
+      "locals": 172,
       "kind": "script",
-      "name": "js::f71",
-      "ordinal": 296,
-      "start": 4877668
+      "name": "js::qt#f197",
+      "ordinal": 293,
+      "start": 4681385
     },
     {
       "index": 429,
-      "bytes": 22488,
-      "locals": 126,
-      "kind": "script",
-      "name": "js::f303",
-      "ordinal": 297,
-      "start": 5239404
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::#f302",
+      "ordinal": 294,
+      "start": 4704997
     },
     {
       "index": 430,
-      "bytes": 15207,
-      "locals": 144,
+      "bytes": 14067,
+      "locals": 167,
       "kind": "script",
-      "name": "js::f305",
-      "ordinal": 298,
-      "start": 5261894
+      "name": "js::Mr#f198",
+      "ordinal": 295,
+      "start": 4705314
     },
     {
       "index": 431,
+      "bytes": 366178,
+      "locals": 599,
+      "kind": "script",
+      "name": "js::f71",
+      "ordinal": 296,
+      "start": 4719384
+    },
+    {
+      "index": 432,
+      "bytes": 22549,
+      "locals": 130,
+      "kind": "script",
+      "name": "js::f303",
+      "ordinal": 297,
+      "start": 5085565
+    },
+    {
+      "index": 433,
+      "bytes": 15892,
+      "locals": 149,
+      "kind": "script",
+      "name": "js::f305",
+      "ordinal": 298,
+      "start": 5108116
+    },
+    {
+      "index": 434,
       "bytes": 2919,
       "locals": 108,
       "kind": "script",
       "name": "js::f306",
       "ordinal": 299,
-      "start": 5277103
-    },
-    {
-      "index": 432,
-      "bytes": 88688,
-      "locals": 220,
-      "kind": "script",
-      "name": "js::f304",
-      "ordinal": 300,
-      "start": 5280025
-    },
-    {
-      "index": 433,
-      "bytes": 5873,
-      "locals": 133,
-      "kind": "script",
-      "name": "js::to#f7",
-      "ordinal": 301,
-      "start": 5368715
-    },
-    {
-      "index": 434,
-      "bytes": 3680,
-      "locals": 106,
-      "kind": "script",
-      "name": "js::f307",
-      "ordinal": 302,
-      "start": 5374590
+      "start": 5124010
     },
     {
       "index": 435,
-      "bytes": 8461,
-      "locals": 215,
+      "bytes": 90111,
+      "locals": 222,
       "kind": "script",
-      "name": "js::xr#f8",
-      "ordinal": 303,
-      "start": 5378272
+      "name": "js::f304",
+      "ordinal": 300,
+      "start": 5126932
     },
     {
       "index": 436,
-      "bytes": 19671,
-      "locals": 161,
+      "bytes": 5497,
+      "locals": 119,
       "kind": "script",
-      "name": "js::ro#f9",
-      "ordinal": 304,
-      "start": 5386736
+      "name": "js::to#f7",
+      "ordinal": 301,
+      "start": 5217045
     },
     {
       "index": 437,
-      "bytes": 40539,
-      "locals": 199,
+      "bytes": 3603,
+      "locals": 100,
       "kind": "script",
-      "name": "js::f6",
-      "ordinal": 305,
-      "start": 5406410
+      "name": "js::f307",
+      "ordinal": 302,
+      "start": 5222544
     },
     {
       "index": 438,
-      "bytes": 2717,
-      "locals": 112,
+      "bytes": 7568,
+      "locals": 188,
       "kind": "script",
-      "name": "js::encode#f3",
-      "ordinal": 306,
-      "start": 5446951
+      "name": "js::xr#f8",
+      "ordinal": 303,
+      "start": 5226149
     },
     {
       "index": 439,
-      "bytes": 11305,
-      "locals": 134,
+      "bytes": 16868,
+      "locals": 148,
       "kind": "script",
-      "name": "js::f2",
-      "ordinal": 307,
-      "start": 5449670
+      "name": "js::ro#f9",
+      "ordinal": 304,
+      "start": 5233720
     },
     {
       "index": 440,
+      "bytes": 37804,
+      "locals": 181,
+      "kind": "script",
+      "name": "js::f6",
+      "ordinal": 305,
+      "start": 5250591
+    },
+    {
+      "index": 441,
+      "bytes": 315,
+      "locals": 19,
+      "kind": "arguments-adapter",
+      "name": "js-arguments-adapter::encode#f3",
+      "ordinal": 306,
+      "start": 5288397
+    },
+    {
+      "index": 442,
+      "bytes": 11335,
+      "locals": 135,
+      "kind": "script",
+      "name": "js::f2",
+      "ordinal": 307,
+      "start": 5288714
+    },
+    {
+      "index": 443,
       "bytes": 7810,
       "locals": 95,
       "kind": "script",
       "name": "js::$scriptw$module$realmImport#f1",
       "ordinal": 308,
-      "start": 5460977
+      "start": 5300051
     },
     {
-      "index": 441,
-      "bytes": 4373,
+      "index": 444,
+      "bytes": 4377,
       "locals": 99,
       "kind": "script",
       "name": "js::f0",
       "ordinal": 309,
-      "start": 5468789
+      "start": 5307863
     },
     {
-      "index": 442,
+      "index": 445,
+      "bytes": 1560,
+      "locals": 72,
+      "kind": "script",
+      "name": "js::f33",
+      "ordinal": 310,
+      "start": 5312242
+    },
+    {
+      "index": 446,
+      "bytes": 808,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f35",
+      "ordinal": 311,
+      "start": 5313804
+    },
+    {
+      "index": 447,
+      "bytes": 4806,
+      "locals": 104,
+      "kind": "script",
+      "name": "js::only#f36",
+      "ordinal": 312,
+      "start": 5314614
+    },
+    {
+      "index": 448,
+      "bytes": 4423,
+      "locals": 128,
+      "kind": "script",
+      "name": "js::f39",
+      "ordinal": 313,
+      "start": 5319422
+    },
+    {
+      "index": 449,
+      "bytes": 696,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f40",
+      "ordinal": 314,
+      "start": 5323847
+    },
+    {
+      "index": 450,
+      "bytes": 1347,
+      "locals": 63,
+      "kind": "script",
+      "name": "js::f43",
+      "ordinal": 315,
+      "start": 5324545
+    },
+    {
+      "index": 451,
+      "bytes": 1837,
+      "locals": 75,
+      "kind": "script",
+      "name": "js::f44",
+      "ordinal": 316,
+      "start": 5325894
+    },
+    {
+      "index": 452,
+      "bytes": 2927,
+      "locals": 87,
+      "kind": "script",
+      "name": "js::f45",
+      "ordinal": 317,
+      "start": 5327733
+    },
+    {
+      "index": 453,
+      "bytes": 4149,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f47",
+      "ordinal": 318,
+      "start": 5330662
+    },
+    {
+      "index": 454,
+      "bytes": 4375,
+      "locals": 131,
+      "kind": "script",
+      "name": "js::f48",
+      "ordinal": 319,
+      "start": 5334813
+    },
+    {
+      "index": 455,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f49",
+      "ordinal": 320,
+      "start": 5339190
+    },
+    {
+      "index": 456,
+      "bytes": 3966,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::f50",
+      "ordinal": 321,
+      "start": 5339818
+    },
+    {
+      "index": 457,
+      "bytes": 4375,
+      "locals": 131,
+      "kind": "script",
+      "name": "js::f51",
+      "ordinal": 322,
+      "start": 5343786
+    },
+    {
+      "index": 458,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::$t#f17",
+      "ordinal": 323,
+      "start": 5348163
+    },
+    {
+      "index": 459,
+      "bytes": 4204,
+      "locals": 133,
+      "kind": "script",
+      "name": "js::ri#f20",
+      "ordinal": 324,
+      "start": 5348791
+    },
+    {
+      "index": 460,
+      "bytes": 3289,
+      "locals": 123,
+      "kind": "script",
+      "name": "js::f52",
+      "ordinal": 325,
+      "start": 5352997
+    },
+    {
+      "index": 461,
+      "bytes": 808,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f55",
+      "ordinal": 326,
+      "start": 5356288
+    },
+    {
+      "index": 462,
+      "bytes": 4038,
+      "locals": 128,
+      "kind": "script",
+      "name": "js::f56",
+      "ordinal": 327,
+      "start": 5357098
+    },
+    {
+      "index": 463,
+      "bytes": 990,
+      "locals": 53,
+      "kind": "script",
+      "name": "js::fi#f28",
+      "ordinal": 328,
+      "start": 5361138
+    },
+    {
+      "index": 464,
+      "bytes": 1609,
+      "locals": 68,
+      "kind": "script",
+      "name": "js::Jn#f29",
+      "ordinal": 329,
+      "start": 5362130
+    },
+    {
+      "index": 465,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::r#f63",
+      "ordinal": 330,
+      "start": 5363741
+    },
+    {
+      "index": 466,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::G#f61",
+      "ordinal": 331,
+      "start": 5366904
+    },
+    {
+      "index": 467,
+      "bytes": 7056,
+      "locals": 132,
+      "kind": "script",
+      "name": "js::f199",
+      "ordinal": 332,
+      "start": 5367532
+    },
+    {
+      "index": 468,
+      "bytes": 737,
+      "locals": 47,
+      "kind": "script",
+      "name": "js::value#f200",
+      "ordinal": 333,
+      "start": 5374590
+    },
+    {
+      "index": 469,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::set#f202",
+      "ordinal": 334,
+      "start": 5375329
+    },
+    {
+      "index": 470,
+      "bytes": 1584,
+      "locals": 77,
+      "kind": "script",
+      "name": "js::get#f203",
+      "ordinal": 335,
+      "start": 5378492
+    },
+    {
+      "index": 471,
+      "bytes": 8073,
+      "locals": 151,
+      "kind": "script",
+      "name": "js::getOwnPropertyDescriptor#f204",
+      "ordinal": 336,
+      "start": 5380078
+    },
+    {
+      "index": 472,
+      "bytes": 978,
+      "locals": 52,
+      "kind": "script",
+      "name": "js::getPrototypeOf#f205",
+      "ordinal": 337,
+      "start": 5388153
+    },
+    {
+      "index": 473,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::set#f206",
+      "ordinal": 338,
+      "start": 5389133
+    },
+    {
+      "index": 474,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::set#f208",
+      "ordinal": 339,
+      "start": 5392296
+    },
+    {
+      "index": 475,
+      "bytes": 808,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::useCallback#f209",
+      "ordinal": 340,
+      "start": 5395459
+    },
+    {
+      "index": 476,
+      "bytes": 1225,
+      "locals": 67,
+      "kind": "script",
+      "name": "js::useMemo#f210",
+      "ordinal": 341,
+      "start": 5396269
+    },
+    {
+      "index": 477,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::useDebugValue#f211",
+      "ordinal": 342,
+      "start": 5397496
+    },
+    {
+      "index": 478,
+      "bytes": 980,
+      "locals": 52,
+      "kind": "script",
+      "name": "js::useCacheRefresh#f213",
+      "ordinal": 343,
+      "start": 5398124
+    },
+    {
+      "index": 479,
+      "bytes": 4321,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::cacheSignal#f215",
+      "ordinal": 344,
+      "start": 5399106
+    },
+    {
+      "index": 480,
+      "bytes": 696,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f217",
+      "ordinal": 345,
+      "start": 5403429
+    },
+    {
+      "index": 481,
+      "bytes": 2805,
+      "locals": 88,
+      "kind": "script",
+      "name": "js::f218",
+      "ordinal": 346,
+      "start": 5404127
+    },
+    {
+      "index": 482,
+      "bytes": 990,
+      "locals": 53,
+      "kind": "script",
+      "name": "js::f219",
+      "ordinal": 347,
+      "start": 5406934
+    },
+    {
+      "index": 483,
+      "bytes": 10301,
+      "locals": 145,
+      "kind": "script",
+      "name": "js::f221",
+      "ordinal": 348,
+      "start": 5407926
+    },
+    {
+      "index": 484,
+      "bytes": 3094,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f222",
+      "ordinal": 349,
+      "start": 5418229
+    },
+    {
+      "index": 485,
+      "bytes": 3595,
+      "locals": 137,
+      "kind": "script",
+      "name": "js::f224",
+      "ordinal": 350,
+      "start": 5421325
+    },
+    {
+      "index": 486,
+      "bytes": 1796,
+      "locals": 75,
+      "kind": "script",
+      "name": "js::pull#f233",
+      "ordinal": 351,
+      "start": 5424922
+    },
+    {
+      "index": 487,
+      "bytes": 1601,
+      "locals": 70,
+      "kind": "script",
+      "name": "js::start#f238",
+      "ordinal": 352,
+      "start": 5426720
+    },
+    {
+      "index": 488,
+      "bytes": 1778,
+      "locals": 75,
+      "kind": "script",
+      "name": "js::pull#f239",
+      "ordinal": 353,
+      "start": 5428323
+    },
+    {
+      "index": 489,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::b#f72",
+      "ordinal": 354,
+      "start": 5430103
+    },
+    {
+      "index": 490,
+      "bytes": 2661,
+      "locals": 72,
+      "kind": "script",
+      "name": "js::f241",
+      "ordinal": 355,
+      "start": 5430731
+    },
+    {
+      "index": 491,
+      "bytes": 1844,
+      "locals": 79,
+      "kind": "script",
+      "name": "js::hn#f76",
+      "ordinal": 356,
+      "start": 5433394
+    },
+    {
+      "index": 492,
+      "bytes": 3025,
+      "locals": 124,
+      "kind": "script",
+      "name": "js::C#f77",
+      "ordinal": 357,
+      "start": 5435240
+    },
+    {
+      "index": 493,
+      "bytes": 2021,
+      "locals": 99,
+      "kind": "script",
+      "name": "js::dt#f78",
+      "ordinal": 358,
+      "start": 5438267
+    },
+    {
+      "index": 494,
+      "bytes": 3886,
+      "locals": 104,
+      "kind": "script",
+      "name": "js::f242",
+      "ordinal": 359,
+      "start": 5440290
+    },
+    {
+      "index": 495,
+      "bytes": 3670,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f243",
+      "ordinal": 360,
+      "start": 5444178
+    },
+    {
+      "index": 496,
+      "bytes": 6354,
+      "locals": 151,
+      "kind": "script",
+      "name": "js::f244",
+      "ordinal": 361,
+      "start": 5447850
+    },
+    {
+      "index": 497,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::f245",
+      "ordinal": 362,
+      "start": 5454206
+    },
+    {
+      "index": 498,
+      "bytes": 2220,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::sr#f95",
+      "ordinal": 363,
+      "start": 5457369
+    },
+    {
+      "index": 499,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::E#f96",
+      "ordinal": 364,
+      "start": 5459591
+    },
+    {
+      "index": 500,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::zi#f97",
+      "ordinal": 365,
+      "start": 5462754
+    },
+    {
+      "index": 501,
+      "bytes": 3161,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::rt#f98",
+      "ordinal": 366,
+      "start": 5465917
+    },
+    {
+      "index": 502,
+      "bytes": 9813,
+      "locals": 156,
+      "kind": "script",
+      "name": "js::dr#f101",
+      "ordinal": 367,
+      "start": 5469080
+    },
+    {
+      "index": 503,
+      "bytes": 2942,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::Fi#f105",
+      "ordinal": 368,
+      "start": 5478895
+    },
+    {
+      "index": 504,
+      "bytes": 4670,
+      "locals": 130,
+      "kind": "script",
+      "name": "js::L#f107",
+      "ordinal": 369,
+      "start": 5481839
+    },
+    {
+      "index": 505,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::Gt#f114",
+      "ordinal": 370,
+      "start": 5486511
+    },
+    {
+      "index": 506,
+      "bytes": 3155,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::f260",
+      "ordinal": 371,
+      "start": 5487139
+    },
+    {
+      "index": 507,
+      "bytes": 4135,
+      "locals": 138,
+      "kind": "script",
+      "name": "js::f261",
+      "ordinal": 372,
+      "start": 5490296
+    },
+    {
+      "index": 508,
+      "bytes": 11351,
+      "locals": 151,
+      "kind": "script",
+      "name": "js::Zt#f118",
+      "ordinal": 373,
+      "start": 5494433
+    },
+    {
+      "index": 509,
+      "bytes": 1577,
+      "locals": 70,
+      "kind": "script",
+      "name": "js::f262",
+      "ordinal": 374,
+      "start": 5505786
+    },
+    {
+      "index": 510,
+      "bytes": 1577,
+      "locals": 70,
+      "kind": "script",
+      "name": "js::f263",
+      "ordinal": 375,
+      "start": 5507365
+    },
+    {
+      "index": 511,
+      "bytes": 1899,
+      "locals": 71,
+      "kind": "script",
+      "name": "js::ping#f264",
+      "ordinal": 376,
+      "start": 5508944
+    },
+    {
+      "index": 512,
+      "bytes": 3104,
+      "locals": 124,
+      "kind": "script",
+      "name": "js::g#f124",
+      "ordinal": 377,
+      "start": 5510845
+    },
+    {
+      "index": 513,
+      "bytes": 3138,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::q#f125",
+      "ordinal": 378,
+      "start": 5513951
+    },
+    {
+      "index": 514,
+      "bytes": 3618,
+      "locals": 118,
+      "kind": "script",
+      "name": "js::f268",
+      "ordinal": 379,
+      "start": 5517091
+    },
+    {
+      "index": 515,
+      "bytes": 1577,
+      "locals": 70,
+      "kind": "script",
+      "name": "js::f269",
+      "ordinal": 380,
+      "start": 5520711
+    },
+    {
+      "index": 516,
+      "bytes": 1754,
+      "locals": 75,
+      "kind": "script",
+      "name": "js::f272",
+      "ordinal": 381,
+      "start": 5522290
+    },
+    {
+      "index": 517,
+      "bytes": 2074,
+      "locals": 76,
+      "kind": "script",
+      "name": "js::f273",
+      "ordinal": 382,
+      "start": 5524046
+    },
+    {
+      "index": 518,
+      "bytes": 3200,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f274",
+      "ordinal": 383,
+      "start": 5526122
+    },
+    {
+      "index": 519,
+      "bytes": 1754,
+      "locals": 75,
+      "kind": "script",
+      "name": "js::f275",
+      "ordinal": 384,
+      "start": 5529324
+    },
+    {
+      "index": 520,
+      "bytes": 1900,
+      "locals": 71,
+      "kind": "script",
+      "name": "js::f276",
+      "ordinal": 385,
+      "start": 5531080
+    },
+    {
+      "index": 521,
+      "bytes": 2074,
+      "locals": 76,
+      "kind": "script",
+      "name": "js::f277",
+      "ordinal": 386,
+      "start": 5532982
+    },
+    {
+      "index": 522,
+      "bytes": 2220,
+      "locals": 72,
+      "kind": "script",
+      "name": "js::f278",
+      "ordinal": 387,
+      "start": 5535058
+    },
+    {
+      "index": 523,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::Ji#f162",
+      "ordinal": 388,
+      "start": 5537280
+    },
+    {
+      "index": 524,
+      "bytes": 1717,
+      "locals": 77,
+      "kind": "script",
+      "name": "js::f281",
+      "ordinal": 389,
+      "start": 5537908
+    },
+    {
+      "index": 525,
+      "bytes": 1169,
+      "locals": 61,
+      "kind": "script",
+      "name": "js::start#f288",
+      "ordinal": 390,
+      "start": 5539627
+    },
+    {
+      "index": 526,
+      "bytes": 2833,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::f292",
+      "ordinal": 391,
+      "start": 5540798
+    },
+    {
+      "index": 527,
+      "bytes": 3173,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::f294",
+      "ordinal": 392,
+      "start": 5543633
+    },
+    {
+      "index": 528,
+      "bytes": 2296,
+      "locals": 105,
+      "kind": "script",
+      "name": "js::wt#f196",
+      "ordinal": 393,
+      "start": 5546808
+    },
+    {
+      "index": 529,
+      "bytes": 13399,
+      "locals": 179,
+      "kind": "script",
+      "name": "js::f300",
+      "ordinal": 394,
+      "start": 5549106
+    },
+    {
+      "index": 530,
+      "bytes": 1575,
+      "locals": 70,
+      "kind": "script",
+      "name": "js::f301",
+      "ordinal": 395,
+      "start": 5562507
+    },
+    {
+      "index": 531,
+      "bytes": 626,
+      "locals": 46,
+      "kind": "script",
+      "name": "js::f302",
+      "ordinal": 396,
+      "start": 5564084
+    },
+    {
+      "index": 532,
+      "bytes": 2883,
+      "locals": 121,
+      "kind": "script",
+      "name": "js::encode#f3",
+      "ordinal": 397,
+      "start": 5564712
+    },
+    {
+      "index": 533,
       "bytes": 12630,
       "locals": 121,
       "kind": "runtime-helper",
       "name": "helper::embedding_export",
-      "ordinal": 310,
-      "start": 5473164
+      "ordinal": 398,
+      "start": 5567597
     },
     {
-      "index": 443,
+      "index": 534,
       "bytes": 18130,
       "locals": 128,
       "kind": "runtime-helper",
       "name": "helper::embedding_checkpoint",
-      "ordinal": 311,
-      "start": 5485797
+      "ordinal": 399,
+      "start": 5580230
     },
     {
-      "index": 444,
-      "bytes": 953,
+      "index": 535,
+      "bytes": 955,
       "locals": 53,
       "kind": "runtime-helper",
       "name": "helper::module_initialize",
-      "ordinal": 312,
-      "start": 5503929
+      "ordinal": 400,
+      "start": 5598362
     },
     {
-      "index": 445,
+      "index": 536,
       "bytes": 7937,
       "locals": 105,
       "kind": "runtime-helper",
       "name": "helper::module_evaluate",
-      "ordinal": 313,
-      "start": 5504884
+      "ordinal": 401,
+      "start": 5599319
     },
     {
-      "index": 446,
+      "index": 537,
       "bytes": 816,
       "locals": 33,
       "kind": "runtime-helper",
       "name": "helper::module_ready",
-      "ordinal": 314,
-      "start": 5512823
+      "ordinal": 402,
+      "start": 5607258
     },
     {
-      "index": 447,
+      "index": 538,
       "bytes": 898,
       "locals": 35,
       "kind": "runtime-helper",
       "name": "helper::module_gather",
-      "ordinal": 315,
-      "start": 5513641
+      "ordinal": 403,
+      "start": 5608076
     },
     {
-      "index": 448,
+      "index": 539,
       "bytes": 13819,
       "locals": 83,
       "kind": "runtime-helper",
       "name": "helper::module_execute",
-      "ordinal": 316,
-      "start": 5514541
+      "ordinal": 404,
+      "start": 5608976
     },
     {
-      "index": 449,
+      "index": 540,
       "bytes": 5713,
       "locals": 86,
       "kind": "runtime-helper",
       "name": "helper::module_fulfilled",
-      "ordinal": 317,
-      "start": 5528362
+      "ordinal": 405,
+      "start": 5622797
     },
     {
-      "index": 450,
+      "index": 541,
       "bytes": 2992,
       "locals": 67,
       "kind": "runtime-helper",
       "name": "helper::module_rejected",
-      "ordinal": 318,
-      "start": 5534077
+      "ordinal": 406,
+      "start": 5628512
     },
     {
-      "index": 451,
+      "index": 542,
       "bytes": 3845,
       "locals": 75,
       "kind": "runtime-helper",
       "name": "helper::module_deferred_import",
-      "ordinal": 319,
-      "start": 5537071
+      "ordinal": 407,
+      "start": 5631506
     },
     {
-      "index": 452,
+      "index": 543,
       "bytes": 3,
       "locals": 0,
       "kind": "runtime-helper",
       "name": "helper::prepared_dynamic_function",
-      "ordinal": 320,
-      "start": 5540917
+      "ordinal": 408,
+      "start": 5635352
     },
     {
-      "index": 453,
+      "index": 544,
       "bytes": 49,
       "locals": 7,
       "kind": "runtime-helper",
       "name": "helper::native_direct_eval_factory",
-      "ordinal": 321,
-      "start": 5540921
+      "ordinal": 409,
+      "start": 5635356
     },
     {
-      "index": 454,
+      "index": 545,
       "bytes": 3,
       "locals": 0,
       "kind": "runtime-helper",
       "name": "helper::prepared_script",
-      "ordinal": 322,
-      "start": 5540971
+      "ordinal": 410,
+      "start": 5635406
     },
     {
-      "index": 455,
-      "bytes": 1026,
+      "index": 546,
+      "bytes": 1028,
       "locals": 58,
       "kind": "runtime-helper",
       "name": "helper::realm_module_import",
-      "ordinal": 323,
-      "start": 5540976
+      "ordinal": 411,
+      "start": 5635411
     },
     {
-      "index": 456,
+      "index": 547,
       "bytes": 285,
       "locals": 21,
       "kind": "runtime-helper",
       "name": "helper::module_body_reaction",
-      "ordinal": 324,
-      "start": 5542004
+      "ordinal": 412,
+      "start": 5636441
     },
     {
-      "index": 457,
+      "index": 548,
       "bytes": 3,
       "locals": 0,
       "kind": "runtime-helper",
       "name": "helper::regexp_program_candidate",
-      "ordinal": 325,
-      "start": 5542290
+      "ordinal": 413,
+      "start": 5636727
     },
     {
-      "index": 458,
+      "index": 549,
       "bytes": 3,
       "locals": 0,
       "kind": "runtime-helper",
       "name": "helper::compact_array_literal",
-      "ordinal": 326,
-      "start": 5542294
+      "ordinal": 414,
+      "start": 5636731
     },
     {
-      "index": 459,
+      "index": 550,
       "bytes": 223,
       "locals": 17,
       "kind": "runtime-helper",
       "name": "helper::initialize_instance_elements",
-      "ordinal": 327,
-      "start": 5542299
+      "ordinal": 415,
+      "start": 5636736
     }
   ],
   "largest_functions": [
     {
-      "index": 428,
-      "bytes": 361733,
-      "locals": 596,
+      "index": 431,
+      "bytes": 366178,
+      "locals": 599,
       "kind": "script",
       "name": "js::f71",
       "ordinal": 296,
-      "start": 4877668
+      "start": 4719384
     },
     {
-      "index": 327,
-      "bytes": 341345,
-      "locals": 324,
+      "index": 330,
+      "bytes": 334947,
+      "locals": 316,
       "kind": "script",
       "name": "js::vn#f133",
       "ordinal": 195,
-      "start": 2769795
+      "start": 2627452
     },
     {
-      "index": 420,
-      "bytes": 137724,
-      "locals": 256,
+      "index": 423,
+      "bytes": 133885,
+      "locals": 259,
       "kind": "script",
       "name": "js::no#f194",
       "ordinal": 288,
-      "start": 4665973
+      "start": 4528872
     },
     {
-      "index": 184,
-      "bytes": 101329,
-      "locals": 224,
+      "index": 187,
+      "bytes": 104523,
+      "locals": 227,
       "kind": "script",
       "name": "js::f15",
       "ordinal": 52,
-      "start": 509182
+      "start": 479043
     },
     {
-      "index": 314,
-      "bytes": 96719,
-      "locals": 250,
+      "index": 317,
+      "bytes": 97025,
+      "locals": 256,
       "kind": "script",
       "name": "js::ft#f123",
       "ordinal": 182,
-      "start": 2443206
+      "start": 2302935
     },
     {
-      "index": 262,
-      "bytes": 94419,
-      "locals": 241,
-      "kind": "script",
-      "name": "js::Ii#f91",
-      "ordinal": 130,
-      "start": 1472655
-    },
-    {
-      "index": 395,
-      "bytes": 93606,
-      "locals": 265,
+      "index": 398,
+      "bytes": 95117,
+      "locals": 271,
       "kind": "script",
       "name": "js::gn#f184",
       "ordinal": 263,
-      "start": 4264459
+      "start": 4121263
     },
     {
-      "index": 432,
-      "bytes": 88688,
-      "locals": 220,
+      "index": 265,
+      "bytes": 92549,
+      "locals": 229,
+      "kind": "script",
+      "name": "js::Ii#f91",
+      "ordinal": 130,
+      "start": 1385487
+    },
+    {
+      "index": 435,
+      "bytes": 90111,
+      "locals": 222,
       "kind": "script",
       "name": "js::f304",
       "ordinal": 300,
-      "start": 5280025
+      "start": 5126932
     },
     {
-      "index": 318,
-      "bytes": 81032,
-      "locals": 246,
-      "kind": "script",
-      "name": "js::Jt#f127",
-      "ordinal": 186,
-      "start": 2552256
-    },
-    {
-      "index": 345,
-      "bytes": 76057,
-      "locals": 228,
+      "index": 348,
+      "bytes": 86468,
+      "locals": 237,
       "kind": "script",
       "name": "js::dn#f151",
       "ordinal": 213,
-      "start": 3444264
+      "start": 3291052
     },
     {
-      "index": 176,
-      "bytes": 75875,
-      "locals": 294,
+      "index": 321,
+      "bytes": 84289,
+      "locals": 255,
+      "kind": "script",
+      "name": "js::Jt#f127",
+      "ordinal": 186,
+      "start": 2406606
+    },
+    {
+      "index": 179,
+      "bytes": 75302,
+      "locals": 287,
       "kind": "script",
       "name": "js::en#f25",
       "ordinal": 44,
-      "start": 374070
+      "start": 350289
     },
     {
-      "index": 307,
-      "bytes": 62820,
-      "locals": 214,
-      "kind": "script",
-      "name": "js::et#f119",
-      "ordinal": 175,
-      "start": 2333916
-    },
-    {
-      "index": 336,
-      "bytes": 62784,
-      "locals": 177,
-      "kind": "script",
-      "name": "js::Er#f142",
-      "ordinal": 204,
-      "start": 3261218
-    },
-    {
-      "index": 286,
-      "bytes": 62657,
-      "locals": 213,
-      "kind": "script",
-      "name": "js::Ht#f108",
-      "ordinal": 154,
-      "start": 1877249
-    },
-    {
-      "index": 278,
-      "bytes": 60134,
-      "locals": 235,
+      "index": 281,
+      "bytes": 64082,
+      "locals": 229,
       "kind": "script",
       "name": "js::j#f104",
       "ordinal": 146,
-      "start": 1732048
+      "start": 1621653
+    },
+    {
+      "index": 395,
+      "bytes": 62971,
+      "locals": 264,
+      "kind": "script",
+      "name": "js::Or#f181",
+      "ordinal": 260,
+      "start": 4021775
+    },
+    {
+      "index": 256,
+      "bytes": 62224,
+      "locals": 236,
+      "kind": "script",
+      "name": "js::Lt#f82",
+      "ordinal": 121,
+      "start": 1188868
+    },
+    {
+      "index": 310,
+      "bytes": 61135,
+      "locals": 203,
+      "kind": "script",
+      "name": "js::et#f119",
+      "ordinal": 175,
+      "start": 2200278
     }
   ],
-  "limits": "Static section and function-body sizes only. Data payloads and function bodies are included in enclosing section totals; not runtime shares or allocation counts."
+  "limits": "Static section and function-body sizes only. Data payloads and function bodies are included in enclosing section totals; not runtime shares or allocation counts. Categories describe this candidate and do not attribute a before/after change."
 }

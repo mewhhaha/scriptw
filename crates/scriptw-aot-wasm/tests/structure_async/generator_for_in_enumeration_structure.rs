@@ -112,7 +112,14 @@ fn inspect_actual_enumeration_artifact(source: &str) {
     let mut cursor_write = [0; 4];
     let mut edge_loads = 0;
     let mut edge_publications_and_retirements = 0;
-    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+    // Shared cursor helpers live in R; source activation edges live in P.
+    let runtime = artifact
+        .runtime()
+        .expect("enumeration links the shared runtime");
+    for payload in Parser::new(0)
+        .parse_all(&artifact.bytes)
+        .chain(Parser::new(0).parse_all(runtime.bytes()))
+    {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             for instruction in body.get_operators_reader().unwrap() {
                 match instruction.unwrap() {

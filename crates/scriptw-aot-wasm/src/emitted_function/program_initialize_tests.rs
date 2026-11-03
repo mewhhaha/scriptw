@@ -46,6 +46,7 @@ fn runtime_program_and_standalone_layouts_match_actual_emission_order() {
                         r_helpers,
                         source_count,
                         0,
+                        0,
                         p_helpers,
                         kind,
                         ModuleEntryRole::for_module(kind),
@@ -160,6 +161,7 @@ fn native_factory_layout_starts_with_its_typed_initializer_without_main() {
         8,
         2,
         0,
+        0,
         3,
         ModuleKind::Program(&runtime),
         ModuleEntryRole::NativeFactory,
@@ -202,6 +204,7 @@ fn only_a_linked_program_can_have_a_native_factory_entry() {
             0,
             0,
             0,
+            0,
             kind,
             ModuleEntryRole::NativeFactory,
         ))
@@ -217,6 +220,7 @@ fn a_bootstrap_body_cannot_be_published_at_main_position() {
     ))
     .unwrap();
     let layout = FunctionIndexLayout::new(
+        0,
         0,
         0,
         0,

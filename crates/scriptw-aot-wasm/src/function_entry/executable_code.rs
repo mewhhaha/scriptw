@@ -4,7 +4,7 @@ use super::*;
 use crate::gc_types::{
     AsyncCallable, AsyncGeneratorCallable, BinaryNumericCallback, ExecutableCode,
     ExecutableCodeEntry, ExecutableCodeKind, ExecutableCodeMetadata, GcStackReference,
-    GeneratorCallable, OrdinaryCallable, RuntimeSchema,
+    GeneratorCallable, LocalArgumentsCallable, OrdinaryCallable, RuntimeSchema,
 };
 
 impl PlannedFunctionEntry {
@@ -56,6 +56,14 @@ impl PlannedFunctionEntry {
                     function,
                 )
         });
+        let local_arguments = self.local_arguments().map(|entry| {
+            schema
+                .reserve_function_local::<LocalArgumentsCallable, _>(function)
+                .initialize(
+                    schema.reference_local_arguments_entry(entry, function),
+                    function,
+                )
+        });
         macro_rules! publish {
             ($role:ident, $variant:ident) => {{
                 let entry = schema
@@ -64,6 +72,7 @@ impl PlannedFunctionEntry {
                 let published = schema.struct_type::<ExecutableCode>().publish(
                     ExecutableCodeEntry::$variant(&entry),
                     binary_numeric.as_ref(),
+                    local_arguments.as_ref(),
                     metadata,
                     function,
                 )?;
@@ -83,6 +92,9 @@ impl PlannedFunctionEntry {
         if let Some(entry) = binary_numeric {
             entry.clear(function);
         }
+        if let Some(entry) = local_arguments {
+            entry.clear(function);
+        }
         Ok(published)
     }
 }
@@ -100,6 +112,7 @@ mod program_ownership_tests {
                 name: "sourceOwner".into(),
                 protocol: FunctionProtocolIr::OrdinaryCallOnly,
                 binary_numeric: None,
+                local_arguments: None,
             },
             wasm_index: 19,
         };

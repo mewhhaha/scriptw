@@ -50,8 +50,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 17.31 ms | 0.505 ms |
-| Async | 18.27 ms | 0.404 ms |
+| Sync | 17.37 ms | 0.484 ms |
+| Async | 18.38 ms | 0.394 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,8 +60,8 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.20 s JavaScript → Wasm**, **11.97 s native preparation**,
-and **2.66 ms module initialization**. Program Wasm is **5.79 MiB** (5.27 MiB
+Cold Scriptw setup: **3.30 s JavaScript → Wasm**, **12.14 s native preparation**,
+and **2.65 ms module initialization**. Program Wasm is **5.88 MiB** (5.36 MiB
 code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
@@ -71,21 +71,6 @@ code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
 global lookup, control-flow scaling, arguments and property mutation history
 against V8. Eight fresh processes per configuration; three checked warmups and
 seven measured calls. Compilation and input preparation precede timing.
-
-<table>
-<tr>
-<td><img src="docs/rust-rewrite/assets/situations-current/global-lookup.svg" width="440" alt="Global lookup: Scriptw Fast, Scriptw Speed and V8"></td>
-<td><img src="docs/rust-rewrite/assets/situations-current/frame-size.svg" width="440" alt="Control-flow and call-site scaling: Scriptw Fast, Scriptw Speed and V8"></td>
-</tr>
-<tr>
-<td><img src="docs/rust-rewrite/assets/situations-current/arguments-observation.svg" width="440" alt="Arguments observation: Scriptw Fast, Scriptw Speed and V8"></td>
-<td><img src="docs/rust-rewrite/assets/situations-current/property-mutation-history.svg" width="440" alt="Property mutation history: Scriptw Fast, Scriptw Speed and V8"></td>
-</tr>
-<tr>
-<td><img src="docs/rust-rewrite/assets/situations-current/frame-native-image.svg" width="440" alt="Native program image growth and portable Wasm size"></td>
-<td><img src="docs/rust-rewrite/assets/situations-current/control.svg" width="440" alt="Retained public-call control: Scriptw Fast, Scriptw Speed and V8"></td>
-</tr>
-</table>
 
 [Individual scores and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
 [Data](docs/rust-rewrite/situations-current.json).
@@ -112,10 +97,10 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-03**): 1,724 Engine cases covered
-(837 unchanged Script cases reused), plus 42 Wasm-emission, 153 typed structural,
-761 IR and 361 source-guard checks. AOT unit checks passed 628 cases;
-four pre-existing bootstrap assertions still fail on both this and the prior build.
+Latest scoped verification (**2026-11-03**): 1,737 Engine cases,
+42 Wasm-emission, 636 structural, 765 IR and
+361 source-guard checks pass. AOT units pass 637 cases; four known
+bootstrap assertions still fail.
 The focused benchmarks passed 3,120 checked calls; React RSC also passed exact
 Flight checks. These scopes do not replace the published full Test262 run.
 Full workspace CI was not rerun; formatting failures and 14 stale Intl recipes
@@ -134,7 +119,7 @@ remain [owned](docs/rust-rewrite/current-inventory.md).
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 47:** rebuild older Portable bundles and native images.
+- **Runtime ABI 48:** rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·
 [Current work](docs/rust-rewrite/current-inventory.md) ·
