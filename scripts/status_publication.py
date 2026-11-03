@@ -35,17 +35,17 @@ def read_local_or_index(root, name):
         return result.stdout
 
 
-def read_committed(root, name):
+def read_committed(root, name, ref="HEAD"):
     path = root / name
     if not path.is_file() or path.is_symlink():
         raise ValueError(f"status evidence must be a regular file: {name}")
     entry = subprocess.check_output(
-        ["git", "ls-tree", "HEAD", "--", name], cwd=root, text=True
+        ["git", "ls-tree", ref, "--", name], cwd=root, text=True
     ).strip()
     metadata, separator, recorded = entry.partition("\t")
     if not separator or recorded != name or not metadata.startswith("100644 blob "):
         raise ValueError(f"status evidence must be a committed regular blob: {name}")
-    return subprocess.check_output(["git", "show", "HEAD:" + name], cwd=root)
+    return subprocess.check_output(["git", "show", ref + ":" + name], cwd=root)
 
 
 def read_generation(
@@ -104,14 +104,68 @@ def load_publication(root):
     return publication, paths[0]
 
 
+def render_current_status(publication):
+    real = publication["real_suite"]
+    pins = real["pinned_revisions"]
+    compiler = real["compiler_identity"]
+    paths = real["snapshot_paths"]
+    return (
+        "## Current Status\n<!-- scriptw-status:start -->\n"
+        f"Published Test262 (`{real['backend']}`, `{real['refresh_date']}`): "
+        f"`{real['passed']}/{real['total']}` passed; `{real['failed']}` failed.\n"
+        "Native-host conformance includes cases unsupported by standalone Wasm; "
+        "it does not establish current HEAD coverage.\n"
+        f"Pinned revisions: `ecma262={pins['ecma262']}` `test262={pins['test262']}`\n"
+        f"Compiler build fingerprint: `{compiler['source_fingerprint']}`; "
+        f"executing image SHA-256: `{compiler['executable_sha256']}`\n"
+        f"Published status artifacts: `{paths['json']}` and `{paths['txt']}`\n"
+        "[Full test details](docs/rust-rewrite/test262-current.md) · "
+        "[Refresh workflow](CONTRIBUTING.md#test262).\n"
+        "<!-- scriptw-status:end -->"
+    )
+
+
+def check_readme_projection(root, base_ref):
+    manifest = read_committed(root, MANIFEST)
+    if manifest != read_committed(root, MANIFEST, base_ref):
+        raise ValueError("presentation-only changes require the existing status generation")
+    published, paths = read_generation(root, read=read_committed)
+    for path in paths:
+        if read_committed(root, path) != read_committed(root, path, base_ref):
+            raise ValueError("presentation-only changes require unchanged status members")
+    raw = read_committed(root, "README.md").decode()
+    heading = "## Current Status"
+    start = "<!-- scriptw-status:start -->"
+    end = "<!-- scriptw-status:end -->"
+    if any(raw.count(marker) != 1 for marker in (heading, start, end)):
+        raise ValueError("status projection requires one canonical heading and marker pair")
+    heading_at, start_at, end_at = (raw.index(marker) for marker in (heading, start, end))
+    if (
+        (heading_at > 0 and raw[heading_at - 1] != "\n")
+        or not heading_at + len(heading) <= start_at < end_at
+        or raw[heading_at + len(heading) : start_at].strip()
+        or raw[heading_at : end_at + len(end)] != render_current_status(published)
+    ):
+        raise ValueError("README must exactly project the unchanged published evidence")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--check-committed", action="store_true")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--render-readme", action="store_true")
+    action.add_argument("--check-readme-projection", metavar="BASE_REF")
     args = parser.parse_args()
-    _, paths = read_generation(
+    if args.check_readme_projection:
+        check_readme_projection(args.root, args.check_readme_projection)
+        return
+    published, paths = read_generation(
         args.root, read=read_committed if args.check_committed else read_local_or_index
     )
+    if args.render_readme:
+        print(render_current_status(published))
+        return
     for path in paths:
         print(path)
 

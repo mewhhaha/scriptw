@@ -34,6 +34,7 @@
 
 ## README and published status
 
+- Keep `README.md` short: project intent, getting started, latest dated benchmarks, test status and caveats. Put full panels and measurement boundaries in [benchmark details](docs/rust-rewrite/benchmarks.md). The former implementation bulletins are preserved in [README history](docs/rust-rewrite/benchmark-history.md); do not append new per-change narratives to the README.
 - Update `README.md` with user-visible capability, conformance, CLI, architecture or workflow changes.
 - When status changes, refresh generated counts, commands and date together. Never hand-edit the pinned Test262 status numbers.
 - Publish with `scriptw test262 publish-status --execution-backend <spec-exec|wasm-aot>` or the equivalent `cargo run -p scriptw-cli -- ...` command. For low RAM, use `./scripts/publish-real-status-low-ram.sh <backend> <snapshot-name>`; it checkpoints one node per process and publishes only after verified completion.

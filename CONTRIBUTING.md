@@ -148,6 +148,9 @@ python3 -B scripts/limited_verification.py -- ./scripts/publish-real-status-low-
 The publisher owns generated README counts. The chart can then be refreshed with
 `python3 -B scripts/generate-test-graph.py --refresh-evidence --full-evidence`
 and checked with `python3 -B scripts/generate-test-graph.py --check`.
+For presentation-only changes, `python3 -B scripts/status_publication.py
+--check-committed --render-readme` prints the concise block from the existing
+verified generation. This changes no counts or dates and requires no new test run.
 Fake suites and selected replays are separate evidence. `Unsupported`, timeout,
 crash and bug outcomes are non-passing; retain all four documented upstream
 disagreements as ordinary failures. A new complete publication is required to
@@ -155,7 +158,8 @@ replace the [published full-suite result](docs/rust-rewrite/test262-current.md).
 
 ## Benchmark charts
 
-The current README cards read the verified inert performance archive. Rendering
+The benchmark cards in [benchmark details](docs/rust-rewrite/benchmarks.md) read
+the verified inert performance archive; the README retains concise summaries. Rendering
 executes no JavaScript, Wasm or native program images. Use the recorded plotting
 version to reproduce the committed SVGs:
 
@@ -169,7 +173,7 @@ Omit `--check` to regenerate; add `--preview-dir target/chart-previews` for PNGs
 The renderer reads `execution_three_runtime` in
 `docs/rust-rewrite/performance-gaps-20261101.json`, validates the three-runtime
 schedule and process samples, and writes `execution-current.json`, the
-`assets/benchmarks-current/` cards and the README runtime comparison. The data
+`assets/benchmarks-current/` cards, the detailed comparison and its README summary. The data
 retains the exact Wasmtime host and Node/V8 identities and timing policy.
 The older CI comparison retains its dated evidence and ordinary runtime
 configuration in `docs/rust-rewrite/compiler-comparison.md`.

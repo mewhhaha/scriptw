@@ -190,10 +190,6 @@ def publish(report_path, root):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(render(report, row))
     (destination / 'compiler-comparison.md').write_text(markdown(report, rows))
-    readme_path = root / 'README.md'
-    readme = readme_path.read_text()
-    start, end = readme.index('## Benchmarks'), readme.index('## Tests')
-    readme_path.write_text(readme[:start] + readme_section(report, rows) + readme[end:])
 
 
 def markdown(report, rows):
@@ -222,24 +218,3 @@ def markdown(report, rows):
               '[Checked report](compiler-comparison.json) · [Raw evidence](compiler-comparison.tar.gz) · '
               '[Workflow and reproduction](contracts/compiler-comparison.md).', '']
     return '\n'.join(lines)
-
-
-def readme_section(report, rows):
-    count = sum(row['runtimes']['scriptc']['status'] == 'ok' for row in rows)
-    return f'''## Benchmarks
-
-**Measured {report['finished_at'][:10]}**, compiler `{report['source_commit'][:9]}`.
-Scriptw / Wasmtime, Scriptc / Wasmtime (WASI), and Node / V8; **{count}/17 Scriptc checksums passed**.
-
-Each image has its own zero-based scales. Bars show median execution time and
-post-execution process RSS. Initial compilation and instance/context setup are outside
-the timer; Scriptw's JavaScript Realm bootstrap and V8 tiering remain inside.
-RSS includes compilation and warmup history, not live heap or peak memory.
-
-{gallery(rows, 'benchmarks', prefix='docs/rust-rewrite/assets')}
-
-[Measurements and complete evidence](docs/rust-rewrite/compiler-comparison.md) ·
-[Workflow and reproduction](docs/rust-rewrite/contracts/compiler-comparison.md) ·
-[Toolchains and refresh provenance](docs/rust-rewrite/benchmark-refresh-20261028.md).
-
-'''

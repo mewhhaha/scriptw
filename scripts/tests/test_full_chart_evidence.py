@@ -103,7 +103,7 @@ class FullChartEvidenceTests(unittest.TestCase):
             scoped_chart_counts=dict(Success=0, Bug=1, Crash=0, NotImplemented=0, OutOfScope=1))
         text = graph.render(dict(real_suite=real), reconciliation=record)
         svg = graph.render_svg(dict(real_suite=real), record)
-        self.assertIn('Fresh full run', text)
+        self.assertIn('Published full run', text)
         self.assertIn('compiler `bbbbbbbbb`', text)
         self.assertNotIn('2026-10-20', text)
         self.assertNotIn('not a fresh full rerun', svg)

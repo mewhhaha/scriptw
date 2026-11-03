@@ -87,17 +87,12 @@ def render(publication, evidence_path=SNAPSHOT, reconciliation=None):
             return f"""{START}
 ![Test262: {counts['Success']:,} passing in scope, {failed:,} failing, {counts['NotImplemented']:,} not implemented, {counts['OutOfScope']:,} out of standalone Wasm scope]({CHART})
 
-**Fresh full run, {reconciliation['date']}:** {display['total']:,} mode-specific
+**Published full run, {reconciliation['date']}:** {display['total']:,} mode-specific
 executions at pin `{display['pin']}`, compiler `{display['measured']}`.
-All executions belong to this compiler; no earlier failure replay is mixed in.
-
-Blue is the unchanged audited **{counts['OutOfScope']:,}-execution subset** focused
-on dynamic `eval` / Function source compilation outside the standalone Wasm promise.
-These cases passed through the native host in this run. Ordinary API properties
-and `call` / `apply` / `bind` stay in the measured categories.
-The four bars partition all {display['total']:,} executions; scope cannot hide a failure.
-[Portable native snapshots and exact scope inventory]({FULL_EVIDENCE}) ·
-[Complete published result]({evidence_path}) ·
+The **{counts['OutOfScope']:,} out-of-scope executions** passed through the native host;
+standalone Wasm excludes their dynamic source compilation. All four categories
+retain the full denominator, including every failure.
+[Scope inventory]({FULL_EVIDENCE}) · [Published result]({evidence_path}) ·
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 {END}"""
         repaired = categories(publication)[1][2] - failed

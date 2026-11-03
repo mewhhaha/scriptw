@@ -1531,83 +1531,20 @@ fn outcome_count(entries: &[PublishedCountEntry], outcome: OutcomeKind) -> usize
         .unwrap_or(0)
 }
 
-fn top_nonzero_labels(entries: &[PublishedCountEntry], limit: usize) -> String {
-    let labels = entries
-        .iter()
-        .filter(|entry| entry.count > 0)
-        .take(limit)
-        .map(|entry| format!("`{}={}`", entry.label, entry.count))
-        .collect::<Vec<_>>();
-    if labels.is_empty() {
-        "none".to_string()
-    } else {
-        labels.join(", ")
-    }
-}
-
-fn all_count_labels(entries: &[PublishedCountEntry]) -> String {
-    entries
-        .iter()
-        .map(|entry| format!("`{}={}`", entry.label, entry.count))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn top_target_labels(entries: &[PublishedTargetEntry], limit: usize) -> String {
-    let labels = entries
-        .iter()
-        .take(limit)
-        .map(|entry| {
-            format!(
-                "`{}: {}/{} passed`",
-                entry.filter, entry.passed, entry.total
-            )
-        })
-        .collect::<Vec<_>>();
-    if labels.is_empty() {
-        "none".to_string()
-    } else {
-        labels.join(", ")
-    }
-}
-
-fn render_current_status_block(artifact: &PublishedStatusArtifact) -> String {
-    let real = &artifact.real_suite;
-    let real_status = if real.passed == real.total {
-        "green"
-    } else {
-        "not green"
-    };
+fn render_current_status_block(real: &PublishedRealSuiteStatus) -> String {
     format!(
-        "## Current Status\n<!-- scriptw-status:start -->\nRust rewrite status must be read in layers, not one vanity number:\n- Fake wasm-safe Test262 subset: `{}/{}` green\n- Fake full Rust rewrite suite: `{}/{}` green\n- Pinned real Test262 baseline (`{}`, refreshed `{}`): `{}/{}` {} (`{}`)\n- Real Test262 goal: Success={}/{} ({}); burn down NotImplemented={}, Crash={}, Bug={} to zero\n- Pinned revisions: `ecma262={}` `test262={}`\n- Compiler build fingerprint: `{}`; executing image SHA-256: `{}`\n- Current real outcomes: {}\n- Biggest current real failing kinds: {}\n- Biggest current real failing origins: {}\n- Worst current real matrix targets: {}\n- Published status artifacts: `{}` and `{}`\n\nAs of `{}`, Rust Wasm-AOT path is at 100% of repo fake coverage, not 100% ECMAScript. Project is still off literal 100% until full pinned real Test262 run is green for Rust path.\n\nStatus refresh commands:\n- `cargo test -p scriptw-engine --quiet`\n- `cargo test -p scriptw-cli --quiet`\n- `./target/debug/scriptw test262 run language/wasm/pass --suite-root crates/scriptw-test262/tests/fixtures/fake_test262/vendor/test262 --execution-backend wasm`\n- `./target/debug/scriptw test262 run --suite-root crates/scriptw-test262/tests/fixtures/fake_test262/vendor/test262`\n- `./scripts/publish-real-status-low-ram.sh {} codex-published-real`\n\nWhen counts move, update this block in same change. Do not claim full Test262 `100%` from fake-suite numbers.\n<!-- scriptw-status:end -->",
-        artifact.fake_wasm_safe.passed,
-        artifact.fake_wasm_safe.total,
-        artifact.fake_full.passed,
-        artifact.fake_full.total,
+        "## Current Status\n<!-- scriptw-status:start -->\nPublished Test262 (`{}`, `{}`): `{}/{}` passed; `{}` failed.\nNative-host conformance includes cases unsupported by standalone Wasm; it does not establish current HEAD coverage.\nPinned revisions: `ecma262={}` `test262={}`\nCompiler build fingerprint: `{}`; executing image SHA-256: `{}`\nPublished status artifacts: `{}` and `{}`\n[Full test details](docs/rust-rewrite/test262-current.md) · [Refresh workflow](CONTRIBUTING.md#test262).\n<!-- scriptw-status:end -->",
         real.backend,
         real.refresh_date,
         real.passed,
         real.total,
-        real_status,
-        percent_string(real.passed, real.total),
-        real.goal.current_success,
-        real.goal.target_total,
-        real.goal.pass_rate,
-        outcome_count(&real.counts_per_outcome, OutcomeKind::NotImplemented),
-        outcome_count(&real.counts_per_outcome, OutcomeKind::Crash),
-        outcome_count(&real.counts_per_outcome, OutcomeKind::Bug),
+        real.failed,
         real.pinned_revisions.ecma262,
         real.pinned_revisions.test262,
         real.compiler_identity.identity().source_fingerprint(),
         real.compiler_identity.identity().executable_sha256(),
-        all_count_labels(&real.counts_per_outcome),
-        top_nonzero_labels(&real.counts_per_kind, 3),
-        top_nonzero_labels(&real.counts_per_origin, 3),
-        top_target_labels(&real.top_targets, 3),
         real.snapshot_paths.json,
         real.snapshot_paths.txt,
-        real.refresh_date,
-        real.backend,
     )
 }
 
@@ -1617,7 +1554,7 @@ fn rewrite_current_status_block(
 ) -> Result<(), String> {
     let raw = fs::read_to_string(readme_path)
         .map_err(|err| format!("failed to read {}: {err}", readme_path.display()))?;
-    let replacement = render_current_status_block(artifact);
+    let replacement = render_current_status_block(&artifact.real_suite);
     let updated =
         status_publication::replace_status_section(&raw, &replacement).map_err(|error| {
             format!(
@@ -3599,6 +3536,67 @@ fn is_module_path(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn current_status_preserves_failures_and_the_published_coverage_boundary() {
+        let compiler_identity = CompilerProvenance::current().unwrap();
+        let real = PublishedRealSuiteStatus {
+            backend: "wasm-aot".into(),
+            refresh_date: "2026-10-21".into(),
+            manifest_hash: 1,
+            compiler_identity: compiler_identity.clone(),
+            passed: 102990,
+            total: 102994,
+            failed: 4,
+            pinned_revisions: PublishedPinnedRevisions {
+                ecma262: "spec-pin".into(),
+                test262: "suite-pin".into(),
+            },
+            counts_per_outcome: Vec::new(),
+            counts_per_kind: Vec::new(),
+            counts_per_origin: Vec::new(),
+            top_targets: Vec::new(),
+            snapshot_paths: PublishedSnapshotPaths {
+                json: "published.json".into(),
+                txt: "published.txt".into(),
+            },
+            goal: PublishedRealSuiteGoal {
+                name: "Full pinned Test262 green".into(),
+                denominator: "pinned-suite-total".into(),
+                target_total: 102994,
+                current_success: 102990,
+                remaining_to_green: 4,
+                pass_rate: "100.0%".into(),
+                outcome_targets: Vec::new(),
+            },
+        };
+        let rendered = render_current_status_block(&real);
+        assert!(rendered.starts_with("## Current Status\n<!-- scriptw-status:start -->\n"));
+        assert!(rendered.ends_with("\n<!-- scriptw-status:end -->"));
+        assert_eq!(rendered.lines().count(), 9);
+        assert!(
+            rendered.contains("(`wasm-aot`, `2026-10-21`): `102990/102994` passed; `4` failed.")
+        );
+        assert!(!rendered.contains("100.0%"));
+        assert!(rendered.contains("Native-host conformance includes cases unsupported by standalone Wasm; it does not establish current HEAD coverage."));
+        assert!(rendered.contains("`ecma262=spec-pin` `test262=suite-pin`"));
+        assert!(rendered.contains(
+            &compiler_identity
+                .identity()
+                .source_fingerprint()
+                .to_string()
+        ));
+        assert!(rendered.contains(&compiler_identity.identity().executable_sha256().to_string()));
+        assert!(
+            rendered.contains("Published status artifacts: `published.json` and `published.txt`")
+        );
+        assert!(rendered.contains("docs/rust-rewrite/test262-current.md"));
+        assert!(rendered.contains("CONTRIBUTING.md#test262"));
+        assert_eq!(
+            status_publication::replace_status_section(&rendered, &rendered).unwrap(),
+            rendered
+        );
+    }
 
     #[test]
     fn manifest_profile_rejects_ambiguous_flags_before_opening_any_input() {

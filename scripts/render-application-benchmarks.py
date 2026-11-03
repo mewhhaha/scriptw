@@ -425,7 +425,7 @@ def reference_chart(report, rows, title, boundary, preview):
             plt.close(fig)
 
 
-def readme_section(authority, rows, react, references):
+def details_section(authority, rows, react, references):
     ratios = []
     for row in rows:
         actors = row['runtimes']
@@ -456,7 +456,7 @@ def readme_section(authority, rows, react, references):
     times = ['| Reference | Entry median · ms |', '| --- | ---: |']
     for row in references:
         times.append(f"| {LABELS[row['case']]} | {row['process_medians_ns']['median'] / 1e6:.3f} |")
-    return f'''<!-- application-benchmarks:start -->
+    return f'''<!-- application-benchmarks-details:start -->
 ## Application workloads
 
 Measured **{authority['finished_at'][:10]}**, compiler `{authority['source_fingerprint'][:12]}`.
@@ -499,7 +499,7 @@ rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
 At this frozen benchmark revision, Scriptw lacked DOM, encoding, Web Streams,
 Fetch and URL APIs, as recorded by its capability probe. Current-source RSC
-measurements are reported below.
+measurements are reported in the [README](../../README.md#benchmarks).
 
 The frozen [failure diagnosis](docs/rust-rewrite/applications-current.json) records
 missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
@@ -511,8 +511,32 @@ compilation; a debugger sample finds Cranelift optimization active at 20 seconds
 [Data, identities and diagnostics](docs/rust-rewrite/applications-current.json) ·
 [Inert raw evidence](docs/rust-rewrite/{authority['archive']['file']}) ·
 [Workflow](CONTRIBUTING.md#react-and-edge-benchmarks).
-<!-- application-benchmarks:end -->
+<!-- application-benchmarks-details:end -->
 '''
+
+
+def readme_section(authority, rows):
+    ratios = []
+    for row in rows:
+        actors = row['runtimes']
+        if actors['scriptw']['status'] == actors['scriptc']['status'] == 'ok':
+            ratios.append(actors['scriptw']['ms'] / actors['scriptc']['ms'])
+    require(bool(ratios), 'no completed application comparisons')
+    date = authority['finished_at'][:10]
+    return f'''<!-- application-benchmarks:start -->
+**Edge kernels · {date}**, compiler `{authority['source_fingerprint'][:12]}`:
+Scriptw takes **{min(ratios):.1f}–{max(ratios):.1f}× Scriptc time** across {len(ratios)} completed comparisons.
+These use plain request/response records; networking and Web APIs are outside the workload.
+[Application charts and failed attempts](docs/rust-rewrite/benchmarks.md#application-workloads) ·
+[Data](docs/rust-rewrite/applications-current.json).
+<!-- application-benchmarks:end -->'''
+
+
+def replace_section(text, section, name):
+    start, end = f'<!-- {name}:start -->', f'<!-- {name}:end -->'
+    require(text.count(start) == text.count(end) == 1 and text.index(start) < text.index(end),
+            'expected one ordered ' + name + ' marker pair')
+    return text[:text.index(start)] + section.rstrip('\n') + text[text.index(end) + len(end):]
 
 
 def main():
@@ -569,18 +593,12 @@ def main():
         selected = [row for row in references if row['case'] in names]
         outputs[ASSETS / (stem + '.svg')] = reference_chart(report, selected, title, boundary, preview)
     readme = ROOT / 'README.md'
-    text = readme.read_text()
-    start_marker, end_marker = '<!-- application-benchmarks:start -->', '<!-- application-benchmarks:end -->'
-    section = readme_section(authority, rows, react, references)
-    if start_marker in text:
-        require(text.count(start_marker) == text.count(end_marker) == 1, 'README application markers differ')
-        start, end = text.index(start_marker), text.index(end_marker) + len(end_marker)
-        text = text[:start] + section.rstrip('\n') + text[end:]
-    else:
-        require(end_marker not in text, 'orphan README application marker')
-        location = text.index('## Compilation time\n')
-        text = text[:location] + section + '\n' + text[location:]
-    outputs[readme] = text.encode()
+    outputs[readme] = replace_section(readme.read_text(), readme_section(authority, rows),
+                                      'application-benchmarks').encode()
+    details = ROOT / 'docs/rust-rewrite/benchmarks.md'
+    section = details_section(authority, rows, react, references)
+    section = section.replace('docs/rust-rewrite/', '').replace('(CONTRIBUTING.md', '(../../CONTRIBUTING.md')
+    outputs[details] = replace_section(details.read_text(), section, 'application-benchmarks-details').encode()
     for path, value in outputs.items():
         if args.check:
             require(path.read_bytes() == value, 'generated output differs: ' + str(path.relative_to(ROOT)))

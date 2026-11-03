@@ -139,14 +139,15 @@ fn test262_publish_status_supports_wasm_backend() {
     assert!(stdout.contains("snapshot_txt:"));
 
     let readme = fs::read_to_string(&readme_path).expect("wasm README should read");
-    assert!(readme.contains("Pinned real Test262 baseline (`wasm-aot`"));
-    assert!(readme.contains("): `1/1` green"));
-    assert!(readme.contains("Current real outcomes:"));
+    assert!(readme.contains("Published Test262 (`wasm-aot`"));
+    assert!(readme.contains("): `1/1` passed; `0` failed."));
     assert!(
-        readme.contains("./scripts/publish-real-status-low-ram.sh wasm-aot codex-published-real")
+        readme.contains("Native-host conformance includes cases unsupported by standalone Wasm")
     );
-    assert!(readme.contains("Fake full Rust rewrite suite: `191/191` green"));
-    assert!(readme.contains("Fake wasm-safe Test262 subset: `187/187` green"));
+    assert!(readme.contains("docs/rust-rewrite/test262-current.md"));
+    assert!(readme.contains("CONTRIBUTING.md#test262"));
+    assert!(!readme.contains("Fake full Rust rewrite suite"));
+    assert!(!readme.contains("Status refresh commands:"));
 
     let status_json_line = stdout
         .lines()

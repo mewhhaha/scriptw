@@ -8,6 +8,11 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
+- Reduce [RSC Wasm expansion](rsc-wasm-size-20261103.json): 6.54 MB of its
+  7.65 MB program is code; 308 source functions account for 6.43 MB. Attribute
+  expansion in the largest bodies and overlapping function-source pool entries.
+  Custom sections are only 1.1%. Owner: AOT codegen and source pooling; measure
+  output size, native preparation and request time together.
 - Reduce application lookup costs while preserving binding identity. The
   [matched RSC cohort](rsc-current.json) improves retained requests by 18–19%,
   but remains 49–67x Node/V8 time. Candidate profiles still put about 12% of

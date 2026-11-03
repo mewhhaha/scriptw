@@ -112,13 +112,21 @@ fi
 canonical_status_manifest='test262/snapshots/published-status-wasm-aot.manifest.json'
 if [ -e "$canonical_status_manifest" ] || [ -L "$canonical_status_manifest" ] \
   || git cat-file -e "HEAD:$canonical_status_manifest" 2>/dev/null; then
+  # A prose-only simplification may project the same committed evidence. It
+  # must match the canonical renderer exactly and retain both immutable members.
+  if ! changed_file "$canonical_status_manifest" \
+    && python3 "$(dirname "${BASH_SOURCE[0]}")/status_publication.py" \
+      --check-readme-projection "$base_ref"; then
+    printf 'check-readme-status-artifacts: concise README projects the unchanged verified wasm-aot generation\n'
+    exit 0
+  fi
   if canonical_status_blob "$canonical_status_manifest" \
     && changed_file "$canonical_status_manifest" \
     && python3 "$(dirname "${BASH_SOURCE[0]}")/status_publication.py" --check-committed; then
     printf 'check-readme-status-artifacts: README status change has one verified wasm-aot generation\n'
     exit 0
   fi
-  printf 'check-readme-status-artifacts: status manifest must change and admit both committed members\n' >&2
+  printf 'check-readme-status-artifacts: README must exactly project the unchanged generation, or a new manifest must admit both committed members\n' >&2
   exit 1
 fi
 

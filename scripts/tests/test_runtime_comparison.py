@@ -7,12 +7,56 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
+RENDER_SPEC = importlib.util.spec_from_file_location('render_runtime_comparison', ROOT / 'scripts/render-runtime-comparison.py')
+renderer = importlib.util.module_from_spec(RENDER_SPEC)
+RENDER_SPEC.loader.exec_module(renderer)
 SPEC = importlib.util.spec_from_file_location('runtime_bench', ROOT / 'scripts/benchmark-runtime-comparison.py')
 bench = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bench)
 
 
 class RuntimeComparisonTests(unittest.TestCase):
+    def test_runtime_summary_is_compact_and_detail_renderer_keeps_the_charts(self):
+        authority = {'date': '2026-11-02'}
+        report = {'source_fingerprint': 'a' * 64}
+        node = {'versions': {'node': 'v24.12.0', 'v8': 'v8-test'}}
+        identity = {'shared_configuration': {
+            'wasmtime_version': '47.0.0', 'native_compilation_mode': 'speed',
+            'register_allocation': 'backtracking', 'target': 'x86_64-test',
+        }}
+        rows = []
+        for index in range(17):
+            rows.append({'file': f'case-{index}.js', 'runtimes': {
+                'scriptw': {'block_median_ms': [1.0, 1.0], 'status': 'ok', 'ms': 1.0, 'rss_mib': 2.0},
+                'scriptc': {'block_median_ms': [2.0, 2.0], 'status': 'ok', 'ms': 2.0, 'rss_mib': 2.0},
+                'v8': {'block_median_ms': [0.5, 0.5], 'status': 'ok', 'ms': 0.5, 'rss_mib': 2.0},
+            }})
+        summary = renderer.readme_section(authority, report, node, rows)
+        self.assertIn('17/17 workloads', summary)
+        self.assertIn('benchmarks.md#runtime-comparison', summary)
+        self.assertIn('execution-current.json', summary)
+        self.assertNotIn('<img', summary)
+        self.assertNotIn('## Benchmarks', summary)
+        details = renderer.details_section(authority, report, node, identity, rows)
+        self.assertIn('<img ', details)
+        self.assertIn('src="assets/benchmarks-current/', details)
+        self.assertIn('(execution-current.json)', details)
+        self.assertIn('(../../CONTRIBUTING.md#benchmark-charts)', details)
+
+    def test_runtime_publication_requires_unique_ordered_markers(self):
+        text = 'intro\n' + renderer.README_START + '\nold\n' + renderer.README_END + '\noutro\n'
+        replaced = renderer.replace_marked_block(
+            text, renderer.README_START, renderer.README_END, 'new section', 'README.md')
+        self.assertEqual(replaced, 'intro\nnew section\noutro\n')
+        for invalid in ('intro\n', renderer.README_START + renderer.README_START + renderer.README_END):
+            with self.subTest(text=invalid), self.assertRaisesRegex(ValueError, 'README.md needs exactly one ordered'):
+                renderer.replace_marked_block(
+                    invalid, renderer.README_START, renderer.README_END, 'new', 'README.md')
+        with self.assertRaisesRegex(ValueError, 'README.md markers are reversed'):
+            renderer.replace_marked_block(
+                renderer.README_END + renderer.README_START,
+                renderer.README_START, renderer.README_END, 'new', 'README.md')
+
     def test_every_case_has_four_processes_per_actor_block_and_reversed_order(self):
         names = [f'case{index}.js' for index in range(17)]
         rows = bench.process_plan(names)

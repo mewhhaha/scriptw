@@ -97,7 +97,7 @@
   },
   "renderer": {
     "matplotlib": "3.11.2",
-    "script_sha256": "f61c620e664227cdbf61206921f26048575b73f10d078f95784ba51204694477",
+    "script_sha256": "66203d0a1bac69bc15ff0d5bbeb07c317c05873d735827c79e0bf8e6dd893068",
     "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"
   },
   "chart_panels": [

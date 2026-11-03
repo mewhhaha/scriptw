@@ -119,7 +119,9 @@ class ComparisonAdmissionTests(unittest.TestCase):
     def test_published_archive_round_trips_without_original_measurement_directory(self):
         destination = self.directory / 'checkout'
         (destination / 'docs/rust-rewrite/assets').mkdir(parents=True)
-        (destination / 'README.md').write_text('# Scriptw\n\n## Benchmarks\nold\n\n## Tests\nkeep me\n')
+        readme_path = destination / 'README.md'
+        readme_path.write_text('# Scriptw\n\n## Benchmarks\nowned by current comparison\n\n## Tests\nkeep me\n')
+        readme_before = readme_path.read_bytes()
         self.save()
         # This control owns archive admission and README publication. The real
         # workflow installs matplotlib and separately verifies the actual SVG.
@@ -128,12 +130,14 @@ class ComparisonAdmissionTests(unittest.TestCase):
         path = destination / 'docs/rust-rewrite/compiler-comparison.json'
         _, rows = load_report(path, path.with_suffix('.tar.gz'))
         self.assertEqual(len(rows), 17)
-        self.assertIn('keep me', (destination / 'README.md').read_text())
-        self.assertIn('17/17', (destination / 'README.md').read_text())
+        self.assertEqual(readme_path.read_bytes(), readme_before)
+        published_detail = (destination / 'docs/rust-rewrite/compiler-comparison.md').read_text()
+        self.assertIn('## Benchmark charts', published_detail)
+        self.assertIn('case', published_detail)
         for row in rows:
             relative = 'assets/benchmarks/' + Path(row['file']).stem + '.svg'
             self.assertEqual((destination / 'docs/rust-rewrite' / relative).read_bytes(), row['file'].encode())
-            self.assertIn(relative, (destination / 'README.md').read_text())
+            self.assertIn(relative, published_detail)
 
 
 if __name__ == '__main__':

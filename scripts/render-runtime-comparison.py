@@ -16,6 +16,10 @@ AUTHORITY = ROOT / 'docs/rust-rewrite/performance-gaps-20261101.json'
 DATA = ROOT / 'docs/rust-rewrite/execution-current.json'
 ASSETS = ROOT / 'docs/rust-rewrite/assets/benchmarks-current'
 RUNTIMES = ('scriptw', 'scriptc', 'v8')
+README_START = '<!-- runtime-comparison:start -->'
+README_END = '<!-- runtime-comparison:end -->'
+DETAILS_START = '<!-- runtime-comparison-details:start -->'
+DETAILS_END = '<!-- runtime-comparison-details:end -->'
 
 
 def digest(path):
@@ -106,6 +110,75 @@ def chart_rows(analysis, fingerprint):
     return rows
 
 
+def replace_marked_block(text, start_marker, end_marker, section, label):
+    if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+        raise ValueError(f'{label} needs exactly one ordered {start_marker} / {end_marker} pair')
+    start = text.index(start_marker)
+    end = text.index(end_marker)
+    if start >= end:
+        raise ValueError(f'{label} markers are reversed')
+    end += len(end_marker)
+    return text[:start] + section.rstrip('\n') + text[end:]
+
+
+def comparison_summaries(rows):
+    summaries = []
+    for runtime, label in (('scriptc', 'Scriptc'), ('v8', 'V8')):
+        wins = sum(all(row['runtimes']['scriptw']['block_median_ms'][block]
+                       < row['runtimes'][runtime]['block_median_ms'][block] for block in range(2))
+                   for row in rows)
+        ratios = [math.exp(statistics.mean(math.log(row['runtimes']['scriptw']['block_median_ms'][block]
+                                                   / row['runtimes'][runtime]['block_median_ms'][block])
+                                           for row in rows)) for block in range(2)]
+        summaries.append(f'Scriptw is faster than {label} in **{wins}/{len(rows)} workloads** in both blocks; '
+                         f'block execution geometric means are **{min(ratios):.3f}–{max(ratios):.3f}× {label}**.')
+    return summaries
+
+
+def readme_section(authority, report, node, rows):
+    scriptc, v8 = comparison_summaries(rows)
+    return f'''{README_START}
+**Runtime kernels · {authority['date']}**, compiler `{report['source_fingerprint'][:12]}`; Node **{node['versions']['node']}**, V8 **{node['versions']['v8']}**.
+{scriptc}
+{v8}
+Wasm is compiled before timing; Scriptw entry includes Realm bootstrap. V8 creates a fresh context before timing; entry checks outputs.
+See [measurement details and charts](docs/rust-rewrite/benchmarks.md#runtime-comparison), [data and identities](docs/rust-rewrite/execution-current.json), and [workflow](CONTRIBUTING.md#benchmark-charts).
+<!-- runtime-comparison:end -->
+'''
+
+
+def details_section(authority, report, node, identity, rows):
+    return f'''{DETAILS_START}
+## Runtime comparison
+
+**Measured {authority['date']} locally**, compiler fingerprint `{report['source_fingerprint'][:12]}`.
+V8 **{node['versions']['v8']}**, Node **{node['versions']['node']}**.
+{' '.join(comparison_summaries(rows))}
+
+This compares Wasm public entry with V8 `runInContext`. Scriptw and Scriptc compile
+Wasm before the measured processes and share a Wasmtime host with compilation disabled.
+Wasmtime {identity['shared_configuration']['wasmtime_version']} uses {identity['shared_configuration']['native_compilation_mode']}/{identity['shared_configuration']['register_allocation']}
+native code and a {identity['shared_configuration']['target']} target.
+Timed Wasm entry includes Scriptw Realm/intrinsic bootstrap. V8 parses one `vm.Script`
+per process and creates a fresh `vm.Context` before each invocation outside entry timing;
+lazy compilation, JIT tiering and natural GC may occur inside. Every entry checks output.
+
+Each bar shows the median of eight process medians: four processes per balanced
+block, each with 21 measured entries after ten checked warmups. Memory bars show
+median GNU-time whole-child **peak RSS** for all three runtimes, including host,
+code, runtime and warmup history. Warmups do not establish optimized steady state.
+Each panel uses its own zero-based scale. Chart data also retains V8 context-creation
+time as a supplemental measurement, excluded from bars and ratios.
+
+{gallery(rows, 'benchmarks-current', prefix='assets')}
+
+[Chart data and runtime identities](execution-current.json) ·
+[Complete evidence](performance-gaps-20261101.json) ·
+[Workflow](../../CONTRIBUTING.md#benchmark-charts).
+<!-- runtime-comparison-details:end -->
+'''
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preview-dir', type=Path)
@@ -143,60 +216,16 @@ def main():
             preview = args.preview_dir / (Path(row['file']).stem + '.png')
         outputs[ASSETS / (Path(row['file']).stem + '.svg')] = render(report, row, RUNTIMES, preview=preview)
     outputs[DATA] = (json.dumps(report, indent=2, ensure_ascii=False) + '\n').encode()
-    historical = json.loads((ROOT / 'docs/rust-rewrite/compiler-comparison.json').read_text())
-    comparisons = []
-    for runtime, label in (('scriptc', 'Scriptc'), ('v8', 'V8')):
-        wins = sum(all(row['runtimes']['scriptw']['block_median_ms'][block]
-                       < row['runtimes'][runtime]['block_median_ms'][block] for block in range(2))
-                   for row in rows)
-        ratios = [math.exp(statistics.mean(math.log(row['runtimes']['scriptw']['block_median_ms'][block]
-                                                   / row['runtimes'][runtime]['block_median_ms'][block])
-                                           for row in rows)) for block in range(2)]
-        comparisons.append(f'Scriptw is faster than {label} in **{wins}/{len(rows)} workloads** in both blocks; '
-                           f'block execution geometric means are **{min(ratios):.3f}–{max(ratios):.3f}× {label}**.')
-    section = f'''## Runtime comparison
-
-**Measured {authority['date']} locally**, compiler fingerprint `{report['source_fingerprint'][:12]}`.
-V8 **{node['versions']['v8']}**, Node **{node['versions']['node']}**.
-{' '.join(comparisons)}
-
-This compares Wasm public entry with V8 `runInContext`. Scriptw and Scriptc compile
-Wasm before the measured processes and share a Wasmtime host with compilation disabled.
-Wasmtime {identity['shared_configuration']['wasmtime_version']} uses {identity['shared_configuration']['native_compilation_mode']}/{identity['shared_configuration']['register_allocation']}
-native code and a {identity['shared_configuration']['target']} target.
-Timed Wasm entry includes Scriptw Realm/intrinsic bootstrap. V8 parses one `vm.Script`
-per process and creates a fresh `vm.Context` before each invocation outside entry timing;
-lazy compilation, JIT tiering and natural GC may occur inside. Every entry checks output.
-
-Each bar shows the median of eight process medians: four processes per balanced
-block, each with 21 measured entries after ten checked warmups. Memory bars show
-median GNU-time whole-child **peak RSS** for all three runtimes, including host,
-code, runtime and warmup history. Warmups do not establish optimized steady state.
-Each panel uses its own zero-based scale. Chart data also retains V8 context-creation
-time as a supplemental measurement, excluded from bars and ratios.
-
-{gallery(rows, 'benchmarks-current', prefix='docs/rust-rewrite/assets')}
-
-[Chart data and runtime identities](docs/rust-rewrite/execution-current.json) ·
-[Complete evidence](docs/rust-rewrite/performance-gaps-20261101.json) ·
-[Workflow](docs/rust-rewrite/contracts/precompiled-comparison.md).
-
-[Regenerate or verify the charts](CONTRIBUTING.md#benchmark-charts).
-
-## Benchmarks
-
-The historical three-runtime CI comparison was measured **{historical['finished_at'][:10]}**,
-compiler `{historical['source_commit'][:9]}`.
-It uses the ordinary Fast configuration and post-execution RSS endpoints.
-[Dated CI charts and evidence](docs/rust-rewrite/compiler-comparison.md) ·
-[Historical precompiled CI comparison](docs/rust-rewrite/precompiled-comparison.md).
-'''
     readme = ROOT / 'README.md'
-    text = readme.read_text()
-    headings = ('## Runtime comparison\n', '## Precompiled comparison\n')
-    start = next(text.index(heading) for heading in headings if heading in text)
-    end = text.index('\nThe [module-local diagnostic]', start)
-    outputs[readme] = (text[:start] + section + text[end:]).encode()
+    readme_text = readme.read_text()
+    detail_path = ROOT / 'docs/rust-rewrite/benchmarks.md'
+    detail_text = detail_path.read_text()
+    outputs[readme] = replace_marked_block(
+        readme_text, README_START, README_END,
+        readme_section(authority, report, node, rows), 'README.md').encode()
+    outputs[detail_path] = replace_marked_block(
+        detail_text, DETAILS_START, DETAILS_END,
+        details_section(authority, report, node, identity, rows), 'benchmarks.md').encode()
     for path, encoded in outputs.items():
         if args.check:
             assert path.read_bytes() == encoded, f'generated output differs: {path.relative_to(ROOT)}'
