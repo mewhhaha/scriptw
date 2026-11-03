@@ -3,7 +3,7 @@ use scriptw_ir::{
     lower, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
     EnvironmentIdentifierResolutionStart, ExprIr, FunctionFlavor, FunctionIr,
     FunctionTargetKnowledge, KindSet, ProgramIr, ProvenBindingCellOrigin, StatementIr, TypedExpr,
-    ValueKind, LEXICAL_ARGUMENTS_NAME,
+    ValueKind, LEXICAL_ARGUMENTS_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
 };
 
 fn lower_module(source: &str) -> ProgramIr {
@@ -135,7 +135,6 @@ fn module_captured_cells_exclude_module_root_globals_eval_and_resumable_owners()
             "let cell = 1; export function read() { return cell; }",
             "read",
         ),
-        ("export function read() { return external; }", "read"),
         (
             "export function make(cell) { eval(''); return function read() { return cell; }; }",
             "read",
@@ -158,6 +157,113 @@ fn module_captured_cells_exclude_module_root_globals_eval_and_resumable_owners()
         assert_eq!(
             reference.resolution_start(),
             EnvironmentIdentifierResolutionStart::CurrentEnvironment,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn module_unbound_references_start_at_live_global_record_for_every_operation() {
+    let program = lower_module(
+        r#"
+        export function diagnostics() { return arguments[0]; }
+        export function read() { return external; }
+        export function readType() { return typeof external; }
+        export function write(value) { return external = value; }
+        export function add(value) { return external += value; }
+        export function logical(value) { return external ||= value; }
+        export function increment() { return external++; }
+        export function call(value) { return external(value); }
+        export function make() {
+            let first = 1;
+            function middle() {
+                let second = first;
+                return function deep() { { let third = second; return external; } };
+            }
+            return middle();
+        }
+    "#,
+    );
+    for name in [
+        "read",
+        "readType",
+        "write",
+        "add",
+        "logical",
+        "increment",
+        "call",
+        "deep",
+    ] {
+        let (_, value, reference) = module_capture_reference(&program, name);
+        assert_eq!(reference.name, "external");
+        assert_eq!(
+            reference.resolution_start(),
+            EnvironmentIdentifierResolutionStart::GlobalEnvironment,
+            "{name}"
+        );
+        assert!(matches!(
+            (&reference.operation, name),
+            (EnvironmentIdentifierOperationIr::Read, "read" | "deep")
+                | (EnvironmentIdentifierOperationIr::Typeof, "readType")
+                | (EnvironmentIdentifierOperationIr::Assign { .. }, "write")
+                | (
+                    EnvironmentIdentifierOperationIr::EagerCompound { .. },
+                    "add"
+                )
+                | (
+                    EnvironmentIdentifierOperationIr::LogicalCompound { .. },
+                    "logical"
+                )
+                | (EnvironmentIdentifierOperationIr::Update { .. }, "increment")
+                | (
+                    EnvironmentIdentifierOperationIr::Call {
+                        direct_eval: None,
+                        ..
+                    },
+                    "call"
+                )
+        ));
+        if matches!(name, "read" | "deep") {
+            assert_eq!(value.kind, ValueKind::Dynamic);
+            assert_eq!(value.possible_kinds, KindSet::all_runtime_tags());
+            assert_eq!(value.function_targets, FunctionTargetKnowledge::unknown());
+            assert!(value.heap_shape.is_none());
+        }
+    }
+}
+
+#[test]
+fn module_global_start_proof_excludes_eval_parameter_scopes_and_implicit_arguments() {
+    for source in [
+        "export function read() { eval(''); return external; }",
+        "export function read() { return external; } export function unrelated() { eval(''); }",
+        "export function read(value = 0) { return external; }",
+        "export function read(...values) { return external; }",
+        "export function read({value}) { return external; }",
+        "export function read() { return arguments; }",
+    ] {
+        let program = lower_module(source);
+        let (_, _, reference) = module_capture_reference(&program, "read");
+        assert_eq!(
+            reference.resolution_start(),
+            EnvironmentIdentifierResolutionStart::CurrentEnvironment,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn module_global_start_proof_respects_closure_lexical_and_function_bindings() {
+    for source in [
+        "export function make() { function read() { return later; } let later = 1; return read; }",
+        "export const holder = function read() { return read; };",
+        "export function make() { function target() {} return function read() { return target; }; }",
+    ] {
+        let program = lower_module(source);
+        let (_, _, reference) = module_capture_reference(&program, "read");
+        assert_ne!(
+            reference.resolution_start(),
+            EnvironmentIdentifierResolutionStart::GlobalEnvironment,
             "{source}"
         );
     }
@@ -369,12 +475,13 @@ fn module_private_locals_do_not_inherit_arguments_storage_requirements() {
                 .captured_bindings
                 .iter()
                 .all(|binding| binding.name != *storage));
-            assert!(
+            assert_eq!(
                 function
                     .owned_env_bindings
                     .iter()
                     .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
-                "local promotion must retain the live arguments cell: {function:?}"
+                name == "snapshot",
+                "retain the arguments cell exactly when this owner observes it: {function:?}"
             );
             if name != "parameter" {
                 assert_eq!(value.kind, ValueKind::Number);
@@ -382,4 +489,133 @@ fn module_private_locals_do_not_inherit_arguments_storage_requirements() {
             }
         }
     }
+}
+
+#[test]
+fn module_synthetic_cells_are_omitted_for_unobserved_arguments_and_direct_entry_values() {
+    let program = lower_module(
+        "export function frame(row) { return row.x; } export function context() { return [this, new.target]; }",
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    for function in &program.script.as_ref().unwrap().functions {
+        if !["frame", "context"].contains(&function.name.as_str()) {
+            continue;
+        }
+        assert!(function.owned_env_bindings.is_empty(), "{function:?}");
+        assert!(function.eval_environment.is_none(), "{function:?}");
+    }
+}
+
+#[test]
+fn module_synthetic_cell_capture_discovery_keeps_real_context_and_adjusts_hops() {
+    let program = lower_module(
+        r#"
+        export function context(value) { return () => [this, new.target, arguments[0], value]; }
+        export function make(value) {
+            function middle() { return () => value; }
+            return middle;
+        }
+    "#,
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let functions = &program.script.as_ref().unwrap().functions;
+    let context = functions
+        .iter()
+        .find(|function| function.name == "context")
+        .unwrap();
+    for name in [
+        LEXICAL_THIS_NAME,
+        LEXICAL_NEW_TARGET_NAME,
+        LEXICAL_ARGUMENTS_NAME,
+    ] {
+        assert!(
+            context
+                .owned_env_bindings
+                .iter()
+                .any(|binding| binding.name == name),
+            "{name}: {context:?}"
+        );
+        assert!(
+            functions.iter().any(
+                |function| function.protocol.flavor() == FunctionFlavor::Arrow
+                    && function
+                        .captured_bindings
+                        .iter()
+                        .any(|binding| binding.source_name == name)
+            ),
+            "{name}"
+        );
+    }
+    let middle = functions
+        .iter()
+        .find(|function| function.name == "middle")
+        .unwrap();
+    assert!(middle.owned_env_bindings.is_empty(), "{middle:?}");
+    assert!(middle.eval_environment.is_none(), "{middle:?}");
+    let capture = functions
+        .iter()
+        .filter(|function| {
+            function.protocol.flavor() == FunctionFlavor::Arrow
+                && !function.captures_lexical_arguments
+        })
+        .flat_map(|function| &function.captured_bindings)
+        .find(|binding| binding.source_name == "value")
+        .expect("the arrow below middle captures make's parameter");
+    assert_eq!(
+        capture.hops, 1,
+        "only the arrow's own retained record precedes make"
+    );
+}
+
+#[test]
+fn module_synthetic_cell_pruning_retains_arguments_observers_and_dynamic_owners() {
+    for source in [
+        "export function read() { return arguments; }",
+        "export function read() { return {arguments}; }",
+        "export function read() { return function() { return arguments; }; }",
+        "export function read() { return () => arguments; }",
+        "export function read($arguments) { return $arguments; }",
+        "export function read() { return eval('arguments'); }",
+        "export function read(value) { return () => eval('arguments[0]'); }",
+        "export function read(value) { const parent = () => arguments[0]; return function() { return eval('parent()'); }; }",
+        "export function read(value) { return (() => ((eval))('arguments[0]'))(); }",
+        "export function read(value = 1) { return value; }",
+        "export async function read() { return 1; }",
+        "export function* read() { yield 1; }",
+    ] {
+        let program = lower_module(source);
+        assert!(
+            program.is_wasm_supported(),
+            "{source}: {:?}",
+            program.diagnostics
+        );
+        let function = program
+            .script
+            .as_ref()
+            .unwrap()
+            .functions
+            .iter()
+            .find(|function| function.name == "read")
+            .unwrap();
+        assert!(
+            function
+                .owned_env_bindings
+                .iter()
+                .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
+            "{source}: {function:?}"
+        );
+    }
+    let program = lower_module("export function read($this) { return $this; }");
+    let function = program
+        .script
+        .as_ref()
+        .unwrap()
+        .functions
+        .iter()
+        .find(|function| function.name == "read")
+        .unwrap();
+    assert!(function
+        .owned_env_bindings
+        .iter()
+        .any(|binding| binding.name == LEXICAL_THIS_NAME));
 }

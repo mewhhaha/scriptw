@@ -1,1003 +1,3313 @@
 {
-  "baseline_program_bytes": 7653675,
-  "baseline_program_sha256": "a19779bb0a6df8782d895c346c1b9e3e1e1e9ffbab48222d5f59257a9daa140d",
-  "body_bytes": 5830014,
-  "categories": {
-    "main": {
-      "body_bytes": 37475,
-      "functions": 1
-    },
-    "program-initialize": {
-      "body_bytes": 699,
-      "functions": 1
-    },
-    "runtime-helper": {
-      "body_bytes": 69328,
-      "functions": 18
-    },
-    "script": {
-      "body_bytes": 5722512,
-      "functions": 308
-    }
-  },
-  "category_deltas": {
-    "main": {
-      "delta_bytes": 0,
-      "new_body_bytes": 37475,
-      "old_body_bytes": 37475
-    },
-    "program-initialize": {
-      "delta_bytes": 0,
-      "new_body_bytes": 699,
-      "old_body_bytes": 699
-    },
-    "runtime-helper": {
-      "delta_bytes": 0,
-      "new_body_bytes": 69328,
-      "old_body_bytes": 69328
-    },
-    "script": {
-      "delta_bytes": -709686,
-      "new_body_bytes": 5722512,
-      "old_body_bytes": 6432198
-    }
-  },
-  "data_segments": [
-    {
-      "bytes": 143192,
-      "delta_bytes": -526192,
-      "index": 0,
-      "old_bytes": 669384,
-      "role": "pooled UTF-16"
-    },
-    {
-      "bytes": 335174,
-      "delta_bytes": 0,
-      "index": 1,
-      "old_bytes": 335174,
-      "role": "metadata including byte-oriented string image"
-    },
-    {
-      "bytes": 11844,
-      "delta_bytes": 0,
-      "index": 2,
-      "old_bytes": 11844,
-      "role": "literal descriptors"
-    },
-    {
-      "bytes": 0,
-      "delta_bytes": 0,
-      "index": 3,
-      "old_bytes": 0,
-      "role": "compact array recipes"
-    }
-  ],
-  "date": "2026-11-03",
-  "defined_functions": 328,
-  "evidence": {
-    "archive": "rsc-final-evidence-2026-11-03.tar.xz",
-    "archive_member_prefix": "verification/final/size/",
-    "measured_campaign": "rsc-current.json",
-    "prior_campaign": "rsc-initial-20261103.json",
-    "reproduction": "Use the exact frozen compiler/source reconstruction in the evidence archive; the GDB capture stops before native compilation. Binary payloads are not published."
-  },
-  "first_trial_comparison": {
-    "categories": {
-      "main": {
-        "delta_bytes": 0,
-        "new_body_bytes": 37475,
-        "old_body_bytes": 37475
-      },
-      "program-initialize": {
-        "delta_bytes": 0,
-        "new_body_bytes": 699,
-        "old_body_bytes": 699
-      },
-      "runtime-helper": {
-        "delta_bytes": 0,
-        "new_body_bytes": 69328,
-        "old_body_bytes": 69328
-      },
-      "script": {
-        "delta_bytes": -1013807,
-        "new_body_bytes": 5722512,
-        "old_body_bytes": 6736319
-      }
-    },
-    "largest_body_reductions": [
-      {
-        "delta_bytes": -85562,
-        "kind": "script",
-        "name": "js::vn#f133",
-        "new_bytes": 340194,
-        "new_locals": 324,
-        "old_bytes": 425756,
-        "old_locals": 313
-      },
-      {
-        "delta_bytes": -55385,
-        "kind": "script",
-        "name": "js::no#f194",
-        "new_bytes": 137482,
-        "new_locals": 255,
-        "old_bytes": 192867,
-        "old_locals": 243
-      },
-      {
-        "delta_bytes": -29514,
-        "kind": "script",
-        "name": "js::ft#f123",
-        "new_bytes": 98365,
-        "new_locals": 247,
-        "old_bytes": 127879,
-        "old_locals": 240
-      },
-      {
-        "delta_bytes": -29106,
-        "kind": "script",
-        "name": "js::j#f104",
-        "new_bytes": 60922,
-        "new_locals": 235,
-        "old_bytes": 90028,
-        "old_locals": 230
-      },
-      {
-        "delta_bytes": -28885,
-        "kind": "script",
-        "name": "js::gn#f184",
-        "new_bytes": 94250,
-        "new_locals": 265,
-        "old_bytes": 123135,
-        "old_locals": 255
-      },
-      {
-        "delta_bytes": -26502,
-        "kind": "script",
-        "name": "js::dn#f151",
-        "new_bytes": 77444,
-        "new_locals": 227,
-        "old_bytes": 103946,
-        "old_locals": 220
-      },
-      {
-        "delta_bytes": -26109,
-        "kind": "script",
-        "name": "js::Jt#f127",
-        "new_bytes": 82948,
-        "new_locals": 243,
-        "old_bytes": 109057,
-        "old_locals": 235
-      },
-      {
-        "delta_bytes": -24123,
-        "kind": "script",
-        "name": "js::Ii#f91",
-        "new_bytes": 96414,
-        "new_locals": 242,
-        "old_bytes": 120537,
-        "old_locals": 233
-      },
-      {
-        "delta_bytes": -23477,
-        "kind": "script",
-        "name": "js::en#f25",
-        "new_bytes": 76945,
-        "new_locals": 292,
-        "old_bytes": 100422,
-        "old_locals": 280
-      },
-      {
-        "delta_bytes": -23083,
-        "kind": "script",
-        "name": "js::Or#f181",
-        "new_bytes": 60996,
-        "new_locals": 254,
-        "old_bytes": 84079,
-        "old_locals": 238
-      },
-      {
-        "delta_bytes": -22684,
-        "kind": "script",
-        "name": "js::lt#f138",
-        "new_bytes": 38487,
-        "new_locals": 190,
-        "old_bytes": 61171,
-        "old_locals": 185
-      },
-      {
-        "delta_bytes": -19346,
-        "kind": "script",
-        "name": "js::Sr#f144",
-        "new_bytes": 61175,
-        "new_locals": 224,
-        "old_bytes": 80521,
-        "old_locals": 213
-      },
-      {
-        "delta_bytes": -17505,
-        "kind": "script",
-        "name": "js::f38",
-        "new_bytes": 53854,
-        "new_locals": 186,
-        "old_bytes": 71359,
-        "old_locals": 186
-      },
-      {
-        "delta_bytes": -16906,
-        "kind": "script",
-        "name": "js::i#f228",
-        "new_bytes": 43143,
-        "new_locals": 213,
-        "old_bytes": 60049,
-        "old_locals": 211
-      },
-      {
-        "delta_bytes": -16542,
-        "kind": "script",
-        "name": "js::Gn#f178",
-        "new_bytes": 46442,
-        "new_locals": 203,
-        "old_bytes": 62984,
-        "old_locals": 195
-      }
-    ],
-    "program_bytes": 7396441,
-    "program_delta_bytes": -1023487,
-    "program_sha256": "cc12bccd9e9e8fe0c829ed58289f40a50aa51adea2e51b1a2811a80537082f06",
-    "sections": [
-      {
-        "delta_bytes": 0,
-        "id": 1,
-        "name": null,
-        "new_bytes": 7210,
-        "old_bytes": 7210
-      },
-      {
-        "delta_bytes": 0,
-        "id": 2,
-        "name": null,
-        "new_bytes": 4344,
-        "old_bytes": 4344
-      },
-      {
-        "delta_bytes": 0,
-        "id": 3,
-        "name": null,
-        "new_bytes": 345,
-        "old_bytes": 345
-      },
-      {
-        "delta_bytes": 0,
-        "id": 6,
-        "name": null,
-        "new_bytes": 3,
-        "old_bytes": 3
-      },
-      {
-        "delta_bytes": 0,
-        "id": 7,
-        "name": null,
-        "new_bytes": 285,
-        "old_bytes": 285
-      },
-      {
-        "delta_bytes": 0,
-        "id": 9,
-        "name": null,
-        "new_bytes": 737,
-        "old_bytes": 737
-      },
-      {
-        "delta_bytes": 0,
-        "id": 12,
-        "name": null,
-        "new_bytes": 3,
-        "old_bytes": 3
-      },
-      {
-        "delta_bytes": -1013815,
-        "id": 10,
-        "name": null,
-        "new_bytes": 5830771,
-        "old_bytes": 6844586
-      },
-      {
-        "delta_bytes": 0,
-        "id": 11,
-        "name": null,
-        "new_bytes": 490228,
-        "old_bytes": 490228
-      },
-      {
-        "delta_bytes": 0,
-        "id": 0,
-        "name": "scriptw.runtime.source-compilation.v1",
-        "new_bytes": 41,
-        "old_bytes": 41
-      },
-      {
-        "delta_bytes": 0,
-        "id": 0,
-        "name": "name",
-        "new_bytes": 4659,
-        "old_bytes": 4659
-      },
-      {
-        "delta_bytes": -9672,
-        "id": 0,
-        "name": "scriptw.native_program.literal_operands",
-        "new_bytes": 34320,
-        "old_bytes": 43992
-      }
-    ]
-  },
-  "identical_body_counts": {
-    "main": 1,
-    "program-initialize": 1,
-    "runtime-helper": 18,
-    "script": 41
-  },
-  "imported_functions": 132,
-  "largest_body_increases": [
-    {
-      "delta_bytes": 563,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Gi#f130",
-      "new_bytes": 32108,
-      "new_locals": 206,
-      "old_bytes": 31545,
-      "old_locals": 204
-    },
-    {
-      "delta_bytes": 430,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Cr#f158",
-      "new_bytes": 13465,
-      "new_locals": 177,
-      "old_bytes": 13035,
-      "old_locals": 177
-    },
-    {
-      "delta_bytes": 348,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Ir#f179",
-      "new_bytes": 9885,
-      "new_locals": 147,
-      "old_bytes": 9537,
-      "old_locals": 147
-    },
-    {
-      "delta_bytes": 320,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::R#f153",
-      "new_bytes": 13299,
-      "new_locals": 154,
-      "old_bytes": 12979,
-      "old_locals": 154
-    },
-    {
-      "delta_bytes": 134,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::pr#f152",
-      "new_bytes": 10138,
-      "new_locals": 155,
-      "old_bytes": 10004,
-      "old_locals": 155
-    },
-    {
-      "delta_bytes": 53,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Qt#f161",
-      "new_bytes": 11664,
-      "new_locals": 152,
-      "old_bytes": 11611,
-      "old_locals": 151
-    },
-    {
-      "delta_bytes": 22,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Yi#f110",
-      "new_bytes": 40011,
-      "new_locals": 226,
-      "old_bytes": 39989,
-      "old_locals": 227
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::f71",
-      "new_bytes": 361733,
-      "new_locals": 596,
-      "old_bytes": 361733,
-      "old_locals": 596
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": true,
-      "kind": "script",
-      "name": "js::f15",
-      "new_bytes": 101329,
-      "new_locals": 224,
-      "old_bytes": 101329,
-      "old_locals": 224
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::f304",
-      "new_bytes": 88688,
-      "new_locals": 220,
-      "old_bytes": 88688,
-      "old_locals": 220
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::f6",
-      "new_bytes": 40539,
-      "new_locals": 199,
-      "old_bytes": 40539,
-      "old_locals": 199
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": true,
-      "kind": "main",
-      "name": "scriptw::main",
-      "new_bytes": 37475,
-      "new_locals": 161,
-      "old_bytes": 37475,
-      "old_locals": 161
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": true,
-      "kind": "script",
-      "name": "js::f60",
-      "new_bytes": 25661,
-      "new_locals": 153,
-      "old_bytes": 25661,
-      "old_locals": 153
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::f303",
-      "new_bytes": 22488,
-      "new_locals": 126,
-      "old_bytes": 22488,
-      "old_locals": 126
-    },
-    {
-      "delta_bytes": 0,
-      "encoded_body_identical": true,
-      "kind": "script",
-      "name": "js::Gr#f12",
-      "new_bytes": 19911,
-      "new_locals": 218,
-      "old_bytes": 19911,
-      "old_locals": 218
-    }
-  ],
-  "largest_body_reductions": [
-    {
-      "delta_bytes": -56252,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::vn#f133",
-      "new_bytes": 340194,
-      "new_locals": 324,
-      "old_bytes": 396446,
-      "old_locals": 313
-    },
-    {
-      "delta_bytes": -37237,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::no#f194",
-      "new_bytes": 137482,
-      "new_locals": 255,
-      "old_bytes": 174719,
-      "old_locals": 243
-    },
-    {
-      "delta_bytes": -21822,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::j#f104",
-      "new_bytes": 60922,
-      "new_locals": 235,
-      "old_bytes": 82744,
-      "old_locals": 230
-    },
-    {
-      "delta_bytes": -20509,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::gn#f184",
-      "new_bytes": 94250,
-      "new_locals": 265,
-      "old_bytes": 114759,
-      "old_locals": 255
-    },
-    {
-      "delta_bytes": -19259,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::dn#f151",
-      "new_bytes": 77444,
-      "new_locals": 227,
-      "old_bytes": 96703,
-      "old_locals": 221
-    },
-    {
-      "delta_bytes": -19075,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Jt#f127",
-      "new_bytes": 82948,
-      "new_locals": 243,
-      "old_bytes": 102023,
-      "old_locals": 238
-    },
-    {
-      "delta_bytes": -18457,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::ft#f123",
-      "new_bytes": 98365,
-      "new_locals": 247,
-      "old_bytes": 116822,
-      "old_locals": 240
-    },
-    {
-      "delta_bytes": -17131,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Or#f181",
-      "new_bytes": 60996,
-      "new_locals": 254,
-      "old_bytes": 78127,
-      "old_locals": 238
-    },
-    {
-      "delta_bytes": -17056,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::lt#f138",
-      "new_bytes": 38487,
-      "new_locals": 190,
-      "old_bytes": 55543,
-      "old_locals": 186
-    },
-    {
-      "delta_bytes": -15619,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::en#f25",
-      "new_bytes": 76945,
-      "new_locals": 292,
-      "old_bytes": 92564,
-      "old_locals": 280
-    },
-    {
-      "delta_bytes": -15296,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Ii#f91",
-      "new_bytes": 96414,
-      "new_locals": 242,
-      "old_bytes": 111710,
-      "old_locals": 233
-    },
-    {
-      "delta_bytes": -13237,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Sr#f144",
-      "new_bytes": 61175,
-      "new_locals": 224,
-      "old_bytes": 74412,
-      "old_locals": 214
-    },
-    {
-      "delta_bytes": -13177,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::i#f228",
-      "new_bytes": 43143,
-      "new_locals": 213,
-      "old_bytes": 56320,
-      "old_locals": 212
-    },
-    {
-      "delta_bytes": -13073,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::f38",
-      "new_bytes": 53854,
-      "new_locals": 186,
-      "old_bytes": 66927,
-      "old_locals": 186
-    },
-    {
-      "delta_bytes": -12582,
-      "encoded_body_identical": false,
-      "kind": "script",
-      "name": "js::Gn#f178",
-      "new_bytes": 46442,
-      "new_locals": 203,
-      "old_bytes": 59024,
-      "old_locals": 195
-    }
-  ],
-  "largest_functions": [
-    {
-      "bytes": 361733,
-      "index": 428,
-      "kind": "script",
-      "locals": 596,
-      "name": "js::f71",
-      "ordinal": 296,
-      "start": 5176424
-    },
-    {
-      "bytes": 340194,
-      "index": 327,
-      "kind": "script",
-      "locals": 324,
-      "name": "js::vn#f133",
-      "ordinal": 195,
-      "start": 2976127
-    },
-    {
-      "bytes": 137482,
-      "index": 420,
-      "kind": "script",
-      "locals": 255,
-      "name": "js::no#f194",
-      "ordinal": 288,
-      "start": 4958234
-    },
-    {
-      "bytes": 101329,
-      "index": 184,
-      "kind": "script",
-      "locals": 224,
-      "name": "js::f15",
-      "ordinal": 52,
-      "start": 555192
-    },
-    {
-      "bytes": 98365,
-      "index": 314,
-      "kind": "script",
-      "locals": 247,
-      "name": "js::ft#f123",
-      "ordinal": 182,
-      "start": 2632384
-    },
-    {
-      "bytes": 96414,
-      "index": 262,
-      "kind": "script",
-      "locals": 242,
-      "name": "js::Ii#f91",
-      "ordinal": 130,
-      "start": 1605998
-    },
-    {
-      "bytes": 94250,
-      "index": 395,
-      "kind": "script",
-      "locals": 265,
-      "name": "js::gn#f184",
-      "ordinal": 263,
-      "start": 4535531
-    },
-    {
-      "bytes": 88688,
-      "index": 432,
-      "kind": "script",
-      "locals": 220,
-      "name": "js::f304",
-      "ordinal": 300,
-      "start": 5578781
-    },
-    {
-      "bytes": 82948,
-      "index": 318,
-      "kind": "script",
-      "locals": 243,
-      "name": "js::Jt#f127",
-      "ordinal": 186,
-      "start": 2748615
-    },
-    {
-      "bytes": 77444,
-      "index": 345,
-      "kind": "script",
-      "locals": 227,
-      "name": "js::dn#f151",
-      "ordinal": 213,
-      "start": 3665174
-    },
-    {
-      "bytes": 76945,
-      "index": 176,
-      "kind": "script",
-      "locals": 292,
-      "name": "js::en#f25",
-      "ordinal": 44,
-      "start": 410849
-    },
-    {
-      "bytes": 63948,
-      "index": 307,
-      "kind": "script",
-      "locals": 214,
-      "name": "js::et#f119",
-      "ordinal": 175,
-      "start": 2514878
-    },
-    {
-      "bytes": 63345,
-      "index": 286,
-      "kind": "script",
-      "locals": 214,
-      "name": "js::Ht#f108",
-      "ordinal": 154,
-      "start": 2036966
-    },
-    {
-      "bytes": 62572,
-      "index": 336,
-      "kind": "script",
-      "locals": 177,
-      "name": "js::Er#f142",
-      "ordinal": 204,
-      "start": 3474839
-    },
-    {
-      "bytes": 61175,
-      "index": 338,
-      "kind": "script",
-      "locals": 224,
-      "name": "js::Sr#f144",
-      "ordinal": 206,
-      "start": 3549114
-    }
-  ],
-  "limits": "Static encoded-byte accounting, including section headers. Capture stopped before native compilation. Not runtime shares, allocation counts, or causal isolation of individual source changes.",
-  "measured_inputs": {
-    "executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
-    "inputs": {
-      "adapted_source_bytes": 64946,
-      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-      "source_bytes": 64835,
-      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-      "versions": {
-        "esbuild": "0.28.2",
-        "playwright": "1.64.1",
-        "react": "19.3.1",
-        "react-dom": "19.3.1",
-        "react-server-dom-webpack": "19.3.1"
-      },
-      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-    },
-    "program_wasm_bytes": 6372954,
-    "program_wasm_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
-    "runtime": {
-      "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
-      "wasm_bytes": 39380016,
-      "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
-    },
-    "source_fingerprint": "083d9dd79f512925074b1089f3966d404c8faf75d9c118cd4dd299a4f61da9d5"
-  },
-  "program_bytes": 6372954,
-  "program_delta_bytes": -1280721,
-  "program_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
   "schema": "scriptw-rsc-wasm-size-current-v1",
-  "section_deltas": [
-    {
-      "delta_bytes": 0,
-      "id": 1,
-      "name": null,
-      "new_bytes": 7210,
-      "old_bytes": 7210
+  "date": "2026-11-03",
+  "evidence": {
+    "archive": "situations-evidence-2026-11-03.tar.xz",
+    "archive_member_prefix": "additional-evidence/target/performance-climb-env-20261103/size/",
+    "measured_campaign": "rsc-current.json",
+    "reproduction": "Reconstruct the final archived source snapshot and Cargo producer; link the archived diagnostic against that Engine library, then validate emitted bytes against the measured campaign. Binary payloads are excluded."
+  },
+  "measurement": "static encoded-byte accounting for final current RSC raw P",
+  "aggregate": {
+    "path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/aggregate.json",
+    "sha256": "45ea0ca41feb109f80d4c4599f6ef0f6dba4a8151920e39579446b75576bcb0f",
+    "campaign_path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/campaign.json",
+    "campaign_sha256": "7c47b6cb118e0a4a5e7f38e43764bd26382a5b0f652559aa93401196be6a5205"
+  },
+  "first_candidate_process": {
+    "path": "/home/jacobt/src/scriptw/target/performance-climb-env-20261103/fast-comparison-campaign/block-0-0-candidate/report.json",
+    "report_sha256": "93d9ab0cc54e331ef4e58d34fc397cc0569be1974a4ad50f205010f2809e10f5",
+    "program_wasm_bytes": 6071770,
+    "program_wasm_sha256": "81c25514f3d9168718cc5c9fa75610f341200112909354a0d4c2aaa4441fe71b"
+  },
+  "compiler": {
+    "source_commit": "6d5820654208656e7b0038d313b2b0737cb61ae9",
+    "source_fingerprint": "95406a463ea5257413ccacdc0ab928f10569538149ca45d8ede4d0f4cde5e17e",
+    "executable_sha256": "fe9cf940aef8bc0b04cb8c5dfb775b9a962d6fd51246dd939a27fd68d4fbb627",
+    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+    "toolchain": {
+      "opt_level": "3",
+      "profile": "release",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+      "target": "x86_64-unknown-linux-gnu"
     },
-    {
-      "delta_bytes": 0,
-      "id": 2,
-      "name": null,
-      "new_bytes": 4344,
-      "old_bytes": 4344
-    },
-    {
-      "delta_bytes": 0,
-      "id": 3,
-      "name": null,
-      "new_bytes": 345,
-      "old_bytes": 345
-    },
-    {
-      "delta_bytes": 0,
-      "id": 6,
-      "name": null,
-      "new_bytes": 3,
-      "old_bytes": 3
-    },
-    {
-      "delta_bytes": 0,
-      "id": 7,
-      "name": null,
-      "new_bytes": 285,
-      "old_bytes": 285
-    },
-    {
-      "delta_bytes": 0,
-      "id": 9,
-      "name": null,
-      "new_bytes": 737,
-      "old_bytes": 737
-    },
-    {
-      "delta_bytes": 0,
-      "id": 12,
-      "name": null,
-      "new_bytes": 3,
-      "old_bytes": 3
-    },
-    {
-      "delta_bytes": -709692,
-      "id": 10,
-      "name": null,
-      "new_bytes": 5830771,
-      "old_bytes": 6540463
-    },
-    {
-      "delta_bytes": -526192,
-      "id": 11,
-      "name": null,
-      "new_bytes": 490228,
-      "old_bytes": 1016420
-    },
-    {
-      "delta_bytes": 0,
-      "id": 0,
-      "name": "scriptw.runtime.source-compilation.v1",
-      "new_bytes": 41,
-      "old_bytes": 41
-    },
-    {
-      "delta_bytes": 0,
-      "id": 0,
-      "name": "name",
-      "new_bytes": 4659,
-      "old_bytes": 4659
-    },
-    {
-      "delta_bytes": -44837,
-      "id": 0,
-      "name": "scriptw.native_program.literal_operands",
-      "new_bytes": 34320,
-      "old_bytes": 79157
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "None",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "SinglePass",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
     }
-  ],
+  },
+  "inputs": {
+    "adapted_source_bytes": 64946,
+    "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+    "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+    "source_bytes": 64835,
+    "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+    "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+    "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+    "versions": {
+      "esbuild": "0.28.2",
+      "playwright": "1.64.1",
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "react-server-dom-webpack": "19.3.1"
+    },
+    "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+  },
+  "runtime_key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
+  "runtime_wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61",
+  "runtime_wasm_bytes": 39380016,
+  "program_wasm_bytes": 6071770,
+  "program_wasm_sha256": "81c25514f3d9168718cc5c9fa75610f341200112909354a0d4c2aaa4441fe71b",
+  "wasm_header_bytes": 8,
+  "sections_total_bytes": 6071762,
+  "accounted_program_bytes": 6071770,
   "sections": [
     {
       "id": 1,
+      "start": 8,
       "payload_bytes": 7207,
       "section_header_bytes": 3,
-      "start": 8,
       "total_bytes": 7210
     },
     {
       "id": 2,
+      "start": 7218,
       "payload_bytes": 4341,
       "section_header_bytes": 3,
-      "start": 7218,
       "total_bytes": 4344
     },
     {
       "id": 3,
+      "start": 11562,
       "payload_bytes": 342,
       "section_header_bytes": 3,
-      "start": 11562,
       "total_bytes": 345
     },
     {
       "id": 6,
+      "start": 11907,
       "payload_bytes": 1,
       "section_header_bytes": 2,
-      "start": 11907,
       "total_bytes": 3
     },
     {
       "id": 7,
+      "start": 11910,
       "payload_bytes": 282,
       "section_header_bytes": 3,
-      "start": 11910,
       "total_bytes": 285
     },
     {
       "id": 9,
+      "start": 12195,
       "payload_bytes": 734,
       "section_header_bytes": 3,
-      "start": 12195,
       "total_bytes": 737
     },
     {
       "id": 12,
+      "start": 12932,
       "payload_bytes": 1,
       "section_header_bytes": 2,
-      "start": 12932,
       "total_bytes": 3
     },
     {
       "id": 10,
-      "payload_bytes": 5830766,
-      "section_header_bytes": 5,
       "start": 12935,
-      "total_bytes": 5830771
+      "payload_bytes": 5529582,
+      "section_header_bytes": 5,
+      "total_bytes": 5529587,
+      "function_bodies": 328,
+      "function_body_bytes": 5528837
     },
     {
       "id": 11,
+      "start": 5542522,
       "payload_bytes": 490224,
       "section_header_bytes": 4,
-      "start": 5843706,
-      "total_bytes": 490228
+      "total_bytes": 490228,
+      "data_segments": 4,
+      "data_segment_bytes": 490210
     },
     {
       "id": 0,
-      "name": "scriptw.runtime.source-compilation.v1",
+      "start": 6032750,
       "payload_bytes": 39,
       "section_header_bytes": 2,
-      "start": 6333934,
-      "total_bytes": 41
+      "total_bytes": 41,
+      "name": "scriptw.runtime.source-compilation.v1"
     },
     {
       "id": 0,
-      "name": "name",
+      "start": 6032791,
       "payload_bytes": 4656,
       "section_header_bytes": 3,
-      "start": 6333975,
-      "total_bytes": 4659
+      "total_bytes": 4659,
+      "name": "name"
     },
     {
       "id": 0,
-      "name": "scriptw.native_program.literal_operands",
+      "start": 6037450,
       "payload_bytes": 34316,
       "section_header_bytes": 4,
-      "start": 6338634,
-      "total_bytes": 34320
+      "total_bytes": 34320,
+      "name": "scriptw.native_program.literal_operands"
     }
   ],
-  "string_pool": {
-    "added_literal_contents": 0,
-    "all_literal_contents_match_baseline": true,
-    "changed_literal_ordinals": 13,
-    "count": 987,
-    "logical_utf16_bytes": 669384,
-    "other_metadata_bytes": 480,
-    "physical_utf16_bytes": 143192,
-    "removed_literal_contents": 0,
-    "utf8_wtf8_bytes": 334694
+  "data_segments": [
+    {
+      "index": 0,
+      "flags": 1,
+      "offset": 5542531,
+      "bytes": 143192
+    },
+    {
+      "index": 1,
+      "flags": 1,
+      "offset": 5685727,
+      "bytes": 335174
+    },
+    {
+      "index": 2,
+      "flags": 1,
+      "offset": 6020904,
+      "bytes": 11844
+    },
+    {
+      "index": 3,
+      "flags": 1,
+      "offset": 6032750,
+      "bytes": 0
+    }
+  ],
+  "data_segment_payload_bytes": 490210,
+  "defined_functions": 328,
+  "imported_functions": 132,
+  "function_body_bytes": 5528837,
+  "categories": {
+    "script": {
+      "functions": 308,
+      "body_bytes": 5421335
+    },
+    "main": {
+      "functions": 1,
+      "body_bytes": 37475
+    },
+    "runtime-helper": {
+      "functions": 18,
+      "body_bytes": 69328
+    },
+    "program-initialize": {
+      "functions": 1,
+      "body_bytes": 699
+    }
   },
-  "unchanged_function_count": 71,
-  "wasm_header_bytes": 8
+  "functions": [
+    {
+      "index": 132,
+      "bytes": 37475,
+      "locals": 161,
+      "kind": "main",
+      "name": "scriptw::main",
+      "ordinal": 0,
+      "start": 12945
+    },
+    {
+      "index": 133,
+      "bytes": 699,
+      "locals": 24,
+      "kind": "program-initialize",
+      "name": "scriptw::program_init",
+      "ordinal": 1,
+      "start": 50422
+    },
+    {
+      "index": 134,
+      "bytes": 1348,
+      "locals": 59,
+      "kind": "script",
+      "name": "js::f4",
+      "ordinal": 2,
+      "start": 51123
+    },
+    {
+      "index": 135,
+      "bytes": 1348,
+      "locals": 59,
+      "kind": "script",
+      "name": "js::f5",
+      "ordinal": 3,
+      "start": 52473
+    },
+    {
+      "index": 136,
+      "bytes": 9748,
+      "locals": 161,
+      "kind": "script",
+      "name": "js::f11",
+      "ordinal": 4,
+      "start": 53823
+    },
+    {
+      "index": 137,
+      "bytes": 2228,
+      "locals": 74,
+      "kind": "script",
+      "name": "js::on#f10",
+      "ordinal": 5,
+      "start": 63573
+    },
+    {
+      "index": 138,
+      "bytes": 1979,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::get#f13",
+      "ordinal": 6,
+      "start": 65803
+    },
+    {
+      "index": 139,
+      "bytes": 19911,
+      "locals": 218,
+      "kind": "script",
+      "name": "js::Gr#f12",
+      "ordinal": 7,
+      "start": 67785
+    },
+    {
+      "index": 140,
+      "bytes": 11160,
+      "locals": 169,
+      "kind": "script",
+      "name": "js::bt#f14",
+      "ordinal": 8,
+      "start": 87698
+    },
+    {
+      "index": 141,
+      "bytes": 4254,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f31",
+      "ordinal": 9,
+      "start": 98860
+    },
+    {
+      "index": 142,
+      "bytes": 4551,
+      "locals": 123,
+      "kind": "script",
+      "name": "js::forEach#f30",
+      "ordinal": 10,
+      "start": 103116
+    },
+    {
+      "index": 143,
+      "bytes": 1580,
+      "locals": 69,
+      "kind": "script",
+      "name": "js::f33",
+      "ordinal": 11,
+      "start": 107669
+    },
+    {
+      "index": 144,
+      "bytes": 4422,
+      "locals": 123,
+      "kind": "script",
+      "name": "js::count#f32",
+      "ordinal": 12,
+      "start": 109251
+    },
+    {
+      "index": 145,
+      "bytes": 886,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f35",
+      "ordinal": 13,
+      "start": 113675
+    },
+    {
+      "index": 146,
+      "bytes": 4352,
+      "locals": 126,
+      "kind": "script",
+      "name": "js::toArray#f34",
+      "ordinal": 14,
+      "start": 114563
+    },
+    {
+      "index": 147,
+      "bytes": 5635,
+      "locals": 123,
+      "kind": "script",
+      "name": "js::only#f36",
+      "ordinal": 15,
+      "start": 118917
+    },
+    {
+      "index": 148,
+      "bytes": 53558,
+      "locals": 185,
+      "kind": "script",
+      "name": "js::f38",
+      "ordinal": 16,
+      "start": 124555
+    },
+    {
+      "index": 149,
+      "bytes": 3161,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::f37",
+      "ordinal": 17,
+      "start": 178115
+    },
+    {
+      "index": 150,
+      "bytes": 4154,
+      "locals": 119,
+      "kind": "script",
+      "name": "js::f39",
+      "ordinal": 18,
+      "start": 181278
+    },
+    {
+      "index": 151,
+      "bytes": 718,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f40",
+      "ordinal": 19,
+      "start": 185434
+    },
+    {
+      "index": 152,
+      "bytes": 36233,
+      "locals": 208,
+      "kind": "script",
+      "name": "js::f41",
+      "ordinal": 20,
+      "start": 186155
+    },
+    {
+      "index": 153,
+      "bytes": 31216,
+      "locals": 200,
+      "kind": "script",
+      "name": "js::f42",
+      "ordinal": 21,
+      "start": 222391
+    },
+    {
+      "index": 154,
+      "bytes": 1369,
+      "locals": 60,
+      "kind": "script",
+      "name": "js::f43",
+      "ordinal": 22,
+      "start": 253609
+    },
+    {
+      "index": 155,
+      "bytes": 1914,
+      "locals": 72,
+      "kind": "script",
+      "name": "js::f44",
+      "ordinal": 23,
+      "start": 254980
+    },
+    {
+      "index": 156,
+      "bytes": 3003,
+      "locals": 84,
+      "kind": "script",
+      "name": "js::f45",
+      "ordinal": 24,
+      "start": 256896
+    },
+    {
+      "index": 157,
+      "bytes": 3608,
+      "locals": 105,
+      "kind": "script",
+      "name": "js::f46",
+      "ordinal": 25,
+      "start": 259901
+    },
+    {
+      "index": 158,
+      "bytes": 3930,
+      "locals": 116,
+      "kind": "script",
+      "name": "js::f47",
+      "ordinal": 26,
+      "start": 263511
+    },
+    {
+      "index": 159,
+      "bytes": 4228,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::f48",
+      "ordinal": 27,
+      "start": 267443
+    },
+    {
+      "index": 160,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f49",
+      "ordinal": 28,
+      "start": 271673
+    },
+    {
+      "index": 161,
+      "bytes": 3720,
+      "locals": 113,
+      "kind": "script",
+      "name": "js::f50",
+      "ordinal": 29,
+      "start": 272323
+    },
+    {
+      "index": 162,
+      "bytes": 4228,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::f51",
+      "ordinal": 30,
+      "start": 276045
+    },
+    {
+      "index": 163,
+      "bytes": 12158,
+      "locals": 193,
+      "kind": "script",
+      "name": "js::Qn#f16",
+      "ordinal": 31,
+      "start": 280275
+    },
+    {
+      "index": 164,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::$t#f17",
+      "ordinal": 32,
+      "start": 292435
+    },
+    {
+      "index": 165,
+      "bytes": 7371,
+      "locals": 136,
+      "kind": "script",
+      "name": "js::ni#f18",
+      "ordinal": 33,
+      "start": 293085
+    },
+    {
+      "index": 166,
+      "bytes": 5432,
+      "locals": 143,
+      "kind": "script",
+      "name": "js::jn#f19",
+      "ordinal": 34,
+      "start": 300458
+    },
+    {
+      "index": 167,
+      "bytes": 4722,
+      "locals": 143,
+      "kind": "script",
+      "name": "js::ri#f20",
+      "ordinal": 35,
+      "start": 305892
+    },
+    {
+      "index": 168,
+      "bytes": 5432,
+      "locals": 128,
+      "kind": "script",
+      "name": "js::kn#f21",
+      "ordinal": 36,
+      "start": 310616
+    },
+    {
+      "index": 169,
+      "bytes": 1888,
+      "locals": 81,
+      "kind": "script",
+      "name": "js::f52",
+      "ordinal": 37,
+      "start": 316050
+    },
+    {
+      "index": 170,
+      "bytes": 6625,
+      "locals": 165,
+      "kind": "script",
+      "name": "js::ii#f22",
+      "ordinal": 38,
+      "start": 317940
+    },
+    {
+      "index": 171,
+      "bytes": 9825,
+      "locals": 180,
+      "kind": "script",
+      "name": "js::Zn#f23",
+      "ordinal": 39,
+      "start": 324567
+    },
+    {
+      "index": 172,
+      "bytes": 6092,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f53",
+      "ordinal": 40,
+      "start": 334394
+    },
+    {
+      "index": 173,
+      "bytes": 6092,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f54",
+      "ordinal": 41,
+      "start": 340488
+    },
+    {
+      "index": 174,
+      "bytes": 26596,
+      "locals": 163,
+      "kind": "script",
+      "name": "js::oi#f24",
+      "ordinal": 42,
+      "start": 346583
+    },
+    {
+      "index": 175,
+      "bytes": 886,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f55",
+      "ordinal": 43,
+      "start": 373181
+    },
+    {
+      "index": 176,
+      "bytes": 75875,
+      "locals": 294,
+      "kind": "script",
+      "name": "js::en#f25",
+      "ordinal": 44,
+      "start": 374070
+    },
+    {
+      "index": 177,
+      "bytes": 4080,
+      "locals": 124,
+      "kind": "script",
+      "name": "js::f56",
+      "ordinal": 45,
+      "start": 449947
+    },
+    {
+      "index": 178,
+      "bytes": 6343,
+      "locals": 135,
+      "kind": "script",
+      "name": "js::Tn#f26",
+      "ordinal": 46,
+      "start": 454029
+    },
+    {
+      "index": 179,
+      "bytes": 12277,
+      "locals": 132,
+      "kind": "script",
+      "name": "js::f57",
+      "ordinal": 47,
+      "start": 460374
+    },
+    {
+      "index": 180,
+      "bytes": 12278,
+      "locals": 132,
+      "kind": "script",
+      "name": "js::f58",
+      "ordinal": 48,
+      "start": 472653
+    },
+    {
+      "index": 181,
+      "bytes": 21602,
+      "locals": 162,
+      "kind": "script",
+      "name": "js::ei#f27",
+      "ordinal": 49,
+      "start": 484934
+    },
+    {
+      "index": 182,
+      "bytes": 1008,
+      "locals": 49,
+      "kind": "script",
+      "name": "js::fi#f28",
+      "ordinal": 50,
+      "start": 506538
+    },
+    {
+      "index": 183,
+      "bytes": 1631,
+      "locals": 65,
+      "kind": "script",
+      "name": "js::Jn#f29",
+      "ordinal": 51,
+      "start": 507548
+    },
+    {
+      "index": 184,
+      "bytes": 101329,
+      "locals": 224,
+      "kind": "script",
+      "name": "js::f15",
+      "ordinal": 52,
+      "start": 509182
+    },
+    {
+      "index": 185,
+      "bytes": 3497,
+      "locals": 89,
+      "kind": "script",
+      "name": "js::f59",
+      "ordinal": 53,
+      "start": 610513
+    },
+    {
+      "index": 186,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::r#f63",
+      "ordinal": 54,
+      "start": 614012
+    },
+    {
+      "index": 187,
+      "bytes": 9532,
+      "locals": 144,
+      "kind": "script",
+      "name": "js::f64",
+      "ordinal": 55,
+      "start": 617267
+    },
+    {
+      "index": 188,
+      "bytes": 6048,
+      "locals": 136,
+      "kind": "script",
+      "name": "js::f65",
+      "ordinal": 56,
+      "start": 626801
+    },
+    {
+      "index": 189,
+      "bytes": 33259,
+      "locals": 204,
+      "kind": "script",
+      "name": "js::f66",
+      "ordinal": 57,
+      "start": 632852
+    },
+    {
+      "index": 190,
+      "bytes": 29951,
+      "locals": 191,
+      "kind": "script",
+      "name": "js::f67",
+      "ordinal": 58,
+      "start": 666114
+    },
+    {
+      "index": 191,
+      "bytes": 43678,
+      "locals": 206,
+      "kind": "script",
+      "name": "js::f68",
+      "ordinal": 59,
+      "start": 696068
+    },
+    {
+      "index": 192,
+      "bytes": 31126,
+      "locals": 197,
+      "kind": "script",
+      "name": "js::f69",
+      "ordinal": 60,
+      "start": 739749
+    },
+    {
+      "index": 193,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::G#f61",
+      "ordinal": 61,
+      "start": 770877
+    },
+    {
+      "index": 194,
+      "bytes": 3906,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::bn#f62",
+      "ordinal": 62,
+      "start": 771527
+    },
+    {
+      "index": 195,
+      "bytes": 25661,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::f60",
+      "ordinal": 63,
+      "start": 775436
+    },
+    {
+      "index": 196,
+      "bytes": 3497,
+      "locals": 89,
+      "kind": "script",
+      "name": "js::f70",
+      "ordinal": 64,
+      "start": 801099
+    },
+    {
+      "index": 197,
+      "bytes": 6342,
+      "locals": 123,
+      "kind": "script",
+      "name": "js::f199",
+      "ordinal": 65,
+      "start": 804598
+    },
+    {
+      "index": 198,
+      "bytes": 759,
+      "locals": 44,
+      "kind": "script",
+      "name": "js::value#f200",
+      "ordinal": 66,
+      "start": 810942
+    },
+    {
+      "index": 199,
+      "bytes": 26423,
+      "locals": 242,
+      "kind": "script",
+      "name": "js::get#f201",
+      "ordinal": 67,
+      "start": 811704
+    },
+    {
+      "index": 200,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::set#f202",
+      "ordinal": 68,
+      "start": 838129
+    },
+    {
+      "index": 201,
+      "bytes": 2007,
+      "locals": 87,
+      "kind": "script",
+      "name": "js::get#f203",
+      "ordinal": 69,
+      "start": 841384
+    },
+    {
+      "index": 202,
+      "bytes": 8194,
+      "locals": 147,
+      "kind": "script",
+      "name": "js::getOwnPropertyDescriptor#f204",
+      "ordinal": 70,
+      "start": 843393
+    },
+    {
+      "index": 203,
+      "bytes": 999,
+      "locals": 49,
+      "kind": "script",
+      "name": "js::getPrototypeOf#f205",
+      "ordinal": 71,
+      "start": 851589
+    },
+    {
+      "index": 204,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::set#f206",
+      "ordinal": 72,
+      "start": 852590
+    },
+    {
+      "index": 205,
+      "bytes": 16684,
+      "locals": 186,
+      "kind": "script",
+      "name": "js::get#f207",
+      "ordinal": 73,
+      "start": 855846
+    },
+    {
+      "index": 206,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::set#f208",
+      "ordinal": 74,
+      "start": 872532
+    },
+    {
+      "index": 207,
+      "bytes": 886,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::useCallback#f209",
+      "ordinal": 75,
+      "start": 875787
+    },
+    {
+      "index": 208,
+      "bytes": 1079,
+      "locals": 54,
+      "kind": "script",
+      "name": "js::useMemo#f210",
+      "ordinal": 76,
+      "start": 876675
+    },
+    {
+      "index": 209,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::useDebugValue#f211",
+      "ordinal": 77,
+      "start": 877756
+    },
+    {
+      "index": 210,
+      "bytes": 4889,
+      "locals": 109,
+      "kind": "script",
+      "name": "js::useMemoCache#f212",
+      "ordinal": 78,
+      "start": 878406
+    },
+    {
+      "index": 211,
+      "bytes": 1001,
+      "locals": 49,
+      "kind": "script",
+      "name": "js::useCacheRefresh#f213",
+      "ordinal": 79,
+      "start": 883297
+    },
+    {
+      "index": 212,
+      "bytes": 9308,
+      "locals": 147,
+      "kind": "script",
+      "name": "js::getCacheForType#f214",
+      "ordinal": 80,
+      "start": 884300
+    },
+    {
+      "index": 213,
+      "bytes": 4253,
+      "locals": 114,
+      "kind": "script",
+      "name": "js::cacheSignal#f215",
+      "ordinal": 81,
+      "start": 893610
+    },
+    {
+      "index": 214,
+      "bytes": 42220,
+      "locals": 192,
+      "kind": "script",
+      "name": "js::value#f216",
+      "ordinal": 82,
+      "start": 897866
+    },
+    {
+      "index": 215,
+      "bytes": 718,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f217",
+      "ordinal": 83,
+      "start": 940088
+    },
+    {
+      "index": 216,
+      "bytes": 3170,
+      "locals": 98,
+      "kind": "script",
+      "name": "js::f218",
+      "ordinal": 84,
+      "start": 940808
+    },
+    {
+      "index": 217,
+      "bytes": 1008,
+      "locals": 49,
+      "kind": "script",
+      "name": "js::f219",
+      "ordinal": 85,
+      "start": 943980
+    },
+    {
+      "index": 218,
+      "bytes": 9439,
+      "locals": 136,
+      "kind": "script",
+      "name": "js::f221",
+      "ordinal": 86,
+      "start": 944990
+    },
+    {
+      "index": 219,
+      "bytes": 2902,
+      "locals": 116,
+      "kind": "script",
+      "name": "js::f222",
+      "ordinal": 87,
+      "start": 954431
+    },
+    {
+      "index": 220,
+      "bytes": 25759,
+      "locals": 205,
+      "kind": "script",
+      "name": "js::f220",
+      "ordinal": 88,
+      "start": 957336
+    },
+    {
+      "index": 221,
+      "bytes": 3460,
+      "locals": 128,
+      "kind": "script",
+      "name": "js::f224",
+      "ordinal": 89,
+      "start": 983097
+    },
+    {
+      "index": 222,
+      "bytes": 6150,
+      "locals": 150,
+      "kind": "script",
+      "name": "js::f225",
+      "ordinal": 90,
+      "start": 986559
+    },
+    {
+      "index": 223,
+      "bytes": 25243,
+      "locals": 192,
+      "kind": "script",
+      "name": "js::f223",
+      "ordinal": 91,
+      "start": 992712
+    },
+    {
+      "index": 224,
+      "bytes": 12375,
+      "locals": 178,
+      "kind": "script",
+      "name": "js::f226",
+      "ordinal": 92,
+      "start": 1017957
+    },
+    {
+      "index": 225,
+      "bytes": 41970,
+      "locals": 212,
+      "kind": "script",
+      "name": "js::i#f228",
+      "ordinal": 93,
+      "start": 1030335
+    },
+    {
+      "index": 226,
+      "bytes": 9763,
+      "locals": 145,
+      "kind": "script",
+      "name": "js::o#f229",
+      "ordinal": 94,
+      "start": 1072307
+    },
+    {
+      "index": 227,
+      "bytes": 17537,
+      "locals": 190,
+      "kind": "script",
+      "name": "js::f227",
+      "ordinal": 95,
+      "start": 1082073
+    },
+    {
+      "index": 228,
+      "bytes": 2162,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::pull#f233",
+      "ordinal": 96,
+      "start": 1099612
+    },
+    {
+      "index": 229,
+      "bytes": 4182,
+      "locals": 98,
+      "kind": "script",
+      "name": "js::cancel#f234",
+      "ordinal": 97,
+      "start": 1101776
+    },
+    {
+      "index": 230,
+      "bytes": 6357,
+      "locals": 124,
+      "kind": "script",
+      "name": "js::f232",
+      "ordinal": 98,
+      "start": 1105960
+    },
+    {
+      "index": 231,
+      "bytes": 17046,
+      "locals": 182,
+      "kind": "script",
+      "name": "js::f231",
+      "ordinal": 99,
+      "start": 1112320
+    },
+    {
+      "index": 232,
+      "bytes": 4024,
+      "locals": 99,
+      "kind": "script",
+      "name": "js::f230",
+      "ordinal": 100,
+      "start": 1129368
+    },
+    {
+      "index": 233,
+      "bytes": 2931,
+      "locals": 117,
+      "kind": "script",
+      "name": "js::f235",
+      "ordinal": 101,
+      "start": 1133394
+    },
+    {
+      "index": 234,
+      "bytes": 10654,
+      "locals": 166,
+      "kind": "script",
+      "name": "js::f236",
+      "ordinal": 102,
+      "start": 1136327
+    },
+    {
+      "index": 235,
+      "bytes": 1911,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::start#f238",
+      "ordinal": 103,
+      "start": 1146983
+    },
+    {
+      "index": 236,
+      "bytes": 2144,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::pull#f239",
+      "ordinal": 104,
+      "start": 1148896
+    },
+    {
+      "index": 237,
+      "bytes": 4164,
+      "locals": 98,
+      "kind": "script",
+      "name": "js::cancel#f240",
+      "ordinal": 105,
+      "start": 1151042
+    },
+    {
+      "index": 238,
+      "bytes": 17884,
+      "locals": 193,
+      "kind": "script",
+      "name": "js::f237",
+      "ordinal": 106,
+      "start": 1155209
+    },
+    {
+      "index": 239,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::b#f72",
+      "ordinal": 107,
+      "start": 1173095
+    },
+    {
+      "index": 240,
+      "bytes": 7375,
+      "locals": 136,
+      "kind": "script",
+      "name": "js::rr#f73",
+      "ordinal": 108,
+      "start": 1173745
+    },
+    {
+      "index": 241,
+      "bytes": 2682,
+      "locals": 69,
+      "kind": "script",
+      "name": "js::f241",
+      "ordinal": 109,
+      "start": 1181122
+    },
+    {
+      "index": 242,
+      "bytes": 3743,
+      "locals": 116,
+      "kind": "script",
+      "name": "js::mi#f74",
+      "ordinal": 110,
+      "start": 1183806
+    },
+    {
+      "index": 243,
+      "bytes": 38341,
+      "locals": 205,
+      "kind": "script",
+      "name": "js::or#f75",
+      "ordinal": 111,
+      "start": 1187552
+    },
+    {
+      "index": 244,
+      "bytes": 2267,
+      "locals": 89,
+      "kind": "script",
+      "name": "js::hn#f76",
+      "ordinal": 112,
+      "start": 1225895
+    },
+    {
+      "index": 245,
+      "bytes": 2847,
+      "locals": 115,
+      "kind": "script",
+      "name": "js::C#f77",
+      "ordinal": 113,
+      "start": 1228164
+    },
+    {
+      "index": 246,
+      "bytes": 2099,
+      "locals": 96,
+      "kind": "script",
+      "name": "js::dt#f78",
+      "ordinal": 114,
+      "start": 1231013
+    },
+    {
+      "index": 247,
+      "bytes": 7325,
+      "locals": 129,
+      "kind": "script",
+      "name": "js::er#f79",
+      "ordinal": 115,
+      "start": 1233114
+    },
+    {
+      "index": 248,
+      "bytes": 6172,
+      "locals": 136,
+      "kind": "script",
+      "name": "js::fn#f80",
+      "ordinal": 116,
+      "start": 1240441
+    },
+    {
+      "index": 249,
+      "bytes": 21152,
+      "locals": 174,
+      "kind": "script",
+      "name": "js::fr#f81",
+      "ordinal": 117,
+      "start": 1246616
+    },
+    {
+      "index": 250,
+      "bytes": 3989,
+      "locals": 109,
+      "kind": "script",
+      "name": "js::f242",
+      "ordinal": 118,
+      "start": 1267770
+    },
+    {
+      "index": 251,
+      "bytes": 3251,
+      "locals": 117,
+      "kind": "script",
+      "name": "js::f243",
+      "ordinal": 119,
+      "start": 1271761
+    },
+    {
+      "index": 252,
+      "bytes": 6703,
+      "locals": 165,
+      "kind": "script",
+      "name": "js::f244",
+      "ordinal": 120,
+      "start": 1275014
+    },
+    {
+      "index": 253,
+      "bytes": 59164,
+      "locals": 243,
+      "kind": "script",
+      "name": "js::Lt#f82",
+      "ordinal": 121,
+      "start": 1281720
+    },
+    {
+      "index": 254,
+      "bytes": 12988,
+      "locals": 155,
+      "kind": "script",
+      "name": "js::Ti#f83",
+      "ordinal": 122,
+      "start": 1340886
+    },
+    {
+      "index": 255,
+      "bytes": 16240,
+      "locals": 168,
+      "kind": "script",
+      "name": "js::Ai#f84",
+      "ordinal": 123,
+      "start": 1353876
+    },
+    {
+      "index": 256,
+      "bytes": 28038,
+      "locals": 187,
+      "kind": "script",
+      "name": "js::$n#f85",
+      "ordinal": 124,
+      "start": 1370119
+    },
+    {
+      "index": 257,
+      "bytes": 15886,
+      "locals": 164,
+      "kind": "script",
+      "name": "js::ur#f86",
+      "ordinal": 125,
+      "start": 1398159
+    },
+    {
+      "index": 258,
+      "bytes": 19964,
+      "locals": 176,
+      "kind": "script",
+      "name": "js::bi#f87",
+      "ordinal": 126,
+      "start": 1414048
+    },
+    {
+      "index": 259,
+      "bytes": 15945,
+      "locals": 164,
+      "kind": "script",
+      "name": "js::Ri#f88",
+      "ordinal": 127,
+      "start": 1434014
+    },
+    {
+      "index": 260,
+      "bytes": 15886,
+      "locals": 164,
+      "kind": "script",
+      "name": "js::$i#f89",
+      "ordinal": 128,
+      "start": 1449961
+    },
+    {
+      "index": 261,
+      "bytes": 6803,
+      "locals": 130,
+      "kind": "script",
+      "name": "js::pn#f90",
+      "ordinal": 129,
+      "start": 1465849
+    },
+    {
+      "index": 262,
+      "bytes": 94419,
+      "locals": 241,
+      "kind": "script",
+      "name": "js::Ii#f91",
+      "ordinal": 130,
+      "start": 1472655
+    },
+    {
+      "index": 263,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::f245",
+      "ordinal": 131,
+      "start": 1567076
+    },
+    {
+      "index": 264,
+      "bytes": 8995,
+      "locals": 159,
+      "kind": "script",
+      "name": "js::Pi#f92",
+      "ordinal": 132,
+      "start": 1570331
+    },
+    {
+      "index": 265,
+      "bytes": 5809,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f246",
+      "ordinal": 133,
+      "start": 1579328
+    },
+    {
+      "index": 266,
+      "bytes": 5809,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::f247",
+      "ordinal": 134,
+      "start": 1585139
+    },
+    {
+      "index": 267,
+      "bytes": 38598,
+      "locals": 190,
+      "kind": "script",
+      "name": "js::Mi#f93",
+      "ordinal": 135,
+      "start": 1590951
+    },
+    {
+      "index": 268,
+      "bytes": 5525,
+      "locals": 101,
+      "kind": "script",
+      "name": "js::ar#f94",
+      "ordinal": 136,
+      "start": 1629551
+    },
+    {
+      "index": 269,
+      "bytes": 2240,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::sr#f95",
+      "ordinal": 137,
+      "start": 1635078
+    },
+    {
+      "index": 270,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::E#f96",
+      "ordinal": 138,
+      "start": 1637320
+    },
+    {
+      "index": 271,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::zi#f97",
+      "ordinal": 139,
+      "start": 1640575
+    },
+    {
+      "index": 272,
+      "bytes": 3253,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::rt#f98",
+      "ordinal": 140,
+      "start": 1643830
+    },
+    {
+      "index": 273,
+      "bytes": 11251,
+      "locals": 179,
+      "kind": "script",
+      "name": "js::Ni#f99",
+      "ordinal": 141,
+      "start": 1647085
+    },
+    {
+      "index": 274,
+      "bytes": 25722,
+      "locals": 187,
+      "kind": "script",
+      "name": "js::xi#f100",
+      "ordinal": 142,
+      "start": 1658339
+    },
+    {
+      "index": 275,
+      "bytes": 9357,
+      "locals": 144,
+      "kind": "script",
+      "name": "js::dr#f101",
+      "ordinal": 143,
+      "start": 1684063
+    },
+    {
+      "index": 276,
+      "bytes": 21673,
+      "locals": 179,
+      "kind": "script",
+      "name": "js::Wt#f102",
+      "ordinal": 144,
+      "start": 1693423
+    },
+    {
+      "index": 277,
+      "bytes": 16946,
+      "locals": 165,
+      "kind": "script",
+      "name": "js::On#f103",
+      "ordinal": 145,
+      "start": 1715099
+    },
+    {
+      "index": 278,
+      "bytes": 60134,
+      "locals": 235,
+      "kind": "script",
+      "name": "js::j#f104",
+      "ordinal": 146,
+      "start": 1732048
+    },
+    {
+      "index": 279,
+      "bytes": 2773,
+      "locals": 113,
+      "kind": "script",
+      "name": "js::Fi#f105",
+      "ordinal": 147,
+      "start": 1792184
+    },
+    {
+      "index": 280,
+      "bytes": 54678,
+      "locals": 257,
+      "kind": "script",
+      "name": "js::hr#f106",
+      "ordinal": 148,
+      "start": 1794960
+    },
+    {
+      "index": 281,
+      "bytes": 4398,
+      "locals": 121,
+      "kind": "script",
+      "name": "js::L#f107",
+      "ordinal": 149,
+      "start": 1849640
+    },
+    {
+      "index": 282,
+      "bytes": 6093,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f248",
+      "ordinal": 150,
+      "start": 1854040
+    },
+    {
+      "index": 283,
+      "bytes": 6093,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f249",
+      "ordinal": 151,
+      "start": 1860135
+    },
+    {
+      "index": 284,
+      "bytes": 4430,
+      "locals": 98,
+      "kind": "script",
+      "name": "js::f250",
+      "ordinal": 152,
+      "start": 1866230
+    },
+    {
+      "index": 285,
+      "bytes": 6584,
+      "locals": 135,
+      "kind": "script",
+      "name": "js::f251",
+      "ordinal": 153,
+      "start": 1870662
+    },
+    {
+      "index": 286,
+      "bytes": 62657,
+      "locals": 213,
+      "kind": "script",
+      "name": "js::Ht#f108",
+      "ordinal": 154,
+      "start": 1877249
+    },
+    {
+      "index": 287,
+      "bytes": 42439,
+      "locals": 194,
+      "kind": "script",
+      "name": "js::i#f252",
+      "ordinal": 155,
+      "start": 1939909
+    },
+    {
+      "index": 288,
+      "bytes": 15508,
+      "locals": 154,
+      "kind": "script",
+      "name": "js::o#f253",
+      "ordinal": 156,
+      "start": 1982350
+    },
+    {
+      "index": 289,
+      "bytes": 23841,
+      "locals": 152,
+      "kind": "script",
+      "name": "js::e#f254",
+      "ordinal": 157,
+      "start": 1997861
+    },
+    {
+      "index": 290,
+      "bytes": 48253,
+      "locals": 243,
+      "kind": "script",
+      "name": "js::Ui#f109",
+      "ordinal": 158,
+      "start": 2021705
+    },
+    {
+      "index": 291,
+      "bytes": 49764,
+      "locals": 218,
+      "kind": "script",
+      "name": "js::o#f255",
+      "ordinal": 159,
+      "start": 2069961
+    },
+    {
+      "index": 292,
+      "bytes": 17913,
+      "locals": 156,
+      "kind": "script",
+      "name": "js::e#f256",
+      "ordinal": 160,
+      "start": 2119728
+    },
+    {
+      "index": 293,
+      "bytes": 27454,
+      "locals": 175,
+      "kind": "script",
+      "name": "js::f#f257",
+      "ordinal": 161,
+      "start": 2137644
+    },
+    {
+      "index": 294,
+      "bytes": 39366,
+      "locals": 224,
+      "kind": "script",
+      "name": "js::Yi#f110",
+      "ordinal": 162,
+      "start": 2165101
+    },
+    {
+      "index": 295,
+      "bytes": 8383,
+      "locals": 166,
+      "kind": "script",
+      "name": "js::_#f111",
+      "ordinal": 163,
+      "start": 2204469
+    },
+    {
+      "index": 296,
+      "bytes": 9246,
+      "locals": 124,
+      "kind": "script",
+      "name": "js::Li#f112",
+      "ordinal": 164,
+      "start": 2212854
+    },
+    {
+      "index": 297,
+      "bytes": 6093,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f258",
+      "ordinal": 165,
+      "start": 2222102
+    },
+    {
+      "index": 298,
+      "bytes": 6093,
+      "locals": 127,
+      "kind": "script",
+      "name": "js::f259",
+      "ordinal": 166,
+      "start": 2228197
+    },
+    {
+      "index": 299,
+      "bytes": 14668,
+      "locals": 172,
+      "kind": "script",
+      "name": "js::Bi#f113",
+      "ordinal": 167,
+      "start": 2234292
+    },
+    {
+      "index": 300,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::Gt#f114",
+      "ordinal": 168,
+      "start": 2248962
+    },
+    {
+      "index": 301,
+      "bytes": 2934,
+      "locals": 111,
+      "kind": "script",
+      "name": "js::f260",
+      "ordinal": 169,
+      "start": 2249612
+    },
+    {
+      "index": 302,
+      "bytes": 2402,
+      "locals": 90,
+      "kind": "script",
+      "name": "js::f261",
+      "ordinal": 170,
+      "start": 2252548
+    },
+    {
+      "index": 303,
+      "bytes": 24095,
+      "locals": 169,
+      "kind": "script",
+      "name": "js::Wi#f115",
+      "ordinal": 171,
+      "start": 2254953
+    },
+    {
+      "index": 304,
+      "bytes": 32798,
+      "locals": 182,
+      "kind": "script",
+      "name": "js::Vt#f116",
+      "ordinal": 172,
+      "start": 2279051
+    },
+    {
+      "index": 305,
+      "bytes": 9834,
+      "locals": 156,
+      "kind": "script",
+      "name": "js::Xt#f117",
+      "ordinal": 173,
+      "start": 2311851
+    },
+    {
+      "index": 306,
+      "bytes": 12226,
+      "locals": 156,
+      "kind": "script",
+      "name": "js::Zt#f118",
+      "ordinal": 174,
+      "start": 2321687
+    },
+    {
+      "index": 307,
+      "bytes": 62820,
+      "locals": 214,
+      "kind": "script",
+      "name": "js::et#f119",
+      "ordinal": 175,
+      "start": 2333916
+    },
+    {
+      "index": 308,
+      "bytes": 1887,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::f262",
+      "ordinal": 176,
+      "start": 2396738
+    },
+    {
+      "index": 309,
+      "bytes": 1887,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::f263",
+      "ordinal": 177,
+      "start": 2398627
+    },
+    {
+      "index": 310,
+      "bytes": 17873,
+      "locals": 177,
+      "kind": "script",
+      "name": "js::Sn#f120",
+      "ordinal": 178,
+      "start": 2400517
+    },
+    {
+      "index": 311,
+      "bytes": 5616,
+      "locals": 148,
+      "kind": "script",
+      "name": "js::P#f121",
+      "ordinal": 179,
+      "start": 2418392
+    },
+    {
+      "index": 312,
+      "bytes": 2208,
+      "locals": 81,
+      "kind": "script",
+      "name": "js::ping#f264",
+      "ordinal": 180,
+      "start": 2424010
+    },
+    {
+      "index": 313,
+      "bytes": 16982,
+      "locals": 206,
+      "kind": "script",
+      "name": "js::Hi#f122",
+      "ordinal": 181,
+      "start": 2426221
+    },
+    {
+      "index": 314,
+      "bytes": 96719,
+      "locals": 250,
+      "kind": "script",
+      "name": "js::ft#f123",
+      "ordinal": 182,
+      "start": 2443206
+    },
+    {
+      "index": 315,
+      "bytes": 3135,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::g#f124",
+      "ordinal": 183,
+      "start": 2539927
+    },
+    {
+      "index": 316,
+      "bytes": 3165,
+      "locals": 121,
+      "kind": "script",
+      "name": "js::q#f125",
+      "ordinal": 184,
+      "start": 2543064
+    },
+    {
+      "index": 317,
+      "bytes": 6022,
+      "locals": 162,
+      "kind": "script",
+      "name": "js::gr#f126",
+      "ordinal": 185,
+      "start": 2546231
+    },
+    {
+      "index": 318,
+      "bytes": 81032,
+      "locals": 246,
+      "kind": "script",
+      "name": "js::Jt#f127",
+      "ordinal": 186,
+      "start": 2552256
+    },
+    {
+      "index": 319,
+      "bytes": 6623,
+      "locals": 159,
+      "kind": "script",
+      "name": "js::k#f128",
+      "ordinal": 187,
+      "start": 2633290
+    },
+    {
+      "index": 320,
+      "bytes": 7226,
+      "locals": 115,
+      "kind": "script",
+      "name": "js::p#f129",
+      "ordinal": 188,
+      "start": 2639915
+    },
+    {
+      "index": 321,
+      "bytes": 20281,
+      "locals": 161,
+      "kind": "script",
+      "name": "js::r#f265",
+      "ordinal": 189,
+      "start": 2647144
+    },
+    {
+      "index": 322,
+      "bytes": 15508,
+      "locals": 154,
+      "kind": "script",
+      "name": "js::i#f266",
+      "ordinal": 190,
+      "start": 2667427
+    },
+    {
+      "index": 323,
+      "bytes": 23843,
+      "locals": 152,
+      "kind": "script",
+      "name": "js::o#f267",
+      "ordinal": 191,
+      "start": 2682938
+    },
+    {
+      "index": 324,
+      "bytes": 31455,
+      "locals": 205,
+      "kind": "script",
+      "name": "js::Gi#f130",
+      "ordinal": 192,
+      "start": 2706784
+    },
+    {
+      "index": 325,
+      "bytes": 2782,
+      "locals": 73,
+      "kind": "script",
+      "name": "js::mn#f131",
+      "ordinal": 193,
+      "start": 2738241
+    },
+    {
+      "index": 326,
+      "bytes": 28766,
+      "locals": 250,
+      "kind": "script",
+      "name": "js::Pn#f132",
+      "ordinal": 194,
+      "start": 2741026
+    },
+    {
+      "index": 327,
+      "bytes": 341345,
+      "locals": 324,
+      "kind": "script",
+      "name": "js::vn#f133",
+      "ordinal": 195,
+      "start": 2769795
+    },
+    {
+      "index": 328,
+      "bytes": 13086,
+      "locals": 168,
+      "kind": "script",
+      "name": "js::B#f134",
+      "ordinal": 196,
+      "start": 3111142
+    },
+    {
+      "index": 329,
+      "bytes": 15421,
+      "locals": 173,
+      "kind": "script",
+      "name": "js::Cn#f135",
+      "ordinal": 197,
+      "start": 3124230
+    },
+    {
+      "index": 330,
+      "bytes": 10378,
+      "locals": 176,
+      "kind": "script",
+      "name": "js::Yn#f136",
+      "ordinal": 198,
+      "start": 3139653
+    },
+    {
+      "index": 331,
+      "bytes": 5540,
+      "locals": 104,
+      "kind": "script",
+      "name": "js::Vi#f137",
+      "ordinal": 199,
+      "start": 3150033
+    },
+    {
+      "index": 332,
+      "bytes": 37799,
+      "locals": 190,
+      "kind": "script",
+      "name": "js::lt#f138",
+      "ordinal": 200,
+      "start": 3155576
+    },
+    {
+      "index": 333,
+      "bytes": 8608,
+      "locals": 170,
+      "kind": "script",
+      "name": "js::yr#f139",
+      "ordinal": 201,
+      "start": 3193377
+    },
+    {
+      "index": 334,
+      "bytes": 37795,
+      "locals": 223,
+      "kind": "script",
+      "name": "js::S#f140",
+      "ordinal": 202,
+      "start": 3201988
+    },
+    {
+      "index": 335,
+      "bytes": 21429,
+      "locals": 198,
+      "kind": "script",
+      "name": "js::mr#f141",
+      "ordinal": 203,
+      "start": 3239786
+    },
+    {
+      "index": 336,
+      "bytes": 62784,
+      "locals": 177,
+      "kind": "script",
+      "name": "js::Er#f142",
+      "ordinal": 204,
+      "start": 3261218
+    },
+    {
+      "index": 337,
+      "bytes": 10886,
+      "locals": 165,
+      "kind": "script",
+      "name": "js::W#f143",
+      "ordinal": 205,
+      "start": 3324004
+    },
+    {
+      "index": 338,
+      "bytes": 59434,
+      "locals": 226,
+      "kind": "script",
+      "name": "js::Sr#f144",
+      "ordinal": 206,
+      "start": 3334893
+    },
+    {
+      "index": 339,
+      "bytes": 5365,
+      "locals": 162,
+      "kind": "script",
+      "name": "js::_r#f145",
+      "ordinal": 207,
+      "start": 3394329
+    },
+    {
+      "index": 340,
+      "bytes": 19391,
+      "locals": 183,
+      "kind": "script",
+      "name": "js::zn#f146",
+      "ordinal": 208,
+      "start": 3399697
+    },
+    {
+      "index": 341,
+      "bytes": 4550,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::St#f147",
+      "ordinal": 209,
+      "start": 3419090
+    },
+    {
+      "index": 342,
+      "bytes": 10895,
+      "locals": 182,
+      "kind": "script",
+      "name": "js::_t#f148",
+      "ordinal": 210,
+      "start": 3423642
+    },
+    {
+      "index": 343,
+      "bytes": 4550,
+      "locals": 120,
+      "kind": "script",
+      "name": "js::an#f149",
+      "ordinal": 211,
+      "start": 3434539
+    },
+    {
+      "index": 344,
+      "bytes": 5170,
+      "locals": 126,
+      "kind": "script",
+      "name": "js::sn#f150",
+      "ordinal": 212,
+      "start": 3439091
+    },
+    {
+      "index": 345,
+      "bytes": 76057,
+      "locals": 228,
+      "kind": "script",
+      "name": "js::dn#f151",
+      "ordinal": 213,
+      "start": 3444264
+    },
+    {
+      "index": 346,
+      "bytes": 3605,
+      "locals": 114,
+      "kind": "script",
+      "name": "js::f268",
+      "ordinal": 214,
+      "start": 3520323
+    },
+    {
+      "index": 347,
+      "bytes": 1887,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::f269",
+      "ordinal": 215,
+      "start": 3523930
+    },
+    {
+      "index": 348,
+      "bytes": 4815,
+      "locals": 122,
+      "kind": "script",
+      "name": "js::f270",
+      "ordinal": 216,
+      "start": 3525819
+    },
+    {
+      "index": 349,
+      "bytes": 9631,
+      "locals": 157,
+      "kind": "script",
+      "name": "js::pr#f152",
+      "ordinal": 217,
+      "start": 3530636
+    },
+    {
+      "index": 350,
+      "bytes": 4178,
+      "locals": 97,
+      "kind": "script",
+      "name": "js::f271",
+      "ordinal": 218,
+      "start": 3540269
+    },
+    {
+      "index": 351,
+      "bytes": 12788,
+      "locals": 155,
+      "kind": "script",
+      "name": "js::R#f153",
+      "ordinal": 219,
+      "start": 3544449
+    },
+    {
+      "index": 352,
+      "bytes": 6346,
+      "locals": 126,
+      "kind": "script",
+      "name": "js::Ln#f154",
+      "ordinal": 220,
+      "start": 3557239
+    },
+    {
+      "index": 353,
+      "bytes": 15977,
+      "locals": 165,
+      "kind": "script",
+      "name": "js::vr#f155",
+      "ordinal": 221,
+      "start": 3563587
+    },
+    {
+      "index": 354,
+      "bytes": 2120,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::f272",
+      "ordinal": 222,
+      "start": 3579566
+    },
+    {
+      "index": 355,
+      "bytes": 11755,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::Xi#f156",
+      "ordinal": 223,
+      "start": 3581688
+    },
+    {
+      "index": 356,
+      "bytes": 2439,
+      "locals": 86,
+      "kind": "script",
+      "name": "js::f273",
+      "ordinal": 224,
+      "start": 3593445
+    },
+    {
+      "index": 357,
+      "bytes": 12131,
+      "locals": 154,
+      "kind": "script",
+      "name": "js::Zi#f157",
+      "ordinal": 225,
+      "start": 3595886
+    },
+    {
+      "index": 358,
+      "bytes": 3545,
+      "locals": 135,
+      "kind": "script",
+      "name": "js::f274",
+      "ordinal": 226,
+      "start": 3608019
+    },
+    {
+      "index": 359,
+      "bytes": 12901,
+      "locals": 178,
+      "kind": "script",
+      "name": "js::Cr#f158",
+      "ordinal": 227,
+      "start": 3611566
+    },
+    {
+      "index": 360,
+      "bytes": 2120,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::f275",
+      "ordinal": 228,
+      "start": 3624469
+    },
+    {
+      "index": 361,
+      "bytes": 2209,
+      "locals": 81,
+      "kind": "script",
+      "name": "js::f276",
+      "ordinal": 229,
+      "start": 3626591
+    },
+    {
+      "index": 362,
+      "bytes": 2439,
+      "locals": 86,
+      "kind": "script",
+      "name": "js::f277",
+      "ordinal": 230,
+      "start": 3628802
+    },
+    {
+      "index": 363,
+      "bytes": 2528,
+      "locals": 82,
+      "kind": "script",
+      "name": "js::f278",
+      "ordinal": 231,
+      "start": 3631243
+    },
+    {
+      "index": 364,
+      "bytes": 43831,
+      "locals": 190,
+      "kind": "script",
+      "name": "js::Nn#f159",
+      "ordinal": 232,
+      "start": 3633774
+    },
+    {
+      "index": 365,
+      "bytes": 24731,
+      "locals": 179,
+      "kind": "script",
+      "name": "js::wr#f160",
+      "ordinal": 233,
+      "start": 3677608
+    },
+    {
+      "index": 366,
+      "bytes": 4047,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::f279",
+      "ordinal": 234,
+      "start": 3702341
+    },
+    {
+      "index": 367,
+      "bytes": 4047,
+      "locals": 85,
+      "kind": "script",
+      "name": "js::f280",
+      "ordinal": 235,
+      "start": 3706390
+    },
+    {
+      "index": 368,
+      "bytes": 11155,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::Qt#f161",
+      "ordinal": 236,
+      "start": 3710439
+    },
+    {
+      "index": 369,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::Ji#f162",
+      "ordinal": 237,
+      "start": 3721596
+    },
+    {
+      "index": 370,
+      "bytes": 2027,
+      "locals": 87,
+      "kind": "script",
+      "name": "js::f281",
+      "ordinal": 238,
+      "start": 3722246
+    },
+    {
+      "index": 371,
+      "bytes": 37080,
+      "locals": 194,
+      "kind": "script",
+      "name": "js::Tr#f163",
+      "ordinal": 239,
+      "start": 3724276
+    },
+    {
+      "index": 372,
+      "bytes": 20274,
+      "locals": 159,
+      "kind": "script",
+      "name": "js::En#f164",
+      "ordinal": 240,
+      "start": 3761359
+    },
+    {
+      "index": 373,
+      "bytes": 37529,
+      "locals": 182,
+      "kind": "script",
+      "name": "js::ct#f165",
+      "ordinal": 241,
+      "start": 3781636
+    },
+    {
+      "index": 374,
+      "bytes": 5544,
+      "locals": 132,
+      "kind": "script",
+      "name": "js::Ar#f166",
+      "ordinal": 242,
+      "start": 3819167
+    },
+    {
+      "index": 375,
+      "bytes": 4758,
+      "locals": 90,
+      "kind": "script",
+      "name": "js::m#f167",
+      "ordinal": 243,
+      "start": 3824713
+    },
+    {
+      "index": 376,
+      "bytes": 9273,
+      "locals": 179,
+      "kind": "script",
+      "name": "js::Wn#f168",
+      "ordinal": 244,
+      "start": 3829473
+    },
+    {
+      "index": 377,
+      "bytes": 8974,
+      "locals": 174,
+      "kind": "script",
+      "name": "js::pt#f169",
+      "ordinal": 245,
+      "start": 3838748
+    },
+    {
+      "index": 378,
+      "bytes": 13769,
+      "locals": 150,
+      "kind": "script",
+      "name": "js::Hn#f170",
+      "ordinal": 246,
+      "start": 3847724
+    },
+    {
+      "index": 379,
+      "bytes": 5177,
+      "locals": 113,
+      "kind": "script",
+      "name": "js::$r#f171",
+      "ordinal": 247,
+      "start": 3861495
+    },
+    {
+      "index": 380,
+      "bytes": 48994,
+      "locals": 212,
+      "kind": "script",
+      "name": "js::xn#f172",
+      "ordinal": 248,
+      "start": 3866675
+    },
+    {
+      "index": 381,
+      "bytes": 5922,
+      "locals": 117,
+      "kind": "script",
+      "name": "js::Kt#f173",
+      "ordinal": 249,
+      "start": 3915671
+    },
+    {
+      "index": 382,
+      "bytes": 3315,
+      "locals": 125,
+      "kind": "script",
+      "name": "js::qn#f174",
+      "ordinal": 250,
+      "start": 3921595
+    },
+    {
+      "index": 383,
+      "bytes": 31201,
+      "locals": 240,
+      "kind": "script",
+      "name": "js::f283",
+      "ordinal": 251,
+      "start": 3924913
+    },
+    {
+      "index": 384,
+      "bytes": 9970,
+      "locals": 140,
+      "kind": "script",
+      "name": "js::o#f282",
+      "ordinal": 252,
+      "start": 3956116
+    },
+    {
+      "index": 385,
+      "bytes": 56922,
+      "locals": 218,
+      "kind": "script",
+      "name": "js::Qi#f175",
+      "ordinal": 253,
+      "start": 3966089
+    },
+    {
+      "index": 386,
+      "bytes": 46091,
+      "locals": 233,
+      "kind": "script",
+      "name": "js::ut#f176",
+      "ordinal": 254,
+      "start": 4023014
+    },
+    {
+      "index": 387,
+      "bytes": 9406,
+      "locals": 153,
+      "kind": "script",
+      "name": "js::F#f177",
+      "ordinal": 255,
+      "start": 4069107
+    },
+    {
+      "index": 388,
+      "bytes": 45596,
+      "locals": 206,
+      "kind": "script",
+      "name": "js::Gn#f178",
+      "ordinal": 256,
+      "start": 4078516
+    },
+    {
+      "index": 389,
+      "bytes": 14172,
+      "locals": 149,
+      "kind": "script",
+      "name": "js::f284",
+      "ordinal": 257,
+      "start": 4124114
+    },
+    {
+      "index": 390,
+      "bytes": 9280,
+      "locals": 146,
+      "kind": "script",
+      "name": "js::Ir#f179",
+      "ordinal": 258,
+      "start": 4138288
+    },
+    {
+      "index": 391,
+      "bytes": 19729,
+      "locals": 167,
+      "kind": "script",
+      "name": "js::wn#f180",
+      "ordinal": 259,
+      "start": 4147571
+    },
+    {
+      "index": 392,
+      "bytes": 60061,
+      "locals": 257,
+      "kind": "script",
+      "name": "js::Or#f181",
+      "ordinal": 260,
+      "start": 4167303
+    },
+    {
+      "index": 393,
+      "bytes": 25244,
+      "locals": 187,
+      "kind": "script",
+      "name": "js::at#f182",
+      "ordinal": 261,
+      "start": 4227367
+    },
+    {
+      "index": 394,
+      "bytes": 11843,
+      "locals": 145,
+      "kind": "script",
+      "name": "js::Fn#f183",
+      "ordinal": 262,
+      "start": 4252613
+    },
+    {
+      "index": 395,
+      "bytes": 93606,
+      "locals": 265,
+      "kind": "script",
+      "name": "js::gn#f184",
+      "ordinal": 263,
+      "start": 4264459
+    },
+    {
+      "index": 396,
+      "bytes": 11752,
+      "locals": 139,
+      "kind": "script",
+      "name": "js::Ki#f185",
+      "ordinal": 264,
+      "start": 4358067
+    },
+    {
+      "index": 397,
+      "bytes": 11752,
+      "locals": 139,
+      "kind": "script",
+      "name": "js::ji#f186",
+      "ordinal": 265,
+      "start": 4369821
+    },
+    {
+      "index": 398,
+      "bytes": 13948,
+      "locals": 156,
+      "kind": "script",
+      "name": "js::ki#f187",
+      "ordinal": 266,
+      "start": 4381575
+    },
+    {
+      "index": 399,
+      "bytes": 3711,
+      "locals": 92,
+      "kind": "script",
+      "name": "js::qi#f188",
+      "ordinal": 267,
+      "start": 4395525
+    },
+    {
+      "index": 400,
+      "bytes": 32050,
+      "locals": 180,
+      "kind": "script",
+      "name": "js::f286",
+      "ordinal": 268,
+      "start": 4399239
+    },
+    {
+      "index": 401,
+      "bytes": 12311,
+      "locals": 139,
+      "kind": "script",
+      "name": "js::l#f285",
+      "ordinal": 269,
+      "start": 4431291
+    },
+    {
+      "index": 402,
+      "bytes": 33403,
+      "locals": 224,
+      "kind": "script",
+      "name": "js::v#f189",
+      "ordinal": 270,
+      "start": 4443605
+    },
+    {
+      "index": 403,
+      "bytes": 23904,
+      "locals": 183,
+      "kind": "script",
+      "name": "js::Pr#f190",
+      "ordinal": 271,
+      "start": 4477011
+    },
+    {
+      "index": 404,
+      "bytes": 1246,
+      "locals": 58,
+      "kind": "script",
+      "name": "js::start#f288",
+      "ordinal": 272,
+      "start": 4500917
+    },
+    {
+      "index": 405,
+      "bytes": 4953,
+      "locals": 99,
+      "kind": "script",
+      "name": "js::f290",
+      "ordinal": 273,
+      "start": 4502165
+    },
+    {
+      "index": 406,
+      "bytes": 21036,
+      "locals": 171,
+      "kind": "script",
+      "name": "js::enqueueModel#f289",
+      "ordinal": 274,
+      "start": 4507121
+    },
+    {
+      "index": 407,
+      "bytes": 2609,
+      "locals": 111,
+      "kind": "script",
+      "name": "js::f292",
+      "ordinal": 275,
+      "start": 4528159
+    },
+    {
+      "index": 408,
+      "bytes": 8414,
+      "locals": 146,
+      "kind": "script",
+      "name": "js::close#f291",
+      "ordinal": 276,
+      "start": 4530770
+    },
+    {
+      "index": 409,
+      "bytes": 2952,
+      "locals": 111,
+      "kind": "script",
+      "name": "js::f294",
+      "ordinal": 277,
+      "start": 4539186
+    },
+    {
+      "index": 410,
+      "bytes": 9309,
+      "locals": 149,
+      "kind": "script",
+      "name": "js::error#f293",
+      "ordinal": 278,
+      "start": 4542140
+    },
+    {
+      "index": 411,
+      "bytes": 9858,
+      "locals": 149,
+      "kind": "script",
+      "name": "js::i#f287",
+      "ordinal": 279,
+      "start": 4551451
+    },
+    {
+      "index": 412,
+      "bytes": 22254,
+      "locals": 207,
+      "kind": "script",
+      "name": "js::jt#f191",
+      "ordinal": 280,
+      "start": 4561312
+    },
+    {
+      "index": 413,
+      "bytes": 2698,
+      "locals": 76,
+      "kind": "script",
+      "name": "js::vt#f192",
+      "ordinal": 281,
+      "start": 4583568
+    },
+    {
+      "index": 414,
+      "bytes": 12917,
+      "locals": 145,
+      "kind": "script",
+      "name": "js::f296",
+      "ordinal": 282,
+      "start": 4586268
+    },
+    {
+      "index": 415,
+      "bytes": 3506,
+      "locals": 96,
+      "kind": "script",
+      "name": "js::f295",
+      "ordinal": 283,
+      "start": 4599187
+    },
+    {
+      "index": 416,
+      "bytes": 10678,
+      "locals": 162,
+      "kind": "script",
+      "name": "js::enqueueModel#f297",
+      "ordinal": 284,
+      "start": 4602695
+    },
+    {
+      "index": 417,
+      "bytes": 17126,
+      "locals": 169,
+      "kind": "script",
+      "name": "js::close#f298",
+      "ordinal": 285,
+      "start": 4613376
+    },
+    {
+      "index": 418,
+      "bytes": 12606,
+      "locals": 163,
+      "kind": "script",
+      "name": "js::error#f299",
+      "ordinal": 286,
+      "start": 4630504
+    },
+    {
+      "index": 419,
+      "bytes": 22857,
+      "locals": 214,
+      "kind": "script",
+      "name": "js::kt#f193",
+      "ordinal": 287,
+      "start": 4643113
+    },
+    {
+      "index": 420,
+      "bytes": 137724,
+      "locals": 256,
+      "kind": "script",
+      "name": "js::no#f194",
+      "ordinal": 288,
+      "start": 4665973
+    },
+    {
+      "index": 421,
+      "bytes": 17272,
+      "locals": 199,
+      "kind": "script",
+      "name": "js::Ct#f195",
+      "ordinal": 289,
+      "start": 4803700
+    },
+    {
+      "index": 422,
+      "bytes": 2739,
+      "locals": 117,
+      "kind": "script",
+      "name": "js::wt#f196",
+      "ordinal": 290,
+      "start": 4820974
+    },
+    {
+      "index": 423,
+      "bytes": 13480,
+      "locals": 184,
+      "kind": "script",
+      "name": "js::f300",
+      "ordinal": 291,
+      "start": 4823715
+    },
+    {
+      "index": 424,
+      "bytes": 1885,
+      "locals": 80,
+      "kind": "script",
+      "name": "js::f301",
+      "ordinal": 292,
+      "start": 4837197
+    },
+    {
+      "index": 425,
+      "bytes": 23444,
+      "locals": 178,
+      "kind": "script",
+      "name": "js::qt#f197",
+      "ordinal": 293,
+      "start": 4839085
+    },
+    {
+      "index": 426,
+      "bytes": 648,
+      "locals": 43,
+      "kind": "script",
+      "name": "js::f302",
+      "ordinal": 294,
+      "start": 4862531
+    },
+    {
+      "index": 427,
+      "bytes": 14484,
+      "locals": 170,
+      "kind": "script",
+      "name": "js::Mr#f198",
+      "ordinal": 295,
+      "start": 4863181
+    },
+    {
+      "index": 428,
+      "bytes": 361733,
+      "locals": 596,
+      "kind": "script",
+      "name": "js::f71",
+      "ordinal": 296,
+      "start": 4877668
+    },
+    {
+      "index": 429,
+      "bytes": 22488,
+      "locals": 126,
+      "kind": "script",
+      "name": "js::f303",
+      "ordinal": 297,
+      "start": 5239404
+    },
+    {
+      "index": 430,
+      "bytes": 15207,
+      "locals": 144,
+      "kind": "script",
+      "name": "js::f305",
+      "ordinal": 298,
+      "start": 5261894
+    },
+    {
+      "index": 431,
+      "bytes": 2919,
+      "locals": 108,
+      "kind": "script",
+      "name": "js::f306",
+      "ordinal": 299,
+      "start": 5277103
+    },
+    {
+      "index": 432,
+      "bytes": 88688,
+      "locals": 220,
+      "kind": "script",
+      "name": "js::f304",
+      "ordinal": 300,
+      "start": 5280025
+    },
+    {
+      "index": 433,
+      "bytes": 5873,
+      "locals": 133,
+      "kind": "script",
+      "name": "js::to#f7",
+      "ordinal": 301,
+      "start": 5368715
+    },
+    {
+      "index": 434,
+      "bytes": 3680,
+      "locals": 106,
+      "kind": "script",
+      "name": "js::f307",
+      "ordinal": 302,
+      "start": 5374590
+    },
+    {
+      "index": 435,
+      "bytes": 8461,
+      "locals": 215,
+      "kind": "script",
+      "name": "js::xr#f8",
+      "ordinal": 303,
+      "start": 5378272
+    },
+    {
+      "index": 436,
+      "bytes": 19671,
+      "locals": 161,
+      "kind": "script",
+      "name": "js::ro#f9",
+      "ordinal": 304,
+      "start": 5386736
+    },
+    {
+      "index": 437,
+      "bytes": 40539,
+      "locals": 199,
+      "kind": "script",
+      "name": "js::f6",
+      "ordinal": 305,
+      "start": 5406410
+    },
+    {
+      "index": 438,
+      "bytes": 2717,
+      "locals": 112,
+      "kind": "script",
+      "name": "js::encode#f3",
+      "ordinal": 306,
+      "start": 5446951
+    },
+    {
+      "index": 439,
+      "bytes": 11305,
+      "locals": 134,
+      "kind": "script",
+      "name": "js::f2",
+      "ordinal": 307,
+      "start": 5449670
+    },
+    {
+      "index": 440,
+      "bytes": 7810,
+      "locals": 95,
+      "kind": "script",
+      "name": "js::$scriptw$module$realmImport#f1",
+      "ordinal": 308,
+      "start": 5460977
+    },
+    {
+      "index": 441,
+      "bytes": 4373,
+      "locals": 99,
+      "kind": "script",
+      "name": "js::f0",
+      "ordinal": 309,
+      "start": 5468789
+    },
+    {
+      "index": 442,
+      "bytes": 12630,
+      "locals": 121,
+      "kind": "runtime-helper",
+      "name": "helper::embedding_export",
+      "ordinal": 310,
+      "start": 5473164
+    },
+    {
+      "index": 443,
+      "bytes": 18130,
+      "locals": 128,
+      "kind": "runtime-helper",
+      "name": "helper::embedding_checkpoint",
+      "ordinal": 311,
+      "start": 5485797
+    },
+    {
+      "index": 444,
+      "bytes": 953,
+      "locals": 53,
+      "kind": "runtime-helper",
+      "name": "helper::module_initialize",
+      "ordinal": 312,
+      "start": 5503929
+    },
+    {
+      "index": 445,
+      "bytes": 7937,
+      "locals": 105,
+      "kind": "runtime-helper",
+      "name": "helper::module_evaluate",
+      "ordinal": 313,
+      "start": 5504884
+    },
+    {
+      "index": 446,
+      "bytes": 816,
+      "locals": 33,
+      "kind": "runtime-helper",
+      "name": "helper::module_ready",
+      "ordinal": 314,
+      "start": 5512823
+    },
+    {
+      "index": 447,
+      "bytes": 898,
+      "locals": 35,
+      "kind": "runtime-helper",
+      "name": "helper::module_gather",
+      "ordinal": 315,
+      "start": 5513641
+    },
+    {
+      "index": 448,
+      "bytes": 13819,
+      "locals": 83,
+      "kind": "runtime-helper",
+      "name": "helper::module_execute",
+      "ordinal": 316,
+      "start": 5514541
+    },
+    {
+      "index": 449,
+      "bytes": 5713,
+      "locals": 86,
+      "kind": "runtime-helper",
+      "name": "helper::module_fulfilled",
+      "ordinal": 317,
+      "start": 5528362
+    },
+    {
+      "index": 450,
+      "bytes": 2992,
+      "locals": 67,
+      "kind": "runtime-helper",
+      "name": "helper::module_rejected",
+      "ordinal": 318,
+      "start": 5534077
+    },
+    {
+      "index": 451,
+      "bytes": 3845,
+      "locals": 75,
+      "kind": "runtime-helper",
+      "name": "helper::module_deferred_import",
+      "ordinal": 319,
+      "start": 5537071
+    },
+    {
+      "index": 452,
+      "bytes": 3,
+      "locals": 0,
+      "kind": "runtime-helper",
+      "name": "helper::prepared_dynamic_function",
+      "ordinal": 320,
+      "start": 5540917
+    },
+    {
+      "index": 453,
+      "bytes": 49,
+      "locals": 7,
+      "kind": "runtime-helper",
+      "name": "helper::native_direct_eval_factory",
+      "ordinal": 321,
+      "start": 5540921
+    },
+    {
+      "index": 454,
+      "bytes": 3,
+      "locals": 0,
+      "kind": "runtime-helper",
+      "name": "helper::prepared_script",
+      "ordinal": 322,
+      "start": 5540971
+    },
+    {
+      "index": 455,
+      "bytes": 1026,
+      "locals": 58,
+      "kind": "runtime-helper",
+      "name": "helper::realm_module_import",
+      "ordinal": 323,
+      "start": 5540976
+    },
+    {
+      "index": 456,
+      "bytes": 285,
+      "locals": 21,
+      "kind": "runtime-helper",
+      "name": "helper::module_body_reaction",
+      "ordinal": 324,
+      "start": 5542004
+    },
+    {
+      "index": 457,
+      "bytes": 3,
+      "locals": 0,
+      "kind": "runtime-helper",
+      "name": "helper::regexp_program_candidate",
+      "ordinal": 325,
+      "start": 5542290
+    },
+    {
+      "index": 458,
+      "bytes": 3,
+      "locals": 0,
+      "kind": "runtime-helper",
+      "name": "helper::compact_array_literal",
+      "ordinal": 326,
+      "start": 5542294
+    },
+    {
+      "index": 459,
+      "bytes": 223,
+      "locals": 17,
+      "kind": "runtime-helper",
+      "name": "helper::initialize_instance_elements",
+      "ordinal": 327,
+      "start": 5542299
+    }
+  ],
+  "largest_functions": [
+    {
+      "index": 428,
+      "bytes": 361733,
+      "locals": 596,
+      "kind": "script",
+      "name": "js::f71",
+      "ordinal": 296,
+      "start": 4877668
+    },
+    {
+      "index": 327,
+      "bytes": 341345,
+      "locals": 324,
+      "kind": "script",
+      "name": "js::vn#f133",
+      "ordinal": 195,
+      "start": 2769795
+    },
+    {
+      "index": 420,
+      "bytes": 137724,
+      "locals": 256,
+      "kind": "script",
+      "name": "js::no#f194",
+      "ordinal": 288,
+      "start": 4665973
+    },
+    {
+      "index": 184,
+      "bytes": 101329,
+      "locals": 224,
+      "kind": "script",
+      "name": "js::f15",
+      "ordinal": 52,
+      "start": 509182
+    },
+    {
+      "index": 314,
+      "bytes": 96719,
+      "locals": 250,
+      "kind": "script",
+      "name": "js::ft#f123",
+      "ordinal": 182,
+      "start": 2443206
+    },
+    {
+      "index": 262,
+      "bytes": 94419,
+      "locals": 241,
+      "kind": "script",
+      "name": "js::Ii#f91",
+      "ordinal": 130,
+      "start": 1472655
+    },
+    {
+      "index": 395,
+      "bytes": 93606,
+      "locals": 265,
+      "kind": "script",
+      "name": "js::gn#f184",
+      "ordinal": 263,
+      "start": 4264459
+    },
+    {
+      "index": 432,
+      "bytes": 88688,
+      "locals": 220,
+      "kind": "script",
+      "name": "js::f304",
+      "ordinal": 300,
+      "start": 5280025
+    },
+    {
+      "index": 318,
+      "bytes": 81032,
+      "locals": 246,
+      "kind": "script",
+      "name": "js::Jt#f127",
+      "ordinal": 186,
+      "start": 2552256
+    },
+    {
+      "index": 345,
+      "bytes": 76057,
+      "locals": 228,
+      "kind": "script",
+      "name": "js::dn#f151",
+      "ordinal": 213,
+      "start": 3444264
+    },
+    {
+      "index": 176,
+      "bytes": 75875,
+      "locals": 294,
+      "kind": "script",
+      "name": "js::en#f25",
+      "ordinal": 44,
+      "start": 374070
+    },
+    {
+      "index": 307,
+      "bytes": 62820,
+      "locals": 214,
+      "kind": "script",
+      "name": "js::et#f119",
+      "ordinal": 175,
+      "start": 2333916
+    },
+    {
+      "index": 336,
+      "bytes": 62784,
+      "locals": 177,
+      "kind": "script",
+      "name": "js::Er#f142",
+      "ordinal": 204,
+      "start": 3261218
+    },
+    {
+      "index": 286,
+      "bytes": 62657,
+      "locals": 213,
+      "kind": "script",
+      "name": "js::Ht#f108",
+      "ordinal": 154,
+      "start": 1877249
+    },
+    {
+      "index": 278,
+      "bytes": 60134,
+      "locals": 235,
+      "kind": "script",
+      "name": "js::j#f104",
+      "ordinal": 146,
+      "start": 1732048
+    }
+  ],
+  "limits": "Static section and function-body sizes only. Data payloads and function bodies are included in enclosing section totals; not runtime shares or allocation counts."
 }

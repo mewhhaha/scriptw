@@ -26,6 +26,7 @@ mod aot_constructor_throw_domain;
 mod aot_control_flow;
 mod aot_declaration_completion;
 mod aot_delete_reference;
+mod aot_dense_switch;
 mod aot_destructuring_var_binding_order;
 mod aot_empty_function;
 mod aot_equality_operand_effects;

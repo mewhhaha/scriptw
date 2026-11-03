@@ -111,6 +111,15 @@ completion and constructor normalization. It does not take the separate empty
 strict-body compilation path. The pre-existing proof for an actually empty,
 strict body retains that separate entry and epilogue.
 
+Strict ordinary functions also admit an arguments-only omission when their
+complete inspected body has no arguments reference, direct eval or newly created
+callable/class. Capture reads, property access, coercion and callbacks are allowed:
+the normal strict caller barrier prevents legacy activation reflection. This
+source-bound proof retains every existing owned environment binding and normal
+entry/epilogue; it removes only the implicit object and its metadata publication.
+Non-simple parameters, resumable/class protocols and uninspected IR forms retain
+materialization. Named Module environment metadata alone is not an eval observer.
+
 Strict simple parameters no longer force environment cells just to seed
 arguments mapping: strict arguments are unmapped. Capture discovery, eval
 visibility, separate body/parameter environments and resumable ownership still

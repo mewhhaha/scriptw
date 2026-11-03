@@ -26,6 +26,7 @@ mod async_function_switch;
 mod async_function_while;
 mod async_suspension;
 mod constant_number_condition;
+mod dense_switch;
 mod for_await_iteration_environment;
 mod for_await_iterator_plan;
 mod for_await_iterator_symbol;
@@ -7296,9 +7297,6 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let discriminant = schema.reserve_value_local(function);
-        let selected = schema.reserve_i32_local(function);
-        let active = schema.reserve_i32_local(function);
-        let default = cases.iter().position(|case| case.condition.is_none());
         self.emit_statement_result(function);
         self.compile_expr_to_value(expression, &discriminant, function)?;
         self.emit_propagate_current_throw_if_needed(function);
@@ -7312,6 +7310,30 @@ impl<'a> FunctionBuilder<'a> {
         for declaration in lexical_declarations {
             self.compile_statement(declaration, function)?;
         }
+        if let Some(dispatch) = dense_switch::DenseIntegerSwitch::analyze(self, cases) {
+            self.compile_dense_integer_switch(&dispatch, &discriminant, labels, function)?;
+        } else {
+            self.compile_linear_switch(&discriminant, cases, labels, function)?;
+        }
+        if lexical_environment.is_some() {
+            self.emit_leave_lexical_environment(function);
+        }
+        self.pop_scope();
+        discriminant.clear(function);
+        Ok(())
+    }
+
+    fn compile_linear_switch(
+        &mut self,
+        discriminant: &ValueLocals,
+        cases: &[SwitchCaseIr],
+        labels: &[String],
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let selected = schema.reserve_i32_local(function);
+        let active = schema.reserve_i32_local(function);
+        let default = cases.iter().position(|case| case.condition.is_none());
         function.instruction(&Instruction::I32Const(-1));
         selected.store(function);
         for (index, case) in cases.iter().enumerate() {
@@ -7325,7 +7347,7 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::I32Const(-1));
             function.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, function);
-            self.compile_switch_case_match(&discriminant, condition, function)?;
+            self.compile_switch_case_match(discriminant, condition, function)?;
             function.instruction(&Instruction::If(BlockType::Empty));
             function.instruction(&Instruction::I32Const(index));
             selected.store(function);
@@ -7376,13 +7398,8 @@ impl<'a> FunctionBuilder<'a> {
         self.breakable_stack.pop();
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        if lexical_environment.is_some() {
-            self.emit_leave_lexical_environment(function);
-        }
-        self.pop_scope();
         schema.release_i32_local(active, function);
         schema.release_i32_local(selected, function);
-        discriminant.clear(function);
         Ok(())
     }
 

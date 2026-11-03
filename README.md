@@ -50,8 +50,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 19.90 ms | 0.487 ms |
-| Async | 21.01 ms | 0.392 ms |
+| Sync | 17.31 ms | 0.505 ms |
+| Async | 18.27 ms | 0.404 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,13 +60,12 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.22 s JavaScript → Wasm**, **12.40 s native preparation**,
-and **2.62 ms module initialization**. Program Wasm is **6.08 MiB** (5.56 MiB
+Cold Scriptw setup: **3.20 s JavaScript → Wasm**, **11.97 s native preparation**,
+and **2.66 ms module initialization**. Program Wasm is **5.79 MiB** (5.27 MiB
 code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
-[Benchmark details, failures and caveats](docs/rust-rewrite/benchmarks.md) ·
-[Recorded RSC build](docs/rust-rewrite/rsc-current.json) ·
-[CPU diagnosis](docs/rust-rewrite/react-attribution-current.json).
+[Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
+[Recorded RSC build](docs/rust-rewrite/rsc-current.json).
 
 **Focused performance situations · 2026-11-03:** 13 checked programs compare
 global lookup, control-flow scaling, arguments and property mutation history
@@ -113,13 +112,14 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-03**): 1,295 Engine, 42 Wasm-emission,
-nine captured-cell IR and two encoded cell-read checks passed, plus nine
-exact-output CLI application runs.
-The focused benchmarks add 34 harness/generator checks and 3,120 checked calls.
-These scopes do not replace the published full Test262 run. Full workspace CI was
-not rerun; existing formatting failures and 14 stale Intl identity recipes remain
-[owned](docs/rust-rewrite/current-inventory.md).
+Latest scoped verification (**2026-11-03**): 1,724 Engine cases covered
+(837 unchanged Script cases reused), plus 42 Wasm-emission, 153 typed structural,
+761 IR and 361 source-guard checks. AOT unit checks passed 628 cases;
+four pre-existing bootstrap assertions still fail on both this and the prior build.
+The focused benchmarks passed 3,120 checked calls; React RSC also passed exact
+Flight checks. These scopes do not replace the published full Test262 run.
+Full workspace CI was not rerun; formatting failures and 14 stale Intl recipes
+remain [owned](docs/rust-rewrite/current-inventory.md).
 
 ## Caveats
 

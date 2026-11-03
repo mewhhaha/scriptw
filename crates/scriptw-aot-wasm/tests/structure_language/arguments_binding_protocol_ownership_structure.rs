@@ -275,7 +275,7 @@ fn binding_transition_moves_the_protocol_and_presence_cannot_recover_it() {
         &[
             "&mutself)->Result<ArgumentsBindingProtocol,EmitError>{",
             "matchcore::mem::replace(&mutself.0,FunctionArgumentsState::BoundAbsent)",
-            "Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf,)",
+            "Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf|FunctionArgumentsKind::UnobservedStrict,)",
             "ArgumentsBindingProtocol(None)",
             "Pending(FunctionArgumentsKind::Present(protocol))",
             "self.0=FunctionArgumentsState::BoundPresent",
@@ -293,7 +293,7 @@ fn binding_transition_moves_the_protocol_and_presence_cannot_recover_it() {
     );
     assert_eq!(
         presence,
-        "&self)->Option<()>{match&self.0{FunctionArgumentsState::Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf,)|FunctionArgumentsState::BoundAbsent=>None,FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))|FunctionArgumentsState::BoundPresent=>Some(()),}}"
+        "&self)->Option<()>{match&self.0{FunctionArgumentsState::Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf|FunctionArgumentsKind::UnobservedStrict,)|FunctionArgumentsState::BoundAbsent=>None,FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))|FunctionArgumentsState::BoundPresent=>Some(()),}}"
     );
 }
 
@@ -327,7 +327,11 @@ fn activation_plan_keeps_original_validation_source_and_storage_under_one_author
             "letarguments=FunctionArgumentsProtocol::for_user_function(function)?;",
             "UnobservableLeafActivation::admit(function)",
             "Some(leaf)=>leaf.consume(arguments)",
-            "None=>Self{function,arguments,owned_bindings:&function.owned_env_bindings,}",
+            "None=>matchsuper::unobserved_strict::UnobservedStrictArguments::admit(function)",
+            "Some(proof)=>proof.consume(arguments)",
+            "None=>Self::retaining_storage(function,arguments)",
+            "pub(super)fnretaining_storage(",
+            "owned_bindings:&function.owned_env_bindings",
         ],
     );
     assert_eq!(exact_identifier_count(&admission, "for_user_function"), 1);

@@ -24,12 +24,22 @@ impl<'a> UserFunctionActivationPlan<'a> {
         let arguments = FunctionArgumentsProtocol::for_user_function(function)?;
         Ok(match UnobservableLeafActivation::admit(function) {
             Some(leaf) => leaf.consume(arguments),
-            None => Self {
-                function,
-                arguments,
-                owned_bindings: &function.owned_env_bindings,
+            None => match super::unobserved_strict::UnobservedStrictArguments::admit(function) {
+                Some(proof) => proof.consume(arguments),
+                None => Self::retaining_storage(function, arguments),
             },
         })
+    }
+
+    pub(super) fn retaining_storage(
+        function: &'a FunctionIr,
+        arguments: FunctionArgumentsProtocol,
+    ) -> Self {
+        Self {
+            function,
+            arguments,
+            owned_bindings: &function.owned_env_bindings,
+        }
     }
 
     pub(crate) fn into_parts(

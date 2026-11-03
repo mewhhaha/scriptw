@@ -511,6 +511,19 @@ impl Function {
         self.instruction(&Instruction::BrIf(depth.immediate()));
     }
 
+    pub(crate) fn branch_table_to_labels(
+        &mut self,
+        labels: impl IntoIterator<Item = LabelDepth>,
+        default: LabelDepth,
+    ) {
+        let depths = labels
+            .into_iter()
+            .map(|label| self.branch_depth_to(label).immediate())
+            .collect::<Vec<_>>();
+        let default = self.branch_depth_to(default).immediate();
+        self.instruction(&Instruction::BrTable(depths.into(), default));
+    }
+
     #[cfg(test)]
     pub(crate) fn byte_len(&self) -> usize {
         self.body.byte_len()

@@ -12,32 +12,32 @@ Use the [13 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Remove proven unnecessary lexical walks for global references. The
-  [caller diagnosis](react-attribution-current.json) attributes 92.1% of
-  StringEquality leaf weight to name resolution, mostly 22 `vn` global reads.
-  Prove an existing GlobalEnvironment start for unbound names; preserve global
-  lexical shadowing, mutable globals/getters, Realms and eval/with boundaries.
-  Owner: IR reference-resolution analysis and existing AOT environment paths.
-- Reduce remaining instruction volume: Fast executes 159–167M instructions per
-  RSC request versus Node's 2.5–2.6M in the excluded 100-request diagnostic.
-  Objects already have hash indexes and shape caches. Attribute repeated
-  semantic work before adding another cache or storage representation. Owner:
-  IR/AOT lowering and runtime lookup/property machinery; retain one heap.
-- Bound Fast native code/spills. P is 85.70 MB native with 1-MB/340-KB hot
-  frames; Speed/Backtracking makes it 29.19 MB with 7.4-KB/4.9-KB frames, but
-  removes only 5.3% of retired instructions. The measured probe loops cost
-  5–6% of sampled locations. Owner: AOT code shape and native policy; preserve
-  cold compilation tradeoffs and measure before changing the default.
-- Measure strict arguments/activation materialization before eliding it.
-  Hot `vn`/`ft` have no arguments/eval tokens yet receive full unmapped objects;
-  total allocations remain unmeasured. Admission must cover nested arrows,
-  prepared eval, reflection and escaping closures. Strict Script factories and
-  CLI RSC/SSR performance remain separate. Owner: IR arguments analysis/AOT.
-- Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup:
-  P remains 6.37 MB (5.83 MB code), R 39.38 MB; source-to-Wasm is 3.2s and native
-  preparation 12.4s. The [SSR checkpoint](react-codegen-20261102.json) retains
-  a 1,110,482-byte body. Owner: AOT codegen/native compilation; preserve exact
-  identities and separate cold setup from requests.
+- Reduce call transport in the compact/control-flow programs. Ordinary calls
+  still construct argument vectors and stored values after eligible arguments
+  objects and synthetic activation cells have been removed. Measure guarded
+  direct calls through the existing ABI before adding fixed-arity entries;
+  preserve callee identity, Realm, captures, receiver, depth and abrupt completion.
+  Owner: AOT function call dispatch and argument-vector construction.
+- Remove repeated property conversions. The property programs exercise `GetV`,
+  including packed-array indexing, through `ValueToObject`, `ValueToPropertyKey`
+  and `ObjectRead`. Test moving the existing guarded packed-array probe ahead of
+  `ToObject`; misses must preserve accessors, prototypes, proxies, key conversion
+  and exception order. Owner: AOT operations and object-read machinery.
+- Re-profile RSC on the latest [recorded compiler](rsc-current.json). The
+  [earlier instruction/caller diagnosis](react-attribution-current.json) belongs
+  to its own build, before global-start selection and activation pruning; its
+  instruction counts and StringEquality shares are not current measurements.
+  Attribute remaining semantic work before adding caches or representations.
+  Owner: IR/AOT lowering and runtime lookup/property machinery; retain one heap.
+- Bound native code, spills and cold preparation. The focused control-flow
+  programs now use guarded dense jump tables, but code/image growth remains
+  visible in their [scores](situations-current.json). Re-measure RSC frames and
+  stack probes before changing the default native policy; Fast and Speed change
+  both optimization and register allocation. Owner: AOT code shape/native policy.
+- Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup.
+  Keep exact P/R identities and code/data accounting separate from native image
+  size and request time. The older [SSR checkpoint](react-codegen-20261102.json)
+  retains a 1,110,482-byte body. Owner: AOT codegen/native compilation.
 - Requalify affected operators before a new full conformance publication.
   The [shared-kernel checkpoint](react-codegen-20261102.json) passes all 79 pinned
   modulus variants; the complete pinned Test262 matrix remains a separate gate.
@@ -89,14 +89,11 @@ accepts `--case <file.js>`.
   Intrinsic descriptor templates are a later hypothesis for the roughly 0.22 ms
   fresh-entry floor; the Realm share is not isolated;
   the [namespace experiment](deferred-namespaces-20261101.json) remains rejected.
-- Continue measuring module function storage after private activation `var`
-  bindings and simple parameters in strict ordinary functions. Lexical locals,
-  arrows and other protocols retain their existing cells. Preserve live exports,
-  Realm-relative lookup, actual captures and the conservative direct-eval,
-  unmapped arguments snapshots and surrounding-`with` boundaries before expanding admission.
-  The [local diagnostic](module-local-performance-20261030.json) preserves all
-  17 retained-call results and the ordinary controls, including reverse-sort-512
-  and join-4096 slowdowns in both balanced orders despite identical emitted Wasm.
+- Expand Module storage admission only with evidence. Real captures, observed
+  arguments, lexical bindings, arrows, eval and non-simple/resumable protocols
+  retain required storage. Preserve live exports, Realm-relative lookup,
+  arguments snapshots, capture hops and source-name collisions. Owner: IR
+  environment planning; measure each expansion with the focused programs.
 - Host type metadata remains a separate hypothesis: demonstrate at least
   **256 KiB of avoidable retained ownership** before changing its decoding or
   registration. Phase deltas do not prove duplication or fault-around behavior.
@@ -128,6 +125,12 @@ accepts `--case <file.js>`.
 - The historical 5,365-case failure replay lacks its original aggregate input.
   Keep that replay blocked until the genuine input is available; do not synthesize
   a substitute or infer its results from newer runs.
+- Repair four pre-existing AOT bootstrap assertions: compact native metadata,
+  deferred Error demand, intrinsic property-layout allocation and eager layout
+  ownership. All four reproduce on the frozen prior test executable; they remain
+  failures in the latest focused checkpoint. Owner: AOT runtime bootstrap recipes
+  and their encoded-allocation assertions. Preserve the original expected and
+  actual values while determining whether recipes or assertions need correction.
 - Repair pre-existing workspace formatting, stale shortcut inventory, identity
   and module-boundary audit findings. The RSC checkpoint still reports 14 stale
   Intl source-identity recipes. Preserve original evidence and compiler

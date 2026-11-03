@@ -553,3 +553,44 @@ export function replace(next) { offset = next; return offset; }
         &["private locals with Realm globals"],
     );
 }
+
+#[test]
+fn pruned_module_entry_values_and_retained_context_captures_cross_realms() {
+    assert_files(
+        EmbeddedModuleGoal::Script,
+        r#"
+const realm = new ShadowRealm();
+Promise.all([
+  import('./context.js'),
+  realm.importValue('./context.js', 'plain'),
+  realm.importValue('./context.js', 'context'),
+  realm.importValue('./context.js', 'make')
+]).then(values => {
+  const local = values[0], plain = values[1], context = values[2], make = values[3];
+  assert((0, local.plain)() && plain(), 'each callable retains its own entry values');
+  const localContext = (0, local.context)(7), foreignContext = context(11);
+  assert(localContext() === 'true:true:7:7' && foreignContext() === 'true:true:11:11',
+    'arrows retain actual this/new.target/arguments and parameter captures');
+  const localMiddle = (0, local.make)(13), foreignMiddle = make(17);
+  assert(localMiddle()() === 13 && foreignMiddle()() === 17,
+    'capture hops cross the pruned middle activation in each defining Realm');
+  print('Module entry storage across Realms');
+});
+true;
+"#,
+        &[(
+            "context.js",
+            r#"
+export function plain() { return this === undefined && new.target === undefined; }
+export function context(value) {
+  return () => [this === undefined, new.target === undefined, arguments[0], value].join(':');
+}
+export function make(value) {
+  function middle() { return () => value; }
+  return middle;
+}
+"#,
+        )],
+        &["Module entry storage across Realms"],
+    );
+}

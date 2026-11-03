@@ -241,6 +241,19 @@ impl ScriptLowerer<'_> {
             })
     }
 
+    /// Static Module owners have no eval-created bindings or enclosing with
+    /// records. An absent lexical binding can therefore start at the defining
+    /// Realm's global record, retaining its live lexical cells and properties.
+    /// Implicit arguments has no ordinary source binding in this lookup.
+    fn identifier_starts_at_global_environment(&self, name: &str) -> bool {
+        self.analysis
+            .module_local_candidates
+            .contains_key(&self.current_owner_id)
+            && name != "arguments"
+            && self.with_environment_chain.is_empty()
+            && self.lookup_binding(name).is_none()
+    }
+
     pub(super) fn environment_identifier(
         &mut self,
         name: String,
@@ -270,6 +283,9 @@ impl ScriptLowerer<'_> {
         let identifier = match cell {
             Some(cell) => {
                 EnvironmentIdentifierIr::cell(name, self.reference_strictness(), operation, cell)
+            }
+            None if self.identifier_starts_at_global_environment(&name) => {
+                EnvironmentIdentifierIr::global(name, self.reference_strictness(), operation)
             }
             None => EnvironmentIdentifierIr::current(name, self.reference_strictness(), operation),
         };

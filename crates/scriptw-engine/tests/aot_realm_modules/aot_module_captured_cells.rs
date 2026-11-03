@@ -535,3 +535,66 @@ print([firstArgs !== secondArgs, firstArgs[0] === a, secondArgs[0] === b,
         ],
     );
 }
+
+#[test]
+fn module_pruned_synthetic_cells_preserve_call_construct_and_subclass_entry_values() {
+    assert_output(
+        r#"
+function context() { return [this, new.target]; }
+var receiver = {tag: 'receiver'};
+var called = context.call(receiver);
+var plain = context();
+var constructed = new context();
+class Sub extends context {}
+var subclassed = new Sub();
+print(called[0] === receiver && called[1] === undefined);
+print(plain[0] === undefined && plain[1] === undefined);
+print(Object.getPrototypeOf(constructed[0]) === context.prototype && constructed[1] === context);
+print(Object.getPrototypeOf(subclassed[0]) === Sub.prototype && subclassed[1] === Sub);
+"#,
+        true,
+        &["true", "true", "true", "true"],
+    );
+}
+
+#[test]
+fn module_pruned_middle_activations_keep_ancestor_and_arrow_context_captures() {
+    assert_output(
+        r#"
+function make(value) {
+  var owner = this;
+  function middle() { return () => [owner, value]; }
+  return middle;
+}
+function context(value) { return () => [this, new.target, arguments[0], value]; }
+var receiver = {};
+var middle = make.call(receiver, 7);
+var read = middle();
+var captured = context.call(receiver, 11);
+var constructed = new context(13);
+await 0;
+var values = read(), called = captured(), created = constructed();
+print(values[0] === receiver && values[1] === 7);
+print(called[0] === receiver && called[1] === undefined && called[2] === 11 && called[3] === 11);
+print(Object.getPrototypeOf(created[0]) === context.prototype && created[1] === context && created[2] === 13 && created[3] === 13);
+"#,
+        true,
+        &["true", "true", "true"],
+    );
+}
+
+#[test]
+fn module_arguments_observers_keep_shorthand_and_unrelated_child_arguments() {
+    assert_output(
+        r#"
+function observed(value) { return {arguments}; }
+function child(value) { return function() { return arguments[0]; }; }
+function snapshot(value) { value = 99; return arguments[0]; }
+print(observed(7).arguments[0]);
+print(child(11)(13));
+print(snapshot(17));
+"#,
+        true,
+        &["7", "13", "17"],
+    );
+}

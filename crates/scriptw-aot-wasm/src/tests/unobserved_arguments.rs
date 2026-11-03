@@ -163,3 +163,26 @@ fn observers_keep_actual_arguments_allocation_in_the_encoded_body() {
         assert!(traffic.depth_guard, "{source}: {traffic:?}");
     }
 }
+
+#[test]
+fn strict_reentry_and_property_reads_omit_only_unobserved_arguments() {
+    for source in [
+        "function make(input) { 'use strict'; return input.x; } make(globalThis.input);",
+        "function make(input) { 'use strict'; return input(); } make(globalThis.input);",
+        "function make(input) { 'use strict'; var value=input.x; value+=input.y; return value; } make(globalThis.input);",
+        "function make(input) { 'use strict'; for(var i=0;i<4;i++) input(i); return input.x; } make(globalThis.input);",
+    ] {
+        let traffic = activation_traffic(source);
+        assert_eq!(traffic.arguments, 0, "{source}: {traffic:?}");
+        assert!(traffic.depth_guard, "strict elision retains the caller barrier: {source}: {traffic:?}");
+    }
+    for source in [
+        "function make(input) { 'use strict'; return arguments[0]; } make(globalThis.input);",
+        "function make(input) { 'use strict'; return () => arguments[0]; } make(globalThis.input);",
+        "function make(input) { 'use strict'; return input[arguments[0]]; } make(globalThis.input);",
+    ] {
+        let traffic = activation_traffic(source);
+        assert_eq!(traffic.arguments, 1, "{source}: {traffic:?}");
+        assert!(traffic.depth_guard, "{source}: {traffic:?}");
+    }
+}

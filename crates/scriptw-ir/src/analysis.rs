@@ -6998,8 +6998,10 @@ impl<'a> AnalysisBuilder<'a> {
             }
         }
 
-        // Capture discovery has now retained every actual cell. Remove empty
-        // local records before named roles and capture hops are finalized.
+        // Capture discovery has now retained every actual cell, including
+        // synthetic this/new.target/arguments cells needed by child closures.
+        // Ordinary entry values and unobserved arguments need no record. Remove
+        // empty local records before named roles and capture hops are finalized.
         // Nonempty records keep their named bindings for nested closures.
         for environment in self.environment_plans.values_mut() {
             if self

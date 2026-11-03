@@ -191,25 +191,38 @@ impl AnalysisBuilder<'_> {
 
     /// Actual eval and dynamic binding creation have already been excluded.
     /// Strict arguments snapshot the incoming list rather than alias parameters.
-    /// Keep their live binding, lexical/function/self/synthetic storage and all
-    /// actual captures; only private vars and simple parameters become locals.
+    /// Keep observed arguments, lexical/function/self storage and all actual
+    /// captures. Ordinary this/new.target reads already use body-entry values;
+    /// only a real child capture requires their synthetic environment cells.
     pub(super) fn plan_module_local_candidates(&mut self) {
         for id in self.ordinary_module_owner_ids() {
             let function = &self.function_plans[&id];
             let owner = &self.owner_plans[&function.id];
             let activation = &self.environment_plans[&owner.activation_environment_id];
+            // Traverse children too: refusing unrelated child arguments only
+            // loses this optimization. Eval is already excluded for this set.
+            let unobserved_arguments = !self.source_identifiers.contains(LEXICAL_ARGUMENTS_NAME)
+                && function
+                    .parameters
+                    .visit_with(&mut ArgumentsReferences)
+                    .is_continue()
+                && function
+                    .body
+                    .visit_with(&mut ArgumentsReferences)
+                    .is_continue();
             let locals = activation
                 .binding_modes
                 .iter()
                 .filter_map(|(name, mode)| {
-                    if matches!(
-                        name.as_str(),
-                        "arguments"
-                            | LEXICAL_ARGUMENTS_NAME
-                            | LEXICAL_THIS_NAME
-                            | LEXICAL_NEW_TARGET_NAME
-                            | LEXICAL_HOME_OBJECT_NAME
-                    ) {
+                    if matches!(name.as_str(), LEXICAL_THIS_NAME | LEXICAL_NEW_TARGET_NAME) {
+                        // Some synthetic spellings are valid source names.
+                        // Never infer their identity from the spelling alone.
+                        return (!self.source_identifiers.contains(name)).then(|| name.clone());
+                    }
+                    if name == LEXICAL_ARGUMENTS_NAME {
+                        return unobserved_arguments.then(|| name.clone());
+                    }
+                    if matches!(name.as_str(), "arguments" | LEXICAL_HOME_OBJECT_NAME) {
                         return None;
                     }
                     ((*mode == BindingMode::Var || owner.parameter_names.contains(name))
@@ -222,5 +235,21 @@ impl AnalysisBuilder<'_> {
             self.module_local_candidates
                 .insert(function.id.clone(), locals);
         }
+    }
+}
+
+struct ArgumentsReferences;
+
+impl<'ast> Visitor<'ast> for ArgumentsReferences {
+    type BreakTy = ();
+
+    fn visit_identifier(
+        &mut self,
+        identifier: &'ast boa_ast::expression::Identifier,
+    ) -> ControlFlow<()> {
+        if identifier.sym() == boa_interner::Sym::ARGUMENTS {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
     }
 }

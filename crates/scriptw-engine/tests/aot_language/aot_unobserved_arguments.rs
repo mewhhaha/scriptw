@@ -229,3 +229,36 @@ object.arguments === null && array.arguments === null && primitive.arguments ===
 "#,
     );
 }
+
+#[test]
+fn strict_unused_arguments_preserve_reentry_barriers_and_getter_coercion_order() {
+    assert_leaf_semantics(
+        r#"
+var log=[];
+function observe() { return observe.caller === null; }
+function invoke(callback, value) { 'use strict'; value = value.x; return callback() && value === 7; }
+function read(input) { 'use strict'; var first=input.x; return first+input.y; }
+function convert(input) { 'use strict'; return +input; }
+function blocked() { 'use strict'; return observe(); }
+var holder={get x(){log.push('x');gc();return 7;},get y(){log.push('y');return 5;}};
+var coercible={valueOf(){log.push('coerce');return 11;}};
+var called=invoke(observe,holder), sum=read(holder), converted=convert(coercible), barrier=blocked();
+called && sum===12 && converted===11 && barrier && log.join('|')==='x|x|y|coerce';
+"#,
+    );
+}
+
+#[test]
+fn strict_observed_arguments_keep_snapshots_nested_arrows_and_prepared_eval() {
+    assert_leaf_semantics(
+        r#"
+function unused(input) { 'use strict'; var saved=input; input=9; return saved.x+input; }
+function observed(input) { 'use strict'; input=9; return arguments[0].x+input+arguments.length; }
+function arrow(input) { 'use strict'; return () => arguments[0]; }
+function evaluated(input) { 'use strict'; return eval('arguments[0]'); }
+var marker={x:7}, capture=arrow(marker);
+gc();
+unused(marker)===16 && observed(marker)===17 && capture()===marker && evaluated(marker)===marker;
+"#,
+    );
+}

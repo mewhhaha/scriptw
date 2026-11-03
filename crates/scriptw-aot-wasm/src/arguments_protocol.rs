@@ -5,6 +5,7 @@ use scriptw_ir::{
 use crate::EmitError;
 
 mod unobservable_leaf;
+mod unobserved_strict;
 pub(crate) use unobservable_leaf::UserFunctionActivationPlan;
 
 /// Whether this invocation needs a materialized arguments object, and the only legal
@@ -23,6 +24,7 @@ enum FunctionArgumentsKind {
     Absent,
     EmptyStrictBody(EmptyStrictBody),
     UnobservableLeaf,
+    UnobservedStrict,
     Present(PresentArgumentsObjectProtocol),
 }
 
@@ -106,7 +108,8 @@ impl FunctionArgumentsProtocol {
             FunctionArgumentsState::Pending(
                 FunctionArgumentsKind::Absent
                 | FunctionArgumentsKind::EmptyStrictBody(_)
-                | FunctionArgumentsKind::UnobservableLeaf,
+                | FunctionArgumentsKind::UnobservableLeaf
+                | FunctionArgumentsKind::UnobservedStrict,
             ) => Ok(ArgumentsBindingProtocol(None)),
             FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(protocol)) => {
                 self.0 = FunctionArgumentsState::BoundPresent;
@@ -141,7 +144,8 @@ impl FunctionArgumentsProtocol {
             FunctionArgumentsState::Pending(
                 FunctionArgumentsKind::Absent
                 | FunctionArgumentsKind::EmptyStrictBody(_)
-                | FunctionArgumentsKind::UnobservableLeaf,
+                | FunctionArgumentsKind::UnobservableLeaf
+                | FunctionArgumentsKind::UnobservedStrict,
             )
             | FunctionArgumentsState::BoundAbsent => None,
             FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))

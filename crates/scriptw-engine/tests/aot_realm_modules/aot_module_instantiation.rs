@@ -479,6 +479,82 @@ print('ordinary Module isolation');
 }
 
 #[test]
+fn module_global_references_keep_live_lexicals_getters_and_reference_order() {
+    assert_modules(
+        &[
+            (
+            "entry.js",
+            r#"
+import { imported, replaceImported } from './dependency.js';
+function readImported() { return imported; }
+function make() {
+  let first = 1;
+  function middle() {
+    let second = first;
+    return function deep() { { let third = second; return shadowed; } };
+  }
+  return middle();
+}
+function replaceLexical(value) { shadowed = value; return shadowed; }
+function compound() { return external += (trace.push('rhs'), stored = 100, 2); }
+function increment() { return external++; }
+function write() { return external = (trace.push('assign'), 8); }
+function typeMissing() { return typeof absentGlobal; }
+function readMissing() { return absentGlobal; }
+function invoke(argument) { return callable(argument()); }
+const read = make();
+print(readImported());
+replaceImported(17);
+print(readImported());
+print([read(), replaceLexical(11), read(), globalThis.shadowed].join(','));
+print([compound(), increment(), write()].join(','));
+print(trace.join(','));
+print(invoke(function() {
+  globalThis.callable = function(value) { return 'new:' + value; };
+  return 'argument';
+}));
+print(invoke(function() { return 'tail'; }));
+print(typeMissing());
+try { readMissing(); } catch (error) { print(error instanceof ReferenceError); }
+"#,
+            ),
+            (
+                "dependency.js",
+                "export let imported = 13; export function replaceImported(value) { imported = value; }",
+            ),
+        ],
+        &[
+            "13",
+            "17",
+            "7,11,11,99",
+            "5,5,8",
+            "get,rhs,set:5,get,set:6,assign,set:8",
+            "old:argument:true",
+            "new:tail",
+            "undefined",
+            "true",
+        ],
+        Some(
+            r#"
+let shadowed = 7;
+globalThis.shadowed = 99;
+var trace = [];
+var stored = 3;
+Object.defineProperty(globalThis, 'external', {
+  configurable: true,
+  get() { trace.push('get'); return stored; },
+  set(value) { trace.push('set:' + value); stored = value; }
+});
+globalThis.callable = function(value) {
+  'use strict';
+  return 'old:' + value + ':' + (this === undefined);
+};
+"#,
+        ),
+    );
+}
+
+#[test]
 fn retained_evaluation_cycle_keeps_module_declarations_out_of_global_script() {
     assert_modules(
         &[

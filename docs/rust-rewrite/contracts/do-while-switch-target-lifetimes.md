@@ -37,6 +37,16 @@ The production repair is three added lines. Completion dispatch, label
 identity checks, environment unwinding and invalid-target traps are unchanged;
 stale targets are removed at their owner boundary, never ignored at dispatch.
 
+## Dense integer dispatch
+
+Ordinary switches with effect-free integer literal selectors may use a validated
+bounded dense table. The original discriminant and lexical setup execute once.
+A Number-tag and exact signed-i32 roundtrip guard selects the table; other values
+reach default without coercion. Duplicate keys retain the first clause, including
+both signs of zero. Nested case-entry blocks keep source-order fallthrough,
+default position and the existing break/label/finally cleanup owners. Effectful,
+sparse, unbounded and resumable selectors retain ordered linear dispatch.
+
 ## Evidence and limits
 
 Seven native regressions added to `aot_control_flow` cover a completed loop
