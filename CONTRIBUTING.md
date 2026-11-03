@@ -280,6 +280,21 @@ link and module initialization remain separate setup spans. This is a fixture
 qualification and descriptive timing comparison, not full Web API or WHATWG
 Streams conformance or an engine-parity claim.
 
+The retained Scriptw probe uses the same generated inputs:
+
+```sh
+python3 -B scripts/limited_verification.py -- cargo build --release --locked -p scriptw-cli --example rsc_baseline
+python3 -B scripts/limited_verification.py -- ./target/release/examples/rsc_baseline \
+  target/new-application-fixtures/rsc.js target/new-application-fixtures/support.json \
+  target/new-retained-rsc.json 7 3 fast
+```
+
+Build the production CLI separately as described above. This probe reports actual
+native settings and separates setup from requests. `speed` selects the optional
+Speed/Backtracking diagnostic; keep it outside the matched Fast cohort. A single
+probe is not a complete comparison; freeze binaries before repeating the balanced
+process campaign. The published evidence archive retains that campaign's driver.
+
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone
 Scriptw/Scriptc attempts retain compilation and execution errors explicitly.

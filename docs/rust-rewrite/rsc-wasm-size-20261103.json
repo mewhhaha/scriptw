@@ -3,7 +3,7 @@
   "date": "2026-11-03",
   "status": "static diagnosis; no compiler optimization applied",
   "evidence": {
-    "measured_campaign": "rsc-current.json",
+    "measured_campaign": "rsc-initial-20261103.json",
     "measured_source_archive": "rsc-current-evidence-2026-11-03.tar.xz",
     "local_capture": "target/rsc-wasm-size-20261103/",
     "inspector": "target/rsc-wasm-size-20261103/analyze.py",

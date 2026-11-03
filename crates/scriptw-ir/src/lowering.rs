@@ -155,8 +155,8 @@ use async_disposable::LoweredStatementListItemIr;
 use call_candidate_analysis::{CallCandidateAnalysis, CallCandidateSource};
 use define_property_call::InvocationTargetProvenance;
 use dynamic_source::{
-    BuiltinCallContext, OptionalCallSource, ResolvedDynamicSourceCall,
-    already_accounted_optional_calls,
+    already_accounted_optional_calls, BuiltinCallContext, OptionalCallSource,
+    ResolvedDynamicSourceCall,
 };
 use generator_identifier_reference::RetainedGeneratorIdentifierReference;
 use intrinsic_method::{IntrinsicMethodLookup, IntrinsicPrototype};
@@ -172,13 +172,13 @@ use static_string_binding_facts::StaticStringBindingFacts;
 /// file is traceable to one import. See
 /// `docs/rust-rewrite/contracts/reference-records.md`.
 use crate::ir::reference::{
-    CapturedBindingPosition, CapturedCursorDepth, CapturedObjectPosition, Composition,
-    CurrentScopeDepth, DeclarativeEnvironmentPosition, DeleteSuperReferencePlan,
-    EagerCompoundAssignmentBindings, EagerCompoundAssignmentOp, NumericUpdateBindings,
-    ObjectEnvironmentBindingObject, OrderedWithEnvironmentChain, OrdinaryPropertyReferencePlan,
-    PositionedWithEnvironment, PutValueBindings, ReferenceBase, ReferenceOperand, ReferencePins,
-    ReferenceRecord, SelectedWithEnvironmentObjects, SuperPropertyReferencePlan,
-    WithEnvironmentReferencePlan, reference_base_of_lowered_read,
+    reference_base_of_lowered_read, CapturedBindingPosition, CapturedCursorDepth,
+    CapturedObjectPosition, Composition, CurrentScopeDepth, DeclarativeEnvironmentPosition,
+    DeleteSuperReferencePlan, EagerCompoundAssignmentBindings, EagerCompoundAssignmentOp,
+    NumericUpdateBindings, ObjectEnvironmentBindingObject, OrderedWithEnvironmentChain,
+    OrdinaryPropertyReferencePlan, PositionedWithEnvironment, PutValueBindings, ReferenceBase,
+    ReferenceOperand, ReferencePins, ReferenceRecord, SelectedWithEnvironmentObjects,
+    SuperPropertyReferencePlan, WithEnvironmentReferencePlan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -253,7 +253,11 @@ enum PrototypeToStringState {
 
 impl PrototypeToStringState {
     fn join(self, other: Self) -> Self {
-        if self == other { self } else { Self::Unknown }
+        if self == other {
+            self
+        } else {
+            Self::Unknown
+        }
     }
 }
 
@@ -1227,6 +1231,9 @@ pub(crate) struct ScriptLowerer<'a> {
     labels: Vec<ActiveLabel>,
     is_function_body: bool,
     current_function_id: Option<FunctionId>,
+    /// The emitted variant may differ from the analyzed source owner. Cell
+    /// witnesses retain this identity without changing source analysis keys.
+    current_output_function_id: Option<FunctionId>,
     current_param_names: Vec<String>,
     current_return: Option<FunctionReturnObservation>,
     current_generator_resume_state: Option<u32>,
@@ -1688,6 +1695,7 @@ impl<'a> ScriptLowerer<'a> {
             labels: Vec::new(),
             is_function_body: false,
             current_function_id: None,
+            current_output_function_id: None,
             current_param_names: Vec::new(),
             current_return: None,
             current_generator_resume_state: None,

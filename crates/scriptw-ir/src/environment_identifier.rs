@@ -192,25 +192,25 @@ pub struct EnvironmentIdentifierIr {
 
 /// Where a fresh ResolveBinding starts. Captured operations already own their
 /// Reference and do not resolve again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EnvironmentIdentifierResolutionStart {
     CurrentEnvironment,
     GlobalEnvironment,
-    CapturedCell(crate::ModuleCapturedCellIr),
+    Cell(crate::ProvenBindingCellIr),
 }
 
 impl EnvironmentIdentifierIr {
-    pub(crate) fn captured_cell(
+    pub(crate) fn cell(
         name: String,
         strictness: Strictness,
         operation: EnvironmentIdentifierOperationIr,
-        cell: crate::ModuleCapturedCellIr,
+        cell: crate::ProvenBindingCellIr,
     ) -> Self {
         Self {
             name,
             strictness,
             operation,
-            resolution_start: EnvironmentIdentifierResolutionStart::CapturedCell(cell),
+            resolution_start: EnvironmentIdentifierResolutionStart::Cell(cell),
         }
     }
 
@@ -241,7 +241,7 @@ impl EnvironmentIdentifierIr {
     }
 
     pub fn resolution_start(&self) -> EnvironmentIdentifierResolutionStart {
-        self.resolution_start
+        self.resolution_start.clone()
     }
 }
 

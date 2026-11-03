@@ -50,19 +50,20 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 23.37 ms | 0.476 ms |
-| Async | 26.19 ms | 0.393 ms |
+| Sync | 19.90 ms | 0.487 ms |
+| Async | 21.01 ms | 0.392 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Eight fresh processes per engine; three checked warmups and seven measured
-requests per mode. Native compilation and module initialization precede timing.
+requests per mode. Request time falls **16.4% / 21.0%** against the matched prior
+compiler. Native compilation and module initialization precede timing.
 Requests include full Flight serialization/consumption; final JSON encoding and
 validation follow timing. Scriptw uses Cranelift **Fast / OptLevel::None**.
 
-Cold RSC setup takes about **3.63 s JavaScript → Wasm + 12.52 s native preparation**.
-Raw Wasm is **7.30 MiB application + 37.56 MiB shared runtime**; code size remains
-an open issue. [Size breakdown](docs/rust-rewrite/rsc-wasm-size-20261103.json) ·
+Cold RSC setup takes about **3.22 s JavaScript → Wasm + 12.40 s native preparation**.
+Raw Wasm is **6.08 MiB application + 37.56 MiB shared runtime**; application code
+shrinks 10.9%, with size still an open issue. [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details, failures and caveats](docs/rust-rewrite/benchmarks.md) ·
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json).
 
@@ -88,8 +89,9 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-03**): 1,290 Engine, 41 Wasm-emission and
-five captured-cell IR checks passed, plus nine exact-output CLI application runs.
+Latest scoped verification (**2026-11-03**): 1,295 Engine, 42 Wasm-emission,
+nine captured-cell IR and two encoded cell-read checks passed, plus nine
+exact-output CLI application runs.
 These scopes do not replace the published full Test262 run. Full workspace CI was
 not rerun; 14 stale Intl identity recipes remain [owned](docs/rust-rewrite/current-inventory.md).
 

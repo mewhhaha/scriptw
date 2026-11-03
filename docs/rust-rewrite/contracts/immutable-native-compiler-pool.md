@@ -19,6 +19,13 @@ pass the same admitted proof into actual emission. The public proof APIs keep
 their signatures. P publication reads only its own appended images and literal
 descriptors. No GC layout or R/P wire version changes.
 
+After collection, P may compact its passive UTF-16 suffix by sharing aligned,
+overlapping slices. Literal ordinals, WTF-8 metadata addresses and R's immutable
+prefix stay fixed. Every descriptor retains its exact length and code units;
+String construction still uses the existing GC representation. Search work is
+bounded, and exhaustion appends the original bytes. Packing is published only
+when the physical image shrinks.
+
 Authored controls compare P images and ordinals against fresh collection,
 assert actual prefix storage identity and isolation between P appendices,
 reject changed same-size R data, and verify that multiple proofs and all three

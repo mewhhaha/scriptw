@@ -255,9 +255,10 @@ impl ScriptLowerer<'_> {
             .map(|cell| cell.value_info(self));
         let cell = if self.with_environment_chain.is_empty() {
             self.lookup_binding(&name).and_then(|binding| {
-                ModuleCapturedCellIr::analyze(
+                ProvenBindingCellIr::analyze(
                     self.analysis,
                     &self.current_owner_id,
+                    self.current_output_function_id.as_deref()?,
                     &binding.storage_name,
                     &name,
                 )
@@ -267,12 +268,9 @@ impl ScriptLowerer<'_> {
         };
         self.invalidate_unknown_user_code_effects();
         let identifier = match cell {
-            Some(cell) => EnvironmentIdentifierIr::captured_cell(
-                name,
-                self.reference_strictness(),
-                operation,
-                cell,
-            ),
+            Some(cell) => {
+                EnvironmentIdentifierIr::cell(name, self.reference_strictness(), operation, cell)
+            }
             None => EnvironmentIdentifierIr::current(name, self.reference_strictness(), operation),
         };
         TypedExpr::from_info(

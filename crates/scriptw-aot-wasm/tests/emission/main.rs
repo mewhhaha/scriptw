@@ -24,6 +24,7 @@ mod iterator_helper_dispatch;
 mod numeric_bitwise_emission;
 mod packed_array_storage;
 mod product_artifact;
+mod program_utf16_sharing;
 mod proper_tail_call_emission;
 mod property_read_plans;
 mod string_match_call_emission;

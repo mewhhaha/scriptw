@@ -2239,6 +2239,7 @@ dependencies = [
  "icu_calendar",
  "icu_normalizer",
  "icu_properties",
+ "memchr",
  "num-bigint",
  "scriptw-front",
  "scriptw-intl",

@@ -146,6 +146,7 @@ impl<'a> ScriptLowerer<'a> {
         lowerer.script_global_call_observation_mode = self.script_global_call_observation_mode;
         lowerer.is_function_body = true;
         lowerer.current_function_id = Some(function.id.clone());
+        lowerer.current_output_function_id = Some(output_id.clone());
         match function.protocol.source_execution_kind() {
             FunctionExecutionKind::Generator => {
                 lowerer.current_generator_resume_state = Some(0);

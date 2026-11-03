@@ -8,6 +8,7 @@ license.workspace = true
 icu_calendar = { version = "=2.0.6", default-features = false, features = ["compiled_data"] }
 icu_normalizer = { version = "=2.0.1", default-features = false, features = ["compiled_data"] }
 icu_properties = "2.0.2"
+memchr = { version = "2.8.0", default-features = false, features = ["std"] }
 num-bigint = "0.4.6"
 scriptw-ir = { path = "../scriptw-ir" }
 scriptw-intl = { path = "../scriptw-intl" }

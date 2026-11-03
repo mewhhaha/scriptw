@@ -21,6 +21,7 @@ pub(crate) use runtime_string_descriptors::RuntimeStringDescriptors;
 mod pooled_literal_domain;
 pub(crate) use pooled_literal_domain::PooledLiteralDomain;
 mod program_string_descriptors;
+mod program_utf16;
 pub(crate) use program_string_descriptors::{
     ProgramStringDescriptorImage, ProgramStringDescriptorWord,
 };
@@ -2408,6 +2409,7 @@ impl CompilerOwnedPool {
         }
         pool.append_regexp_programs();
         pool.numeric_call_tables.validate()?;
+        pool.compact_program_utf16();
         Ok(pool)
     }
 }

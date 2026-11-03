@@ -7,15 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-
 Measured **2026-11-03** with pinned React 19.3.1 and one retained module per
 process. Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw platform baseline | 28.827 | 31.844 |
-| Scriptw candidate | 23.372 | 26.186 |
-| Node 24.12.0 / V8 | 0.476 | 0.393 |
+| Scriptw prior build | 23.802 | 26.590 |
+| Scriptw current build | 19.898 | 21.012 |
+| Node 24.12.0 / V8 | 0.487 | 0.392 |
 
 ![Matched retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -23,23 +22,61 @@ Each engine uses eight fresh processes across two balanced blocks, with three
 checked warmups and seven measured requests per mode. Scriptw's request clock
 covers the retained call through full Flight consumption; Node uses the same
 bundle and wrapper in one `vm.SourceTextModule`/Realm for sync then async. JSON
-encoding and exact-output checks follow the clock. Candidate medians are 18.9%
-and 17.8% below baseline; this combines captured-cell and timer-owner changes,
-so it does not isolate either change or claim engine parity.
+encoding and exact-output checks follow the clock. Current medians are **16.4%**
+and **21.0%** below the prior build; both modes improve in both blocks. Process
+medians are the comparison units, with no significance or engine-parity claim.
+V8 remains about **41× / 54× faster** on this fixture. Scriptc's existing React
+build failures remain unqualified; client React/DOM is a separate open scope.
 
-Runtime ABI 47 adds bounded `TextEncoder`/`TextDecoder`, byte `ReadableStream`
-sources with default readers, events, abort signals, `DOMException`, microtasks
-and timers. This is not full Web API or WHATWG Streams conformance;
-Fetch/Request/URL integration and DOM nodes remain unsupported.
+Strict ordinary module functions now keep private, uncaptured variables and
+simple parameters in Wasm locals even when the bundle uses arguments. Real
+captures, synthetic bindings and arguments retain their storage and snapshots.
+Proven reads of retained cells also avoid generic name resolution while keeping
+TDZ and mutation behavior. Immutable program UTF-16 slices share physical data;
+all 987 literal contents remain. This batch changes those mechanisms together,
+so the matched cohort does not isolate each mechanism's contribution.
 
-Cold phase medians are similar: source-to-Wasm is 3.629 s / 3.625 s and native
-preparation 12.464 s / 12.524 s (baseline / candidate). Program Wasm grows 1.36%,
-from 7,551,136 to 7,653,675 bytes; no cold-preparation improvement is claimed.
+| Cold setup / raw size | Prior build | Current build |
+| --- | ---: | ---: |
+| JavaScript → Wasm | 3.737 s | 3.216 s |
+| Native preparation | 12.779 s | 12.400 s |
+| Module initialization | 2.635 ms | 2.620 ms |
+| Program Wasm | 7,653,675 B | 6,372,954 B |
+| Code section | 6,540,463 B | 5,830,771 B |
+| Data section | 1,016,420 B | 490,228 B |
+| Whole-child peak RSS | 538.5 MiB | 513.5 MiB |
+
+The program shrinks **16.7%**, including a **10.9%** code reduction. R is byte
+identical at 39,380,016 bytes. An excluded loading trace confirms R loads from
+the bundled native image; P still compiles from Wasm before request timing.
+RSS includes compilation and all process history; it does not measure live guest heap. The first rejected intermediate trial grew
+code 4.7% despite a smaller total program; its separate diagnostic is retained
+in the evidence. Large bodies and native compilation remain open costs.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
-[Current report](rsc-current.json) ·
-[Inert evidence archive](rsc-current-evidence-2026-11-03.tar.xz).
+The main cohort keeps Wasmtime 47 **Fast / OptLevel::None / SinglePass**, one
+CPU, 16-MiB copying GC and the same stack/deadline settings. A separate
+**one-process** Speed/Backtracking diagnostic reached 16.00 / 16.69 ms, with
+18.45 s native preparation; it is excluded from the comparison and changes no
+default. The ordinary CLI chooses its own automatic native policy: the nine
+exact-output controls include cold RSC at about 17.8 s and React HTML SSR at
+42.4 s. Those Script-mode controls do not establish an SSR performance gain.
+
+Excluded request profiles still place about 8.5% of sampled user cycles in
+string equality, 4.4–4.8% in environment resolution and 4.4–5.1% in property
+search. React's `vn` body contributes 11.4–12.1%. These are instruction-location
+samples, not wall-time or allocation percentages; zero-IP and unresolved
+samples stay in the denominator. The next work is lookup representation and
+remaining call/prologue machinery, guided by caller and allocation evidence.
+
+Runtime ABI 47 supplies bounded UTF-8 codecs, byte streams with default readers,
+events, abort signals and tasks for these fixtures. Fetch/Request/URL integration,
+DOM nodes and full WHATWG conformance remain unsupported or unverified.
+
+[Current report](rsc-current.json) · [Size attribution](rsc-wasm-size-current.json) ·
+[Inert evidence archive](rsc-final-evidence-2026-11-03.tar.xz) ·
+[Prior report](rsc-initial-20261103.json).
 
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison

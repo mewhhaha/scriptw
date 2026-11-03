@@ -71,6 +71,24 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        use EnvironmentIdentifierOperationIr as Operation;
+        let resolution = identifier.resolution_start();
+        if matches!(identifier.operation, Operation::Read | Operation::Typeof) {
+            if let EnvironmentIdentifierResolutionStart::Cell(proof) = &resolution {
+                // Resolving this identity cannot run source code. Read its
+                // existing cell without a pooled key or generic Reference;
+                // initialization and abrupt completion retain the normal path.
+                let value = schema.reserve_value_local(function);
+                self.emit_read_module_cell_identifier(proof, &identifier.name, &value, function)?;
+                if matches!(identifier.operation, Operation::Typeof) {
+                    self.emit_typeof_value(&value, output, function)?;
+                } else {
+                    output.copy_from(&value, function);
+                }
+                value.clear(function);
+                return Ok(());
+            }
+        }
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(
@@ -78,7 +96,6 @@ impl FunctionBuilder<'_> {
                 function,
             );
         let value = schema.reserve_value_local(function);
-        use EnvironmentIdentifierOperationIr as Operation;
         match &identifier.operation {
             Operation::AssignWithGlobalFallback {
                 selection,
@@ -161,17 +178,11 @@ impl FunctionBuilder<'_> {
                         global.clear(function);
                         Some(record)
                     }
-                    EnvironmentIdentifierResolutionStart::CapturedCell(proof) => {
-                        let reference = self.emit_resolve_module_captured_identifier(
-                            proof,
-                            &identifier.name,
-                            &key,
-                            identifier.strictness,
-                            function,
-                        )?;
-                        self.emit_environment_identifier_get(&reference, read, &value, function)?;
-                        self.release_environment_identifier_reference(reference, function);
-                        None
+                    EnvironmentIdentifierResolutionStart::Cell(proof) => {
+                        return Err(EmitError::unsupported(format!(
+                            "compiler invariant: proven cell read for {} missed its direct path",
+                            proof.storage_name()
+                        )));
                     }
                 };
                 if let Some(record) = record {
@@ -208,9 +219,9 @@ impl FunctionBuilder<'_> {
             EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
                 self.emit_resolve_global_identifier(&key, identifier.strictness, function)?
             }
-            EnvironmentIdentifierResolutionStart::CapturedCell(proof) => self
-                .emit_resolve_module_captured_identifier(
-                    proof,
+            EnvironmentIdentifierResolutionStart::Cell(proof) => self
+                .emit_resolve_module_cell_identifier(
+                    &proof,
                     &identifier.name,
                     &key,
                     identifier.strictness,

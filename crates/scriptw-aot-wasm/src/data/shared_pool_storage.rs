@@ -47,6 +47,11 @@ impl PoolBytes {
         );
         self.appended.resize(length - self.prefix.len(), value);
     }
+    pub(super) fn replace_suffix(&mut self, start: usize, bytes: Vec<u8>) {
+        assert!(start >= self.prefix.len() && start <= self.len());
+        self.appended.truncate(start - self.prefix.len());
+        self.appended.extend(bytes);
+    }
     /// Standalone and R emission have one contiguous image. A linked P reads
     /// its explicit suffix, so it never requests a combined allocation.
     pub(crate) fn as_slice(&self) -> &[u8] {
@@ -148,5 +153,8 @@ impl PoolStringRefs {
     }
     pub(super) fn program_values(&self) -> impl Iterator<Item = &StringRef> {
         self.appended.values()
+    }
+    pub(super) fn program_values_mut(&mut self) -> impl Iterator<Item = &mut StringRef> {
+        self.appended.values_mut()
     }
 }

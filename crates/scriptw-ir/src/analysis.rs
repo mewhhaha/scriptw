@@ -10,8 +10,8 @@ use boa_ast::pattern::{ArrayPattern, ObjectPattern};
 pub(crate) use eval_environment::{
     CompleteResumableForInOwner, CompleteResumableForOfOwner, MixedAsyncGeneratorWithOwner,
 };
-pub(crate) use module_locals::ModuleCaptureOwners;
-pub use module_locals::ModuleCapturedCellIr;
+pub(crate) use module_locals::ModuleCellOwners;
+pub use module_locals::{ProvenBindingCellIr, ProvenBindingCellOrigin};
 use std::sync::Arc;
 
 /// Necessary syntax condition only; intrinsic eval identity remains a lowering proof.
@@ -289,7 +289,7 @@ impl AnalysisAllocationState {
 pub(crate) struct Analysis<'a> {
     pub(crate) binding_inference: OwnerBindingInference<'a>,
     pub(crate) module_local_candidates: BTreeMap<FunctionId, BTreeSet<String>>,
-    pub(crate) module_capture_owners: ModuleCaptureOwners,
+    pub(crate) module_cell_owners: ModuleCellOwners,
     pub(crate) template_source: Option<TemplateSourceIr>,
     pub(crate) function_global_hints: crate::prepared_source_cache::FunctionGlobalConstructorHints,
     pub(crate) source_function_global_hypotheses:
@@ -492,15 +492,11 @@ impl<'a> AnalysisBuilder<'a> {
                 ))
             || eval_environment::contains_direct_eval_call(script)
             || eval_environment::contains_annex_b_arguments_candidate(script);
-        // Stable captures do not require private-local elimination. Preserve
-        // all arguments aliases and named allocation below, but distinguish
-        // that storage requirement from actual dynamic binding creation.
-        let module_capture_owners = self.realm_reusable_module_environments && !self.eval_visible;
+        // Module reuse and arguments require named nonlocals and a live arguments
+        // binding, but cannot expose private strict-function locals. Actual eval
+        // or Annex-B binding creation still disables both static storage paths.
+        let static_module_bindings = self.realm_reusable_module_environments && !self.eval_visible;
         self.eval_visible |= eval_environment::contains_arguments_reference(script);
-        // Reusable Realm lookup needs named nonlocals, but does not expose
-        // uncaptured function locals to eval. Actual eval/arguments syntax
-        // conservatively retains the complete existing environment plan.
-        let module_local_candidates = self.realm_reusable_module_environments && !self.eval_visible;
         self.eval_visible |= self.realm_reusable_module_environments;
         self.source_identifiers = eval_environment::source_identifiers(script, interner);
         let direct_context = match &self.script_instantiation {
@@ -641,12 +637,12 @@ impl<'a> AnalysisBuilder<'a> {
             );
         }
         self.finalize_with_continuation_owners();
-        let module_capture_owners = if module_capture_owners {
-            ModuleCaptureOwners::collect(&self)
+        let module_cell_owners = if static_module_bindings {
+            ModuleCellOwners::collect(&self)
         } else {
-            ModuleCaptureOwners::default()
+            ModuleCellOwners::default()
         };
-        if module_local_candidates {
+        if static_module_bindings {
             self.plan_module_local_candidates();
         }
         self.finalize_capture_plans(interner);
@@ -665,7 +661,7 @@ impl<'a> AnalysisBuilder<'a> {
         Analysis {
             binding_inference,
             module_local_candidates: self.module_local_candidates,
-            module_capture_owners,
+            module_cell_owners,
             function_global_hints: Default::default(),
             source_function_global_hypotheses: Default::default(),
             template_source: self.template_source,

@@ -270,3 +270,268 @@ export function bump(amount) { return counter(amount); }
     assert!(first.take_output(&mut first_store).unwrap().is_empty());
     assert!(second.take_output(&mut second_store).unwrap().is_empty());
 }
+
+#[test]
+fn current_owner_cells_keep_reentrant_values_and_callee_argument_order() {
+    assert_output(
+        r#"
+function unrelated() { return arguments.length; }
+function subject(value, callback) {
+  var cell = 5;
+  var trace = [];
+  function replaceValue() { value = 40; cell = 80; return 2; }
+  function replaceCell() { cell = 100; return 2; }
+  function changeType() { value = {}; }
+  function replacement(input) { trace.push('new'); return 'new:' + input + ':' + (this === undefined); }
+  function argument() { trace.push('arg'); callback = replacement; return 'payload'; }
+  var sum = value += replaceValue();
+  var product = cell *= replaceCell();
+  changeType();
+  var kind = typeof value;
+  var first = callback(argument());
+  var second = callback('tail');
+  return [sum, product, kind, first, second, trace.join(',')].join('|');
+}
+print(subject(1, function(input) { return 'old:' + input + ':' + (this === undefined); }));
+print(unrelated(1, 2));
+"#,
+        true,
+        &["3|160|object|old:payload:true|new:tail:true|arg,new", "2"],
+    );
+}
+
+#[test]
+fn current_owner_block_cells_keep_tdz_const_and_shadow_boundaries() {
+    assert_output(
+        r#"
+function inspect(seed) {
+  var trace = [typeof hoisted];
+  var hoisted = seed;
+  var readHoisted = () => hoisted;
+  {
+    try { typeof local; } catch (error) { trace.push(error instanceof ReferenceError); }
+    try { local; } catch (error) { trace.push(error instanceof ReferenceError); }
+    let local = seed * 2;
+    const fixed = 17;
+    var readLocal = () => local;
+    var readFixed = () => fixed;
+    trace.push(typeof local, local);
+    {
+      let local = 'inner';
+      trace.push(local, readLocal());
+    }
+    try { fixed = (trace.push('const-rhs'), 99); }
+    catch (error) { trace.push(error instanceof TypeError); }
+    local += (hoisted = 9, 1);
+    trace.push(local, readLocal(), readFixed());
+  }
+  trace.push(hoisted, readHoisted());
+  return trace.join(',');
+}
+print(inspect(3));
+"#,
+        true,
+        &["undefined,true,true,number,6,inner,6,const-rhs,true,7,7,17,9,9"],
+    );
+}
+
+#[test]
+fn react_like_simple_factories_retry_with_live_owned_parameters_and_vars() {
+    assert_output(
+        r#"
+function strictArguments(value) {
+  var read = () => arguments[0];
+  value = 99;
+  return [value, arguments[0], read()].join(',');
+}
+function lazy(factory, cached) {
+  return function load() {
+    try {
+      if (!cached) {
+        cached = {exports: {}};
+        factory(cached.exports, cached);
+      }
+      return cached.exports;
+    } catch (error) {
+      cached = 0;
+      throw error;
+    }
+  };
+}
+var attempts = 0;
+var marker = {};
+var load = lazy(function(exports, module) {
+  ++attempts;
+  var value = attempts;
+  function write(next) { value = next; exports.note = next; module.tag = next; }
+  if (value === 1) { write(3); throw marker; }
+  exports.count = value;
+  write(7);
+  module.exports = {count: exports.count, live: value, note: exports.note, tag: module.tag,
+    receiver: this === undefined};
+});
+try { load(); } catch (error) { print(error === marker); }
+var first = load();
+var second = load();
+print([attempts, first === second, first.count, first.live, first.note, first.tag, first.receiver].join(','));
+print(strictArguments(8));
+"#,
+        true,
+        &["true", "2,true,2,7,7,7,true", "99,8,8"],
+    );
+}
+
+#[test]
+fn packed_utf16_keeps_nested_function_sources_and_exact_units_across_instances() {
+    const INNER_SOURCE: &str =
+        r#"function inner(x) { /* café 😀 */ return x + "\u0000\u0001\u0100\ud800"; }"#;
+    const EXPORTS: &str = r#"
+const nested = outer("Āā");
+export function outerSource() { return outer.toString(); }
+export function innerSource() { return nested.inner.toString(); }
+export function payload() { return nested.value; }
+export function callInner(input) { return nested.inner(input); }
+export function boundaries() {
+  return ["\u0100\u0001", "\u0001\u0100", "\u0000\u0100", "\u0100\u0000",
+    "Āā", "\u0100", "\u0001", "\u0000"].join("|");
+}
+"#;
+    let outer_source = format!(
+        "function outer(Ā) {{ /* outer 😀 */\n  {INNER_SOURCE}\n  return {{inner, value: inner(Ā)}};\n}}"
+    );
+    let source = format!("{outer_source}\n{EXPORTS}");
+    configure_compilation_jobs(1).unwrap();
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let unit = compiler
+        .compile_module(&source, CompileOptions::default())
+        .unwrap();
+    let artifact = compiler.emit_wasm(&unit).unwrap();
+    let mut config = wasmtime::Config::new();
+    configure_wasm_runtime(&mut config);
+    let native = wasmtime::Engine::new(&config).unwrap();
+    let runtime = EmbeddedRuntime::compile(&native, &artifact).unwrap();
+    for _ in 0..2 {
+        let (mut store, instance) = fresh_instance(&native, &runtime);
+        store.gc(None).unwrap();
+        let read =
+            |store: &mut wasmtime::Store<WasmStoreState>, name: &str, arguments: &[JsValue]| {
+                let function = normal(instance.get_export(store, name).unwrap());
+                normal(instance.call(store, &function, None, arguments).unwrap())
+                    .to_utf16(store)
+                    .unwrap()
+            };
+        assert_eq!(
+            read(&mut store, "outerSource", &[]),
+            outer_source.encode_utf16().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            read(&mut store, "innerSource", &[]),
+            INNER_SOURCE.encode_utf16().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            read(&mut store, "payload", &[]),
+            [0x0100, 0x0101, 0, 1, 0x0100, 0xd800]
+        );
+        assert_eq!(
+            read(&mut store, "boundaries", &[]),
+            "\u{0100}\u{0001}|\u{0001}\u{0100}|\0\u{0100}|\u{0100}\0|Āā|\u{0100}|\u{0001}|\0"
+                .encode_utf16()
+                .collect::<Vec<_>>()
+        );
+        let input = instance
+            .value(&mut store, ForeignValue::StringUtf16(vec![0x0101, 0]))
+            .unwrap();
+        assert_eq!(
+            read(&mut store, "callInner", &[input]),
+            [0x0101, 0, 0, 1, 0x0100, 0xd800]
+        );
+        assert!(instance.take_output(&mut store).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn private_aliases_observe_callback_shape_changes_and_keep_callee_snapshots() {
+    assert_output(
+        r#"
+function elsewhere() { return arguments.length; }
+function holder(initial) {
+  let current = initial;
+  return {read() { return current; }, replace(next) { current = next; }};
+}
+function work(mutate, callbacks, next) {
+  var object = {value: 1, keep: true, method() { return 'old'; }};
+  var alias = object;
+  var before = object.value;
+  var stable = function(input) { return 'stable:' + input + ':' + (this === undefined); };
+  var stableResult = stable((mutate(alias), 'value'));
+  var kind = typeof object.value;
+  var tag = object.value.tag;
+  var method = object.method();
+  var selected = callbacks.read();
+  var first = selected((callbacks.replace(next), 'arg'));
+  var second = callbacks.read()('tail');
+  return [before, kind, tag, typeof object.keep, method, stableResult, first, second].join('|');
+}
+var trace = [];
+var callbacks = holder(function(input) {
+  trace.push('old:' + input);
+  return 'old:' + input + ':' + (this === undefined);
+});
+print(work(function(object) {
+  trace.push('mutate');
+  Object.defineProperty(object, 'value', {configurable: true, get() {
+    trace.push('get'); return {tag: 'after'};
+  }});
+  delete object.keep;
+  object.method = function() { trace.push('method'); return this === object; };
+}, callbacks, function(input) {
+  trace.push('new:' + input);
+  return 'new:' + input + ':' + (this === undefined);
+}));
+print(trace.join(','));
+print(elsewhere(1, 2));
+"#,
+        true,
+        &[
+            "1|object|after|undefined|true|stable:value:true|old:arg:true|new:tail:true",
+            "mutate,get,get,method,old:arg,new:tail",
+            "2",
+        ],
+    );
+}
+
+#[test]
+fn strict_arguments_keep_snapshots_object_aliases_and_escaped_activation_identity() {
+    assert_output(
+        r#"
+function snapshot(value, extra) {
+  var original = value;
+  value = {tag: 'private'};
+  var args = arguments;
+  args[0].tag += ':args';
+  var trace = [value.tag, original.tag, args[0] === original, value === args[0], extra, args[1]];
+  extra = 'changed';
+  args[1] = 'written';
+  trace.push(extra, args[1], typeof value);
+  return {trace: trace.join('|'), escaped: () => arguments};
+}
+var a = {tag: 'A'}, b = {tag: 'B'};
+var first = snapshot(a, 'one');
+var second = snapshot(b, 'two');
+print(first.trace);
+print(second.trace);
+var firstArgs = first.escaped();
+var secondArgs = second.escaped();
+firstArgs[0].tag += ':later';
+firstArgs[1] = 'later';
+print([firstArgs !== secondArgs, firstArgs[0] === a, secondArgs[0] === b,
+  a.tag, b.tag, firstArgs[1], secondArgs[1], firstArgs.length, secondArgs.length].join('|'));
+"#,
+        true,
+        &[
+            "private|A:args|true|false|one|one|changed|written|object",
+            "private|B:args|true|false|two|two|changed|written|object",
+            "true|true|true|A:args:later|B:args|later|written|2|2",
+        ],
+    );
+}

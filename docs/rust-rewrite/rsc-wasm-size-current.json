@@ -1,0 +1,1003 @@
+{
+  "baseline_program_bytes": 7653675,
+  "baseline_program_sha256": "a19779bb0a6df8782d895c346c1b9e3e1e1e9ffbab48222d5f59257a9daa140d",
+  "body_bytes": 5830014,
+  "categories": {
+    "main": {
+      "body_bytes": 37475,
+      "functions": 1
+    },
+    "program-initialize": {
+      "body_bytes": 699,
+      "functions": 1
+    },
+    "runtime-helper": {
+      "body_bytes": 69328,
+      "functions": 18
+    },
+    "script": {
+      "body_bytes": 5722512,
+      "functions": 308
+    }
+  },
+  "category_deltas": {
+    "main": {
+      "delta_bytes": 0,
+      "new_body_bytes": 37475,
+      "old_body_bytes": 37475
+    },
+    "program-initialize": {
+      "delta_bytes": 0,
+      "new_body_bytes": 699,
+      "old_body_bytes": 699
+    },
+    "runtime-helper": {
+      "delta_bytes": 0,
+      "new_body_bytes": 69328,
+      "old_body_bytes": 69328
+    },
+    "script": {
+      "delta_bytes": -709686,
+      "new_body_bytes": 5722512,
+      "old_body_bytes": 6432198
+    }
+  },
+  "data_segments": [
+    {
+      "bytes": 143192,
+      "delta_bytes": -526192,
+      "index": 0,
+      "old_bytes": 669384,
+      "role": "pooled UTF-16"
+    },
+    {
+      "bytes": 335174,
+      "delta_bytes": 0,
+      "index": 1,
+      "old_bytes": 335174,
+      "role": "metadata including byte-oriented string image"
+    },
+    {
+      "bytes": 11844,
+      "delta_bytes": 0,
+      "index": 2,
+      "old_bytes": 11844,
+      "role": "literal descriptors"
+    },
+    {
+      "bytes": 0,
+      "delta_bytes": 0,
+      "index": 3,
+      "old_bytes": 0,
+      "role": "compact array recipes"
+    }
+  ],
+  "date": "2026-11-03",
+  "defined_functions": 328,
+  "evidence": {
+    "archive": "rsc-final-evidence-2026-11-03.tar.xz",
+    "archive_member_prefix": "verification/final/size/",
+    "measured_campaign": "rsc-current.json",
+    "prior_campaign": "rsc-initial-20261103.json",
+    "reproduction": "Use the exact frozen compiler/source reconstruction in the evidence archive; the GDB capture stops before native compilation. Binary payloads are not published."
+  },
+  "first_trial_comparison": {
+    "categories": {
+      "main": {
+        "delta_bytes": 0,
+        "new_body_bytes": 37475,
+        "old_body_bytes": 37475
+      },
+      "program-initialize": {
+        "delta_bytes": 0,
+        "new_body_bytes": 699,
+        "old_body_bytes": 699
+      },
+      "runtime-helper": {
+        "delta_bytes": 0,
+        "new_body_bytes": 69328,
+        "old_body_bytes": 69328
+      },
+      "script": {
+        "delta_bytes": -1013807,
+        "new_body_bytes": 5722512,
+        "old_body_bytes": 6736319
+      }
+    },
+    "largest_body_reductions": [
+      {
+        "delta_bytes": -85562,
+        "kind": "script",
+        "name": "js::vn#f133",
+        "new_bytes": 340194,
+        "new_locals": 324,
+        "old_bytes": 425756,
+        "old_locals": 313
+      },
+      {
+        "delta_bytes": -55385,
+        "kind": "script",
+        "name": "js::no#f194",
+        "new_bytes": 137482,
+        "new_locals": 255,
+        "old_bytes": 192867,
+        "old_locals": 243
+      },
+      {
+        "delta_bytes": -29514,
+        "kind": "script",
+        "name": "js::ft#f123",
+        "new_bytes": 98365,
+        "new_locals": 247,
+        "old_bytes": 127879,
+        "old_locals": 240
+      },
+      {
+        "delta_bytes": -29106,
+        "kind": "script",
+        "name": "js::j#f104",
+        "new_bytes": 60922,
+        "new_locals": 235,
+        "old_bytes": 90028,
+        "old_locals": 230
+      },
+      {
+        "delta_bytes": -28885,
+        "kind": "script",
+        "name": "js::gn#f184",
+        "new_bytes": 94250,
+        "new_locals": 265,
+        "old_bytes": 123135,
+        "old_locals": 255
+      },
+      {
+        "delta_bytes": -26502,
+        "kind": "script",
+        "name": "js::dn#f151",
+        "new_bytes": 77444,
+        "new_locals": 227,
+        "old_bytes": 103946,
+        "old_locals": 220
+      },
+      {
+        "delta_bytes": -26109,
+        "kind": "script",
+        "name": "js::Jt#f127",
+        "new_bytes": 82948,
+        "new_locals": 243,
+        "old_bytes": 109057,
+        "old_locals": 235
+      },
+      {
+        "delta_bytes": -24123,
+        "kind": "script",
+        "name": "js::Ii#f91",
+        "new_bytes": 96414,
+        "new_locals": 242,
+        "old_bytes": 120537,
+        "old_locals": 233
+      },
+      {
+        "delta_bytes": -23477,
+        "kind": "script",
+        "name": "js::en#f25",
+        "new_bytes": 76945,
+        "new_locals": 292,
+        "old_bytes": 100422,
+        "old_locals": 280
+      },
+      {
+        "delta_bytes": -23083,
+        "kind": "script",
+        "name": "js::Or#f181",
+        "new_bytes": 60996,
+        "new_locals": 254,
+        "old_bytes": 84079,
+        "old_locals": 238
+      },
+      {
+        "delta_bytes": -22684,
+        "kind": "script",
+        "name": "js::lt#f138",
+        "new_bytes": 38487,
+        "new_locals": 190,
+        "old_bytes": 61171,
+        "old_locals": 185
+      },
+      {
+        "delta_bytes": -19346,
+        "kind": "script",
+        "name": "js::Sr#f144",
+        "new_bytes": 61175,
+        "new_locals": 224,
+        "old_bytes": 80521,
+        "old_locals": 213
+      },
+      {
+        "delta_bytes": -17505,
+        "kind": "script",
+        "name": "js::f38",
+        "new_bytes": 53854,
+        "new_locals": 186,
+        "old_bytes": 71359,
+        "old_locals": 186
+      },
+      {
+        "delta_bytes": -16906,
+        "kind": "script",
+        "name": "js::i#f228",
+        "new_bytes": 43143,
+        "new_locals": 213,
+        "old_bytes": 60049,
+        "old_locals": 211
+      },
+      {
+        "delta_bytes": -16542,
+        "kind": "script",
+        "name": "js::Gn#f178",
+        "new_bytes": 46442,
+        "new_locals": 203,
+        "old_bytes": 62984,
+        "old_locals": 195
+      }
+    ],
+    "program_bytes": 7396441,
+    "program_delta_bytes": -1023487,
+    "program_sha256": "cc12bccd9e9e8fe0c829ed58289f40a50aa51adea2e51b1a2811a80537082f06",
+    "sections": [
+      {
+        "delta_bytes": 0,
+        "id": 1,
+        "name": null,
+        "new_bytes": 7210,
+        "old_bytes": 7210
+      },
+      {
+        "delta_bytes": 0,
+        "id": 2,
+        "name": null,
+        "new_bytes": 4344,
+        "old_bytes": 4344
+      },
+      {
+        "delta_bytes": 0,
+        "id": 3,
+        "name": null,
+        "new_bytes": 345,
+        "old_bytes": 345
+      },
+      {
+        "delta_bytes": 0,
+        "id": 6,
+        "name": null,
+        "new_bytes": 3,
+        "old_bytes": 3
+      },
+      {
+        "delta_bytes": 0,
+        "id": 7,
+        "name": null,
+        "new_bytes": 285,
+        "old_bytes": 285
+      },
+      {
+        "delta_bytes": 0,
+        "id": 9,
+        "name": null,
+        "new_bytes": 737,
+        "old_bytes": 737
+      },
+      {
+        "delta_bytes": 0,
+        "id": 12,
+        "name": null,
+        "new_bytes": 3,
+        "old_bytes": 3
+      },
+      {
+        "delta_bytes": -1013815,
+        "id": 10,
+        "name": null,
+        "new_bytes": 5830771,
+        "old_bytes": 6844586
+      },
+      {
+        "delta_bytes": 0,
+        "id": 11,
+        "name": null,
+        "new_bytes": 490228,
+        "old_bytes": 490228
+      },
+      {
+        "delta_bytes": 0,
+        "id": 0,
+        "name": "scriptw.runtime.source-compilation.v1",
+        "new_bytes": 41,
+        "old_bytes": 41
+      },
+      {
+        "delta_bytes": 0,
+        "id": 0,
+        "name": "name",
+        "new_bytes": 4659,
+        "old_bytes": 4659
+      },
+      {
+        "delta_bytes": -9672,
+        "id": 0,
+        "name": "scriptw.native_program.literal_operands",
+        "new_bytes": 34320,
+        "old_bytes": 43992
+      }
+    ]
+  },
+  "identical_body_counts": {
+    "main": 1,
+    "program-initialize": 1,
+    "runtime-helper": 18,
+    "script": 41
+  },
+  "imported_functions": 132,
+  "largest_body_increases": [
+    {
+      "delta_bytes": 563,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Gi#f130",
+      "new_bytes": 32108,
+      "new_locals": 206,
+      "old_bytes": 31545,
+      "old_locals": 204
+    },
+    {
+      "delta_bytes": 430,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Cr#f158",
+      "new_bytes": 13465,
+      "new_locals": 177,
+      "old_bytes": 13035,
+      "old_locals": 177
+    },
+    {
+      "delta_bytes": 348,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Ir#f179",
+      "new_bytes": 9885,
+      "new_locals": 147,
+      "old_bytes": 9537,
+      "old_locals": 147
+    },
+    {
+      "delta_bytes": 320,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::R#f153",
+      "new_bytes": 13299,
+      "new_locals": 154,
+      "old_bytes": 12979,
+      "old_locals": 154
+    },
+    {
+      "delta_bytes": 134,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::pr#f152",
+      "new_bytes": 10138,
+      "new_locals": 155,
+      "old_bytes": 10004,
+      "old_locals": 155
+    },
+    {
+      "delta_bytes": 53,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Qt#f161",
+      "new_bytes": 11664,
+      "new_locals": 152,
+      "old_bytes": 11611,
+      "old_locals": 151
+    },
+    {
+      "delta_bytes": 22,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Yi#f110",
+      "new_bytes": 40011,
+      "new_locals": 226,
+      "old_bytes": 39989,
+      "old_locals": 227
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::f71",
+      "new_bytes": 361733,
+      "new_locals": 596,
+      "old_bytes": 361733,
+      "old_locals": 596
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": true,
+      "kind": "script",
+      "name": "js::f15",
+      "new_bytes": 101329,
+      "new_locals": 224,
+      "old_bytes": 101329,
+      "old_locals": 224
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::f304",
+      "new_bytes": 88688,
+      "new_locals": 220,
+      "old_bytes": 88688,
+      "old_locals": 220
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::f6",
+      "new_bytes": 40539,
+      "new_locals": 199,
+      "old_bytes": 40539,
+      "old_locals": 199
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": true,
+      "kind": "main",
+      "name": "scriptw::main",
+      "new_bytes": 37475,
+      "new_locals": 161,
+      "old_bytes": 37475,
+      "old_locals": 161
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": true,
+      "kind": "script",
+      "name": "js::f60",
+      "new_bytes": 25661,
+      "new_locals": 153,
+      "old_bytes": 25661,
+      "old_locals": 153
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::f303",
+      "new_bytes": 22488,
+      "new_locals": 126,
+      "old_bytes": 22488,
+      "old_locals": 126
+    },
+    {
+      "delta_bytes": 0,
+      "encoded_body_identical": true,
+      "kind": "script",
+      "name": "js::Gr#f12",
+      "new_bytes": 19911,
+      "new_locals": 218,
+      "old_bytes": 19911,
+      "old_locals": 218
+    }
+  ],
+  "largest_body_reductions": [
+    {
+      "delta_bytes": -56252,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::vn#f133",
+      "new_bytes": 340194,
+      "new_locals": 324,
+      "old_bytes": 396446,
+      "old_locals": 313
+    },
+    {
+      "delta_bytes": -37237,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::no#f194",
+      "new_bytes": 137482,
+      "new_locals": 255,
+      "old_bytes": 174719,
+      "old_locals": 243
+    },
+    {
+      "delta_bytes": -21822,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::j#f104",
+      "new_bytes": 60922,
+      "new_locals": 235,
+      "old_bytes": 82744,
+      "old_locals": 230
+    },
+    {
+      "delta_bytes": -20509,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::gn#f184",
+      "new_bytes": 94250,
+      "new_locals": 265,
+      "old_bytes": 114759,
+      "old_locals": 255
+    },
+    {
+      "delta_bytes": -19259,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::dn#f151",
+      "new_bytes": 77444,
+      "new_locals": 227,
+      "old_bytes": 96703,
+      "old_locals": 221
+    },
+    {
+      "delta_bytes": -19075,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Jt#f127",
+      "new_bytes": 82948,
+      "new_locals": 243,
+      "old_bytes": 102023,
+      "old_locals": 238
+    },
+    {
+      "delta_bytes": -18457,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::ft#f123",
+      "new_bytes": 98365,
+      "new_locals": 247,
+      "old_bytes": 116822,
+      "old_locals": 240
+    },
+    {
+      "delta_bytes": -17131,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Or#f181",
+      "new_bytes": 60996,
+      "new_locals": 254,
+      "old_bytes": 78127,
+      "old_locals": 238
+    },
+    {
+      "delta_bytes": -17056,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::lt#f138",
+      "new_bytes": 38487,
+      "new_locals": 190,
+      "old_bytes": 55543,
+      "old_locals": 186
+    },
+    {
+      "delta_bytes": -15619,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::en#f25",
+      "new_bytes": 76945,
+      "new_locals": 292,
+      "old_bytes": 92564,
+      "old_locals": 280
+    },
+    {
+      "delta_bytes": -15296,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Ii#f91",
+      "new_bytes": 96414,
+      "new_locals": 242,
+      "old_bytes": 111710,
+      "old_locals": 233
+    },
+    {
+      "delta_bytes": -13237,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Sr#f144",
+      "new_bytes": 61175,
+      "new_locals": 224,
+      "old_bytes": 74412,
+      "old_locals": 214
+    },
+    {
+      "delta_bytes": -13177,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::i#f228",
+      "new_bytes": 43143,
+      "new_locals": 213,
+      "old_bytes": 56320,
+      "old_locals": 212
+    },
+    {
+      "delta_bytes": -13073,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::f38",
+      "new_bytes": 53854,
+      "new_locals": 186,
+      "old_bytes": 66927,
+      "old_locals": 186
+    },
+    {
+      "delta_bytes": -12582,
+      "encoded_body_identical": false,
+      "kind": "script",
+      "name": "js::Gn#f178",
+      "new_bytes": 46442,
+      "new_locals": 203,
+      "old_bytes": 59024,
+      "old_locals": 195
+    }
+  ],
+  "largest_functions": [
+    {
+      "bytes": 361733,
+      "index": 428,
+      "kind": "script",
+      "locals": 596,
+      "name": "js::f71",
+      "ordinal": 296,
+      "start": 5176424
+    },
+    {
+      "bytes": 340194,
+      "index": 327,
+      "kind": "script",
+      "locals": 324,
+      "name": "js::vn#f133",
+      "ordinal": 195,
+      "start": 2976127
+    },
+    {
+      "bytes": 137482,
+      "index": 420,
+      "kind": "script",
+      "locals": 255,
+      "name": "js::no#f194",
+      "ordinal": 288,
+      "start": 4958234
+    },
+    {
+      "bytes": 101329,
+      "index": 184,
+      "kind": "script",
+      "locals": 224,
+      "name": "js::f15",
+      "ordinal": 52,
+      "start": 555192
+    },
+    {
+      "bytes": 98365,
+      "index": 314,
+      "kind": "script",
+      "locals": 247,
+      "name": "js::ft#f123",
+      "ordinal": 182,
+      "start": 2632384
+    },
+    {
+      "bytes": 96414,
+      "index": 262,
+      "kind": "script",
+      "locals": 242,
+      "name": "js::Ii#f91",
+      "ordinal": 130,
+      "start": 1605998
+    },
+    {
+      "bytes": 94250,
+      "index": 395,
+      "kind": "script",
+      "locals": 265,
+      "name": "js::gn#f184",
+      "ordinal": 263,
+      "start": 4535531
+    },
+    {
+      "bytes": 88688,
+      "index": 432,
+      "kind": "script",
+      "locals": 220,
+      "name": "js::f304",
+      "ordinal": 300,
+      "start": 5578781
+    },
+    {
+      "bytes": 82948,
+      "index": 318,
+      "kind": "script",
+      "locals": 243,
+      "name": "js::Jt#f127",
+      "ordinal": 186,
+      "start": 2748615
+    },
+    {
+      "bytes": 77444,
+      "index": 345,
+      "kind": "script",
+      "locals": 227,
+      "name": "js::dn#f151",
+      "ordinal": 213,
+      "start": 3665174
+    },
+    {
+      "bytes": 76945,
+      "index": 176,
+      "kind": "script",
+      "locals": 292,
+      "name": "js::en#f25",
+      "ordinal": 44,
+      "start": 410849
+    },
+    {
+      "bytes": 63948,
+      "index": 307,
+      "kind": "script",
+      "locals": 214,
+      "name": "js::et#f119",
+      "ordinal": 175,
+      "start": 2514878
+    },
+    {
+      "bytes": 63345,
+      "index": 286,
+      "kind": "script",
+      "locals": 214,
+      "name": "js::Ht#f108",
+      "ordinal": 154,
+      "start": 2036966
+    },
+    {
+      "bytes": 62572,
+      "index": 336,
+      "kind": "script",
+      "locals": 177,
+      "name": "js::Er#f142",
+      "ordinal": 204,
+      "start": 3474839
+    },
+    {
+      "bytes": 61175,
+      "index": 338,
+      "kind": "script",
+      "locals": 224,
+      "name": "js::Sr#f144",
+      "ordinal": 206,
+      "start": 3549114
+    }
+  ],
+  "limits": "Static encoded-byte accounting, including section headers. Capture stopped before native compilation. Not runtime shares, allocation counts, or causal isolation of individual source changes.",
+  "measured_inputs": {
+    "executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
+    "inputs": {
+      "adapted_source_bytes": 64946,
+      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+      "source_bytes": 64835,
+      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+      "versions": {
+        "esbuild": "0.28.2",
+        "playwright": "1.64.1",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-server-dom-webpack": "19.3.1"
+      },
+      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+    },
+    "program_wasm_bytes": 6372954,
+    "program_wasm_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+    "runtime": {
+      "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
+      "wasm_bytes": 39380016,
+      "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
+    },
+    "source_fingerprint": "083d9dd79f512925074b1089f3966d404c8faf75d9c118cd4dd299a4f61da9d5"
+  },
+  "program_bytes": 6372954,
+  "program_delta_bytes": -1280721,
+  "program_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+  "schema": "scriptw-rsc-wasm-size-current-v1",
+  "section_deltas": [
+    {
+      "delta_bytes": 0,
+      "id": 1,
+      "name": null,
+      "new_bytes": 7210,
+      "old_bytes": 7210
+    },
+    {
+      "delta_bytes": 0,
+      "id": 2,
+      "name": null,
+      "new_bytes": 4344,
+      "old_bytes": 4344
+    },
+    {
+      "delta_bytes": 0,
+      "id": 3,
+      "name": null,
+      "new_bytes": 345,
+      "old_bytes": 345
+    },
+    {
+      "delta_bytes": 0,
+      "id": 6,
+      "name": null,
+      "new_bytes": 3,
+      "old_bytes": 3
+    },
+    {
+      "delta_bytes": 0,
+      "id": 7,
+      "name": null,
+      "new_bytes": 285,
+      "old_bytes": 285
+    },
+    {
+      "delta_bytes": 0,
+      "id": 9,
+      "name": null,
+      "new_bytes": 737,
+      "old_bytes": 737
+    },
+    {
+      "delta_bytes": 0,
+      "id": 12,
+      "name": null,
+      "new_bytes": 3,
+      "old_bytes": 3
+    },
+    {
+      "delta_bytes": -709692,
+      "id": 10,
+      "name": null,
+      "new_bytes": 5830771,
+      "old_bytes": 6540463
+    },
+    {
+      "delta_bytes": -526192,
+      "id": 11,
+      "name": null,
+      "new_bytes": 490228,
+      "old_bytes": 1016420
+    },
+    {
+      "delta_bytes": 0,
+      "id": 0,
+      "name": "scriptw.runtime.source-compilation.v1",
+      "new_bytes": 41,
+      "old_bytes": 41
+    },
+    {
+      "delta_bytes": 0,
+      "id": 0,
+      "name": "name",
+      "new_bytes": 4659,
+      "old_bytes": 4659
+    },
+    {
+      "delta_bytes": -44837,
+      "id": 0,
+      "name": "scriptw.native_program.literal_operands",
+      "new_bytes": 34320,
+      "old_bytes": 79157
+    }
+  ],
+  "sections": [
+    {
+      "id": 1,
+      "payload_bytes": 7207,
+      "section_header_bytes": 3,
+      "start": 8,
+      "total_bytes": 7210
+    },
+    {
+      "id": 2,
+      "payload_bytes": 4341,
+      "section_header_bytes": 3,
+      "start": 7218,
+      "total_bytes": 4344
+    },
+    {
+      "id": 3,
+      "payload_bytes": 342,
+      "section_header_bytes": 3,
+      "start": 11562,
+      "total_bytes": 345
+    },
+    {
+      "id": 6,
+      "payload_bytes": 1,
+      "section_header_bytes": 2,
+      "start": 11907,
+      "total_bytes": 3
+    },
+    {
+      "id": 7,
+      "payload_bytes": 282,
+      "section_header_bytes": 3,
+      "start": 11910,
+      "total_bytes": 285
+    },
+    {
+      "id": 9,
+      "payload_bytes": 734,
+      "section_header_bytes": 3,
+      "start": 12195,
+      "total_bytes": 737
+    },
+    {
+      "id": 12,
+      "payload_bytes": 1,
+      "section_header_bytes": 2,
+      "start": 12932,
+      "total_bytes": 3
+    },
+    {
+      "id": 10,
+      "payload_bytes": 5830766,
+      "section_header_bytes": 5,
+      "start": 12935,
+      "total_bytes": 5830771
+    },
+    {
+      "id": 11,
+      "payload_bytes": 490224,
+      "section_header_bytes": 4,
+      "start": 5843706,
+      "total_bytes": 490228
+    },
+    {
+      "id": 0,
+      "name": "scriptw.runtime.source-compilation.v1",
+      "payload_bytes": 39,
+      "section_header_bytes": 2,
+      "start": 6333934,
+      "total_bytes": 41
+    },
+    {
+      "id": 0,
+      "name": "name",
+      "payload_bytes": 4656,
+      "section_header_bytes": 3,
+      "start": 6333975,
+      "total_bytes": 4659
+    },
+    {
+      "id": 0,
+      "name": "scriptw.native_program.literal_operands",
+      "payload_bytes": 34316,
+      "section_header_bytes": 4,
+      "start": 6338634,
+      "total_bytes": 34320
+    }
+  ],
+  "string_pool": {
+    "added_literal_contents": 0,
+    "all_literal_contents_match_baseline": true,
+    "changed_literal_ordinals": 13,
+    "count": 987,
+    "logical_utf16_bytes": 669384,
+    "other_metadata_bytes": 480,
+    "physical_utf16_bytes": 143192,
+    "removed_literal_contents": 0,
+    "utf8_wtf8_bytes": 334694
+  },
+  "unchanged_function_count": 71,
+  "wasm_header_bytes": 8
+}

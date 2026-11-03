@@ -21,6 +21,7 @@ mod intl_demand_initialization;
 mod intrinsic_accessor_allocation;
 mod intrinsic_array_read;
 mod intrinsic_property_layout_allocation;
+mod module_cell_reads;
 mod numeric_imul;
 mod numeric_leaf;
 mod ordered_bootstrap_allocation;

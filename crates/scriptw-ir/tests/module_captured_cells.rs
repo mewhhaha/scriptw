@@ -2,7 +2,8 @@ use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{
     lower, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
     EnvironmentIdentifierResolutionStart, ExprIr, FunctionFlavor, FunctionIr,
-    FunctionTargetKnowledge, KindSet, ProgramIr, StatementIr, TypedExpr, ValueKind,
+    FunctionTargetKnowledge, KindSet, ProgramIr, ProvenBindingCellOrigin, StatementIr, TypedExpr,
+    ValueKind, LEXICAL_ARGUMENTS_NAME,
 };
 
 fn lower_module(source: &str) -> ProgramIr {
@@ -60,8 +61,7 @@ fn module_captured_cells_use_finalized_capture_without_value_facts() {
     "#,
     );
     let (function, value, reference) = module_capture_reference(&program, "read");
-    let EnvironmentIdentifierResolutionStart::CapturedCell(cell) = reference.resolution_start()
-    else {
+    let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
         panic!("ordinary function capture should have a fixed cell: {reference:?}");
     };
     let capture = function
@@ -69,7 +69,15 @@ fn module_captured_cells_use_finalized_capture_without_value_facts() {
         .iter()
         .find(|binding| binding.source_name == "cell")
         .unwrap();
-    assert_eq!((cell.slot(), cell.hops()), (capture.slot, capture.hops));
+    assert_eq!(cell.slot(), capture.slot);
+    assert_eq!(cell.storage_name(), capture.name);
+    assert_eq!(cell.owner(), function.id);
+    assert_eq!(
+        cell.origin(),
+        ProvenBindingCellOrigin::Captured {
+            entry_hops: capture.hops
+        }
+    );
     assert_eq!(value.kind, ValueKind::Dynamic);
     assert_eq!(value.possible_kinds, KindSet::all_runtime_tags());
     assert_eq!(value.function_targets, FunctionTargetKnowledge::unknown());
@@ -96,8 +104,7 @@ fn module_captured_cells_keep_reference_operations_and_unknown_calls() {
     );
     for name in ["readType", "write", "add", "increment", "call"] {
         let (function, _, reference) = module_capture_reference(&program, name);
-        let EnvironmentIdentifierResolutionStart::CapturedCell(cell) = reference.resolution_start()
-        else {
+        let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
             panic!("{name} should retain a direct held cell: {reference:?}");
         };
         assert!(function
@@ -105,7 +112,10 @@ fn module_captured_cells_keep_reference_operations_and_unknown_calls() {
             .iter()
             .any(|binding| binding.source_name == reference.name
                 && binding.slot == cell.slot()
-                && binding.hops == cell.hops()));
+                && cell.origin()
+                    == ProvenBindingCellOrigin::Captured {
+                        entry_hops: binding.hops
+                    }));
         assert!(match (&reference.operation, name) {
             (EnvironmentIdentifierOperationIr::Typeof, "readType")
             | (EnvironmentIdentifierOperationIr::Assign { .. }, "write")
@@ -189,8 +199,7 @@ fn module_captured_cells_match_block_storage_not_shadowed_spelling() {
     "#,
     );
     let (function, _, reference) = module_capture_reference(&program, "read");
-    let EnvironmentIdentifierResolutionStart::CapturedCell(cell) = reference.resolution_start()
-    else {
+    let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
         panic!("block capture should retain its analyzed cell: {reference:?}");
     };
     let capture = function
@@ -198,9 +207,179 @@ fn module_captured_cells_match_block_storage_not_shadowed_spelling() {
         .iter()
         .find(|binding| binding.source_name == "cell")
         .unwrap();
-    assert_eq!((cell.slot(), cell.hops()), (capture.slot, capture.hops));
+    assert_eq!(cell.slot(), capture.slot);
+    assert_eq!(cell.storage_name(), capture.name);
+    assert_eq!(
+        cell.origin(),
+        ProvenBindingCellOrigin::Captured {
+            entry_hops: capture.hops
+        }
+    );
     assert_ne!(
         capture.name, "cell",
         "block identity has its own storage name"
     );
+}
+
+#[test]
+fn module_owned_cells_keep_existing_storage_and_unknown_value_facts() {
+    let program = lower_module(
+        r#"
+        export function diagnostics() { return arguments[0]; }
+        export function parameter(value) { function hold() { return value; } return value; }
+        export function variable() { var value = 1; function hold() { return value; } return value; }
+        export function lexical() { let value = 2; return value; }
+    "#,
+    );
+    for name in ["parameter", "variable", "lexical"] {
+        let (function, value, reference) = module_capture_reference(&program, name);
+        let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
+            panic!("{name} should retain a proven existing owned cell: {reference:?}");
+        };
+        assert_eq!(cell.origin(), ProvenBindingCellOrigin::Owned);
+        assert_eq!(cell.owner(), function.id);
+        assert!(
+            function.owned_env_bindings.iter().any(|binding| {
+                binding.name == cell.storage_name() && binding.slot == cell.slot()
+            }),
+            "owned proof must not allocate or substitute another cell: {function:?}"
+        );
+        assert_eq!(value.kind, ValueKind::Dynamic);
+        assert_eq!(value.possible_kinds, KindSet::all_runtime_tags());
+        assert_eq!(value.function_targets, FunctionTargetKnowledge::unknown());
+        assert!(value.heap_shape.is_none());
+    }
+}
+
+#[test]
+fn module_owned_cells_preserve_held_operations_and_block_identity() {
+    let program = lower_module(
+        r#"
+        export function diagnostics() { return arguments[0]; }
+        export function readType(cell) { function hold() { return cell; } return typeof cell; }
+        export function write(cell, value) { function hold() { return cell; } return cell = value; }
+        export function add(cell, value) { function hold() { return cell; } return cell += value; }
+        export function logical(cell, value) { function hold() { return cell; } return cell ||= value; }
+        export function increment(cell) { function hold() { return cell; } return cell++; }
+        export function call(fn, value) { function hold() { return fn; } return fn(value); }
+        export function block(cell) {
+            { let cell = 3; function nested() { return cell; } return cell; }
+        }
+    "#,
+    );
+    for name in ["readType", "write", "add", "logical", "increment", "call"] {
+        let (function, _, reference) = module_capture_reference(&program, name);
+        let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
+            panic!("{name} must locate its existing own cell: {reference:?}");
+        };
+        assert_eq!(cell.origin(), ProvenBindingCellOrigin::Owned);
+        assert_eq!(cell.owner(), function.id);
+        assert!(matches!(
+            (&reference.operation, name),
+            (EnvironmentIdentifierOperationIr::Typeof, "readType")
+                | (EnvironmentIdentifierOperationIr::Assign { .. }, "write")
+                | (
+                    EnvironmentIdentifierOperationIr::EagerCompound { .. },
+                    "add"
+                )
+                | (
+                    EnvironmentIdentifierOperationIr::LogicalCompound { .. },
+                    "logical"
+                )
+                | (EnvironmentIdentifierOperationIr::Update { .. }, "increment")
+                | (
+                    EnvironmentIdentifierOperationIr::Call {
+                        direct_eval: None,
+                        ..
+                    },
+                    "call"
+                )
+        ));
+    }
+    let (_, _, owned) = module_capture_reference(&program, "block");
+    let (_, _, captured) = module_capture_reference(&program, "nested");
+    let EnvironmentIdentifierResolutionStart::Cell(owned) = owned.resolution_start() else {
+        panic!("the block's resolved owned cell must retain its lexical identity");
+    };
+    let EnvironmentIdentifierResolutionStart::Cell(captured) = captured.resolution_start() else {
+        panic!("the nested function must capture that same block cell");
+    };
+    assert_eq!(owned.origin(), ProvenBindingCellOrigin::Owned);
+    assert!(matches!(
+        captured.origin(),
+        ProvenBindingCellOrigin::Captured { .. }
+    ));
+    assert_eq!(owned.storage_name(), captured.storage_name());
+    assert_eq!(owned.slot(), captured.slot());
+    assert_ne!(owned.storage_name(), "cell");
+    assert_ne!(owned.owner(), captured.owner());
+}
+
+#[test]
+fn module_owned_cells_exclude_eval_non_simple_parameters_and_arguments() {
+    for source in [
+        "export function read(cell) { eval(''); return cell; }",
+        "export function read(cell = 0) { return cell; }",
+        "export function read(...cell) { return cell; }",
+        "export function read({cell}) { return cell; }",
+        "export function read() { return arguments; }",
+        "export function read($arguments) { return $arguments; }",
+    ] {
+        let program = lower_module(source);
+        let (_, _, reference) = module_capture_reference(&program, "read");
+        assert_eq!(
+            reference.resolution_start(),
+            EnvironmentIdentifierResolutionStart::CurrentEnvironment,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn module_private_locals_do_not_inherit_arguments_storage_requirements() {
+    let program = lower_module(
+        r#"
+        export function diagnostics() { return arguments[0]; }
+        export function parameter(value) { return value; }
+        export function variable() { var value = 1; return value; }
+        export function snapshot(value) { value = 9; arguments[0]; return value; }
+    "#,
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    for name in ["parameter", "variable", "snapshot"] {
+        let functions = program
+            .script
+            .as_ref()
+            .unwrap()
+            .functions
+            .iter()
+            .filter(|function| function.name == name)
+            .collect::<Vec<_>>();
+        assert!(!functions.is_empty(), "source function {name} exists");
+        for function in functions {
+            let value = function_return(function).expect("private local return remains explicit");
+            let ExprIr::Identifier(storage) = &value.expr else {
+                panic!("{name} must use ordinary local lowering: {value:?}");
+            };
+            assert!(function
+                .owned_env_bindings
+                .iter()
+                .all(|binding| binding.name != *storage));
+            assert!(function
+                .captured_bindings
+                .iter()
+                .all(|binding| binding.name != *storage));
+            assert!(
+                function
+                    .owned_env_bindings
+                    .iter()
+                    .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
+                "local promotion must retain the live arguments cell: {function:?}"
+            );
+            if name != "parameter" {
+                assert_eq!(value.kind, ValueKind::Number);
+                assert_eq!(value.possible_kinds, KindSet::from_kind(ValueKind::Number));
+            }
+        }
+    }
 }

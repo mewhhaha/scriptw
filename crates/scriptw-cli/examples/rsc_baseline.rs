@@ -24,6 +24,31 @@ const EPOCH_TICKS: u64 = 6_000;
 const WORKER_STACK_BYTES: usize = 64 * 1024 * 1024;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+#[derive(Clone, Copy)]
+enum NativeMode {
+    Fast,
+    Speed,
+}
+
+impl NativeMode {
+    fn parse(value: Option<String>) -> Result<Self> {
+        match value.as_deref() {
+            None | Some("fast") => Ok(Self::Fast),
+            Some("speed") => Ok(Self::Speed),
+            Some(value) => {
+                Err(format!("unknown native mode {value:?}; expected fast or speed").into())
+            }
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Fast => "fast",
+            Self::Speed => "speed",
+        }
+    }
+}
+
 // Excluded diagnostics only. The parent owns the inherited connected socket;
 // this process takes ownership of its child descriptor. Normal runs have no
 // profiler, control socket, or sampling barriers.
@@ -210,12 +235,13 @@ fn run() -> Result<Value> {
     let mut profile = ProfileBarrier::from_environment()?;
     let mut args = std::env::args().skip(1);
     let source_path = PathBuf::from(args.next().ok_or(
-        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3]",
+        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3] [native-mode=fast|speed]",
     )?);
     let support_path = PathBuf::from(args.next().ok_or("missing support.json")?);
     let output = PathBuf::from(args.next().ok_or("missing output.json")?);
     let samples = count(args.next(), 7, "samples")?;
     let warmups = count(args.next(), 3, "warmups")?;
+    let native_mode = NativeMode::parse(args.next())?;
     let calls = samples
         .checked_add(warmups)
         .ok_or("sample count overflow")?;
@@ -249,6 +275,10 @@ fn run() -> Result<Value> {
     let started = Instant::now();
     let mut config = wasmtime::Config::new();
     configure_wasm_runtime(&mut config);
+    if let NativeMode::Speed = native_mode {
+        config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+        config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
+    }
     config.target(env!("SCRIPTW_PERF_TARGET"))?;
     if profile.is_some() {
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);
@@ -273,6 +303,12 @@ fn run() -> Result<Value> {
         "epoch_tick_ms":EPOCH_PERIOD.as_millis(),"epoch_deadline_ticks":EPOCH_TICKS,
         "pending_deadline_ms":DEADLINE.as_millis(),
     });
+    let native_mode_scope = match native_mode {
+        NativeMode::Fast => "matched Fast cohort",
+        NativeMode::Speed => {
+            "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+        }
+    };
     let started = Instant::now();
     let runtime = EmbeddedRuntime::compile(&native, &artifact)?;
     let native_preparation_ns = started.elapsed().as_nanos();
@@ -367,6 +403,8 @@ fn run() -> Result<Value> {
         "scope":"one process and one retained Realm/module; diagnostic, not a statistical comparison",
         "request_clock":"retained call through fulfilled applicationRun Promise after complete Flight consumption; includes bridge and required pumps; excludes setup, JSON validation serialization, host string copying and output checking",
         "source_commit":revision,"source_fingerprint":identity.source_fingerprint().to_string(),
+        "native_mode":native_mode.as_str(),
+        "native_mode_scope":native_mode_scope,
         "executable_sha256":identity.executable_sha256().to_string(),
         "compiler_identity_scheme":CompilerIdentity::source_fingerprint_scheme(),
         "toolchain":{"rustc":env!("SCRIPTW_PERF_RUSTC"),"target":env!("SCRIPTW_PERF_TARGET"),

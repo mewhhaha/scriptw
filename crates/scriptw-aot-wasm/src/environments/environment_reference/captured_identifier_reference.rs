@@ -19,41 +19,77 @@ struct IdentifierReferenceCaptureSlot {
 }
 
 impl FunctionBuilder<'_> {
-    /// Analysis proved the lexical identity, not its value. Reuse the finalized
-    /// capture's active storage so block entry and per-iteration records retain
-    /// the same hop adjustment as every other lexical access.
-    pub(crate) fn emit_resolve_module_captured_identifier(
+    /// Authenticate the finalized identity, then reuse the active storage's
+    /// lexical hop adjustment. No value or initialization fact is inferred.
+    fn module_cell_storage(
+        &self,
+        proof: &scriptw_ir::ProvenBindingCellIr,
+        source_name: &str,
+    ) -> Result<BindingStorage, EmitError> {
+        let invalid = || {
+            EmitError::unsupported(format!(
+                "module cell proof for `{source_name}` ({}, slot {}) does not name this function's cell",
+                proof.storage_name(), proof.slot()
+            ))
+        };
+        if self.function_id.as_deref() != Some(proof.owner()) || proof.source_name() != source_name
+        {
+            return Err(invalid());
+        }
+        match proof.origin() {
+            scriptw_ir::ProvenBindingCellOrigin::Owned => {
+                if self
+                    .captured_bindings
+                    .iter()
+                    .any(|binding| binding.name == proof.storage_name())
+                {
+                    return Err(invalid());
+                }
+            }
+            scriptw_ir::ProvenBindingCellOrigin::Captured { entry_hops } => {
+                if !self.captured_bindings.iter().any(|binding| {
+                    binding.name == proof.storage_name()
+                        && binding.source_name == source_name
+                        && binding.slot == proof.slot()
+                        && binding.hops == entry_hops
+                }) {
+                    return Err(invalid());
+                }
+            }
+        }
+        let storage = self
+            .lookup_binding(proof.storage_name())
+            .or_else(|| self.activation_owned_binding_storage(proof.storage_name()))
+            .ok_or_else(invalid)?;
+        match storage {
+            BindingStorage::EnvSlot { slot, .. } if slot == proof.slot() => Ok(storage),
+            _ => Err(invalid()),
+        }
+    }
+
+    pub(crate) fn emit_read_module_cell_identifier(
         &mut self,
-        proof: scriptw_ir::ModuleCapturedCellIr,
+        proof: &scriptw_ir::ProvenBindingCellIr,
+        source_name: &str,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let storage = self.module_cell_storage(proof, source_name)?;
+        // The existing cell read follows TARGET and checks INITIALIZED. Only
+        // its failing branch calls the shared lexical-TDZ error helper in R.
+        self.read_binding_to_locals(storage, value, function)
+    }
+
+    pub(crate) fn emit_resolve_module_cell_identifier(
+        &mut self,
+        proof: &scriptw_ir::ProvenBindingCellIr,
         source_name: &str,
         name: &GcLocal<StringValue>,
         strictness: Strictness,
         function: &mut Function,
     ) -> Result<EnvironmentIdentifierReference, EmitError> {
-        let binding = self
-            .captured_bindings
-            .iter()
-            .find(|binding| {
-                binding.source_name == source_name
-                    && binding.slot == proof.slot()
-                    && binding.hops == proof.hops()
-            })
-            .ok_or_else(|| {
-                EmitError::unsupported(format!(
-                    "module capture proof for `{source_name}` (slot {}, hops {}) does not name this function's cell",
-                    proof.slot(), proof.hops()
-                ))
-            })?;
-        let binding = TypedExpr::from_info(
-            scriptw_ir::ValueInfo::new(ValueKind::Dynamic),
-            ExprIr::Identifier(binding.name.clone()),
-        );
-        self.emit_located_identifier_reference(
-            name,
-            strictness,
-            IdentifierReferenceFallbackDisposition::Declarative { binding: &binding },
-            function,
-        )
+        let storage = self.module_cell_storage(proof, source_name)?;
+        self.emit_declarative_identifier_reference(name, strictness, storage, function)
     }
 
     fn identifier_reference_capture_slot(
@@ -196,7 +232,6 @@ impl FunctionBuilder<'_> {
         fallback: IdentifierReferenceFallbackDisposition<'_>,
         function: &mut Function,
     ) -> Result<EnvironmentIdentifierReference, EmitError> {
-        let schema = self.runtime_schema();
         match fallback {
             IdentifierReferenceFallbackDisposition::Global => {
                 // Ordered with selection already ran. Begin the sole resolver
@@ -209,43 +244,57 @@ impl FunctionBuilder<'_> {
                         "compiler invariant: captured declarative Reference has no binding identifier",
                     ));
                 };
-                let Some(BindingStorage::EnvSlot { slot, hops }) = self
+                let storage = self
                     .lookup_binding(storage_name)
                     .or_else(|| self.activation_owned_binding_storage(storage_name))
-                else {
-                    return Err(EmitError::unsupported(
+                    .ok_or_else(|| EmitError::unsupported(
                         "compiler invariant: suspended declarative Reference has no real BindingCell",
-                    ));
-                };
-                let environment = self.resolve_env_handle_local(hops, function);
-                let actual = self.emit_environment_cell_local(&environment, slot, function);
-                let reference = EnvironmentIdentifierReference {
-                    key: schema
-                        .reserve_gc_local::<StringValue, NonNullable>(function)
-                        .initialize(name.load(schema, function), function),
-                    kind: schema.reserve_i32_local(function),
-                    record: schema
-                        .reserve_gc_local::<Environment, Nullable>(function)
-                        .initialize_null(schema, function),
-                    entry: schema
-                        .reserve_gc_local::<NamedBinding, Nullable>(function)
-                        .initialize_null(schema, function),
-                    cell: schema
-                        .reserve_gc_local::<BindingCell, Nullable>(function)
-                        .initialize(actual.load(schema, function).nullable(), function),
-                    base: schema.reserve_value_local(function),
-                    strictness,
-                };
-                reference.base.set_undefined(function);
-                function.instruction(&Instruction::I32Const(
-                    EnvironmentReferenceKind::DirectDeclarativeCell.code(),
-                ));
-                reference.kind.store(function);
-                actual.clear(function);
-                environment.clear(function);
-                Ok(reference)
+                    ))?;
+                self.emit_declarative_identifier_reference(name, strictness, storage, function)
             }
         }
+    }
+
+    fn emit_declarative_identifier_reference(
+        &mut self,
+        name: &GcLocal<StringValue>,
+        strictness: Strictness,
+        storage: BindingStorage,
+        function: &mut Function,
+    ) -> Result<EnvironmentIdentifierReference, EmitError> {
+        let BindingStorage::EnvSlot { slot, hops } = storage else {
+            return Err(EmitError::unsupported(
+                "compiler invariant: declarative Reference requires a real BindingCell",
+            ));
+        };
+        let schema = self.runtime_schema();
+        let environment = self.resolve_env_handle_local(hops, function);
+        let actual = self.emit_environment_cell_local(&environment, slot, function);
+        let reference = EnvironmentIdentifierReference {
+            key: schema
+                .reserve_gc_local::<StringValue, NonNullable>(function)
+                .initialize(name.load(schema, function), function),
+            kind: schema.reserve_i32_local(function),
+            record: schema
+                .reserve_gc_local::<Environment, Nullable>(function)
+                .initialize_null(schema, function),
+            entry: schema
+                .reserve_gc_local::<NamedBinding, Nullable>(function)
+                .initialize_null(schema, function),
+            cell: schema
+                .reserve_gc_local::<BindingCell, Nullable>(function)
+                .initialize(actual.load(schema, function).nullable(), function),
+            base: schema.reserve_value_local(function),
+            strictness,
+        };
+        reference.base.set_undefined(function);
+        function.instruction(&Instruction::I32Const(
+            EnvironmentReferenceKind::DirectDeclarativeCell.code(),
+        ));
+        reference.kind.store(function);
+        actual.clear(function);
+        environment.clear(function);
+        Ok(reference)
     }
 
     fn emit_publish_identifier_reference(

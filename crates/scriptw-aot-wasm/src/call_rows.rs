@@ -227,9 +227,9 @@ impl FunctionBuilder<'_> {
                     EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
                         self.emit_resolve_global_identifier(&key, identifier.strictness, function)?
                     }
-                    EnvironmentIdentifierResolutionStart::CapturedCell(proof) => self
-                        .emit_resolve_module_captured_identifier(
-                            proof,
+                    EnvironmentIdentifierResolutionStart::Cell(proof) => self
+                        .emit_resolve_module_cell_identifier(
+                            &proof,
                             &identifier.name,
                             &key,
                             identifier.strictness,
