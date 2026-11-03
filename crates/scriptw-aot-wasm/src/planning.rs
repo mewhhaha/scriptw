@@ -423,9 +423,6 @@ impl RuntimeBootstrapPlan {
             // Receiver Set delegates to its complete native [[DefineOwnProperty]]
             // owner, including Proxy and indexed exotic receivers.
             StandardBuiltinId::ReflectDefineProperty,
-            // CopyDataProperties and Proxy own-key validation call the recorded
-            // native OwnKeys boundary before publishing the checked key list.
-            StandardBuiltinId::ReflectOwnKeys,
             StandardBuiltinId::ErrorConstructor,
             StandardBuiltinId::EvalErrorConstructor,
             StandardBuiltinId::AggregateErrorConstructor,
@@ -825,7 +822,6 @@ impl RuntimeBootstrapPlan {
             self.require_standard_builtin(StandardBuiltinId::ObjectDefineProperty);
         }
         if builtin == StandardBuiltinId::IteratorZipKeyed {
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
             self.require_standard_builtin(StandardBuiltinId::ReflectGetOwnPropertyDescriptor);
         }
         if matches!(
@@ -836,7 +832,6 @@ impl RuntimeBootstrapPlan {
                 | StandardBuiltinId::ObjectGetOwnPropertyDescriptors
                 | StandardBuiltinId::ObjectValues
         ) {
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
             self.require_standard_builtin(StandardBuiltinId::ReflectGetOwnPropertyDescriptor);
         }
         if builtin == StandardBuiltinId::ObjectAssign {
@@ -859,14 +854,12 @@ impl RuntimeBootstrapPlan {
         ) {
             // Reviver/serialization snapshot own keys and descriptors; fresh
             // parser/root publications use the same real definition owner.
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
             self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
             self.require_standard_builtin(StandardBuiltinId::ReflectDefineProperty);
         }
         if builtin == StandardBuiltinId::IteratorZipKeyed {
             // Keyed acquisition snapshots enumerable own descriptors before
             // Get; resume publishes each result through real DefineOwnProperty.
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
             self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
             self.require_standard_builtin(StandardBuiltinId::ReflectDefineProperty);
         }
@@ -878,18 +871,8 @@ impl RuntimeBootstrapPlan {
         }
         if builtin == StandardBuiltinId::ObjectDefineProperties {
             self.require_standard_builtin(StandardBuiltinId::ObjectDefineProperty);
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
             self.require_standard_builtin(StandardBuiltinId::ReflectGetOwnPropertyDescriptor);
             self.require_standard_builtin(StandardBuiltinId::ReflectDefineProperty);
-        }
-        if matches!(
-            builtin,
-            StandardBuiltinId::ObjectSeal
-                | StandardBuiltinId::ObjectFreeze
-                | StandardBuiltinId::ObjectIsSealed
-                | StandardBuiltinId::ObjectIsFrozen
-        ) {
-            self.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
         }
         if matches!(
             builtin,
@@ -4524,7 +4507,6 @@ pub(crate) fn object_property_references_function(
         | ObjectPropertyIr::Setter { function, .. } => function.function_id() == target,
         ObjectPropertyIr::Spread { source } => {
             expr_references_function(source, target)
-                || *target == StandardBuiltinId::ReflectOwnKeys.function_id()
                 || *target == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()
         }
         ObjectPropertyIr::ComputedData { key, value, .. } => {
@@ -4931,9 +4913,7 @@ pub(crate) fn expr_references_function(expr: &TypedExpr, target: &FunctionId) ->
                         })
                     })
                 || matches!(operation, SpecOperationIr::CopyDataProperties)
-                    && (*target == StandardBuiltinId::ReflectOwnKeys.function_id()
-                        || *target
-                            == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id())
+                    && *target == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()
                 || matches!(
                     operation,
                     SpecOperationIr::Get | SpecOperationIr::GetV | SpecOperationIr::GetMethod
@@ -5134,8 +5114,7 @@ pub(crate) fn expr_references_function(expr: &TypedExpr, target: &FunctionId) ->
         }
         ExprIr::ObjectDestructure { value, pattern } => {
             (pattern.rest.is_some()
-                && (*target == StandardBuiltinId::ReflectOwnKeys.function_id()
-                    || *target == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()))
+                && *target == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id())
                 || expr_references_function(value, target)
                 || object_destructuring_pattern_any_expression(pattern, |expr| {
                     expr_references_function(expr, target)
@@ -5145,9 +5124,7 @@ pub(crate) fn expr_references_function(expr: &TypedExpr, target: &FunctionId) ->
             use scriptw_ir::ObjectDestructuringOperationView;
             let mut referenced = match operation.use_view() {
                 ObjectDestructuringOperationView::Rest { .. } => {
-                    *target == StandardBuiltinId::ReflectOwnKeys.function_id()
-                        || *target
-                            == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()
+                    *target == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()
                 }
                 ObjectDestructuringOperationView::PutTarget {
                     target: DestructuringTargetIr::NestedArray(_),
@@ -5156,7 +5133,6 @@ pub(crate) fn expr_references_function(expr: &TypedExpr, target: &FunctionId) ->
                     *target == StandardBuiltinId::ArrayPrototypeValues.function_id()
                         || *target == StandardBuiltinId::ArrayIteratorNext.function_id()
                         || *target == StandardBuiltinId::StringConstructor.function_id()
-                        || *target == StandardBuiltinId::ReflectOwnKeys.function_id()
                         || *target
                             == StandardBuiltinId::ReflectGetOwnPropertyDescriptor.function_id()
                 }

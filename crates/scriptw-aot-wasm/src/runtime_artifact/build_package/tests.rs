@@ -554,6 +554,11 @@ fn abi35_package_is_replaced_before_temporal_demand_initialization_is_admitted()
     assert_previous_build_package_replaced(35);
 }
 
+#[test]
+fn abi48_package_is_replaced_before_typed_own_keys_are_admitted() {
+    assert_previous_build_package_replaced(48);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

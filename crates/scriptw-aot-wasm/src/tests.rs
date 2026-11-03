@@ -4265,3 +4265,4 @@ fn dense_literals_avoid_sparse_bookkeeping_and_sparse_writes_share_one_body() {
 mod raw_key_own_data;
 
 mod local_argument_calls;
+mod own_keys_helper;

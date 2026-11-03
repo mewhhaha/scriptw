@@ -1,8 +1,33 @@
 # Proxy OwnPropertyKeys result ownership
 
-Status: typed acquisition ownership has historical verification. The
-completed-list semantic follow-up below is dry source; executable verification
-and full Proxy closure remain pending.
+## Internal List boundary
+
+`ObjectOwnKeys` is the sole shared runtime kernel for accepted own-key Lists.
+Its typed arguments retain the target Value, executing Realm, Environment and
+Program. Its result is the whole five-part Completion followed by a nullable
+`PropertyKeyTable` GC reference. The table is null on Throw. The caller roots
+both outputs before propagating the original Throw; only Normal completion
+admits a nonnull table as `CompletedOwnPropertyKeys`. Every kernel throw branches
+to the extended-result exit rather than returning the JavaScript-call ABI.
+
+Proxy fallback and target validation call this same helper recursively. The
+kernel is emitted once, with no Rust emitter recursion. ForIn, CopyDataProperties,
+JSON and Object consumers retain the accepted List directly. Public own-key
+array producers materialize their specified Arrays after successful acquisition;
+internal consumers do not manufacture a Reflect callable, a result Array or its
+property descriptors merely to reconstruct the private List.
+
+The existing Proxy acquisition, duplicate checks, target observation order,
+descriptor checks, arbitrary abrupt identity and executing-Realm errors are
+unchanged. ForIn still snapshots lazily per prototype and checks live descriptors
+before marking a String visited. This introduces no new heap representation.
+
+Runtime layout 49 rejects layout 48 caches and build packages because the typed
+helper changes the shared function/type layout. Raw cache keys also include the
+compiler identity and layout version; the runtime key hashes its bytes and
+layout version. `own_keys_helper` checks emitted R/P signatures, recursive calls
+and internal consumers; existing Proxy and ForIn semantic cohorts remain the
+runtime correctness gates. Verification of this change is pending.
 
 ## Completed list authority — 2026-10-03 dry source
 
@@ -47,7 +72,7 @@ or status refresh ran for this batch. Full T11 and semantic GC remain open.
 
 After duplicate validation, the target phase calls the existing Proxy-aware
 IsExtensible operation once and retains its result. It then calls the real
-Reflect.ownKeys implementation directly for target OwnPropertyKeys and the real
+shared ObjectOwnKeys helper directly for target OwnPropertyKeys and the real
 Object.getOwnPropertyDescriptor implementation for each captured target key.
 These calls consume the existing metadata dependency fixpoint and outer trusted
 Realm context; mutable public Reflect/Object properties are not operation
@@ -73,8 +98,8 @@ execution and object-read error source projections recognize that helper;
 recursive extensibility calls, handler Get and trap dispatch forward the same
 context. Revocation and generated noncallable/inconsistent-result errors select
 that Realm and retain active-handler completion routing. Arbitrary trap/getter
-throws propagate without replacement. No new Realm authority, semantic object
-representation or helper signature is introduced.
+throws propagate without replacement. Target validation retains the original
+Realm authority and semantic object representation.
 
 Two additional finite strict/sloppy Engine fixtures cover ordered target
 operations and all-descriptor abrupt precedence, captured extensibility and key
@@ -103,7 +128,7 @@ Each of the three Object/Reflect producers (`Object.getOwnPropertyNames`,
 authority to the single acquisition emitter, receives that same authority back,
 and consumes it once in the corresponding post-trap validator. `Object.keys`,
 `Object.values` and `Object.entries` share one EnumerableOwnProperties owner
-that calls the `Reflect.ownKeys` builtin and so acquires no trap of its own.
+that calls the `ObjectOwnKeys` helper and so acquires no trap of its own.
 Validators also accept the existing distinct `ProxyTargetLocals` instead of
 adjacent raw payload/tag arguments. Trap, target, handler, and result roles
 therefore cannot be transposed at these boundaries.
@@ -122,7 +147,6 @@ On 2026-08-27, its seven focused structure tests passed, as did
 the Wasm-AOT backend. Rustfmt's check mode and `git diff --check` also passed
 for the scoped source, test, task, and contract files.
 
-This boundary changes no Proxy trap lookup, argument order, fallback,
-revocation, call, validation, emitted instruction, public API, or conformance
-count. It is not a claim that recursive Proxy descriptor validation or the full
-Proxy/Reflect trees are complete.
+The typed trap, target and result roles preserve Proxy lookup order, fallback,
+revocation, calls and validation. This contract does not claim complete
+Proxy/Reflect conformance.

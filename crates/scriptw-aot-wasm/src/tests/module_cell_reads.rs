@@ -117,6 +117,8 @@ fn proven_module_reads_load_cells_without_reference_or_name_lookup() {
     let program = module(
         r#"
         export function diagnostics() { return arguments[0]; }
+        let moduleCell = 1;
+        export function root() { return moduleCell; }
         export function owned(cell) { function hold() { return cell; } return cell; }
         export function make(cell) { return function captured() { return cell; }; }
     "#,
@@ -124,7 +126,7 @@ fn proven_module_reads_load_cells_without_reference_or_name_lookup() {
     let actual = emit(&program).expect("proven cells emit");
     let mut control = program.clone();
     for function in &mut control.script.as_mut().unwrap().functions {
-        if !["owned", "captured"].contains(&function.name.as_str()) {
+        if !["root", "owned", "captured"].contains(&function.name.as_str()) {
             continue;
         }
         let returned = function
@@ -140,7 +142,7 @@ fn proven_module_reads_load_cells_without_reference_or_name_lookup() {
         *returned = TypedExpr::from_info(ValueInfo::undefined(), ExprIr::Undefined);
     }
     let control = emit(&control).expect("same prologues without the read emit");
-    for name in ["owned", "captured"] {
+    for name in ["root", "owned", "captured"] {
         let controls = inspect(&control, name);
         for (variant, actual) in inspect(&actual, name) {
             let control = &controls[&variant];
@@ -182,25 +184,29 @@ fn proven_typeof_keeps_tdz_while_non_simple_owner_keeps_named_fallback() {
     let artifact = emit(&module(
         r#"
         export function diagnostics() { return arguments[0]; }
+        let moduleCell = 1;
+        export function rootType() { return typeof moduleCell; }
         export function typed(cell) { function hold() { return cell; } return typeof cell; }
         export function fallback(cell = 0) { return cell; }
     "#,
     ))
     .expect("typeof and fallback emit");
-    for (variant, reads) in inspect(&artifact, "typed") {
-        assert!(reads.fields.len() >= 2, "{variant}: {reads:?}");
-        assert_eq!(
-            reads.calls("helper::lexical_binding_uninitialized"),
-            1,
-            "{variant}: {reads:?}"
-        );
-        assert!(
-            !reads
-                .calls
-                .keys()
-                .any(|name| name.starts_with("helper::environment_identifier_")),
-            "{variant}: {reads:?}"
-        );
+    for name in ["rootType", "typed"] {
+        for (variant, reads) in inspect(&artifact, name) {
+            assert!(reads.fields.len() >= 2, "{variant}: {reads:?}");
+            assert_eq!(
+                reads.calls("helper::lexical_binding_uninitialized"),
+                1,
+                "{variant}: {reads:?}"
+            );
+            assert!(
+                !reads
+                    .calls
+                    .keys()
+                    .any(|name| name.starts_with("helper::environment_identifier_")),
+                "{variant}: {reads:?}"
+            );
+        }
     }
     for (variant, reads) in inspect(&artifact, "fallback") {
         assert!(

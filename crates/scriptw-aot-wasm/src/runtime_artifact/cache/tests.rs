@@ -717,6 +717,11 @@ fn abi35_runtime_cache_is_replaced_before_temporal_demand_initialization_is_admi
     assert_previous_runtime_cache_entry_replaced(35);
 }
 
+#[test]
+fn abi48_runtime_cache_is_replaced_before_typed_own_keys_are_admitted() {
+    assert_previous_runtime_cache_entry_replaced(48);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

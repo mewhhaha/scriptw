@@ -600,6 +600,29 @@ impl StatusCompletionCallResult {
 pub(crate) struct RealmImportCallResult {
     private: (),
 }
+/// OwnKeys returns its whole completion and a separately typed, rooted List.
+/// The private table is not a JavaScript value and is null on abrupt completion.
+#[must_use = "root the accepted-key table and completion before checking for Throw"]
+pub(crate) struct OwnPropertyKeysCallResult {
+    private: (),
+}
+impl OwnPropertyKeysCallResult {
+    pub(crate) fn bind(
+        self,
+        schema: &RuntimeSchema,
+        completion: &CompletionLocals,
+        function: &mut Function,
+    ) -> GcLocal<PropertyKeyTable, Nullable> {
+        let table = ReferenceHelperResult {
+            private: std::marker::PhantomData,
+        }
+        .bind(schema, schema.reserve_gc_local(function), function);
+        completion
+            .value()
+            .store_call_result(completion.kind(), completion.target(), function);
+        table
+    }
+}
 /// ResolveBinding returns its complete completion and the held Reference.
 /// Root every GC edge before the caller can propagate an abrupt completion.
 #[must_use = "the completion and held Reference must be consumed together"]
@@ -875,6 +898,7 @@ macro_rules! helper_field {
     (@result_type RegExpCompile) => { RegExpCompileCallResult };
     (@result_type StatusCompletion) => { StatusCompletionCallResult };
     (@result_type RealmImport) => { RealmImportCallResult };
+    (@result_type OwnPropertyKeys) => { OwnPropertyKeysCallResult };
     (@result_type EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult };
     (@result_type ModuleGather) => { ModuleGatherCallResult };
     (@result_type RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult };
@@ -894,6 +918,11 @@ macro_rules! helper_field {
     (@result_abi RegExpCompile) => { vec![AbiType::Gc(GcLayout::RegExpProgram, GcNullability::Nullable), AbiType::I32, AbiType::I64, AbiType::I64] };
     (@result_abi StatusCompletion) => { { let mut types = crate::module::COMPLETION_TYPES.to_vec(); types.push(AbiType::I32); types } };
     (@result_abi RealmImport) => { { let mut types = crate::module::COMPLETION_TYPES.to_vec(); types.extend([AbiType::I32, AbiType::I64, AbiType::EqRef]); types } };
+    (@result_abi OwnPropertyKeys) => { {
+        let mut types = crate::module::COMPLETION_TYPES.to_vec();
+        types.push(AbiType::Gc(GcLayout::PropertyKeyTable, GcNullability::Nullable));
+        types
+    } };
     (@result_abi EnvironmentIdentifierResolution) => { {
         let mut types = crate::module::COMPLETION_TYPES.to_vec();
         types.extend([
@@ -923,6 +952,7 @@ macro_rules! helper_field {
     (@result RegExpCompile) => { RegExpCompileCallResult { private: () } };
     (@result StatusCompletion) => { StatusCompletionCallResult { private: () } };
     (@result RealmImport) => { RealmImportCallResult { private: () } };
+    (@result OwnPropertyKeys) => { OwnPropertyKeysCallResult { private: () } };
     (@result EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult { private: () } };
     (@result ModuleGather) => { ModuleGatherCallResult { private: () } };
     (@result RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult { private: () } };
@@ -1277,6 +1307,7 @@ runtime_helper_domain! {
     RelationalComparison / RelationalComparisonArguments / RelationalComparisonParameters / "relational_comparison" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     LooseEquality / LooseEqualityArguments / LooseEqualityParameters / "loose_equality" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    ObjectOwnKeys / ObjectOwnKeysArguments / ObjectOwnKeysParameters / "object_own_keys" { target:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyKeys;
     BigIntEquality / BigIntEqualityArguments / BigIntEqualityParameters / "bigint_equality" { left:(Ref BigIntValue NonNullable),right:(Ref BigIntValue NonNullable) } => I32;
     PrivateElementAdd / PrivateElementAddArguments / PrivateElementAddParameters / "private_element_add" { receiver:Value,element:(Ref PrivateElement NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
     PrivateFieldDefine / PrivateFieldDefineArguments / PrivateFieldDefineParameters / "private_field_define" { receiver:Value,private_environment:(Ref PrivateEnvironment Nullable),class_scope:I64,name_ordinal:I32,value:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1381,6 +1412,7 @@ impl RuntimeHelperId {
             Self::RelationalComparison => HelperOwner::Runtime,
             Self::LooseEquality => HelperOwner::Runtime,
             Self::ForInAdvance => HelperOwner::Runtime,
+            Self::ObjectOwnKeys => HelperOwner::Runtime,
             Self::BigIntEquality => HelperOwner::Runtime,
             Self::ObjectGetPrototypeOf => HelperOwner::Runtime,
             Self::ObjectIsExtensible => HelperOwner::Runtime,
@@ -1547,6 +1579,7 @@ impl RuntimeHelperId {
             Self::RelationalComparison => true,
             Self::LooseEquality => true,
             Self::ForInAdvance => true,
+            Self::ObjectOwnKeys => true,
             Self::BigIntEquality => true,
             Self::ObjectGetPrototypeOf => true,
             Self::ObjectIsExtensible => true,

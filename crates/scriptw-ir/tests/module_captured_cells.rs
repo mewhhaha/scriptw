@@ -1,14 +1,44 @@
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{
-    lower, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
-    EnvironmentIdentifierResolutionStart, ExprIr, FunctionFlavor, FunctionIr,
-    FunctionTargetKnowledge, KindSet, ProgramIr, ProvenBindingCellOrigin, StatementIr, TypedExpr,
-    ValueKind, LEXICAL_ARGUMENTS_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
+    lower, lower_module_graph, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
+    EnvironmentIdentifierResolutionStart, ExprIr, FunctionFlavor, FunctionIr, FunctionProtocolIr,
+    FunctionTargetKnowledge, KindSet, ModuleActivationKindIr, ModuleGraphSources, ModuleKey,
+    ModuleSourceIr, ProgramIr, ProvenBindingCellOrigin, StatementIr, TypedExpr, ValueKind,
+    LEXICAL_ARGUMENTS_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
 };
 
 fn lower_module(source: &str) -> ProgramIr {
     let parsed = parse(source, ParseOptions::module()).expect("module should parse");
     lower(&parsed)
+}
+
+fn lower_modules(files: &[(&str, &str)]) -> ProgramIr {
+    let modules: Vec<_> = files
+        .iter()
+        .map(|(name, source)| {
+            ModuleSourceIr::new(
+                ModuleKey::from_host(*name),
+                (*source).into(),
+                format!("file:///{name}"),
+            )
+        })
+        .collect();
+    let mut resolutions = Vec::new();
+    for (referrer, module) in modules.iter().enumerate() {
+        for request in module.module_requests().expect("fixture requests parse") {
+            let target = files
+                .iter()
+                .position(|(name, _)| *name == request.specifier().trim_start_matches("./"))
+                .expect("fixture request has its source");
+            resolutions.push((referrer as u32, request, target as u32));
+        }
+    }
+    lower_module_graph(&ModuleGraphSources {
+        realm_requests: Default::default(),
+        modules,
+        entry: 0,
+        resolutions,
+    })
 }
 
 fn function_return(function: &FunctionIr) -> Option<&TypedExpr> {
@@ -44,6 +74,172 @@ fn module_capture_reference<'a>(
         panic!("expected held identifier operation in {name}: {value:?}");
     };
     (function, value, reference)
+}
+
+fn assert_module_activation_capture(
+    program: &ProgramIr,
+    name: &str,
+    expected_kind: ModuleActivationKindIr,
+) {
+    let (function, value, reference) = module_capture_reference(program, name);
+    let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
+        panic!("{name} should address its canonical Module cell: {reference:?}");
+    };
+    let capture = function
+        .captured_bindings
+        .iter()
+        .find(|capture| capture.name == cell.storage_name())
+        .expect("proof names an actual capture");
+    assert_eq!(cell.owner(), function.id);
+    assert_eq!(cell.source_name(), reference.name);
+    assert_eq!(capture.source_name, reference.name);
+    assert_eq!(cell.slot(), capture.slot);
+    assert_eq!(
+        cell.origin(),
+        ProvenBindingCellOrigin::Captured {
+            entry_hops: capture.hops
+        }
+    );
+    let script = program.script.as_ref().unwrap();
+    let activation = script
+        .body
+        .statements
+        .iter()
+        .find_map(|statement| {
+            let StatementIr::Expression(value) = statement else {
+                return None;
+            };
+            let ExprIr::ModuleExecutionGraph(graph) = &value.expr else {
+                return None;
+            };
+            graph.activations().iter().find(|owner| owner.module() == 0)
+        })
+        .expect("entry Module owns a trusted graph activation");
+    assert_eq!(activation.kind(), expected_kind);
+    let owner = script
+        .functions
+        .iter()
+        .find(|owner| &owner.id == activation.function())
+        .unwrap();
+    assert_eq!(
+        owner.protocol,
+        match expected_kind {
+            ModuleActivationKindIr::Synchronous => FunctionProtocolIr::ModuleActivation,
+            ModuleActivationKindIr::Async => FunctionProtocolIr::AsyncModuleActivation,
+        }
+    );
+    assert!(owner
+        .owned_env_bindings
+        .iter()
+        .any(|binding| binding.name == capture.name && binding.slot == capture.slot));
+    assert_eq!(value.kind, ValueKind::Dynamic);
+    assert_eq!(value.possible_kinds, KindSet::all_runtime_tags());
+    assert_eq!(value.function_targets, FunctionTargetKnowledge::unknown());
+    assert!(value.heap_shape.is_none());
+}
+
+#[test]
+fn module_activation_cells_keep_live_reference_operations_and_open_callee_candidates() {
+    let program = lower_module(
+        r#"
+        export let cell = 1;
+        function target(value) { return value; }
+        export function read() { return cell; }
+        export function readType() { return typeof cell; }
+        export function write(value) { return cell = value; }
+        export function add(value) { return cell += value; }
+        export function logical(value) { return cell ||= value; }
+        export function increment() { return cell++; }
+        export function call(value) { return target(value); }
+        export function make() {
+            function middle() {
+                return function deep(a, b, c, d, e) { return cell; };
+            }
+            return middle();
+        }
+    "#,
+    );
+    for name in [
+        "read",
+        "readType",
+        "write",
+        "add",
+        "logical",
+        "increment",
+        "call",
+        "deep",
+    ] {
+        assert_module_activation_capture(&program, name, ModuleActivationKindIr::Synchronous);
+    }
+    let (_, _, call) = module_capture_reference(&program, "call");
+    let EnvironmentIdentifierOperationIr::Call {
+        direct_eval,
+        callee_targets,
+        ..
+    } = &call.operation
+    else {
+        panic!("cell selection retains the actual Call operation");
+    };
+    assert!(direct_eval.is_none());
+    assert!(callee_targets.exact_targets().is_none());
+    let target = program
+        .script
+        .as_ref()
+        .unwrap()
+        .functions
+        .iter()
+        .find(|function| function.name == "target")
+        .unwrap();
+    assert!(callee_targets.known_targets().contains(&target.id));
+}
+
+#[test]
+fn async_module_activation_cells_keep_the_same_proof_before_and_after_await() {
+    let program = lower_module(
+        r#"
+        export let cell = 1;
+        export function before() { return cell; }
+        await 0;
+        cell = 2;
+        export function after() { return cell; }
+    "#,
+    );
+    for name in ["before", "after"] {
+        assert_module_activation_capture(&program, name, ModuleActivationKindIr::Async);
+    }
+}
+
+#[test]
+fn module_import_aliases_address_the_importing_cell_without_exporter_value_facts() {
+    let program = lower_modules(&[
+        (
+            "entry.js",
+            r#"
+            import { value as renamed, invoke as importedCall } from './source.js';
+            export function read() { return renamed; }
+            export function write(value) { return renamed = value; }
+            export function add(value) { return renamed += value; }
+            export function call(value) { return importedCall(value); }
+        "#,
+        ),
+        (
+            "source.js",
+            "export let value = 1; export function invoke(value) { return value; }",
+        ),
+    ]);
+    for name in ["read", "write", "add", "call"] {
+        assert_module_activation_capture(&program, name, ModuleActivationKindIr::Synchronous);
+    }
+    let (_, _, read) = module_capture_reference(&program, "read");
+    assert_eq!(
+        read.name, "renamed",
+        "the source reference keeps its local alias"
+    );
+    let (_, _, call) = module_capture_reference(&program, "call");
+    let EnvironmentIdentifierOperationIr::Call { callee_targets, .. } = &call.operation else {
+        panic!("imported call remains a held Reference operation");
+    };
+    assert!(callee_targets.exact_targets().is_none());
 }
 
 #[test]
@@ -129,12 +325,8 @@ fn module_captured_cells_keep_reference_operations_and_unknown_calls() {
 }
 
 #[test]
-fn module_captured_cells_exclude_module_root_globals_eval_and_resumable_owners() {
+fn module_captured_cells_exclude_eval_complex_parameters_and_user_resumable_owners() {
     for (source, name) in [
-        (
-            "let cell = 1; export function read() { return cell; }",
-            "read",
-        ),
         (
             "export function make(cell) { eval(''); return function read() { return cell; }; }",
             "read",
@@ -151,9 +343,37 @@ fn module_captured_cells_exclude_module_root_globals_eval_and_resumable_owners()
             "export function* make(cell) { yield function read() { return cell; }; }",
             "read",
         ),
+        (
+            "let cell = 1; export function read(value = 0) { return cell; }",
+            "read",
+        ),
+        (
+            "let cell = 1; export async function make() { return function read() { return cell; }; }",
+            "read",
+        ),
+        (
+            "let cell = 1; export function* make() { yield function read() { return cell; }; }",
+            "read",
+        ),
     ] {
         let program = lower_module(source);
         let (_, _, reference) = module_capture_reference(&program, name);
+        assert_eq!(
+            reference.resolution_start(),
+            EnvironmentIdentifierResolutionStart::CurrentEnvironment,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn module_block_and_iteration_cells_do_not_inherit_the_activation_lifetime_proof() {
+    for source in [
+        "export let saved; { let cell = 1; saved = function read() { return cell; }; }",
+        "export let saved; for (let cell of [1, 2]) { saved = function read() { return cell; }; }",
+    ] {
+        let program = lower_module(source);
+        let (_, _, reference) = module_capture_reference(&program, "read");
         assert_eq!(
             reference.resolution_start(),
             EnvironmentIdentifierResolutionStart::CurrentEnvironment,

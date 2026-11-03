@@ -88,7 +88,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 46 shares abstract equality, BigInt equality and for-in advancement
 // through typed runtime kernels instead of expanding them at each source site.
 // Version 47 adds native Web codecs, byte streams, abort events and host task queues.
-const LAYOUT_VERSION: u32 = 48;
+// Version 49 gives internal OwnKeys its own typed List/completion helper,
+// changing the shared runtime's function/type layout without a new heap layout.
+const LAYOUT_VERSION: u32 = 49;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

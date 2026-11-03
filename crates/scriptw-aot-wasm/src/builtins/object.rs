@@ -364,7 +364,7 @@ impl FunctionBuilder<'_> {
         self.emit_value_to_object_locals(&argument, &pending, function)?;
         self.emit_native_object_abrupt_exit(&pending, &output, exit, function);
         object.copy_from(pending.value(), function);
-        let keys = self.emit_own_keys_internal(&object, function)?;
+        let keys = self.emit_object_own_property_keys(&object, function)?;
         let count = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         keys.length(count, schema, function);
@@ -497,7 +497,7 @@ impl FunctionBuilder<'_> {
         self.compile_truthy_tagged_i32(pending.value(), function)?;
         function.instruction(&Instruction::I32Eqz);
         self.emit_native_object_error_if(RuntimeErrorMessage::TYPEERROR, &output, exit, function)?;
-        let keys = self.emit_own_keys_internal(&target, function)?;
+        let keys = self.emit_object_own_property_keys(&target, function)?;
         let count = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         keys.length(count, schema, function);

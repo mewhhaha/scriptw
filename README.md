@@ -50,8 +50,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 17.37 ms | 0.484 ms |
-| Async | 18.38 ms | 0.394 ms |
+| Sync | 16.60 ms | 0.572 ms |
+| Async | 17.77 ms | 0.460 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,9 +60,9 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.30 s JavaScript → Wasm**, **12.14 s native preparation**,
-and **2.65 ms module initialization**. Program Wasm is **5.88 MiB** (5.36 MiB
-code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
+Cold Scriptw setup: **3.93 s JavaScript → Wasm**, **14.72 s native preparation**,
+and **3.06 ms module initialization**. Program Wasm is **5.88 MiB** (5.36 MiB
+code, 0.47 MiB data); shared runtime Wasm is **37.42 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json).
@@ -97,9 +97,9 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-03**): 1,737 Engine cases,
-42 Wasm-emission, 636 structural, 765 IR and
-361 source-guard checks pass. AOT units pass 637 cases; four known
+Latest scoped verification (**2026-11-03**): 1,741 Engine cases,
+42 Wasm-emission, 636 structural, 769 IR and
+361 source-guard checks pass. AOT units pass 642 cases; four known
 bootstrap assertions still fail.
 The focused benchmarks passed 3,120 checked calls; React RSC also passed exact
 Flight checks. These scopes do not replace the published full Test262 run.
@@ -119,7 +119,7 @@ remain [owned](docs/rust-rewrite/current-inventory.md).
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 48:** rebuild older Portable bundles and native images.
+- **Runtime ABI 49:** rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·
 [Current work](docs/rust-rewrite/current-inventory.md) ·

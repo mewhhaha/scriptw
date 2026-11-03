@@ -755,7 +755,6 @@ pub(crate) enum FunctionPrototypeMaterialization {
 #[derive(Clone, Copy)]
 pub(crate) enum NativeObjectAlgorithm {
     GetOwnPropertyDescriptor,
-    OwnKeys,
 }
 
 impl FunctionBuilder<'_> {
@@ -1262,7 +1261,6 @@ impl FunctionBuilder<'_> {
             NativeObjectAlgorithm::GetOwnPropertyDescriptor => {
                 StandardBuiltinId::ObjectGetOwnPropertyDescriptor
             }
-            NativeObjectAlgorithm::OwnKeys => StandardBuiltinId::ReflectOwnKeys,
         };
         let meta = self
             .functions

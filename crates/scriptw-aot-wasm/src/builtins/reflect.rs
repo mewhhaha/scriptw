@@ -267,8 +267,8 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        // The direct internal owner avoids recursion through Reflect.ownKeys.
-        let keys = self.emit_own_keys_internal(target.0, function)?;
+        // Only the public builtin materializes the accepted List as an Array.
+        let keys = self.emit_object_own_property_keys(target.0, function)?;
         let count = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         let length = schema.reserve_i64_local(function);

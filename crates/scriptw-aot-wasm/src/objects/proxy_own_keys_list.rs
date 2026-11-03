@@ -8,6 +8,9 @@ use crate::gc_types::{
     ModuleNamespaceObject, ModuleNamespaceObjectSchema, PrimitiveBox, PrimitiveBoxSchema,
     PropertyKeyConstruction, PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
 };
+use crate::runtime_helpers::{
+    HelperParameters, ObjectOwnKeysArguments, ObjectOwnKeysParameters, RuntimeHelperId,
+};
 
 #[must_use = "the complete own-key snapshot must be consumed and cleared"]
 pub(crate) struct CompletedOwnPropertyKeys {
@@ -78,8 +81,8 @@ impl FunctionBuilder<'_> {
 }
 
 impl FunctionBuilder<'_> {
-    /// The native algorithm is the recursive runtime boundary in the executing
-    /// Realm. Its fresh Array is private; no public property is consulted.
+    /// Internal consumers retain the accepted List directly. Recursive Proxy
+    /// targets cross this same typed runtime boundary in the executing Realm.
     pub(crate) fn emit_object_own_property_keys(
         &mut self,
         target: &ValueLocals,
@@ -87,90 +90,66 @@ impl FunctionBuilder<'_> {
     ) -> Result<CompletedOwnPropertyKeys, EmitError> {
         let schema = self.runtime_schema();
         let pending = schema.reserve_completion(function);
-        self.emit_native_object_algorithm_call(
-            crate::functions::NativeObjectAlgorithm::OwnKeys,
-            &[target],
-            &pending,
-            function,
-        )?;
+        let realm = self.emit_execution_realm(function);
+        let returned = schema
+            .call_helper(
+                ObjectOwnKeysArguments::new(
+                    target,
+                    &realm,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .bind(schema, &pending, function);
+        realm.clear(function);
+        // Both returned GC edges are rooted before an abrupt branch. Only a
+        // successful operation can publish a completed accepted-key snapshot.
         self.emit_own_keys_propagate_throw(&pending, function);
-        let array = schema.reserve_gc_local(function).initialize(
-            pending
-                .value()
-                .cast_reference::<ArrayObject>(schema, function),
+        let table = schema.reserve_gc_local(function).initialize(
+            returned.load(schema, function).require_non_null(function),
             function,
         );
-
-        let length = schema.reserve_i32_local(function);
-        let index = schema.reserve_i32_local(function);
-        let index64 = schema.reserve_i64_local(function);
-        let value = schema.reserve_value_local(function);
-        schema
-            .field(ArrayObjectSchema::LENGTH)
-            .read(&array, schema, function)
-            .store_i64(value.scalar(), function);
-        value.scalar().load(function);
-        function.instruction(&Instruction::I32WrapI64);
-        length.store(function);
-        let construction = PropertyKeyConstruction::allocate(
-            schema,
-            schema.reserve_gc_local(function),
-            length,
-            function,
-        );
-        function.instruction(&Instruction::I32Const(0));
-        index.store(function);
-        self.open_frame(ControlFrameKind::Block, function);
-        self.open_frame(ControlFrameKind::Loop, function);
-        index.load(function);
-        length.load(function);
-        function.instruction(&Instruction::I32GeU);
-        function.instruction(&Instruction::BrIf(1));
-        index.load(function);
-        function.instruction(&Instruction::I64ExtendI32U);
-        index64.store(function);
-        let nullable_descriptor = self.emit_array_indexed_descriptor(&array, index64, function);
-        let descriptor = schema.reserve_gc_local(function).initialize(
-            nullable_descriptor
-                .load(schema, function)
-                .require_non_null(function),
-            function,
-        );
-        nullable_descriptor.clear(function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(PropertyDescriptorSchema::VALUE)
-                .read(&descriptor, schema, function)
-                .reference(),
-            function,
-        );
-        self.emit_property_value_into(&stored, &value, function);
-        let key = self.emit_value_to_property_key_locals(&value, function)?;
-        construction.write(index, &key, schema, function);
-        key.clear(function);
-        stored.clear(function);
-        descriptor.clear(function);
-        self.emit_own_keys_increment(index, function);
-        function.instruction(&Instruction::Br(0));
-        self.pop_control(ControlFrameKind::Loop);
-        function.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        function.instruction(&Instruction::End);
-        let table = schema
-            .reserve_gc_local(function)
-            .initialize(construction.publish(schema, function), function);
-        value.clear(function);
-        schema.release_i32_local(index, function);
-        schema.release_i32_local(length, function);
-        schema.release_i64_local(index64, function);
-        array.clear(function);
+        returned.clear(function);
         pending.clear(function);
         Ok(CompletedOwnPropertyKeys { table })
     }
 
-    /// Direct native Reflect.ownKeys body. Recursive Proxy targets use the
-    /// recorded facade above; the compiler never recursively emits this body.
-    pub(crate) fn emit_own_keys_internal(
+    pub(crate) fn compile_object_own_keys_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::ObjectOwnKeys);
+        let parameters = self.helper_parameters::<ObjectOwnKeysParameters>(&mut function);
+        let schema = self.runtime_schema();
+        self.completion().initialize(&mut function);
+        let table = schema
+            .reserve_gc_local::<PropertyKeyTable, Nullable>(&mut function)
+            .initialize_null(schema, &mut function);
+        // All throws leave through the extended result ABI. A failed operation
+        // returns null, never a partial table disguised as a completed List.
+        let exit = self.open_frame(ControlFrameKind::Block, &mut function);
+        self.throw_handler_stack.push(exit);
+        let keys = self.emit_own_keys_kernel(&parameters.target, &mut function)?;
+        table.replace(
+            keys.table.load(schema, &mut function).nullable(),
+            &mut function,
+        );
+        keys.clear(&mut function);
+        self.completion().initialize(&mut function);
+        self.throw_handler_stack.pop();
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        self.completion().emit(&mut function);
+        table.load(schema, &mut function);
+        table.clear(&mut function);
+        self.clear_helper_execution_realm(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    /// Sole OwnKeys kernel. The facade keeps recursive Proxy target operations
+    /// as runtime calls rather than recursively expanding this emitter.
+    fn emit_own_keys_kernel(
         &mut self,
         target: &ValueLocals,
         function: &mut Function,
@@ -194,7 +173,9 @@ impl FunctionBuilder<'_> {
         self.emit_is_heap_object_like_tag_i32(target.tag(), function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_throw_current_function_realm_type_error(
+        // This kernel has an explicit executing Realm, not a callable context.
+        self.emit_throw_runtime_error(
+            scriptw_ir::NativeErrorKind::TypeError,
             RuntimeErrorMessage::REFLECT_OWNKEYS_TARGET_MUST_BE_OBJECT,
             &pending,
             function,

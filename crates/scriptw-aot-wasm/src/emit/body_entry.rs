@@ -135,6 +135,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RelationalComparison
             | RuntimeHelperId::LooseEquality
             | RuntimeHelperId::ForInAdvance
+            | RuntimeHelperId::ObjectOwnKeys
             | RuntimeHelperId::BigIntEquality
             | RuntimeHelperId::RegExpMatcher
             | RuntimeHelperId::RegExpCompiler

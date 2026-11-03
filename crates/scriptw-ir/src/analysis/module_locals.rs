@@ -81,10 +81,6 @@ impl ProvenBindingCellIr {
         let owner = analysis.function_plans.get(&capture.owner_id)?;
         if capture.owner_id == SCRIPT_OWNER_ID
             || capture.owner_id == owner_id
-            || matches!(
-                owner.protocol,
-                FunctionProtocolIr::ModuleActivation | FunctionProtocolIr::AsyncModuleActivation
-            )
             || environment.owner_id != capture.owner_id
             || capture.source_name != source_name
             || environment.owned_env_slots.get(storage_name) != Some(&capture.slot)
@@ -92,7 +88,34 @@ impl ProvenBindingCellIr {
         {
             return None;
         }
-        // Do not extend this first admission across a resumable invocation.
+        let module_kind = match owner.protocol {
+            FunctionProtocolIr::ModuleActivation => {
+                Some(crate::ModuleActivationKindIr::Synchronous)
+            }
+            FunctionProtocolIr::AsyncModuleActivation => Some(crate::ModuleActivationKindIr::Async),
+            _ => None,
+        };
+        if let Some(kind) = module_kind {
+            let module_owner = analysis.owner_plans.get(&capture.owner_id)?;
+            // The graph retains this one invocation environment before linking
+            // imports or evaluating source. Block/iteration records and split
+            // parameter/body records do not inherit that lifetime proof.
+            if capture.environment_id != module_owner.activation_environment_id
+                || environment.kind != EnvironmentKind::Activation
+                || module_owner.body_environment_id.is_some()
+                || module_owner.parameter_eval_environment_id.is_some()
+                || module_owner.owned_env_slots.get(storage_name) != Some(&capture.slot)
+                || !analysis.module_execution.graphs.values().any(|graph| {
+                    graph.activations().iter().any(|activation| {
+                        activation.function() == &capture.owner_id && activation.kind() == kind
+                    })
+                })
+            {
+                return None;
+            }
+        }
+        // Only the authenticated Module activation may terminate this walk
+        // across a resumable protocol. User async/generator ancestors still miss.
         // The exact owner ancestry, rather than a matching spelling, must lead
         // to the source environment that owns the finalized capture cell.
         let mut cursor = analysis
@@ -103,6 +126,9 @@ impl ProvenBindingCellIr {
         loop {
             let ancestor_id = cursor?;
             let ancestor = analysis.function_plans.get(ancestor_id)?;
+            if ancestor_id == capture.owner_id && module_kind.is_some() {
+                break;
+            }
             if ancestor.protocol.execution_kind() != FunctionExecutionKind::Ordinary {
                 return None;
             }

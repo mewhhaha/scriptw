@@ -349,3 +349,95 @@ print('body');"#,
         );
     }
 }
+
+#[test]
+fn module_capture_import_cells_preserve_tdz_write_order_and_hoisted_calls() {
+    success(
+        &[
+            (
+                "entry.js",
+                r#"import './setup.js';
+import { value, bump, hoisted } from './owner.js';
+import { read, held, next } from './reader.js';
+import { renamed } from './relay.js';
+function readRelay() { return renamed; }
+print(trace.join(','));
+const before = read();
+const first = held();
+const second = next();
+bump(); gc();
+print([before, read(), readRelay(), hoisted(), first, second].join(','));"#,
+            ),
+            ("setup.js", "globalThis.trace = [];"),
+            (
+                "owner.js",
+                r#"import './reader.js';
+export var ready = 9;
+export let value = 5;
+export let callable = function old(value) { return 'old:' + value + ':' + (this === undefined); };
+export function hoisted() { return ready; }
+export function bump() { ++value; }
+export function replace() { callable = function next(value) { return 'new:' + value + ':' + (this === undefined); }; }"#,
+            ),
+            (
+                "reader.js",
+                r#"import { value as alias, callable as callAlias, replace, hoisted } from './owner.js';
+export function read() { return alias; }
+function kind() { return typeof alias; }
+function plain() { alias = (trace.push('plain-rhs'), 99); }
+function compound() { alias += (trace.push('compound-rhs'), 1); }
+export function held() { return callAlias((replace(), 3)); }
+export function next() { return callAlias(4); }
+trace.push('hoisted:' + typeof hoisted());
+try { read(); } catch (error) { trace.push('read:' + (error instanceof ReferenceError)); }
+try { kind(); } catch (error) { trace.push('type:' + (error instanceof ReferenceError)); }
+try { plain(); } catch (error) { trace.push('plain:' + (error instanceof TypeError)); }
+try { compound(); } catch (error) { trace.push('compound:' + (error instanceof ReferenceError)); }"#,
+            ),
+            ("relay.js", "export { value as renamed } from './owner.js';"),
+        ],
+        &[
+            "hoisted:undefined,read:true,type:true,plain-rhs,plain:true,compound:true",
+            "5,6,6,9,old:3:true,new:4:true",
+        ],
+        None,
+    );
+}
+
+#[test]
+fn module_capture_async_root_cells_remain_live_after_await_and_evaluation() {
+    success(
+        &[
+            (
+                "entry.js",
+                r#"import { before, after, read, write, nested } from './owner.js';
+import { alias } from './relay.js';
+function readAlias() { return alias; }
+if (before !== 2 || after !== 5 || read() !== 5 || nested() !== 6) throw 'suspended root';
+write(8); gc();
+if (read() !== 8 || readAlias() !== 8 || nested() !== 9) throw 'live completed root';
+await import('./owner.js').then(function(namespace) {
+  if (namespace.read !== read || namespace.read() !== 8) throw 'retained namespace';
+  namespace.write(11); gc();
+  if (read() !== 11 || readAlias() !== 11 || nested() !== 12) throw 'late root identity';
+});
+print('live async root cells');"#,
+            ),
+            (
+                "owner.js",
+                r#"export let value = 2;
+export function read() { return value; }
+export function write(next) { value = next; }
+function make(padding) { return function inner() { return value + padding; }; }
+export const nested = make(1);
+export const before = read();
+await 0;
+write(5); gc();
+export const after = read();"#,
+            ),
+            ("relay.js", "export { value as alias } from './owner.js';"),
+        ],
+        &["live async root cells"],
+        None,
+    );
+}

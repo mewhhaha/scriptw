@@ -30,8 +30,18 @@ Ordinary module functions can carry a sealed proof of an existing owned or
 captured cell. It binds the emitted function, source/storage names, slot and
 capture ancestry. Proven reads and `typeof` use the same live cell and TDZ
 operation directly; writes and calls retain held References. Retained cells keep
-their allocation, aliases and unknown value facts. Dynamic environments, arguments cells,
-module roots, ambiguous owners and resumable crossings retain ordinary lookup.
+their allocation, aliases and unknown value facts.
+
+A captured Module root cell may terminate ordinary capture ancestry only when
+the trusted graph names its synchronous or async activation, the environment is
+that owner's canonical activation record without a parameter/body split, and
+the finalized capture, environment and owner slots agree. The Module record and
+closures retain this same environment across instantiation, evaluation and
+top-level await. Import reads follow the existing cell's target and TDZ state;
+writes check the importing cell's own initialization and mutability. This proof
+does not cache values or turn callee candidates into exact targets. Dynamic
+environments, arguments cells, Module block/iteration records, ambiguous owners
+and user async/generator crossings retain ordinary lookup.
 
 Private `var` bindings and simple parameters of admitted strict ordinary module
 functions may instead use existing local storage, even when another function

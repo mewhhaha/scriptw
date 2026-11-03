@@ -24,21 +24,28 @@ accepts `--case <file.js>`.
   within the [property scores](situations-current.json); retain live mutation,
   accessors, prototypes, proxies and coercion/exception order on misses.
   Owner: AOT operations and the existing object model.
-- Attribute current RSC semantic work. The [fresh instruction counts](react-attribution-current.json)
-  use 100 checked requests in three fresh processes per engine/mode; they are
-  unscored user-thread counters, not causal cost percentages. Re-sample the name
-  resolver and remaining call/property paths on the [recorded compiler](rsc-current.json)
-  before adding caches, changing environment addressing or broadening inlining.
-  The existing direct-cell proof rejects Module activation owners; validate
-  canonical Module frame/slot identity and lifecycle before extending it across
-  that boundary. Reuse its live-cell/alias/TDZ operations; add no parallel cache.
-  Earlier sampled caller profiles remain in their Git-bound archive.
-  Owner: IR/AOT lowering and runtime lookup/property machinery; retain one heap.
-- Bound native code, spills and cold preparation. The focused control-flow
-  programs now use guarded dense jump tables, but code/image growth remains
-  visible in their [scores](situations-current.json). Re-measure RSC frames and
-  stack probes before changing the default native policy; Fast and Speed change
-  both optimization and register allocation. Owner: AOT code shape/native policy.
+- Measure remaining RSC property, descriptor and allocation work after typed
+  internal OwnKeys and canonical Module direct-cell capture admission. Keep
+  [instruction counts and sampled callers](react-attribution-current.json)
+  separate from scored timings; inclusive sample shares overlap. Preserve live
+  import aliases, TDZ, cross-Realm errors and Proxy invariants. Total executed
+  allocation remains unmeasured. Owner: IR/AOT lowering and object operations.
+- Reduce Fast's native frames by outlining the existing unified `instanceof`
+  state machine once. Preserve operand evaluation, both entry modes, actual
+  execution Realms and whole Throws. Measure emitted size, native frame/body
+  sizes, probe samples, preparation and balanced Fast execution; keep
+  Backtracking as a separate control. The [allocator diagnostic](react-attribution-current.json)
+  establishes a runtime/preparation tradeoff; default policy changes need
+  broader workload evidence. Owner: AOT code shape/native policy.
+- Shorten emitter iteration by moving public emitted-artifact acceptance cases
+  into the existing external `emission` target. This can reuse the ordinary AOT
+  library needed by Engine rather than compiling it again under `cfg(test)`.
+  Keep private unit tests at frozen qualification and measure an identical edit
+  loop before claiming savings. Preserve canonical R regeneration and compiler
+  source fingerprints. Move embedding-only benchmark hosts to Engine examples
+  so emitter iterations do not rebuild the Test262-linked CLI library. Reuse
+  native producer/consumer runs for retained RSC requests while measuring cold
+  setup separately. Owner: AOT test layout, benchmark tools/runtime-image build.
 - Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup.
   Keep exact P/R identities and code/data accounting separate from native image
   size and request time. The older [SSR checkpoint](react-codegen-20261102.json)

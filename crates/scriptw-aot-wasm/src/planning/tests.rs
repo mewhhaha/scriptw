@@ -837,7 +837,6 @@ fn object_descriptor_map_builtins_root_reflective_operations() {
             entry_point,
             StandardBuiltinId::ObjectDefineProperties,
             StandardBuiltinId::ObjectDefineProperty,
-            StandardBuiltinId::ReflectOwnKeys,
             StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
             StandardBuiltinId::ReflectDefineProperty,
         ] {
@@ -852,7 +851,6 @@ fn object_integrity_builtins_root_reflective_property_operations() {
         (
             StandardBuiltinId::ObjectSeal,
             &[
-                StandardBuiltinId::ReflectOwnKeys,
                 StandardBuiltinId::ReflectDefineProperty,
                 StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
             ][..],
@@ -860,7 +858,6 @@ fn object_integrity_builtins_root_reflective_property_operations() {
         (
             StandardBuiltinId::ObjectFreeze,
             &[
-                StandardBuiltinId::ReflectOwnKeys,
                 StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
                 StandardBuiltinId::ReflectDefineProperty,
                 StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
@@ -869,7 +866,6 @@ fn object_integrity_builtins_root_reflective_property_operations() {
         (
             StandardBuiltinId::ObjectIsSealed,
             &[
-                StandardBuiltinId::ReflectOwnKeys,
                 StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
                 StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
             ][..],
@@ -877,7 +873,6 @@ fn object_integrity_builtins_root_reflective_property_operations() {
         (
             StandardBuiltinId::ObjectIsFrozen,
             &[
-                StandardBuiltinId::ReflectOwnKeys,
                 StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
                 StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
             ][..],
@@ -905,7 +900,6 @@ fn enumerable_own_properties_root_reflective_property_operations() {
 
         for builtin in [
             enumerable_own_properties_builtin,
-            StandardBuiltinId::ReflectOwnKeys,
             StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
             StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
         ] {
@@ -925,7 +919,6 @@ fn object_property_copy_builtins_root_reflective_property_operations() {
 
         for dependency in [
             builtin,
-            StandardBuiltinId::ReflectOwnKeys,
             StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
             StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
         ] {
@@ -936,6 +929,40 @@ fn object_property_copy_builtins_root_reflective_property_operations() {
             assert!(plan.standard_roots.contains(&StandardBuiltinId::ReflectSet));
         }
     }
+}
+
+#[test]
+fn internal_key_consumers_do_not_retain_the_public_own_keys_callable() {
+    for builtin in [
+        StandardBuiltinId::ObjectAssign,
+        StandardBuiltinId::ObjectKeys,
+        StandardBuiltinId::ObjectGetOwnPropertyNames,
+        StandardBuiltinId::ObjectGetOwnPropertySymbols,
+        StandardBuiltinId::ObjectGetOwnPropertyDescriptors,
+        StandardBuiltinId::ObjectDefineProperties,
+        StandardBuiltinId::ObjectSeal,
+        StandardBuiltinId::ObjectFreeze,
+        StandardBuiltinId::ObjectIsSealed,
+        StandardBuiltinId::ObjectIsFrozen,
+        StandardBuiltinId::IteratorZipKeyed,
+        StandardBuiltinId::JsonParse,
+        StandardBuiltinId::JsonStringify,
+    ] {
+        let mut plan = RuntimeBootstrapPlan::default();
+        plan.require_foundational_roots();
+        plan.require_standard_builtin(builtin);
+        assert!(
+            !plan
+                .standard_roots
+                .contains(&StandardBuiltinId::ReflectOwnKeys),
+            "{builtin:?} uses the shared accepted-key List"
+        );
+    }
+    let mut public = RuntimeBootstrapPlan::default();
+    public.require_standard_builtin(StandardBuiltinId::ReflectOwnKeys);
+    assert!(public
+        .standard_roots
+        .contains(&StandardBuiltinId::ReflectOwnKeys));
 }
 
 #[test]

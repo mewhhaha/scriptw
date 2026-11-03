@@ -598,3 +598,83 @@ print(snapshot(17));
         &["7", "13", "17"],
     );
 }
+
+#[test]
+fn root_module_cells_keep_live_operations_and_saved_callees() {
+    assert_output(
+        r#"
+var state = 1;
+let callee = original;
+const fixed = 7;
+const trace = [];
+function original(value) { return 'old:' + value + ':' + (this === undefined); }
+function replacement(value) { return 'new:' + value + ':' + (this === undefined); }
+function argument() { trace.push('arg'); callee = replacement; return 2; }
+function read() { return state; }
+function compound() { return state += (state = 40, 2); }
+function update() {
+  state = {valueOf() { state = 99; return 4; }};
+  return state++;
+}
+function logical() { state = 0; return state ||= (trace.push('logical'), 8); }
+function kind() { return typeof state; }
+function call() { return callee(argument()); }
+function next() { return callee(3); }
+function readonly() { fixed = (trace.push('const-rhs'), 9); }
+function deep(a, b, c, d, e) {
+  function middle() { return function readDeep() { return state + a + b + c + d + e; }; }
+  return middle();
+}
+print(compound());
+print(update() + ',' + read());
+print(logical() + ',' + kind() + ',' + deep(1, 2, 3, 4, 5)());
+print(call());
+print(next());
+try { readonly(); } catch (error) { print((error instanceof TypeError) + ',' + fixed); }
+print(trace.join(','));
+"#,
+        true,
+        &[
+            "3",
+            "4,5",
+            "8,number,23",
+            "old:2:true",
+            "new:3:true",
+            "true,7",
+            "logical,arg,const-rhs",
+        ],
+    );
+}
+
+#[test]
+fn root_module_tdz_and_module_block_cells_keep_distinct_identities() {
+    assert_output(
+        r#"
+var trace = [];
+function read() { return later; }
+function kind() { return typeof later; }
+function write() { return later = (trace.push('write-rhs'), 9); }
+for (const action of [read, kind, write]) {
+  try { action(); trace.push('missed'); }
+  catch (error) { trace.push(error instanceof ReferenceError); }
+}
+let later = 7;
+const blocks = [], iterations = [];
+{
+  let later = 'block';
+  blocks.push(function readBlock() { return later; });
+}
+for (let index = 0; index < 2; index++) {
+  iterations.push(function readIteration() { return index + ':' + later; });
+}
+function shadow() {
+  let later = 'local';
+  return function readLocal() { return later; };
+}
+print(trace.join(',') + '|' + read() + '|' + kind() + '|' + shadow()() + '|' +
+  blocks[0]() + '|' + iterations.map(function(value) { return value(); }).join(','));
+"#,
+        true,
+        &["true,true,write-rhs,true|7|number|local|block|0:7,1:7"],
+    );
+}
