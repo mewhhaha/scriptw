@@ -12,8 +12,7 @@ process. Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw prior build | 23.802 | 26.590 |
-| Scriptw current build | 19.898 | 21.012 |
+| Scriptw | 19.898 | 21.012 |
 | Node 24.12.0 / V8 | 0.487 | 0.392 |
 
 ![Matched retained RSC request timings](assets/rsc-current/runtime.svg)
@@ -22,61 +21,68 @@ Each engine uses eight fresh processes across two balanced blocks, with three
 checked warmups and seven measured requests per mode. Scriptw's request clock
 covers the retained call through full Flight consumption; Node uses the same
 bundle and wrapper in one `vm.SourceTextModule`/Realm for sync then async. JSON
-encoding and exact-output checks follow the clock. Current medians are **16.4%**
-and **21.0%** below the prior build; both modes improve in both blocks. Process
-medians are the comparison units, with no significance or engine-parity claim.
-V8 remains about **41× / 54× faster** on this fixture. Scriptc's existing React
-build failures remain unqualified; client React/DOM is a separate open scope.
+encoding and exact-output checks follow the clock. Values are process medians;
+V8 is about **41× / 54× faster** on this fixture. Scriptc's React build failures
+remain unqualified; client React/DOM is a separate open scope.
 
-Strict ordinary module functions now keep private, uncaptured variables and
-simple parameters in Wasm locals even when the bundle uses arguments. Real
-captures, synthetic bindings and arguments retain their storage and snapshots.
-Proven reads of retained cells also avoid generic name resolution while keeping
-TDZ and mutation behavior. Immutable program UTF-16 slices share physical data;
-all 987 literal contents remain. This batch changes those mechanisms together,
-so the matched cohort does not isolate each mechanism's contribution.
-
-| Cold setup / raw size | Prior build | Current build |
-| --- | ---: | ---: |
-| JavaScript → Wasm | 3.737 s | 3.216 s |
-| Native preparation | 12.779 s | 12.400 s |
-| Module initialization | 2.635 ms | 2.620 ms |
-| Program Wasm | 7,653,675 B | 6,372,954 B |
-| Code section | 6,540,463 B | 5,830,771 B |
-| Data section | 1,016,420 B | 490,228 B |
-| Whole-child peak RSS | 538.5 MiB | 513.5 MiB |
-
-The program shrinks **16.7%**, including a **10.9%** code reduction. R is byte
-identical at 39,380,016 bytes. An excluded loading trace confirms R loads from
-the bundled native image; P still compiles from Wasm before request timing.
-RSS includes compilation and all process history; it does not measure live guest heap. The first rejected intermediate trial grew
-code 4.7% despite a smaller total program; its separate diagnostic is retained
-in the evidence. Large bodies and native compilation remain open costs.
+Current Scriptw cold setup is **3.216 s JavaScript → Wasm**, **12.400 s native
+preparation**, and **2.620 ms module initialization**. Program Wasm is
+**6,372,954 B** (5,830,771 B code; 490,228 B data); shared runtime Wasm is
+**39,380,016 B**. Whole-child peak RSS is 513.5 MiB and includes compilation
+and process history, not just the live guest heap. The size attribution and
+frozen evidence archive retain byte-level details.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
-The main cohort keeps Wasmtime 47 **Fast / OptLevel::None / SinglePass**, one
-CPU, 16-MiB copying GC and the same stack/deadline settings. A separate
-**one-process** Speed/Backtracking diagnostic reached 16.00 / 16.69 ms, with
-18.45 s native preparation; it is excluded from the comparison and changes no
-default. The ordinary CLI chooses its own automatic native policy: the nine
-exact-output controls include cold RSC at about 17.8 s and React HTML SSR at
-42.4 s. Those Script-mode controls do not establish an SSR performance gain.
+The cohort uses Wasmtime 47 **Fast / OptLevel::None / SinglePass**, one CPU,
+16-MiB copying GC and fixed stack/deadline settings. The Wasm size attribution
+and evidence archive include the matching frozen compiler and process receipts.
 
-Excluded request profiles still place about 8.5% of sampled user cycles in
-string equality, 4.4–4.8% in environment resolution and 4.4–5.1% in property
-search. React's `vn` body contributes 11.4–12.1%. These are instruction-location
-samples, not wall-time or allocation percentages; zero-IP and unresolved
-samples stay in the denominator. The next work is lookup representation and
-remaining call/prologue machinery, guided by caller and allocation evidence.
+Excluded diagnostics use the same compiler and source, with 100 checked requests
+after three warmups in each engine/mode process:
+
+| Retired instructions per request · median | Scriptw | Node / V8 |
+| --- | ---: | ---: |
+| Sync | 158.67 million | 2.53 million |
+| Async | 167.07 million | 2.64 million |
+
+All counter windows ran without multiplexing. Scriptw has higher aggregate
+instructions per cycle and fewer branch misses per branch; excessive instruction
+volume is the main observed gap. These are execution-thread counters, excluding
+background threads. Node's barrier edges are included; an empty-window calibration
+measures 0.33 million instructions, without subtraction. Natural JIT/GC history
+across 100 calls differs from the timing cohort; these counts establish no new
+timing ratio.
+
+The sync caller profile identifies repeated global-name resolution: **92.1%** of
+StringEquality leaf sample weight comes directly from the environment resolver.
+Most originates in 22 React `vn` sites reading `Map`, `Number`, typed arrays,
+`Date`, `ReadableStream`, `Blob` and `FormData`. These unbound references start
+at the current environment and scan irrelevant lexical binding tables. The next
+compiler cut is a proof that selects the existing global-environment start while
+preserving live global lexical bindings, mutable properties, getters and Realms.
+
+Fast native code is also excessive: P contains 85.70 MB of machine code, and
+`vn` reserves a 1,011,584-byte stack frame. One checked sync render executes
+88,258 repeated stack-page writes in `vn`/`ft`; their probe loops account for
+5.3–5.8% of retained sampled locations. Speed/Backtracking shrinks P to 29.19 MB
+and those frames to 7,424/4,912 bytes, yet still executes 150–158 million
+instructions per request. Both optimization and allocator change together;
+policy alone leaves the large semantic-work gap. Samples are not wall-time or
+allocation percentages. Total heap and arguments-object allocations remain
+unmeasured.
+
+[Diagnostic report](react-attribution-current.json) ·
+[Diagnostic evidence](react-attribution-evidence-2026-11-03.tar.xz).
 
 Runtime ABI 47 supplies bounded UTF-8 codecs, byte streams with default readers,
 events, abort signals and tasks for these fixtures. Fetch/Request/URL integration,
 DOM nodes and full WHATWG conformance remain unsupported or unverified.
 
-[Current report](rsc-current.json) · [Size attribution](rsc-wasm-size-current.json) ·
+[Current report and process receipts](rsc-current.json) ·
+[Size attribution](rsc-wasm-size-current.json) ·
 [Inert evidence archive](rsc-final-evidence-2026-11-03.tar.xz) ·
-[Prior report](rsc-initial-20261103.json).
+[Historical raw cohort](rsc-initial-20261103.json).
 
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison

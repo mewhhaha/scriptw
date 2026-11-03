@@ -1,0 +1,4654 @@
+{
+  "conclusions": [
+    "Instruction volume is the primary observed gap: about159-167M retired instructions per Fast request versus2.5-2.6M Node across100 requests; higher Scriptw aggregate IPC and lower branch-miss rate do not support branch prediction as the main explanation.",
+    "Repeated variable-name resolution is a measured hotspot: about92percent of sampled StringEquality leaf weight has EnvironmentIdentifierResolve as the immediate physical caller; most of that work originates in React vn.",
+    "Fast code generation creates excessive spill frames and page probes. These are real costs but the two exact probe loops are only about0.22percent of retired instructions and5-6percent of sampled locations, so they cannot explain the entire surplus.",
+    "Speed/Backtracking shrinks native frames/code substantially while removing only about5.3percent of retired instructions; backend policy alone leaves the main semantic-work problem.",
+    "All22 dominant vn sites resolve global or optional-global constructor names but begin at the current lexical environment. Next work should prove global-start resolution and reuse the existing live global lookup path rather than scanning irrelevant scopes. Total heap and arguments-object allocation counts remain unmeasured."
+  ],
+  "current_timing_report": "rsc-current.json",
+  "current_timing_report_sha256": "1a05ae9ba0e10e64989c38681819731c47512ebe12da20539e9ffdfdb22b9b07",
+  "date": "2026-11-03",
+  "evidence_archive": {
+    "bytes": 709620,
+    "expanded_utf8_bytes": 54464655,
+    "file": "docs/rust-rewrite/react-attribution-evidence-2026-11-03.tar.xz",
+    "over_5mb": false,
+    "regular_utf8_members": 171,
+    "sha256": "1d44a2c509fe79446dc1eec52a50dfad080f5950c32296a52ef47b4d8c45009a"
+  },
+  "exact_stack_probes": {
+    "async": {
+      "functions": [
+        {
+          "address": 139658126744320,
+          "completed_probe_count": 291,
+          "entry_count": 291,
+          "entry_offset": 0,
+          "executed_probe_instructions": 288381,
+          "executed_probe_page_writes": 71877,
+          "name": "js::vn#f133",
+          "native_bytes": 5136192,
+          "page_size": 4096,
+          "postprobe_offset": 77,
+          "probe_pages_per_completed_entry": 247,
+          "stack_frame_bytes": 1011584,
+          "verified_native_prefix_sha256": "cc37193856cb66dda52190b880d664acc7e8dd1caaa4893fcacd43bee05f5204"
+        },
+        {
+          "address": 139658121010144,
+          "completed_probe_count": 254,
+          "entry_count": 254,
+          "entry_offset": 0,
+          "executed_probe_instructions": 85090,
+          "executed_probe_page_writes": 21082,
+          "name": "js::ft#f123",
+          "native_bytes": 1632544,
+          "page_size": 4096,
+          "postprobe_offset": 77,
+          "probe_pages_per_completed_entry": 83,
+          "stack_frame_bytes": 339840,
+          "verified_native_prefix_sha256": "84d27c602441a8cb12630cfa7db8918a7427a15f3761b60cb230681fdb39f2a0"
+        }
+      ],
+      "limits": "Excluded debugger run, not timing. Entry and completed-probe counts only; page touches are repeated stack writes, not unique pages or heap allocations.",
+      "pid": 1358588,
+      "schema": "scriptw-exact-native-probe-counts-v1",
+      "status": "counted",
+      "total_breakpoint_events": 1090
+    },
+    "sync": {
+      "functions": [
+        {
+          "address": 140329550928640,
+          "completed_probe_count": 276,
+          "entry_count": 276,
+          "entry_offset": 0,
+          "executed_probe_instructions": 273516,
+          "executed_probe_page_writes": 68172,
+          "name": "js::vn#f133",
+          "native_bytes": 5136192,
+          "page_size": 4096,
+          "postprobe_offset": 77,
+          "probe_pages_per_completed_entry": 247,
+          "stack_frame_bytes": 1011584,
+          "verified_native_prefix_sha256": "cc37193856cb66dda52190b880d664acc7e8dd1caaa4893fcacd43bee05f5204"
+        },
+        {
+          "address": 140329545194464,
+          "completed_probe_count": 242,
+          "entry_count": 242,
+          "entry_offset": 0,
+          "executed_probe_instructions": 81070,
+          "executed_probe_page_writes": 20086,
+          "name": "js::ft#f123",
+          "native_bytes": 1632544,
+          "page_size": 4096,
+          "postprobe_offset": 77,
+          "probe_pages_per_completed_entry": 83,
+          "stack_frame_bytes": 339840,
+          "verified_native_prefix_sha256": "84d27c602441a8cb12630cfa7db8918a7427a15f3761b60cb230681fdb39f2a0"
+        }
+      ],
+      "limits": "Excluded debugger run, not timing. Entry and completed-probe counts only; page touches are repeated stack writes, not unique pages or heap allocations.",
+      "pid": 1358448,
+      "schema": "scriptw-exact-native-probe-counts-v1",
+      "status": "counted",
+      "total_breakpoint_events": 1036
+    }
+  },
+  "executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
+  "limitations": [
+    "No claim that total allocation counts or the entire V8 gap have been causally partitioned.",
+    "Instruction-location sample shares are not wall-time or allocation percentages. Inclusive caller weights overlap; leaf own weights do not.",
+    "Original flat profiles retain zero/unresolved samples. Frame-pointer chains can truncate or be invalid; empty records retain their full weight with an explicit unavailable owner.",
+    "FP run1 failed kernel-callchain admission; user-only run2 completed requests but exposed an empty-record parser issue. Preserved raw data was reanalyzed without rerunning the workload; all original failed receipts remain.",
+    "Native Fast/Speed comparison changes optimization and register allocation together, not an allocator-only isolation. Exact native frame byte partition is unmeasured.",
+    "No compiler change, full CI or full pinned Test262 rerun in this diagnostic/presentation batch."
+  ],
+  "native_configuration_comparison": {
+    "configurations": {
+      "fast": {
+        "collector": "Copying",
+        "compilation_jobs": 1,
+        "cranelift_opt_level": "None",
+        "driver_worker_stack_bytes": 67108864,
+        "epoch_deadline_ticks": 6000,
+        "epoch_interruption": true,
+        "epoch_tick_ms": 5,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_parallel_compilation": false,
+        "pending_deadline_ms": 30000,
+        "register_allocation": "SinglePass",
+        "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+        "target": "x86_64-unknown-linux-gnu",
+        "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+        "wasmtime": "47.0.0",
+        "wasmtime_async_stack_bytes": 67108864
+      },
+      "speed": {
+        "collector": "Copying",
+        "compilation_jobs": 1,
+        "cranelift_opt_level": "Speed",
+        "driver_worker_stack_bytes": 67108864,
+        "epoch_deadline_ticks": 6000,
+        "epoch_interruption": true,
+        "epoch_tick_ms": 5,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_parallel_compilation": false,
+        "pending_deadline_ms": 30000,
+        "register_allocation": "Backtracking",
+        "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+        "target": "x86_64-unknown-linux-gnu",
+        "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+        "wasmtime": "47.0.0",
+        "wasmtime_async_stack_bytes": 67108864
+      }
+    },
+    "frozen_executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
+    "functions": [
+      {
+        "fast": {
+          "frame_subtraction_native_offset": 77,
+          "native_bytes": 5136192,
+          "native_sha256": "8ccc37c680b91749c7252f472399431be6dc52b0f3477dec61235ea91223dc07",
+          "probe_page_writes_per_successful_entry": 247,
+          "stack_frame_bytes": 1011584
+        },
+        "frame_reduction_fraction": 0.9926610148045046,
+        "name": "js::vn#f133",
+        "native_size_reduction_fraction": 0.6756289484505252,
+        "speed": {
+          "frame_subtraction_native_offset": 49,
+          "native_bytes": 1666032,
+          "native_sha256": "f9b86b880fa5ada3fb041f8bb6638effc4c4654f3d1b7b2b1e9a4cbbe8421dbb",
+          "probe_page_writes_per_successful_entry": 1,
+          "stack_frame_bytes": 7424
+        }
+      },
+      {
+        "fast": {
+          "frame_subtraction_native_offset": 77,
+          "native_bytes": 1632544,
+          "native_sha256": "f2b2c3792c640dfc751fa6d0a9772546e42cbb43370a4410b544de8d270cb0bf",
+          "probe_page_writes_per_successful_entry": 83,
+          "stack_frame_bytes": 339840
+        },
+        "frame_reduction_fraction": 0.9855461393596987,
+        "name": "js::ft#f123",
+        "native_size_reduction_fraction": 0.6767744085304899,
+        "speed": {
+          "frame_subtraction_native_offset": 49,
+          "native_bytes": 527680,
+          "native_sha256": "63c87806b75ba69e156ea231674831583776d249d778d0013d923bfe2d9d4269",
+          "probe_page_writes_per_successful_entry": 1,
+          "stack_frame_bytes": 4912
+        }
+      }
+    ],
+    "interpretation": "Identical source, P and imported R; Speed+Backtracking reduces the two frames from about1MB/340KB to7424/4912B, and P native text from85.7MB to29.2MB. The huge Fast frames are backend-policy-sensitive, not a requirement of the JavaScript activation or Wasm local declarations. Both optimization level and register allocation changed, so this is not a regalloc-only experiment.",
+    "limits": [
+      "Static native layout evidence, not a matched runtime speedup campaign. One checked request follows each capture.",
+      "Fast stack-probe counts are actual counts; Speed entry counts were not instrumented.",
+      "Speed native offsets differ and must never be used with retained Fast instruction samples.",
+      "Separate PMU diagnostics found only about5.3% fewer retired instructions under Speed, so code/frame-size reductions do not explain away the remaining execution gap.",
+      "Exact byte partition between frontend explicit slots and register-allocator slots remains unmeasured."
+    ],
+    "program_native_text": {
+      "fast_bytes": 85696512,
+      "reduction_fraction": 0.6594015868463818,
+      "speed_bytes": 29188096
+    },
+    "program_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+    "runtime": {
+      "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
+      "wasm_bytes": 39380016,
+      "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
+    },
+    "schema": "scriptw-exact-native-mode-frame-comparison-v1"
+  },
+  "pmu": {
+    "calibration": "Node empty-window calibration measures protocol edges only after 3 real warmups. It is not a render. Its counts are not subtracted.",
+    "limits": "Targets Scriptw execution TID versus Node main TID; excludes other/background threads. Node protocol edges are included, Scriptw coordinator edges excluded. Natural JIT/GC across100 requests differs from the published7-request timing cohort; separate-mode processes also differ from its sync-then-async order. No new timing ratio is claimed.",
+    "policy": "100 checked renders after 3 warmups, one fresh process per engine/mode/policy; user-only hardware group; zero multiplexing.",
+    "runs": {
+      "node-async": {
+        "archive_prefix": "pmu/pmu-node-async/",
+        "branch_miss_fraction": 0.012237039364931087,
+        "first_seven_median_counts": {
+          "branch-misses:u": 12692,
+          "branches:u": 790159,
+          "cycles:u": 2409531,
+          "instructions:u": 3768489
+        },
+        "instructions_per_cycle": 1.7846853914941814,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 5513.5,
+          "branches:u": 523601.5,
+          "cycles:u": 1426945.5,
+          "instructions:u": 2635361.5
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 690925,
+          "branches:u": 56461778,
+          "cycles:u": 158281369,
+          "instructions:u": 282482447
+        },
+        "receipt_sha256": "fe26d5bac9a3f02c2cb4a13285f18d597bba4a59f44dfedae4441846ab85575f",
+        "requests": 100,
+        "warmups": 3
+      },
+      "node-empty-calibration": {
+        "archive_prefix": "pmu/pmu-node-empty-calibration/",
+        "branch_miss_fraction": 0.011570141766111116,
+        "first_seven_median_counts": {
+          "branch-misses:u": 1760,
+          "branches:u": 130022,
+          "cycles:u": 412597,
+          "instructions:u": 558517
+        },
+        "instructions_per_cycle": 1.4635009208365493,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 650.0,
+          "branches:u": 78417.5,
+          "cycles:u": 210253.5,
+          "instructions:u": 332334.5
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 107899,
+          "branches:u": 9325642,
+          "cycles:u": 27164973,
+          "instructions:u": 39755963
+        },
+        "receipt_sha256": "675a233305e57a82882cc4312c556f3208207a0888168d0fc8c23d416e74efe4",
+        "requests": 100,
+        "warmups": 3
+      },
+      "node-sync": {
+        "archive_prefix": "pmu/pmu-node-sync/",
+        "branch_miss_fraction": 0.0117012267462356,
+        "first_seven_median_counts": {
+          "branch-misses:u": 12159,
+          "branches:u": 678726,
+          "cycles:u": 2281255,
+          "instructions:u": 3481227
+        },
+        "instructions_per_cycle": 1.7290870107226517,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 5050.0,
+          "branches:u": 498394.5,
+          "cycles:u": 1363800.0,
+          "instructions:u": 2526027.5
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 635509,
+          "branches:u": 54311314,
+          "cycles:u": 158019961,
+          "instructions:u": 273230262
+        },
+        "receipt_sha256": "9978b5b1d5bbb8891ff4bf4e89f15219c65111a34428ac44cdbe34c464ba73f9",
+        "requests": 100,
+        "warmups": 3
+      },
+      "scriptw-async": {
+        "archive_prefix": "pmu/pmu-scriptw-async/",
+        "branch_miss_fraction": 0.003980089298355744,
+        "first_seven_median_counts": {
+          "branch-misses:u": 96172,
+          "branches:u": 23949827,
+          "cycles:u": 72892576,
+          "instructions:u": 167265415
+        },
+        "instructions_per_cycle": 2.299692608271248,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 94744.5,
+          "branches:u": 23932240.5,
+          "cycles:u": 72745163.5,
+          "instructions:u": 167073024.5
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 9718958,
+          "branches:u": 2441894458,
+          "cycles:u": 7372867218,
+          "instructions:u": 16955328243
+        },
+        "receipt_sha256": "91c2fcf4579c66a440907dce27b61f077d43ae62e755bb35d13fb859529d2ecd",
+        "requests": 100,
+        "warmups": 3
+      },
+      "scriptw-speed-async": {
+        "archive_prefix": "pmu/pmu-scriptw-speed-async/",
+        "branch_miss_fraction": 0.002901001125383252,
+        "first_seven_median_counts": {
+          "branch-misses:u": 68872,
+          "branches:u": 23627461,
+          "cycles:u": 60413721,
+          "instructions:u": 158337189
+        },
+        "instructions_per_cycle": 2.800183317236467,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 67392.0,
+          "branches:u": 23609790.0,
+          "cycles:u": 56320608.5,
+          "instructions:u": 158144379.0
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 6990398,
+          "branches:u": 2409650220,
+          "cycles:u": 5736220010,
+          "instructions:u": 16062467576
+        },
+        "receipt_sha256": "09b1c29e48bdd9adee94e836ed9972404791695ee27f6c41ae6012a61e81753e",
+        "requests": 100,
+        "warmups": 3
+      },
+      "scriptw-speed-sync": {
+        "archive_prefix": "pmu/pmu-scriptw-speed-sync/",
+        "branch_miss_fraction": 0.0028890070106988375,
+        "first_seven_median_counts": {
+          "branch-misses:u": 64895,
+          "branches:u": 22363857,
+          "cycles:u": 54421817,
+          "instructions:u": 150223073
+        },
+        "instructions_per_cycle": 2.770236504821494,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 63175.5,
+          "branches:u": 22358028.0,
+          "cycles:u": 53840302.0,
+          "instructions:u": 150194225.0
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 6562050,
+          "branches:u": 2271385973,
+          "cycles:u": 5487101539,
+          "instructions:u": 15200568989
+        },
+        "receipt_sha256": "e8380063731bb4c00096a5f0590357c7a7dbebc33cafac64ef9d65fd4b0b7e40",
+        "requests": 100,
+        "warmups": 3
+      },
+      "scriptw-sync": {
+        "archive_prefix": "pmu/pmu-scriptw-sync/",
+        "branch_miss_fraction": 0.003912599979709296,
+        "first_seven_median_counts": {
+          "branch-misses:u": 89506,
+          "branches:u": 22669214,
+          "cycles:u": 67210252,
+          "instructions:u": 158694431
+        },
+        "instructions_per_cycle": 2.3555978639890967,
+        "minimum_running_fraction": 1.0,
+        "raw_median_counts": {
+          "branch-misses:u": 88295.5,
+          "branches:u": 22663450.0,
+          "cycles:u": 67304190.5,
+          "instructions:u": 158665904.0
+        },
+        "raw_total_counts": {
+          "branch-misses:u": 9006535,
+          "branches:u": 2301930953,
+          "cycles:u": 6812602865,
+          "instructions:u": 16047752757
+        },
+        "receipt_sha256": "ee8bfe963a7164b838d4b6bfd9fe094c79db18e6cfad26a525c20e2f7a786653",
+        "requests": 100,
+        "warmups": 3
+      }
+    }
+  },
+  "program_wasm_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+  "resolved_global_reference_sites": {
+    "diagnosis": {
+      "finding": "Dominant residual environment-name comparisons are global constructor and optional Web-API identifier resolution inside React serializer vn, not its private captured cells or source string comparisons.",
+      "limits": "A runtime-interned name can also be a local; global classification here additionally uses exact vn source and emitted CurrentEnvironment start. General admission must be scope-owned, never a builtin-name allowlist.",
+      "lowering_owner": {
+        "finding": "Unbound names require runtime environment; if no proven cell exists, environment_identifier constructs CurrentEnvironment rather than GlobalEnvironment.",
+        "lines": "212-216,244-275",
+        "path": "crates/scriptw-ir/src/lowering/environment_identifier.rs"
+      },
+      "next_cut": "Validate no name interception and no enclosing local/module/import binding, then use existing GlobalEnvironment resolution start. Preserve live global lexical shadowing, mutable global property/accessor reads, typeof missing-name semantics, call receiver and abrupt completion; do not constant-fold mutable constructors.",
+      "status": "Exact source-call attribution",
+      "verified_examples": [
+        {
+          "name": "Map",
+          "period_sum": 52250000,
+          "wasm_call_position": 3080680
+        },
+        {
+          "name": "Number",
+          "period_sum": 45250000,
+          "wasm_call_position": 3229216
+        },
+        {
+          "name": "Uint8ClampedArray",
+          "period_sum": 36500000,
+          "wasm_call_position": 3122488
+        },
+        {
+          "name": "Date",
+          "period_sum": 33500000,
+          "wasm_call_position": 3194760
+        },
+        {
+          "name": "ReadableStream",
+          "period_sum": 32750000,
+          "wasm_call_position": 3176475
+        },
+        {
+          "name": "Uint8Array",
+          "period_sum": 31250000,
+          "wasm_call_position": 3118771
+        },
+        {
+          "name": "Float32Array",
+          "period_sum": 31000000,
+          "wasm_call_position": 3140895
+        },
+        {
+          "name": "ArrayBuffer",
+          "period_sum": 31000000,
+          "wasm_call_position": 3111078
+        },
+        {
+          "name": "Set",
+          "period_sum": 30750000,
+          "wasm_call_position": 3088861
+        },
+        {
+          "name": "DataView",
+          "period_sum": 30750000,
+          "wasm_call_position": 3155715
+        },
+        {
+          "name": "Int32Array",
+          "period_sum": 30000000,
+          "wasm_call_position": 3133524
+        },
+        {
+          "name": "Int8Array",
+          "period_sum": 29750000,
+          "wasm_call_position": 3115046
+        },
+        {
+          "name": "BigInt64Array",
+          "period_sum": 29500000,
+          "wasm_call_position": 3148332
+        },
+        {
+          "name": "BigUint64Array",
+          "period_sum": 29500000,
+          "wasm_call_position": 3152026
+        },
+        {
+          "name": "Float64Array",
+          "period_sum": 29250000,
+          "wasm_call_position": 3144636
+        },
+        {
+          "name": "Blob",
+          "period_sum": 28750000,
+          "wasm_call_position": 3159357
+        },
+        {
+          "name": "Int16Array",
+          "period_sum": 28500000,
+          "wasm_call_position": 3126146
+        },
+        {
+          "name": "Error",
+          "period_sum": 27250000,
+          "wasm_call_position": 3108463
+        },
+        {
+          "name": "ReadableStream",
+          "period_sum": 26750000,
+          "wasm_call_position": 3177624
+        },
+        {
+          "name": "Uint32Array",
+          "period_sum": 26750000,
+          "wasm_call_position": 3137196
+        },
+        {
+          "name": "FormData",
+          "period_sum": 26500000,
+          "wasm_call_position": 3096937
+        },
+        {
+          "name": "Uint16Array",
+          "period_sum": 26500000,
+          "wasm_call_position": 3129828
+        }
+      ]
+    },
+    "helper_callers": [
+      [
+        "wasm:helper::environment_identifier_read_strict",
+        641750000
+      ],
+      [
+        "wasm:helper::environment_identifier_read_typeof_strict",
+        88000000
+      ],
+      [
+        "wasm:js::f307",
+        3000000
+      ],
+      [
+        "wasm:js::to#f7",
+        2000000
+      ],
+      [
+        "wasm:js::pr#f152",
+        2000000
+      ],
+      [
+        "wasm:js::f42",
+        1500000
+      ],
+      [
+        "wasm:js::dn#f151",
+        500000
+      ],
+      [
+        "wasm:js::f304",
+        250000
+      ]
+    ],
+    "input": "target/react-performance-20261103/diagnostics/fp-sync-v2/callchains.json",
+    "limits": "Leaf-conditioned rows only; each sample counted once. Immediate caller at frames[1] must be environment_identifier_resolve. Source IPs are return addresses mapped at IP-1 after function-relative rebasing to identical frozen P/config/native sizes; not call counts. No cross-process native bytes were retained for the sampling process.",
+    "period_sum": 8877000000,
+    "resolver_fraction_of_string_equality": 0.9205854873871068,
+    "runtime_pool_evidence": {
+      "callsite_match": "Within160 bytes before exact helper call: i32.const ordinal;local.set k;local.get k;call117;local.set key. Single exact candidate retained; ambiguous/missing remains explicit.",
+      "descriptor_rows": "Last16*count bytes of final R data segment; every UTF16 FNV hash and span checked.",
+      "package": "target/release/build/scriptw-runtime-image-8a4ab4bcb736f6f7/out/scriptw-runtime-portable-package.bin",
+      "raw_wasm_bytes": 39380016,
+      "raw_wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61",
+      "string_count": 4318
+    },
+    "sample_count": 35508,
+    "schema": "scriptw-residual-environment-caller-attribution-v1",
+    "source_owners": [
+      [
+        "wasm:js::vn#f133",
+        694000000
+      ],
+      [
+        "wasm:js::hr#f106",
+        11250000
+      ],
+      [
+        "wasm:js::Er#f142",
+        10500000
+      ],
+      [
+        "wasm:js::f307",
+        8250000
+      ],
+      [
+        "wasm:js::f42",
+        3250000
+      ],
+      [
+        "wasm:js::dn#f151",
+        3250000
+      ],
+      [
+        "wasm:js::to#f7",
+        2750000
+      ],
+      [
+        "wasm:js::pr#f152",
+        2000000
+      ],
+      [
+        "wasm:js::f304",
+        1500000
+      ],
+      [
+        "wasm:js::f237",
+        1250000
+      ],
+      [
+        "wasm:js::xr#f8",
+        750000
+      ],
+      [
+        "wasm:js::get#f13",
+        250000
+      ]
+    ],
+    "string_equality_immediate_resolver_period": 739000000,
+    "string_equality_own_period": 802750000,
+    "top_source_return_sites": [
+      {
+        "native_return_offset": 2363480,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 52250000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 3080641,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3458,
+          "text": "Map"
+        },
+        "total_sample_fraction": 0.005885997521685254,
+        "wasm_call_position": 3080680
+      },
+      {
+        "native_return_offset": 1256070,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 45250000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3229175,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 185,
+          "text": "Number"
+        },
+        "total_sample_fraction": 0.005097442829784837,
+        "wasm_call_position": 3229216
+      },
+      {
+        "native_return_offset": 2593113,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 36500000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3122447,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 168,
+          "text": "Uint8ClampedArray"
+        },
+        "total_sample_fraction": 0.004111749464909316,
+        "wasm_call_position": 3122488
+      },
+      {
+        "native_return_offset": 2984119,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 33500000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 3194721,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 155,
+          "text": "Date"
+        },
+        "total_sample_fraction": 0.0037737974540948517,
+        "wasm_call_position": 3194760
+      },
+      {
+        "native_return_offset": 2935203,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 32750000,
+        "runtime_key": {
+          "key_local": 206,
+          "literal_offset": 3176434,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3111,
+          "text": "ReadableStream"
+        },
+        "total_sample_fraction": 0.0036893094513912356,
+        "wasm_call_position": 3176475
+      },
+      {
+        "native_return_offset": 2563561,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 31250000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3118732,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 167,
+          "text": "Uint8Array"
+        },
+        "total_sample_fraction": 0.0035203334459840037,
+        "wasm_call_position": 3118771
+      },
+      {
+        "native_return_offset": 2740863,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 31000000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3140856,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 160,
+          "text": "Float32Array"
+        },
+        "total_sample_fraction": 0.0034921707784161316,
+        "wasm_call_position": 3140895
+      },
+      {
+        "native_return_offset": 2504490,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 31000000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 3111039,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 153,
+          "text": "ArrayBuffer"
+        },
+        "total_sample_fraction": 0.0034921707784161316,
+        "wasm_call_position": 3111078
+      },
+      {
+        "native_return_offset": 2398062,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 30750000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3088820,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3459,
+          "text": "Set"
+        },
+        "total_sample_fraction": 0.0034640081108482596,
+        "wasm_call_position": 3088861
+      },
+      {
+        "native_return_offset": 2859563,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 30750000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3155676,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 154,
+          "text": "DataView"
+        },
+        "total_sample_fraction": 0.0034640081108482596,
+        "wasm_call_position": 3155715
+      },
+      {
+        "native_return_offset": 2681792,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 30000000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3133483,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 162,
+          "text": "Int32Array"
+        },
+        "total_sample_fraction": 0.0033795201081446434,
+        "wasm_call_position": 3133524
+      },
+      {
+        "native_return_offset": 2534041,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 29750000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 3115009,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 164,
+          "text": "Int8Array"
+        },
+        "total_sample_fraction": 0.0033513574405767714,
+        "wasm_call_position": 3115046
+      },
+      {
+        "native_return_offset": 2799993,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 29500000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3148291,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 169,
+          "text": "BigInt64Array"
+        },
+        "total_sample_fraction": 0.0033231947730088993,
+        "wasm_call_position": 3148332
+      },
+      {
+        "native_return_offset": 2829544,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 29500000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3151987,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 170,
+          "text": "BigUint64Array"
+        },
+        "total_sample_fraction": 0.0033231947730088993,
+        "wasm_call_position": 3152026
+      },
+      {
+        "native_return_offset": 2770452,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 29250000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3144595,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 159,
+          "text": "Float64Array"
+        },
+        "total_sample_fraction": 0.0032950321054410273,
+        "wasm_call_position": 3144636
+      },
+      {
+        "key_candidates": [],
+        "native_return_offset": 2890184,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 28750000,
+        "program_key": {
+          "literal_offset": 3159307,
+          "pooled_string_array_type": 150,
+          "program_literal_ordinal": 800,
+          "text": "Blob"
+        },
+        "total_sample_fraction": 0.003238706770305283,
+        "wasm_call_position": 3159357
+      },
+      {
+        "native_return_offset": 2622701,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 28500000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3126107,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 163,
+          "text": "Int16Array"
+        },
+        "total_sample_fraction": 0.003210544102737411,
+        "wasm_call_position": 3126146
+      },
+      {
+        "native_return_offset": 2474950,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 27250000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3108422,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 188,
+          "text": "Error"
+        },
+        "total_sample_fraction": 0.0030697307648980513,
+        "wasm_call_position": 3108463
+      },
+      {
+        "native_return_offset": 2943072,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 26750000,
+        "runtime_key": {
+          "key_local": 125,
+          "literal_offset": 3177585,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3111,
+          "text": "ReadableStream"
+        },
+        "total_sample_fraction": 0.003013405429762307,
+        "wasm_call_position": 3177624
+      },
+      {
+        "native_return_offset": 2711311,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 26750000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3137157,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 165,
+          "text": "Uint32Array"
+        },
+        "total_sample_fraction": 0.003013405429762307,
+        "wasm_call_position": 3137196
+      },
+      {
+        "key_candidates": [],
+        "native_return_offset": 2432965,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 26500000,
+        "program_key": {
+          "literal_offset": 3096885,
+          "pooled_string_array_type": 150,
+          "program_literal_ordinal": 617,
+          "text": "FormData"
+        },
+        "total_sample_fraction": 0.002985242762194435,
+        "wasm_call_position": 3096937
+      },
+      {
+        "native_return_offset": 2652241,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 26500000,
+        "runtime_key": {
+          "key_local": 224,
+          "literal_offset": 3129787,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 166,
+          "text": "Uint16Array"
+        },
+        "total_sample_fraction": 0.002985242762194435,
+        "wasm_call_position": 3129828
+      },
+      {
+        "key_candidates": [],
+        "native_return_offset": 12689,
+        "owner": "wasm:js::f307",
+        "period_sum": 5000000,
+        "program_key": {
+          "literal_offset": 5675285,
+          "pooled_string_array_type": 150,
+          "program_literal_ordinal": 394,
+          "text": "to"
+        },
+        "total_sample_fraction": 0.0005632533513574405,
+        "wasm_call_position": 5675333
+      },
+      {
+        "native_return_offset": 119471,
+        "owner": "wasm:js::hr#f106",
+        "period_sum": 5000000,
+        "runtime_key": {
+          "key_local": 177,
+          "literal_offset": 1961743,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3459,
+          "text": "Set"
+        },
+        "total_sample_fraction": 0.0005632533513574405,
+        "wasm_call_position": 1961784
+      },
+      {
+        "native_return_offset": 10640,
+        "owner": "wasm:js::f307",
+        "period_sum": 3000000,
+        "runtime_key": {
+          "key_local": 45,
+          "literal_offset": 5674816,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3421,
+          "text": "H"
+        },
+        "total_sample_fraction": 0.0003379520108144643,
+        "wasm_call_position": 5674858
+      },
+      {
+        "native_return_offset": 63511,
+        "owner": "wasm:js::Er#f142",
+        "period_sum": 2250000,
+        "runtime_key": {
+          "key_local": 153,
+          "literal_offset": 3482038,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 153,
+          "text": "ArrayBuffer"
+        },
+        "total_sample_fraction": 0.00025346400811084827,
+        "wasm_call_position": 3482077
+      },
+      {
+        "native_return_offset": 25365,
+        "owner": "wasm:js::to#f7",
+        "period_sum": 2000000,
+        "runtime_key": {
+          "key_local": 47,
+          "literal_offset": 5670783,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3421,
+          "text": "H"
+        },
+        "total_sample_fraction": 0.00022530134054297624,
+        "wasm_call_position": 5670825
+      },
+      {
+        "native_return_offset": 72271,
+        "owner": "wasm:js::pr#f152",
+        "period_sum": 2000000,
+        "runtime_key": {
+          "key_local": 153,
+          "literal_offset": 3765490,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3466,
+          "text": "setTimeout"
+        },
+        "total_sample_fraction": 0.00022530134054297624,
+        "wasm_call_position": 3765536
+      },
+      {
+        "native_return_offset": 194306,
+        "owner": "wasm:js::f42",
+        "period_sum": 1750000,
+        "runtime_key": {
+          "key_local": 174,
+          "literal_offset": 248578,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 119,
+          "text": "arguments"
+        },
+        "total_sample_fraction": 0.00019713867297510421,
+        "wasm_call_position": 248619
+      },
+      {
+        "key_candidates": [
+          {
+            "key_local": 46,
+            "literal_offset": 3669824,
+            "pooled_resolve_import": 117,
+            "runtime_literal_ordinal": 788,
+            "text": "T"
+          },
+          {
+            "key_local": 157,
+            "literal_offset": 3669939,
+            "pooled_resolve_import": 117,
+            "runtime_literal_ordinal": 167,
+            "text": "Uint8Array"
+          }
+        ],
+        "native_return_offset": 79792,
+        "owner": "wasm:js::dn#f151",
+        "period_sum": 1750000,
+        "total_sample_fraction": 0.00019713867297510421,
+        "wasm_call_position": 3669980
+      },
+      {
+        "native_return_offset": 238884,
+        "owner": "wasm:js::f42",
+        "period_sum": 1500000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 252525,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 152,
+          "text": "Array"
+        },
+        "total_sample_fraction": 0.00016897600540723216,
+        "wasm_call_position": 252569
+      },
+      {
+        "native_return_offset": 203658,
+        "owner": "wasm:js::hr#f106",
+        "period_sum": 1500000,
+        "runtime_key": {
+          "key_local": 183,
+          "literal_offset": 1983858,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3458,
+          "text": "Map"
+        },
+        "total_sample_fraction": 0.00016897600540723216,
+        "wasm_call_position": 1983899
+      },
+      {
+        "native_return_offset": 216747,
+        "owner": "wasm:js::hr#f106",
+        "period_sum": 1250000,
+        "runtime_key": {
+          "key_local": 46,
+          "literal_offset": 1987678,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 302,
+          "text": "WeakMap"
+        },
+        "total_sample_fraction": 0.00014081333783936013,
+        "wasm_call_position": 1987717
+      },
+      {
+        "native_return_offset": 224569,
+        "owner": "wasm:js::f237",
+        "period_sum": 1250000,
+        "runtime_key": {
+          "key_local": 47,
+          "literal_offset": 1278024,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 3111,
+          "text": "ReadableStream"
+        },
+        "total_sample_fraction": 0.00014081333783936013,
+        "wasm_call_position": 1278061
+      },
+      {
+        "native_return_offset": 227144,
+        "owner": "wasm:js::Er#f142",
+        "period_sum": 1250000,
+        "runtime_key": {
+          "key_local": 148,
+          "literal_offset": 3508674,
+          "pooled_resolve_import": 117,
+          "runtime_literal_ordinal": 165,
+          "text": "Uint32Array"
+        },
+        "total_sample_fraction": 0.00014081333783936013,
+        "wasm_call_position": 3508713
+      }
+    ],
+    "unresolved_source_period": 0
+  },
+  "runtime": {
+    "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
+    "wasm_bytes": 39380016,
+    "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
+  },
+  "sampled_locations": {
+    "async": {
+      "categories": [
+        {
+          "category": "compiled-JavaScript-bodies",
+          "period_sum": 1895500000,
+          "sample_share": 0.25639118084674695
+        },
+        {
+          "category": "zero-IP",
+          "period_sum": 823000000,
+          "sample_share": 0.11132152035709456
+        },
+        {
+          "category": "Wasm-runtime-helpers",
+          "period_sum": 3099000000,
+          "sample_share": 0.4191803056945759
+        },
+        {
+          "category": "host-or-unresolved",
+          "period_sum": 1199750000,
+          "sample_share": 0.16228188827269038
+        },
+        {
+          "category": "Wasm-builtins",
+          "period_sum": 328000000,
+          "sample_share": 0.044366292438793455
+        },
+        {
+          "category": "other-Wasm",
+          "period_sum": 47750000,
+          "sample_share": 0.006458812390098742
+        }
+      ],
+      "period_sum": 7393000000,
+      "receipt_sha256": "d18188f5dfa0e0e3369f93f76eaa1e03d19a75fb5e867811ad73e4327c3129ab",
+      "samples": 29572
+    },
+    "sync": {
+      "categories": [
+        {
+          "category": "compiled-JavaScript-bodies",
+          "period_sum": 1743750000,
+          "sample_share": 0.24555535997183595
+        },
+        {
+          "category": "zero-IP",
+          "period_sum": 773250000,
+          "sample_share": 0.10888928005632811
+        },
+        {
+          "category": "Wasm-runtime-helpers",
+          "period_sum": 3123750000,
+          "sample_share": 0.43988734377750394
+        },
+        {
+          "category": "host-or-unresolved",
+          "period_sum": 1090250000,
+          "sample_share": 0.15352930822038374
+        },
+        {
+          "category": "Wasm-builtins",
+          "period_sum": 319000000,
+          "sample_share": 0.044921668720295724
+        },
+        {
+          "category": "other-Wasm",
+          "period_sum": 51250000,
+          "sample_share": 0.007217039253652526
+        }
+      ],
+      "period_sum": 7101250000,
+      "receipt_sha256": "7812d8813a353a7d34075a8546cfbd63dfe80e7a9a46862f8e80672504db27ba",
+      "samples": 28405
+    }
+  },
+  "schema": "scriptw-react-attribution-current-v1",
+  "source_fingerprint": "083d9dd79f512925074b1089f3966d404c8faf75d9c118cd4dd299a4f61da9d5",
+  "source_interpretation": {
+    "architecture_priorities": [
+      {
+        "direction": "Add scope-owned evidence that no current/enclosing lexical, function, module or import binding and no dynamic name interceptor can precede the global environment, then select existing GlobalEnvironment. This skips irrelevant named scopes while preserving live global lookup.",
+        "disconfirming_experiment": "On an unchanged workload/configuration, require exact output and shadow/getter/mutation/foreign-Realm regressions, then compare retired instructions and leaf-conditioned resolver/StringEquality samples. A failure to remove these22 CurrentEnvironment sites or their sampled chains rejects the hypothesis.",
+        "evidence": "92.0585% of StringEquality own sample weight has environment_identifier_resolve as its immediate caller. Of that,694M period belongs to22 vn source callsites, all decoded to global constructors or optional Web globals. Exact hottest Map site: native return+2363480, P call byte3080680, runtime ordinal3458.",
+        "limits": "This identifies a concrete measured source of wasted work, not a complete attribution of the entire V8 gap or a promised speedup.",
+        "proof_constraints": [
+          "Prove absence using actual binding/owner identities, not builtin spelling or the value observed during compilation.",
+          "Exclude actual direct/prepared eval, with environments and unproved resumable/owner chains until their resolution semantics are established.",
+          "Resolve the defining source Realm global environment, including its live global lexical table. A later legal global lexical declaration must still shadow a configurable builtin.",
+          "Read mutable global properties and invoke their getters at the original evaluation point; preserve deletion/missing-name behavior, typeof, abrupt completion and held callee/reference evaluation order.",
+          "Do not substitute immutable builtin values for Map, Number, typed arrays, ReadableStream or other mutable global names."
+        ],
+        "rank": 1,
+        "source_owners": [
+          {
+            "lines": "212-216,244-275",
+            "path": "crates/scriptw-ir/src/lowering/environment_identifier.rs",
+            "role": "Unbound names remain runtime-resolved; absent a proven cell, lowering creates CurrentEnvironment."
+          },
+          {
+            "lines": "194-250",
+            "path": "crates/scriptw-ir/src/environment_identifier.rs",
+            "role": "Existing closed resolution domain already includes GlobalEnvironment."
+          },
+          {
+            "lines": "163-201",
+            "path": "crates/scriptw-aot-wasm/src/expressions/environment_identifier.rs",
+            "role": "Existing GlobalEnvironment read/typeof path roots the resolver at the canonical source global environment."
+          },
+          {
+            "path": "crates/scriptw-aot-wasm/src/environments/named_environment.rs",
+            "role": "Generic resolution scans each named-binding table with StringEquality."
+          }
+        ],
+        "status": "Measured caller/key cause; production change not implemented",
+        "subject": "Start statically unbound identifiers at their live global environment"
+      },
+      {
+        "direction": "A source-owned demand proof could omit unused strict arguments objects and dependent environment publication; validate lexical arguments capture, reflection, eval, parameter semantics and escaping closures.",
+        "evidence": "functions/arguments_object.rs materializes an indexed descriptor graph and three named properties when arguments protocol is Present; arguments_protocol.rs admits strict ordinary functions by default.",
+        "limits": "Source establishes eager construction policy; this report does not measure total arguments allocations or attribute all entry samples to it.",
+        "rank": 2,
+        "subject": "Reduce eager per-invocation graphs when semantically unobservable"
+      },
+      {
+        "direction": "Prefer typed hot paths plus shared cold semantic kernels; reduce redundant branches, all-kind fallback duplication and oversized SSA regions while retaining the sole Wasm GC backend.",
+        "evidence": "vn 340194-byte Wasm becomes 5136192-byte native code with a 1011584-byte frame; ft 98365 becomes1632544 with339840-byte frame. Fastalloc has spill traffic at basic-block boundaries.",
+        "limits": "The separate Speed/Backtracking PMU run removes only about5.3% of retired instructions. Backend mode alone cannot explain or solve the63x instruction gap. Stack probe instructions are only about0.22% of total retired instructions despite5-6% sampled locations.",
+        "rank": 3,
+        "subject": "Keep generated control flow and native SSA bounded"
+      }
+    ],
+    "frame_cause": {
+      "evidence": [
+        {
+          "finding": "SinglePass selects regalloc2 Algorithm::Fastalloc.",
+          "lines": "60-63",
+          "path": "/home/jacobt/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-codegen-0.134.0/src/machinst/compile.rs"
+        },
+        {
+          "finding": "Spill allocation advances num_spillslots; each spilled SSA vreg retains its slot. No spill-slot free list in this allocator.",
+          "lines": "85-103,145-149",
+          "path": "/home/jacobt/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regalloc2-0.15.2/src/fastalloc/mod.rs"
+        },
+        {
+          "finding": "Branch arguments, block parameters and live-ins are transferred through per-vreg spill slots.",
+          "lines": "932-989,1319-1404",
+          "path": "/home/jacobt/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regalloc2-0.15.2/src/fastalloc/mod.rs"
+        },
+        {
+          "finding": "GC safepoint spiller already reuses slots via size-indexed free lists; values free their slot at their defining instruction during backwards traversal.",
+          "lines": "532-595,660-689",
+          "path": "/home/jacobt/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-frontend-0.134.0/src/frontend/safepoints.rs"
+        },
+        {
+          "finding": "Frame combines explicit stack slots plus machine-word bytes times register-allocator spillslots, then alignment and ABI frame regions.",
+          "lines": "2198-2224",
+          "path": "/home/jacobt/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cranelift-codegen-0.134.0/src/machinst/abi.rs"
+        }
+      ],
+      "interpretation": "Wasm local count is not native spill-slot count. Expanded SSA temporaries and block parameters can each acquire permanent Fastalloc spills, explaining the route to a large frame without a large Wasm-local declaration. The measured exact frame bytes cannot be partitioned without CLIF/regalloc statistics.",
+      "status": "Backend source mechanism established; exact per-function GC-slot versus regalloc-slot byte split not measured.",
+      "versions": {
+        "cranelift_codegen": "0.134.0",
+        "cranelift_frontend": "0.134.0",
+        "regalloc2": "0.15.2",
+        "wasmtime": "47.0.0"
+      }
+    },
+    "limits": [
+      "Native samples are instruction locations, not allocation counts or exact wall-time percentages.",
+      "Entry counts are exact for one checked request after3warmups; PMU numbers came from separate100request diagnostics.",
+      "Page writes are repeated touches, not unique pages, allocated memory or bytes of actual memory traffic.",
+      "Unmapped address-map entries are not automatically JavaScript prologue.",
+      "Original departed sample-process bytes were not retained; rebasing used pinned binary/P/configuration and equal native function sizes."
+    ],
+    "measurements": [
+      {
+        "checked_requests": 1,
+        "exact_counts": [
+          {
+            "address": 140329550928640,
+            "completed_probe_count": 276,
+            "entry_count": 276,
+            "entry_offset": 0,
+            "executed_probe_instructions": 273516,
+            "executed_probe_page_writes": 68172,
+            "name": "js::vn#f133",
+            "native_bytes": 5136192,
+            "page_size": 4096,
+            "postprobe_offset": 77,
+            "probe_pages_per_completed_entry": 247,
+            "stack_frame_bytes": 1011584,
+            "verified_native_prefix_sha256": "cc37193856cb66dda52190b880d664acc7e8dd1caaa4893fcacd43bee05f5204"
+          },
+          {
+            "address": 140329545194464,
+            "completed_probe_count": 242,
+            "entry_count": 242,
+            "entry_offset": 0,
+            "executed_probe_instructions": 81070,
+            "executed_probe_page_writes": 20086,
+            "name": "js::ft#f123",
+            "native_bytes": 1632544,
+            "page_size": 4096,
+            "postprobe_offset": 77,
+            "probe_pages_per_completed_entry": 83,
+            "stack_frame_bytes": 339840,
+            "verified_native_prefix_sha256": "84d27c602441a8cb12630cfa7db8918a7427a15f3761b60cb230681fdb39f2a0"
+          }
+        ],
+        "exact_probe_sample_fraction": 0.05333568033796867,
+        "exact_probe_samples": 1515,
+        "mode": "sync",
+        "probe_instructions": 354586,
+        "probe_instructions_fraction_of_separate_pmu_diagnostic": 0.0022347387659923112,
+        "probe_page_writes": 88258,
+        "reference_pmu_instructions_per_request": 158670000,
+        "retained_profile_samples": 28405
+      },
+      {
+        "checked_requests": 1,
+        "exact_counts": [
+          {
+            "address": 139658126744320,
+            "completed_probe_count": 291,
+            "entry_count": 291,
+            "entry_offset": 0,
+            "executed_probe_instructions": 288381,
+            "executed_probe_page_writes": 71877,
+            "name": "js::vn#f133",
+            "native_bytes": 5136192,
+            "page_size": 4096,
+            "postprobe_offset": 77,
+            "probe_pages_per_completed_entry": 247,
+            "stack_frame_bytes": 1011584,
+            "verified_native_prefix_sha256": "cc37193856cb66dda52190b880d664acc7e8dd1caaa4893fcacd43bee05f5204"
+          },
+          {
+            "address": 139658121010144,
+            "completed_probe_count": 254,
+            "entry_count": 254,
+            "entry_offset": 0,
+            "executed_probe_instructions": 85090,
+            "executed_probe_page_writes": 21082,
+            "name": "js::ft#f123",
+            "native_bytes": 1632544,
+            "page_size": 4096,
+            "postprobe_offset": 77,
+            "probe_pages_per_completed_entry": 83,
+            "stack_frame_bytes": 339840,
+            "verified_native_prefix_sha256": "84d27c602441a8cb12630cfa7db8918a7427a15f3761b60cb230681fdb39f2a0"
+          }
+        ],
+        "exact_probe_sample_fraction": 0.05779115379412958,
+        "exact_probe_samples": 1709,
+        "mode": "async",
+        "probe_instructions": 373471,
+        "probe_instructions_fraction_of_separate_pmu_diagnostic": 0.002235416292571976,
+        "probe_page_writes": 92959,
+        "reference_pmu_instructions_per_request": 167070000,
+        "retained_profile_samples": 29572
+      }
+    ],
+    "native_functions": [
+      {
+        "name": "js::vn#f133",
+        "native_bytes": 5136192,
+        "native_per_wasm_byte": 15.097832413270075,
+        "wasm_body_bytes": 340194
+      },
+      {
+        "name": "js::ft#f123",
+        "native_bytes": 1632544,
+        "native_per_wasm_byte": 16.596797641437504,
+        "wasm_body_bytes": 98365
+      }
+    ],
+    "native_mode_comparison": {
+      "configurations": {
+        "fast": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "speed": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "Speed",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "Backtracking",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        }
+      },
+      "frozen_executable_sha256": "7d548d4598914805596f877c137249860e63f0131e65fbdc45e710b4948d4f39",
+      "functions": [
+        {
+          "fast": {
+            "frame_subtraction_native_offset": 77,
+            "native_bytes": 5136192,
+            "native_sha256": "8ccc37c680b91749c7252f472399431be6dc52b0f3477dec61235ea91223dc07",
+            "probe_page_writes_per_successful_entry": 247,
+            "stack_frame_bytes": 1011584
+          },
+          "frame_reduction_fraction": 0.9926610148045046,
+          "name": "js::vn#f133",
+          "native_size_reduction_fraction": 0.6756289484505252,
+          "speed": {
+            "frame_subtraction_native_offset": 49,
+            "native_bytes": 1666032,
+            "native_sha256": "f9b86b880fa5ada3fb041f8bb6638effc4c4654f3d1b7b2b1e9a4cbbe8421dbb",
+            "probe_page_writes_per_successful_entry": 1,
+            "stack_frame_bytes": 7424
+          }
+        },
+        {
+          "fast": {
+            "frame_subtraction_native_offset": 77,
+            "native_bytes": 1632544,
+            "native_sha256": "f2b2c3792c640dfc751fa6d0a9772546e42cbb43370a4410b544de8d270cb0bf",
+            "probe_page_writes_per_successful_entry": 83,
+            "stack_frame_bytes": 339840
+          },
+          "frame_reduction_fraction": 0.9855461393596987,
+          "name": "js::ft#f123",
+          "native_size_reduction_fraction": 0.6767744085304899,
+          "speed": {
+            "frame_subtraction_native_offset": 49,
+            "native_bytes": 527680,
+            "native_sha256": "63c87806b75ba69e156ea231674831583776d249d778d0013d923bfe2d9d4269",
+            "probe_page_writes_per_successful_entry": 1,
+            "stack_frame_bytes": 4912
+          }
+        }
+      ],
+      "interpretation": "Identical source, P and imported R; Speed+Backtracking reduces the two frames from about1MB/340KB to7424/4912B, and P native text from85.7MB to29.2MB. The huge Fast frames are backend-policy-sensitive, not a requirement of the JavaScript activation or Wasm local declarations. Both optimization level and register allocation changed, so this is not a regalloc-only experiment.",
+      "limits": [
+        "Static native layout evidence, not a matched runtime speedup campaign. One checked request follows each capture.",
+        "Fast stack-probe counts are actual counts; Speed entry counts were not instrumented.",
+        "Speed native offsets differ and must never be used with retained Fast instruction samples.",
+        "Separate PMU diagnostics found only about5.3% fewer retired instructions under Speed, so code/frame-size reductions do not explain away the remaining execution gap.",
+        "Exact byte partition between frontend explicit slots and register-allocator slots remains unmeasured."
+      ],
+      "program_native_text": {
+        "fast_bytes": 85696512,
+        "reduction_fraction": 0.6594015868463818,
+        "speed_bytes": 29188096
+      },
+      "program_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+      "runtime": {
+        "key": "ae8b99e2261112d368e989d47e0ec76c8259879ab29df01fe4c7b12dda01286b",
+        "wasm_bytes": 39380016,
+        "wasm_sha256": "f31e565ee65c6d56d550af54e3671d94acfacfb529f676f46427a9167b907a61"
+      },
+      "schema": "scriptw-exact-native-mode-frame-comparison-v1"
+    },
+    "native_text_bytes": 85696512,
+    "pending": [
+      "No additional measurement is scheduled in this batch.",
+      "GlobalEnvironment admission is an unimplemented next compiler experiment; source proof and semantic tests are required before changing production.",
+      "GC bulk-header census was not performed; allocation counts remain unmeasured."
+    ],
+    "program_sha256": "95c3d88b8cffaa8956e9b20a7671c94e08812db30b56d5539b5dcb4f9ef29895",
+    "residual_name_resolution": {
+      "finding": "Dominant residual environment-name comparisons are global constructor and optional Web-API identifier resolution inside React serializer vn, not its private captured cells or source string comparisons.",
+      "limits": "A runtime-interned name can also be a local; global classification here additionally uses exact vn source and emitted CurrentEnvironment start. General admission must be scope-owned, never a builtin-name allowlist.",
+      "lowering_owner": {
+        "finding": "Unbound names require runtime environment; if no proven cell exists, environment_identifier constructs CurrentEnvironment rather than GlobalEnvironment.",
+        "lines": "212-216,244-275",
+        "path": "crates/scriptw-ir/src/lowering/environment_identifier.rs"
+      },
+      "next_cut": "Validate no name interception and no enclosing local/module/import binding, then use existing GlobalEnvironment resolution start. Preserve live global lexical shadowing, mutable global property/accessor reads, typeof missing-name semantics, call receiver and abrupt completion; do not constant-fold mutable constructors.",
+      "status": "Exact source-call attribution",
+      "verified_examples": [
+        {
+          "name": "Map",
+          "period_sum": 52250000,
+          "wasm_call_position": 3080680
+        },
+        {
+          "name": "Number",
+          "period_sum": 45250000,
+          "wasm_call_position": 3229216
+        },
+        {
+          "name": "Uint8ClampedArray",
+          "period_sum": 36500000,
+          "wasm_call_position": 3122488
+        },
+        {
+          "name": "Date",
+          "period_sum": 33500000,
+          "wasm_call_position": 3194760
+        },
+        {
+          "name": "ReadableStream",
+          "period_sum": 32750000,
+          "wasm_call_position": 3176475
+        },
+        {
+          "name": "Uint8Array",
+          "period_sum": 31250000,
+          "wasm_call_position": 3118771
+        },
+        {
+          "name": "Float32Array",
+          "period_sum": 31000000,
+          "wasm_call_position": 3140895
+        },
+        {
+          "name": "ArrayBuffer",
+          "period_sum": 31000000,
+          "wasm_call_position": 3111078
+        },
+        {
+          "name": "Set",
+          "period_sum": 30750000,
+          "wasm_call_position": 3088861
+        },
+        {
+          "name": "DataView",
+          "period_sum": 30750000,
+          "wasm_call_position": 3155715
+        },
+        {
+          "name": "Int32Array",
+          "period_sum": 30000000,
+          "wasm_call_position": 3133524
+        },
+        {
+          "name": "Int8Array",
+          "period_sum": 29750000,
+          "wasm_call_position": 3115046
+        },
+        {
+          "name": "BigInt64Array",
+          "period_sum": 29500000,
+          "wasm_call_position": 3148332
+        },
+        {
+          "name": "BigUint64Array",
+          "period_sum": 29500000,
+          "wasm_call_position": 3152026
+        },
+        {
+          "name": "Float64Array",
+          "period_sum": 29250000,
+          "wasm_call_position": 3144636
+        },
+        {
+          "name": "Blob",
+          "period_sum": 28750000,
+          "wasm_call_position": 3159357
+        },
+        {
+          "name": "Int16Array",
+          "period_sum": 28500000,
+          "wasm_call_position": 3126146
+        },
+        {
+          "name": "Error",
+          "period_sum": 27250000,
+          "wasm_call_position": 3108463
+        },
+        {
+          "name": "ReadableStream",
+          "period_sum": 26750000,
+          "wasm_call_position": 3177624
+        },
+        {
+          "name": "Uint32Array",
+          "period_sum": 26750000,
+          "wasm_call_position": 3137196
+        },
+        {
+          "name": "FormData",
+          "period_sum": 26500000,
+          "wasm_call_position": 3096937
+        },
+        {
+          "name": "Uint16Array",
+          "period_sum": 26500000,
+          "wasm_call_position": 3129828
+        }
+      ],
+      "weighted_evidence": {
+        "all_profile_period": 8877000000,
+        "conditional_fraction": 0.9205854873871068,
+        "immediate_environment_resolver": 739000000,
+        "string_equality_own": 802750000,
+        "vn_period": 694000000
+      }
+    },
+    "schema": "scriptw-rsc-native-architecture-findings-v1",
+    "scope": "Read-only analysis of the frozen promoted Fast product; no product source modifications."
+  },
+  "status": "completed diagnostic scope; product/compiler bytes unchanged",
+  "sync_caller_profile": {
+    "archive_prefix": "fp/fp-sync-v2/",
+    "environment_fraction_of_all_samples": 0.08324884533062972,
+    "environment_fraction_of_string_equality_leaf_samples": 0.9205854873871068,
+    "environment_source_callers": [
+      {
+        "fraction_of_all_samples": 0.07817956516841275,
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 694000000
+      },
+      {
+        "fraction_of_all_samples": 0.0012673200405542413,
+        "owner": "wasm:js::hr#f106",
+        "period_sum": 11250000
+      },
+      {
+        "fraction_of_all_samples": 0.0011828320378506252,
+        "owner": "wasm:js::Er#f142",
+        "period_sum": 10500000
+      },
+      {
+        "fraction_of_all_samples": 0.0009293680297397769,
+        "owner": "wasm:js::f307",
+        "period_sum": 8250000
+      },
+      {
+        "fraction_of_all_samples": 0.0003661146783823364,
+        "owner": "wasm:js::f42",
+        "period_sum": 3250000
+      },
+      {
+        "fraction_of_all_samples": 0.0003661146783823364,
+        "owner": "wasm:js::dn#f151",
+        "period_sum": 3250000
+      },
+      {
+        "fraction_of_all_samples": 0.0003097893432465923,
+        "owner": "wasm:js::to#f7",
+        "period_sum": 2750000
+      },
+      {
+        "fraction_of_all_samples": 0.00022530134054297624,
+        "owner": "wasm:js::pr#f152",
+        "period_sum": 2000000
+      },
+      {
+        "fraction_of_all_samples": 0.00016897600540723216,
+        "owner": "wasm:js::f304",
+        "period_sum": 1500000
+      },
+      {
+        "fraction_of_all_samples": 0.00014081333783936013,
+        "owner": "wasm:js::f237",
+        "period_sum": 1250000
+      },
+      {
+        "fraction_of_all_samples": 8.448800270361608e-05,
+        "owner": "wasm:js::xr#f8",
+        "period_sum": 750000
+      },
+      {
+        "fraction_of_all_samples": 2.816266756787203e-05,
+        "owner": "wasm:js::get#f13",
+        "period_sum": 250000
+      }
+    ],
+    "helper_immediate_callers": {
+      "wasm:helper::argument_list_append": [
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 4500000,
+          "sample_share": 0.0005069280162216965
+        }
+      ],
+      "wasm:helper::array_indexed_publish": [
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 41250000,
+          "sample_share": 0.004646840148698885
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 5500000,
+          "sample_share": 0.0006195786864931846
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::array_indexed_publish_default_data": [
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 3250000,
+          "sample_share": 0.0003661146783823364
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.push",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::async_await_reactions": [
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        }
+      ],
+      "wasm:helper::cached_property_read": [
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 178250000,
+          "sample_share": 0.020079981975892756
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 136250000,
+          "sample_share": 0.015348653824490256
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 37500000,
+          "sample_share": 0.004224400135180805
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 36000000,
+          "sample_share": 0.004055424129773572
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 12250000,
+          "sample_share": 0.0013799707108257293
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 8500000,
+          "sample_share": 0.000957530697307649
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 8000000,
+          "sample_share": 0.000901205362171905
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 5750000,
+          "sample_share": 0.0006477413540610567
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 5000000,
+          "sample_share": 0.0005632533513574405
+        },
+        {
+          "owner": "wasm:js::or#f75",
+          "period_sum": 5000000,
+          "sample_share": 0.0005632533513574405
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 3500000,
+          "sample_share": 0.00039427734595020843
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "wasm:js::f305",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::xr#f8",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::yr#f139",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Ln#f154",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::C#f77",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::vr#f155",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::pr#f152",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::promise_drain_jobs",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::coercive_add": [
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 18000000,
+          "sample_share": 0.002027712064886786
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 8500000,
+          "sample_share": 0.000957530697307649
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::yr#f139",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::collection_prepare_set": [
+        {
+          "owner": "wasm:builtin::Set.prototype.add",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::compact_data_store": [
+        {
+          "owner": "wasm:helper::native_function_allocate",
+          "period_sum": 45750000,
+          "sample_share": 0.005153768164920581
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 5250000,
+          "sample_share": 0.0005914160189253126
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::compact_literal_allocate": [
+        {
+          "owner": "wasm:helper::native_function_allocate",
+          "period_sum": 51500000,
+          "sample_share": 0.005801509518981638
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::f307",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] (/home/jacobt/.cache/scriptw/wasmtime-modules-v1/private-native-backing-v1/#17423712 (deleted))",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::dynamic_property_read": [
+        {
+          "owner": "wasm:js::mn#f131",
+          "period_sum": 67750000,
+          "sample_share": 0.00763208291089332
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:js::f305",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        }
+      ],
+      "wasm:helper::embedding_call": [
+        {
+          "owner": "wasm:wasm[0]::array_to_wasm_trampoline[1064]",
+          "period_sum": 7424000000,
+          "sample_share": 0.8363185760955277
+        },
+        {
+          "owner": "host-or-unresolved:<wasmtime::runtime::func::HostFunc>::array_call_trampoline::<scriptw_engine::embedding::WasmStoreState, <wasmtime::runtime::func::HostFunc>::wrap<scriptw_engine::embedding::WasmStoreState, <scriptw_engine::wasm_agent_host::agent_call as wasmtime::runtime::func::IntoFunc<scriptw_engine::embedding::WasmStoreState, (wasmtime::runtime::func::Caller<scriptw_engine::embedding::WasmStoreState>, i64, i64, i64), core::result::Result<i64, wasmtime_internal_core::error::error::Error>>>::into_func::{closure#0}, (i64, i64, i64), core::result::Result<i64, wasmtime_internal_core::error::error::Error>>::{closure#0}> (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::embedding_promise": [
+        {
+          "owner": "wasm:wasm[0]::array_to_wasm_trampoline[1069]",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::environment_identifier_get_strict": [
+        {
+          "owner": "wasm:helper::environment_identifier_read_strict",
+          "period_sum": 55000000,
+          "sample_share": 0.006195786864931847
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 12000000,
+          "sample_share": 0.0013518080432578573
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 5500000,
+          "sample_share": 0.0006195786864931846
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::pr#f152",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::f307",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::f269",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::environment_identifier_put_strict": [
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::environment_identifier_read_strict": [
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 1029500000,
+          "sample_share": 0.11597386504449701
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 19250000,
+          "sample_share": 0.0021685254027261464
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 18250000,
+          "sample_share": 0.002055874732454658
+        },
+        {
+          "owner": "wasm:js::f307",
+          "period_sum": 10000000,
+          "sample_share": 0.001126506702714881
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::f237",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::xr#f8",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::get#f13",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f305",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::environment_identifier_read_typeof_strict": [
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 156250000,
+          "sample_share": 0.01760166722992002
+        }
+      ],
+      "wasm:helper::environment_identifier_resolve": [
+        {
+          "owner": "wasm:helper::environment_identifier_read_strict",
+          "period_sum": 1021250000,
+          "sample_share": 0.11504449701475723
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_read_typeof_strict",
+          "period_sum": 149000000,
+          "sample_share": 0.01678494987045173
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 4500000,
+          "sample_share": 0.0005069280162216965
+        },
+        {
+          "owner": "wasm:js::f307",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:js::pr#f152",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::environment_identifier_typeof_strict": [
+        {
+          "owner": "wasm:helper::environment_identifier_read_typeof_strict",
+          "period_sum": 3750000,
+          "sample_share": 0.00042244001351808043
+        }
+      ],
+      "wasm:helper::for_in_advance": [
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 942000000,
+          "sample_share": 0.1061169313957418
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 542250000,
+          "sample_share": 0.06108482595471443
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::function_call": [
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 1141750000,
+          "sample_share": 0.12861890278247157
+        },
+        {
+          "owner": "wasm:js::xr#f8",
+          "period_sum": 750750000,
+          "sample_share": 0.0845724907063197
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 685750000,
+          "sample_share": 0.07725019713867297
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 368250000,
+          "sample_share": 0.041483609327475496
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 359750000,
+          "sample_share": 0.04052607863016785
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 179250000,
+          "sample_share": 0.020192632646164246
+        },
+        {
+          "owner": "wasm:helper::embedding_call",
+          "period_sum": 132250000,
+          "sample_share": 0.014898051143404303
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 105000000,
+          "sample_share": 0.011828320378506252
+        },
+        {
+          "owner": "wasm:builtin::ReadableStream.StartFulfilled",
+          "period_sum": 79250000,
+          "sample_share": 0.008927565619015433
+        },
+        {
+          "owner": "wasm:helper::promise_drain_jobs",
+          "period_sum": 79000000,
+          "sample_share": 0.00889940295144756
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 63500000,
+          "sample_share": 0.007153317562239496
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 50000000,
+          "sample_share": 0.0056325335135744056
+        },
+        {
+          "owner": "wasm:js::yr#f139",
+          "period_sum": 31750000,
+          "sample_share": 0.003576658781119748
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 28500000,
+          "sample_share": 0.003210544102737411
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 16500000,
+          "sample_share": 0.0018587360594795538
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 8000000,
+          "sample_share": 0.000901205362171905
+        },
+        {
+          "owner": "wasm:js::or#f75",
+          "period_sum": 7000000,
+          "sample_share": 0.0007885546919004169
+        },
+        {
+          "owner": "wasm:wasmtime_builtin_memory_fill",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 3500000,
+          "sample_share": 0.00039427734595020843
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:wasmtime_builtin_intern_func_ref_for_gc_heap",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:helper::async_await_reactions",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:wasmtime_builtin_is_subtype",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f305",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableStreamDefaultReader.prototype.read",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::hn#f76",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:wasmtime_builtin_ref_func",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::pull#f239",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "host-or-unresolved:<wasmtime::runtime::vm::instance::Instance>::get_func_ref (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::pr#f152",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::function_metadata_publish": [
+        {
+          "owner": "wasm:js::f237",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::indexed_element_read": [
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 5750000,
+          "sample_share": 0.0006477413540610567
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::integer_decimal_string": [
+        {
+          "owner": "wasm:helper::number_to_string",
+          "period_sum": 28000000,
+          "sample_share": 0.0031542187676016674
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::native_function_allocate",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::value_to_string",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::intrinsic_property_find": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 67000000,
+          "sample_share": 0.0075475949081897035
+        },
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 44500000,
+          "sample_share": 0.005012954827081221
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::intrinsic_property_value": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 16250000,
+          "sample_share": 0.001830573391911682
+        },
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 7250000,
+          "sample_share": 0.0008167173594682888
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::json_stringify_value": [
+        {
+          "owner": "wasm:builtin::JSON.stringify",
+          "period_sum": 168500000,
+          "sample_share": 0.018981637940745748
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 165000000,
+          "sample_share": 0.01858736059479554
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        }
+      ],
+      "wasm:helper::loose_equality": [
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 7000000,
+          "sample_share": 0.0007885546919004169
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 5500000,
+          "sample_share": 0.0006195786864931846
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::native_function_allocate": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 74000000,
+          "sample_share": 0.008336149600090121
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 33500000,
+          "sample_share": 0.0037737974540948517
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 6250000,
+          "sample_share": 0.0007040666891968007
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableStream",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::async_await_reactions",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::number_to_string": [
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 26500000,
+          "sample_share": 0.002985242762194435
+        },
+        {
+          "owner": "wasm:helper::value_to_string",
+          "period_sum": 12500000,
+          "sample_share": 0.0014081333783936014
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:helper::indexed_element_read",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::value_to_property_key",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::coercive_add",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::object_define_data": [
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 1052500000,
+          "sample_share": 0.11856483046074125
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 23500000,
+          "sample_share": 0.002647290751379971
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.map",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:builtin::JSON.stringify",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::object_delete": [
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::object_get_prototype_of": [
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 11250000,
+          "sample_share": 0.0012673200405542413
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        }
+      ],
+      "wasm:helper::object_has_property": [
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 304500000,
+          "sample_share": 0.03430212909766813
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_resolve",
+          "period_sum": 37500000,
+          "sample_share": 0.004224400135180805
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_get_strict",
+          "period_sum": 20000000,
+          "sample_share": 0.002253013405429762
+        },
+        {
+          "owner": "wasm:helper::object_has_property",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_typeof_strict",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        }
+      ],
+      "wasm:helper::object_header_projection": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 31500000,
+          "sample_share": 0.0035484961135518757
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 18750000,
+          "sample_share": 0.0021122000675904023
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 7250000,
+          "sample_share": 0.0008167173594682888
+        },
+        {
+          "owner": "wasm:helper::object_has_property",
+          "period_sum": 6500000,
+          "sample_share": 0.0007322293567646727
+        },
+        {
+          "owner": "wasm:helper::object_get_prototype_of",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::object_read": [
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 408250000,
+          "sample_share": 0.045989636138335024
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 385750000,
+          "sample_share": 0.04345499605722654
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 292000000,
+          "sample_share": 0.03289399571927453
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 273000000,
+          "sample_share": 0.030753632984116257
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 209250000,
+          "sample_share": 0.02357215275430889
+        },
+        {
+          "owner": "wasm:helper::dynamic_property_read",
+          "period_sum": 67000000,
+          "sample_share": 0.0075475949081897035
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 24750000,
+          "sample_share": 0.0027881040892193307
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_get_strict",
+          "period_sum": 23750000,
+          "sample_share": 0.002675453418947843
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 16250000,
+          "sample_share": 0.001830573391911682
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 15500000,
+          "sample_share": 0.0017460853892080658
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 8750000,
+          "sample_share": 0.000985693364875521
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 7250000,
+          "sample_share": 0.0008167173594682888
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 5000000,
+          "sample_share": 0.0005632533513574405
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 4500000,
+          "sample_share": 0.0005069280162216965
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 4500000,
+          "sample_share": 0.0005069280162216965
+        },
+        {
+          "owner": "wasm:helper::indexed_element_read",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 3750000,
+          "sample_share": 0.00042244001351808043
+        },
+        {
+          "owner": "wasm:builtin::Uint8Array",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:builtin::Error",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:builtin::Promise.resolve",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:builtin::ReadableStream",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:builtin::Set",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::promise_drain_jobs",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_typeof_strict",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::proxy_construct",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:builtin::Map",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::native_function_allocate",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableByteStreamController.prototype.enqueue",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.map",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_resolve",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::number_to_string",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_read_typeof_strict",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::P#f121",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_object_allocate": [
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 12250000,
+          "sample_share": 0.0013799707108257293
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 8000000,
+          "sample_share": 0.000901205362171905
+        },
+        {
+          "owner": "wasm:helper::value_to_object",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 3500000,
+          "sample_share": 0.00039427734595020843
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 3250000,
+          "sample_share": 0.0003661146783823364
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::mn#f131",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Ii#f91",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableStream",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::proxy_construct",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::C#f77",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Ln#f154",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_own_descriptor": [
+        {
+          "owner": "wasm:helper::object_has_property",
+          "period_sum": 222250000,
+          "sample_share": 0.025036611467838234
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 52500000,
+          "sample_share": 0.005914160189253126
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 46250000,
+          "sample_share": 0.005210093500056325
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 32000000,
+          "sample_share": 0.00360482144868762
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 20250000,
+          "sample_share": 0.002281176072997634
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 5750000,
+          "sample_share": 0.0006477413540610567
+        },
+        {
+          "owner": "wasm:builtin::Object.prototype.hasOwnProperty",
+          "period_sum": 3750000,
+          "sample_share": 0.00042244001351808043
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_resolve",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_property_append": [
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 177500000,
+          "sample_share": 0.01999549397318914
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 91000000,
+          "sample_share": 0.010251210994705419
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 27500000,
+          "sample_share": 0.0030978934324659233
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 24750000,
+          "sample_share": 0.0027881040892193307
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 20000000,
+          "sample_share": 0.002253013405429762
+        },
+        {
+          "owner": "wasm:helper::value_to_object",
+          "period_sum": 15500000,
+          "sample_share": 0.0017460853892080658
+        },
+        {
+          "owner": "wasm:js::mn#f131",
+          "period_sum": 11250000,
+          "sample_share": 0.0012673200405542413
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 6750000,
+          "sample_share": 0.0007603920243325448
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 6500000,
+          "sample_share": 0.0007322293567646727
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 6250000,
+          "sample_share": 0.0007040666891968007
+        },
+        {
+          "owner": "wasm:js::Ii#f91",
+          "period_sum": 5250000,
+          "sample_share": 0.0005914160189253126
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 3500000,
+          "sample_share": 0.00039427734595020843
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 3500000,
+          "sample_share": 0.00039427734595020843
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::function_metadata_publish",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f237",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::start#f238",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::xr#f8",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Xt#f117",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::f270",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableStreamDefaultReader.prototype.read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::ReadableByteStreamController.prototype.enqueue",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::vr#f155",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_property_find": [
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 209250000,
+          "sample_share": 0.02357215275430889
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 169000000,
+          "sample_share": 0.019037963275881493
+        },
+        {
+          "owner": "wasm:helper::object_has_property",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_property_prepare": [
+        {
+          "owner": "wasm:helper::ordinary_property_append",
+          "period_sum": 79250000,
+          "sample_share": 0.008927565619015433
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "<zero IP>",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "host-or-unresolved:wasmtime::runtime::vm::libcalls::raw::is_subtype (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "<unwound caller unavailable>",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_set": [
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 251000000,
+          "sample_share": 0.028275318238143516
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 160250000,
+          "sample_share": 0.01805226991100597
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 101750000,
+          "sample_share": 0.011462205700123915
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 28250000,
+          "sample_share": 0.003182381435169539
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 13250000,
+          "sample_share": 0.0014926213810972176
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 11500000,
+          "sample_share": 0.0012954827081221134
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 4500000,
+          "sample_share": 0.0005069280162216965
+        },
+        {
+          "owner": "wasm:js::vr#f155",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::P#f121",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::Hi#f122",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::pr#f152",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::ordinary_set_data_on_receiver": [
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 221500000,
+          "sample_share": 0.024952123465134618
+        },
+        {
+          "owner": "host-or-unresolved:[unknown] ([unknown])",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::vr#f155",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::pooled_string_resolve": [
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 38500000,
+          "sample_share": 0.004337050805452293
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 29500000,
+          "sample_share": 0.0033231947730088993
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 24250000,
+          "sample_share": 0.0027317787540835866
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 21000000,
+          "sample_share": 0.0023656640757012504
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 17750000,
+          "sample_share": 0.001999549397318914
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 11750000,
+          "sample_share": 0.0013236453756899854
+        },
+        {
+          "owner": "wasm:helper::intrinsic_property_find",
+          "period_sum": 7250000,
+          "sample_share": 0.0008167173594682888
+        },
+        {
+          "owner": "wasm:helper::number_to_string",
+          "period_sum": 7250000,
+          "sample_share": 0.0008167173594682888
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 6250000,
+          "sample_share": 0.0007040666891968007
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 5750000,
+          "sample_share": 0.0006477413540610567
+        },
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 5000000,
+          "sample_share": 0.0005632533513574405
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:js::mn#f131",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::to#f7",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::jn#f19",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::value_to_object",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Ii#f91",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::f270",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::proxy_construct",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::f306",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::xr#f8",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::promise_drain_jobs": [
+        {
+          "owner": "wasm:helper::embedding_call",
+          "period_sum": 7289250000,
+          "sample_share": 0.8211388982764447
+        }
+      ],
+      "wasm:helper::property_value_resolve": [
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        }
+      ],
+      "wasm:helper::proxy_call": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 15250000,
+          "sample_share": 0.0017179227216401938
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 11000000,
+          "sample_share": 0.0012391573729863693
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 7750000,
+          "sample_share": 0.0008730426946040329
+        },
+        {
+          "owner": "wasm:helper::object_define_data",
+          "period_sum": 4250000,
+          "sample_share": 0.0004787653486538245
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::et#f119",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::g#f124",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::yr#f139",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Er#f142",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::promise_drain_jobs",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::proxy_construct": [
+        {
+          "owner": "wasm:js::f237",
+          "period_sum": 97750000,
+          "sample_share": 0.011011603019037964
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "wasm:builtin::TextEncoderPrototypeEncode",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:builtin::Array.from",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f304",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::proxy_construct",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.map",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::realm_ensure_binary_data": [
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        }
+      ],
+      "wasm:helper::string_equality": [
+        {
+          "owner": "wasm:helper::environment_identifier_resolve",
+          "period_sum": 739000000,
+          "sample_share": 0.08324884533062972
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 19500000,
+          "sample_share": 0.0021966880702940185
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_read_strict",
+          "period_sum": 11250000,
+          "sample_share": 0.0012673200405542413
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 5500000,
+          "sample_share": 0.0006195786864931846
+        },
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 4000000,
+          "sample_share": 0.0004506026810859525
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 3750000,
+          "sample_share": 0.00042244001351808043
+        },
+        {
+          "owner": "wasm:helper::loose_equality",
+          "period_sum": 3750000,
+          "sample_share": 0.00042244001351808043
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_read_typeof_strict",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "wasm:helper::ordinary_own_descriptor",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::Ii#f91",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:js::mn#f131",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::dn#f151",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::string_to_number": [
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_number": [
+        {
+          "owner": "wasm:builtin::String.prototype.indexOf",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::ordinary_set_data_on_receiver",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.splice",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_numeric": [
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 3000000,
+          "sample_share": 0.0003379520108144643
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        }
+      ],
+      "wasm:helper::value_to_object": [
+        {
+          "owner": "wasm:helper::object_read",
+          "period_sum": 50500000,
+          "sample_share": 0.00568885884871015
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 11000000,
+          "sample_share": 0.0012391573729863693
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 5750000,
+          "sample_share": 0.0006477413540610567
+        },
+        {
+          "owner": "wasm:helper::ordinary_set",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 2000000,
+          "sample_share": 0.00022530134054297624
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 1250000,
+          "sample_share": 0.00014081333783936013
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:helper::cached_property_read",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:builtin::Array.prototype.map",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::environment_identifier_get_strict",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:builtin::Function.prototype[Symbol.hasInstance]",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Sr#f144",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::rr#f73",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::Object.prototype.hasOwnProperty",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_primitive_default": [
+        {
+          "owner": "wasm:helper::coercive_add",
+          "period_sum": 4750000,
+          "sample_share": 0.0005350906837895686
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_primitive_number": [
+        {
+          "owner": "wasm:helper::value_to_numeric",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:helper::value_to_number",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_primitive_string": [
+        {
+          "owner": "wasm:helper::value_to_property_key",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:helper::value_to_string",
+          "period_sum": 2500000,
+          "sample_share": 0.00028162667567872027
+        },
+        {
+          "owner": "wasm:helper::coercive_add",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_property_key": [
+        {
+          "owner": "wasm:builtin::Reflect.ownKeys",
+          "period_sum": 8250000,
+          "sample_share": 0.0009293680297397769
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 7500000,
+          "sample_share": 0.0008448800270361609
+        },
+        {
+          "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+          "period_sum": 6750000,
+          "sample_share": 0.0007603920243325448
+        },
+        {
+          "owner": "wasm:js::vn#f133",
+          "period_sum": 6750000,
+          "sample_share": 0.0007603920243325448
+        },
+        {
+          "owner": "wasm:helper::for_in_advance",
+          "period_sum": 5250000,
+          "sample_share": 0.0005914160189253126
+        },
+        {
+          "owner": "wasm:builtin::Reflect.defineProperty",
+          "period_sum": 2750000,
+          "sample_share": 0.0003097893432465923
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 1750000,
+          "sample_share": 0.00019713867297510421
+        },
+        {
+          "owner": "wasm:helper::dynamic_property_read",
+          "period_sum": 1500000,
+          "sample_share": 0.00016897600540723216
+        },
+        {
+          "owner": "wasm:helper::json_stringify_value",
+          "period_sum": 1000000,
+          "sample_share": 0.00011265067027148812
+        },
+        {
+          "owner": "wasm:js::Wi#f115",
+          "period_sum": 750000,
+          "sample_share": 8.448800270361608e-05
+        },
+        {
+          "owner": "wasm:js::f42",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::hr#f106",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:js::zn#f146",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:js::Vt#f116",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ],
+      "wasm:helper::value_to_string": [
+        {
+          "owner": "wasm:helper::value_to_property_key",
+          "period_sum": 9250000,
+          "sample_share": 0.0010420187000112651
+        },
+        {
+          "owner": "wasm:helper::coercive_add",
+          "period_sum": 8000000,
+          "sample_share": 0.000901205362171905
+        },
+        {
+          "owner": "wasm:builtin::String.prototype.indexOf",
+          "period_sum": 2250000,
+          "sample_share": 0.00025346400811084827
+        },
+        {
+          "owner": "wasm:js::ft#f123",
+          "period_sum": 500000,
+          "sample_share": 5.632533513574406e-05
+        },
+        {
+          "owner": "wasm:helper::function_call",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        },
+        {
+          "owner": "wasm:builtin::TextEncoderPrototypeEncode",
+          "period_sum": 250000,
+          "sample_share": 2.816266756787203e-05
+        }
+      ]
+    },
+    "limits": "User-cycle sample weights, never wall-time shares or exact call counts. Own samples are disjoint; inclusive owners overlap. Frame-pointer chains can truncate or be invalid, and missing callers remain explicit. Caller return PCs resolve at IP-1. No silent cross-process rebasing.",
+    "own": [
+      {
+        "owner": "wasm:js::vn#f133",
+        "period_sum": 1014250000,
+        "sample_share": 0.11425594232285682
+      },
+      {
+        "owner": "wasm:helper::string_equality",
+        "period_sum": 802750000,
+        "sample_share": 0.09043032556043709
+      },
+      {
+        "owner": "wasm:helper::object_read",
+        "period_sum": 547250000,
+        "sample_share": 0.06164807930607187
+      },
+      {
+        "owner": "wasm:js::ft#f123",
+        "period_sum": 514000000,
+        "sample_share": 0.05790244451954489
+      },
+      {
+        "owner": "wasm:helper::environment_identifier_resolve",
+        "period_sum": 408250000,
+        "sample_share": 0.045989636138335024
+      },
+      {
+        "owner": "wasm:helper::ordinary_property_find",
+        "period_sum": 380000000,
+        "sample_share": 0.04280725470316549
+      },
+      {
+        "owner": "wasm:helper::ordinary_property_append",
+        "period_sum": 338250000,
+        "sample_share": 0.03810408921933085
+      },
+      {
+        "owner": "wasm:helper::for_in_advance",
+        "period_sum": 254250000,
+        "sample_share": 0.028641432916525853
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 222000000,
+        "sample_share": 0.025008448800270363
+      },
+      {
+        "owner": "wasm:helper::pooled_string_resolve",
+        "period_sum": 203000000,
+        "sample_share": 0.02286808606511209
+      },
+      {
+        "owner": "wasm:helper::function_call",
+        "period_sum": 147500000,
+        "sample_share": 0.016615973865044497
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 144500000,
+        "sample_share": 0.016278021854230034
+      },
+      {
+        "owner": "wasm:builtin::Reflect.defineProperty",
+        "period_sum": 139750000,
+        "sample_share": 0.015742931170440465
+      },
+      {
+        "owner": "wasm:helper::object_has_property",
+        "period_sum": 135250000,
+        "sample_share": 0.015236003154218768
+      },
+      {
+        "owner": "wasm:js::et#f119",
+        "period_sum": 134000000,
+        "sample_share": 0.015095189816379407
+      },
+      {
+        "owner": "wasm:js::f42",
+        "period_sum": 130500000,
+        "sample_share": 0.014700912470429199
+      },
+      {
+        "owner": "wasm:helper::object_define_data",
+        "period_sum": 115250000,
+        "sample_share": 0.012982989748789005
+      },
+      {
+        "owner": "wasm:helper::ordinary_own_descriptor",
+        "period_sum": 112750000,
+        "sample_share": 0.012701363073110285
+      },
+      {
+        "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
+        "period_sum": 104750000,
+        "sample_share": 0.01180015771093838
+      },
+      {
+        "owner": "wasm:helper::intrinsic_property_find",
+        "period_sum": 104500000,
+        "sample_share": 0.011771995043370507
+      },
+      {
+        "owner": "host-or-unresolved:memcpy (/usr/lib/libc.so.6)",
+        "period_sum": 104000000,
+        "sample_share": 0.011715669708234764
+      },
+      {
+        "owner": "host-or-unresolved:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&core::option::Option<wasmtime::runtime::vm::send_sync_ptr::SendSyncPtr<wasmtime::runtime::vm::vmcontext::VMFuncRef>>> (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 103000000,
+        "sample_share": 0.011603019037963276
+      },
+      {
+        "owner": "wasm:builtin::Reflect.ownKeys",
+        "period_sum": 100750000,
+        "sample_share": 0.011349555029852427
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::instantiate::CompiledModule>::func_loc (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 96750000,
+        "sample_share": 0.010898952348766476
+      },
+      {
+        "owner": "host-or-unresolved:[unknown] (/usr/lib/libc.so.6)",
+        "period_sum": 94750000,
+        "sample_share": 0.0106736510082235
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::func_ref::FuncRefTable>::intern (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 86750000,
+        "sample_share": 0.009772445646051594
+      },
+      {
+        "owner": "wasm:js::Vt#f116",
+        "period_sum": 80750000,
+        "sample_share": 0.009096541624422666
+      },
+      {
+        "owner": "wasm:helper::object_header_projection",
+        "period_sum": 71000000,
+        "sample_share": 0.007998197589275656
+      },
+      {
+        "owner": "wasm:helper::ordinary_property_prepare",
+        "period_sum": 65500000,
+        "sample_share": 0.007378618902782471
+      },
+      {
+        "owner": "wasm:helper::ordinary_set",
+        "period_sum": 63500000,
+        "sample_share": 0.007153317562239496
+      },
+      {
+        "owner": "wasm:helper::compact_literal_allocate",
+        "period_sum": 60500000,
+        "sample_share": 0.006815365551425031
+      },
+      {
+        "owner": "wasm:helper::value_to_object",
+        "period_sum": 55750000,
+        "sample_share": 0.006280274867635462
+      },
+      {
+        "owner": "wasm:helper::json_stringify_value",
+        "period_sum": 55750000,
+        "sample_share": 0.006280274867635462
+      },
+      {
+        "owner": "wasm:helper::compact_data_store",
+        "period_sum": 55500000,
+        "sample_share": 0.006252112200067591
+      },
+      {
+        "owner": "wasm:helper::ordinary_set_data_on_receiver",
+        "period_sum": 54250000,
+        "sample_share": 0.00611129886222823
+      },
+      {
+        "owner": "host-or-unresolved:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 53000000,
+        "sample_share": 0.00597048552438887
+      },
+      {
+        "owner": "wasm:helper::proxy_call",
+        "period_sum": 52500000,
+        "sample_share": 0.005914160189253126
+      },
+      {
+        "owner": "wasm:js::Wi#f115",
+        "period_sum": 52250000,
+        "sample_share": 0.005885997521685254
+      },
+      {
+        "owner": "host-or-unresolved:wasmtime::runtime::vm::libcalls::raw::is_subtype (/home/jacobt/src/scriptw/target/react-performance-20261103/promoted/frozen/rsc_baseline)",
+        "period_sum": 50500000,
+        "sample_share": 0.00568885884871015
+      },
+      {
+        "owner": "wasm:js::rr#f73",
+        "period_sum": 49250000,
+        "sample_share": 0.00554804551087079
+      }
+    ],
+    "period_sum": 8877000000,
+    "reanalysis_receipt_sha256": "f01ad1b2c965575f71f42c573474bb11ded5c3dfed6b5615c1ad86e8a7f2dda4",
+    "samples": 35508,
+    "string_equality_leaf_period_sum": 802750000,
+    "string_equality_with_environment_resolver_immediate_caller_period_sum": 739000000
+  },
+  "verification": {
+    "PMU_actual_outputs_checked": true,
+    "exact_probe_outputs_checked": true,
+    "native_capture_outputs_checked": true,
+    "new_product_native_builds": 0,
+    "primary_timing_cohort_unchanged": true,
+    "product_Rust_sources_unchanged": true
+  }
+}

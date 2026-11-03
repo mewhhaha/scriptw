@@ -19,7 +19,7 @@ ARCHIVED_ROOT = ROOT
 AUTHORITY = ROOT / 'docs/rust-rewrite/applications-current.json'
 ASSETS = AUTHORITY.parent / 'assets/applications-current'
 RSC_ASSETS = AUTHORITY.parent / 'assets/rsc-current'
-RSC_ENGINE_LABELS = {'baseline': 'Scriptw before', 'candidate': 'Scriptw current', 'v8': 'Node / V8'}
+RSC_ENGINE_LABELS = {'candidate': 'Scriptw', 'v8': 'Node / V8'}
 SERVER = ('rsc-sync', 'rsc-async', 'web-url', 'web-json')
 BROWSER = ('mount', 'update', 'hydrate')
 LABELS = {'rsc-sync': 'RSC Flight · sync', 'rsc-async': 'RSC Flight · async',
@@ -73,9 +73,9 @@ def rsc_runtime_chart(report, preview=None):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     names = ('rsc-sync', 'rsc-async')
-    engines = ('baseline', 'candidate', 'v8')
-    colors = ('#8a96a3', '#3478a8', '#d17b36')
-    width = .23
+    engines = ('candidate', 'v8')
+    colors = ('#3478a8', '#d17b36')
+    width = .34
     centers = (0, 1)
     with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
                          'svg.hashsalt': 'scriptw-rsc-current-runtime-v1', 'text.usetex': False}):
@@ -86,7 +86,7 @@ def rsc_runtime_chart(report, preview=None):
                 values = [statistics.median(engine['cases'][name]) / 1e6 for name in names]
                 minimum = [min(engine['cases'][name]) / 1e6 for name in names]
                 maximum = [max(engine['cases'][name]) / 1e6 for name in names]
-                positions = [center + (engine_index - 1) * width for center in centers]
+                positions = [center + (engine_index - .5) * width for center in centers]
                 ax.bar(positions, values, width, color=color, label=RSC_ENGINE_LABELS[engine_name],
                        yerr=[[value - low for value, low in zip(values, minimum, strict=True)],
                              [high - value for value, high in zip(values, maximum, strict=True)]],
@@ -99,7 +99,7 @@ def rsc_runtime_chart(report, preview=None):
             ax.set_title('React 19.3.1 · retained RSC module', loc='left', fontweight='bold', pad=14)
             ax.set_axisbelow(True)
             ax.grid(axis='y', color='#eaeef2')
-            ax.legend(frameon=False, ncol=3, loc='upper left')
+            ax.legend(frameon=False, ncol=2, loc='upper left')
             ax.set_ylim(bottom=0, top=max(max(report['engines'][name]['cases'][case]) / 1e6
                                          for name in engines for case in names) * 1.28)
             for side in ('top', 'right'):
@@ -115,41 +115,38 @@ def rsc_compile_chart(report, preview=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    engines = ('baseline', 'candidate')
+    engine_name = 'candidate'
     phases = ('front_and_lower', 'wasm_emission', 'native_preparation')
     labels = ('Front end + lower', 'Wasm emission', 'Native preparation')
     colors = ('#6687a3', '#e5a23d', '#4a9a79')
-    medians = {}
-    for engine_name in engines:
-        medians[engine_name] = [statistics.median(
-            process[phase] for process in report['engines'][engine_name]['phase_processes']) / 1e9
-            for phase in phases]
+    medians = [statistics.median(
+        process[phase] for process in report['engines'][engine_name]['phase_processes']) / 1e9
+        for phase in phases]
     with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
                          'svg.hashsalt': 'scriptw-rsc-current-compilation-v1', 'text.usetex': False}):
         fig, ax = plt.subplots(figsize=(8, 4.1))
         try:
-            positions = (0, 1)
-            bottoms = [0.0, 0.0]
+            position = 0
+            bottom = 0.0
             for phase_index, (label, color) in enumerate(zip(labels, colors, strict=True)):
-                values = [medians[name][phase_index] for name in engines]
-                ax.bar(positions, values, bottom=bottoms, color=color, width=.55, label=label)
+                value = medians[phase_index]
+                ax.bar(position, value, bottom=bottom, color=color, width=.55, label=label)
                 label_color = 'white'
                 if phase_index == 1:
                     label_color = '#32220b'
-                for x, bottom, value in zip(positions, bottoms, values, strict=True):
-                    ax.text(x, bottom + value / 2, f'{value:.2f}', ha='center', va='center',
-                            fontsize=9, color=label_color, fontweight='bold')
-                bottoms = [bottom + value for bottom, value in zip(bottoms, values, strict=True)]
-            ax.set_xticks(positions, [RSC_ENGINE_LABELS[name] for name in engines])
+                ax.text(position, bottom + value / 2, f'{value:.2f}', ha='center', va='center',
+                        fontsize=9, color=label_color, fontweight='bold')
+                bottom += value
+            ax.set_xticks([position], [RSC_ENGINE_LABELS[engine_name]])
+            ax.set_xlim(-.75, .75)
             ax.set_ylabel('Cold compile + native preparation · s')
             ax.set_title('React 19.3.1 · cold compilation phases', loc='left', fontweight='bold', pad=14)
             ax.set_axisbelow(True)
             ax.grid(axis='y', color='#eaeef2')
             ax.legend(frameon=False, ncol=3, loc='upper left')
-            for x, total in zip(positions, bottoms, strict=True):
-                ax.annotate(f'{total:.2f} s', (x, total), xytext=(0, 5), textcoords='offset points',
-                            ha='center', va='bottom', fontweight='bold')
-            ax.set_ylim(bottom=0, top=max(bottoms) * 1.24)
+            ax.annotate(f'{bottom:.2f} s', (position, bottom), xytext=(0, 5), textcoords='offset points',
+                        ha='center', va='bottom', fontweight='bold')
+            ax.set_ylim(bottom=0, top=bottom * 1.24)
             for side in ('top', 'right'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(length=0, pad=7)

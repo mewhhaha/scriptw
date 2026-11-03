@@ -56,16 +56,17 @@ These use plain request/response records; networking and Web APIs are outside th
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Eight fresh processes per engine; three checked warmups and seven measured
-requests per mode. Request time falls **16.4% / 21.0%** against the matched prior
-compiler. Native compilation and module initialization precede timing.
-Requests include full Flight serialization/consumption; final JSON encoding and
-validation follow timing. Scriptw uses Cranelift **Fast / OptLevel::None**.
+requests per mode. Requests include full Flight serialization and consumption;
+final JSON encoding and validation follow timing. Scriptw uses Cranelift
+**Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold RSC setup takes about **3.22 s JavaScript → Wasm + 12.40 s native preparation**.
-Raw Wasm is **6.08 MiB application + 37.56 MiB shared runtime**; application code
-shrinks 10.9%, with size still an open issue. [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
+Cold Scriptw setup: **3.22 s JavaScript → Wasm**, **12.40 s native preparation**,
+and **2.62 ms module initialization**. Program Wasm is **6.08 MiB** (5.56 MiB
+code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
+[Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details, failures and caveats](docs/rust-rewrite/benchmarks.md) ·
-[Recorded RSC build](docs/rust-rewrite/rsc-current.json).
+[Recorded RSC build](docs/rust-rewrite/rsc-current.json) ·
+[CPU diagnosis](docs/rust-rewrite/react-attribution-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->

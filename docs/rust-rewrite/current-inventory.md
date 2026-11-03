@@ -8,27 +8,32 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-- Reduce remaining [RSC Wasm expansion](rsc-wasm-size-current.json): 5.83 MB
-  of the 6.37-MB program is code, with a 361,733-byte largest body. Shared R
-  remains 39.38 MB. Owner: AOT codegen; attribute remaining bodies before
-  outlining or changing ABI, and measure size, preparation and requests together.
-- Measure and remove unobserved strict arguments/activation materialization.
-  Hot React `vn`/`ft` bodies have no arguments/eval tokens yet receive full
-  unmapped arguments objects. Admission must cover nested arrows, prepared eval
-  and legacy behavior. Generalizing private-local promotion to strict Script
-  factories is separate; CLI RSC/SSR have no established speedup. Owner: IR
-  binding/arguments analysis and AOT prologues; retain one heap and real renderers.
-- Attribute remaining name/property lookup callers. The [RSC cohort](rsc-current.json)
-  remains 41–54x V8 time; current profiles put 8.4–8.6% of sampled cycles in
-  string equality and 4.4–4.8% in environment resolution. Objects already have
-  hash indexes and shape caches. Measure same-reference equality and callers
-  before adding storage or another cache. The [edge corpus](applications-current.json)
-  remains 4–9x Scriptc time. Owner: runtime lookup/property machinery.
-- Reduce cold native preparation: RSC takes about 3.2s source-to-Wasm and
-  12.4s native preparation. The separate one-process Speed diagnostic raises
-  preparation to 18.45s. The [SSR checkpoint](react-codegen-20261102.json) retains
-  a 1,110,482-byte body. Owner: AOT code size/native compilation; preserve exact
-  identities, setup boundaries and unchanged default policy.
+- Remove proven unnecessary lexical walks for global references. The
+  [caller diagnosis](react-attribution-current.json) attributes 92.1% of
+  StringEquality leaf weight to name resolution, mostly 22 `vn` global reads.
+  Prove an existing GlobalEnvironment start for unbound names; preserve global
+  lexical shadowing, mutable globals/getters, Realms and eval/with boundaries.
+  Owner: IR reference-resolution analysis and existing AOT environment paths.
+- Reduce remaining instruction volume: Fast executes 159–167M instructions per
+  RSC request versus Node's 2.5–2.6M in the excluded 100-request diagnostic.
+  Objects already have hash indexes and shape caches. Attribute repeated
+  semantic work before adding another cache or storage representation. Owner:
+  IR/AOT lowering and runtime lookup/property machinery; retain one heap.
+- Bound Fast native code/spills. P is 85.70 MB native with 1-MB/340-KB hot
+  frames; Speed/Backtracking makes it 29.19 MB with 7.4-KB/4.9-KB frames, but
+  removes only 5.3% of retired instructions. The measured probe loops cost
+  5–6% of sampled locations. Owner: AOT code shape and native policy; preserve
+  cold compilation tradeoffs and measure before changing the default.
+- Measure strict arguments/activation materialization before eliding it.
+  Hot `vn`/`ft` have no arguments/eval tokens yet receive full unmapped objects;
+  total allocations remain unmeasured. Admission must cover nested arrows,
+  prepared eval, reflection and escaping closures. Strict Script factories and
+  CLI RSC/SSR performance remain separate. Owner: IR arguments analysis/AOT.
+- Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup:
+  P remains 6.37 MB (5.83 MB code), R 39.38 MB; source-to-Wasm is 3.2s and native
+  preparation 12.4s. The [SSR checkpoint](react-codegen-20261102.json) retains
+  a 1,110,482-byte body. Owner: AOT codegen/native compilation; preserve exact
+  identities and separate cold setup from requests.
 - Requalify affected operators before a new full conformance publication.
   The [shared-kernel checkpoint](react-codegen-20261102.json) passes all 79 pinned
   modulus variants; the complete pinned Test262 matrix remains a separate gate.
