@@ -84,6 +84,127 @@ DOM nodes and full WHATWG conformance remain unsupported or unverified.
 [Inert evidence archive](rsc-final-evidence-2026-11-03.tar.xz) ·
 [Historical raw cohort](rsc-initial-20261103.json).
 
+## Focused performance situations
+
+Measured **2026-11-03**: 13 standalone Module programs, compiled Scriptw build
+`083d9dd79f51` (base `ee46c7cb6` plus the archived benchmark-host patch),
+Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
+Each program has its own score; these are separate from the RSC and fresh-entry
+kernel cohorts. No aggregate score combines their arbitrary operation counts.
+
+| Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
+| --- | ---: | ---: | ---: |
+| `control-empty.js` | 0.012 | 0.010 | 0.001 |
+| `global-shallow.js` | 3.769 | 3.469 | 0.973 |
+| `global-deep8.js` | 5.277 | 4.800 | 0.990 |
+| `global-bound-deep.js` | 0.781 | 0.278 | 0.006 |
+| `global-getter-deep.js` | 6.932 | 6.239 | 0.966 |
+| `frame-compact.js` | 31.885 | 23.402 | 0.062 |
+| `frame-branches32.js` | 34.658 | 24.738 | 0.095 |
+| `frame-branches128.js` | 44.998 | 27.850 | 0.140 |
+| `frame-branches512.js` | 117.189 | 43.185 | 0.215 |
+| `args-unused.js` | 2.350 | 1.663 | 0.088 |
+| `args-observed.js` | 6.703 | 5.877 | 0.135 |
+| `property-stable.js` | 4.736 | 3.843 | 0.075 |
+| `property-mutated.js` | 4.645 | 3.749 | 0.066 |
+
+Each value is the median of eight fresh-process medians across two balanced
+blocks. Every process initializes one Module/Realm, then runs three checked
+warmups and seven measured calls. Four inputs rotate identically in every actor;
+every call checks an independently computed integer checksum. Bars show current
+configurations only; whiskers span the eight process medians. Block medians and
+process summaries remain in the [data](situations-current.json); every call is
+retained in the evidence archive.
+
+Scriptw uses Wasmtime 47: **Fast = None / SinglePass**, **Speed = Speed /
+Backtracking**, generic target, 16-MiB copying GC, one CPU, 4-GiB cap and no swap.
+JavaScript/Wasm/native compilation, module initialization and `prepare(input)`
+precede the public `run()` clock. Every consumer has its compiler disabled.
+Node uses the exact same source bytes in `vm.SourceTextModule`, with normal JIT
+and natural GC; three warmups do not establish optimized steady state. Timings
+include each runtime's public-call bridge and `print` conversion/capture; output
+draining and validation follow timing. The empty control is shown without
+subtraction. Excluded preparation can still influence timed GC, feedback and JIT
+invalidation. Child peak RSS and preparation observations are retained separately.
+
+### Global lookup
+
+The four cases read six constructor values across 1,024 passes. Deep lookup
+retains eight syntactically nested padding captures; the bound control captures
+constructor references beside the worker. Fast takes **5.277 ms** for deep global
+reads versus **0.781 ms** for bound references; Speed takes **4.800 / 0.278 ms**.
+This gives the global-resolution hill a small reproducible program. The getter
+control changes the returned constructor with the input and checks all getter
+calls, preserving a live global observation.
+
+![Global lookup situations](assets/situations-current/global-lookup.svg)
+
+Shallow/deep also differ in padding reads and arithmetic; their difference is not
+pure lexical-depth cost. Bound aliases may fold, and V8 may hoist global reads.
+Operation counts describe logical source references, not guaranteed executed
+lookups. The getter score includes getter calls and counter increments.
+
+### Control-flow and call-site scaling
+
+All four cases make **8,192** entries into a function with one, 32, 128 or 512
+selected call sites, exercising every site and producing identical checksums.
+Fast rises from **31.885 to 117.189 ms**; Speed from **23.402 to 43.185 ms**.
+
+![Control-flow and call-site scaling](assets/situations-current/frame-size.svg)
+
+![Native program image growth](assets/situations-current/frame-native-image.svg)
+
+The 512-site native P image is **6.71 MiB Fast / 2.55 MiB Speed**; portable Wasm P
+is **0.83 MiB**. Native serialized images include metadata and data, not just code.
+This measures source/control-flow and call-site scaling: compact dispatch uses a
+dynamic key and one polymorphic site; switch arms use constant keys and separate
+sites. It does not isolate individual stack frame growth or stack-probe cost.
+V8's 512-site block medians differ (**0.290 / 0.215 ms**); retain that variation
+when evaluating future changes.
+
+### Arguments observation
+
+Both cases make 1,024 strict ordinary calls with captured state, reassign a formal
+parameter and compute the same result. The observed case reads the original
+`arguments[0]` and `arguments.length`. Fast takes **2.350 / 6.703 ms**; Speed
+**1.663 / 5.877 ms**. The extra observation is timed work; the difference is not
+an allocation count or an isolated arguments-object construction cost.
+
+![Arguments observation situations](assets/situations-current/arguments-observation.svg)
+
+### Property mutation history
+
+Each case performs 8,192 variable-key reads over 64 records. Mutation setup adds
+an accessor, deletes properties and restores the same values before timing.
+Fast takes **4.736 / 4.645 ms** and Speed **3.843 / 3.749 ms**: this history adds
+little cost here, while both cases remain much slower than V8. No compact or
+dictionary representation is assumed, and equal string recipes do not establish
+distinct string backing storage.
+
+![Property mutation history situations](assets/situations-current/property-mutation-history.svg)
+
+### Public-call control and reproduction
+
+![Retained public-call control](assets/situations-current/control.svg)
+
+[Generate/run selected programs](../../CONTRIBUTING.md#focused-performance-situations)
+with `--case <file.js>`; choose native policy with `--policies fast` or `speed`.
+Scriptc has no compatible retained-Module `prepare`/`run` consumer in this
+workflow, so it has no substituted fresh-WASI-entry score. These programs expose
+optimization targets; they do not estimate each mechanism's share of RSC time.
+
+The release example's 16 tests, seven generator/V8 checks and 11 runner checks
+passed; all 312 process results passed exact output checks. No product compiler
+or runtime source changed. Full workspace CI and pinned Test262 were not rerun.
+Changed Rust files pass formatting and conformance ownership passes. Workspace
+formatting still fails on 13 unchanged files; 14 stale Intl identity recipes
+remain [owned](current-inventory.md).
+The aborted first harness attempt and its configuration fix remain in the inert
+evidence, excluded from scored calls.
+
+[Report, source/tool identities and process summaries](situations-current.json) ·
+[Checksummed UTF-8 evidence](situations-evidence-2026-11-03.tar.xz).
+
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison
 

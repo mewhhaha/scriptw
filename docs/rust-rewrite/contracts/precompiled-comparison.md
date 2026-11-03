@@ -66,6 +66,11 @@ repeated public calls. Every warmup and measured call drains and checks output.
 These derived-module observations have distinct, explicitly excluded schemas;
 they never replace the original Script/WASI entry measurements or their bars.
 
+The [focused situations](../../../CONTRIBUTING.md#focused-performance-situations)
+use exact standalone Module bytes with untimed `prepare(input)` and timed `run()`.
+They publish a separate Scriptw Fast/Speed versus V8 cohort; native policy is
+selected during preparation and compilation stays disabled during consumption.
+
 The native-image transport buffers are dropped before the first Store. Both
 native modules are deserialized from bytes into the same configured engine.
 Scriptw additionally admits its matching Cargo runtime and host bindings;

@@ -68,6 +68,10 @@ code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json) ·
 [CPU diagnosis](docs/rust-rewrite/react-attribution-current.json).
 
+**Focused performance situations · 2026-11-03:** 13 checked programs compare
+global lookup, control-flow scaling, arguments and property mutation history
+against V8. [Individual scores and charts](docs/rust-rewrite/benchmarks.md#focused-performance-situations).
+
 ## Current Status
 <!-- scriptw-status:start -->
 Published Test262 (`wasm-aot`, `2026-10-23`): `102990/102994` passed; `4` failed.
@@ -93,8 +97,10 @@ retain the full denominator, including every failure.
 Latest scoped verification (**2026-11-03**): 1,295 Engine, 42 Wasm-emission,
 nine captured-cell IR and two encoded cell-read checks passed, plus nine
 exact-output CLI application runs.
+The focused benchmarks add 34 harness/generator checks and 3,120 checked calls.
 These scopes do not replace the published full Test262 run. Full workspace CI was
-not rerun; 14 stale Intl identity recipes remain [owned](docs/rust-rewrite/current-inventory.md).
+not rerun; existing formatting failures and 14 stale Intl identity recipes remain
+[owned](docs/rust-rewrite/current-inventory.md).
 
 ## Caveats
 

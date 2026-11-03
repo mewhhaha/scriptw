@@ -71,6 +71,16 @@ fn execute_scriptw(args: &[String]) -> Result<Value, String> {
     Ok(decorate(report, "scriptw"))
 }
 
+fn prepare_retained(args: &[String]) -> Result<Value, String> {
+    if !(3..=4).contains(&args.len()) {
+        return Err(
+            "usage: prepare-retained FIXTURES NEW_DIRECTORY [fast|speed|size-optimized]".into(),
+        );
+    }
+    let policy = callable::NativePolicy::parse(args.get(3).map(String::as_str))?;
+    callable::prepare(Path::new(&args[1]), Path::new(&args[2]), policy)
+}
+
 fn run() -> Result<Value, String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     // Bind/read the executable identically before either adapter's measured
@@ -82,12 +92,12 @@ fn run() -> Result<Value, String> {
             Ok(decorate(identity, "shared"))
         }
         (Some("prepare-scriptw"), 3) => prepare_scriptw(Path::new(&args[1]), Path::new(&args[2])),
-        (Some("prepare-retained"), 3) => callable::prepare(Path::new(&args[1]), Path::new(&args[2])),
+        (Some("prepare-retained"), _) => prepare_retained(&args),
         (Some("prepare-wasi"), 3) => wasi_produce::prepare(Path::new(&args[1]), Path::new(&args[2])),
         (Some("execute-scriptw"), 5) => execute_scriptw(&args),
         (Some("execute-retained"), 5) => callable::execute(Path::new(&args[1]), &args[2], &args[3], &args[4]),
         (Some("execute-wasi"), 5) => wasi::execute(Path::new(&args[1]), &args[2], &args[3], &args[4]),
-        _ => Err("usage: compiler_precompiled_baseline identity | prepare-{scriptw|retained} FIXTURES NEW_DIRECTORY | prepare-wasi INPUT.wasm NEW_IMAGE | execute-{scriptw|wasi|retained} IMAGE EXPECTED_STDOUT SAMPLES WARMUPS".into()),
+        _ => Err("usage: compiler_precompiled_baseline identity | prepare-scriptw FIXTURES NEW_DIRECTORY | prepare-retained FIXTURES NEW_DIRECTORY [fast|speed|size-optimized] | prepare-wasi INPUT.wasm NEW_IMAGE | execute-{scriptw|wasi|retained} IMAGE EXPECTED_STDOUT SAMPLES WARMUPS".into()),
     }
 }
 
@@ -107,6 +117,28 @@ fn main() {
         Err(error) => {
             eprintln!("{error}");
             std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_cli_rejects_invalid_arguments_before_filesystem_access() {
+        for arguments in [
+            vec!["prepare-retained"],
+            vec!["prepare-retained", "fixtures"],
+            vec!["prepare-retained", "fixtures", "output", "unknown"],
+            vec!["prepare-retained", "fixtures", "output", "fast", "extra"],
+        ] {
+            let arguments: Vec<String> = arguments.into_iter().map(str::to_owned).collect();
+            let error = prepare_retained(&arguments).unwrap_err();
+            assert!(
+                error.contains("usage:") || error.contains("native policy"),
+                "{error}"
+            );
         }
     }
 }

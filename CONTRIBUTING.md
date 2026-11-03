@@ -228,6 +228,35 @@ Only Scriptc receives the pinned `print` adapter. The checked publication retain
 source/tool hashes, diagnostics, raw wall/child-peak-RSS observations and portable
 artifacts. Compilation success does not verify runtime output or conformance.
 
+## Focused performance situations
+
+Generate the checked programs for global lookup, branch fan-out, arguments and
+property mutation history. They use retained Modules with untimed `prepare(input)`
+and timed `run()`, shared by Scriptw and Node/V8:
+
+```sh
+mkdir -p target/situation-build
+python3 -B scripts/performance_situations.py --output-dir target/situation-fixtures
+python3 -B scripts/limited_verification.py -- cargo build --release --locked -p scriptw-cli --example compiler_precompiled_baseline --message-format=json-render-diagnostics > target/situation-build/cargo.jsonl
+cp target/release/examples/compiler_precompiled_baseline target/situation-build/host
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-situations.py \
+  --host target/situation-build/host --producer-log target/situation-build/cargo.jsonl \
+  --fixtures target/situation-fixtures --output target/new-situation-reference \
+  --node /path/to/node-24.12.0 --time /path/to/gnu-time
+python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python -B scripts/render-situation-benchmarks.py \
+  --report target/new-situation-reference/report.json --output-dir target/situation-charts \
+  --preview-dir target/situation-previews
+```
+
+Use fresh output directories. `--case <file.js>` selects a hill; `--policies fast`
+or `--policies speed` selects a Scriptw compilation policy. Each default cohort
+uses two balanced blocks and eight fresh processes per case/actor, with three
+checked warmups and seven measured calls. Native compilation precedes those
+processes; every Wasmtime consumer has its compiler disabled. Record preparation
+time and native-image size separately. Mutation and getter controls have their
+own scores; their differences are not allocation counts or isolated stack costs.
+Scriptc has no matched retained-Module consumer in this workflow.
+
 ## React and edge benchmarks
 
 Use a fresh ignored tool directory with exact `react`, `react-dom` and

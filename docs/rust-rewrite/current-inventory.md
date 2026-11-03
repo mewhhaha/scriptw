@@ -8,6 +8,10 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
+Use the [13 focused programs and scores](benchmarks.md#focused-performance-situations)
+to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
+accepts `--case <file.js>`.
+
 - Remove proven unnecessary lexical walks for global references. The
   [caller diagnosis](react-attribution-current.json) attributes 92.1% of
   StringEquality leaf weight to name resolution, mostly 22 `vn` global reads.
