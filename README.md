@@ -70,7 +70,26 @@ code, 0.47 MiB data); shared runtime Wasm is **37.56 MiB**.
 
 **Focused performance situations · 2026-11-03:** 13 checked programs compare
 global lookup, control-flow scaling, arguments and property mutation history
-against V8. [Individual scores and charts](docs/rust-rewrite/benchmarks.md#focused-performance-situations).
+against V8. Eight fresh processes per configuration; three checked warmups and
+seven measured calls. Compilation and input preparation precede timing.
+
+<table>
+<tr>
+<td><img src="docs/rust-rewrite/assets/situations-current/global-lookup.svg" width="440" alt="Global lookup: Scriptw Fast, Scriptw Speed and V8"></td>
+<td><img src="docs/rust-rewrite/assets/situations-current/frame-size.svg" width="440" alt="Control-flow and call-site scaling: Scriptw Fast, Scriptw Speed and V8"></td>
+</tr>
+<tr>
+<td><img src="docs/rust-rewrite/assets/situations-current/arguments-observation.svg" width="440" alt="Arguments observation: Scriptw Fast, Scriptw Speed and V8"></td>
+<td><img src="docs/rust-rewrite/assets/situations-current/property-mutation-history.svg" width="440" alt="Property mutation history: Scriptw Fast, Scriptw Speed and V8"></td>
+</tr>
+<tr>
+<td><img src="docs/rust-rewrite/assets/situations-current/frame-native-image.svg" width="440" alt="Native program image growth and portable Wasm size"></td>
+<td><img src="docs/rust-rewrite/assets/situations-current/control.svg" width="440" alt="Retained public-call control: Scriptw Fast, Scriptw Speed and V8"></td>
+</tr>
+</table>
+
+[Individual scores and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
+[Data](docs/rust-rewrite/situations-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->
