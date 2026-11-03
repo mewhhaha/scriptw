@@ -8,21 +8,19 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-- Attribute application-workload gaps using the
-  [React/edge corpus](applications-current.json). Scriptw passes all six portable
-  handlers but takes about 4–9x Scriptc time on their five comparable cases;
-  measure JSON/property/escaping costs before changing machinery. Real RSC and
-  Web API bundles emit Wasm but fail with unbound identifiers; the host surface
-  lacks DOM, encoding, streams, Fetch and URL APIs. Client rendering remains a
-  Chromium reference, not a Scriptw compatibility pass. Owner: explicit product
-  host surface and embedding adapters; retain one heap/backend and the real
-  renderer instead of silently substituting SSR or fake DOM.
-- Reduce React's remaining native compilation cost. The
-  [shared-kernel checkpoint](react-codegen-20261102.json) renders correctly within
-  the original 60s limits, but native preparation still takes about 50s and its
-  largest source function remains 1,110,482 Wasm bytes. Owner: AOT code size and
-  native compilation. Profile identical frozen Wasm and compiler settings;
-  preserve generated-code identity when testing compiler implementation changes.
+- Reduce application lookup costs while preserving binding identity. The
+  [matched RSC cohort](rsc-current.json) improves retained requests by 18–19%,
+  but remains 49–67x Node/V8 time. Candidate profiles still put about 12% of
+  sampled user cycles in string equality and 9% in environment resolution.
+  Separate cell allocation from dynamic name resolution before extending direct
+  access to current-owner cells. The [frozen edge corpus](applications-current.json)
+  also remains 4–9x Scriptc time on five comparable cases. Owner: IR binding
+  analysis and AOT lookup/property machinery; retain one heap and real renderers.
+- Reduce cold native preparation. Current RSC takes about 3.6s source-to-Wasm
+  and 12.5s native preparation, with no measured cold improvement. Program Wasm
+  grew 1.36%. The [SSR checkpoint](react-codegen-20261102.json) still has a
+  1,110,482-byte source function. Owner: AOT code size and native compilation;
+  preserve generated-code identities and separate cold setup from requests.
 - Requalify affected operators before a new full conformance publication.
   The [shared-kernel checkpoint](react-codegen-20261102.json) passes all 79 pinned
   modulus variants; the complete pinned Test262 matrix remains a separate gate.
@@ -114,7 +112,8 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
   Keep that replay blocked until the genuine input is available; do not synthesize
   a substitute or infer its results from newer runs.
 - Repair pre-existing workspace formatting, stale shortcut inventory, identity
-  and module-boundary audit findings. Preserve original evidence and compiler
+  and module-boundary audit findings. The RSC checkpoint still reports 14 stale
+  Intl source-identity recipes. Preserve original evidence and compiler
   invariants; focused native verification does not clear these separate gates.
 - Repair pinned Wasmtime's owned-reference downcast: `AnyRef::as_struct` can
   construct a LIFO `Rooted` from an `OwnedRooted` index. Collector tests use a

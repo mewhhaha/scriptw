@@ -465,6 +465,14 @@ impl RuntimeBootstrapPlan {
         if !self.walked.insert(builtin) {
             return;
         }
+        if crate::builtins::is_stream_builtin(builtin) {
+            for dependency in crate::builtins::STREAM_BUILTINS {
+                self.require_standard_builtin(*dependency);
+            }
+            self.require_standard_builtin(StandardBuiltinId::PromiseConstructor);
+            self.require_standard_builtin(StandardBuiltinId::Uint8ArrayConstructor);
+            self.require_standard_builtin(StandardBuiltinId::ArrayBufferConstructor);
+        }
         if builtin == StandardBuiltinId::AbstractModuleSourceConstructor {
             self.require_standard_builtin(
                 StandardBuiltinId::AbstractModuleSourcePrototypeToStringTagGetter,
@@ -535,6 +543,23 @@ impl RuntimeBootstrapPlan {
                 self.require_standard_builtin(codec);
             }
         }
+        if matches!(
+            builtin,
+            StandardBuiltinId::TextEncoderPrototypeEncode
+                | StandardBuiltinId::TextEncoderPrototypeEncodeInto
+                | StandardBuiltinId::TextEncoderPrototypeEncodingGetter
+        ) {
+            self.require_standard_builtin(StandardBuiltinId::TextEncoderConstructor);
+        }
+        if matches!(
+            builtin,
+            StandardBuiltinId::TextDecoderPrototypeDecode
+                | StandardBuiltinId::TextDecoderPrototypeEncodingGetter
+                | StandardBuiltinId::TextDecoderPrototypeFatalGetter
+                | StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter
+        ) {
+            self.require_standard_builtin(StandardBuiltinId::TextDecoderConstructor);
+        }
         if builtin == StandardBuiltinId::FunctionConstructor {
             // `%Function.prototype%` is a callable intrinsic, not an Object
             // shell, and its non-configurable `@@hasInstance` property publishes
@@ -545,6 +570,26 @@ impl RuntimeBootstrapPlan {
             for dependency in [
                 StandardBuiltinId::FunctionPrototype,
                 StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
+            ] {
+                self.require_standard_builtin(dependency);
+            }
+        }
+        if builtin == StandardBuiltinId::TextEncoderConstructor {
+            for dependency in [
+                StandardBuiltinId::TextEncoderPrototypeEncode,
+                StandardBuiltinId::TextEncoderPrototypeEncodeInto,
+                StandardBuiltinId::TextEncoderPrototypeEncodingGetter,
+                StandardBuiltinId::Uint8ArrayConstructor,
+            ] {
+                self.require_standard_builtin(dependency);
+            }
+        }
+        if builtin == StandardBuiltinId::TextDecoderConstructor {
+            for dependency in [
+                StandardBuiltinId::TextDecoderPrototypeDecode,
+                StandardBuiltinId::TextDecoderPrototypeEncodingGetter,
+                StandardBuiltinId::TextDecoderPrototypeFatalGetter,
+                StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter,
             ] {
                 self.require_standard_builtin(dependency);
             }
@@ -1023,6 +1068,9 @@ impl RuntimeBootstrapPlan {
                 self.standard_roots
                     .insert(StandardBuiltinId::PromiseSpeciesGetter);
             }
+            StandardBuiltinId::QueueMicrotask
+            | StandardBuiltinId::SetTimeout
+            | StandardBuiltinId::ClearTimeout => {}
             StandardBuiltinId::IntlSupportedValuesOf
             | StandardBuiltinId::IntlGetCanonicalLocales
             | StandardBuiltinId::IntlLocaleConstructor
@@ -5899,6 +5947,8 @@ pub(crate) fn function_length(params: &[FunctionParamIr]) -> u64 {
 
 pub(crate) fn standard_builtin_length(builtin: StandardBuiltinId) -> u64 {
     match builtin {
+        StandardBuiltinId::QueueMicrotask | StandardBuiltinId::ClearTimeout => 1,
+        StandardBuiltinId::SetTimeout => 1,
         StandardBuiltinId::FunctionConstructor
         | StandardBuiltinId::FunctionPrototypeSymbolHasInstance
         | StandardBuiltinId::WeakRefConstructor
@@ -6130,6 +6180,57 @@ pub(crate) fn standard_builtin_length(builtin: StandardBuiltinId) -> u64 {
         StandardBuiltinId::AsyncIteratorPrototypeAsyncDispose => 0,
         StandardBuiltinId::AsyncIteratorPrototypeAsyncDisposeFulfilled => 1,
         StandardBuiltinId::StringPrototypeIterator => 0,
+        StandardBuiltinId::ReadableStreamConstructor => 0,
+        StandardBuiltinId::ReadableStreamGetReader => 0,
+        StandardBuiltinId::ReadableStreamCancel => 0,
+        StandardBuiltinId::ReadableStreamLocked => 0,
+        StandardBuiltinId::ReadableStreamDefaultReaderConstructor => 1,
+        StandardBuiltinId::ReadableStreamDefaultReaderRead => 0,
+        StandardBuiltinId::ReadableStreamDefaultReaderCancel => 0,
+        StandardBuiltinId::ReadableStreamDefaultReaderReleaseLock => 0,
+        StandardBuiltinId::ReadableStreamDefaultReaderClosed => 0,
+        StandardBuiltinId::ReadableByteStreamControllerConstructor => 0,
+        StandardBuiltinId::ReadableByteStreamControllerEnqueue => 1,
+        StandardBuiltinId::ReadableByteStreamControllerClose => 0,
+        StandardBuiltinId::ReadableByteStreamControllerError => 0,
+        StandardBuiltinId::ReadableByteStreamControllerDesiredSize => 0,
+        StandardBuiltinId::ReadableStreamStartFulfilled => 1,
+        StandardBuiltinId::ReadableStreamStartRejected => 1,
+        StandardBuiltinId::ReadableStreamPullFulfilled => 1,
+        StandardBuiltinId::ReadableStreamPullRejected => 1,
+        StandardBuiltinId::ReadableStreamCancelFulfilled => 1,
+        StandardBuiltinId::ReadableStreamPullIfNeeded => 0,
+        StandardBuiltinId::AbortControllerConstructor => 0,
+        StandardBuiltinId::AbortControllerPrototypeAbort => 0,
+        StandardBuiltinId::AbortControllerPrototypeSignalGetter => 0,
+        StandardBuiltinId::AbortSignalConstructor => 0,
+        StandardBuiltinId::AbortSignalPrototypeThrowIfAborted => 0,
+        StandardBuiltinId::AbortSignalAbort => 0,
+        StandardBuiltinId::AbortSignalPrototypeAbortedGetter => 0,
+        StandardBuiltinId::AbortSignalPrototypeReasonGetter => 0,
+        StandardBuiltinId::AbortSignalPrototypeOnabortGetter => 0,
+        StandardBuiltinId::AbortSignalPrototypeOnabortSetter => 1,
+        StandardBuiltinId::EventTargetConstructor => 0,
+        StandardBuiltinId::EventTargetPrototypeAddEventListener => 2,
+        StandardBuiltinId::EventTargetPrototypeRemoveEventListener => 2,
+        StandardBuiltinId::EventTargetPrototypeDispatchEvent => 1,
+        StandardBuiltinId::EventConstructor => 1,
+        StandardBuiltinId::EventPrototypePreventDefault => 0,
+        StandardBuiltinId::EventPrototypeStopPropagation => 0,
+        StandardBuiltinId::EventPrototypeStopImmediatePropagation => 0,
+        StandardBuiltinId::EventPrototypeTypeGetter => 0,
+        StandardBuiltinId::EventPrototypeTargetGetter => 0,
+        StandardBuiltinId::EventPrototypeCurrentTargetGetter => 0,
+        StandardBuiltinId::EventPrototypeDefaultPreventedGetter => 0,
+        StandardBuiltinId::EventPrototypeEventPhaseGetter => 0,
+        StandardBuiltinId::EventPrototypeBubblesGetter => 0,
+        StandardBuiltinId::EventPrototypeCancelableGetter => 0,
+        StandardBuiltinId::EventPrototypeComposedGetter => 0,
+        StandardBuiltinId::EventPrototypeIsTrustedGetter => 0,
+        StandardBuiltinId::DOMExceptionConstructor => 0,
+        StandardBuiltinId::DOMExceptionPrototypeNameGetter => 0,
+        StandardBuiltinId::DOMExceptionPrototypeMessageGetter => 0,
+        StandardBuiltinId::DOMExceptionPrototypeCodeGetter => 0,
         StandardBuiltinId::ShadowRealmConstructor | StandardBuiltinId::ShadowRealmWrappedFunctionCall => 0,
         StandardBuiltinId::ShadowRealmPrototypeEvaluate
         | StandardBuiltinId::ShadowRealmImportFulfilled
@@ -6792,6 +6893,15 @@ pub(crate) fn standard_builtin_length(builtin: StandardBuiltinId) -> u64 {
         // file per row. The async settlement callbacks are anonymous reaction
         // handlers and take the settled value, like the `AsyncIterator`
         // `@@asyncDispose` pair.
+        StandardBuiltinId::TextEncoderConstructor
+        | StandardBuiltinId::TextEncoderPrototypeEncode
+        | StandardBuiltinId::TextEncoderPrototypeEncodingGetter
+        | StandardBuiltinId::TextDecoderConstructor
+        | StandardBuiltinId::TextDecoderPrototypeDecode
+        | StandardBuiltinId::TextDecoderPrototypeEncodingGetter
+        | StandardBuiltinId::TextDecoderPrototypeFatalGetter
+        | StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter => 0,
+        StandardBuiltinId::TextEncoderPrototypeEncodeInto => 2,
         StandardBuiltinId::AsyncDisposableStackConstructor
         | StandardBuiltinId::DisposableStackConstructor
         | StandardBuiltinId::AsyncDisposableStackPrototypeMove

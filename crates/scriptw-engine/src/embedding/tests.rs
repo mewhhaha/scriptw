@@ -12,6 +12,7 @@ mod async_operations;
 mod compact_records;
 mod profiled_entry;
 mod reentrant_execution;
+mod timers;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {
     let mut registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(

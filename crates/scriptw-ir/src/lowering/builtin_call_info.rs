@@ -20,6 +20,71 @@ impl<'a> ScriptLowerer<'a> {
         }
         let promise_invocation_policy = PromiseInvocationPolicy::for_call(builtin, args, &context);
         let result = match builtin {
+            StandardBuiltinId::ReadableStreamConstructor
+            | StandardBuiltinId::ReadableStreamDefaultReaderConstructor
+            | StandardBuiltinId::ReadableByteStreamControllerConstructor
+            | StandardBuiltinId::ReadableStreamGetReader => Some(ValueInfo::new(ValueKind::Object)),
+            StandardBuiltinId::ReadableStreamCancel
+            | StandardBuiltinId::ReadableStreamDefaultReaderRead
+            | StandardBuiltinId::ReadableStreamDefaultReaderCancel
+            | StandardBuiltinId::ReadableStreamDefaultReaderClosed => Some(
+                Self::value_info_from_shape(Some(Self::promise_instance_shape())),
+            ),
+            StandardBuiltinId::ReadableStreamDefaultReaderReleaseLock
+            | StandardBuiltinId::ReadableByteStreamControllerEnqueue
+            | StandardBuiltinId::ReadableByteStreamControllerClose
+            | StandardBuiltinId::ReadableByteStreamControllerError
+            | StandardBuiltinId::ReadableStreamStartFulfilled
+            | StandardBuiltinId::ReadableStreamStartRejected
+            | StandardBuiltinId::ReadableStreamPullFulfilled
+            | StandardBuiltinId::ReadableStreamPullRejected
+            | StandardBuiltinId::ReadableStreamCancelFulfilled
+            | StandardBuiltinId::ReadableStreamPullIfNeeded => Some(ValueInfo::undefined()),
+            StandardBuiltinId::ReadableStreamLocked => Some(ValueInfo::new(ValueKind::Boolean)),
+            StandardBuiltinId::ReadableByteStreamControllerDesiredSize => Some(ValueInfo {
+                kind: ValueKind::Dynamic,
+                possible_kinds: KindSet::from_kind(ValueKind::Number)
+                    .union(KindSet::from_kind(ValueKind::Null)),
+                heap_shape: None,
+                function_targets: FunctionTargetKnowledge::none(),
+            }),
+            StandardBuiltinId::AbortControllerConstructor
+            | StandardBuiltinId::AbortControllerPrototypeAbort
+            | StandardBuiltinId::AbortControllerPrototypeSignalGetter
+            | StandardBuiltinId::AbortSignalConstructor
+            | StandardBuiltinId::AbortSignalPrototypeThrowIfAborted
+            | StandardBuiltinId::AbortSignalAbort
+            | StandardBuiltinId::AbortSignalPrototypeAbortedGetter
+            | StandardBuiltinId::AbortSignalPrototypeReasonGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortSetter
+            | StandardBuiltinId::EventTargetConstructor
+            | StandardBuiltinId::EventTargetPrototypeAddEventListener
+            | StandardBuiltinId::EventTargetPrototypeRemoveEventListener
+            | StandardBuiltinId::EventTargetPrototypeDispatchEvent
+            | StandardBuiltinId::EventConstructor
+            | StandardBuiltinId::EventPrototypePreventDefault
+            | StandardBuiltinId::EventPrototypeStopPropagation
+            | StandardBuiltinId::EventPrototypeStopImmediatePropagation
+            | StandardBuiltinId::EventPrototypeTypeGetter
+            | StandardBuiltinId::EventPrototypeTargetGetter
+            | StandardBuiltinId::EventPrototypeCurrentTargetGetter
+            | StandardBuiltinId::EventPrototypeDefaultPreventedGetter
+            | StandardBuiltinId::EventPrototypeEventPhaseGetter
+            | StandardBuiltinId::EventPrototypeBubblesGetter
+            | StandardBuiltinId::EventPrototypeCancelableGetter
+            | StandardBuiltinId::EventPrototypeComposedGetter
+            | StandardBuiltinId::EventPrototypeIsTrustedGetter
+            | StandardBuiltinId::DOMExceptionConstructor
+            | StandardBuiltinId::DOMExceptionPrototypeNameGetter
+            | StandardBuiltinId::DOMExceptionPrototypeMessageGetter
+            | StandardBuiltinId::DOMExceptionPrototypeCodeGetter => {
+                Some(unknown_runtime_value_info())
+            }
+            StandardBuiltinId::QueueMicrotask | StandardBuiltinId::ClearTimeout => {
+                Some(ValueInfo::undefined())
+            }
+            StandardBuiltinId::SetTimeout => Some(ValueInfo::new(ValueKind::Number)),
             StandardBuiltinId::FunctionConstructor => Some(Self::empty_dynamic_function_info(
                 DynamicFunctionKind::Ordinary,
             )),
@@ -220,7 +285,11 @@ impl<'a> ScriptLowerer<'a> {
             // The kinds match `standard_builtin_signature` above; the
             // `IntlDateTimeFormatConstructor` arm is again the precedent for a
             // constructor with no instance shape.
-            StandardBuiltinId::AsyncDisposableStackConstructor
+            StandardBuiltinId::TextEncoderConstructor
+            | StandardBuiltinId::TextDecoderConstructor
+            | StandardBuiltinId::TextEncoderPrototypeEncode
+            | StandardBuiltinId::TextEncoderPrototypeEncodeInto
+            | StandardBuiltinId::AsyncDisposableStackConstructor
             | StandardBuiltinId::DisposableStackConstructor
             | StandardBuiltinId::AsyncDisposableStackPrototypeMove
             | StandardBuiltinId::DisposableStackPrototypeMove
@@ -245,6 +314,15 @@ impl<'a> ScriptLowerer<'a> {
             }
             StandardBuiltinId::AsyncDisposableStackPrototypeDisposedGetter
             | StandardBuiltinId::DisposableStackPrototypeDisposedGetter => {
+                Some(ValueInfo::new(ValueKind::Boolean))
+            }
+            StandardBuiltinId::TextEncoderPrototypeEncodingGetter
+            | StandardBuiltinId::TextDecoderPrototypeEncodingGetter
+            | StandardBuiltinId::TextDecoderPrototypeDecode => {
+                Some(ValueInfo::new(ValueKind::String))
+            }
+            StandardBuiltinId::TextDecoderPrototypeFatalGetter
+            | StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter => {
                 Some(ValueInfo::new(ValueKind::Boolean))
             }
             StandardBuiltinId::SetConstructor => Some(Self::value_info_from_shape(Some(

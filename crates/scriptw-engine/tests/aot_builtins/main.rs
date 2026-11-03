@@ -73,6 +73,7 @@ mod aot_string_invocation_family;
 mod aot_string_match_call;
 mod aot_string_numeric_prefixes;
 mod aot_tagged_template_source_owners;
+mod aot_text_codec;
 mod aot_typed_array_byte_copy;
 mod aot_typed_array_constructor_storage;
 mod aot_typed_array_fill;
@@ -87,3 +88,7 @@ mod aot_weak_reachability;
 mod aot_weak_unavailable;
 mod aot_well_known_symbol_identity;
 mod reflect_descriptor_object_realm;
+
+mod aot_web_events;
+
+mod aot_readable_byte_stream;

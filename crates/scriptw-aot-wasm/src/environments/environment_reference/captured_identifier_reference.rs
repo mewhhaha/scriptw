@@ -19,6 +19,43 @@ struct IdentifierReferenceCaptureSlot {
 }
 
 impl FunctionBuilder<'_> {
+    /// Analysis proved the lexical identity, not its value. Reuse the finalized
+    /// capture's active storage so block entry and per-iteration records retain
+    /// the same hop adjustment as every other lexical access.
+    pub(crate) fn emit_resolve_module_captured_identifier(
+        &mut self,
+        proof: scriptw_ir::ModuleCapturedCellIr,
+        source_name: &str,
+        name: &GcLocal<StringValue>,
+        strictness: Strictness,
+        function: &mut Function,
+    ) -> Result<EnvironmentIdentifierReference, EmitError> {
+        let binding = self
+            .captured_bindings
+            .iter()
+            .find(|binding| {
+                binding.source_name == source_name
+                    && binding.slot == proof.slot()
+                    && binding.hops == proof.hops()
+            })
+            .ok_or_else(|| {
+                EmitError::unsupported(format!(
+                    "module capture proof for `{source_name}` (slot {}, hops {}) does not name this function's cell",
+                    proof.slot(), proof.hops()
+                ))
+            })?;
+        let binding = TypedExpr::from_info(
+            scriptw_ir::ValueInfo::new(ValueKind::Dynamic),
+            ExprIr::Identifier(binding.name.clone()),
+        );
+        self.emit_located_identifier_reference(
+            name,
+            strictness,
+            IdentifierReferenceFallbackDisposition::Declarative { binding: &binding },
+            function,
+        )
+    }
+
     fn identifier_reference_capture_slot(
         &self,
         reference: &CapturedIdentifierReferenceIr,
@@ -168,13 +205,17 @@ impl FunctionBuilder<'_> {
             }
             IdentifierReferenceFallbackDisposition::Declarative { binding } => {
                 let ExprIr::Identifier(storage_name) = &binding.expr else {
-                    return Err(EmitError::unsupported("compiler invariant: captured declarative Reference has no binding identifier"));
+                    return Err(EmitError::unsupported(
+                        "compiler invariant: captured declarative Reference has no binding identifier",
+                    ));
                 };
                 let Some(BindingStorage::EnvSlot { slot, hops }) = self
                     .lookup_binding(storage_name)
                     .or_else(|| self.activation_owned_binding_storage(storage_name))
                 else {
-                    return Err(EmitError::unsupported("compiler invariant: suspended declarative Reference has no real BindingCell"));
+                    return Err(EmitError::unsupported(
+                        "compiler invariant: suspended declarative Reference has no real BindingCell",
+                    ));
                 };
                 let environment = self.resolve_env_handle_local(hops, function);
                 let actual = self.emit_environment_cell_local(&environment, slot, function);

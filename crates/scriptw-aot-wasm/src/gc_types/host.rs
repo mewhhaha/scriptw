@@ -591,7 +591,9 @@ impl GcHostImports {
         let mut declarations = Vec::new();
         for import in GcHostImport::ALL {
             let needed = match import {
-                GcHostImport::CollectGc | GcHostImport::ByteArrayAllocate => true,
+                GcHostImport::CollectGc | GcHostImport::ByteArrayAllocate
+                // Web event callbacks and finalization cleanups share reporting.
+                | GcHostImport::ReportCleanupException => true,
                 GcHostImport::CompileDynamicFunction
                 | GcHostImport::CompileGlobalScript
                 | GcHostImport::CompileDirectEval => {
@@ -626,8 +628,7 @@ impl GcHostImports {
                 | GcHostImport::FinalizationCellAllocate
                 | GcHostImport::FinalizationTargetAlive
                 | GcHostImport::FinalizationTokenMatches
-                | GcHostImport::FinalizationCellRemove
-                | GcHostImport::ReportCleanupException => weak,
+                | GcHostImport::FinalizationCellRemove => weak,
             };
             if needed {
                 declarations.push(DeclaredGcHostImport {

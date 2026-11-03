@@ -432,6 +432,7 @@ impl FunctionBuilder<'_> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum EnvironmentIdentifierRead {
     Value,
     Typeof,

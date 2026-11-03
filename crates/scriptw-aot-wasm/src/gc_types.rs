@@ -410,6 +410,7 @@ impl RuntimeGcTypes {
         let throw_constructor_name = GcRootGlobal::declare(&self.layouts, &mut globals);
         let pending_jobs_head = GcRootGlobal::declare(&self.layouts, &mut globals);
         let pending_jobs_tail = GcRootGlobal::declare(&self.layouts, &mut globals);
+        let timer_queue = GcRootGlobal::declare(&self.layouts, &mut globals);
         let unhandled_promises_head = GcRootGlobal::declare(&self.layouts, &mut globals);
         let unhandled_promises_tail = GcRootGlobal::declare(&self.layouts, &mut globals);
         let module_evaluation_promise = GcRootGlobal::declare(&self.layouts, &mut globals);
@@ -449,6 +450,7 @@ impl RuntimeGcTypes {
             throw_constructor_name,
             pending_jobs_head,
             pending_jobs_tail,
+            timer_queue,
             unhandled_promises_head,
             unhandled_promises_tail,
             module_evaluation_promise,
@@ -777,6 +779,7 @@ pub(crate) struct RuntimeSchema {
     throw_constructor_name: GcRootGlobal<StringValue>,
     pending_jobs_head: GcRootGlobal<PendingJob>,
     pending_jobs_tail: GcRootGlobal<PendingJob>,
+    timer_queue: GcRootGlobal<TimerQueue>,
     unhandled_promises_head: GcRootGlobal<PromiseObject>,
     unhandled_promises_tail: GcRootGlobal<PromiseObject>,
     module_evaluation_promise: GcRootGlobal<PromiseObject>,

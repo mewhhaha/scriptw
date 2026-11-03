@@ -379,6 +379,7 @@ impl<'a> FunctionBuilder<'a> {
                 function.instruction(&Instruction::Block(BlockType::Empty));
                 function.instruction(&Instruction::Loop(BlockType::Empty));
                 self.emit_drain_promise_jobs(&mut function)?;
+                self.emit_timer_checkpoint(true, &mut function)?;
                 let progressed = self.emit_drain_atomics_wait_async_timeouts(&mut function)?;
                 progressed.load(&mut function);
                 self.schema.release_i32_local(progressed, &mut function);

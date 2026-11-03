@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="576pt" height="295.2pt" viewBox="0 0 576 295.2" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <title>Current React Server Components cold compilation</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Current React Server Components cold compilation</dc:title>
+    <dc:description>{"date": "2026-11-03", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63", "/home/jacobt/src/scriptw/target/rsc-platform-work/candidate-frozen/cli-producer.json": "8c9fbd9ca983692de54cb5d9dc0226202174fac22624b64f32ee74a5c033147e", "/home/jacobt/src/scriptw/target/rsc-platform-work/candidate-frozen/rsc-producer.json": "138f55d8e8128f9ef0b6df688c1d5ba2ea59428cf09ecee82e26da22815b8a22", "/home/jacobt/src/scriptw/target/rsc-platform-work/candidate-frozen/rsc_baseline": "49719887bfe0f9438a601fff9a8baa236e52496cd3bfdc62b965adfc9e06e817", "/home/jacobt/src/scriptw/target/rsc-platform-work/frozen/cli-producer.json": "8c9fbd9ca983692de54cb5d9dc0226202174fac22624b64f32ee74a5c033147e", "/home/jacobt/src/scriptw/target/rsc-platform-work/frozen/rsc-producer.json": "138f55d8e8128f9ef0b6df688c1d5ba2ea59428cf09ecee82e26da22815b8a22", "/home/jacobt/src/scriptw/target/rsc-platform-work/frozen/rsc_baseline": "adddd3a73226dad2aa65130a2641dcce513c0c68742f482162d14b197184cb9c", "/home/jacobt/src/scriptw/target/rsc-platform-work/measure_current_rsc.py": "1f482f951acb0c1d5d59c1ae2d9b39254405d53028e25f901cd12079c97f94e3", "/home/jacobt/src/scriptw/target/rsc-platform-work/rsc-baseline-0.json": "6ae1ba7d519b089df7fdc53998286a21cc14529cf9f10917f290f6b54a710f0d", "/home/jacobt/src/scriptw/target/rsc-platform-work/source-ready.json": "0ee692130f938bfdfcc7fa0204e5a0975f479b1b256adece9353cb0bce674d8e"}, "measurement": {"blocks": 2, "campaign": "target/rsc-platform-work/current-rsc-campaign/campaign.json", "campaign_sha256": "3f5204ded90540a99ca515c3d9ce314fb2e1503bb224e9983a2c08561d0d2fd6", "case_order": ["rsc-sync", "rsc-async"], "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Scriptw application charts</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 295.2
+L 576 295.2
+L 576 0
+L 0 0
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 63.36 247.968
+L 558.72 247.968
+L 558.72 53.136
+L 63.36 53.136
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1"/>
+     <g id="text_1">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="165.773138" y="263.326281" transform="rotate(-0 165.773138 263.326281)">Scriptw before</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2"/>
+     <g id="text_2">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="456.306862" y="263.326281" transform="rotate(-0 456.306862 263.326281)">Scriptw current</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_3">
+      <path d="M 63.36 247.968
+L 558.72 247.968
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_3">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="252.146711" transform="rotate(-0 56.36 252.146711)">0</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_5">
+      <path d="M 63.36 199.315881
+L 558.72 199.315881
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_4">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="203.494592" transform="rotate(-0 56.36 203.494592)">5</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_7">
+      <path d="M 63.36 150.663763
+L 558.72 150.663763
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_5">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="154.842474" transform="rotate(-0 56.36 154.842474)">10</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_9">
+      <path d="M 63.36 102.011644
+L 558.72 102.011644
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10"/>
+     <g id="text_6">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="106.190355" transform="rotate(-0 56.36 106.190355)">15</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_11">
+      <path d="M 63.36 53.359526
+L 558.72 53.359526
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12"/>
+     <g id="text_7">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="57.538237" transform="rotate(-0 56.36 57.538237)">20</text>
+     </g>
+    </g>
+    <g id="text_8">
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="35.719922" y="150.552" transform="rotate(-90 35.719922 150.552)">Cold compile + native preparation · s</text>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 85.876364 247.968
+L 245.669912 247.968
+L 245.669912 219.006878
+L 85.876364 219.006878
+z
+" clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 376.410088 247.968
+L 536.203636 247.968
+L 536.203636 219.133378
+L 376.410088 219.133378
+z
+" clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 85.876364 219.006878
+L 245.669912 219.006878
+L 245.669912 212.663813
+L 85.876364 212.663813
+z
+" clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 376.410088 219.133378
+L 536.203636 219.133378
+L 536.203636 212.706729
+L 376.410088 212.706729
+z
+" clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 85.876364 212.663813
+L 245.669912 212.663813
+L 245.669912 91.380094
+L 85.876364 91.380094
+z
+" clip-path="url(#pc5acb95793)" style="fill: #4a9a79"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 376.410088 212.706729
+L 536.203636 212.706729
+L 536.203636 90.845419
+L 376.410088 90.845419
+z
+" clip-path="url(#pc5acb95793)" style="fill: #4a9a79"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 63.36 247.968
+L 63.36 53.136
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 63.36 247.968
+L 558.72 247.968
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="165.773138" y="235.825329" transform="rotate(-0 165.773138 235.825329)">2.98</text>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="456.306862" y="235.888579" transform="rotate(-0 456.306862 235.888579)">2.96</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="165.773138" y="218.173236" transform="rotate(-0 165.773138 218.173236)">0.65</text>
+   </g>
+   <g id="text_12">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="456.306862" y="218.257944" transform="rotate(-0 456.306862 218.257944)">0.66</text>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="165.773138" y="154.359844" transform="rotate(-0 165.773138 154.359844)">12.46</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="456.306862" y="154.113965" transform="rotate(-0 456.306862 154.113965)">12.52</text>
+   </g>
+   <g id="text_15">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="165.773138" y="83.737516" transform="rotate(-0 165.773138 83.737516)">16.09 s</text>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="456.306862" y="83.202841" transform="rotate(-0 456.306862 83.202841)">16.15 s</text>
+   </g>
+   <g id="text_17">
+    <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · cold compilation phases</text>
+   </g>
+   <g id="legend_1">
+    <g id="patch_11">
+     <path d="M 73.26 71.394281
+L 95.26 71.394281
+L 95.26 63.694281
+L 73.26 63.694281
+z
+" style="fill: #6687a3"/>
+    </g>
+    <g id="text_18">
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="104.06" y="71.394281" transform="rotate(-0 104.06 71.394281)">Front end + lower</text>
+    </g>
+    <g id="patch_12">
+     <path d="M 224.381094 71.394281
+L 246.381094 71.394281
+L 246.381094 63.694281
+L 224.381094 63.694281
+z
+" style="fill: #e5a23d"/>
+    </g>
+    <g id="text_19">
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="255.181094" y="71.394281" transform="rotate(-0 255.181094 71.394281)">Wasm emission</text>
+    </g>
+    <g id="patch_13">
+     <path d="M 362.79375 71.394281
+L 384.79375 71.394281
+L 384.79375 63.694281
+L 362.79375 63.694281
+z
+" style="fill: #4a9a79"/>
+    </g>
+    <g id="text_20">
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="393.59375" y="71.394281" transform="rotate(-0 393.59375 71.394281)">Native preparation</text>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pc5acb95793">
+   <rect x="63.36" y="53.136" width="495.36" height="194.832"/>
+  </clipPath>
+ </defs>
+</svg>

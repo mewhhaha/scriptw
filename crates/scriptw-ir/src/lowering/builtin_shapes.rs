@@ -5066,6 +5066,97 @@ impl<'a> ScriptLowerer<'a> {
     pub(super) fn standard_builtin_signature(builtin: StandardBuiltinId) -> FunctionSignature {
         let (return_kind, return_possible_kinds, return_shape, constructor_instance) = match builtin
         {
+            StandardBuiltinId::ReadableStreamConstructor
+            | StandardBuiltinId::ReadableStreamDefaultReaderConstructor
+            | StandardBuiltinId::ReadableByteStreamControllerConstructor => (
+                ValueKind::Object,
+                KindSet::from_kind(ValueKind::Object),
+                None,
+                ValueInfo::new(ValueKind::Object),
+            ),
+            StandardBuiltinId::ReadableStreamGetReader => (
+                ValueKind::Object,
+                KindSet::from_kind(ValueKind::Object),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::ReadableStreamCancel
+            | StandardBuiltinId::ReadableStreamDefaultReaderRead
+            | StandardBuiltinId::ReadableStreamDefaultReaderCancel
+            | StandardBuiltinId::ReadableStreamDefaultReaderClosed => (
+                ValueKind::Object,
+                KindSet::from_kind(ValueKind::Object),
+                Some(Self::promise_instance_shape()),
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::ReadableStreamDefaultReaderReleaseLock
+            | StandardBuiltinId::ReadableByteStreamControllerEnqueue
+            | StandardBuiltinId::ReadableByteStreamControllerClose
+            | StandardBuiltinId::ReadableByteStreamControllerError
+            | StandardBuiltinId::ReadableStreamStartFulfilled
+            | StandardBuiltinId::ReadableStreamStartRejected
+            | StandardBuiltinId::ReadableStreamPullFulfilled
+            | StandardBuiltinId::ReadableStreamPullRejected
+            | StandardBuiltinId::ReadableStreamCancelFulfilled
+            | StandardBuiltinId::ReadableStreamPullIfNeeded => (
+                ValueKind::Undefined,
+                KindSet::from_kind(ValueKind::Undefined),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::ReadableStreamLocked => (
+                ValueKind::Boolean,
+                KindSet::from_kind(ValueKind::Boolean),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::ReadableByteStreamControllerDesiredSize => (
+                ValueKind::Dynamic,
+                KindSet::from_kind(ValueKind::Number).union(KindSet::from_kind(ValueKind::Null)),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::AbortControllerConstructor
+            | StandardBuiltinId::AbortSignalConstructor
+            | StandardBuiltinId::EventTargetConstructor
+            | StandardBuiltinId::EventConstructor
+            | StandardBuiltinId::DOMExceptionConstructor => (
+                ValueKind::Object,
+                KindSet::from_kind(ValueKind::Object),
+                None,
+                ValueInfo::new(ValueKind::Object),
+            ),
+            StandardBuiltinId::AbortControllerPrototypeAbort
+            | StandardBuiltinId::AbortControllerPrototypeSignalGetter
+            | StandardBuiltinId::AbortSignalPrototypeThrowIfAborted
+            | StandardBuiltinId::AbortSignalAbort
+            | StandardBuiltinId::AbortSignalPrototypeAbortedGetter
+            | StandardBuiltinId::AbortSignalPrototypeReasonGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortSetter
+            | StandardBuiltinId::EventTargetPrototypeAddEventListener
+            | StandardBuiltinId::EventTargetPrototypeRemoveEventListener
+            | StandardBuiltinId::EventTargetPrototypeDispatchEvent
+            | StandardBuiltinId::EventPrototypePreventDefault
+            | StandardBuiltinId::EventPrototypeStopPropagation
+            | StandardBuiltinId::EventPrototypeStopImmediatePropagation
+            | StandardBuiltinId::EventPrototypeTypeGetter
+            | StandardBuiltinId::EventPrototypeTargetGetter
+            | StandardBuiltinId::EventPrototypeCurrentTargetGetter
+            | StandardBuiltinId::EventPrototypeDefaultPreventedGetter
+            | StandardBuiltinId::EventPrototypeEventPhaseGetter
+            | StandardBuiltinId::EventPrototypeBubblesGetter
+            | StandardBuiltinId::EventPrototypeCancelableGetter
+            | StandardBuiltinId::EventPrototypeComposedGetter
+            | StandardBuiltinId::EventPrototypeIsTrustedGetter
+            | StandardBuiltinId::DOMExceptionPrototypeNameGetter
+            | StandardBuiltinId::DOMExceptionPrototypeMessageGetter
+            | StandardBuiltinId::DOMExceptionPrototypeCodeGetter => (
+                ValueKind::Dynamic,
+                KindSet::all_runtime_tags(),
+                None,
+                ValueInfo::undefined(),
+            ),
             StandardBuiltinId::ShadowRealmConstructor => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
@@ -5084,6 +5175,18 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::ShadowRealmImportRejected => (
                 ValueKind::Dynamic,
                 KindSet::all_runtime_tags(),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::QueueMicrotask | StandardBuiltinId::ClearTimeout => (
+                ValueKind::Undefined,
+                KindSet::from_kind(ValueKind::Undefined),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::SetTimeout => (
+                ValueKind::Number,
+                KindSet::from_kind(ValueKind::Number),
                 None,
                 ValueInfo::undefined(),
             ),
@@ -7844,7 +7947,11 @@ impl<'a> ScriptLowerer<'a> {
             // the batch-7 `IntlDateTimeFormatConstructor` defect verbatim, whose
             // arm 20 lines below is the precedent this copies (`Object`,
             // `{Object}`, no return shape, fresh constructed instance).
-            StandardBuiltinId::AsyncDisposableStackConstructor
+            StandardBuiltinId::TextEncoderConstructor
+            | StandardBuiltinId::TextDecoderConstructor
+            | StandardBuiltinId::TextEncoderPrototypeEncode
+            | StandardBuiltinId::TextEncoderPrototypeEncodeInto
+            | StandardBuiltinId::AsyncDisposableStackConstructor
             | StandardBuiltinId::DisposableStackConstructor => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
@@ -7881,10 +7988,20 @@ impl<'a> ScriptLowerer<'a> {
                 None,
                 ValueInfo::undefined(),
             ),
-            StandardBuiltinId::AsyncDisposableStackPrototypeDisposedGetter
+            StandardBuiltinId::TextDecoderPrototypeFatalGetter
+            | StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter
+            | StandardBuiltinId::AsyncDisposableStackPrototypeDisposedGetter
             | StandardBuiltinId::DisposableStackPrototypeDisposedGetter => (
                 ValueKind::Boolean,
                 KindSet::from_kind(ValueKind::Boolean),
+                None,
+                ValueInfo::undefined(),
+            ),
+            StandardBuiltinId::TextEncoderPrototypeEncodingGetter
+            | StandardBuiltinId::TextDecoderPrototypeEncodingGetter
+            | StandardBuiltinId::TextDecoderPrototypeDecode => (
+                ValueKind::String,
+                KindSet::from_kind(ValueKind::String),
                 None,
                 ValueInfo::undefined(),
             ),

@@ -26,6 +26,22 @@ pub(crate) enum IntrinsicPropertyLayoutId {
     FunctionConstructor,
     ObjectConstructor,
     AbstractModuleSourceConstructor,
+    AbortControllerConstructor,
+    AbortControllerPrototype,
+    AbortSignalConstructor,
+    AbortSignalPrototype,
+    EventTargetConstructor,
+    EventTargetPrototype,
+    EventConstructor,
+    EventPrototype,
+    DOMExceptionConstructor,
+    DOMExceptionPrototype,
+    ReadableStreamConstructor,
+    ReadableStreamPrototype,
+    ReadableStreamDefaultReaderConstructor,
+    ReadableStreamDefaultReaderPrototype,
+    ReadableByteStreamControllerConstructor,
+    ReadableByteStreamControllerPrototype,
     ShadowRealmConstructor,
     ProxyConstructor,
     IteratorConstructor,
@@ -41,6 +57,10 @@ pub(crate) enum IntrinsicPropertyLayoutId {
     WeakSetConstructor,
     AsyncDisposableStackConstructor,
     DisposableStackConstructor,
+    TextEncoderConstructor,
+    TextDecoderConstructor,
+    TextEncoderPrototype,
+    TextDecoderPrototype,
     SetConstructor,
     SymbolConstructor,
     BigIntConstructor,
@@ -80,7 +100,7 @@ pub(crate) enum IntrinsicPropertyLayoutId {
 }
 
 impl IntrinsicPropertyLayoutId {
-    pub(crate) const ALL: [Self; 62] = [
+    pub(crate) const ALL: [Self; 82] = [
         Self::Reflect,
         Self::Math,
         Self::Json,
@@ -92,6 +112,22 @@ impl IntrinsicPropertyLayoutId {
         Self::FunctionConstructor,
         Self::ObjectConstructor,
         Self::AbstractModuleSourceConstructor,
+        Self::AbortControllerConstructor,
+        Self::AbortControllerPrototype,
+        Self::AbortSignalConstructor,
+        Self::AbortSignalPrototype,
+        Self::EventTargetConstructor,
+        Self::EventTargetPrototype,
+        Self::EventConstructor,
+        Self::EventPrototype,
+        Self::DOMExceptionConstructor,
+        Self::DOMExceptionPrototype,
+        Self::ReadableStreamConstructor,
+        Self::ReadableStreamPrototype,
+        Self::ReadableStreamDefaultReaderConstructor,
+        Self::ReadableStreamDefaultReaderPrototype,
+        Self::ReadableByteStreamControllerConstructor,
+        Self::ReadableByteStreamControllerPrototype,
         Self::ShadowRealmConstructor,
         Self::ProxyConstructor,
         Self::IteratorConstructor,
@@ -107,6 +143,10 @@ impl IntrinsicPropertyLayoutId {
         Self::WeakSetConstructor,
         Self::AsyncDisposableStackConstructor,
         Self::DisposableStackConstructor,
+        Self::TextEncoderConstructor,
+        Self::TextDecoderConstructor,
+        Self::TextEncoderPrototype,
+        Self::TextDecoderPrototype,
         Self::SetConstructor,
         Self::SymbolConstructor,
         Self::BigIntConstructor,
@@ -156,6 +196,34 @@ impl IntrinsicPropertyLayoutId {
             Self::AbstractModuleSourceConstructor => Some(FunctionIdentity::StandardBuiltin(
                 StandardBuiltinId::AbstractModuleSourceConstructor,
             )),
+            Self::AbortControllerConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::AbortControllerConstructor,
+            )),
+            Self::AbortSignalConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::AbortSignalConstructor,
+            )),
+            Self::EventTargetConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::EventTargetConstructor,
+            )),
+            Self::EventConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::EventConstructor,
+            )),
+            Self::DOMExceptionConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::DOMExceptionConstructor,
+            )),
+            Self::ReadableStreamConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::ReadableStreamConstructor,
+            )),
+            Self::ReadableStreamDefaultReaderConstructor => {
+                Some(FunctionIdentity::StandardBuiltin(
+                    StandardBuiltinId::ReadableStreamDefaultReaderConstructor,
+                ))
+            }
+            Self::ReadableByteStreamControllerConstructor => {
+                Some(FunctionIdentity::StandardBuiltin(
+                    StandardBuiltinId::ReadableByteStreamControllerConstructor,
+                ))
+            }
             Self::ShadowRealmConstructor => Some(FunctionIdentity::StandardBuiltin(
                 StandardBuiltinId::ShadowRealmConstructor,
             )),
@@ -200,6 +268,12 @@ impl IntrinsicPropertyLayoutId {
             )),
             Self::DisposableStackConstructor => Some(FunctionIdentity::StandardBuiltin(
                 StandardBuiltinId::DisposableStackConstructor,
+            )),
+            Self::TextEncoderConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::TextEncoderConstructor,
+            )),
+            Self::TextDecoderConstructor => Some(FunctionIdentity::StandardBuiltin(
+                StandardBuiltinId::TextDecoderConstructor,
             )),
             Self::SetConstructor => Some(FunctionIdentity::StandardBuiltin(
                 StandardBuiltinId::SetConstructor,
@@ -411,6 +485,16 @@ impl IntrinsicPropertyLayoutId {
             Self::FunctionConstructor
             | Self::ObjectConstructor
             | Self::AbstractModuleSourceConstructor
+            | Self::AbortControllerConstructor
+            | Self::AbortControllerPrototype
+            | Self::AbortSignalConstructor
+            | Self::AbortSignalPrototype
+            | Self::EventTargetConstructor
+            | Self::EventTargetPrototype
+            | Self::EventConstructor
+            | Self::EventPrototype
+            | Self::DOMExceptionConstructor
+            | Self::DOMExceptionPrototype
             | Self::ShadowRealmConstructor
             | Self::ProxyConstructor
             | Self::IteratorConstructor
@@ -426,6 +510,10 @@ impl IntrinsicPropertyLayoutId {
             | Self::WeakSetConstructor
             | Self::AsyncDisposableStackConstructor
             | Self::DisposableStackConstructor
+            | Self::TextEncoderConstructor
+            | Self::TextEncoderPrototype
+            | Self::TextDecoderConstructor
+            | Self::TextDecoderPrototype
             | Self::SetConstructor
             | Self::SymbolConstructor
             | Self::BigIntConstructor
@@ -461,6 +549,12 @@ impl IntrinsicPropertyLayoutId {
             | Self::AsyncFunctionPrototype
             | Self::AsyncGeneratorFunctionPrototype
             | Self::AbstractModuleSourcePrototype
+            | Self::ReadableStreamConstructor
+            | Self::ReadableStreamPrototype
+            | Self::ReadableStreamDefaultReaderConstructor
+            | Self::ReadableStreamDefaultReaderPrototype
+            | Self::ReadableByteStreamControllerConstructor
+            | Self::ReadableByteStreamControllerPrototype
             | Self::ShadowRealmPrototype => eager::populate(self, &mut plan)?,
         }
         ValidatedIntrinsicPropertyLayout::new(plan.properties, plan.groups)
@@ -474,7 +568,23 @@ impl ReadyRealmSlot {
     fn new(slot: NonArrayRealmIntrinsicSlot) -> Result<Self, EmitError> {
         use NonArrayRealmIntrinsicSlot as Slot;
         match slot {
-            Slot::ShadowRealmConstructor
+            Slot::AbortControllerConstructor
+            | Slot::AbortControllerPrototype
+            | Slot::AbortSignalConstructor
+            | Slot::AbortSignalPrototype
+            | Slot::EventTargetConstructor
+            | Slot::EventTargetPrototype
+            | Slot::EventConstructor
+            | Slot::EventPrototype
+            | Slot::DOMExceptionConstructor
+            | Slot::DOMExceptionPrototype
+            | Slot::ReadableStreamConstructor
+            | Slot::ReadableStreamPrototype
+            | Slot::ReadableStreamDefaultReaderConstructor
+            | Slot::ReadableStreamDefaultReaderPrototype
+            | Slot::ReadableByteStreamControllerConstructor
+            | Slot::ReadableByteStreamControllerPrototype
+            | Slot::ShadowRealmConstructor
             | Slot::ShadowRealmPrototype
             | Slot::AbstractModuleSourceConstructor
             | Slot::AbstractModuleSourcePrototype
@@ -486,6 +596,8 @@ impl ReadyRealmSlot {
             | Slot::PromiseConstructor
             | Slot::AsyncDisposableStackPrototype
             | Slot::DisposableStackPrototype
+            | Slot::TextEncoderPrototype
+            | Slot::TextDecoderPrototype
             | Slot::GeneratorFunctionConstructor
             | Slot::AsyncFunctionConstructor
             | Slot::AsyncGeneratorFunctionConstructor
@@ -533,6 +645,8 @@ impl ReadyRealmSlot {
             | Slot::FinalizationRegistryConstructor
             | Slot::AsyncDisposableStackConstructor
             | Slot::DisposableStackConstructor
+            | Slot::TextEncoderConstructor
+            | Slot::TextDecoderConstructor
             | Slot::TypedArrayPrototypeToString
             | Slot::ParseInt
             | Slot::ParseFloat => Ok(Self(slot)),
@@ -547,6 +661,28 @@ impl ReadyRealmSlot {
     pub(crate) fn function_id(self) -> Option<FunctionId> {
         use NonArrayRealmIntrinsicSlot as Slot;
         match self.0 {
+            Slot::AbortControllerConstructor => {
+                Some(StandardBuiltinId::AbortControllerConstructor.function_id())
+            }
+            Slot::AbortSignalConstructor => {
+                Some(StandardBuiltinId::AbortSignalConstructor.function_id())
+            }
+            Slot::EventTargetConstructor => {
+                Some(StandardBuiltinId::EventTargetConstructor.function_id())
+            }
+            Slot::EventConstructor => Some(StandardBuiltinId::EventConstructor.function_id()),
+            Slot::DOMExceptionConstructor => {
+                Some(StandardBuiltinId::DOMExceptionConstructor.function_id())
+            }
+            Slot::ReadableStreamConstructor => {
+                Some(StandardBuiltinId::ReadableStreamConstructor.function_id())
+            }
+            Slot::ReadableStreamDefaultReaderConstructor => {
+                Some(StandardBuiltinId::ReadableStreamDefaultReaderConstructor.function_id())
+            }
+            Slot::ReadableByteStreamControllerConstructor => {
+                Some(StandardBuiltinId::ReadableByteStreamControllerConstructor.function_id())
+            }
             Slot::ShadowRealmConstructor => {
                 Some(StandardBuiltinId::ShadowRealmConstructor.function_id())
             }
@@ -586,6 +722,12 @@ impl ReadyRealmSlot {
             }
             Slot::DisposableStackConstructor => {
                 Some(StandardBuiltinId::DisposableStackConstructor.function_id())
+            }
+            Slot::TextEncoderConstructor => {
+                Some(StandardBuiltinId::TextEncoderConstructor.function_id())
+            }
+            Slot::TextDecoderConstructor => {
+                Some(StandardBuiltinId::TextDecoderConstructor.function_id())
             }
             Slot::FunctionPrototype => Some(StandardBuiltinId::FunctionPrototype.function_id()),
             Slot::ArrayPrototypeValues => {
@@ -633,6 +775,8 @@ impl ReadyRealmCallableSlot {
             | Slot::FinalizationRegistryConstructor
             | Slot::AsyncDisposableStackConstructor
             | Slot::DisposableStackConstructor
+            | Slot::TextEncoderConstructor
+            | Slot::TextDecoderConstructor
             | Slot::FunctionPrototype
             | Slot::ArrayPrototypeValues
             | Slot::ThrowTypeError
@@ -981,13 +1125,22 @@ impl LayoutBuilder {
         getter: IntrinsicCallableRecipe,
         setter: IntrinsicCallableRecipe,
     ) {
+        self.accessor_with_enumerability(key, getter, setter, false);
+    }
+    fn accessor_with_enumerability(
+        &mut self,
+        key: IntrinsicKey<'static>,
+        getter: IntrinsicCallableRecipe,
+        setter: IntrinsicCallableRecipe,
+        enumerable: bool,
+    ) {
         let group = IntrinsicIdentityGroup(self.groups);
         self.groups += 2;
         self.properties.push(IntrinsicPropertySpec {
             key,
             group,
             flags: StoredPropertyAttributes::Accessor {
-                enumerable: false,
+                enumerable,
                 configurable: true,
             }
             .descriptor_word(),

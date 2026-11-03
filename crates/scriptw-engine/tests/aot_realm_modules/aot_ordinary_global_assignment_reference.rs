@@ -42,7 +42,7 @@ fn unresolved_identifier_messages_retain_exact_read_and_write_names() {
     succeeds(
         r#"
 const errors = [];
-try { new TextEncoder(); } catch (error) { errors.push(error); }
+try { new MissingTextEncoder(); } catch (error) { errors.push(error); }
 try { missing\u0052untime; } catch (error) { errors.push(error); }
 try { café; } catch (error) { errors.push(error); }
 function strictWrite() { 'use strict'; missingEndpoint = 1; }
@@ -53,13 +53,13 @@ try { strictDelete(); } catch (error) { errors.push(error); }
 with ({}) {
   try { missingInsideWith; } catch (error) { errors.push(error); }
 }
-const expected = ['TextEncoder', 'missingRuntime', 'café', 'missingEndpoint',
+const expected = ['MissingTextEncoder', 'missingRuntime', 'café', 'missingEndpoint',
   'deletedRuntime', 'missingInsideWith'];
 errors.length === expected.length && errors.every((error, index) => {
   const descriptor = Object.getOwnPropertyDescriptor(error, 'message');
   return error instanceof ReferenceError && error.message === expected[index] + ' is not defined'
     && descriptor.writable && descriptor.configurable && !descriptor.enumerable;
-}) && typeof TextEncoder === 'undefined' && typeof missingEndpoint === 'undefined';
+}) && typeof MissingTextEncoder === 'undefined' && typeof missingEndpoint === 'undefined';
 "#,
     );
 }
@@ -67,7 +67,7 @@ errors.length === expected.length && errors.every((error, index) => {
 #[test]
 fn uncaught_reference_diagnostics_name_missing_runtime_capabilities() {
     for (source, name) in [
-        ("new TextEncoder();", "TextEncoder"),
+        ("new MissingTextEncoder();", "MissingTextEncoder"),
         ("'use strict'; missingEndpoint = 1;", "missingEndpoint"),
     ] {
         let error = engine()

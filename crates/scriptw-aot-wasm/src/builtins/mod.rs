@@ -1,6 +1,7 @@
 mod array;
 mod array_from_async;
 mod async_disposable_stack;
+mod web_events;
 pub(crate) use async_disposable_stack::AsyncDisposableStackDisposeCompletionKind;
 mod async_iterator;
 mod atomics;
@@ -22,10 +23,13 @@ mod errors;
 mod function;
 mod runtime_semantics;
 mod shadow_realm;
+mod streams;
+mod text_codec;
 pub(crate) use function::{
     append_empty_dynamic_function_bodies, is_empty_dynamic_function_body,
     is_empty_dynamic_function_id,
 };
+pub(crate) use streams::{is_stream_builtin, STREAM_BUILTINS, STREAM_POOL_STRINGS};
 mod global_numeric;
 mod host;
 mod intl;

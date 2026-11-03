@@ -266,6 +266,16 @@ The [Server Components](https://react.dev/reference/rsc/server-components) and
 [client DOM](https://react.dev/reference/react-dom/client) APIs are separate
 scopes; synchronous HTML SSR is a third workload.
 
+Current-source qualification covers the pinned React 19.3.1 sync and async RSC
+fixtures, each checked against its exact Node Flight output. The matched Node
+reference uses the same generated `rsc.js` and wrapper in one retained
+`vm.SourceTextModule` and Realm, running sync then async with three checked
+warmups and seven samples per mode. Its request clock ends when the full Flight
+Promise resolves; JSON encoding and golden comparison follow the clock. Parse,
+link and module initialization remain separate setup spans. This is a fixture
+qualification and descriptive timing comparison, not full Web API or WHATWG
+Streams conformance or an engine-parity claim.
+
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone
 Scriptw/Scriptc attempts retain compilation and execution errors explicitly.
@@ -276,6 +286,23 @@ can select size-optimized compilation instead of Fast.
 Unsupported host APIs never become zero bars, wins or permanent exclusions. All
 children remain serial under the resource wrapper. No product compiler rebuild
 is needed when the recorded frozen Rust bytes still match.
+
+## Web platform runtime
+
+The standalone platform surface supports UTF-8 `TextEncoder`/`TextDecoder`, byte
+`ReadableStream` sources with default readers, `AbortController`/`AbortSignal`,
+standalone `EventTarget`/`Event`, `DOMException`, `queueMicrotask`, `setTimeout` and
+`clearTimeout`. These use the existing compiled Wasm GC object model. UTF-8 label
+aliases are accepted; other decoder encodings reject explicitly. BYOB readers,
+generic object streams, pipe/tee operations, Fetch/URL and DOM nodes are separate
+capabilities, not implied by this surface. The changes use Runtime ABI 47.
+Current-source sync and async React RSC fixture output passes exact Flight checks;
+that does not establish full Web API or WHATWG Streams conformance.
+
+Microtasks drain at checkpoints. Timers use a distinct queue and monotonic
+clock; the CLI waits for their deadlines under its execution limits. Embedding
+`pump` polls ready tasks without sleeping, allowing the embedder to control its
+own event loop. Callback exceptions are reported while the checkpoint continues.
 
 ## Artifact reuse
 

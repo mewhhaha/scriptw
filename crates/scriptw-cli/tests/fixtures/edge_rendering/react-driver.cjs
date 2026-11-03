@@ -14,6 +14,7 @@ const save = (name, value) => fs.writeFileSync(name, JSON.stringify(value, null,
 const ns = () => process.hrtime.bigint();
 const elapsed = start => Number(ns()-start);
 const cases = ['rsc-sync', 'rsc-async', 'web-url', 'web-json'];
+const RSC_WRAPPER = '\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n';
 function context() {
   return vm.createContext({console, TextEncoder, TextDecoder, ReadableStream, TransformStream,
     Request, Response, Headers, URL, AbortController, AbortSignal, Blob, FormData,
@@ -104,6 +105,51 @@ async function server(directory,name) {
   return {schema:'scriptw-react-server-v1',case:name,node:process.versions,parse_ns,initialization_ns,
     samples:7,warmups:3,observations};
 }
+async function retainedModule(directory) {
+  assert.equal(typeof vm.SourceTextModule,'function',
+    'run with --experimental-vm-modules on a Node version that exposes vm.SourceTextModule');
+  const sourcePath=path.join(directory,'rsc.js');
+  const supportPath=path.join(directory,'support.json');
+  const source=read(sourcePath);
+  const adapted=source+RSC_WRAPPER;
+  const supportBytes=fs.readFileSync(supportPath);
+  const support=JSON.parse(supportBytes);
+  assert.equal(support.versions.react,'19.3.1');
+  assert.equal(support.versions['react-server-dom-webpack'],'19.3.1');
+  const realmStart=ns();
+  const realm=context();
+  const realm_creation_ns=elapsed(realmStart);
+  const parseStart=ns();
+  const module=new vm.SourceTextModule(adapted,{context:realm,identifier:'rsc.js'});
+  const source_module_parse_ns=elapsed(parseStart);
+  const initializeStart=ns();
+  await module.link(() => { throw new Error('RSC bundle unexpectedly imports a dependency'); });
+  await module.evaluate();
+  const module_link_and_initialization_ns=elapsed(initializeStart);
+  const {run,encode}=module.namespace;
+  assert.equal(typeof run,'function');
+  assert.equal(typeof encode,'function');
+  const observations=[];
+  for(const mode of ['sync','async']) {
+    const name='rsc-'+mode;
+    const expected=support.expected[name];
+    assert.equal(typeof expected,'string','missing Node Flight expectation: '+name);
+    for(let index=0;index<10;index++) {
+      const start=ns();
+      const result=await run(mode);
+      const elapsed_ns=elapsed(start);
+      const stdout=encode(result)+'\n';
+      assert.equal(stdout,expected,'retained-module output changed, including warmup: '+name);
+      observations.push({case:name,index,warmup:index<3,elapsed_ns,stdout});
+    }
+  }
+  return {schema:'scriptw-react-retained-module-reference-v1',node:process.versions,
+    case_order:['rsc-sync','rsc-async'],realm_policy:'one fresh context and one linked/evaluated SourceTextModule shared by both cases',
+    request_clock:'await applicationRun(mode); excludes JSON encoding, exact golden validation and output checks',
+    samples:7,warmups:3,realm_creation_ns,source_module_parse_ns,module_link_and_initialization_ns,
+    inputs:{source:sourcePath,source_sha256:hash(source),wrapper:RSC_WRAPPER,wrapper_sha256:hash(RSC_WRAPPER),
+      adapted_source_sha256:hash(adapted),support:supportPath,support_sha256:hash(supportBytes)},observations};
+}
 async function browser(tools,directory,chromium,index,screenshot) {
   const use=createRequire(path.join(tools,'package.json'));
   const {chromium:engine}=use('playwright');
@@ -162,6 +208,7 @@ async function browser(tools,directory,chromium,index,screenshot) {
   let result;
   if(mode==='build') result=await build(...args);
   else if(mode==='server') result=await server(...args);
+  else if(mode==='retained-module') result=await retainedModule(args[0]);
   else if(mode==='browser') result=await browser(args[0],args[1],args[2],Number(args[3]),args[4]);
   else throw new Error('Expected build, server or browser');
   process.stdout.write(JSON.stringify(result)+'\n',()=>process.exit(0));

@@ -253,14 +253,31 @@ impl ScriptLowerer<'_> {
             .then(|| StableImplicitArgumentsCell::analyze(self, &name))
             .flatten()
             .map(|cell| cell.value_info(self));
+        let cell = if self.with_environment_chain.is_empty() {
+            self.lookup_binding(&name).and_then(|binding| {
+                ModuleCapturedCellIr::analyze(
+                    self.analysis,
+                    &self.current_owner_id,
+                    &binding.storage_name,
+                    &name,
+                )
+            })
+        } else {
+            None
+        };
         self.invalidate_unknown_user_code_effects();
-        TypedExpr::from_info(
-            read_info.unwrap_or_else(unknown_runtime_value_info),
-            ExprIr::EnvironmentIdentifier(Box::new(EnvironmentIdentifierIr::current(
+        let identifier = match cell {
+            Some(cell) => EnvironmentIdentifierIr::captured_cell(
                 name,
                 self.reference_strictness(),
                 operation,
-            ))),
+                cell,
+            ),
+            None => EnvironmentIdentifierIr::current(name, self.reference_strictness(), operation),
+        };
+        TypedExpr::from_info(
+            read_info.unwrap_or_else(unknown_runtime_value_info),
+            ExprIr::EnvironmentIdentifier(Box::new(identifier)),
         )
     }
 

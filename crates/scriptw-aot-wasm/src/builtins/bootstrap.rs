@@ -168,6 +168,8 @@ impl<'a> FunctionBuilder<'a> {
             | StandardBuiltinInstaller::FinalizationRegistry
             | StandardBuiltinInstaller::AsyncDisposableStack
             | StandardBuiltinInstaller::DisposableStack
+            | StandardBuiltinInstaller::TextEncoder
+            | StandardBuiltinInstaller::TextDecoder
             | StandardBuiltinInstaller::Set
             | StandardBuiltinInstaller::Object
             | StandardBuiltinInstaller::Proxy
@@ -812,12 +814,41 @@ impl<'a> FunctionBuilder<'a> {
             NonArrayRealmIntrinsicSlot::WeakSetPrototype,
             NonArrayRealmIntrinsicSlot::AsyncDisposableStackPrototype,
             NonArrayRealmIntrinsicSlot::DisposableStackPrototype,
+            NonArrayRealmIntrinsicSlot::AbortControllerPrototype,
+            NonArrayRealmIntrinsicSlot::EventTargetPrototype,
+            NonArrayRealmIntrinsicSlot::EventPrototype,
+            NonArrayRealmIntrinsicSlot::TextEncoderPrototype,
+            NonArrayRealmIntrinsicSlot::TextDecoderPrototype,
             NonArrayRealmIntrinsicSlot::SetPrototype,
             NonArrayRealmIntrinsicSlot::SymbolPrototype,
             NonArrayRealmIntrinsicSlot::BigIntPrototype,
         ] {
             self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
         }
+        self.emit_load_non_array_realm_intrinsic(
+            realm,
+            NonArrayRealmIntrinsicSlot::EventTargetPrototype,
+            &parent,
+            function,
+        );
+        self.emit_bootstrap_plain_prototype(
+            &context,
+            NonArrayRealmIntrinsicSlot::AbortSignalPrototype,
+            &parent,
+            function,
+        )?;
+        self.emit_load_non_array_realm_intrinsic(
+            realm,
+            NonArrayRealmIntrinsicSlot::ErrorPrototype,
+            &parent,
+            function,
+        );
+        self.emit_bootstrap_plain_prototype(
+            &context,
+            NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
+            &parent,
+            function,
+        )?;
         let primitive = schema.reserve_value_local(function);
         primitive.set_scalar(ScalarValue::NumberBits(0), function);
         self.emit_bootstrap_boxed_prototype(
@@ -884,6 +915,12 @@ impl<'a> FunctionBuilder<'a> {
             .should_initialize_standard_builtin(StandardBuiltinId::ShadowRealmConstructor)
         {
             self.emit_initialize_shadow_realm_intrinsic(&context, &object_prototype, function)?;
+        }
+        if self
+            .runtime_bootstrap_plan
+            .should_initialize_standard_builtin(StandardBuiltinId::ReadableStreamConstructor)
+        {
+            self.emit_initialize_stream_intrinsics(&context, &object_prototype, function)?;
         }
         for (builtin, slot) in [
             (
@@ -969,6 +1006,34 @@ impl<'a> FunctionBuilder<'a> {
             (
                 StandardBuiltinId::DisposableStackConstructor,
                 NonArrayRealmIntrinsicSlot::DisposableStackPrototype,
+            ),
+            (
+                StandardBuiltinId::AbortControllerConstructor,
+                NonArrayRealmIntrinsicSlot::AbortControllerPrototype,
+            ),
+            (
+                StandardBuiltinId::AbortSignalConstructor,
+                NonArrayRealmIntrinsicSlot::AbortSignalPrototype,
+            ),
+            (
+                StandardBuiltinId::EventTargetConstructor,
+                NonArrayRealmIntrinsicSlot::EventTargetPrototype,
+            ),
+            (
+                StandardBuiltinId::EventConstructor,
+                NonArrayRealmIntrinsicSlot::EventPrototype,
+            ),
+            (
+                StandardBuiltinId::DOMExceptionConstructor,
+                NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
+            ),
+            (
+                StandardBuiltinId::TextEncoderConstructor,
+                NonArrayRealmIntrinsicSlot::TextEncoderPrototype,
+            ),
+            (
+                StandardBuiltinId::TextDecoderConstructor,
+                NonArrayRealmIntrinsicSlot::TextDecoderPrototype,
             ),
             (
                 StandardBuiltinId::SetConstructor,

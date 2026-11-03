@@ -476,7 +476,7 @@ enum_i32_codec!(crate::heap::PromiseReactionType; Fulfill => 1, Reject => 2);
 enum_i32_codec!(crate::heap::PromiseReactionCallbackKind; Default => 0, AsyncFunction => 1,
     AsyncGeneratorAwaitReturn => 2, AsyncGeneratorAwait => 3, AsyncGeneratorYield => 4,
     AsyncGeneratorYieldReturn => 5, ModuleBody => 6, ModuleJoin => 7, AsyncFromSyncIterator => 8);
-enum_i32_codec!(crate::heap::PromiseJobKind; Reaction => 1, ResolveThenable => 2, FinalizationCleanup => 3);
+enum_i32_codec!(crate::heap::PromiseJobKind; Reaction => 1, ResolveThenable => 2, FinalizationCleanup => 3, Callback => 4);
 enum_i32_codec!(crate::heap::AsyncModuleEntryMode; Allocate => 0, Instantiate => 1, Execute => 2);
 enum_i32_codec!(crate::heap::ModuleEvaluationState; Linked => 0, Evaluating => 1,
     EvaluatingAsync => 2, Evaluated => 3);
@@ -529,7 +529,8 @@ enum_i32_codec!(IteratorZipMode; Shortest => 0, Longest => 1, Strict => 2);
 enum_i32_codec!(ArrayFromAsyncStage; InputValue => 0, MappedValue => 1, AsyncIteratorResult => 2,
     AsyncCloseResult => 4);
 enum_i32_codec!(ArrayFromAsyncSourceMode; ArrayLike => 0, AsyncIterator => 1, SyncIterator => 2);
-enum_i32_codec!(BuiltinClosureCaptureKind; IntlCollator => 0, IntlNumberFormat => 1,
+enum_i32_codec!(ReadableStreamState; Readable => 0, Closed => 1, Errored => 2);
+enum_i32_codec!(BuiltinClosureCaptureKind; ReadableStreamController => 17, IntlCollator => 0, IntlNumberFormat => 1,
     IntlDateTimeFormat => 2, PromiseResolving => 3, PromiseCapabilityExecutor => 4,
     PromiseElement => 5, PromiseKeyedElement => 6, PromiseFinally => 7,
     PromiseFinallyValue => 8, ArrayFromAsync => 9, ProxyRevocation => 11,
@@ -873,6 +874,7 @@ impl GcStructType<ExecutableCode> {
 }
 
 pub(crate) enum BuiltinClosurePayload<'a> {
+    ReadableStreamController(&'a GcLocal<ReadableByteStreamControllerObject>),
     IntlCollator(&'a GcLocal<IntlCollatorObject>),
     IntlNumberFormat(&'a GcLocal<IntlNumberFormatObject>),
     IntlDateTimeFormat(&'a GcLocal<IntlDateTimeFormatObject>),
@@ -898,10 +900,34 @@ impl GcStructType<BuiltinClosureCapture> {
         function: &mut Function,
     ) -> GcStackReference<BuiltinClosureCapture> {
         match payload {
+            BuiltinClosurePayload::ReadableStreamController(value) => self.construct(
+                (
+                    GcOperand::constant(BuiltinClosureCaptureKind::ReadableStreamController),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::nullable_reference(value, schema),
+                ),
+                function,
+            ),
             BuiltinClosurePayload::IntlCollator(value) => self.construct(
                 (
                     GcOperand::constant(BuiltinClosureCaptureKind::IntlCollator),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -939,6 +965,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -948,6 +975,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -983,6 +1011,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -994,6 +1023,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1027,6 +1057,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1040,6 +1071,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1071,6 +1103,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1086,6 +1119,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1115,6 +1149,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1133,6 +1168,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1160,6 +1196,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1179,6 +1216,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1204,6 +1242,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::nullable_reference(value, schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1225,6 +1264,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                     GcOperand::null(schema),
                 ),
                 function,
@@ -1248,6 +1288,7 @@ impl GcStructType<BuiltinClosureCapture> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::nullable_reference(value, schema),
+                    GcOperand::null(schema),
                 ),
                 function,
             ),
@@ -1662,6 +1703,37 @@ impl RuntimeSchema {
             RuntimeQueueEnd::Head => self.pending_jobs_head,
             RuntimeQueueEnd::Tail => self.pending_jobs_tail,
         }
+    }
+    pub(crate) fn load_timer_queue(&self, function: &mut Function) -> GcLocal<TimerQueue> {
+        let root = self.load_existing_timer_queue(function);
+        root.load(self, function).is_null(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let queue = self.reserve_gc_local(function).initialize(
+            self.struct_type::<TimerQueue>().construct(
+                (GcOperand::null(self), GcOperand::i64(1), GcOperand::i64(0)),
+                function,
+            ),
+            function,
+        );
+        queue.load(self, function);
+        emit_root_set(function, self.timer_queue);
+        root.replace(queue.load(self, function).nullable(), function);
+        queue.clear(function);
+        function.instruction(&Instruction::End);
+        let queue = self.reserve_gc_local(function).initialize(
+            root.load(self, function).require_non_null(function),
+            function,
+        );
+        root.clear(function);
+        queue
+    }
+    pub(crate) fn load_existing_timer_queue(
+        &self,
+        function: &mut Function,
+    ) -> GcLocal<TimerQueue, Nullable> {
+        let root = self.reserve_gc_local::<TimerQueue, Nullable>(function);
+        emit_root_get(function, self.timer_queue);
+        root.initialize(GcStackReference::new(), function)
     }
     fn unhandled_promise_queue_root(&self, end: RuntimeQueueEnd) -> GcRootGlobal<PromiseObject> {
         match end {

@@ -18,6 +18,28 @@ pub(super) fn populate(
         Layout::AbstractModuleSourceConstructor => Some(IntrinsicPropertyRecipe::ready(
             Slot::AbstractModuleSourcePrototype,
         )?),
+        Layout::AbortControllerConstructor => Some(IntrinsicPropertyRecipe::ready(
+            Slot::AbortControllerPrototype,
+        )?),
+        Layout::AbortSignalConstructor => {
+            Some(IntrinsicPropertyRecipe::ready(Slot::AbortSignalPrototype)?)
+        }
+        Layout::EventTargetConstructor => {
+            Some(IntrinsicPropertyRecipe::ready(Slot::EventTargetPrototype)?)
+        }
+        Layout::EventConstructor => Some(IntrinsicPropertyRecipe::ready(Slot::EventPrototype)?),
+        Layout::DOMExceptionConstructor => {
+            Some(IntrinsicPropertyRecipe::ready(Slot::DOMExceptionPrototype)?)
+        }
+        Layout::ReadableStreamConstructor => Some(IntrinsicPropertyRecipe::ready(
+            Slot::ReadableStreamPrototype,
+        )?),
+        Layout::ReadableStreamDefaultReaderConstructor => Some(IntrinsicPropertyRecipe::ready(
+            Slot::ReadableStreamDefaultReaderPrototype,
+        )?),
+        Layout::ReadableByteStreamControllerConstructor => Some(IntrinsicPropertyRecipe::ready(
+            Slot::ReadableByteStreamControllerPrototype,
+        )?),
         Layout::ShadowRealmConstructor => {
             Some(IntrinsicPropertyRecipe::ready(Slot::ShadowRealmPrototype)?)
         }
@@ -43,6 +65,12 @@ pub(super) fn populate(
             Slot::DisposableStackPrototype,
         )?),
         Layout::SetConstructor => Some(IntrinsicPropertyRecipe::ready(Slot::SetPrototype)?),
+        Layout::TextEncoderConstructor => {
+            Some(IntrinsicPropertyRecipe::ready(Slot::TextEncoderPrototype)?)
+        }
+        Layout::TextDecoderConstructor => {
+            Some(IntrinsicPropertyRecipe::ready(Slot::TextDecoderPrototype)?)
+        }
         Layout::SymbolConstructor => Some(IntrinsicPropertyRecipe::ready(Slot::SymbolPrototype)?),
         Layout::BigIntConstructor => Some(IntrinsicPropertyRecipe::ready(Slot::BigIntPrototype)?),
         Layout::GeneratorFunctionConstructor => Some(IntrinsicPropertyRecipe::ready(
@@ -68,6 +96,92 @@ pub(super) fn populate(
     }
 
     match id {
+        Layout::ReadableStreamConstructor => {}
+        Layout::ReadableStreamPrototype => {
+            plan.constructor(Slot::ReadableStreamConstructor)?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("locked"),
+                Builtin::ReadableStreamLocked,
+            )?;
+            plan.data(
+                IntrinsicKey::Name("cancel"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableStreamCancel),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("getReader"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableStreamGetReader),
+                true,
+                true,
+                true,
+            );
+            plan.tag("ReadableStream");
+        }
+        Layout::ReadableStreamDefaultReaderConstructor => {}
+        Layout::ReadableStreamDefaultReaderPrototype => {
+            plan.constructor(Slot::ReadableStreamDefaultReaderConstructor)?;
+            plan.data(
+                IntrinsicKey::Name("cancel"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableStreamDefaultReaderCancel),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("read"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableStreamDefaultReaderRead),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("releaseLock"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableStreamDefaultReaderReleaseLock),
+                true,
+                true,
+                true,
+            );
+            web_getter(
+                plan,
+                IntrinsicKey::Name("closed"),
+                Builtin::ReadableStreamDefaultReaderClosed,
+            )?;
+            plan.tag("ReadableStreamDefaultReader");
+        }
+        Layout::ReadableByteStreamControllerConstructor => {}
+        Layout::ReadableByteStreamControllerPrototype => {
+            plan.constructor(Slot::ReadableByteStreamControllerConstructor)?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("desiredSize"),
+                Builtin::ReadableByteStreamControllerDesiredSize,
+            )?;
+            plan.data(
+                IntrinsicKey::Name("close"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableByteStreamControllerClose),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("enqueue"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableByteStreamControllerEnqueue),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("error"),
+                IntrinsicPropertyRecipe::Method(Builtin::ReadableByteStreamControllerError),
+                true,
+                true,
+                true,
+            );
+            plan.tag("ReadableByteStreamController");
+        }
         Layout::ProxyConstructor => {
             plan.native_metadata(id)?;
             named_method(plan, "revocable", Builtin::ProxyRevocable);
@@ -188,6 +302,8 @@ pub(super) fn populate(
         | Layout::WeakSetConstructor
         | Layout::AsyncDisposableStackConstructor
         | Layout::DisposableStackConstructor
+        | Layout::TextEncoderConstructor
+        | Layout::TextDecoderConstructor
         | Layout::GeneratorFunctionConstructor
         | Layout::AsyncFunctionConstructor
         | Layout::AsyncGeneratorFunctionConstructor => {}
@@ -291,6 +407,55 @@ pub(super) fn populate(
             )?;
             plan.tag("AsyncDisposableStack");
         }
+        Layout::TextEncoderPrototype => {
+            plan.constructor(Slot::TextEncoderConstructor)?;
+            plan.data(
+                IntrinsicKey::Name("encode"),
+                IntrinsicPropertyRecipe::Method(Builtin::TextEncoderPrototypeEncode),
+                true,
+                true,
+                true,
+            );
+            plan.data(
+                IntrinsicKey::Name("encodeInto"),
+                IntrinsicPropertyRecipe::Method(Builtin::TextEncoderPrototypeEncodeInto),
+                true,
+                true,
+                true,
+            );
+            web_getter(
+                plan,
+                IntrinsicKey::Name("encoding"),
+                Builtin::TextEncoderPrototypeEncodingGetter,
+            )?;
+            plan.tag("TextEncoder");
+        }
+        Layout::TextDecoderPrototype => {
+            plan.constructor(Slot::TextDecoderConstructor)?;
+            plan.data(
+                IntrinsicKey::Name("decode"),
+                IntrinsicPropertyRecipe::Method(Builtin::TextDecoderPrototypeDecode),
+                true,
+                true,
+                true,
+            );
+            web_getter(
+                plan,
+                IntrinsicKey::Name("encoding"),
+                Builtin::TextDecoderPrototypeEncodingGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("fatal"),
+                Builtin::TextDecoderPrototypeFatalGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("ignoreBOM"),
+                Builtin::TextDecoderPrototypeIgnoreBOMGetter,
+            )?;
+            plan.tag("TextDecoder");
+        }
         Layout::DisposableStackPrototype => {
             plan.constructor(Slot::DisposableStackConstructor)?;
             plan.methods(IntrinsicMethodPlan::DisposableStackPrototype)?;
@@ -383,6 +548,150 @@ pub(super) fn populate(
                 plan,
                 IntrinsicKey::Symbol(WellKnownSymbol::ToStringTag),
                 Builtin::AbstractModuleSourcePrototypeToStringTagGetter,
+            )?;
+        }
+        Layout::AbortControllerConstructor => {}
+        Layout::AbortControllerPrototype => {
+            plan.constructor(Slot::AbortControllerConstructor)?;
+            plan.tag("AbortController");
+            web_method(plan, "abort", Builtin::AbortControllerPrototypeAbort);
+            web_getter(
+                plan,
+                IntrinsicKey::Name("signal"),
+                Builtin::AbortControllerPrototypeSignalGetter,
+            )?;
+        }
+        Layout::AbortSignalConstructor => {
+            web_method(plan, "abort", Builtin::AbortSignalAbort);
+        }
+        Layout::AbortSignalPrototype => {
+            plan.constructor(Slot::AbortSignalConstructor)?;
+            plan.tag("AbortSignal");
+            web_method(
+                plan,
+                "throwIfAborted",
+                Builtin::AbortSignalPrototypeThrowIfAborted,
+            );
+            web_getter(
+                plan,
+                IntrinsicKey::Name("aborted"),
+                Builtin::AbortSignalPrototypeAbortedGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("reason"),
+                Builtin::AbortSignalPrototypeReasonGetter,
+            )?;
+            plan.accessor_with_enumerability(
+                IntrinsicKey::Name("onabort"),
+                IntrinsicCallableRecipe::method(Builtin::AbortSignalPrototypeOnabortGetter)?,
+                IntrinsicCallableRecipe::method(Builtin::AbortSignalPrototypeOnabortSetter)?,
+                true,
+            );
+        }
+        Layout::EventTargetConstructor => {}
+        Layout::EventTargetPrototype => {
+            plan.constructor(Slot::EventTargetConstructor)?;
+            plan.tag("EventTarget");
+            web_method(
+                plan,
+                "addEventListener",
+                Builtin::EventTargetPrototypeAddEventListener,
+            );
+            web_method(
+                plan,
+                "removeEventListener",
+                Builtin::EventTargetPrototypeRemoveEventListener,
+            );
+            web_method(
+                plan,
+                "dispatchEvent",
+                Builtin::EventTargetPrototypeDispatchEvent,
+            );
+        }
+        Layout::EventConstructor => {}
+        Layout::EventPrototype => {
+            plan.constructor(Slot::EventConstructor)?;
+            plan.tag("Event");
+            web_method(
+                plan,
+                "preventDefault",
+                Builtin::EventPrototypePreventDefault,
+            );
+            web_method(
+                plan,
+                "stopPropagation",
+                Builtin::EventPrototypeStopPropagation,
+            );
+            web_method(
+                plan,
+                "stopImmediatePropagation",
+                Builtin::EventPrototypeStopImmediatePropagation,
+            );
+            web_getter(
+                plan,
+                IntrinsicKey::Name("type"),
+                Builtin::EventPrototypeTypeGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("target"),
+                Builtin::EventPrototypeTargetGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("currentTarget"),
+                Builtin::EventPrototypeCurrentTargetGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("defaultPrevented"),
+                Builtin::EventPrototypeDefaultPreventedGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("eventPhase"),
+                Builtin::EventPrototypeEventPhaseGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("bubbles"),
+                Builtin::EventPrototypeBubblesGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("cancelable"),
+                Builtin::EventPrototypeCancelableGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("composed"),
+                Builtin::EventPrototypeComposedGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("isTrusted"),
+                Builtin::EventPrototypeIsTrustedGetter,
+            )?;
+        }
+        Layout::DOMExceptionConstructor => {}
+        Layout::DOMExceptionPrototype => {
+            plan.constructor(Slot::DOMExceptionConstructor)?;
+            plan.tag("DOMException");
+            web_getter(
+                plan,
+                IntrinsicKey::Name("name"),
+                Builtin::DOMExceptionPrototypeNameGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("message"),
+                Builtin::DOMExceptionPrototypeMessageGetter,
+            )?;
+            web_getter(
+                plan,
+                IntrinsicKey::Name("code"),
+                Builtin::DOMExceptionPrototypeCodeGetter,
             )?;
         }
         Layout::ShadowRealmPrototype => {
@@ -482,7 +791,7 @@ pub(super) fn populate(
         | Layout::ArrayUnscopables => {
             return Err(EmitError::unsupported(
                 "existing intrinsic layout has its own complete owner",
-            ))
+            ));
         }
     }
     Ok(())
@@ -517,6 +826,30 @@ fn getter(
         key,
         IntrinsicCallableRecipe::method(builtin)?,
         IntrinsicCallableRecipe::Undefined,
+    );
+    Ok(())
+}
+
+fn web_method(plan: &mut LayoutBuilder, name: &'static str, builtin: StandardBuiltinId) {
+    plan.data(
+        IntrinsicKey::Name(name),
+        IntrinsicPropertyRecipe::Method(builtin),
+        true,
+        true,
+        true,
+    );
+}
+
+fn web_getter(
+    plan: &mut LayoutBuilder,
+    key: IntrinsicKey<'static>,
+    builtin: StandardBuiltinId,
+) -> Result<(), EmitError> {
+    plan.accessor_with_enumerability(
+        key,
+        IntrinsicCallableRecipe::method(builtin)?,
+        IntrinsicCallableRecipe::Undefined,
+        true,
     );
     Ok(())
 }
@@ -587,12 +920,31 @@ pub(super) fn prototype_layout(
         Slot::FinalizationRegistryPrototype => Some(Layout::FinalizationRegistryPrototype),
         Slot::AsyncDisposableStackPrototype => Some(Layout::AsyncDisposableStackPrototype),
         Slot::DisposableStackPrototype => Some(Layout::DisposableStackPrototype),
+        Slot::TextEncoderPrototype => Some(Layout::TextEncoderPrototype),
+        Slot::TextDecoderPrototype => Some(Layout::TextDecoderPrototype),
         Slot::SetPrototype => Some(Layout::SetPrototype),
         Slot::SymbolPrototype => Some(Layout::SymbolPrototype),
         Slot::IteratorPrototype => Some(Layout::IteratorPrototype),
         Slot::IteratorFromWrapperPrototype => Some(Layout::IteratorFromWrapperPrototype),
         Slot::IteratorHelperPrototype => Some(Layout::IteratorHelperPrototype),
         Slot::AbstractModuleSourcePrototype => Some(Layout::AbstractModuleSourcePrototype),
+        Slot::AbortControllerConstructor => Some(Layout::AbortControllerConstructor),
+        Slot::AbortControllerPrototype => Some(Layout::AbortControllerPrototype),
+        Slot::AbortSignalConstructor => Some(Layout::AbortSignalConstructor),
+        Slot::AbortSignalPrototype => Some(Layout::AbortSignalPrototype),
+        Slot::EventTargetConstructor => Some(Layout::EventTargetConstructor),
+        Slot::EventTargetPrototype => Some(Layout::EventTargetPrototype),
+        Slot::EventConstructor => Some(Layout::EventConstructor),
+        Slot::EventPrototype => Some(Layout::EventPrototype),
+        Slot::DOMExceptionConstructor => Some(Layout::DOMExceptionConstructor),
+        Slot::DOMExceptionPrototype => Some(Layout::DOMExceptionPrototype),
+        Slot::ReadableStreamPrototype => Some(Layout::ReadableStreamPrototype),
+        Slot::ReadableStreamDefaultReaderPrototype => {
+            Some(Layout::ReadableStreamDefaultReaderPrototype)
+        }
+        Slot::ReadableByteStreamControllerPrototype => {
+            Some(Layout::ReadableByteStreamControllerPrototype)
+        }
         Slot::ShadowRealmPrototype => Some(Layout::ShadowRealmPrototype),
         Slot::ArrayIteratorPrototype => Some(Layout::ArrayIteratorPrototype),
         Slot::StringIteratorPrototype => Some(Layout::StringIteratorPrototype),

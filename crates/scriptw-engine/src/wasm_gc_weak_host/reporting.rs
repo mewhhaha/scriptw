@@ -43,7 +43,7 @@ pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), Eng
                     (None, None) => None,
                 };
                 let text = format!(
-                    "FinalizationRegistry cleanup exception: {}",
+                    "Uncaught exception: {}",
                     wasm_gc_completion::render_value(tag, &value, detail.as_deref())
                 );
                 caller.data().output_events.record_exception(&text);

@@ -71,7 +71,15 @@ impl FunctionBuilder<'_> {
             // the blocking drain would wait indefinitely on an infinite wait.
             self.emit_poll_atomics_wait_async_timeouts(function)?;
         }
-        self.emit_drain_promise_jobs(function)
+        self.emit_drain_promise_jobs(function)?;
+        if self
+            .functions
+            .monotonic_clock_nanos_import_function_index()
+            .is_some()
+        {
+            self.emit_timer_checkpoint(false, function)?;
+        }
+        Ok(())
     }
 
     pub(crate) fn compile_embedding_call(&mut self) -> Result<Function, EmitError> {

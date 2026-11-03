@@ -13,6 +13,13 @@ use crate::intrinsics::temporal::TemporalIntrinsicFamily;
 /// select the closed ordinary intrinsic table; neither route exposes an index.
 #[derive(Clone, Copy)]
 pub(crate) enum OrdinaryDefaultPrototype {
+    ReadableStream,
+    ReadableStreamDefaultReader,
+    AbortController,
+    AbortSignal,
+    EventTarget,
+    Event,
+    DOMException,
     ShadowRealm,
     Object,
     Array,
@@ -47,6 +54,8 @@ pub(crate) enum OrdinaryDefaultPrototype {
     IntlDurationFormat,
     Promise,
     DisposableStack,
+    TextEncoder,
+    TextDecoder,
     AsyncDisposableStack,
     AggregateError,
     SuppressedError,
@@ -57,6 +66,15 @@ pub(crate) enum OrdinaryDefaultPrototype {
 impl OrdinaryDefaultPrototype {
     const fn slot(self) -> Option<NonArrayRealmIntrinsicSlot> {
         Some(match self {
+            Self::ReadableStream => NonArrayRealmIntrinsicSlot::ReadableStreamPrototype,
+            Self::ReadableStreamDefaultReader => {
+                NonArrayRealmIntrinsicSlot::ReadableStreamDefaultReaderPrototype
+            }
+            Self::AbortController => NonArrayRealmIntrinsicSlot::AbortControllerPrototype,
+            Self::AbortSignal => NonArrayRealmIntrinsicSlot::AbortSignalPrototype,
+            Self::EventTarget => NonArrayRealmIntrinsicSlot::EventTargetPrototype,
+            Self::Event => NonArrayRealmIntrinsicSlot::EventPrototype,
+            Self::DOMException => NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
             Self::ShadowRealm => NonArrayRealmIntrinsicSlot::ShadowRealmPrototype,
             Self::Array => return None,
             Self::MessageError(kind) => kind.prototype_slot(),
@@ -102,6 +120,8 @@ impl OrdinaryDefaultPrototype {
             Self::IntlDurationFormat => NonArrayRealmIntrinsicSlot::IntlDurationFormatPrototype,
             Self::Promise => NonArrayRealmIntrinsicSlot::PromisePrototype,
             Self::DisposableStack => NonArrayRealmIntrinsicSlot::DisposableStackPrototype,
+            Self::TextEncoder => NonArrayRealmIntrinsicSlot::TextEncoderPrototype,
+            Self::TextDecoder => NonArrayRealmIntrinsicSlot::TextDecoderPrototype,
             Self::AsyncDisposableStack => NonArrayRealmIntrinsicSlot::AsyncDisposableStackPrototype,
             Self::AggregateError => NonArrayRealmIntrinsicSlot::AggregateErrorPrototype,
             Self::SuppressedError => NonArrayRealmIntrinsicSlot::SuppressedErrorPrototype,

@@ -75,6 +75,8 @@ pub enum StandardBuiltinInstaller {
     FinalizationRegistry,
     AsyncDisposableStack,
     DisposableStack,
+    TextEncoder,
+    TextDecoder,
     Set,
     Object,
     Proxy,
@@ -112,6 +114,100 @@ pub enum StandardBuiltinInstaller {
 }
 
 standard_builtin_catalog! {
+    QueueMicrotask {
+        function: FunctionOrdinal(911) => "$builtin.queueMicrotask",
+        global: GlobalOrdinal(65),
+        global_name: "queueMicrotask",
+        debug: "queueMicrotask",
+        flags: [],
+        installer: None,
+        native: "queueMicrotask",
+    }
+    SetTimeout {
+        function: FunctionOrdinal(912) => "$builtin.setTimeout",
+        global: GlobalOrdinal(66),
+        global_name: "setTimeout",
+        debug: "setTimeout",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "setTimeout",
+    }
+    ClearTimeout {
+        function: FunctionOrdinal(913) => "$builtin.clearTimeout",
+        global: GlobalOrdinal(67),
+        global_name: "clearTimeout",
+        debug: "clearTimeout",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "clearTimeout",
+    }
+    TextEncoderConstructor {
+        function: FunctionOrdinal(914) => "$builtin.TextEncoderConstructor",
+        global: GlobalOrdinal(55),
+        global_name: "TextEncoder",
+        debug: "TextEncoderConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: TextEncoder,
+        native: "TextEncoder",
+    }
+    TextEncoderPrototypeEncode {
+        function: FunctionOrdinal(915) => "$builtin.TextEncoderPrototypeEncode",
+        debug: "TextEncoderPrototypeEncode",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "encode",
+    }
+    TextEncoderPrototypeEncodeInto {
+        function: FunctionOrdinal(916) => "$builtin.TextEncoderPrototypeEncodeInto",
+        debug: "TextEncoderPrototypeEncodeInto",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "encodeInto",
+    }
+    TextEncoderPrototypeEncodingGetter {
+        function: FunctionOrdinal(917) => "$builtin.TextEncoderPrototypeEncodingGetter",
+        debug: "TextEncoderPrototypeEncodingGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get encoding",
+    }
+    TextDecoderConstructor {
+        function: FunctionOrdinal(918) => "$builtin.TextDecoderConstructor",
+        global: GlobalOrdinal(56),
+        global_name: "TextDecoder",
+        debug: "TextDecoderConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: TextDecoder,
+        native: "TextDecoder",
+    }
+    TextDecoderPrototypeDecode {
+        function: FunctionOrdinal(919) => "$builtin.TextDecoderPrototypeDecode",
+        debug: "TextDecoderPrototypeDecode",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "decode",
+    }
+    TextDecoderPrototypeEncodingGetter {
+        function: FunctionOrdinal(920) => "$builtin.TextDecoderPrototypeEncodingGetter",
+        debug: "TextDecoderPrototypeEncodingGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get encoding",
+    }
+    TextDecoderPrototypeFatalGetter {
+        function: FunctionOrdinal(921) => "$builtin.TextDecoderPrototypeFatalGetter",
+        debug: "TextDecoderPrototypeFatalGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get fatal",
+    }
+    TextDecoderPrototypeIgnoreBOMGetter {
+        function: FunctionOrdinal(922) => "$builtin.TextDecoderPrototypeIgnoreBOMGetter",
+        debug: "TextDecoderPrototypeIgnoreBOMGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get ignoreBOM",
+    }
     FunctionConstructor {
         function: FunctionOrdinal(0) => BUILTIN_FUNCTION_FUNCTION_ID,
         global: GlobalOrdinal(0),
@@ -6539,6 +6635,153 @@ standard_builtin_catalog! {
         installer: None,
         native: "supportedValuesOf",
     }
+    ReadableStreamConstructor {
+        function: FunctionOrdinal(923) => "$builtin.ReadableStreamConstructor",
+        global: GlobalOrdinal(62),
+        global_name: "ReadableStream",
+        debug: "ReadableStream",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "ReadableStream",
+    }
+    ReadableStreamGetReader {
+        function: FunctionOrdinal(924) => "$builtin.ReadableStreamGetReader",
+        debug: "ReadableStream.prototype.getReader",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "getReader",
+    }
+    ReadableStreamCancel {
+        function: FunctionOrdinal(925) => "$builtin.ReadableStreamCancel",
+        debug: "ReadableStream.prototype.cancel",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "cancel",
+    }
+    ReadableStreamLocked {
+        function: FunctionOrdinal(926) => "$builtin.ReadableStreamLocked",
+        debug: "get ReadableStream.prototype.locked",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get locked",
+    }
+    ReadableStreamDefaultReaderConstructor {
+        function: FunctionOrdinal(927) => "$builtin.ReadableStreamDefaultReaderConstructor",
+        global: GlobalOrdinal(63),
+        global_name: "ReadableStreamDefaultReader",
+        debug: "ReadableStreamDefaultReader",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "ReadableStreamDefaultReader",
+    }
+    ReadableStreamDefaultReaderRead {
+        function: FunctionOrdinal(928) => "$builtin.ReadableStreamDefaultReaderRead",
+        debug: "ReadableStreamDefaultReader.prototype.read",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "read",
+    }
+    ReadableStreamDefaultReaderCancel {
+        function: FunctionOrdinal(929) => "$builtin.ReadableStreamDefaultReaderCancel",
+        debug: "ReadableStreamDefaultReader.prototype.cancel",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "cancel",
+    }
+    ReadableStreamDefaultReaderReleaseLock {
+        function: FunctionOrdinal(930) => "$builtin.ReadableStreamDefaultReaderReleaseLock",
+        debug: "ReadableStreamDefaultReader.prototype.releaseLock",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "releaseLock",
+    }
+    ReadableStreamDefaultReaderClosed {
+        function: FunctionOrdinal(931) => "$builtin.ReadableStreamDefaultReaderClosed",
+        debug: "get ReadableStreamDefaultReader.prototype.closed",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get closed",
+    }
+    ReadableByteStreamControllerConstructor {
+        function: FunctionOrdinal(932) => "$builtin.ReadableByteStreamControllerConstructor",
+        global: GlobalOrdinal(64),
+        global_name: "ReadableByteStreamController",
+        debug: "ReadableByteStreamController",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "ReadableByteStreamController",
+    }
+    ReadableByteStreamControllerEnqueue {
+        function: FunctionOrdinal(933) => "$builtin.ReadableByteStreamControllerEnqueue",
+        debug: "ReadableByteStreamController.prototype.enqueue",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "enqueue",
+    }
+    ReadableByteStreamControllerClose {
+        function: FunctionOrdinal(934) => "$builtin.ReadableByteStreamControllerClose",
+        debug: "ReadableByteStreamController.prototype.close",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "close",
+    }
+    ReadableByteStreamControllerError {
+        function: FunctionOrdinal(935) => "$builtin.ReadableByteStreamControllerError",
+        debug: "ReadableByteStreamController.prototype.error",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "error",
+    }
+    ReadableByteStreamControllerDesiredSize {
+        function: FunctionOrdinal(936) => "$builtin.ReadableByteStreamControllerDesiredSize",
+        debug: "get ReadableByteStreamController.prototype.desiredSize",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get desiredSize",
+    }
+    ReadableStreamStartFulfilled {
+        function: FunctionOrdinal(937) => "$builtin.ReadableStreamStartFulfilled",
+        debug: "ReadableStream.StartFulfilled",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+    ReadableStreamStartRejected {
+        function: FunctionOrdinal(938) => "$builtin.ReadableStreamStartRejected",
+        debug: "ReadableStream.StartRejected",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+    ReadableStreamPullFulfilled {
+        function: FunctionOrdinal(939) => "$builtin.ReadableStreamPullFulfilled",
+        debug: "ReadableStream.PullFulfilled",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+    ReadableStreamPullRejected {
+        function: FunctionOrdinal(940) => "$builtin.ReadableStreamPullRejected",
+        debug: "ReadableStream.PullRejected",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+    ReadableStreamCancelFulfilled {
+        function: FunctionOrdinal(941) => "$builtin.ReadableStreamCancelFulfilled",
+        debug: "ReadableStream.CancelFulfilled",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+    ReadableStreamPullIfNeeded {
+        function: FunctionOrdinal(942) => "$builtin.ReadableStreamPullIfNeeded",
+        debug: "ReadableStream.PullIfNeeded",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "",
+    }
+
     ShadowRealmConstructor {
         function: FunctionOrdinal(895) => "$builtin.ShadowRealm",
         global: GlobalOrdinal(54),
@@ -6659,6 +6902,235 @@ standard_builtin_catalog! {
         installer: None,
         native: "[Symbol.asyncIterator]",
     }
+    AbortControllerConstructor {
+        function: FunctionOrdinal(943) => "scriptw:web:AbortControllerConstructor",
+        global: GlobalOrdinal(57),
+        global_name: "AbortController",
+        debug: "AbortControllerConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "AbortController",
+    }
+    AbortControllerPrototypeAbort {
+        function: FunctionOrdinal(944) => "scriptw:web:AbortControllerPrototypeAbort",
+        debug: "AbortControllerPrototypeAbort",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "abort",
+    }
+    AbortControllerPrototypeSignalGetter {
+        function: FunctionOrdinal(945) => "scriptw:web:AbortControllerPrototypeSignalGetter",
+        debug: "AbortControllerPrototypeSignalGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get signal",
+    }
+    AbortSignalConstructor {
+        function: FunctionOrdinal(946) => "scriptw:web:AbortSignalConstructor",
+        global: GlobalOrdinal(58),
+        global_name: "AbortSignal",
+        debug: "AbortSignalConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "AbortSignal",
+    }
+    AbortSignalPrototypeThrowIfAborted {
+        function: FunctionOrdinal(947) => "scriptw:web:AbortSignalPrototypeThrowIfAborted",
+        debug: "AbortSignalPrototypeThrowIfAborted",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "throwIfAborted",
+    }
+    AbortSignalAbort {
+        function: FunctionOrdinal(948) => "scriptw:web:AbortSignalAbort",
+        debug: "AbortSignalAbort",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "abort",
+    }
+    AbortSignalPrototypeAbortedGetter {
+        function: FunctionOrdinal(949) => "scriptw:web:AbortSignalPrototypeAbortedGetter",
+        debug: "AbortSignalPrototypeAbortedGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get aborted",
+    }
+    AbortSignalPrototypeReasonGetter {
+        function: FunctionOrdinal(950) => "scriptw:web:AbortSignalPrototypeReasonGetter",
+        debug: "AbortSignalPrototypeReasonGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get reason",
+    }
+    AbortSignalPrototypeOnabortGetter {
+        function: FunctionOrdinal(951) => "scriptw:web:AbortSignalPrototypeOnabortGetter",
+        debug: "AbortSignalPrototypeOnabortGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get onabort",
+    }
+    AbortSignalPrototypeOnabortSetter {
+        function: FunctionOrdinal(952) => "scriptw:web:AbortSignalPrototypeOnabortSetter",
+        debug: "AbortSignalPrototypeOnabortSetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "set onabort",
+    }
+    EventTargetConstructor {
+        function: FunctionOrdinal(953) => "scriptw:web:EventTargetConstructor",
+        global: GlobalOrdinal(59),
+        global_name: "EventTarget",
+        debug: "EventTargetConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "EventTarget",
+    }
+    EventTargetPrototypeAddEventListener {
+        function: FunctionOrdinal(954) => "scriptw:web:EventTargetPrototypeAddEventListener",
+        debug: "EventTargetPrototypeAddEventListener",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "addEventListener",
+    }
+    EventTargetPrototypeRemoveEventListener {
+        function: FunctionOrdinal(955) => "scriptw:web:EventTargetPrototypeRemoveEventListener",
+        debug: "EventTargetPrototypeRemoveEventListener",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "removeEventListener",
+    }
+    EventTargetPrototypeDispatchEvent {
+        function: FunctionOrdinal(956) => "scriptw:web:EventTargetPrototypeDispatchEvent",
+        debug: "EventTargetPrototypeDispatchEvent",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "dispatchEvent",
+    }
+    EventConstructor {
+        function: FunctionOrdinal(957) => "scriptw:web:EventConstructor",
+        global: GlobalOrdinal(60),
+        global_name: "Event",
+        debug: "EventConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "Event",
+    }
+    EventPrototypePreventDefault {
+        function: FunctionOrdinal(958) => "scriptw:web:EventPrototypePreventDefault",
+        debug: "EventPrototypePreventDefault",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "preventDefault",
+    }
+    EventPrototypeStopPropagation {
+        function: FunctionOrdinal(959) => "scriptw:web:EventPrototypeStopPropagation",
+        debug: "EventPrototypeStopPropagation",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "stopPropagation",
+    }
+    EventPrototypeStopImmediatePropagation {
+        function: FunctionOrdinal(960) => "scriptw:web:EventPrototypeStopImmediatePropagation",
+        debug: "EventPrototypeStopImmediatePropagation",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "stopImmediatePropagation",
+    }
+    EventPrototypeTypeGetter {
+        function: FunctionOrdinal(961) => "scriptw:web:EventPrototypeTypeGetter",
+        debug: "EventPrototypeTypeGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get type",
+    }
+    EventPrototypeTargetGetter {
+        function: FunctionOrdinal(962) => "scriptw:web:EventPrototypeTargetGetter",
+        debug: "EventPrototypeTargetGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get target",
+    }
+    EventPrototypeCurrentTargetGetter {
+        function: FunctionOrdinal(963) => "scriptw:web:EventPrototypeCurrentTargetGetter",
+        debug: "EventPrototypeCurrentTargetGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get currentTarget",
+    }
+    EventPrototypeDefaultPreventedGetter {
+        function: FunctionOrdinal(964) => "scriptw:web:EventPrototypeDefaultPreventedGetter",
+        debug: "EventPrototypeDefaultPreventedGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get defaultPrevented",
+    }
+    EventPrototypeEventPhaseGetter {
+        function: FunctionOrdinal(965) => "scriptw:web:EventPrototypeEventPhaseGetter",
+        debug: "EventPrototypeEventPhaseGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get eventPhase",
+    }
+    EventPrototypeBubblesGetter {
+        function: FunctionOrdinal(966) => "scriptw:web:EventPrototypeBubblesGetter",
+        debug: "EventPrototypeBubblesGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get bubbles",
+    }
+    EventPrototypeCancelableGetter {
+        function: FunctionOrdinal(967) => "scriptw:web:EventPrototypeCancelableGetter",
+        debug: "EventPrototypeCancelableGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get cancelable",
+    }
+    EventPrototypeComposedGetter {
+        function: FunctionOrdinal(968) => "scriptw:web:EventPrototypeComposedGetter",
+        debug: "EventPrototypeComposedGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get composed",
+    }
+    EventPrototypeIsTrustedGetter {
+        function: FunctionOrdinal(969) => "scriptw:web:EventPrototypeIsTrustedGetter",
+        debug: "EventPrototypeIsTrustedGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get isTrusted",
+    }
+    DOMExceptionConstructor {
+        function: FunctionOrdinal(970) => "scriptw:web:DOMExceptionConstructor",
+        global: GlobalOrdinal(61),
+        global_name: "DOMException",
+        debug: "DOMExceptionConstructor",
+        flags: [CONSTRUCTABLE, SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "DOMException",
+    }
+    DOMExceptionPrototypeNameGetter {
+        function: FunctionOrdinal(971) => "scriptw:web:DOMExceptionPrototypeNameGetter",
+        debug: "DOMExceptionPrototypeNameGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get name",
+    }
+    DOMExceptionPrototypeMessageGetter {
+        function: FunctionOrdinal(972) => "scriptw:web:DOMExceptionPrototypeMessageGetter",
+        debug: "DOMExceptionPrototypeMessageGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get message",
+    }
+    DOMExceptionPrototypeCodeGetter {
+        function: FunctionOrdinal(973) => "scriptw:web:DOMExceptionPrototypeCodeGetter",
+        debug: "DOMExceptionPrototypeCodeGetter",
+        flags: [SYNCHRONOUS_USER_CODE],
+        installer: None,
+        native: "get code",
+    }
+
+
 }
 
 // Native metadata supplies both the initial public name and its frozen source

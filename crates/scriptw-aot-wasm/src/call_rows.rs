@@ -227,6 +227,14 @@ impl FunctionBuilder<'_> {
                     EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
                         self.emit_resolve_global_identifier(&key, identifier.strictness, function)?
                     }
+                    EnvironmentIdentifierResolutionStart::CapturedCell(proof) => self
+                        .emit_resolve_module_captured_identifier(
+                            proof,
+                            &identifier.name,
+                            &key,
+                            identifier.strictness,
+                            function,
+                        )?,
                 };
                 self.emit_environment_identifier_get(
                     &held,

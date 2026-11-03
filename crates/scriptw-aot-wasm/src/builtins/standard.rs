@@ -53,6 +53,100 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         match builtin {
+            StandardBuiltinId::ReadableStreamConstructor => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamGetReader => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamCancel => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamLocked => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamDefaultReaderConstructor => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamDefaultReaderRead => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamDefaultReaderCancel => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamDefaultReaderReleaseLock => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamDefaultReaderClosed => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableByteStreamControllerConstructor => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableByteStreamControllerEnqueue => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableByteStreamControllerClose => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableByteStreamControllerError => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableByteStreamControllerDesiredSize => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamStartFulfilled => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamStartRejected => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamPullFulfilled => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamPullRejected => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamCancelFulfilled => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+            StandardBuiltinId::ReadableStreamPullIfNeeded => {
+                self.emit_stream_builtin(builtin, function)?
+            }
+
+            StandardBuiltinId::AbortControllerConstructor
+            | StandardBuiltinId::AbortControllerPrototypeAbort
+            | StandardBuiltinId::AbortControllerPrototypeSignalGetter
+            | StandardBuiltinId::AbortSignalConstructor
+            | StandardBuiltinId::AbortSignalPrototypeThrowIfAborted
+            | StandardBuiltinId::AbortSignalAbort
+            | StandardBuiltinId::AbortSignalPrototypeAbortedGetter
+            | StandardBuiltinId::AbortSignalPrototypeReasonGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortGetter
+            | StandardBuiltinId::AbortSignalPrototypeOnabortSetter
+            | StandardBuiltinId::EventTargetConstructor
+            | StandardBuiltinId::EventTargetPrototypeAddEventListener
+            | StandardBuiltinId::EventTargetPrototypeRemoveEventListener
+            | StandardBuiltinId::EventTargetPrototypeDispatchEvent
+            | StandardBuiltinId::EventConstructor
+            | StandardBuiltinId::EventPrototypePreventDefault
+            | StandardBuiltinId::EventPrototypeStopPropagation
+            | StandardBuiltinId::EventPrototypeStopImmediatePropagation
+            | StandardBuiltinId::EventPrototypeTypeGetter
+            | StandardBuiltinId::EventPrototypeTargetGetter
+            | StandardBuiltinId::EventPrototypeCurrentTargetGetter
+            | StandardBuiltinId::EventPrototypeDefaultPreventedGetter
+            | StandardBuiltinId::EventPrototypeEventPhaseGetter
+            | StandardBuiltinId::EventPrototypeBubblesGetter
+            | StandardBuiltinId::EventPrototypeCancelableGetter
+            | StandardBuiltinId::EventPrototypeComposedGetter
+            | StandardBuiltinId::EventPrototypeIsTrustedGetter
+            | StandardBuiltinId::DOMExceptionConstructor
+            | StandardBuiltinId::DOMExceptionPrototypeNameGetter
+            | StandardBuiltinId::DOMExceptionPrototypeMessageGetter
+            | StandardBuiltinId::DOMExceptionPrototypeCodeGetter => {
+                self.emit_web_event_builtin(builtin, function)?
+            }
             StandardBuiltinId::ShadowRealmConstructor => {
                 self.compile_shadow_realm_constructor_builtin(function)?;
             }
@@ -159,6 +253,33 @@ impl<'a> FunctionBuilder<'a> {
             }
             StandardBuiltinId::DisposableStackConstructor => {
                 self.emit_disposable_stack_constructor(function)?;
+            }
+            StandardBuiltinId::TextEncoderConstructor => {
+                self.emit_text_encoder_constructor(function)?
+            }
+            StandardBuiltinId::TextEncoderPrototypeEncode => {
+                self.emit_text_encoder_encode(function)?
+            }
+            StandardBuiltinId::TextEncoderPrototypeEncodeInto => {
+                self.emit_text_encoder_encode_into(function)?
+            }
+            StandardBuiltinId::TextEncoderPrototypeEncodingGetter => {
+                self.emit_text_encoder_encoding_getter(function)?
+            }
+            StandardBuiltinId::TextDecoderConstructor => {
+                self.emit_text_decoder_constructor(function)?
+            }
+            StandardBuiltinId::TextDecoderPrototypeDecode => {
+                self.emit_text_decoder_decode(function)?
+            }
+            StandardBuiltinId::TextDecoderPrototypeEncodingGetter => {
+                self.emit_text_decoder_encoding_getter(function)?
+            }
+            StandardBuiltinId::TextDecoderPrototypeFatalGetter => {
+                self.emit_text_decoder_fatal_getter(function)?
+            }
+            StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter => {
+                self.emit_text_decoder_ignore_bom_getter(function)?
             }
             StandardBuiltinId::DisposableStackPrototypeUse => {
                 self.emit_disposable_stack_use(function)?;
@@ -3149,6 +3270,9 @@ impl<'a> FunctionBuilder<'a> {
             StandardBuiltinId::JsonRawJson => self.emit_json_raw_json_builtin(function)?,
             StandardBuiltinId::JsonIsRawJson => self.emit_json_is_raw_json_builtin(function)?,
             StandardBuiltinId::AtomicsAdd => self.emit_atomics_add_builtin(function)?,
+            StandardBuiltinId::QueueMicrotask => self.emit_queue_microtask_builtin(function)?,
+            StandardBuiltinId::SetTimeout => self.emit_set_timeout_builtin(function)?,
+            StandardBuiltinId::ClearTimeout => self.emit_clear_timeout_builtin(function)?,
             StandardBuiltinId::AtomicsAnd => self.emit_atomics_and_builtin(function)?,
             StandardBuiltinId::AtomicsCompareExchange => {
                 self.emit_atomics_compare_exchange_builtin(function)?

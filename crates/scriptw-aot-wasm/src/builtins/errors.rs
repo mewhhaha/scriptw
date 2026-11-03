@@ -46,14 +46,21 @@ impl FunctionBuilder<'_> {
                 let argument = schema.reserve_value_local(function);
                 let is_error = schema.reserve_i32_local(function);
                 self.emit_builtin_arg_to_value(0, &argument, function);
-                // IsError recognizes the ErrorData brand. Proxy and arbitrary
-                // ordinary objects cannot impersonate this GC record.
+                // ECMAScript errors and Web IDL DOMExceptions carry ErrorData.
+                // Proxy and ordinary objects cannot impersonate either brand.
                 argument.reference().load(function);
                 function.instruction(&Instruction::RefTestNonNull(
                     schema
                         .reference_type::<NativeErrorObject>(GcNullability::NonNullable)
                         .heap_type,
                 ));
+                argument.reference().load(function);
+                function.instruction(&Instruction::RefTestNonNull(
+                    schema
+                        .reference_type::<DOMExceptionObject>(GcNullability::NonNullable)
+                        .heap_type,
+                ));
+                function.instruction(&Instruction::I32Or);
                 is_error.store(function);
                 result.value().set_boolean(is_error, function);
                 schema.release_i32_local(is_error, function);

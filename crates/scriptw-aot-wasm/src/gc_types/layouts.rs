@@ -284,6 +284,7 @@ pub(crate) enum ExecutableCodeKind {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BuiltinClosureCaptureKind {
+    ReadableStreamController,
     IntlCollator,
     IntlNumberFormat,
     IntlDateTimeFormat,
@@ -339,7 +340,14 @@ pub(crate) enum HostResourceKind {
     WeakRef,
     FinalizationCell,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReadableStreamState {
+    Readable,
+    Closed,
+    Errored,
+}
 closed_scalar_storage!(
+    ReadableStreamState,
     HostResourceKind,
     IteratorZipMode,
     IteratorBufferMode,
@@ -1130,6 +1138,99 @@ gc_layout_registry! {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             TIME_VALUE: F64Value, Mutable, NonNullable;
         }
+        // Byte-stream state, queues and callbacks are collector-owned. No host
+        // object proxy or JS evaluator participates in stream algorithms.
+        struct ReadableStreamObject: JavaScriptObject => ReadableStreamObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            STATE: ReadableStreamState, Mutable, NonNullable;
+            STORED_ERROR: GcRef<StoredValue>, Mutable, NonNullable;
+            READER: GcRef<ReadableStreamDefaultReaderObject>, Mutable, Nullable;
+            CONTROLLER: GcRef<ReadableByteStreamControllerObject>, Mutable, Nullable;
+        }
+        struct ReadableStreamDefaultReaderObject: JavaScriptObject => ReadableStreamDefaultReaderObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            STREAM: GcRef<ReadableStreamObject>, Mutable, Nullable;
+            CLOSED: GcRef<PromiseObject>, Mutable, NonNullable;
+            READ_HEAD: GcRef<StreamReadRequest>, Mutable, Nullable;
+            READ_TAIL: GcRef<StreamReadRequest>, Mutable, Nullable;
+        }
+        struct ReadableByteStreamControllerObject: JavaScriptObject => ReadableByteStreamControllerObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            STREAM: GcRef<ReadableStreamObject>, Immutable, NonNullable;
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            SOURCE: GcRef<StoredValue>, Mutable, NonNullable;
+            PULL: GcRef<StoredValue>, Mutable, NonNullable;
+            CANCEL: GcRef<StoredValue>, Mutable, NonNullable;
+            QUEUE_HEAD: GcRef<StreamByteChunk>, Mutable, Nullable;
+            QUEUE_TAIL: GcRef<StreamByteChunk>, Mutable, Nullable;
+            QUEUE_BYTES: I64Value, Mutable, NonNullable;
+            HIGH_WATER_MARK: F64Value, Immutable, NonNullable;
+            STARTED: bool, Mutable, NonNullable;
+            CLOSE_REQUESTED: bool, Mutable, NonNullable;
+            PULLING: bool, Mutable, NonNullable;
+            PULL_AGAIN: bool, Mutable, NonNullable;
+        }
+        struct StreamByteChunk => StreamByteChunkSchema {
+            VALUE: GcRef<TypedArrayObject>, Immutable, NonNullable;
+            BYTE_LENGTH: I64Value, Immutable, NonNullable;
+            NEXT: GcRef<StreamByteChunk>, Mutable, Nullable;
+        }
+        struct StreamReadRequest => StreamReadRequestSchema {
+            PROMISE: GcRef<PromiseObject>, Immutable, NonNullable;
+            NEXT: GcRef<StreamReadRequest>, Mutable, Nullable;
+        }
+        struct EventTargetObject: JavaScriptObject => EventTargetObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            HEAD: GcRef<WebEventListener>, Mutable, Nullable;
+            TAIL: GcRef<WebEventListener>, Mutable, Nullable;
+            ONABORT: GcRef<WebEventListener>, Mutable, Nullable;
+        }
+        struct AbortControllerObject: JavaScriptObject => AbortControllerObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            SIGNAL: GcRef<AbortSignalObject>, Immutable, NonNullable;
+        }
+        struct AbortSignalObject: JavaScriptObject => AbortSignalObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            TARGET: GcRef<EventTargetObject>, Immutable, NonNullable;
+            ABORTED: bool, Mutable, NonNullable;
+            REASON: GcRef<StoredValue>, Mutable, NonNullable;
+            REGISTRATIONS: GcRef<AbortListenerRegistration>, Mutable, Nullable;
+        }
+        struct AbortListenerRegistration => AbortListenerRegistrationSchema {
+            TARGET: GcRef<EventTargetObject>, Immutable, NonNullable;
+            LISTENER: GcRef<WebEventListener>, Immutable, NonNullable;
+            NEXT: GcRef<AbortListenerRegistration>, Mutable, Nullable;
+        }
+        struct WebEventListener => WebEventListenerSchema {
+            TYPE: GcRef<StringValue>, Immutable, NonNullable;
+            CALLBACK: GcRef<StoredValue>, Mutable, NonNullable;
+            CAPTURE: bool, Immutable, NonNullable;
+            ONCE: bool, Immutable, NonNullable;
+            PASSIVE: bool, Immutable, NonNullable;
+            REMOVED: bool, Mutable, NonNullable;
+            SIGNAL: GcRef<AbortSignalObject>, Immutable, Nullable;
+            NEXT: GcRef<WebEventListener>, Mutable, Nullable;
+        }
+        array WebEventListenerTable => WebEventListenerTableSchema { ELEMENT: GcRef<WebEventListener>, Mutable, Nullable; }
+        struct WebEventObject: JavaScriptObject => WebEventObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            TYPE: GcRef<StringValue>, Immutable, NonNullable;
+            TARGET: GcRef<StoredValue>, Mutable, NonNullable;
+            CURRENT_TARGET: GcRef<StoredValue>, Mutable, NonNullable;
+            BUBBLES: bool, Immutable, NonNullable;
+            CANCELABLE: bool, Immutable, NonNullable;
+            COMPOSED: bool, Immutable, NonNullable;
+            TRUSTED: bool, Mutable, NonNullable;
+            DISPATCHING: bool, Mutable, NonNullable;
+            CANCELED: bool, Mutable, NonNullable;
+            PASSIVE: bool, Mutable, NonNullable;
+            STOP_IMMEDIATE: bool, Mutable, NonNullable;
+        }
+        struct DOMExceptionObject: JavaScriptObject => DOMExceptionObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            NAME: GcRef<StringValue>, Immutable, NonNullable;
+            MESSAGE: GcRef<StringValue>, Immutable, NonNullable;
+        }
         struct ShadowRealmObject: JavaScriptObject => ShadowRealmObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
@@ -1285,6 +1386,17 @@ gc_layout_registry! {
             BYTE_LENGTH: I64Value, Mutable, NonNullable;
         }
         array ByteArray => ByteArraySchema { ELEMENT: I8Value, Mutable, NonNullable; }
+        struct TextEncoderObject: JavaScriptObject => TextEncoderObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+        }
+        struct TextDecoderObject: JavaScriptObject => TextDecoderObjectSchema {
+            OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            FATAL: bool, Immutable, NonNullable;
+            IGNORE_BOM: bool, Immutable, NonNullable;
+            BOM_SEEN: bool, Mutable, NonNullable;
+            STREAMING: bool, Mutable, NonNullable;
+            PENDING: GcRef<ByteArray>, Mutable, NonNullable;
+        }
         struct SharedArrayBuffer: JavaScriptObject => SharedArrayBufferSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             BACKING_RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
@@ -1432,6 +1544,21 @@ gc_layout_registry! {
             ARGUMENT: GcRef<StoredValue>, Immutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, Nullable;
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
+        }
+        struct TimerTask => TimerTaskSchema {
+            CALLBACK: GcRef<StoredValue>, Immutable, NonNullable;
+            ARGUMENTS: GcRef<ValueArray>, Immutable, NonNullable;
+            OWNER_REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            DEADLINE: I64Value, Immutable, NonNullable;
+            ID: I64Value, Immutable, NonNullable;
+            NESTING: I64Value, Immutable, NonNullable;
+            CANCELLED: bool, Mutable, NonNullable;
+            NEXT: GcRef<TimerTask>, Mutable, Nullable;
+        }
+        struct TimerQueue => TimerQueueSchema {
+            HEAD: GcRef<TimerTask>, Mutable, Nullable;
+            NEXT_ID: I64Value, Mutable, NonNullable;
+            NESTING: I64Value, Mutable, NonNullable;
         }
         // CreateRealm allocates an empty record before installing globals and
         // the environment's strong back edge to this Realm.
@@ -2171,6 +2298,7 @@ gc_layout_registry! {
             REGEXP_LEGACY_ACCESSOR: GcRef<RegExpLegacyAccessorContext>, Immutable, Nullable;
             SHADOW_REALM_WRAPPED_FUNCTION: GcRef<ShadowRealmWrappedFunctionContext>, Immutable, Nullable;
             SHADOW_REALM_IMPORT: GcRef<ShadowRealmImportContext>, Immutable, Nullable;
+            READABLE_STREAM_CONTROLLER: GcRef<ReadableByteStreamControllerObject>, Immutable, Nullable;
         }
         struct ShadowRealmWrappedFunctionContext => ShadowRealmWrappedFunctionContextSchema {
             TARGET: GcRef<StoredValue>, Immutable, NonNullable;

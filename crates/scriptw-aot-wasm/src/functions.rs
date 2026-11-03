@@ -104,6 +104,23 @@ impl RealmFunctionMaterializationContext {
 /// requires an explicit change to this closed domain and its exhaustive map.
 #[derive(Clone, Copy)]
 pub(crate) enum NonArrayRealmIntrinsicSlot {
+    ReadableStreamConstructor,
+    ReadableStreamPrototype,
+    ReadableStreamDefaultReaderConstructor,
+    ReadableStreamDefaultReaderPrototype,
+    ReadableByteStreamControllerConstructor,
+    ReadableByteStreamControllerPrototype,
+
+    AbortControllerConstructor,
+    AbortControllerPrototype,
+    AbortSignalConstructor,
+    AbortSignalPrototype,
+    EventTargetConstructor,
+    EventTargetPrototype,
+    EventConstructor,
+    EventPrototype,
+    DOMExceptionConstructor,
+    DOMExceptionPrototype,
     ShadowRealmConstructor,
     ShadowRealmPrototype,
     AbstractModuleSourceConstructor,
@@ -210,6 +227,10 @@ pub(crate) enum NonArrayRealmIntrinsicSlot {
     FinalizationRegistryConstructor,
     AsyncDisposableStackConstructor,
     DisposableStackConstructor,
+    TextEncoderConstructor,
+    TextDecoderConstructor,
+    TextEncoderPrototype,
+    TextDecoderPrototype,
     SetConstructor,
     AggregateErrorConstructor,
     SuppressedErrorConstructor,
@@ -370,7 +391,7 @@ error_message_constructor_kinds! {
 /// actual caller.
 impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
-    pub(crate) const TABLE_LENGTH: u32 = 159;
+    pub(crate) const TABLE_LENGTH: u32 = 179;
 
     pub(crate) const fn is_date(self) -> bool {
         matches!(self, Self::DateConstructor | Self::DatePrototype)
@@ -538,6 +559,22 @@ impl NonArrayRealmIntrinsicSlot {
 
     pub(crate) const fn gc_index(self) -> u32 {
         match self {
+            Self::ReadableStreamConstructor => 173,
+            Self::ReadableStreamPrototype => 174,
+            Self::ReadableStreamDefaultReaderConstructor => 175,
+            Self::ReadableStreamDefaultReaderPrototype => 176,
+            Self::ReadableByteStreamControllerConstructor => 177,
+            Self::ReadableByteStreamControllerPrototype => 178,
+            Self::AbortControllerConstructor => 163,
+            Self::AbortControllerPrototype => 164,
+            Self::AbortSignalConstructor => 165,
+            Self::AbortSignalPrototype => 166,
+            Self::EventTargetConstructor => 167,
+            Self::EventTargetPrototype => 168,
+            Self::EventConstructor => 169,
+            Self::EventPrototype => 170,
+            Self::DOMExceptionConstructor => 171,
+            Self::DOMExceptionPrototype => 172,
             Self::ShadowRealmConstructor => 156,
             Self::ShadowRealmPrototype => 157,
             Self::AbstractModuleSourceConstructor => 154,
@@ -643,6 +680,10 @@ impl NonArrayRealmIntrinsicSlot {
             Self::FinalizationRegistryConstructor => 98,
             Self::AsyncDisposableStackConstructor => 99,
             Self::DisposableStackConstructor => 100,
+            Self::TextEncoderConstructor => 159,
+            Self::TextDecoderConstructor => 160,
+            Self::TextEncoderPrototype => 161,
+            Self::TextDecoderPrototype => 162,
             Self::SetConstructor => 101,
             Self::AggregateErrorConstructor => 102,
             Self::SuppressedErrorConstructor => 103,

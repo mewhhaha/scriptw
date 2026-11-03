@@ -43,6 +43,7 @@ mod aot_captured_for_await;
 mod aot_conditional_await_expressions;
 mod aot_for_await_rejection_close;
 mod aot_grouped_optional_reference_await;
+mod aot_host_tasks;
 mod aot_logical_assignment_await;
 mod aot_logical_await_expressions;
 mod aot_optional_call_await;

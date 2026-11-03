@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
+import re
 import statistics
 import tarfile
 
@@ -17,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCHIVED_ROOT = ROOT
 AUTHORITY = ROOT / 'docs/rust-rewrite/applications-current.json'
 ASSETS = AUTHORITY.parent / 'assets/applications-current'
+RSC_ASSETS = AUTHORITY.parent / 'assets/rsc-current'
+RSC_ENGINE_LABELS = {'baseline': 'Scriptw before', 'candidate': 'Scriptw current', 'v8': 'Node / V8'}
 SERVER = ('rsc-sync', 'rsc-async', 'web-url', 'web-json')
 BROWSER = ('mount', 'update', 'hydrate')
 LABELS = {'rsc-sync': 'RSC Flight · sync', 'rsc-async': 'RSC Flight · async',
@@ -26,6 +29,146 @@ LABELS = {'rsc-sync': 'RSC Flight · sync', 'rsc-async': 'RSC Flight · async',
 
 def sha(value):
     return hashlib.sha256(value).hexdigest()
+
+
+def rsc_report(path):
+    report = json.loads(path.read_text())
+    require(report['schema'] == 'scriptw-rsc-current-v1', 'foreign current RSC report')
+    require(re.fullmatch(r'\d{4}-\d{2}-\d{2}', report['date']) is not None,
+            'current RSC date must be YYYY-MM-DD')
+    measurement = report['measurement']
+    require(measurement['blocks'] == 2 and measurement['processes_per_engine'] == 8
+            and measurement['warmups'] == 3 and measurement['samples'] == 7
+            and isinstance(measurement['clock'], str) and measurement['clock'],
+            'current RSC measurement cohort differs')
+    inputs = report['inputs']
+    require(isinstance(inputs, dict) and inputs, 'current RSC input fingerprints are missing')
+    for name, value in inputs.items():
+        require(isinstance(name, str) and name and re.fullmatch(r'[0-9a-f]{64}', value) is not None,
+                'invalid current RSC input fingerprint')
+    engines = report['engines']
+    require(set(engines) == {'baseline', 'candidate', 'v8'}, 'current RSC engine inventory differs')
+    for engine_name, engine in engines.items():
+        require(isinstance(engine['label'], str) and engine['label'],
+                'current RSC engine label missing: ' + engine_name)
+        require(set(engine['cases']) == {'rsc-sync', 'rsc-async'},
+                'current RSC case inventory differs: ' + engine_name)
+        for case_name, values in engine['cases'].items():
+            require(isinstance(values, list) and len(values) == 8
+                    and all(type(value) is int and value > 0 for value in values),
+                    'current RSC case needs eight positive process medians: ' + engine_name + '/' + case_name)
+    for engine_name in ('baseline', 'candidate'):
+        phases = engines[engine_name]['phase_processes']
+        require(isinstance(phases, list) and len(phases) == 8,
+                'current RSC phase inventory needs eight processes: ' + engine_name)
+        for process in phases:
+            require(all(type(process.get(name)) is int and process[name] > 0
+                        for name in ('front_and_lower', 'wasm_emission', 'native_preparation')),
+                    'current RSC phase timings missing or nonpositive: ' + engine_name)
+    return report
+
+
+def rsc_runtime_chart(report, preview=None):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    names = ('rsc-sync', 'rsc-async')
+    engines = ('baseline', 'candidate', 'v8')
+    colors = ('#8a96a3', '#3478a8', '#d17b36')
+    width = .23
+    centers = (0, 1)
+    with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
+                         'svg.hashsalt': 'scriptw-rsc-current-runtime-v1', 'text.usetex': False}):
+        fig, ax = plt.subplots(figsize=(8, 4.1))
+        try:
+            for engine_index, (engine_name, color) in enumerate(zip(engines, colors, strict=True)):
+                engine = report['engines'][engine_name]
+                values = [statistics.median(engine['cases'][name]) / 1e6 for name in names]
+                minimum = [min(engine['cases'][name]) / 1e6 for name in names]
+                maximum = [max(engine['cases'][name]) / 1e6 for name in names]
+                positions = [center + (engine_index - 1) * width for center in centers]
+                ax.bar(positions, values, width, color=color, label=RSC_ENGINE_LABELS[engine_name],
+                       yerr=[[value - low for value, low in zip(values, minimum, strict=True)],
+                             [high - value for value, high in zip(values, maximum, strict=True)]],
+                       capsize=3, error_kw={'elinewidth': 1, 'ecolor': '#555b61'})
+                for x, value, low, high in zip(positions, values, minimum, maximum, strict=True):
+                    ax.annotate(f'{value:.3f}', (x, high), xytext=(0, 5), textcoords='offset points',
+                                ha='center', va='bottom', fontsize=9)
+            ax.set_xticks(centers, ['Sync Flight', 'Async Flight'])
+            ax.set_ylabel('Retained request · ms')
+            ax.set_title('React 19.3.1 · retained RSC module', loc='left', fontweight='bold', pad=14)
+            ax.set_axisbelow(True)
+            ax.grid(axis='y', color='#eaeef2')
+            ax.legend(frameon=False, ncol=3, loc='upper left')
+            ax.set_ylim(bottom=0, top=max(max(report['engines'][name]['cases'][case]) / 1e6
+                                         for name in engines for case in names) * 1.28)
+            for side in ('top', 'right'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(length=0, pad=7)
+            fig.subplots_adjust(left=.11, right=.97, top=.82, bottom=.16)
+            return rsc_svg(fig, 'Current React Server Components runtime', report, preview)
+        finally:
+            plt.close(fig)
+
+
+def rsc_compile_chart(report, preview=None):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    engines = ('baseline', 'candidate')
+    phases = ('front_and_lower', 'wasm_emission', 'native_preparation')
+    labels = ('Front end + lower', 'Wasm emission', 'Native preparation')
+    colors = ('#6687a3', '#e5a23d', '#4a9a79')
+    medians = {}
+    for engine_name in engines:
+        medians[engine_name] = [statistics.median(
+            process[phase] for process in report['engines'][engine_name]['phase_processes']) / 1e9
+            for phase in phases]
+    with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
+                         'svg.hashsalt': 'scriptw-rsc-current-compilation-v1', 'text.usetex': False}):
+        fig, ax = plt.subplots(figsize=(8, 4.1))
+        try:
+            positions = (0, 1)
+            bottoms = [0.0, 0.0]
+            for phase_index, (label, color) in enumerate(zip(labels, colors, strict=True)):
+                values = [medians[name][phase_index] for name in engines]
+                ax.bar(positions, values, bottom=bottoms, color=color, width=.55, label=label)
+                label_color = 'white'
+                if phase_index == 1:
+                    label_color = '#32220b'
+                for x, bottom, value in zip(positions, bottoms, values, strict=True):
+                    ax.text(x, bottom + value / 2, f'{value:.2f}', ha='center', va='center',
+                            fontsize=9, color=label_color, fontweight='bold')
+                bottoms = [bottom + value for bottom, value in zip(bottoms, values, strict=True)]
+            ax.set_xticks(positions, [RSC_ENGINE_LABELS[name] for name in engines])
+            ax.set_ylabel('Cold compile + native preparation · s')
+            ax.set_title('React 19.3.1 · cold compilation phases', loc='left', fontweight='bold', pad=14)
+            ax.set_axisbelow(True)
+            ax.grid(axis='y', color='#eaeef2')
+            ax.legend(frameon=False, ncol=3, loc='upper left')
+            for x, total in zip(positions, bottoms, strict=True):
+                ax.annotate(f'{total:.2f} s', (x, total), xytext=(0, 5), textcoords='offset points',
+                            ha='center', va='bottom', fontweight='bold')
+            ax.set_ylim(bottom=0, top=max(bottoms) * 1.24)
+            for side in ('top', 'right'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(length=0, pad=7)
+            fig.subplots_adjust(left=.11, right=.97, top=.82, bottom=.16)
+            return rsc_svg(fig, 'Current React Server Components cold compilation', report, preview)
+        finally:
+            plt.close(fig)
+
+
+def rsc_svg(fig, title, report, preview):
+    output = io.BytesIO()
+    fig.savefig(output, format='svg', facecolor='white', metadata={'Date': None, 'Title': title,
+        'Creator': 'Scriptw application charts', 'Description': json.dumps(dict(
+            date=report['date'], measurement=report['measurement'], inputs=report['inputs'],
+            source_report=report['schema']), sort_keys=True)})
+    if preview:
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(preview, dpi=110, facecolor='white')
+    return b'\n'.join(line.rstrip() for line in output.getvalue().splitlines()) + b'\n'
 
 
 def safe_path(name):
@@ -354,10 +497,11 @@ Actual standalone build/execution attempts remain visible, including failures:
 Standalone run timeouts include compilation and startup; they do not isolate
 rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
-The current Scriptw host also lacks DOM, encoding, Web Streams,
-Fetch and URL APIs, as recorded by the separate capability probe.
+At this frozen benchmark revision, Scriptw lacked DOM, encoding, Web Streams,
+Fetch and URL APIs, as recorded by its capability probe. Current-source RSC
+measurements are reported below.
 
-The [failure diagnosis](docs/rust-rewrite/applications-current.json) identifies
+The frozen [failure diagnosis](docs/rust-rewrite/applications-current.json) records
 missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
 reach `SC3002` (WASI API admission), and its nested-result case reports `SC2020`
 (dynamic `Array.slice` end unsupported). React bundles retain type-check errors.
@@ -376,7 +520,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--preview-dir', type=Path)
+    parser.add_argument('--rsc-json', type=Path,
+                        help='render only current retained-module RSC charts from a scriptw-rsc-current-v1 report')
     args = parser.parse_args()
+    if args.rsc_json:
+        current = rsc_report(args.rsc_json)
+        runtime_preview = None
+        compilation_preview = None
+        if args.preview_dir:
+            runtime_preview = args.preview_dir / 'rsc-current-runtime.png'
+            compilation_preview = args.preview_dir / 'rsc-current-compilation.png'
+        outputs = {
+            RSC_ASSETS / 'runtime.svg': rsc_runtime_chart(current, runtime_preview),
+            RSC_ASSETS / 'compilation.svg': rsc_compile_chart(current, compilation_preview),
+        }
+        for path, value in outputs.items():
+            if args.check:
+                require(path.is_file() and path.read_bytes() == value,
+                        'generated output differs: ' + str(path.relative_to(ROOT)))
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(value)
+        print('Verified two current RSC charts')
+        return
     authority = json.loads(AUTHORITY.read_text())
     require(authority['schema'] == 'scriptw-application-charts-v1', 'foreign application chart authority')
     ARCHIVED_ROOT = Path(authority['repository_root'])

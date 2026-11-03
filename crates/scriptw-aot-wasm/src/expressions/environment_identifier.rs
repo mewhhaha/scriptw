@@ -148,10 +148,10 @@ impl FunctionBuilder<'_> {
                     EnvironmentIdentifierRead::Value
                 };
                 // No source evaluation separates ResolveBinding and GetValue.
-                // Keep the held Reference entirely inside the shared runtime.
+                // Dynamic names keep both steps inside the shared runtime.
                 let record = match identifier.resolution_start() {
                     EnvironmentIdentifierResolutionStart::CurrentEnvironment => {
-                        self.resolve_env_handle_local(0, function)
+                        Some(self.resolve_env_handle_local(0, function))
                     }
                     EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
                         let global = self.emit_source_global_environment_to_local(function);
@@ -159,17 +159,31 @@ impl FunctionBuilder<'_> {
                             .reserve_gc_local(function)
                             .initialize(global.load(schema, function).nullable(), function);
                         global.clear(function);
-                        record
+                        Some(record)
+                    }
+                    EnvironmentIdentifierResolutionStart::CapturedCell(proof) => {
+                        let reference = self.emit_resolve_module_captured_identifier(
+                            proof,
+                            &identifier.name,
+                            &key,
+                            identifier.strictness,
+                            function,
+                        )?;
+                        self.emit_environment_identifier_get(&reference, read, &value, function)?;
+                        self.release_environment_identifier_reference(reference, function);
+                        None
                     }
                 };
-                self.emit_environment_identifier_read_from_record(
-                    &key,
-                    identifier.strictness,
-                    read,
-                    record,
-                    &value,
-                    function,
-                )?;
+                if let Some(record) = record {
+                    self.emit_environment_identifier_read_from_record(
+                        &key,
+                        identifier.strictness,
+                        read,
+                        record,
+                        &value,
+                        function,
+                    )?;
+                }
                 if matches!(identifier.operation, Operation::Typeof) {
                     self.emit_typeof_value(&value, output, function)?;
                 } else {
@@ -194,6 +208,14 @@ impl FunctionBuilder<'_> {
             EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
                 self.emit_resolve_global_identifier(&key, identifier.strictness, function)?
             }
+            EnvironmentIdentifierResolutionStart::CapturedCell(proof) => self
+                .emit_resolve_module_captured_identifier(
+                    proof,
+                    &identifier.name,
+                    &key,
+                    identifier.strictness,
+                    function,
+                )?,
         };
         match &identifier.operation {
             Operation::Assign { value: rhs } => {

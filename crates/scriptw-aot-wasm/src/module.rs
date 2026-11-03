@@ -129,10 +129,77 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
     builtin: StandardBuiltinId,
 ) -> Option<crate::functions::NonArrayRealmIntrinsicSlot> {
     match builtin {
+        StandardBuiltinId::ReadableStreamConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::ReadableStreamConstructor)
+        }
+        StandardBuiltinId::ReadableStreamDefaultReaderConstructor => Some(
+            crate::functions::NonArrayRealmIntrinsicSlot::ReadableStreamDefaultReaderConstructor,
+        ),
+        StandardBuiltinId::ReadableByteStreamControllerConstructor => Some(
+            crate::functions::NonArrayRealmIntrinsicSlot::ReadableByteStreamControllerConstructor,
+        ),
+        StandardBuiltinId::ReadableStreamGetReader => None,
+        StandardBuiltinId::ReadableStreamCancel => None,
+        StandardBuiltinId::ReadableStreamLocked => None,
+        StandardBuiltinId::ReadableStreamDefaultReaderRead => None,
+        StandardBuiltinId::ReadableStreamDefaultReaderCancel => None,
+        StandardBuiltinId::ReadableStreamDefaultReaderReleaseLock => None,
+        StandardBuiltinId::ReadableStreamDefaultReaderClosed => None,
+        StandardBuiltinId::ReadableByteStreamControllerEnqueue => None,
+        StandardBuiltinId::ReadableByteStreamControllerClose => None,
+        StandardBuiltinId::ReadableByteStreamControllerError => None,
+        StandardBuiltinId::ReadableByteStreamControllerDesiredSize => None,
+        StandardBuiltinId::ReadableStreamStartFulfilled => None,
+        StandardBuiltinId::ReadableStreamStartRejected => None,
+        StandardBuiltinId::ReadableStreamPullFulfilled => None,
+        StandardBuiltinId::ReadableStreamPullRejected => None,
+        StandardBuiltinId::ReadableStreamCancelFulfilled => None,
+        StandardBuiltinId::ReadableStreamPullIfNeeded => None,
+        StandardBuiltinId::AbortControllerConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::AbortControllerConstructor)
+        }
+        StandardBuiltinId::AbortSignalConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::AbortSignalConstructor)
+        }
+        StandardBuiltinId::EventTargetConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::EventTargetConstructor)
+        }
+        StandardBuiltinId::EventConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::EventConstructor)
+        }
+        StandardBuiltinId::DOMExceptionConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::DOMExceptionConstructor)
+        }
         StandardBuiltinId::ShadowRealmConstructor => {
             Some(crate::functions::NonArrayRealmIntrinsicSlot::ShadowRealmConstructor)
         }
-        StandardBuiltinId::ShadowRealmPrototypeEvaluate
+        StandardBuiltinId::AbortControllerPrototypeAbort
+        | StandardBuiltinId::AbortControllerPrototypeSignalGetter
+        | StandardBuiltinId::AbortSignalPrototypeThrowIfAborted
+        | StandardBuiltinId::AbortSignalAbort
+        | StandardBuiltinId::AbortSignalPrototypeAbortedGetter
+        | StandardBuiltinId::AbortSignalPrototypeReasonGetter
+        | StandardBuiltinId::AbortSignalPrototypeOnabortGetter
+        | StandardBuiltinId::AbortSignalPrototypeOnabortSetter
+        | StandardBuiltinId::EventTargetPrototypeAddEventListener
+        | StandardBuiltinId::EventTargetPrototypeRemoveEventListener
+        | StandardBuiltinId::EventTargetPrototypeDispatchEvent
+        | StandardBuiltinId::EventPrototypePreventDefault
+        | StandardBuiltinId::EventPrototypeStopPropagation
+        | StandardBuiltinId::EventPrototypeStopImmediatePropagation
+        | StandardBuiltinId::EventPrototypeTypeGetter
+        | StandardBuiltinId::EventPrototypeTargetGetter
+        | StandardBuiltinId::EventPrototypeCurrentTargetGetter
+        | StandardBuiltinId::EventPrototypeDefaultPreventedGetter
+        | StandardBuiltinId::EventPrototypeEventPhaseGetter
+        | StandardBuiltinId::EventPrototypeBubblesGetter
+        | StandardBuiltinId::EventPrototypeCancelableGetter
+        | StandardBuiltinId::EventPrototypeComposedGetter
+        | StandardBuiltinId::EventPrototypeIsTrustedGetter
+        | StandardBuiltinId::DOMExceptionPrototypeNameGetter
+        | StandardBuiltinId::DOMExceptionPrototypeMessageGetter
+        | StandardBuiltinId::DOMExceptionPrototypeCodeGetter
+        | StandardBuiltinId::ShadowRealmPrototypeEvaluate
         | StandardBuiltinId::ShadowRealmPrototypeImportValue
         | StandardBuiltinId::ShadowRealmWrappedFunctionCall
         | StandardBuiltinId::ShadowRealmImportFulfilled
@@ -166,6 +233,12 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         }
         StandardBuiltinId::DisposableStackConstructor => {
             Some(crate::functions::NonArrayRealmIntrinsicSlot::DisposableStackConstructor)
+        }
+        StandardBuiltinId::TextEncoderConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::TextEncoderConstructor)
+        }
+        StandardBuiltinId::TextDecoderConstructor => {
+            Some(crate::functions::NonArrayRealmIntrinsicSlot::TextDecoderConstructor)
         }
         StandardBuiltinId::SetConstructor => {
             Some(crate::functions::NonArrayRealmIntrinsicSlot::SetConstructor)
@@ -777,6 +850,9 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         | StandardBuiltinId::AtomicsStore
         | StandardBuiltinId::AtomicsWait
         | StandardBuiltinId::AtomicsWaitAsync
+        | StandardBuiltinId::QueueMicrotask
+        | StandardBuiltinId::SetTimeout
+        | StandardBuiltinId::ClearTimeout
         | StandardBuiltinId::AtomicsXor
         | StandardBuiltinId::AtomicsIsLockFree
         | StandardBuiltinId::Escape
@@ -1170,6 +1246,13 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         | StandardBuiltinId::DisposableStackPrototypeMove
         | StandardBuiltinId::DisposableStackPrototypeDispose
         | StandardBuiltinId::DisposableStackPrototypeDisposedGetter
+        | StandardBuiltinId::TextEncoderPrototypeEncode
+        | StandardBuiltinId::TextEncoderPrototypeEncodeInto
+        | StandardBuiltinId::TextEncoderPrototypeEncodingGetter
+        | StandardBuiltinId::TextDecoderPrototypeDecode
+        | StandardBuiltinId::TextDecoderPrototypeEncodingGetter
+        | StandardBuiltinId::TextDecoderPrototypeFatalGetter
+        | StandardBuiltinId::TextDecoderPrototypeIgnoreBOMGetter
         | StandardBuiltinId::FunctionPrototype
         | StandardBuiltinId::FunctionPrototypeSymbolHasInstance => None,
     }

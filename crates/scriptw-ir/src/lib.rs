@@ -54,6 +54,7 @@ use num_traits::ToPrimitive;
 use scriptw_front::{ParseGoal, ParsedModule, ParsedScript, ParsedSource, SourceUnit};
 
 mod analysis;
+pub use analysis::ModuleCapturedCellIr;
 pub mod foreign;
 mod language_features;
 pub use language_features::{LanguageFeaturePolicy, PrivateElementExtensibility};

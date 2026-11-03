@@ -24,6 +24,7 @@ mod promise_species_realm_context;
 mod promise_try_callback_type_error;
 mod promise_with_resolvers_result_allocation;
 mod scheduling_helpers;
+mod tasks;
 
 pub(crate) enum AsyncGeneratorCompleteStepKind {
     Yielded,
@@ -1861,6 +1862,43 @@ impl<'a> FunctionBuilder<'a> {
         emitted
     }
 
+    /// Internal observers consume an actual Promise record. This intentionally
+    /// does not perform ECMAScript PromiseResolve: Web-IDL callers own their
+    /// fresh Promise conversion and its ordinary then assimilation.
+    pub(in crate::builtins) fn emit_perform_promise_then_without_capability(
+        &mut self,
+        promise: &GcLocal<PromiseObject>,
+        fulfilled: &ValueLocals,
+        rejected: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let capability = schema
+            .reserve_gc_local::<PromiseCapability, Nullable>(function)
+            .initialize_null(schema, function);
+        let fulfill = self.emit_initialize_promise_reaction(
+            PromiseReactionType::Fulfill,
+            &PromiseReactionInitialization::Default {
+                handler: fulfilled,
+                capability: &capability,
+            },
+            function,
+        );
+        let reject = self.emit_initialize_promise_reaction(
+            PromiseReactionType::Reject,
+            &PromiseReactionInitialization::Default {
+                handler: rejected,
+                capability: &capability,
+            },
+            function,
+        );
+        self.emit_route_promise_reaction_pair(promise, &fulfill, &reject, function)?;
+        reject.clear(function);
+        fulfill.clear(function);
+        capability.clear(function);
+        Ok(())
+    }
+
     fn emit_intrinsic_await_reactions(
         &mut self,
         value: &ValueLocals,
@@ -3352,6 +3390,17 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::I32Eq);
             function.instruction(&Instruction::If(BlockType::Empty));
             match selected {
+                PromiseJobKind::Callback => {
+                    let stored = schema.reserve_gc_local(function).initialize(
+                        schema
+                            .field(PendingJobSchema::ARGUMENT)
+                            .read(&job, schema, function)
+                            .reference(),
+                        function,
+                    );
+                    self.emit_run_microtask_callback(&stored, function)?;
+                    stored.clear(function);
+                }
                 PromiseJobKind::FinalizationCleanup => {
                     let registry = schema.reserve_gc_local(function).initialize(
                         schema

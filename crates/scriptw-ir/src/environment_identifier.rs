@@ -196,9 +196,24 @@ pub struct EnvironmentIdentifierIr {
 pub enum EnvironmentIdentifierResolutionStart {
     CurrentEnvironment,
     GlobalEnvironment,
+    CapturedCell(crate::ModuleCapturedCellIr),
 }
 
 impl EnvironmentIdentifierIr {
+    pub(crate) fn captured_cell(
+        name: String,
+        strictness: Strictness,
+        operation: EnvironmentIdentifierOperationIr,
+        cell: crate::ModuleCapturedCellIr,
+    ) -> Self {
+        Self {
+            name,
+            strictness,
+            operation,
+            resolution_start: EnvironmentIdentifierResolutionStart::CapturedCell(cell),
+        }
+    }
+
     pub(crate) fn current(
         name: String,
         strictness: Strictness,

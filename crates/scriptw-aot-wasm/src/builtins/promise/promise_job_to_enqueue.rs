@@ -3,6 +3,9 @@ use super::*;
 /// A queue append must carry the exact target, full argument and Realm policy.
 /// Reaction and thenable payloads cannot occupy each other's target fields.
 enum PromiseJobToEnqueue<'a> {
+    Callback {
+        callback: &'a ValueLocals,
+    },
     FinalizationCleanup {
         registry: &'a GcLocal<FinalizationRegistryObject>,
     },
@@ -17,6 +20,13 @@ enum PromiseJobToEnqueue<'a> {
 }
 
 impl FunctionBuilder<'_> {
+    pub(crate) fn emit_enqueue_microtask_callback(
+        &mut self,
+        callback: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.emit_enqueue_promise_job(PromiseJobToEnqueue::Callback { callback }, function)
+    }
     pub(crate) fn emit_enqueue_finalization_job(
         &mut self,
         registry: &GcLocal<FinalizationRegistryObject>,
@@ -91,6 +101,33 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let job: GcLocal<PendingJob> = match selected {
+            PromiseJobToEnqueue::Callback { callback } => {
+                let value = schema.reserve_gc_local(function).initialize(
+                    schema
+                        .struct_type::<StoredValue>()
+                        .from_value(callback, function),
+                    function,
+                );
+                let realm = self.emit_promise_job_callback_realm(callback, function)?;
+                let job = schema.reserve_gc_local(function).initialize(
+                    schema.struct_type::<PendingJob>().construct(
+                        (
+                            GcOperand::constant(PromiseJobKind::Callback),
+                            GcOperand::null(schema),
+                            GcOperand::null(schema),
+                            GcOperand::null(schema),
+                            GcOperand::reference(&value, schema),
+                            GcOperand::nullable_reference(&realm, schema),
+                            GcOperand::null(schema),
+                        ),
+                        function,
+                    ),
+                    function,
+                );
+                realm.clear(function);
+                value.clear(function);
+                job
+            }
             PromiseJobToEnqueue::FinalizationCleanup { registry } => {
                 let undefined = schema.reserve_value_local(function);
                 undefined.set_undefined(function);

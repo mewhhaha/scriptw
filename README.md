@@ -36,7 +36,7 @@ created equal Strings retain the ordinary lazy hash path. Linked-module caching
 keeps an admitted runtime resident when its program cannot share the configured
 entry or image-byte budget. Programs still execute in fresh Stores and Realms.
 Runtime admission avoids re-serializing validated receipts. Embedded calls reuse
-host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 46
+host execution stacks; callers own Store and Realm lifetimes. Runtime ABI 47
 requires rebuilding older Portable bundles and native images. Native images use
 binary execution facts (`SCRWEP03`).
 Abstract equality, BigInt equality and for-in advancement share compiled Wasm
@@ -275,10 +275,11 @@ Actual standalone build/execution attempts remain visible, including failures:
 Standalone run timeouts include compilation and startup; they do not isolate
 rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
-The current Scriptw host also lacks DOM, encoding, Web Streams,
-Fetch and URL APIs, as recorded by the separate capability probe.
+At this frozen benchmark revision, Scriptw lacked DOM, encoding, Web Streams,
+Fetch and URL APIs, as recorded by its capability probe. Current-source RSC
+measurements are reported below.
 
-The [failure diagnosis](docs/rust-rewrite/applications-current.json) identifies
+The frozen [failure diagnosis](docs/rust-rewrite/applications-current.json) records
 missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
 reach `SC3002` (WASI API admission), and its nested-result case reports `SC2020`
 (dynamic `Array.slice` end unsupported). React bundles retain type-check errors.
@@ -290,14 +291,46 @@ compilation; a debugger sample finds Cranelift optimization active at 20 seconds
 [Workflow](CONTRIBUTING.md#react-and-edge-benchmarks).
 <!-- application-benchmarks:end -->
 
+## Current React Server Components
+
+Measured **2026-11-03** with pinned React 19.3.1 and one retained module per
+process. Both sync and async Flight outputs match Node exactly.
+
+| Engine | Sync · ms | Async · ms |
+| --- | ---: | ---: |
+| Scriptw platform baseline | 28.827 | 31.844 |
+| Scriptw candidate | 23.372 | 26.186 |
+| Node 24.12.0 / V8 | 0.476 | 0.393 |
+
+![Matched retained RSC request timings](docs/rust-rewrite/assets/rsc-current/runtime.svg)
+
+Each engine uses eight fresh processes across two balanced blocks, with three
+checked warmups and seven measured requests per mode. Scriptw's request clock
+covers the retained call through full Flight consumption; Node uses the same
+bundle and wrapper in one `vm.SourceTextModule`/Realm for sync then async. JSON
+encoding and exact-output checks follow the clock. Candidate medians are 18.9%
+and 17.8% below baseline; this combines captured-cell and timer-owner changes,
+so it does not isolate either change or claim engine parity.
+
+Runtime ABI 47 adds bounded `TextEncoder`/`TextDecoder`, byte `ReadableStream`
+sources with default readers, events, abort signals, `DOMException`, microtasks
+and timers. This is not full Web API or WHATWG Streams conformance;
+Fetch/Request/URL integration and DOM nodes remain unsupported.
+
+Cold phase medians are similar: source-to-Wasm is 3.629 s / 3.625 s and native
+preparation 12.464 s / 12.524 s (baseline / candidate). Program Wasm grows 1.36%,
+from 7,551,136 to 7,653,675 bytes; no cold-preparation improvement is claimed.
+
+![RSC cold compilation phases](docs/rust-rewrite/assets/rsc-current/compilation.svg)
+
+[Current report](docs/rust-rewrite/rsc-current.json) ·
+[Inert evidence archive](docs/rust-rewrite/rsc-current-evidence-2026-11-03.tar.xz).
+
 The [shared-kernel replay](docs/rust-rewrite/react-codegen-20261102.json) reduces
 SSR's largest function from 2,014,440 to 1,110,482 Wasm bytes. All three ordinary
 runs render correctly in 41.2–41.9 seconds; benchmark preparation finishes in
 56.6 seconds under its original 60-second limit, followed by ten checked renders.
 All 79 pinned modulus variants pass, including the previously crashing BigInt case.
-RSC still needs `TextEncoder` and related Web APIs; Request-based handlers need
-`Request`. The client case still times out. These replays do not replace the
-dated cross-engine benchmark results above.
 Two [native compiler experiments](docs/rust-rewrite/native-compiler-probes-20261103.json)
 left compilation near 50 seconds with identical machine code; both were reverted.
 

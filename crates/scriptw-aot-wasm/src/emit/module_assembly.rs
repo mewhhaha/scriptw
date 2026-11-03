@@ -93,6 +93,7 @@ fn emit_script_module_with_factory(
         Vec::new()
     };
     let uses_shared_memory = uses_agent_host
+        || compiled_standard_builtins.contains(&StandardBuiltinId::SetTimeout)
         || script_references_memory_atomics(script)
         || compiled_standard_builtins.iter().copied().any(|builtin| {
             standard_builtin_uses_memory_atomics(builtin)
@@ -101,6 +102,8 @@ fn emit_script_module_with_factory(
     let uses_atomics_wait = compiled_standard_builtins.contains(&StandardBuiltinId::AtomicsWait);
     let uses_atomics_wait_async =
         compiled_standard_builtins.contains(&StandardBuiltinId::AtomicsWaitAsync);
+    let uses_scheduling_clock = uses_atomics_wait_async
+        || compiled_standard_builtins.contains(&StandardBuiltinId::SetTimeout);
     let uses_agent_call = uses_agent_host || uses_atomics_wait_async;
     // Carrier bodies and these Duration bodies can inline calendar helpers in
     // the initial compilation pass. Namespace bootstrap roots are materialized
@@ -167,7 +170,7 @@ fn emit_script_module_with_factory(
         uses_number_pow_import.then_some(1 + u32::from(uses_host_print));
     let wall_clock_millis_import_function_index = uses_wall_clock_millis
         .then_some(1 + u32::from(uses_host_print) + u32::from(uses_number_pow_import));
-    let monotonic_clock_nanos_import_function_index = uses_atomics_wait_async.then_some(
+    let monotonic_clock_nanos_import_function_index = uses_scheduling_clock.then_some(
         1 + u32::from(uses_host_print)
             + u32::from(uses_number_pow_import)
             + u32::from(uses_wall_clock_millis),
@@ -178,7 +181,7 @@ fn emit_script_module_with_factory(
         1 + u32::from(uses_host_print)
             + u32::from(uses_number_pow_import)
             + u32::from(uses_wall_clock_millis)
-            + 2 * u32::from(uses_atomics_wait_async),
+            + 2 * u32::from(uses_scheduling_clock),
     );
     // Provider calls are declared in the typed GC host profile below. Numeric
     // scalar imports carry no JavaScript reference or private byte-array handle.
@@ -186,7 +189,7 @@ fn emit_script_module_with_factory(
         1 + u32::from(uses_host_print)
             + u32::from(uses_number_pow_import)
             + u32::from(uses_wall_clock_millis)
-            + 2 * u32::from(uses_atomics_wait_async)
+            + 2 * u32::from(uses_scheduling_clock)
             + u32::from(uses_agent_call),
     );
     // The Math block is appended after every existing optional host
@@ -199,7 +202,7 @@ fn emit_script_module_with_factory(
         + u32::from(uses_host_print)
         + u32::from(uses_number_pow_import)
         + u32::from(uses_wall_clock_millis)
-        + 2 * u32::from(uses_atomics_wait_async)
+        + 2 * u32::from(uses_scheduling_clock)
         + u32::from(uses_agent_call)
         + u32::from(uses_random_f64);
     let math_acos_import_function_index = uses_math_acos
@@ -1602,7 +1605,7 @@ fn emit_script_module_with_factory(
         );
     }
     if uses_shared_memory {
-        if uses_atomics_wait_async {
+        if uses_scheduling_clock {
             imports.import(
                 HOST_IMPORT_MODULE,
                 HOST_IMPORT_MONOTONIC_CLOCK_NANOS,
@@ -1935,7 +1938,7 @@ fn emit_script_module_with_factory(
             "import memory: {HOST_IMPORT_MODULE}.{HOST_IMPORT_SHARED_MEMORY}"
         ));
     }
-    if uses_atomics_wait_async {
+    if uses_scheduling_clock {
         debug_dump.push(format!(
             "import func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_MONOTONIC_CLOCK_NANOS}"
         ));

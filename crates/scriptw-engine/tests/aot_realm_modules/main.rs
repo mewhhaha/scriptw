@@ -31,6 +31,7 @@ mod aot_indirect_eval_admission;
 mod aot_intrinsic_receiver_observation;
 mod aot_json_modules;
 mod aot_module_async_lifecycle;
+mod aot_module_captured_cells;
 mod aot_module_default_export_names;
 mod aot_module_entry_completion;
 mod aot_module_import_jobs;

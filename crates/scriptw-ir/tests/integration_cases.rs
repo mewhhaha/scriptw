@@ -202,6 +202,8 @@ mod logical_assignment_await;
 mod logical_assignment_reachability_structure;
 #[path = "logical_await_expressions.rs"]
 mod logical_await_expressions;
+#[path = "module_captured_cells.rs"]
+mod module_captured_cells;
 #[path = "module_default_export_names.rs"]
 mod module_default_export_names;
 #[path = "module_entry_completion.rs"]

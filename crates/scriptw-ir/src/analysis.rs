@@ -10,6 +10,8 @@ use boa_ast::pattern::{ArrayPattern, ObjectPattern};
 pub(crate) use eval_environment::{
     CompleteResumableForInOwner, CompleteResumableForOfOwner, MixedAsyncGeneratorWithOwner,
 };
+pub(crate) use module_locals::ModuleCaptureOwners;
+pub use module_locals::ModuleCapturedCellIr;
 use std::sync::Arc;
 
 /// Necessary syntax condition only; intrinsic eval identity remains a lowering proof.
@@ -287,6 +289,7 @@ impl AnalysisAllocationState {
 pub(crate) struct Analysis<'a> {
     pub(crate) binding_inference: OwnerBindingInference<'a>,
     pub(crate) module_local_candidates: BTreeMap<FunctionId, BTreeSet<String>>,
+    pub(crate) module_capture_owners: ModuleCaptureOwners,
     pub(crate) template_source: Option<TemplateSourceIr>,
     pub(crate) function_global_hints: crate::prepared_source_cache::FunctionGlobalConstructorHints,
     pub(crate) source_function_global_hypotheses:
@@ -488,8 +491,12 @@ impl<'a> AnalysisBuilder<'a> {
                     )
                 ))
             || eval_environment::contains_direct_eval_call(script)
-            || eval_environment::contains_annex_b_arguments_candidate(script)
-            || eval_environment::contains_arguments_reference(script);
+            || eval_environment::contains_annex_b_arguments_candidate(script);
+        // Stable captures do not require private-local elimination. Preserve
+        // all arguments aliases and named allocation below, but distinguish
+        // that storage requirement from actual dynamic binding creation.
+        let module_capture_owners = self.realm_reusable_module_environments && !self.eval_visible;
+        self.eval_visible |= eval_environment::contains_arguments_reference(script);
         // Reusable Realm lookup needs named nonlocals, but does not expose
         // uncaptured function locals to eval. Actual eval/arguments syntax
         // conservatively retains the complete existing environment plan.
@@ -634,6 +641,11 @@ impl<'a> AnalysisBuilder<'a> {
             );
         }
         self.finalize_with_continuation_owners();
+        let module_capture_owners = if module_capture_owners {
+            ModuleCaptureOwners::collect(&self)
+        } else {
+            ModuleCaptureOwners::default()
+        };
         if module_local_candidates {
             self.plan_module_local_candidates();
         }
@@ -653,6 +665,7 @@ impl<'a> AnalysisBuilder<'a> {
         Analysis {
             binding_inference,
             module_local_candidates: self.module_local_candidates,
+            module_capture_owners,
             function_global_hints: Default::default(),
             source_function_global_hypotheses: Default::default(),
             template_source: self.template_source,
