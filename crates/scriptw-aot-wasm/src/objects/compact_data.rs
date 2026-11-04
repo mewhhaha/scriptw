@@ -759,7 +759,8 @@ impl FunctionBuilder<'_> {
         tags.clear(f);
     }
 
-    /// Allocation-free own data probe for the sole ordinary object model.
+    /// Callback-free own data probe for the sole ordinary object model.
+    /// Internal recipes may allocate and normalize in their defining Realm.
     /// Accessors and absence both miss, leaving full Get/descriptor consumers
     /// free to preserve their required semantics.
     pub(crate) fn emit_ordinary_own_data_value(

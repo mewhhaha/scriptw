@@ -322,12 +322,12 @@ impl CompactRegionTypes {
     }
 }
 
-fn compact_string_equality(artifact: &WasmArtifact) -> Option<u32> {
+fn compact_runtime_helper(artifact: &WasmArtifact, helper: &str) -> Option<u32> {
     let runtime = artifact.runtime().expect("ordinary canonical runtime");
     let equality = function_names_in_bytes(runtime.bytes())
         .into_iter()
-        .find_map(|(index, name)| (name == "helper::string_equality").then_some(index))
-        .expect("canonical pure String equality helper");
+        .find_map(|(index, name)| (name == helper).then_some(index))
+        .expect("canonical row preparation helper");
     imported_runtime_function_index(artifact, equality)
 }
 
@@ -539,7 +539,8 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
     let types = CompactRegionTypes::new();
     let source = "function varied(rows,column,start,total){'use strict';for(var i=start;i<rows.length;i++)total+=rows[i].values[column]+rows[i].more[column];return total;}varied([],0,0,0);";
     let artifact = emit_script(source).expect("prefix continuation emits");
-    let equality = compact_string_equality(&artifact);
+    let equality = compact_runtime_helper(&artifact, "helper::string_equality");
+    let finder = compact_runtime_helper(&artifact, "helper::ordinary_property_find");
     with_source_artifact_variants(artifact, "varied", |name, operators| {
         let compact = compact_loop_ranges(operators, &types);
         assert_eq!(compact.len(), 1, "actual guarded row loop: {name}");
@@ -560,9 +561,23 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
                 _ => {}
             }
         }
-        let done = *frames.last().expect("rotated loop has an enclosing exit");
+        let mode_if = *frames
+            .last()
+            .expect("mode selection encloses each row loop");
+        assert!(matches!(operators[mode_if], Operator::If { .. }));
+        let done_frame = frames.len() - 2;
+        let done = frames[done_frame];
         assert!(matches!(operators[done], Operator::Block { .. }));
-        let preheader = &operators[done + 1..range.start - 1];
+        let exit_depth = (frames.len() - done_frame) as u32;
+        let Operator::LocalGet { local_index: mode } = operators[mode_if - 1] else {
+            panic!("one storage-mode choice precedes both backedges");
+        };
+        assert!(
+            !region.iter().any(|op| matches!(op,
+            Operator::LocalGet { local_index } if *local_index == mode)),
+            "the inline backedge contains no storage-mode redispatch"
+        );
+        let preheader = &operators[done + 1..mode_if - 1];
         let [Operator::LocalGet {
             local_index: cursor,
         }, Operator::LocalGet {
@@ -600,8 +615,8 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
             [Operator::LocalGet { local_index: actual_cursor },
              Operator::LocalGet { local_index: actual_length },
              Operator::I32WrapI64, Operator::I32LtU, Operator::I32Eqz,
-             Operator::BrIf { relative_depth: 1 }]
-                if actual_cursor == cursor && actual_length == length)
+             Operator::BrIf { relative_depth }]
+                if actual_cursor == cursor && actual_length == length && *relative_depth == exit_depth)
             })
             .expect("the updated mirror is bounded before inspecting another row");
         assert_eq!(
@@ -625,21 +640,25 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
         );
         assert!(
             matches!(
-                region[region.len() - 4..],
+                &region[region.len() - 4..],
                 [
                     Operator::LocalGet { .. },
                     Operator::I32Eqz,
-                    Operator::BrIf { relative_depth: 1 },
+                    Operator::BrIf { relative_depth },
                     Operator::Br { relative_depth: 0 }
-                ]
+                ] if *relative_depth == exit_depth
             ),
             "next-row rejection publishes the prefix; success returns to the sole body"
         );
         let first_guard = &preheader[6..preheader.len() - 3];
         let next_guard = &region[bound + 6..region.len() - 4];
         assert!(
-            compact_readonly_operators(first_guard, equality),
-            "first-row setup neither mutates the heap nor resolves Strings or properties"
+            first_guard.iter().all(|op| match op {
+                Operator::Call { function_index } =>
+                    Some(*function_index) == equality || Some(*function_index) == finder,
+                _ => compact_readonly_operators(std::slice::from_ref(op), None),
+            }),
+            "first-row setup only calls pure String equality or the concretely guarded dictionary finder"
         );
         assert!(
             next_guard.iter().all(|op| !matches!(op, Operator::F64Add)),

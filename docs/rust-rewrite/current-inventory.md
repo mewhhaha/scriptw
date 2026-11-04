@@ -8,22 +8,23 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-Use the [19 focused programs and scores](benchmarks.md#focused-performance-situations)
+Use the [21 focused programs and scores](benchmarks.md#focused-performance-situations)
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Measure remaining call transport after canonical local-argument entries and
-  guarded direct calls. Attribute executed entry coverage, argument vectors and
-  activation allocation before widening the two-formal admission or inlining
-  larger source bodies. React's five-formal `vn`/`ft` helpers are outside that
-  transport bound; exclusion alone does not establish their cost. Preserve
+- Measure unnecessary initialization guards on proven simple local formals,
+  then remaining call transport and activation allocation. React's five-formal
+  `vn`/`ft` helpers remain outside the two-formal local-entry bound; exclusion
+  alone does not establish their cost. Preserve source binding ownership,
+  non-simple parameter TDZ, arguments snapshots and captures, as well as
   callee identity, Realm, captures, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Reduce remaining function and intrinsic metadata costs after closed numeric
-  row-loop admission. Measure concrete current own-data descriptor coverage
-  before expanding storage borrowing or slot caching. Preserve live guards,
-  private alias publication and complete accessor/Proxy/coercion fallback.
-  Owner: AOT scalar Number-loop planning and object reads.
+- Reduce preflight and allocation costs in closed numeric row loops. Complete
+  read-only periods now project Number/string-length leaves through canonical
+  own-data reads into the existing numeric array layout. Measure the remaining
+  ordinary-metadata gap, short-loop refusals and native frames; preserve whole-loop
+  fallback and original alias identity. Mixed/Number strict equality remains
+  a separate hill. Owner: AOT scalar-loop planning and object reads.
 - Measure scalar replacement of strict arguments index/length reads. A missing
   own index can expose the object through a prototype getter; short argument
   lists must retain real object semantics. Preserve original actual count and

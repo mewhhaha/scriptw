@@ -23,6 +23,14 @@ against dynamic, shadowed, numeric and loose controls. Engine fixtures exercise
 both operand orders, every value category, GC/reentry, whole Throws, TDZ and
 HTMLDDA under strict and sloppy source modes.
 
+The spec dispatcher directly publishes the catalog's seven infallible Boolean
+operations: IsCallable, IsConstructor, IsPropertyKey, ToBoolean, SameValue,
+SameValueZero and StrictEqualityComparison. A compile-time catalog check pins
+that complete set and its operand domains. Operands still evaluate in order and
+can throw; only the selected kernel is infallible. It writes the Boolean output
+and the complete current Normal completion without a temporary Completion,
+Normal test or second value copy. Loose equality keeps its coercion/Throw path.
+
 ```sh
 cargo test -p scriptw-aot-wasm --test emission -- singleton_comparisons::
 cargo test -p scriptw-engine --test aot_language -- aot_strict_singleton_comparisons::

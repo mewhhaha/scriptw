@@ -34,19 +34,18 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// An expression operand lives in the real local-binding arena. The scope
-    /// keeps only its copied ID; releasing that ID clears the owned reference.
+    /// An already-evaluated operand owns initialized compiler storage, not a
+    /// source declaration or TDZ. The scope retains its arena ID until release.
     pub(crate) fn retain_expression_operand(
         &mut self,
         name: &str,
         value: &ValueLocals,
         function: &mut Function,
     ) -> (TypedExpr, crate::emit::LocalBindingId) {
-        let storage = self.allocate_local_binding(BindingMode::Let, function);
+        let storage = self.allocate_compiler_temporary_binding(value, function);
         let BindingStorage::Local(id) = storage else {
             unreachable!("local binding allocation returns its owned arena identity")
         };
-        self.write_binding_from_locals(storage, value, function);
         self.binding_scopes
             .last_mut()
             .expect("operand scope exists")

@@ -6,7 +6,11 @@ Reference is created; later emission must not substitute its own context.
 
 Evaluate an assignment target once. Reads borrow the resolved Reference;
 writes consume it. Effectful base/key temporaries remain pinned until the
-operation finishes. Compound assignments retain the old value before evaluating
+operation finishes. Already-evaluated expression operands use the initialized
+compiler-temporary constructor in the same local-binding arena; they acquire no
+source TDZ flag. Their scopes release the owned Value roots after use. Source
+lexical bindings and suspension-owned captures keep their existing initialization
+and storage protocols. Compound assignments retain the old value before evaluating
 the RHS. Logical assignments keep the RHS lazy and write only on the selected
 branch. Numeric updates preserve ToNumeric, prefix/postfix result choice and
 Number/BigInt identity.

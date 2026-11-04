@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parents[2]
 class SituationTests(unittest.TestCase):
     def test_inventory_has_bounded_independently_climbable_families(self):
         entries = situations.workloads()
-        self.assertEqual(len(entries), 19)
-        self.assertEqual(len({entry['file'] for entry in entries}), 19)
+        self.assertEqual(len(entries), 21)
+        self.assertEqual(len({entry['file'] for entry in entries}), 21)
         self.assertEqual({entry['category'] for entry in entries}, {
             'control', 'global lookup', 'frame size', 'arguments observation',
-            'property mutation history', 'function properties', 'type tests', 'enumeration'})
+            'property mutation history', 'function properties', 'type tests', 'enumeration', 'strict equality'})
         for entry in entries:
             with self.subTest(file=entry['file']):
                 self.assertLess(len(entry['source'].encode()), 40000)
@@ -49,6 +49,10 @@ class SituationTests(unittest.TestCase):
                          [443907, 443909, 443911, 443915])
         self.assertEqual([int(row['stdout']) for row in entries['for-in-wide.js']['invocations']],
                          [123395, 121349, 123399, 123403])
+        self.assertEqual([int(row['stdout']) for row in entries['strict-equality-numbers.js']['invocations']],
+                         [9267, 9301, 9335, 9403])
+        self.assertEqual([int(row['stdout']) for row in entries['strict-equality-mixed.js']['invocations']],
+                         [4659, 4693, 4727, 4795])
         for family in (['frame-compact', 'frame-branches32', 'frame-branches128', 'frame-branches512'],
                        ['args-unused', 'args-observed'], ['property-stable', 'property-mutated'],
                        ['metadata-ordinary', 'metadata-function', 'metadata-intrinsic'],

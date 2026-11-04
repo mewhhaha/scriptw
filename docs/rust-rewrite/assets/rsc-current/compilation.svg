@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Current React Server Components cold compilation</dc:title>
-    <dc:description>{"date": "2026-11-04", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/fast-comparison-campaign/block-0-0-candidate/report.json": "eaacc140d0922f6b3f0ccaa9491bd0fd4e8977fb67b3d9fe44a30904a77bd896", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/frozen/compiler_precompiled_baseline-producer.json": "f1a32ed522b1fab21b905cd4ba569e0741a05f7e43ddf23268efa040b92c18df", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/frozen/rsc_baseline": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/frozen/rsc_baseline-producer.json": "dc69a2328c7776030f193689e0a738ae06eba84c91ee0e532a0f6e90b119820f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/compiler_precompiled_baseline-producer.json": "89fe81c38a1c243f5fd6ecce721ef480415236687d7aa63ecdbd513b430cb437", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/rsc_baseline": "94fb560154574007bb4c5b997e6d0f57f1236af80944b7b015b181149ca37759", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/rsc_baseline-producer.json": "59ce7dcd56116ebb0f15dd2c621ec7e7e6d487992a564a62b6297c158149e3b8", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/measure_rsc.py": "0b87d179afe99202aaa8267e3cebdb2d77e57b6da27ef3d9f0c8452a6560ad16", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/source/crates/scriptw-aot-wasm/tests/emission/scalar_masked_rows.rs": "c0f7bd534147fbaa1cf6aa71d2cef056ba3918774f6d84cec866f3e9eca15a13", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/source/crates/scriptw-engine/tests/aot_language/aot_scalar_masked_rows.rs": "f4c184e3866e0aa20794b7ebe90e0efd0c3dfd3c4fe681678f6cafbf8eec17d0", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/source/crates/scriptw-engine/tests/fixtures/scalar_masked_rows.js": "efa74fd049aa0e70ffaae3ac8ed4d09512865a471a280b4137799a95fe000484", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/source/manifest.json": "38064dd94c2332d4cbad875c06487fd8f5cc03ca45fe9de64eb00de1d70f2845", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/source/tracked.patch": "d65aa16711aa30dcded2a255d6f351fe19882343ca44b9e4712cd05e96efc56f", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "campaign": "target/performance-v8-climb-20261104/scalar-loop/fast-comparison-campaign/campaign.json", "campaign_sha256": "7c17dde229829e42be87325267f7259264f5d255f4f1db30236f6b4932bc8070", "case_order": ["rsc-sync", "rsc-async"], "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
+    <dc:description>{"date": "2026-11-05", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/frozen/compiler_precompiled_baseline-producer.json": "fa586fb88a7b781ad7f9308f43838a4d1ba39bee119fb8d7ef14e2e226c5e33d", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/frozen/rsc_baseline": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/frozen/rsc_baseline-producer.json": "44219007e1b81374bd2743a99f6f75469f565268de521c454f56b5b1bb871db0", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/measure_rsc.py": "d93b94e4b9160c2eeadc8f70f39833588cc997a874a6e1f5de4ad2f45de32579", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/compact_path/dictionary.rs": "667b192ba15c8ecd63f3dbf387a02e9a00b479d4cb0bc5cc701f1ba2ff86b09f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/compact_path/projection.rs": "c0856e72358db92fb52e463ebf85df52e00eb28a7ff0a6eb2e51f548f6b56567", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/fixtures/compact_inline_metadata.mjs": "37cd4a8969d8e4baa7f1cd5bea040dd2a2ecac52f573edc07b31f1773cb2cb66", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/fixtures/compact_inline_metadata.ops": "373e97148634fda75f17e2455046241190199638bde39df9e97f05bc8f404a45", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/function_own_data_probe.rs": "a3f4c7d06885c1025c8cc266627eb98cf492bb4b0cfbbee353ef6209910b19da", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/infallible_booleans.rs": "2d48fd49c916934fc97086b8a01da7bcba1215bbb544ae7572244e678543f00c", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/retained_operands.rs": "41a3e848555c1f01ed52c2f1cbab927a5dc7f9e9d4b14126e28e4bd3a6a097e1", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/row_loop_operators.rs": "bfc9027f64932d34ce1a2be024a3a833aab702b378056fb811a0eca52eef436f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/scalar_dictionary_rows.rs": "de2c6529e0b00b2e06c3794aec8c84980aae289d2d03120866561ce68d468479", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs": "05196f2b091567e17a0b8df8841722dfa8f3262e6b1ffa00ef5bbe67ca54bf77", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-aot-wasm/tests/emission/scalar_row_projection.rs": "dacf2047abd5cb9a9a97fbeae1c086c7ee1fca01b1c2610797f3ee4dae250630", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_cached_read_inputs.rs": "fedfc61cb73b9446e9cf03fa2d517f4bf69e39f362ac5bd9bbfad211c5399a7c", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_cached_read_outcome.rs": "553ba782c8e236afb981f74f1bc13cc3407dbadadceda0325d01d4f54bcd8607", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_dictionary_read_cache.rs": "9341760461fb1fd902eedf46bb7fac44385857d42a732346b0f1a38b9bb8003f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_function_own_data_probe.rs": "18cd354f0f7c1bc49bdabb40d75ec7b421e54c7f9a1b02b718aed0f0b00541fa", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_infallible_booleans.rs": "60b62648f15aaac8872e19bdaef05412cbabfc8921c27a0b103cb57e8c56974b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_scalar_dictionary_rows.rs": "45591b93b962313f04169f8a23677e3c9836d6f0fc00514322542ed904e1a621", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/aot_language/aot_scalar_row_projection.rs": "14f778feafd0c5e57765e7e3baea29cd4551a8a7762558409c78eefab962333f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/cached_read_inputs.js": "e84803bb8a35725e52b647e286bb2aa10007360674cc14d33ebbf0842dfcfd9d", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/cached_read_outcome.js": "9f956d6324cd4db445aeff7620dff1f759f2ad10d75c0fb03f3d7e51270f166b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/dictionary_read_cache.js": "f71b8219e49a9198890878ea4c93a170fb53b536634d4385ce6f9d20084a8899", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/function_own_data_probe.js": "d84a16df94ed0907947077df12775f3dba6ae30ee359d0ef4f22ecc929cc9282", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/function_own_data_realms.js": "8375a39805fa6d8aac177e169ce5a4176e21803a90690dc66c4031b60802da2f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/infallible_booleans.js": "8ed8ba1f5418371164fdf4e57d30f77fb901fb24c19dd62194cdcaef96dc864b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/retained_operands.js": "b9b3737bfe9c6fe51ab4cc00f55c6afc91e70d6cc2a52fead3eb523c8e3bab32", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/scalar_dictionary_rows.js": "4a73d5c7f856269915075f0f62c061da0adab126c65341d892efcbf5c8b17e6f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/scalar_row_projection.js": "04ba81df2e3712a684fc5114a5d12a6cedc7486a781031c08974a32a19147f8a", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/crates/scriptw-engine/tests/fixtures/scalar_row_projection_realms.js": "4f8b63191b9c702392e9df25f0222199e7a5a187a708f881bc4ae4142df70ee6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/manifest.json": "bab16d940434643b2e6d812216ef144a6deef23402e225b01dc97b7a99f250f7", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/row-preflight/source/tracked.patch": "a460d9a3a8983da9c9201a126b67da04f9475b09a5bf6b970f2203f7c48e0147", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/fast-comparison-campaign/block-0-0-candidate/report.json": "eae7d7abde7975b487d3255291bd46aa971e0868026100ef4da86ca3b588ae73", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/compiler_precompiled_baseline-producer.json": "89fe81c38a1c243f5fd6ecce721ef480415236687d7aa63ecdbd513b430cb437", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/rsc_baseline": "94fb560154574007bb4c5b997e6d0f57f1236af80944b7b015b181149ca37759", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/frozen/rsc_baseline-producer.json": "59ce7dcd56116ebb0f15dd2c621ec7e7e6d487992a564a62b6297c158149e3b8", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "campaign": "target/performance-v8-climb-20261104/row-preflight/fast-comparison-campaign/campaign.json", "campaign_sha256": "b1815ef707eb321745f26e099df88b1fefbf801d7a11e784af77bd75ead88349", "case_order": ["rsc-sync", "rsc-async"], "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -61,57 +61,57 @@ L 558.72 247.968
     </g>
     <g id="ytick_2">
      <g id="line2d_4">
-      <path d="M 63.36 212.966553
-L 558.72 212.966553
+      <path d="M 63.36 212.405566
+L 558.72 212.405566
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_5"/>
      <g id="text_3">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="217.145263" transform="rotate(-0 56.36 217.145263)">2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="216.584277" transform="rotate(-0 56.36 216.584277)">2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_6">
-      <path d="M 63.36 177.965105
-L 558.72 177.965105
+      <path d="M 63.36 176.843132
+L 558.72 176.843132
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="182.143816" transform="rotate(-0 56.36 182.143816)">4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="181.021843" transform="rotate(-0 56.36 181.021843)">4</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_8">
-      <path d="M 63.36 142.963658
-L 558.72 142.963658
+      <path d="M 63.36 141.280699
+L 558.72 141.280699
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_9"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="147.142368" transform="rotate(-0 56.36 147.142368)">6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="145.45941" transform="rotate(-0 56.36 145.45941)">6</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_10">
-      <path d="M 63.36 107.96221
-L 558.72 107.96221
+      <path d="M 63.36 105.718265
+L 558.72 105.718265
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_11"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="112.140921" transform="rotate(-0 56.36 112.140921)">8</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="109.896976" transform="rotate(-0 56.36 109.896976)">8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_12">
-      <path d="M 63.36 72.960763
-L 558.72 72.960763
+      <path d="M 63.36 70.155831
+L 558.72 70.155831
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_13"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="77.139473" transform="rotate(-0 56.36 77.139473)">10</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="74.334542" transform="rotate(-0 56.36 74.334542)">10</text>
      </g>
     </g>
     <g id="text_8">
@@ -121,22 +121,22 @@ L 558.72 72.960763
    <g id="patch_3">
     <path d="M 220.224 247.968
 L 401.856 247.968
-L 401.856 200.652249
-L 220.224 200.652249
+L 401.856 199.653736
+L 220.224 199.653736
 z
 " clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
    </g>
    <g id="patch_4">
-    <path d="M 220.224 200.652249
-L 401.856 200.652249
-L 401.856 192.946017
-L 220.224 192.946017
+    <path d="M 220.224 199.653736
+L 401.856 199.653736
+L 401.856 191.951672
+L 220.224 191.951672
 z
 " clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
    </g>
    <g id="patch_5">
-    <path d="M 220.224 192.946017
-L 401.856 192.946017
+    <path d="M 220.224 191.951672
+L 401.856 191.951672
 L 401.856 90.845419
 L 220.224 90.845419
 z
@@ -153,16 +153,16 @@ L 558.72 247.968
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_9">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="226.648015" transform="rotate(-0 311.04 226.648015)">2.70</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="226.148759" transform="rotate(-0 311.04 226.148759)">2.72</text>
    </g>
    <g id="text_10">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="311.04" y="199.137024" transform="rotate(-0 311.04 199.137024)">0.44</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="311.04" y="198.140595" transform="rotate(-0 311.04 198.140595)">0.43</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="144.233609" transform="rotate(-0 311.04 144.233609)">5.83</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="143.736436" transform="rotate(-0 311.04 143.736436)">5.69</text>
    </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="311.04" y="83.202841" transform="rotate(-0 311.04 83.202841)">8.98 s</text>
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="311.04" y="83.202841" transform="rotate(-0 311.04 83.202841)">8.84 s</text>
    </g>
    <g id="text_13">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · cold compilation phases</text>

@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-04**, React **19.3.1**, compiler `5385a6345b86`
-(base `3f65dc859` plus the archived source patch).
+Measured **2026-11-05**, React **19.3.1**, compiler `59022867cdb8`
+(base `0a8e918b5` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 5.779 | 6.184 |
-| Node 24.12.0 / V8 | 0.488 | 0.415 |
+| Scriptw | 5.930 | 6.495 |
+| Node 24.12.0 / V8 | 0.495 | 0.406 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -23,25 +23,28 @@ checked warmups and seven measured requests per mode. A process retains one
 Module/Realm and runs sync then async. Requests include full Flight serialization
 and consumption; JSON encoding and exact-output checks follow timing. Values
 are medians of process medians. The frozen prior-build control stays in the
-receipts; chart bars show the latest compiler and V8. Scriptc's React build
+receipts; its sync/async requests are about 2%/4% faster than the candidate.
+Chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
 
-Cold Scriptw setup is **3.148 s JavaScript → Wasm**,
-**5.834 s native preparation**, and
-**2.329 ms module initialization**.
-Program Wasm is **4,343,634 B** (3,795,214 B code; 490,228 B data);
-shared runtime Wasm is **38,816,286 B**. All setup precedes request timing.
+Cold Scriptw setup is **3.150 s JavaScript → Wasm**,
+**5.686 s native preparation**, and
+**2.284 ms module initialization**.
+Program Wasm is **4,231,662 B** (3,683,242 B code; 490,228 B data);
+shared runtime Wasm is **38,816,202 B**. All setup precedes request timing.
 Child peak RSS includes compilation and process history; it is not live guest heap.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
-Scriptw uses Wasmtime 47 **Fast / OptLevel::None / SinglePass**, a generic target,
-one CPU, 16-MiB copying GC and the recorded stack/deadline/cache settings.
+Scriptw compiles P with Wasmtime 47 **Fast / OptLevel::None / SinglePass**.
+Shared R is built with **SpeedAndSize / Backtracking**. Its successful native
+bundle admission is silent; absence of a hit trace does not establish fallback. The cohort uses
+a generic target, one CPU, 16-MiB copying GC and the recorded stack/deadline/cache settings.
 The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
-engine/mode. Scriptw retires **50.62 million sync /
-54.54 million async user instructions per request**;
-Node retires **2.50 / 2.75 million**.
+engine/mode. Scriptw retires **50.19 million sync /
+54.08 million async user instructions per request**;
+Node retires **2.50 / 2.63 million**.
 Counters run without multiplexing. They count Scriptw's execution worker and
 Node's main thread, including Node barrier/Promise-return edges; background
 compilation/GC threads are excluded. These are unscored counts, not causal shares.
@@ -55,14 +58,30 @@ Closed numeric row loops can borrow authenticated captured arrays, use masked
 indices and read own Number fields and primitive String lengths. Complete live
 guards retain the original loop and completed-prefix fallback; no calls or
 allocations enter the admitted loop.
+Function own-data probes use the current ordinary dictionary without the
+former storage gate. The seven infallible Boolean operations publish directly.
+Retained private operands use initialized compiler storage; source lexical TDZ
+and suspended reference owners remain unchanged.
+Cached literal reads retain their original twelve-input/five-result boundary.
+Closed row loops can borrow current dictionary data after checking live
+extent, current key/descriptor/value and complete field guards. For repeated
+low-bit masked rows with Number/string-length leaves, canonical own-data
+reads validate a complete read-only period before any source body and copy its
+leaves to one existing numeric array. A miss resumes the whole original loop; a successful preflight uses
+numeric-only loads with the original arithmetic and row identity. Other admitted
+rows retain compact/dictionary guarded backedges and completed-prefix fallback.
+Recipes, accessors, Proxies and incomplete regions keep their original semantics.
+Scratch roots clear before the generic continuation. Projection allocates one
+numeric array. Canonical recipe reads can also allocate or normalize intrinsic metadata without invoking JavaScript; rejected preflight
+work remains an explicit cost.
 Local argument entries retain their two-formal bound. Runtime value,
 environment, descriptor and call-transport costs remain; V8 parity is open.
 
-Fresh user-cycle sampling attributes **24.51% sync /
-24.75% async** to six property/enumeration helpers' disjoint
+Fresh user-cycle sampling attributes **24.42% sync /
+24.27% async** to six property/enumeration helpers' disjoint
 own samples. The `vn`/`ft` page-touch loops account for
-**2.22% /
-2.48%**. Each mode has one
+**2.33% /
+1.98%**. Each mode has one
 sampled process and 200 checked requests after three warmups. Frame-pointer
 chains can truncate; inclusive caller shares overlap. These observations do not
 partition wall time or predict a change's gain. The linked diagnostic retains
@@ -81,35 +100,37 @@ and full WHATWG conformance remain unsupported or unverified.
 
 [Current report and process receipts](rsc-current.json) ·
 [Size accounting](rsc-wasm-size-current.json) ·
-[Inert evidence](situations-evidence-2026-11-04.tar.xz).
+[Inert evidence](situations-evidence-2026-11-05.tar.xz).
 
 ## Focused performance situations
 
-Measured **2026-11-04**: **19** standalone Module programs, compiler `5385a6345b86`,
+Measured **2026-11-05**: **21** standalone Module programs, compiler `59022867cdb8`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.010 | 0.001 |
-| `global-shallow.js` | 2.306 | 1.833 | 1.002 |
-| `global-deep8.js` | 2.866 | 2.082 | 0.999 |
-| `global-bound-deep.js` | 0.740 | 0.246 | 0.129 |
-| `global-getter-deep.js` | 3.145 | 2.272 | 0.989 |
-| `frame-compact.js` | 8.339 | 5.846 | 0.073 |
-| `frame-branches32.js` | 8.513 | 6.055 | 0.095 |
-| `frame-branches128.js` | 9.198 | 6.040 | 0.137 |
-| `frame-branches512.js` | 16.725 | 6.236 | 0.322 |
-| `args-unused.js` | 0.732 | 0.521 | 0.103 |
-| `args-observed.js` | 2.533 | 2.027 | 0.140 |
-| `property-stable.js` | 3.628 | 1.705 | 0.077 |
-| `property-mutated.js` | 3.144 | 1.614 | 0.067 |
-| `metadata-ordinary.js` | 0.566 | 0.266 | 0.020 |
-| `metadata-function.js` | 4.750 | 4.126 | 0.220 |
-| `metadata-intrinsic.js` | 4.347 | 3.634 | 0.234 |
-| `typeof-dispatch.js` | 0.962 | 0.383 | 0.032 |
-| `singleton-dispatch.js` | 0.950 | 0.360 | 0.017 |
-| `for-in-wide.js` | 2.071 | 1.996 | 0.071 |
+| `control-empty.js` | 0.010 | 0.010 | 0.002 |
+| `global-shallow.js` | 2.271 | 1.806 | 1.040 |
+| `global-deep8.js` | 2.885 | 2.064 | 1.107 |
+| `global-bound-deep.js` | 0.705 | 0.242 | 0.140 |
+| `global-getter-deep.js` | 3.119 | 2.235 | 0.981 |
+| `frame-compact.js` | 8.200 | 5.796 | 0.069 |
+| `frame-branches32.js` | 8.510 | 6.108 | 0.099 |
+| `frame-branches128.js` | 9.085 | 6.278 | 0.137 |
+| `frame-branches512.js` | 14.259 | 6.283 | 0.415 |
+| `args-unused.js` | 0.732 | 0.503 | 0.105 |
+| `args-observed.js` | 2.474 | 2.003 | 0.136 |
+| `property-stable.js` | 3.555 | 1.791 | 0.076 |
+| `property-mutated.js` | 3.182 | 1.611 | 0.066 |
+| `metadata-ordinary.js` | 0.212 | 0.087 | 0.020 |
+| `metadata-function.js` | 0.209 | 0.086 | 0.209 |
+| `metadata-intrinsic.js` | 0.211 | 0.089 | 0.234 |
+| `typeof-dispatch.js` | 0.958 | 0.372 | 0.026 |
+| `singleton-dispatch.js` | 0.915 | 0.357 | 0.021 |
+| `strict-equality-numbers.js` | 2.586 | 1.217 | 0.021 |
+| `strict-equality-mixed.js` | 2.603 | 1.328 | 0.068 |
+| `for-in-wide.js` | 2.071 | 1.969 | 0.070 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs three checked
@@ -120,13 +141,16 @@ whiskers span process medians. Block medians and process summaries remain in the
 
 **Fast = None / SinglePass**, **Speed = Speed / Backtracking**. Both use Wasmtime
 47, a generic target, one CPU, 16-MiB copying GC, a 4-GiB cap and no swap.
-The labels select P compilation; shared R uses its recorded precompiled image.
+The labels select P compilation; shared R is built with SpeedAndSize /
+Backtracking and uses its recorded native-image admission path.
 Compilation, initialization and `prepare(input)` precede the public `run()` clock.
 Wasmtime consumers have their compiler disabled. Node uses the same source in
 `vm.SourceTextModule`, with normal JIT and natural GC; three warmups do not prove
 optimized steady state. Timings include the public bridge and print conversion;
 output draining and validation follow timing. Setup can influence timed GC/JIT.
-The empty control is shown without subtraction.
+The empty control is shown without subtraction. Benchmark scratch and prepared
+images used tmpfs after Btrfs exhausted metadata reservations; completed raw files
+were copied byte-for-byte into the evidence tree. File preparation remains untimed.
 
 ### Global lookup
 
@@ -142,9 +166,9 @@ include calls and counter increments. These differences are not isolated lookup 
 All programs make 8,192 entries and exercise every selected site with matching
 checksums. Compact dispatch uses one polymorphic site and a dynamic key; switch
 arms use constant keys and separate sites. This does not isolate stack-probe cost.
-The 512-site native P image is **6.06 MiB Fast /
-2.38 MiB Speed**;
-portable P is **0.80 MiB**.
+The 512-site native P image is **5.43 MiB Fast /
+2.30 MiB Speed**;
+portable P is **0.72 MiB**.
 Native serialized sizes include metadata and data.
 
 ![Call-site scaling](assets/situations-current/frame-size.svg)
@@ -188,6 +212,16 @@ cover operand Throws/TDZ and HTMLDDA, outside these timed programs.
 
 ![Type classification](assets/situations-current/type-tests.svg)
 
+### Dynamic strict equality
+
+Both programs execute 8,192 strict comparisons over prepared pairs. Number pairs
+include NaN, signed zero and infinities. Mixed pairs cover String/BigInt content,
+Symbol and object identity, boxed values, functions and revoked Proxies. Operand
+coercion must not run. Preparation precedes timing; pair indexing, branches and
+checksum arithmetic remain timed. Independent models check every input.
+
+![Dynamic strict equality](assets/situations-current/strict-equality.svg)
+
 ### Enumeration
 
 Sixteen for-in loops visit all 64 own enumerable properties of a prepared ordinary
@@ -202,9 +236,9 @@ Mutation, Proxy and suspension controls run separately as semantic regressions.
 
 ![Public-call control](assets/situations-current/control.svg)
 
-All **456** situation processes and **4,560** calls passed exact checks.
+All **504** situation processes and **5,040** calls passed exact checks.
 The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
-Fresh scoped verification passes **1,754 Engine**, **55 emission**,
+Fresh scoped verification passes **1,766 Engine**, **61 emission**,
 **637 structural** and **380 source-guard** checks. The **769 IR** cases
 reuse their original passing binary/receipts with unchanged IR/front-end inputs.
 AOT units pass **653** cases; four known bootstrap assertions remain failures.

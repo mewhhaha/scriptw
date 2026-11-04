@@ -3,8 +3,8 @@
 //! lookup can be bypassed by these concrete representation guards.
 use super::*;
 use crate::gc_types::{
-    CodeUnitArray, CompactDataStorage, FunctionObject, FunctionObjectSchema, GcNullability,
-    IntrinsicPropertyStorage, PrimitiveBox, PrimitiveBoxSchema, StringValue, StringValueSchema,
+    CodeUnitArray, FunctionObject, FunctionObjectSchema, GcNullability, PrimitiveBox,
+    PrimitiveBoxSchema, StringValue, StringValueSchema,
 };
 
 impl FunctionBuilder<'_> {
@@ -43,8 +43,8 @@ impl FunctionBuilder<'_> {
 
     /// Plain objects and primitive boxes check ordinary own properties first.
     /// A boxed String miss retains its virtual character-index lookup; accessors
-    /// retain the original receiver. Callable headers join only while their
-    /// storage is sealed native metadata, preserving legacy reflection.
+    /// retain the original receiver. Function headers expose their current own
+    /// data, including legacy values maintained by activation entry and exit.
     pub(in crate::objects) fn emit_simple_data_header(
         &mut self,
         target: &ValueLocals,
@@ -100,29 +100,14 @@ impl FunctionBuilder<'_> {
             target.cast_reference::<FunctionObject>(schema, function),
             function,
         );
-        let header = schema.reserve_gc_local(function).initialize(
+        result.replace(
             schema
                 .field(FunctionObjectSchema::OBJECT)
                 .read(&callable, schema, function)
-                .reference(),
+                .reference()
+                .nullable(),
             function,
         );
-        let storage = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(OrdinaryObjectSchema::PROPERTIES)
-                .read(&header, schema, function)
-                .reference(),
-            function,
-        );
-        storage.is_subtype::<CompactDataStorage>(schema, function);
-        storage.is_subtype::<IntrinsicPropertyStorage>(schema, function);
-        function.instruction(&Instruction::I32Or);
-        self.open_frame(ControlFrameKind::If, function);
-        result.replace(header.load(schema, function).nullable(), function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        storage.clear(function);
-        header.clear(function);
         callable.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);

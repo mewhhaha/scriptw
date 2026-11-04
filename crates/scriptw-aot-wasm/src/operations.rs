@@ -10,6 +10,7 @@ use crate::gc_types::{
 use crate::runtime_helpers::RuntimeHelperPropertyKeyParameter;
 use scriptw_ir::NativeErrorKind;
 use scriptw_ir::StaticRegExpCompilation;
+use scriptw_ir::{AbruptCapability, NormalResult};
 
 mod bigint_equality;
 mod coercive_add;
@@ -27,6 +28,44 @@ mod string_trim;
 pub(crate) use string_trim::EcmaTrimMode;
 mod to_object;
 mod typeof_comparison;
+
+// Catalog admission and the kernels' operand domains must agree at build time.
+const _: () = {
+    let mut index = 0;
+    while index < SpecOperationIr::ALL.len() {
+        let operation = SpecOperationIr::ALL[index];
+        let descriptor = operation.descriptor();
+        let supported = match operation {
+            SpecOperationIr::IsCallable
+            | SpecOperationIr::IsConstructor
+            | SpecOperationIr::IsPropertyKey
+            | SpecOperationIr::ToBoolean => {
+                assert!(matches!(
+                    descriptor.domain(),
+                    scriptw_ir::OperationDomain::Value
+                ));
+                true
+            }
+            SpecOperationIr::SameValue
+            | SpecOperationIr::SameValueZero
+            | SpecOperationIr::StrictEqualityComparison => {
+                assert!(matches!(
+                    descriptor.domain(),
+                    scriptw_ir::OperationDomain::ValuePair
+                ));
+                true
+            }
+            _ => false,
+        };
+        let infallible_boolean = matches!(descriptor.normal_result(), NormalResult::Boolean)
+            && matches!(descriptor.abrupt(), AbruptCapability::Infallible);
+        assert!(
+            infallible_boolean == supported,
+            "infallible Boolean catalog/kernel drift"
+        );
+        index += 1;
+    }
+};
 
 /// A rooted String or Symbol already accepted as an ECMAScript property key.
 /// Computed raw values must pass through ToPropertyKey before this owner exists.
@@ -429,6 +468,44 @@ impl<'a> FunctionBuilder<'a> {
             self.compile_expr_to_value(operand, &value, function)?;
             inputs.push(value);
         }
+        // The catalog proves the operation itself cannot throw. Operand
+        // evaluation above still retains its ordinary order and Throw exits.
+        let descriptor = operation.descriptor();
+        if descriptor.normal_result() == NormalResult::Boolean
+            && descriptor.abrupt() == AbruptCapability::Infallible
+        {
+            match operation {
+                SpecOperationIr::IsCallable => self.emit_is_callable_i32(&inputs[0], function)?,
+                SpecOperationIr::IsConstructor => {
+                    self.emit_is_constructor_i32(&inputs[0], function)
+                }
+                SpecOperationIr::IsPropertyKey => {
+                    self.emit_is_property_key_i32(inputs[0].tag(), function)
+                }
+                SpecOperationIr::ToBoolean => {
+                    self.compile_truthy_tagged_i32(&inputs[0], function)?
+                }
+                SpecOperationIr::SameValue => {
+                    self.emit_tagged_payload_same_value_i32(&inputs[0], &inputs[1], function)?
+                }
+                SpecOperationIr::SameValueZero => {
+                    self.emit_tagged_payload_same_value_zero_i32(&inputs[0], &inputs[1], function)?
+                }
+                SpecOperationIr::StrictEqualityComparison => {
+                    self.emit_tagged_payload_equality_i32(&inputs[0], &inputs[1], function)?
+                }
+                _ => unreachable!("infallible Boolean catalog entry has an emitter"),
+            }
+            let boolean = schema.reserve_i32_local(function);
+            boolean.store(function);
+            output.set_boolean(boolean, function);
+            self.completion().set_normal(output, function);
+            schema.release_i32_local(boolean, function);
+            for input in inputs.into_iter().rev() {
+                input.clear(function);
+            }
+            return Ok(());
+        }
         let pending = schema.reserve_completion(function);
         let boolean = schema.reserve_i32_local(function);
         let scalar = schema.reserve_i64_local(function);
@@ -438,25 +515,11 @@ impl<'a> FunctionBuilder<'a> {
             SpecOperationIr::IsCallable
             | SpecOperationIr::IsConstructor
             | SpecOperationIr::IsPropertyKey
-            | SpecOperationIr::ToBoolean => {
-                match operation {
-                    SpecOperationIr::IsCallable => {
-                        self.emit_is_callable_i32(&inputs[0], function)?
-                    }
-                    SpecOperationIr::IsConstructor => {
-                        self.emit_is_constructor_i32(&inputs[0], function)
-                    }
-                    SpecOperationIr::IsPropertyKey => {
-                        self.emit_is_property_key_i32(inputs[0].tag(), function)
-                    }
-                    SpecOperationIr::ToBoolean => {
-                        self.compile_truthy_tagged_i32(&inputs[0], function)?
-                    }
-                    _ => unreachable!("closed Boolean query group"),
-                }
-                boolean.store(function);
-                pending.value().set_boolean(boolean, function);
-                pending.set_normal(pending.value(), function);
+            | SpecOperationIr::ToBoolean
+            | SpecOperationIr::SameValue
+            | SpecOperationIr::SameValueZero
+            | SpecOperationIr::StrictEqualityComparison => {
+                unreachable!("infallible Boolean operations returned before completion transport")
             }
             SpecOperationIr::ToPrimitive(hint) => {
                 self.emit_tagged_to_primitive_locals_pending(hint, &inputs[0], &pending, function)?;
@@ -515,26 +578,8 @@ impl<'a> FunctionBuilder<'a> {
                 pending.value().set_number(scalar, function);
                 pending.set_normal(pending.value(), function);
             }
-            SpecOperationIr::SameValue
-            | SpecOperationIr::SameValueZero
-            | SpecOperationIr::StrictEqualityComparison
-            | SpecOperationIr::IsLooselyEqual => {
-                match operation {
-                    SpecOperationIr::SameValue => {
-                        self.emit_tagged_payload_same_value_i32(&inputs[0], &inputs[1], function)?
-                    }
-                    SpecOperationIr::SameValueZero => self
-                        .emit_tagged_payload_same_value_zero_i32(
-                            &inputs[0], &inputs[1], function,
-                        )?,
-                    SpecOperationIr::StrictEqualityComparison => {
-                        self.emit_tagged_payload_equality_i32(&inputs[0], &inputs[1], function)?
-                    }
-                    SpecOperationIr::IsLooselyEqual => {
-                        self.emit_loose_tagged_equality_i32(&inputs[0], &inputs[1], function)?
-                    }
-                    _ => unreachable!("closed comparison group"),
-                }
+            SpecOperationIr::IsLooselyEqual => {
+                self.emit_loose_tagged_equality_i32(&inputs[0], &inputs[1], function)?;
                 boolean.store(function);
                 pending.value().set_boolean(boolean, function);
                 pending.set_normal(pending.value(), function);

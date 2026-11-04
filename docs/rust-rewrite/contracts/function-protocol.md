@@ -95,17 +95,12 @@ prototype identities are preserved. This seam changes which metadata states
 can be built; it does not broaden supported dynamic Function construction,
 proxy behavior, async/generator execution or class semantics.
 
-## Legacy caller property
+## Legacy function reflection
 
-Ordinary sloppy ECMAScript functions have an own `caller` data property whose
-value is always `null`, with `writable`, `enumerable`, and `configurable` all
-false. This implementation-defined extension does not expose the call stack.
-Strict functions, arrows, methods, classes, generators, async functions, bound
-functions, and builtins do not receive this property and retain the inherited
-`%ThrowTypeError%` accessors on `Function.prototype`.
-
-This follows the [Forbidden Extensions restrictions](https://tc39.es/ecma262/multipage/error-handling-and-language-extensions.html#sec-forbidden-extensions):
-only ordinary sloppy functions may receive the legacy property, and its value
-must never expose a strict function. The protocol and strictness select this
-policy at function allocation, including source-free ordinary Function
-construction.
+The protocol and strictness select eligible ordinary non-strict functions at
+allocation. Their initially configurable `caller` and `arguments` data
+properties follow implementation-owned activations; user redefinition,
+deletion or freezing retires automatic updates. Strict and other excluded
+function forms retain their defining Realm's inherited ThrowTypeError behavior.
+[Active legacy reflection](active-legacy-function-reflection.md) owns the exact
+eligibility, ArgumentsObject identity, caller restrictions and restoration rules.

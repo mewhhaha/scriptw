@@ -327,6 +327,121 @@ export function run() {
 }
 '''
 
+EQUALITY_STEPS = 8192
+
+STRICT_NUMBER_SOURCE = '''var left, right, seed;
+export function prepare(input) {
+  seed = input;
+  left = [input, input, -0, -0, NaN, Infinity, -Infinity, 2.5,
+    input + 0.25, input + 1, 0, -1, NaN, input * 2, Infinity, -Infinity];
+  right = [input, input + 1, 0, -0, NaN, Infinity, Infinity, 2.5,
+    input + 0.5, input + 1, NaN, -1, 0, input * 2, -Infinity, -Infinity];
+}
+export function run() {
+  var sum = seed * 17;
+  for (var i = 0; i < 8192; i++) {
+    var slot = (i + seed) & 15;
+    if (left[slot] === right[slot]) sum += (slot & 3) + 1;
+    else sum -= (slot & 1) + 1;
+  }
+  print(sum);
+}
+'''
+
+STRICT_MIXED_SOURCE = '''var left, right, seed, coercions;
+export function prepare(input) {
+  seed = input;
+  coercions = 0;
+  var text = 'text-' + input;
+  var copy = ('prefix-' + text).slice(7);
+  var big = 9007199254740993n + BigInt(input);
+  var bigCopy = BigInt('9007199254740993') + BigInt(input);
+  var symbol = Symbol('same'), otherSymbol = Symbol('same');
+  var object = {}, otherObject = {};
+  Object.defineProperty(object, Symbol.toPrimitive, {
+    get: function () { coercions++; throw 'strict equality coerced an object'; }
+  });
+  var fn = function value() {}, otherFn = function value() {};
+  var first = Proxy.revocable(fn, {}), second = Proxy.revocable(otherFn, {});
+  var proxy = first.proxy, otherProxy = second.proxy;
+  first.revoke(); second.revoke();
+  left = [NaN, -0, 0, text, text, big, big, symbol,
+    symbol, object, object, fn, fn, proxy, proxy, undefined,
+    null, false, true, true, null, 1, 1n, Infinity,
+    -Infinity, Infinity, text, big, symbol, object, input + 0.5, input + 0.5];
+  right = [NaN, 0, -0, copy, text + 'x', bigCopy, big + 1n, symbol,
+    otherSymbol, object, otherObject, fn, otherFn, proxy, otherProxy, undefined,
+    null, false, true, false, undefined, '1', 1, Infinity,
+    -Infinity, -Infinity, new String(text), Object(big), Object(symbol), otherObject,
+    input + 0.5, input + 1.5];
+}
+export function run() {
+  var sum = seed * 17;
+  for (var i = 0; i < 8192; i++) {
+    var slot = (i + seed) & 31;
+    if (left[slot] === right[slot]) sum += (slot & 3) + 1;
+    else sum -= (slot & 1) + 1;
+  }
+  if (coercions) throw 'strict equality invoked coercion';
+  print(sum);
+}
+'''
+
+
+def strict_equality_pairs(seed, mixed):
+    n = lambda value: ('number', value)
+    if not mixed:
+        left = [seed, seed, -0.0, -0.0, float('nan'), float('inf'), -float('inf'), 2.5,
+                seed + 0.25, seed + 1, 0, -1, float('nan'), seed * 2, float('inf'), -float('inf')]
+        right = [seed, seed + 1, 0, -0.0, float('nan'), float('inf'), float('inf'), 2.5,
+                 seed + 0.5, seed + 1, float('nan'), -1, 0, seed * 2, -float('inf'), -float('inf')]
+        return [(n(a), n(b)) for a, b in zip(left, right, strict=True)]
+    text = ('string', 'text-' + str(seed))
+    different_text = ('string', text[1] + 'x')
+    big = ('bigint', 9007199254740993 + seed)
+    next_big = ('bigint', big[1] + 1)
+    symbol, other_symbol = ('symbol', 'a'), ('symbol', 'b')
+    obj, other_obj = ('object', 'a'), ('object', 'b')
+    fn, other_fn = ('object', 'fn-a'), ('object', 'fn-b')
+    proxy, other_proxy = ('object', 'proxy-a'), ('object', 'proxy-b')
+    null, undefined = ('null', None), ('undefined', None)
+    false, true = ('boolean', False), ('boolean', True)
+    return [
+        (n(float('nan')), n(float('nan'))), (n(-0.0), n(0)), (n(0), n(-0.0)),
+        (text, ('string', text[1])), (text, different_text), (big, ('bigint', big[1])),
+        (big, next_big), (symbol, symbol), (symbol, other_symbol), (obj, obj),
+        (obj, other_obj), (fn, fn), (fn, other_fn), (proxy, proxy), (proxy, other_proxy),
+        (undefined, undefined), (null, null), (false, false), (true, true), (true, false),
+        (null, undefined), (n(1), ('string', '1')), (('bigint', 1), n(1)),
+        (n(float('inf')), n(float('inf'))), (n(-float('inf')), n(-float('inf'))),
+        (n(float('inf')), n(-float('inf'))), (text, ('object', 'boxed-string')),
+        (big, ('object', 'boxed-bigint')), (symbol, ('object', 'boxed-symbol')),
+        (obj, other_obj), (n(seed + 0.5), n(seed + 0.5)), (n(seed + 0.5), n(seed + 1.5)),
+    ]
+
+
+def strict_equal_value(left, right):
+    if left[0] != right[0]:
+        return False
+    # Direct scalar comparison preserves NaN != NaN and -0 == +0. Avoid
+    # Python tuple equality's same-object shortcut for floating-point NaN.
+    return left[1] == right[1]
+
+
+def strict_equality_checksum(seed, mixed):
+    values = strict_equality_pairs(seed, mixed)
+    assert len(values) in (16, 32)
+    total = seed * 17
+    for i in range(EQUALITY_STEPS):
+        slot = (i + seed) & (len(values) - 1)
+        left, right = values[slot]
+        if strict_equal_value(left, right):
+            total += (slot & 3) + 1
+        else:
+            total -= (slot & 1) + 1
+    return total
+
+
 def workloads():
     entries = []
 
@@ -391,6 +506,14 @@ export function run() { print(input); }
         lambda seed: seed + 4096 // 8 * 867, 'type tests',
         '4096 mixed-value passes; 16384 strict null/undefined comparisons; array/loop/public bridge included',
         4096 * 4, 'Strict null/undefined comparisons')
+    add('strict-equality-numbers', STRICT_NUMBER_SOURCE,
+        lambda seed: strict_equality_checksum(seed, False), 'strict equality',
+        '8192 dynamic strict comparisons over 16 Number pairs; NaN, signed zero and infinities; array/index/public bridge work included',
+        EQUALITY_STEPS, 'Dynamic Number strict equality')
+    add('strict-equality-mixed', STRICT_MIXED_SOURCE,
+        lambda seed: strict_equality_checksum(seed, True), 'strict equality',
+        '8192 dynamic strict comparisons over 32 mixed pairs; String/BigInt content and reference identity; revoked Proxies and forbidden coercion guard; array/index/public bridge work included',
+        EQUALITY_STEPS, 'Mixed-value strict equality')
     add('for-in-wide', FOR_IN_WIDE_SOURCE,
         lambda seed: seed + 16 * sum(((index * 13 + seed) & 255) for index in range(64)),
         'enumeration', '1024 yielded own keys across sixteen enumerations of a 64-property ordinary record; inherited nonenumerable processing and value reads included',

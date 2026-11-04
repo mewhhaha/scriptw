@@ -34,10 +34,12 @@ mod aot_equality_operand_effects;
 mod aot_exact_context_budget;
 mod aot_for_in_codegen;
 mod aot_for_of_head_completion;
+mod aot_function_own_data_probe;
 mod aot_guarded_number_add;
 mod aot_guarded_number_relational;
 mod aot_guarded_number_update;
 mod aot_in_operand_order;
+mod aot_infallible_booleans;
 mod aot_local_concat_length;
 mod aot_loose_equality_codegen;
 mod aot_numeric_call_rows;
@@ -72,3 +74,13 @@ mod aot_local_argument_calls;
 mod aot_typeof_comparisons;
 
 mod aot_strict_singleton_comparisons;
+
+mod aot_cached_read_inputs;
+
+mod aot_cached_read_outcome;
+
+mod aot_scalar_dictionary_rows;
+
+mod aot_dictionary_read_cache;
+
+mod aot_scalar_row_projection;

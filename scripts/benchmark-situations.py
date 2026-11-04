@@ -82,7 +82,7 @@ def validate_manifest(plan):
     return cases
 
 
-def validate_cargo(rows, host):
+def validate_cargo(rows, host, frozen_receipt=None):
     candidates = [row for row in rows if row.get('reason') == 'compiler-artifact'
                   and row.get('target', {}).get('name') == 'compiler_precompiled_baseline'
                   and row.get('executable')]
@@ -98,9 +98,16 @@ def validate_cargo(rows, host):
     require(row['features'] == [] and profile['opt_level'] == '3'
             and profile['debug_assertions'] is False and profile['test'] is False
             and profile['overflow_checks'] is False, 'release opt3/no-feature producer required')
-    producer = Path(row['executable']).resolve()
-    require(producer.is_file() and digest(producer) == digest(host),
-            'Cargo producer executable must match the frozen host bytes')
+    if frozen_receipt is None:
+        producer = Path(row['executable']).resolve()
+        require(producer.is_file() and digest(producer) == digest(host),
+                'Cargo producer executable must match the frozen host bytes')
+    else:
+        require(isinstance(frozen_receipt, dict) and frozen_receipt.get('artifact') == row
+                and frozen_receipt.get('sha256') == digest(host)
+                and isinstance(frozen_receipt.get('source_manifest_sha256'), str)
+                and re.fullmatch(r'[0-9a-f]{64}', frozen_receipt['source_manifest_sha256']),
+                'frozen receipt must bind the exact Cargo artifact, source manifest and host bytes')
     return row
 
 
@@ -290,7 +297,13 @@ def run(args):
     host = output / 'bin/compiler_precompiled_baseline'
     shutil.copyfile(args.producer_log, output / 'build/cargo.jsonl')
     cargo = [json.loads(line) for line in (output / 'build/cargo.jsonl').read_text().splitlines() if line.strip()]
-    producer = validate_cargo(cargo, host)
+    receipt_path = None
+    frozen_receipt = None
+    if args.producer_receipt is not None:
+        receipt_path = output / 'build/host-producer-receipt.json'
+        shutil.copyfile(args.producer_receipt, receipt_path)
+        frozen_receipt = json.loads(receipt_path.read_text())
+    producer = validate_cargo(cargo, host, frozen_receipt)
     tooling = ['scripts/benchmark-situations.py', 'scripts/benchmark_metrics.py',
                'scripts/limited_verification.py', 'scripts/performance_situations.py', ADAPTER, HOST_SOURCE]
     for directory in ('runtime_precompiled', 'compiler_precompiled_baseline'):
@@ -339,6 +352,10 @@ def run(args):
         machine=dict(system=platform.system(), kernel=platform.release(), architecture=platform.machine()),
         tooling=[dict(original=str(ROOT / name), path='tooling/' + name,
                       sha256=digest(output / 'tooling' / name)) for name in tooling])
+    if receipt_path is not None:
+        report['tools']['host']['frozen_producer_receipt'] = dict(
+            original=str(args.producer_receipt), path='build/host-producer-receipt.json',
+            sha256=digest(receipt_path))
     prepared = {}
 
     def checkpoint():
@@ -504,6 +521,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', type=Path, required=True)
     parser.add_argument('--producer-log', type=Path, required=True)
+    parser.add_argument('--producer-receipt', type=Path,
+                        help='frozen artifact/source/hash receipt when Cargo output has been rebuilt')
     parser.add_argument('--fixtures', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--node', type=Path, required=True)

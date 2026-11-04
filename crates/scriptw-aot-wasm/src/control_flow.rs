@@ -6915,7 +6915,7 @@ impl<'a> FunctionBuilder<'a> {
             let entry = plan.emit_entry_guard(self, function)?;
             if let Some(fallback) = entry.compact_fallback(self, function) {
                 self.open_frame(ControlFrameKind::If, function);
-                self.compile_scalar_number_loop(&plan, &entry, function);
+                self.compile_scalar_number_loop(&plan, &entry, function)?;
                 fallback.capture_remaining(function);
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
@@ -6938,7 +6938,7 @@ impl<'a> FunctionBuilder<'a> {
                 function.instruction(&Instruction::End);
             } else {
                 self.open_frame(ControlFrameKind::If, function);
-                self.compile_scalar_number_loop(&plan, &entry, function);
+                self.compile_scalar_number_loop(&plan, &entry, function)?;
                 function.instruction(&Instruction::Else);
                 self.compile_classic_for_iterations(
                     test,

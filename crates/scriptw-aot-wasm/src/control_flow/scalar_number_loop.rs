@@ -10,7 +10,10 @@ use crate::emit::LocalBindingId;
 mod dense_array;
 use dense_array::{ArrayRead, ArrayReadBorrow, ArrayReadLoop, PropertyReadView};
 mod compact_path;
-use compact_path::{CompactPathBorrow, CompactPathId, CompactReadPath, PreparedCompactRows};
+use compact_path::{
+    CompactPathBorrow, CompactPathId, CompactReadPath, PreparedCompactRows, RowLoopKind,
+    RowStorageKind,
+};
 mod joined_length;
 use joined_length::{JoinedLengthFact, JoinedStringArrayLength};
 
@@ -1135,7 +1138,7 @@ impl FunctionBuilder<'_> {
         plan: &ScalarNumberLoop,
         entry: &ScalarNumberLoopEntry<'_>,
         function: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let values = plan
             .bindings
@@ -1217,26 +1220,52 @@ impl FunctionBuilder<'_> {
         }
         let done = self.open_frame(ControlFrameKind::Block, function);
         let compact = match locals.invariant {
-            Some(RegionFact::ArrayReads(array)) => array.prepare_compact_loop(done, self, function),
+            Some(RegionFact::ArrayReads(array)) => {
+                array.prepare_compact_loop(done, self, function)?
+            }
             _ => None,
         };
-        let next = self.open_frame(ControlFrameKind::Loop, function);
-        if compact.is_none() {
-            if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
-                array.emit_test(function);
-            } else {
-                plan.test.emit(self, &locals, function);
-            }
-            function.instruction(&Instruction::I32Eqz);
-            self.emit_branch_if_to_target(done, function);
+        if let Some(compact) = compact.as_ref().filter(|rows| rows.is_projected()) {
+            self.emit_scalar_number_loop_iterations(
+                plan,
+                &locals,
+                value,
+                iterated,
+                Some((compact, RowLoopKind::Projected)),
+                done,
+                function,
+            );
+        } else if let Some(compact) = &compact {
+            // First-row preparation fixes the storage mode. Emit each backedge
+            // with its own guards/scratch, sharing arithmetic and prefix exit.
+            compact.emit_dictionary_mode(function);
+            self.open_frame(ControlFrameKind::If, function);
+            self.emit_scalar_number_loop_iterations(
+                plan,
+                &locals,
+                value,
+                iterated,
+                Some((compact, RowLoopKind::Guarded(RowStorageKind::Dictionary))),
+                done,
+                function,
+            );
+            function.instruction(&Instruction::Else);
+            self.emit_scalar_number_loop_iterations(
+                plan,
+                &locals,
+                value,
+                iterated,
+                Some((compact, RowLoopKind::Guarded(RowStorageKind::Inline))),
+                done,
+                function,
+            );
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        } else {
+            self.emit_scalar_number_loop_iterations(
+                plan, &locals, value, iterated, None, done, function,
+            );
         }
-        plan.emit_iteration(self, &locals, value, iterated, function);
-        if let Some(compact) = compact {
-            compact.prepare_next(self, function);
-        }
-        self.emit_branch_to_target(next, function);
-        self.pop_control(ControlFrameKind::Loop);
-        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         if iterations_done.is_some() {
@@ -1277,5 +1306,35 @@ impl FunctionBuilder<'_> {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn emit_scalar_number_loop_iterations(
+        &mut self,
+        plan: &ScalarNumberLoop,
+        locals: &LoopLocals<'_>,
+        value: Option<LoopLocal>,
+        iterated: I32Local,
+        compact: Option<(&PreparedCompactRows<'_, '_>, RowLoopKind)>,
+        done: ControlTarget,
+        function: &mut Function,
+    ) {
+        let next = self.open_frame(ControlFrameKind::Loop, function);
+        if compact.is_none() {
+            if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
+                array.emit_test(function);
+            } else {
+                plan.test.emit(self, locals, function);
+            }
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(done, function);
+        }
+        plan.emit_iteration(self, locals, value, iterated, function);
+        if let Some((compact, kind)) = compact {
+            compact.prepare_next(kind, self, function);
+        }
+        self.emit_branch_to_target(next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
     }
 }

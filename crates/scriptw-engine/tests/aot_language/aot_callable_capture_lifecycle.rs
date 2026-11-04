@@ -548,3 +548,23 @@ var last = iterator.next();
 "#,
     );
 }
+
+#[test]
+fn retained_operands_survive_reentry_abrupt_paths_and_suspended_reference_owners() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let engine = Engine::new(RealmBuilder::new().build());
+    let outcome = engine
+        .run_script(
+            include_str!("../fixtures/retained_operands.js"),
+            CompileOptions {
+                host_surface_policy: scriptw_engine::HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                ..RunOptions::default()
+            },
+        )
+        .unwrap();
+    assert!(outcome.note.contains("boolean(true)"), "{}", outcome.note);
+}

@@ -128,8 +128,8 @@ prototype, Realm relationships and referenced values keep their identities.
 Entry-returning APIs first require concrete dictionary storage; there are no
 fabricated `PropertyEntry` records.
 
-The allocation-free ordinary own-value probe distinguishes present Undefined
-from absence. Accessors miss. Full Get remains responsible for prototype
+The callback-free ordinary own-value probe distinguishes present Undefined
+from absence. Internal recipe decoding may allocate; accessors miss. Full Get remains responsible for prototype
 traversal, accessors, proxies and receiver semantics. Reflection creates proper
 fresh descriptor snapshots from current compact values without converting the
 object or exposing mutable storage fields. OwnKeys snapshots use the source key
@@ -151,31 +151,35 @@ Each admitted static string read site can own a monomorphic cache in its
 ProgramInstance. Both the shaped PropertyRead carrier and canonical GetV with
 a literal String operand reach this seam. Operands retain their evaluation
 order; the compiler-owned literal String needs no observable key coercion.
-The runtime helper receives separate lookup and receiver values plus a completed
-PropertyKey, and owns nullish errors and primitive boxing on a miss. Common Get
-does not repeat user key coercion. Boxed primitive lookups retain
-the original primitive getter receiver. Computed keys, Get and GetMethod retain
-their existing spec-operation paths. Known primitive, Array and intrinsic-only
-targets retain generic Get; unresolved object reads remain candidates.
+The runtime helper retains its twelve-input target Value, receiver Value,
+completed PropertyKey, site, Environment and ProgramInstance contract. It checks
+the actual String tag before cache registration; computed keys, super reads,
+Get and GetMethod retain their existing paths. Nullish errors and getter
+receivers keep their existing execution context and whole-Throw behavior.
 
-P calls the existing typed `CachedPropertyRead` helper for every admitted read.
-R owns cache registration, warm-hit guards, value loads and complete Get fallback.
+P calls the typed `CachedPropertyRead` helper for every admitted read. R owns
+cache registration, live storage guards, value loads and complete Get fallback.
 P retains neither an invocation-long metadata root nor a duplicate storage-read
 path. Each helper call reloads the ProgramInstance's indexed cache table, with
-the same source-site identity, execution context and whole Completion result.
-This ownership change adds no helper or GC layout and does not increment ABI 51;
-compiler/source identity still rejects stale P and native artifacts. The extra
-call and cache-table lookup versus reduced P code and native frames require
-matched measurement.
+the same source-site identity and execution context. The full five-slot
+Completion result, general helper/source/resumable signatures and ABI 51 remain
+unchanged. Runtime/compiler source identity still invalidates stale artifacts.
 
 The optimized runtime checks the live concrete lookup, live compact storage and
 actual immutable shape before loading the current slot value through the common
 read path. Every later read repeats those checks, including reads after calls.
 Value-only Set keeps the shape and the cache reads the new value from either
-representation. Dictionary conversion makes the old shape check fail.
-Inherited/absent properties and proxies use full Get and are not cached. Cache
-records retain only primitive string/shape metadata and a slot; they cannot
-retain a user object, prototype, Symbol or value.
+compact representation. Structural mutation falls back to complete Get and does
+not let a cache bypass accessors, prototypes or proxies. Cache records retain
+only primitive string/shape metadata and a slot; they cannot retain a user
+object, prototype, Symbol, value or Realm.
+
+Concrete FunctionObjects join the effect-free own-data probe through their
+canonical ordinary header, including dictionary storage. Each read resolves its
+current descriptor and value; it retains no receiver/value cache. Active legacy
+caller/arguments values keep their existing descriptor/StoredValue ownership
+and invocation updates. Accessors, absence, prototypes, bound functions and
+Proxies retain the complete Get path and original receiver/Realm semantics.
 
 Each ProgramInstance owns a typed directory for each cache kind. Indexed
 directories grow geometrically; nullable 64-slot leaf pages allocate on first
@@ -201,6 +205,66 @@ row alias is reread from that same rooted immutable packed table; no admitted
 operation can mutate it or reenter JavaScript. Captured-cell TDZ, imported-cell
 authentication and generic accessor/Proxy/coercion behavior keep their existing
 owners. This adds no heap representation, helper or runtime ABI.
+
+The same closed proof can read concrete source Function headers and ordinary
+objects backed by canonical dictionaries. The first row resolves each static
+String key through the existing ordinary finder and retains its insertion slot
+and immutable String identity as frame-local hints. Every subsequent row reloads
+its actual storage and table, checks the slot against live logical LENGTH and
+capacity, then requires a non-null matching-key data entry and a concrete
+StoredValue. No cached table, descriptor, receiver or value authorizes a read.
+Different insertion positions or String identities safely decline. Dictionary
+compaction and deleted entries cannot make stale hints authoritative.
+
+All row fields and primitive leaves are validated before the iteration body.
+A getter, missing entry, changed storage mode, deferred value recipe or type
+failure publishes only the completed prefix and resumes the original iteration.
+The admitted body makes no calls or heap writes/allocations; the whole-region
+proof still rejects callbacks, escapes, captured row aliases and dynamic with
+resolution. The alias retains the original StoredValue tag and identity.
+Intrinsic recipe storage, BoundFunction and Proxy rows remain generic.
+
+For guarded row mode, first-row preparation chooses storage once. Two emitted backedges use
+one arithmetic emitter and the same completed-prefix publication/continuation
+owner. The ordinary inline arm retains its original concrete Object/Inline
+shape guards and scratch operations; dictionary roots and per-field mode tests
+are absent from that arm. The dictionary arm retains live Function/Ordinary
+header, slot, key, descriptor and StoredValue checks. Every row preparation
+clears its temporary roots before returning, including guard misses. A later
+storage/type mismatch resumes the original loop at the completed prefix. No
+source callbacks, speculative reads beyond the current row or mutable heap
+snapshots are introduced. Native frames/code size and timings need measurement.
+
+Repeated masked rows have a separate admission within this same complete region
+proof. A contiguous low-bit mask establishes a complete finite period; more
+remaining trips than that period establishes reuse and proves every preflight
+row is source-addressable. Only the existing one or two own Number/String-length
+paths qualify. Nested Array paths and other masks retain guarded row mode.
+Zero-trip/TDZ/receiver checks still precede speculative work.
+
+The first-row preallocation gate and every preflight row use the canonical raw
+String own-data probe with cached actual keys. The same decoder accepts current
+inline/array compact, dictionary and intrinsic storage; internal recipes may
+allocate and normalize in their defining Realm without source/provider callbacks.
+Accessors, exotics, absence and wrong primitive types decline to the original
+whole loop. Streaming rows retain their separate live shape/slot guards.
+Preflight writes one private existing NumberBitsI64Array. Each Number is copied
+by bit reinterpretation; String leaves
+use the same immutable UTF-16 length. No source body, counter, sum or row-alias
+write occurs until the entire projection is valid. Any preflight miss takes the
+whole original loop from its original local state, so getters and coercions
+retain their original partial-iteration effects and Throw order. All projection
+and borrowed roots clear before that generic continuation.
+
+The repeated body uses projected numeric loads and the unchanged scalar
+arithmetic/update emitter, preserving Number order, NaN and signed zero. The
+final alias still reads the original packed row table, preserving callable tags
+and identity. The complete effect proof excludes every callback, write, escape
+or reentry that could invalidate the snapshot. This is one per-invocation GC
+array in the existing heap, not a permanent cache or another object model. The
+existing period/trip/path bounds imply finite checked projection storage; no
+workload name, field spelling or measured trip count authorizes admission.
+Allocation cost, guard-miss overhead and native performance remain to measure.
 
 ## Allocation accounting and evidence limits
 

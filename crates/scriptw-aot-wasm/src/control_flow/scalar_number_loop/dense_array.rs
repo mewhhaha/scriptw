@@ -63,6 +63,18 @@ enum ArrayIteration {
 }
 
 impl ArrayIteration {
+    fn projection_period(self) -> Option<u32> {
+        let Self::Masked { limit, mask } = self else {
+            return None;
+        };
+        let period = mask.checked_add(1)?;
+        if period.is_power_of_two() && limit > period {
+            Some(period)
+        } else {
+            None
+        }
+    }
+
     fn mask(self) -> Option<u32> {
         match self {
             Self::Length => None,
@@ -531,6 +543,7 @@ impl<'a> ArrayReadBorrow<'a> {
                 ReadPaths::Compact(paths) => ReadBacking::Compact(CompactPathBorrow::new(
                     paths,
                     plan.row_alias,
+                    plan.iteration.projection_period(),
                     builder,
                     function,
                 )),
@@ -717,11 +730,18 @@ impl<'a> ArrayReadBorrow<'a> {
         done: ControlTarget,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> Option<PreparedCompactRows<'_, 'a>> {
+    ) -> Result<Option<PreparedCompactRows<'_, 'a>>, EmitError> {
         let ReadBacking::Compact(rows) = &self.backing else {
-            return None;
+            return Ok(None);
         };
-        Some(rows.prepare_loop(self.slot, self.length, self.mask, done, builder, function))
+        Ok(Some(rows.prepare_loop(
+            self.slot,
+            self.length,
+            self.mask,
+            done,
+            builder,
+            function,
+        )?))
     }
 
     pub(super) fn publish_row_alias(

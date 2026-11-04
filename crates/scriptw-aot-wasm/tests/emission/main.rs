@@ -21,9 +21,11 @@ mod embedding;
 mod emit_golden;
 mod for_in_prefix_copy;
 mod foreign_functions;
+mod function_own_data_probe;
 mod guarded_push;
 mod has_instance_helper;
 mod host_html_dda_structure;
+mod infallible_booleans;
 mod iterator_helper_dispatch;
 mod numeric_bitwise_emission;
 mod own_keys_helper;
@@ -40,3 +42,11 @@ mod throw_guard_dedup;
 mod typeof_comparisons;
 
 mod regexp_shared_recovery;
+
+mod scalar_dictionary_rows;
+
+mod scalar_row_modes;
+
+mod scalar_row_projection;
+
+mod retained_operands;

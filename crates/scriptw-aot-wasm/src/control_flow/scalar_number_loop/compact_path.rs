@@ -1,7 +1,11 @@
 //! Static own-data paths are validated across the complete read-only region.
+mod dictionary;
+mod projection;
 use super::invariant_imul::CachedRuntimeName;
 use super::*;
 use crate::data::PooledLiteralDomain;
+use dictionary::DictionaryScratch;
+use projection::RowProjection;
 
 #[derive(PartialEq, Eq)]
 pub(super) enum CachedReadName {
@@ -126,25 +130,37 @@ pub(super) struct CompactPathBorrow<'a> {
     paths: &'a [CompactReadPath],
     values: GcLocal<PackedValueTable, Nullable>,
     shape: GcLocal<CompactDataShape, Nullable>,
+    storage_kind: I32Local,
+    names: Vec<GcLocal<StringValue, Nullable>>,
     slots: Vec<I32Local>,
     columns: Vec<Option<I32Local>>,
     numbers: Vec<F64Local>,
     row_alias: Option<LocalBindingId>,
+    projection: Option<RowProjection>,
 }
 
 impl<'a> CompactPathBorrow<'a> {
     pub(super) fn new(
         paths: &'a [CompactReadPath],
         row_alias: Option<LocalBindingId>,
+        projection_period: Option<u32>,
         builder: &FunctionBuilder<'_>,
         function: &mut Function,
     ) -> Self {
         let s = builder.runtime_schema();
+        let storage_kind = s.reserve_i32_local(function);
+        storage_kind.set_constant(RowStorageKind::Inline as i32, function);
         Self {
             paths,
             row_alias,
+            projection: RowProjection::new(projection_period, paths, builder, function),
             values: s.reserve_gc_local(function).initialize_null(s, function),
             shape: s.reserve_gc_local(function).initialize_null(s, function),
+            storage_kind,
+            names: paths
+                .iter()
+                .map(|_| s.reserve_gc_local(function).initialize_null(s, function))
+                .collect(),
             slots: paths
                 .iter()
                 .map(|_| s.reserve_i32_local(function))
@@ -235,7 +251,7 @@ impl<'a> CompactPathBorrow<'a> {
         done: ControlTarget,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> PreparedCompactRows<'_, 'a> {
+    ) -> Result<PreparedCompactRows<'_, 'a>, EmitError> {
         let prepared = PreparedCompactRows {
             rows: self,
             slot,
@@ -244,8 +260,14 @@ impl<'a> CompactPathBorrow<'a> {
             done,
         };
         prepared.guard_bound(builder, function);
-        prepared.guard_row(RowSetup::First, builder, function);
-        prepared
+        if let Some(projection) = &self.projection {
+            projection.guard_reuse(slot, length, done, builder, function);
+            projection.prepare(self, slot, done, builder, function)?;
+            projection.read_row(self, slot, builder, function);
+        } else {
+            prepared.guard_row(RowSetup::First, builder, function);
+        }
+        Ok(prepared)
     }
 
     /// Every row guard captures the complete footprint before a source body and
@@ -261,59 +283,128 @@ impl<'a> CompactPathBorrow<'a> {
         let accepted = s.reserve_i32_local(function);
         accepted.set_constant(0, function);
         let scratch = RowScratch::new(builder, function);
+        let dictionary = match setup {
+            RowSetup::Established(RowStorageKind::Inline) => None,
+            RowSetup::First | RowSetup::Established(RowStorageKind::Dictionary) => {
+                Some(DictionaryScratch::new(builder, function))
+            }
+        };
         let first = match setup {
             RowSetup::First => Some(FirstRowKeys::new(self, builder, function)),
-            RowSetup::Established => None,
+            RowSetup::Established(_) => None,
         };
         let declined = builder.open_frame(ControlFrameKind::Block, function);
         scratch.load_row(&self.values, slot, builder, function);
-        scratch.value.tag().load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
-        function.instruction(&Instruction::I32Ne);
-        builder.emit_branch_if_to_target(declined, function);
-        scratch.value.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::I32Eqz);
-        builder.emit_branch_if_to_target(declined, function);
-        scratch.load_storage(builder, function);
-        scratch.base.load(s, function);
-        function.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<InlineCompactDataStorage>(
-                crate::gc_types::GcNullability::NonNullable,
-            )
-            .heap_type,
-        ));
-        function.instruction(&Instruction::I32Eqz);
-        builder.emit_branch_if_to_target(declined, function);
-        scratch.cast_inline(builder, function);
-        if let Some(first) = &first {
-            self.shape.replace(
+        match setup {
+            RowSetup::First => {
+                scratch.load_function_or_ordinary_storage(builder, declined, function);
+                scratch.base.load(s, function);
+                function.instruction(&Instruction::RefTestNonNull(
+                    s.reference_type::<InlineCompactDataStorage>(
+                        crate::gc_types::GcNullability::NonNullable,
+                    )
+                    .heap_type,
+                ));
+                builder.open_frame(ControlFrameKind::If, function);
+                scratch.cast_inline(builder, function);
+                if let Some(first) = &first {
+                    self.storage_kind
+                        .set_constant(RowStorageKind::Inline as i32, function);
+                    self.shape.replace(
+                        s.field(InlineCompactDataStorageSchema::SHAPE)
+                            .read(&scratch.inline, s, function)
+                            .reference()
+                            .nullable(),
+                        function,
+                    );
+                    first.resolve(builder, declined, function);
+                }
+                function.instruction(&Instruction::Else);
+                dictionary
+                    .as_ref()
+                    .expect("first-row dictionary scratch")
+                    .capture(&scratch, builder, declined, function);
+                if let Some(first) = &first {
+                    self.storage_kind
+                        .set_constant(RowStorageKind::Dictionary as i32, function);
+                    first.resolve_dictionary(
+                        &scratch,
+                        dictionary.as_ref().expect("first-row dictionary scratch"),
+                        builder,
+                        declined,
+                        function,
+                    );
+                }
+                builder.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+            }
+            RowSetup::Established(RowStorageKind::Inline) => {
+                scratch.value.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
+                function.instruction(&Instruction::I32Ne);
+                builder.emit_branch_if_to_target(declined, function);
+                scratch.value.reference().load(function);
+                function.instruction(&Instruction::RefTestNonNull(
+                    s.reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
+                        .heap_type,
+                ));
+                function.instruction(&Instruction::I32Eqz);
+                builder.emit_branch_if_to_target(declined, function);
+                scratch.load_storage(builder, function);
+                scratch.base.load(s, function);
+                function.instruction(&Instruction::RefTestNonNull(
+                    s.reference_type::<InlineCompactDataStorage>(
+                        crate::gc_types::GcNullability::NonNullable,
+                    )
+                    .heap_type,
+                ));
+                function.instruction(&Instruction::I32Eqz);
+                builder.emit_branch_if_to_target(declined, function);
+                scratch.cast_inline(builder, function);
                 s.field(InlineCompactDataStorageSchema::SHAPE)
-                    .read(&scratch.inline, s, function)
-                    .reference()
-                    .nullable(),
-                function,
-            );
-            first.resolve(builder, declined, function);
-        } else {
-            s.field(InlineCompactDataStorageSchema::SHAPE)
-                .read(&scratch.inline, s, function);
-            self.shape.load(s, function);
-            function.instruction(&Instruction::RefEq);
-            function.instruction(&Instruction::I32Eqz);
-            builder.emit_branch_if_to_target(declined, function);
+                    .read(&scratch.inline, s, function);
+                self.shape.load(s, function);
+                function.instruction(&Instruction::RefEq);
+                function.instruction(&Instruction::I32Eqz);
+                builder.emit_branch_if_to_target(declined, function);
+            }
+            RowSetup::Established(RowStorageKind::Dictionary) => {
+                scratch.load_function_or_ordinary_storage(builder, declined, function);
+                dictionary
+                    .as_ref()
+                    .expect("dictionary-mode scratch")
+                    .capture(&scratch, builder, declined, function);
+            }
         }
-        for (((path, slot), column), number) in self
+        for ((((path, slot), column), number), name) in self
             .paths
             .iter()
             .zip(&self.slots)
             .zip(&self.columns)
             .zip(&self.numbers)
+            .zip(&self.names)
         {
-            scratch.read_slot(*slot, builder, function);
+            match setup {
+                RowSetup::First => {
+                    self.storage_kind.load(function);
+                    builder.open_frame(ControlFrameKind::If, function);
+                    dictionary
+                        .as_ref()
+                        .expect("first-row dictionary scratch")
+                        .read_slot(&scratch, *slot, name, builder, declined, function);
+                    function.instruction(&Instruction::Else);
+                    scratch.read_slot(*slot, builder, function);
+                    builder.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                }
+                RowSetup::Established(RowStorageKind::Inline) => {
+                    scratch.read_slot(*slot, builder, function)
+                }
+                RowSetup::Established(RowStorageKind::Dictionary) => dictionary
+                    .as_ref()
+                    .expect("dictionary-mode scratch")
+                    .read_slot(&scratch, *slot, name, builder, declined, function),
+            }
             scratch.value.tag().load(function);
             function.instruction(&Instruction::I32Const(path.tag().tag()));
             function.instruction(&Instruction::I32Ne);
@@ -402,6 +493,9 @@ impl<'a> CompactPathBorrow<'a> {
         if let Some(first) = first {
             first.release(builder, function);
         }
+        if let Some(dictionary) = dictionary {
+            dictionary.release(function);
+        }
         scratch.release(builder, function);
         accepted
     }
@@ -453,14 +547,27 @@ impl<'a> CompactPathBorrow<'a> {
 
     pub(super) fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         let s = builder.runtime_schema();
+        if let Some(projection) = &self.projection {
+            projection.clear_roots(builder, function);
+        }
         self.values.set_null(s, function);
         self.shape.set_null(s, function);
+        for name in &self.names {
+            name.set_null(s, function);
+        }
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         let s = builder.runtime_schema();
+        if let Some(projection) = self.projection {
+            projection.release(function);
+        }
         self.values.clear(function);
         self.shape.clear(function);
+        s.release_i32_local(self.storage_kind, function);
+        for name in self.names {
+            name.clear(function);
+        }
         for slot in self.slots {
             s.release_i32_local(slot, function);
         }
@@ -473,9 +580,23 @@ impl<'a> CompactPathBorrow<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
+#[repr(i32)]
+pub(super) enum RowStorageKind {
+    Inline = 0,
+    Dictionary = 1,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum RowLoopKind {
+    Guarded(RowStorageKind),
+    Projected,
+}
+
+#[derive(Clone, Copy)]
 enum RowSetup {
     First,
-    Established,
+    Established(RowStorageKind),
 }
 
 /// Construction emits first-row admission before returning this capability.
@@ -524,9 +645,33 @@ impl PreparedCompactRows<'_, '_> {
         builder.emit_branch_if_to_target(self.done, function);
     }
 
-    pub(super) fn prepare_next(&self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
+    pub(super) fn is_projected(&self) -> bool {
+        self.rows.projection.is_some()
+    }
+
+    pub(super) fn emit_dictionary_mode(&self, function: &mut Function) {
+        self.rows.storage_kind.load(function);
+    }
+
+    pub(super) fn prepare_next(
+        &self,
+        kind: RowLoopKind,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
         self.guard_bound(builder, function);
-        self.guard_row(RowSetup::Established, builder, function);
+        match kind {
+            RowLoopKind::Guarded(kind) => {
+                self.guard_row(RowSetup::Established(kind), builder, function);
+            }
+            RowLoopKind::Projected => {
+                self.rows
+                    .projection
+                    .as_ref()
+                    .expect("prepared projection owner")
+                    .read_row(self.rows, self.slot, builder, function);
+            }
+        }
     }
 }
 
@@ -534,7 +679,6 @@ struct FirstRowKeys<'a, 'p> {
     rows: &'a CompactPathBorrow<'p>,
     keys: GcLocal<CompactShapeKeys, Nullable>,
     length: I32Local,
-    names: Vec<GcLocal<StringValue, Nullable>>,
 }
 
 impl<'a, 'p> FirstRowKeys<'a, 'p> {
@@ -548,14 +692,6 @@ impl<'a, 'p> FirstRowKeys<'a, 'p> {
             rows,
             keys: s.reserve_gc_local(function).initialize_null(s, function),
             length: s.reserve_i32_local(function),
-            names: rows
-                .paths
-                .iter()
-                .map(|_| {
-                    s.reserve_gc_local::<StringValue, Nullable>(function)
-                        .initialize_null(s, function)
-                })
-                .collect(),
         }
     }
 
@@ -585,7 +721,7 @@ impl<'a, 'p> FirstRowKeys<'a, 'p> {
             .paths
             .iter()
             .zip(&self.rows.slots)
-            .zip(&self.names)
+            .zip(&self.rows.names)
         {
             let cached = path.name().cached(builder, function);
             name.replace(cached.load(s, function), function);
@@ -625,9 +761,6 @@ impl<'a, 'p> FirstRowKeys<'a, 'p> {
     }
 
     fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
-        for name in self.names {
-            name.clear(function);
-        }
         self.keys.clear(function);
         builder
             .runtime_schema()

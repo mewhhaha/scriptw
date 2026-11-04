@@ -40,6 +40,10 @@ machine, explicit `--cloud` uses its finite inherited cgroup budget; serial
 defaults remain. Optional cloud CPU settings never authorize changing a campaign's
 workers, deadlines or cache policy. Missing resource controls must fail clearly.
 
+Prefer persistent Cargo output directories. If filesystem pressure requires
+temporary tmpfs outputs, restore verified persistent copies before runtime tests.
+Tmpfs pages consume the producing cgroup's memory budget after compilation ends.
+
 ## Development workflow
 
 1. Start from a reproducible failure or missing invariant and choose one coherent
@@ -242,8 +246,8 @@ artifacts. Compilation success does not verify runtime output or conformance.
 
 ## Focused performance situations
 
-Generate the checked programs for global lookup, branch fan-out, arguments and
-property mutation history. They use retained Modules with untimed `prepare(input)`
+Generate the checked programs for each performance hill.
+They use retained Modules with untimed `prepare(input)`
 and timed `run()`, shared by Scriptw and Node/V8:
 
 ```sh
@@ -268,6 +272,11 @@ processes; every Wasmtime consumer has its compiler disabled. Record preparation
 time and native-image size separately. Mutation and getter controls have their
 own scores; their differences are not allocation counts or isolated stack costs.
 Scriptc has no matched retained-Module consumer in this workflow.
+
+After a later Cargo build replaces the original executable, a frozen host can
+use `--producer-receipt <receipt.json>`. The receipt must retain the exact Cargo
+`artifact` row, the frozen host's `sha256` and its `source_manifest_sha256`.
+The runner verifies and archives it alongside the original Cargo stream.
 
 ## React and edge benchmarks
 

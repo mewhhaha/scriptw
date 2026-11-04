@@ -73,6 +73,32 @@ class Admission(unittest.TestCase):
     def validate(self, row, actor='v8'):
         return m.validate_execution(row, case(), actor, 'd' * 64, identity(), {'inert': 'receipt'})
 
+    def test_frozen_host_receipt_survives_rebuild_but_rejects_different_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / 'cargo-host'
+            frozen = Path(directory) / 'frozen-host'
+            original.write_bytes(b'original compiler')
+            frozen.write_bytes(original.read_bytes())
+            row = dict(reason='compiler-artifact',
+                       package_id='path+file:///workspace/crates/scriptw-cli#0.1.0',
+                       target=dict(name='compiler_precompiled_baseline', kind=['example'],
+                                   crate_types=['bin'], src_path=str(m.ROOT / m.HOST_SOURCE)),
+                       profile=dict(opt_level='3', debug_assertions=False, test=False,
+                                    overflow_checks=False), features=[], executable=str(original))
+            receipt = dict(artifact=copy.deepcopy(row), sha256=m.digest(frozen),
+                           source_manifest_sha256='a' * 64)
+            self.assertEqual(m.validate_cargo([row], frozen), row)
+            original.write_bytes(b'rebuilt compiler')
+            with self.assertRaises(ValueError):
+                m.validate_cargo([row], frozen)
+            self.assertEqual(m.validate_cargo([row], frozen, receipt), row)
+            for field, value in [('sha256', 'b' * 64), ('source_manifest_sha256', ''),
+                                 ('artifact', dict(row, executable='another compiler'))]:
+                changed = copy.deepcopy(receipt)
+                changed[field] = value
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    m.validate_cargo([row], frozen, changed)
+
     def test_every_prepared_input_and_warmup_is_checked(self):
         self.assertEqual(self.validate(execution()), list(range(13, 20)))
         for index in range(m.SAMPLES + m.WARMUPS):

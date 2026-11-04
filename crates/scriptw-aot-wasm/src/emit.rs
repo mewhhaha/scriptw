@@ -1027,8 +1027,8 @@ impl<'a> FunctionBuilder<'a> {
         }));
         BindingStorage::Local(id)
     }
-    /// An eager inferred-name binding is compiler storage, with no source
-    /// declaration mode or TDZ. Its whole value is initialized before use.
+    /// An already-acquired Value becomes initialized compiler storage, with
+    /// no source declaration mode or TDZ. The arena owns its copied roots.
     pub(crate) fn allocate_compiler_temporary_binding(
         &mut self,
         source: &ValueLocals,

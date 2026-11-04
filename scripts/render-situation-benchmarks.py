@@ -14,6 +14,7 @@ ACTOR_LABELS = {'scriptw-fast': 'Scriptw Fast', 'scriptw-speed': 'Scriptw Speed'
 ACTOR_COLORS = {'scriptw-fast': '#3478a8', 'scriptw-speed': '#4a9a79',
                 'v8': '#d17b36'}
 CATEGORIES = (
+    ('strict equality', 'Dynamic strict equality', 'Retained public call · ms', ('strict-equality-numbers.js', 'strict-equality-mixed.js')),
     ('enumeration', 'For-in enumeration', 'Retained public call · ms', ('for-in-wide.js',)),
     ('type tests', 'Type classification', 'Retained public call · ms', ('typeof-dispatch.js', 'singleton-dispatch.js')),
     ('control', 'Control', 'Retained public call · ms', ('control-empty.js',)),
@@ -29,6 +30,8 @@ CATEGORIES = (
      ('metadata-ordinary.js', 'metadata-function.js', 'metadata-intrinsic.js')),
 )
 SHORT_LABELS = {
+    'strict-equality-numbers.js': 'Number pairs',
+    'strict-equality-mixed.js': 'Mixed value pairs',
     'for-in-wide.js': '64 own keys · 16 passes',
     'typeof-dispatch.js': 'Mixed typeof dispatch',
     'singleton-dispatch.js': 'Strict null / undefined',
