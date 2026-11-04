@@ -1,6 +1,10 @@
 # `%Function.prototype%[@@hasInstance]`
 
-Current source status (2026-10-05): the T05 semantic Wasm-GC cutover is source-authored and unverified. Earlier source recipes, caller counts, and dated verification below describe their recorded checkpoints; they do not verify this cutover. ECMAScript requirements and retained fixtures remain acceptance criteria. Semantic values and Realm ownership now use the typed GC/compiler path described in [the GC value contract](../value-heap-gc.md). The retired representation assertions add no Test262 skips or new passing results.
+Current implementation (2026-11-04): both entry points call one typed runtime
+helper over the existing [GC value representation](../value-heap-gc.md).
+Current qualification scopes and measurements are recorded in the
+[README](../../../README.md) and [benchmark details](../benchmarks.md).
+Historical results below describe their recorded checkpoints.
 
 `%Function.prototype%[@@hasInstance]` is the built-in entry point for
 `OrdinaryHasInstance`. The `instanceof` operator is the distinct entry point
@@ -40,17 +44,17 @@ stub or at an independently materialized duplicate function object.
 Lowering and code generation preserve the two already-evaluated operands as:
 
 ```rust
-HasInstanceRequestLocals::InstanceofOperator {
+HasInstanceRequest::InstanceofOperator {
     object,
     constructor,
 }
-HasInstanceRequestLocals::OrdinaryHasInstance {
+HasInstanceRequest::OrdinaryHasInstance {
     constructor,
     object,
 }
 ```
 
-Each field names one payload/tag local pair. `InstanceofOperator` keeps source
+Each field borrows one whole `ValueLocals`. `InstanceofOperator` keeps source
 evaluation order — left operand, then right operand — while the named fields
 make the abstract-operation roles explicit. `OrdinaryHasInstance` is used by
 the intrinsic body after its receiver and first argument have already been
@@ -61,7 +65,7 @@ error at every emitter consumer. The different field order is intentional and
 mirrors the specification signatures `InstanceofOperator(O, C)` and
 `OrdinaryHasInstance(C, O)`.
 
-The backend persists that request mode in one raw Wasm `i64` local. Its private,
+The backend persists that request mode in one raw Wasm `i32` local. Its private,
 non-copyable `HasInstanceRuntimeState` authority projects the stable internal
 codes exhaustively: `InstanceofOperator` is 0 and `OrdinaryHasInstance` is 1.
 The selected initial state, the operator gate, the absent-handler transition
@@ -69,10 +73,30 @@ and the bound-target transition all use that borrowed projection; Rust enum
 declaration order is not an implicit ABI. Adding a Rust state without assigning
 its code is therefore `E0004`.
 
-This is deliberately narrower than a typed runtime state machine. Wasm locals
-remain numeric, so the structure guard pins the one comparison, all three
-writes and their variant polarity. It does not claim that every possible
-numeric runtime transition is made unrepresentable by Rust's type system.
+The request facade alone supplies the initial helper mode. The helper owns the
+mutable state and the two transitions; bound-target redispatch stays inside its
+loop rather than expanding another algorithm or reevaluating source operands.
+Wasm state remains numeric; this does not claim that arbitrary numeric runtime
+transitions are unrepresentable by Rust's type system.
+
+`helper::has_instance` receives the entry mode, both held Value triples, the
+execution Realm, caller Environment and caller Program. Its normal Boolean or
+original Throw crosses the existing whole-Completion ABI. Generated abstract
+operation errors use the supplied execution Realm. A source operator supplies
+its executing context; the native method projects its actual callable's Realm
+before crossing the helper boundary. The helper has no callable context, and
+must not use current-function-Realm error constructors. Nested property reads,
+calls and prototype queries retain their existing receiver, environment and
+completion protocols.
+
+Source operator bodies and `%Function.prototype%[@@hasInstance]` contain only
+the call facade; `emit_has_instance_kernel` emits the algorithm once in R.
+The existing foundational Function/GPD dependencies already cover this owner.
+Runtime layout 50 records the new helper function/type ABI without introducing
+a heap layout. Cache and package controls reject valid-checksum ABI-49
+envelopes before reuse. External encoded R/P tests check the actual matching
+signature, native-method and source call edges, whole-completion validation,
+and bounded repeated-site growth.
 
 ## `InstanceofOperator`
 
@@ -100,7 +124,7 @@ Calling the intrinsic with receiver `C` and first argument `O` performs
 
 1. If `C` is not callable, return `false`.
 2. If `C` is a bound function exotic object, transition to
-   `HasInstanceRequestLocals::InstanceofOperator` with `O` and
+   `HasInstanceRequest::InstanceofOperator` with `O` and
    `C.[[BoundTargetFunction]]`. This step occurs before reading `C.prototype`
    and preserves the target's observable `@@hasInstance` dispatch.
 3. If `O` is not an object, return `false`.

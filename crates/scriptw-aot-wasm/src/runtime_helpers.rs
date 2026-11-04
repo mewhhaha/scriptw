@@ -1306,6 +1306,7 @@ runtime_helper_domain! {
     LexicalBindingUninitialized / LexicalBindingUninitializedArguments / LexicalBindingUninitializedParameters / "lexical_binding_uninitialized" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => Completion;
     RelationalComparison / RelationalComparisonArguments / RelationalComparisonParameters / "relational_comparison" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     LooseEquality / LooseEqualityArguments / LooseEqualityParameters / "loose_equality" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    HasInstance / HasInstanceArguments / HasInstanceParameters / "has_instance" { entry:I32,object:Value,constructor:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectOwnKeys / ObjectOwnKeysArguments / ObjectOwnKeysParameters / "object_own_keys" { target:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyKeys;
     BigIntEquality / BigIntEqualityArguments / BigIntEqualityParameters / "bigint_equality" { left:(Ref BigIntValue NonNullable),right:(Ref BigIntValue NonNullable) } => I32;
@@ -1411,6 +1412,7 @@ impl RuntimeHelperId {
             Self::LexicalBindingUninitialized => HelperOwner::Runtime,
             Self::RelationalComparison => HelperOwner::Runtime,
             Self::LooseEquality => HelperOwner::Runtime,
+            Self::HasInstance => HelperOwner::Runtime,
             Self::ForInAdvance => HelperOwner::Runtime,
             Self::ObjectOwnKeys => HelperOwner::Runtime,
             Self::BigIntEquality => HelperOwner::Runtime,
@@ -1578,6 +1580,7 @@ impl RuntimeHelperId {
             Self::LexicalBindingUninitialized => true,
             Self::RelationalComparison => true,
             Self::LooseEquality => true,
+            Self::HasInstance => true,
             Self::ForInAdvance => true,
             Self::ObjectOwnKeys => true,
             Self::BigIntEquality => true,

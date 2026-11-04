@@ -30,22 +30,26 @@ accepts `--case <file.js>`.
   separate from scored timings; inclusive sample shares overlap. Preserve live
   import aliases, TDZ, cross-Realm errors and Proxy invariants. Total executed
   allocation remains unmeasured. Owner: IR/AOT lowering and object operations.
-- Reduce Fast's native frames by outlining the existing unified `instanceof`
-  state machine once. Preserve operand evaluation, both entry modes, actual
-  execution Realms and whole Throws. Measure emitted size, native frame/body
-  sizes, probe samples, preparation and balanced Fast execution; keep
-  Backtracking as a separate control. The [allocator diagnostic](react-attribution-current.json)
-  establishes a runtime/preparation tradeoff; default policy changes need
-  broader workload evidence. Owner: AOT code shape/native policy.
-- Shorten emitter iteration by moving public emitted-artifact acceptance cases
-  into the existing external `emission` target. This can reuse the ordinary AOT
-  library needed by Engine rather than compiling it again under `cfg(test)`.
-  Keep private unit tests at frozen qualification and measure an identical edit
-  loop before claiming savings. Preserve canonical R regeneration and compiler
-  source fingerprints. Move embedding-only benchmark hosts to Engine examples
-  so emitter iterations do not rebuild the Test262-linked CLI library. Reuse
-  native producer/consumer runs for retained RSC requests while measuring cold
-  setup separately. Owner: AOT test layout, benchmark tools/runtime-image build.
+- Remove JavaScript descriptor transport from internal `[[GetOwnProperty]]`
+  reads. Extract the existing recursive owner into one whole-Completion plus
+  nullable private descriptor helper; public reflection alone materializes
+  JavaScript descriptor objects. The [current profiles](react-attribution-current.json)
+  place descriptor calls mainly under object reads and HasInstance, rather than
+  ForIn. Preserve snapshots across effects, Proxy ordering, namespace TDZ,
+  mapped arguments, typed arrays and the actual execution Realm. Add a focused
+  exotic/intrinsic read benchmark alongside ordinary controls; measure retired
+  work and allocation before predicting gains. Owner: AOT object operations.
+- Reduce remaining Fast frame and spill costs. The [allocator-only control](react-attribution-current.json)
+  still improves retained requests while increasing native preparation. Measure
+  a broader workload set and amortization before changing default policy;
+  keep allocator changes separate from source transformations.
+  Owner: AOT code shape/native policy.
+- Move embedding-only benchmark hosts to Engine examples so emitter iterations
+  do not rebuild the Test262-linked CLI library. Reuse native producer/consumer
+  runs for retained RSC requests while measuring cold setup separately. Prefer
+  the existing external emission target for public artifact acceptance checks;
+  keep private unit checks at frozen qualification. Measure identical edits
+  before claiming build savings. Owner: benchmark tools/runtime-image build.
 - Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup.
   Keep exact P/R identities and code/data accounting separate from native image
   size and request time. The older [SSR checkpoint](react-codegen-20261102.json)

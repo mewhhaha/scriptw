@@ -3,7 +3,10 @@ use crate::emit::ControlTarget;
 use crate::gc_types::{
     BoundFunction, BoundFunctionSchema, CompletionLocals, GcNullability, StoredValue,
 };
-use crate::runtime_helpers::ObjectGetPrototypeOfArguments;
+use crate::runtime_helpers::{
+    HasInstanceArguments, HasInstanceParameters, HelperParameters, ObjectGetPrototypeOfArguments,
+    RuntimeHelperId,
+};
 
 /// These two entry algorithms have different hook and non-callable policies.
 /// Borrowed whole values preserve the specification roles without raw slots.
@@ -105,7 +108,7 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let (state, initial_constructor, object) = match request {
+        let (state, constructor, object) = match request {
             HasInstanceRequest::InstanceofOperator {
                 object,
                 constructor,
@@ -123,6 +126,61 @@ impl FunctionBuilder<'_> {
                 object,
             ),
         };
+        let entry = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(state.runtime_code()));
+        entry.store(function);
+        let realm = self.emit_execution_realm(function);
+        schema
+            .call_helper(
+                HasInstanceArguments::new(
+                    entry,
+                    object,
+                    constructor,
+                    &realm,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(result, function);
+        realm.clear(function);
+        schema.release_i32_local(entry, function);
+        Ok(())
+    }
+
+    pub(crate) fn compile_has_instance_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::HasInstance);
+        let parameters = self.helper_parameters::<HasInstanceParameters>(&mut function);
+        self.completion().initialize(&mut function);
+        let result = self.runtime_schema().reserve_completion(&mut function);
+        self.emit_has_instance_kernel(
+            parameters.entry,
+            &parameters.object,
+            &parameters.constructor,
+            &result,
+            &mut function,
+        )?;
+        result.emit(&mut function);
+        result.clear(&mut function);
+        self.clear_helper_execution_realm(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    /// One emitted state machine owns both entry modes and bound-target
+    /// transitions. Its errors use the supplied execution Realm; this helper
+    /// has no actual callable context of its own.
+    fn emit_has_instance_kernel(
+        &mut self,
+        entry: crate::gc_types::I32Local,
+        object: &ValueLocals,
+        initial_constructor: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
         let state_local = schema.reserve_i32_local(function);
         let constructor = schema.reserve_value_local(function);
         let handler = schema.reserve_value_local(function);
@@ -131,7 +189,7 @@ impl FunctionBuilder<'_> {
         let call_result = schema.reserve_completion(function);
         let boolean = schema.reserve_i32_local(function);
         constructor.copy_from(initial_constructor, function);
-        function.instruction(&Instruction::I32Const(state.runtime_code()));
+        entry.load(function);
         state_local.store(function);
         function.instruction(&Instruction::I32Const(0));
         boolean.store(function);

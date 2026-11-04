@@ -46,12 +46,12 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-03:** both modes produce the exact expected Flight output.
+**React 19.3.1 RSC · 2026-11-04:** both modes produce the exact expected Flight output.
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 16.60 ms | 0.572 ms |
-| Async | 17.77 ms | 0.460 ms |
+| Sync | 13.65 ms | 0.487 ms |
+| Async | 14.51 ms | 0.400 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,14 +60,14 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.93 s JavaScript → Wasm**, **14.72 s native preparation**,
-and **3.06 ms module initialization**. Program Wasm is **5.88 MiB** (5.36 MiB
-code, 0.47 MiB data); shared runtime Wasm is **37.42 MiB**.
+Cold Scriptw setup: **3.28 s JavaScript → Wasm**, **11.86 s native preparation**,
+and **2.67 ms module initialization**. Program Wasm is **5.80 MiB** (5.28 MiB
+code, 0.47 MiB data); shared runtime Wasm is **37.41 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json).
 
-**Focused performance situations · 2026-11-03:** 13 checked programs compare
+**Focused performance situations · 2026-11-04:** 13 checked programs compare
 global lookup, control-flow scaling, arguments and property mutation history
 against V8. Eight fresh processes per configuration; three checked warmups and
 seven measured calls. Compilation and input preparation precede timing.
@@ -97,8 +97,8 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-03**): 1,741 Engine cases,
-42 Wasm-emission, 636 structural, 769 IR and
+Latest scoped verification (**2026-11-04**): 1,744 Engine cases,
+46 Wasm-emission, 636 structural, 769 IR and
 361 source-guard checks pass. AOT units pass 642 cases; four known
 bootstrap assertions still fail.
 The focused benchmarks passed 3,120 checked calls; React RSC also passed exact
@@ -119,7 +119,7 @@ remain [owned](docs/rust-rewrite/current-inventory.md).
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 49:** rebuild older Portable bundles and native images.
+- **Runtime ABI 50:** rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·
 [Current work](docs/rust-rewrite/current-inventory.md) ·

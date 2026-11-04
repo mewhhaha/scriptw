@@ -134,6 +134,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::LexicalBindingUninitialized
             | RuntimeHelperId::RelationalComparison
             | RuntimeHelperId::LooseEquality
+            | RuntimeHelperId::HasInstance
             | RuntimeHelperId::ForInAdvance
             | RuntimeHelperId::ObjectOwnKeys
             | RuntimeHelperId::BigIntEquality

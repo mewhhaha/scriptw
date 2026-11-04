@@ -89,6 +89,16 @@ python3 -B scripts/limited_verification.py -- cargo test --locked -p scriptw-aot
 python3 -B scripts/limited_verification.py -- ./scripts/check-no-interpreter-in-product-graph.sh
 ```
 
+Encoded R/P ABI and code-size acceptance checks belong in the external
+`emission` target when the public emission API is sufficient. It links the
+ordinary emitter library that Engine also uses; private unit checks remain in
+`--lib` qualification. For the shared internal operations:
+
+```sh
+python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-aot-wasm --test emission -- has_instance_helper:: --test-threads=1
+python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-aot-wasm --test emission -- own_keys_helper:: --test-threads=1
+```
+
 Select the owning target rather than copying the example for every change.
 A zero-test filter is not a passing regression check. Use
 `scripts/run_workspace_tests.py --plan-only --output <fresh-directory>` to inspect

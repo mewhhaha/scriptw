@@ -1,13 +1,68 @@
 {
   "schema": "scriptw-react-attribution-current-v2",
-  "date": "2026-11-03",
+  "date": "2026-11-04",
   "status": "captured",
   "timing_report_in_evidence": {
     "path": "reports/rsc-current.json",
-    "sha256": "6572b9ade792a0dca296afd867abc47ae01dda9806db45d91427f5d2767e6f1b"
+    "sha256": "9f8d5eaea69a26a8a36d6abb9116a10692a15408d83536980af8bbf98999caec"
   },
   "excluded_from_scored_cohorts": true,
   "candidate_identity": {
+    "source_fingerprint": "e0789502793702d955dd99efa8c3a089781dc76f00ce024dd90391369933f9cd",
+    "source_commit": "19b59f9536cc4a3df102d7e06bce24a9407a70d0",
+    "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+    "toolchain": {
+      "opt_level": "3",
+      "profile": "release",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+      "target": "x86_64-unknown-linux-gnu"
+    },
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "None",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "SinglePass",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "program_wasm_sha256": "ba2166faa2f7d0cdcf72166707ddd9ad2444a155fa137b0122e0a412b42b3b0b",
+    "runtime": {
+      "key": "efa845c549f49bfa20b1c1bdb13bfe4017b87b660a994989e3675ef0a1e83e07",
+      "wasm_bytes": 39224975,
+      "wasm_sha256": "1d51b71fb3082074276ffb3e11be064513943a689c29863c7742883c9ea017ce"
+    },
+    "inputs": {
+      "adapted_source_bytes": 64946,
+      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+      "source_bytes": 64835,
+      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+      "versions": {
+        "esbuild": "0.28.2",
+        "playwright": "1.64.1",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-server-dom-webpack": "19.3.1"
+      },
+      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+    }
+  },
+  "baseline_identity": {
     "source_fingerprint": "f2efa28197f4299775e2378a90eb0e64b4e3b4d768077aaa2d653bca7ab14639",
     "source_commit": "a7a44759ce392a48e7c9885e8ab00bd25195a5d4",
     "executable_sha256": "20acf8525d093f4452490d6b824f34e298db33990ced26cd087a000278325897",
@@ -62,61 +117,6 @@
       "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
     }
   },
-  "baseline_identity": {
-    "source_fingerprint": "9dd31eafb905f7a203c525096d1c274d3d6eaf764a6b6cb72e25db226c10ba32",
-    "source_commit": "5479452b5927ec789c42f018d9ebb7f6f6cc480f",
-    "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-    "toolchain": {
-      "opt_level": "3",
-      "profile": "release",
-      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-      "target": "x86_64-unknown-linux-gnu"
-    },
-    "configuration": {
-      "collector": "Copying",
-      "compilation_jobs": 1,
-      "cranelift_opt_level": "None",
-      "driver_worker_stack_bytes": 67108864,
-      "epoch_deadline_ticks": 6000,
-      "epoch_interruption": true,
-      "epoch_tick_ms": 5,
-      "gc_initial_bytes": 16777216,
-      "max_wasm_stack_bytes": 33554432,
-      "native_parallel_compilation": false,
-      "pending_deadline_ms": 30000,
-      "register_allocation": "SinglePass",
-      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-      "target": "x86_64-unknown-linux-gnu",
-      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-      "wasmtime": "47.0.0",
-      "wasmtime_async_stack_bytes": 67108864
-    },
-    "program_wasm_sha256": "9d5f2104a7e1fb30f9d4050f4f4b75ccbfd1c8c38ed0614a491e794a45d87a66",
-    "runtime": {
-      "key": "0bef8ee58b989c2f6409c7800985dab63f8df08be6d6d85ac46ac3fd33e1ebe5",
-      "wasm_bytes": 39382946,
-      "wasm_sha256": "194958918606fa929a197f8cabc3c1f9bd39bc4f884c53eb2bafa3a738b6097f"
-    },
-    "inputs": {
-      "adapted_source_bytes": 64946,
-      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-      "source_bytes": 64835,
-      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-      "versions": {
-        "esbuild": "0.28.2",
-        "playwright": "1.64.1",
-        "react": "19.3.1",
-        "react-dom": "19.3.1",
-        "react-server-dom-webpack": "19.3.1"
-      },
-      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-    }
-  },
   "pmu": {
     "fresh_processes": 24,
     "measured_request_windows": 2400,
@@ -126,530 +126,6 @@
     "minimum_running_fraction": 1,
     "cohorts": {
       "baseline-node-sync": {
-        "processes": [
-          {
-            "name": "candidate-node-sync-0",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-0/receipt.json",
-              "sha256": "82e4214524660984035cb7891f1640dd73b8cc4135e23d3b877bd67274824f73",
-              "bytes": 121877
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-0/observations.json",
-              "sha256": "334d434c6aba9b34fcb343dd9703ec3d9769ead9fbbcb2f9c97a81e452fa07dd",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 151989102,
-              "instructions:u": 274621122,
-              "branches:u": 54158127,
-              "branch-misses:u": 613670
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1373049.0,
-              "instructions:u": 2570690.5,
-              "branches:u": 503754.5,
-              "branch-misses:u": 4959.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1519891.02,
-              "instructions:u": 2746211.22,
-              "branches:u": 541581.27,
-              "branch-misses:u": 6136.7
-            },
-            "ipc": 1.8068474541023343,
-            "branch_miss_fraction": 0.011331078713264955
-          },
-          {
-            "name": "candidate-node-sync-1",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-1/receipt.json",
-              "sha256": "5a04703623d0556d7cf6ef9bad53290c7f2ac8c1ea660eeda95ead7a1c3c8ef9",
-              "bytes": 121871
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-1/observations.json",
-              "sha256": "f33b790784c939a4dd1fca11ea190dc0f7e3b3104ab203fd167648046cd25512",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 146543898,
-              "instructions:u": 263879445,
-              "branches:u": 52773421,
-              "branch-misses:u": 626425
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1325130.5,
-              "instructions:u": 2462483.0,
-              "branches:u": 489650.5,
-              "branch-misses:u": 5085.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1465438.98,
-              "instructions:u": 2638794.45,
-              "branches:u": 527734.21,
-              "branch-misses:u": 6264.25
-            },
-            "ipc": 1.8006853141029455,
-            "branch_miss_fraction": 0.011870085132438164
-          },
-          {
-            "name": "candidate-node-sync-2",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-2/receipt.json",
-              "sha256": "c1b3f3d2cf1d41f08b52acdee7585e55a022910af65590de9510c7d302266863",
-              "bytes": 121895
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-sync-2/observations.json",
-              "sha256": "8c7d3da21753a2414e0c325bdf81e6bc19ef2d1659b44540907885762ac189d2",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 152288255,
-              "instructions:u": 272087954,
-              "branches:u": 54512653,
-              "branch-misses:u": 658389
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1332930.0,
-              "instructions:u": 2473825.0,
-              "branches:u": 491028.0,
-              "branch-misses:u": 5014.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1522882.55,
-              "instructions:u": 2720879.54,
-              "branches:u": 545126.53,
-              "branch-misses:u": 6583.89
-            },
-            "ipc": 1.7866640733390766,
-            "branch_miss_fraction": 0.012077728082689353
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1332930.0,
-          "instructions:u": 2473825.0,
-          "branches:u": 491028.0,
-          "branch-misses:u": 5014.5
-        },
-        "process_instruction_medians": [
-          2570690.5,
-          2462483.0,
-          2473825.0
-        ],
-        "median_process_ipc": 1.8006853141029455,
-        "median_process_branch_miss_fraction": 0.011870085132438164
-      },
-      "baseline-node-async": {
-        "processes": [
-          {
-            "name": "candidate-node-async-0",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-0/receipt.json",
-              "sha256": "db67ebb759aee6ab2d752a9462cb47e684778695412305385fa7d432db690265",
-              "bytes": 121880
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-0/observations.json",
-              "sha256": "dbc5bfb63d443edf98f6e6a9d09269a5ed362a8b01fbc77472d05a30fa2f7202",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 155895022,
-              "instructions:u": 278683676,
-              "branches:u": 55599586,
-              "branch-misses:u": 681242
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1433112.5,
-              "instructions:u": 2639667.5,
-              "branches:u": 524595.5,
-              "branch-misses:u": 5633.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1558950.22,
-              "instructions:u": 2786836.76,
-              "branches:u": 555995.86,
-              "branch-misses:u": 6812.42
-            },
-            "ipc": 1.7876367854773452,
-            "branch_miss_fraction": 0.012252645190559512
-          },
-          {
-            "name": "candidate-node-async-1",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-1/receipt.json",
-              "sha256": "1a007f55e8fbcd40ff049ac5e2656221f0e11446ef7cdcc70f58109052afa561",
-              "bytes": 121884
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-1/observations.json",
-              "sha256": "0c8cee755344ad65d12682caacb0962b8f90b803f5798391766a6e77e3bb9070",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 158313667,
-              "instructions:u": 285409696,
-              "branches:u": 56648099,
-              "branch-misses:u": 677631
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1449117.0,
-              "instructions:u": 2684150.5,
-              "branches:u": 530053.5,
-              "branch-misses:u": 5555.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1583136.67,
-              "instructions:u": 2854096.96,
-              "branches:u": 566480.99,
-              "branch-misses:u": 6776.31
-            },
-            "ipc": 1.8028114780513549,
-            "branch_miss_fraction": 0.011962113680107783
-          },
-          {
-            "name": "candidate-node-async-2",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-2/receipt.json",
-              "sha256": "b116dd5bff14d43583b1307421ca7cb1c650d04ead1f221c19984c3c38c2f69c",
-              "bytes": 121896
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-node-async-2/observations.json",
-              "sha256": "f38b6c87a38870e435455147b87a0e657d2b1d9ad91e72f4825068b421ab2874",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 162967562,
-              "instructions:u": 298929252,
-              "branches:u": 58316740,
-              "branch-misses:u": 666340
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1494883.0,
-              "instructions:u": 2821016.0,
-              "branches:u": 546939.0,
-              "branch-misses:u": 5418.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1629675.62,
-              "instructions:u": 2989292.52,
-              "branches:u": 583167.4,
-              "branch-misses:u": 6663.4
-            },
-            "ipc": 1.8342868257426592,
-            "branch_miss_fraction": 0.011426221698949563
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1449117.0,
-          "instructions:u": 2684150.5,
-          "branches:u": 530053.5,
-          "branch-misses:u": 5555.0
-        },
-        "process_instruction_medians": [
-          2639667.5,
-          2684150.5,
-          2821016.0
-        ],
-        "median_process_ipc": 1.8028114780513549,
-        "median_process_branch_miss_fraction": 0.011962113680107783
-      },
-      "baseline-scriptw-sync": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-sync-0",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-0/receipt.json",
-              "sha256": "d3b82858c51f57fc78108ca4630d198a66b97e703872a26e59448a76802e81d7",
-              "bytes": 125014
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-0/observations.json",
-              "sha256": "9f38b2655912c6a22400605816ca671c05d6e6a32f34def829f9f9ec67473482",
-              "bytes": 14724
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 6027313515,
-              "instructions:u": 12976143332,
-              "branches:u": 1793066068,
-              "branch-misses:u": 8957297
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 59778702.0,
-              "instructions:u": 128605329.5,
-              "branches:u": 17704760.5,
-              "branch-misses:u": 88440.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 60273135.15,
-              "instructions:u": 129761433.32,
-              "branches:u": 17930660.68,
-              "branch-misses:u": 89572.97
-            },
-            "ipc": 2.1528900561928044,
-            "branch_miss_fraction": 0.004995519774679044
-          },
-          {
-            "name": "candidate-scriptw-sync-1",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-1/receipt.json",
-              "sha256": "a65cbb4788c2b3c39fe4072ba89cb6eea415489b4afab753f41a76a5f8ce3ef9",
-              "bytes": 125014
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-1/observations.json",
-              "sha256": "86eb82996cd64beeac679618bb62471a9dd3547d49421ecdf6dd1a5727894f4a",
-              "bytes": 14724
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 6013168859,
-              "instructions:u": 12976145401,
-              "branches:u": 1793066563,
-              "branch-misses:u": 8921292
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 59648993.5,
-              "instructions:u": 128605154.5,
-              "branches:u": 17704724.5,
-              "branch-misses:u": 88146.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 60131688.59,
-              "instructions:u": 129761454.01,
-              "branches:u": 17930665.63,
-              "branch-misses:u": 89212.92
-            },
-            "ipc": 2.157954600190282,
-            "branch_miss_fraction": 0.004975438270999648
-          },
-          {
-            "name": "candidate-scriptw-sync-2",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-2/receipt.json",
-              "sha256": "852590bbeb775a90b53edc2a9d95815504f22e44e3fda174fef45188f4077800",
-              "bytes": 125014
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-sync-2/observations.json",
-              "sha256": "19e64ad345f19ba7d8d789a742ab7cfde0fa401283fd1cc31bcbcf13aaeda932",
-              "bytes": 14724
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 5980045324,
-              "instructions:u": 12976143810,
-              "branches:u": 1793066332,
-              "branch-misses:u": 8969323
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 59286123.5,
-              "instructions:u": 128605293.5,
-              "branches:u": 17704754.0,
-              "branch-misses:u": 88609.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 59800453.24,
-              "instructions:u": 129761438.1,
-              "branches:u": 17930663.32,
-              "branch-misses:u": 89693.23
-            },
-            "ipc": 2.1699072677463205,
-            "branch_miss_fraction": 0.0050022259856920895
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 59648993.5,
-          "instructions:u": 128605293.5,
-          "branches:u": 17704754.0,
-          "branch-misses:u": 88440.5
-        },
-        "process_instruction_medians": [
-          128605329.5,
-          128605154.5,
-          128605293.5
-        ],
-        "median_process_ipc": 2.157954600190282,
-        "median_process_branch_miss_fraction": 0.004995519774679044
-      },
-      "baseline-scriptw-async": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-async-0",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-0/receipt.json",
-              "sha256": "51c4b76ce19233d6d20d9427b9adfddb3166aead2f3905fb2ef3bc6facceb8c5",
-              "bytes": 125075
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-0/observations.json",
-              "sha256": "e264b649652be45d1282a10ae1f2cbfc18d05712baccd9fafd7e86963c37fbaf",
-              "bytes": 14726
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 6458541909,
-              "instructions:u": 13690026551,
-              "branches:u": 1900162576,
-              "branch-misses:u": 9756494
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 63840522.5,
-              "instructions:u": 135432468.5,
-              "branches:u": 18710260.5,
-              "branch-misses:u": 96108.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 64585419.09,
-              "instructions:u": 136900265.51,
-              "branches:u": 19001625.76,
-              "branch-misses:u": 97564.94
-            },
-            "ipc": 2.1196775903742147,
-            "branch_miss_fraction": 0.005134557496937041
-          },
-          {
-            "name": "candidate-scriptw-async-1",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-1/receipt.json",
-              "sha256": "2366d5ac662451b8087ed60c6f91c06c41d98cc2f8e8b2acc59e8b909bcf8f44",
-              "bytes": 125075
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-1/observations.json",
-              "sha256": "b82891f2412bcdbe88a1ddc07fa40d9c15cff9d6399e22ed349af478b534b886",
-              "bytes": 14726
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 6472318973,
-              "instructions:u": 13690025261,
-              "branches:u": 1900162301,
-              "branch-misses:u": 9789699
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 64083984.0,
-              "instructions:u": 135432899.5,
-              "branches:u": 18710304.0,
-              "branch-misses:u": 96470.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 64723189.73,
-              "instructions:u": 136900252.61,
-              "branches:u": 19001623.01,
-              "branch-misses:u": 97896.99
-            },
-            "ipc": 2.115165417234451,
-            "branch_miss_fraction": 0.005152033063095698
-          },
-          {
-            "name": "candidate-scriptw-async-2",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-2/receipt.json",
-              "sha256": "3b461f736d64ab86aabe9899dbc062a9bb75bf25783e9282d19366fafb84f300",
-              "bytes": 125071
-            },
-            "observations": {
-              "path": "target/performance-specialize-20261103/candidate-scriptw-async-2/observations.json",
-              "sha256": "31a2d978f1557f205cc2bcf7f458274842d2f9f52b7dbf17e4e294ad081c0a40",
-              "bytes": 14726
-            },
-            "executable_sha256": "f8e474e3a94a9558be09e8871f08a6dfe45c68b15b271cc57ef39803a0728a05",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 6400299155,
-              "instructions:u": 13690028259,
-              "branches:u": 1900162888,
-              "branch-misses:u": 9723682
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 63238176.5,
-              "instructions:u": 135432451.5,
-              "branches:u": 18710310.0,
-              "branch-misses:u": 95726.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 64002991.55,
-              "instructions:u": 136900282.59,
-              "branches:u": 19001628.88,
-              "branch-misses:u": 97236.82
-            },
-            "ipc": 2.138966933804206,
-            "branch_miss_fraction": 0.005117288660570872
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 63840522.5,
-          "instructions:u": 135432468.5,
-          "branches:u": 18710304.0,
-          "branch-misses:u": 96108.0
-        },
-        "process_instruction_medians": [
-          135432468.5,
-          135432899.5,
-          135432451.5
-        ],
-        "median_process_ipc": 2.1196775903742147,
-        "median_process_branch_miss_fraction": 0.005134557496937041
-      },
-      "candidate-node-sync": {
         "processes": [
           {
             "name": "candidate-node-sync-0",
@@ -780,7 +256,7 @@
         "median_process_ipc": 1.8246177156375287,
         "median_process_branch_miss_fraction": 0.01162486576448741
       },
-      "candidate-node-async": {
+      "baseline-node-async": {
         "processes": [
           {
             "name": "candidate-node-async-0",
@@ -911,7 +387,7 @@
         "median_process_ipc": 1.8052278770010879,
         "median_process_branch_miss_fraction": 0.011831233615608219
       },
-      "candidate-scriptw-sync": {
+      "baseline-scriptw-sync": {
         "processes": [
           {
             "name": "candidate-scriptw-sync-0",
@@ -1042,7 +518,7 @@
         "median_process_ipc": 1.935966829557687,
         "median_process_branch_miss_fraction": 0.006135895122257706
       },
-      "candidate-scriptw-async": {
+      "baseline-scriptw-async": {
         "processes": [
           {
             "name": "candidate-scriptw-async-0",
@@ -1172,6 +648,530 @@
         ],
         "median_process_ipc": 1.9369745477981501,
         "median_process_branch_miss_fraction": 0.006198533315969249
+      },
+      "candidate-node-sync": {
+        "processes": [
+          {
+            "name": "candidate-node-sync-0",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-0/receipt.json",
+              "sha256": "81a50a1131a6eb5aeb72fbedae1df9f2ca830a9d82a84a845c93245a133dd838",
+              "bytes": 121877
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-0/observations.json",
+              "sha256": "45cebd95eb25b3595b70c5611f57f4a019e1449a1b65b86b3054ebb3a58159e5",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 150969848,
+              "instructions:u": 272932335,
+              "branches:u": 53964377,
+              "branch-misses:u": 623593
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1375201.5,
+              "instructions:u": 2560106.5,
+              "branches:u": 503108.5,
+              "branch-misses:u": 5091.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1509698.48,
+              "instructions:u": 2729323.35,
+              "branches:u": 539643.77,
+              "branch-misses:u": 6235.93
+            },
+            "ipc": 1.8078599045817414,
+            "branch_miss_fraction": 0.011555641604090046
+          },
+          {
+            "name": "candidate-node-sync-1",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-1/receipt.json",
+              "sha256": "deb05f16b3d275a1caed17642284992a313b4ae42a4a1d5d0de83517c5c0ab46",
+              "bytes": 121895
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-1/observations.json",
+              "sha256": "a8fdc44d72fe766a74e6ffb43974663bd6d5513a8641b86e78cab7139042069b",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 152478301,
+              "instructions:u": 273659536,
+              "branches:u": 54762722,
+              "branch-misses:u": 654779
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1337111.5,
+              "instructions:u": 2488144.5,
+              "branches:u": 493503.5,
+              "branch-misses:u": 5019.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1524783.01,
+              "instructions:u": 2736595.36,
+              "branches:u": 547627.22,
+              "branch-misses:u": 6547.79
+            },
+            "ipc": 1.7947441321503181,
+            "branch_miss_fraction": 0.011956655478155376
+          },
+          {
+            "name": "candidate-node-sync-2",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-2/receipt.json",
+              "sha256": "c57a9bd47b6777f3b6e76fb5b284890659e6014d7ca255787175320e36e5f9bd",
+              "bytes": 121874
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-sync-2/observations.json",
+              "sha256": "1f3e8ecc3c398ca18a9dfcb6570f264bbdb4dffbf81ca9b0ba5c079d92a7f2e3",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 148129372,
+              "instructions:u": 266442982,
+              "branches:u": 53169504,
+              "branch-misses:u": 621147
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1336170.0,
+              "instructions:u": 2489979.5,
+              "branches:u": 493770.5,
+              "branch-misses:u": 5038.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1481293.72,
+              "instructions:u": 2664429.82,
+              "branches:u": 531695.04,
+              "branch-misses:u": 6211.47
+            },
+            "ipc": 1.7987180962327984,
+            "branch_miss_fraction": 0.011682392222428856
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1337111.5,
+          "instructions:u": 2489979.5,
+          "branches:u": 493770.5,
+          "branch-misses:u": 5038.5
+        },
+        "process_instruction_medians": [
+          2560106.5,
+          2488144.5,
+          2489979.5
+        ],
+        "median_process_ipc": 1.7987180962327984,
+        "median_process_branch_miss_fraction": 0.011682392222428856
+      },
+      "candidate-node-async": {
+        "processes": [
+          {
+            "name": "candidate-node-async-0",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-0/receipt.json",
+              "sha256": "f06437045925f25fcb054e0f0811b8964182629b530f6e9857a9bfb7573efd11",
+              "bytes": 121895
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-0/observations.json",
+              "sha256": "3293c7189a271d6ee936abf624f4c0aab960699bf9eaecdef43ab6a6f711269e",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 162786581,
+              "instructions:u": 299208432,
+              "branches:u": 58411851,
+              "branch-misses:u": 666745
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1492072.0,
+              "instructions:u": 2822292.5,
+              "branches:u": 547663.0,
+              "branch-misses:u": 5423.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1627865.81,
+              "instructions:u": 2992084.32,
+              "branches:u": 584118.51,
+              "branch-misses:u": 6667.45
+            },
+            "ipc": 1.8380411343610688,
+            "branch_miss_fraction": 0.011414550105594154
+          },
+          {
+            "name": "candidate-node-async-1",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-1/receipt.json",
+              "sha256": "266c69115ded0cc00d415c0397e6c7721d0cfb4e32f0b55616bf1bf708c6b0ec",
+              "bytes": 121885
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-1/observations.json",
+              "sha256": "d41bb6da3bff20986d73e7c947f38fc5380a3ef2e39f030c0d6dc312005fb43c",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 157368636,
+              "instructions:u": 280992218,
+              "branches:u": 56064323,
+              "branch-misses:u": 675469
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1440153.5,
+              "instructions:u": 2644758.0,
+              "branches:u": 525179.0,
+              "branch-misses:u": 5597.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1573686.36,
+              "instructions:u": 2809922.18,
+              "branches:u": 560643.23,
+              "branch-misses:u": 6754.69
+            },
+            "ipc": 1.785566839379608,
+            "branch_miss_fraction": 0.012048107670897944
+          },
+          {
+            "name": "candidate-node-async-2",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-2/receipt.json",
+              "sha256": "4c92b576638e768a642663666774344cc437f64ec6f11775f7339220049047e8",
+              "bytes": 121893
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-node-async-2/observations.json",
+              "sha256": "d3345ff3c77e3687a6294ec18cbdd2ae35e11067404f7d63a6402d225d914621",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 161009020,
+              "instructions:u": 295945579,
+              "branches:u": 57694144,
+              "branch-misses:u": 661459
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1483569.5,
+              "instructions:u": 2810746.5,
+              "branches:u": 544195.5,
+              "branch-misses:u": 5520.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1610090.2,
+              "instructions:u": 2959455.79,
+              "branches:u": 576941.44,
+              "branch-misses:u": 6614.59
+            },
+            "ipc": 1.8380683206443962,
+            "branch_miss_fraction": 0.011464924412432569
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1483569.5,
+          "instructions:u": 2810746.5,
+          "branches:u": 544195.5,
+          "branch-misses:u": 5520.0
+        },
+        "process_instruction_medians": [
+          2822292.5,
+          2644758.0,
+          2810746.5
+        ],
+        "median_process_ipc": 1.8380411343610688,
+        "median_process_branch_miss_fraction": 0.011464924412432569
+      },
+      "candidate-scriptw-sync": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-sync-0",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-0/receipt.json",
+              "sha256": "e7b591f42c04f1c56efd967e405ef619e1150773511a3a1b192adaba22d9123b",
+              "bytes": 124715
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-0/observations.json",
+              "sha256": "3c8f39700472e9fff71a896025251d259a018f0e5374af907a48388248a6e7a9",
+              "bytes": 14724
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 4687444116,
+              "instructions:u": 9290472683,
+              "branches:u": 1258478881,
+              "branch-misses:u": 7472515
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 47567745.0,
+              "instructions:u": 94833304.0,
+              "branches:u": 12959025.0,
+              "branch-misses:u": 76803.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 46874441.16,
+              "instructions:u": 92904726.83,
+              "branches:u": 12584788.81,
+              "branch-misses:u": 74725.15
+            },
+            "ipc": 1.981991134846417,
+            "branch_miss_fraction": 0.005937735716361219
+          },
+          {
+            "name": "candidate-scriptw-sync-1",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-1/receipt.json",
+              "sha256": "3c26d8e3aa0a0ba1fdb283778f0c1b5d196d654739d1efb6978ad25b1732c4b6",
+              "bytes": 124717
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-1/observations.json",
+              "sha256": "fc9e89f4b19b46d4937327e200cb397425e6ed629364793880079af0aeabed66",
+              "bytes": 14725
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 4605755930,
+              "instructions:u": 9290478983,
+              "branches:u": 1258480111,
+              "branch-misses:u": 7368560
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 46591970.0,
+              "instructions:u": 94833009.0,
+              "branches:u": 12958969.0,
+              "branch-misses:u": 75720.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 46057559.3,
+              "instructions:u": 92904789.83,
+              "branches:u": 12584801.11,
+              "branch-misses:u": 73685.6
+            },
+            "ipc": 2.0171453121268628,
+            "branch_miss_fraction": 0.005855126303223715
+          },
+          {
+            "name": "candidate-scriptw-sync-2",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-2/receipt.json",
+              "sha256": "47a9b088e2b6ae5039449b352637e99581bb2b9e6717285cade241a7bd9a6c34",
+              "bytes": 124713
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-2/observations.json",
+              "sha256": "938365431dfa4ffaec92f2577b71175cb265505422c5ff99eafc69a04713375d",
+              "bytes": 14725
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 4610273239,
+              "instructions:u": 9290474480,
+              "branches:u": 1258479190,
+              "branch-misses:u": 7323351
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 46836125.5,
+              "instructions:u": 94833144.0,
+              "branches:u": 12958990.5,
+              "branch-misses:u": 75315.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 46102732.39,
+              "instructions:u": 92904744.8,
+              "branches:u": 12584791.9,
+              "branch-misses:u": 73233.51
+            },
+            "ipc": 2.015167864977818,
+            "branch_miss_fraction": 0.00581920707008274
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 46836125.5,
+          "instructions:u": 94833144.0,
+          "branches:u": 12958990.5,
+          "branch-misses:u": 75720.5
+        },
+        "process_instruction_medians": [
+          94833304.0,
+          94833009.0,
+          94833144.0
+        ],
+        "median_process_ipc": 2.015167864977818,
+        "median_process_branch_miss_fraction": 0.005855126303223715
+      },
+      "candidate-scriptw-async": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-async-0",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-0/receipt.json",
+              "sha256": "c0615e20edc10108b124144739a3198612e559439eb0e011b47c9a906e31d815",
+              "bytes": 124909
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-0/observations.json",
+              "sha256": "48399978fe8245eff6c06535c111e31bcc4f2bb962759c23f46e0e0d26577c8b",
+              "bytes": 14727
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 5077462016,
+              "instructions:u": 9932481490,
+              "branches:u": 1355550248,
+              "branch-misses:u": 8042391
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 50843047.0,
+              "instructions:u": 100864887.0,
+              "branches:u": 13853702.0,
+              "branch-misses:u": 82075.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 50774620.16,
+              "instructions:u": 99324814.9,
+              "branches:u": 13555502.48,
+              "branch-misses:u": 80423.91
+            },
+            "ipc": 1.9561902105226896,
+            "branch_miss_fraction": 0.005932934623313204
+          },
+          {
+            "name": "candidate-scriptw-async-1",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-1/receipt.json",
+              "sha256": "fed10695c95941fa9c1bb68bd432b55f5e986d589ad9e119cd7d08f158c62cb7",
+              "bytes": 124907
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-1/observations.json",
+              "sha256": "6806aa298c1abb9d05e9a1d675d618bb01c7d23e58f9531790c3244e8439417e",
+              "bytes": 14726
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 5039125786,
+              "instructions:u": 9932483945,
+              "branches:u": 1355550538,
+              "branch-misses:u": 8113881
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 50870271.5,
+              "instructions:u": 100864851.5,
+              "branches:u": 13853635.5,
+              "branch-misses:u": 82717.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 50391257.86,
+              "instructions:u": 99324839.45,
+              "branches:u": 13555505.38,
+              "branch-misses:u": 81138.81
+            },
+            "ipc": 1.9710728342195822,
+            "branch_miss_fraction": 0.00598567207385078
+          },
+          {
+            "name": "candidate-scriptw-async-2",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-2/receipt.json",
+              "sha256": "da7af93d6e7e1febefd40b11c60342f6044ff6fba5a25d08c1d7a86811ffd5b7",
+              "bytes": 124905
+            },
+            "observations": {
+              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-2/observations.json",
+              "sha256": "b40e364212eb61064aacfb7a4404f916252c563288ec33c49874de1934197444",
+              "bytes": 14727
+            },
+            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 5005793188,
+              "instructions:u": 9932480932,
+              "branches:u": 1355549969,
+              "branch-misses:u": 7872780
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 50619933.0,
+              "instructions:u": 100864899.5,
+              "branches:u": 13853663.5,
+              "branch-misses:u": 80388.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 50057931.88,
+              "instructions:u": 99324809.32,
+              "branches:u": 13555499.69,
+              "branch-misses:u": 78727.8
+            },
+            "ipc": 1.9841972208940566,
+            "branch_miss_fraction": 0.005807812459918252
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 50843047.0,
+          "instructions:u": 100864887.0,
+          "branches:u": 13853663.5,
+          "branch-misses:u": 82075.0
+        },
+        "process_instruction_medians": [
+          100864887.0,
+          100864851.5,
+          100864899.5
+        ],
+        "median_process_ipc": 1.9710728342195822,
+        "median_process_branch_miss_fraction": 0.005932934623313204
       }
     }
   },
@@ -1179,23 +1179,23 @@
     "Unscored main-thread/worker-thread user hardware-counter diagnostic; initialization, warmups and output validation excluded.",
     "Node barrier and Promise-return edge instructions remain in counter bounds. Node background compilation/GC and other Scriptw threads are excluded.",
     "Counts are raw hardware events with full counter running time. They are not request timings, causal allocation shares, or a partition of the runtime gap.",
-    "Current sampled callchains and the immediately preceding Module-cell component diagnostic are archived separately, with their own build and process identities. Sampling shares overlap and do not predict wall-time gains."
+    "Current sampled callchains and allocator controls retain their own build and process identities. Older diagnostics remain in the Git-bound baseline archive. Inclusive sampling shares overlap and do not predict wall-time gains."
   ],
   "sampled_diagnostics": {
     "scope": "Current Fast sync worker only; 100 checked requests after three warmups; excluded from scored cohorts.",
     "receipt": {
-      "path": "target/performance-own-keys-20261103/profile/sync-current/receipt.json",
-      "sha256": "14fc696fe3e720c2ab42e97d280a0fe5e85c56d35ce0dcba66ff93c6c1d1095c",
-      "bytes": 49076
+      "path": "target/performance-has-instance-20261104/profile/sync-current/receipt.json",
+      "sha256": "f48392fe7d05652c96c11a038a6c6705c1eab24087c0bec2eb52865274270fd4",
+      "bytes": 49088
     },
     "callchains": {
-      "path": "target/performance-own-keys-20261103/profile/sync-current/callchains.json",
-      "sha256": "be78df426a5b4b252f7759f9521c495d1e774d73fbd0a3a97126f8706789cae3",
-      "bytes": 129240691
+      "path": "target/performance-has-instance-20261104/profile/sync-current/callchains.json",
+      "sha256": "66e0a8f7005d9f36a085be89d13c50f479c42fe47b832f64529fbf9e0e0b9ab3",
+      "bytes": 120862006
     },
-    "archive_prefix": "additional-evidence/target/performance-own-keys-20261103/profile/sync-current/",
-    "samples": 20331,
-    "period_sum": 5082750000,
+    "archive_prefix": "additional-evidence/target/performance-has-instance-20261104/profile/sync-current/",
+    "samples": 18684,
+    "period_sum": 4671000000,
     "limits": "User-cycle sample weights, never wall-time shares or exact call counts. Own samples are disjoint; inclusive owners overlap. Frame-pointer chains can truncate or be invalid, and missing callers remain explicit. Caller return PCs resolve at IP-1. No silent cross-process rebasing.",
     "archived_callchains_summary": "callchains-summary.json",
     "derived_callchains_mapping": "../derived-callchains-mapping.json",
@@ -1203,195 +1203,359 @@
     "leading_own_samples": [
       {
         "owner": "wasm:js::vn#f133",
-        "period_sum": 991250000,
-        "sample_share": 0.19502237961733312
+        "period_sum": 791000000,
+        "sample_share": 0.16934275315778205
       },
       {
         "owner": "wasm:js::ft#f123",
-        "period_sum": 415750000,
-        "sample_share": 0.08179627170331022
+        "period_sum": 411750000,
+        "sample_share": 0.08815028901734104
       },
       {
         "owner": "wasm:helper::object_read",
-        "period_sum": 353750000,
-        "sample_share": 0.06959815060744676
+        "period_sum": 350000000,
+        "sample_share": 0.074930421751231
       },
       {
         "owner": "wasm:helper::ordinary_property_append",
-        "period_sum": 164000000,
-        "sample_share": 0.03226599773744528
-      },
-      {
-        "owner": "wasm:helper::ordinary_property_find",
-        "period_sum": 164000000,
-        "sample_share": 0.03226599773744528
+        "period_sum": 166250000,
+        "sample_share": 0.035591950331834724
       },
       {
         "owner": "wasm:helper::for_in_advance",
-        "period_sum": 147500000,
-        "sample_share": 0.029019723574836457
+        "period_sum": 160500000,
+        "sample_share": 0.03436095054592164
       },
       {
-        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-own-keys-20261103/frozen/rsc_baseline)",
-        "period_sum": 126000000,
-        "sample_share": 0.02478972996901284
+        "owner": "wasm:helper::ordinary_property_find",
+        "period_sum": 145250000,
+        "sample_share": 0.031096125026760867
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-has-instance-20261104/frozen/rsc_baseline)",
+        "period_sum": 112750000,
+        "sample_share": 0.024138300149860844
       },
       {
         "owner": "wasm:js::f42",
-        "period_sum": 115000000,
-        "sample_share": 0.022625547193940287
+        "period_sum": 103250000,
+        "sample_share": 0.022104474416613146
       },
       {
         "owner": "wasm:js::et#f119",
-        "period_sum": 103500000,
-        "sample_share": 0.02036299247454626
+        "period_sum": 96750000,
+        "sample_share": 0.020712909441233142
       },
       {
-        "owner": "wasm:helper::pooled_string_resolve",
-        "period_sum": 94500000,
-        "sample_share": 0.01859229747675963
-      },
-      {
-        "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-own-keys-20261103/frozen/rsc_baseline)",
-        "period_sum": 87250000,
-        "sample_share": 0.017165904284098175
+        "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-has-instance-20261104/frozen/rsc_baseline)",
+        "period_sum": 89250000,
+        "sample_share": 0.019107257546563904
       },
       {
         "owner": "wasm:builtin::Object.getOwnPropertyDescriptor",
-        "period_sum": 77500000,
-        "sample_share": 0.015247651369829324
+        "period_sum": 86500000,
+        "sample_share": 0.018518518518518517
+      },
+      {
+        "owner": "wasm:helper::pooled_string_resolve",
+        "period_sum": 77250000,
+        "sample_share": 0.016538214515093127
       },
       {
         "owner": "wasm:helper::function_call",
-        "period_sum": 75500000,
-        "sample_share": 0.014854163592543407
+        "period_sum": 72750000,
+        "sample_share": 0.015574823378291587
       },
       {
-        "owner": "host-or-unresolved:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&core::option::Option<wasmtime::runtime::vm::send_sync_ptr::SendSyncPtr<wasmtime::runtime::vm::vmcontext::VMFuncRef>>> (/home/jacobt/src/scriptw/target/performance-own-keys-20261103/frozen/rsc_baseline)",
-        "period_sum": 74500000,
-        "sample_share": 0.014657419703900448
+        "owner": "host-or-unresolved:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&core::option::Option<wasmtime::runtime::vm::send_sync_ptr::SendSyncPtr<wasmtime::runtime::vm::vmcontext::VMFuncRef>>> (/home/jacobt/src/scriptw/target/performance-has-instance-20261104/frozen/rsc_baseline)",
+        "period_sum": 72750000,
+        "sample_share": 0.015574823378291587
       },
       {
         "owner": "wasm:helper::intrinsic_property_find",
-        "period_sum": 73000000,
-        "sample_share": 0.014362303870936009
-      },
-      {
-        "owner": "wasm:helper::object_own_keys",
-        "period_sum": 67000000,
-        "sample_share": 0.013181840539078254
-      },
-      {
-        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::func_ref::FuncRefTable>::intern (/home/jacobt/src/scriptw/target/performance-own-keys-20261103/frozen/rsc_baseline)",
-        "period_sum": 63750000,
-        "sample_share": 0.012542422900988639
-      },
-      {
-        "owner": "wasm:helper::ordinary_own_descriptor",
-        "period_sum": 61500000,
-        "sample_share": 0.01209974915154198
+        "period_sum": 71750000,
+        "sample_share": 0.015360736459002355
       },
       {
         "owner": "host-or-unresolved:[unknown] (/usr/lib/libc.so.6)",
-        "period_sum": 61250000,
-        "sample_share": 0.012050563179381241
+        "period_sum": 65250000,
+        "sample_share": 0.013969171483622351
       },
       {
-        "owner": "wasm:js::Vt#f116",
-        "period_sum": 59750000,
-        "sample_share": 0.011755447346416802
+        "owner": "wasm:helper::object_own_keys",
+        "period_sum": 60500000,
+        "sample_share": 0.012952258616998502
+      },
+      {
+        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::func_ref::FuncRefTable>::intern (/home/jacobt/src/scriptw/target/performance-has-instance-20261104/frozen/rsc_baseline)",
+        "period_sum": 58750000,
+        "sample_share": 0.012577606508242346
+      },
+      {
+        "owner": "wasm:helper::object_header_projection",
+        "period_sum": 58500000,
+        "sample_share": 0.012524084778420038
+      },
+      {
+        "owner": "host-or-unresolved:memcpy (/usr/lib/libc.so.6)",
+        "period_sum": 55750000,
+        "sample_share": 0.011935345750374651
       }
     ],
     "component_control": {
-      "source_snapshot_archive_prefix": "source/preserved-attempts/measured-source-module-proof/",
-      "archive_prefix": "additional-evidence/target/performance-module-cells-20261103/profile/",
-      "limits": "Immediately preceding Module-cell-only component, before OwnKeys. Distinct retained process and build identities. Inclusive caller shares overlap."
+      "git_commit": "19b59f9536cc4a3df102d7e06bce24a9407a70d0",
+      "limits": "Previous sampled/allocator diagnostics retain their own identities in the Git-bound baseline report; current samples belong only to this outlined candidate."
     },
     "diagnosis": {
       "schema": "scriptw-rsc-profile-diagnosis-v1",
       "unscored": true,
       "profiles": {
         "sync-current": {
-          "samples": 20331,
-          "period_sum": 5082750000,
-          "probe_samples": 1703,
-          "probe_period_sum": 425750000,
-          "probe_sample_share": 0.0837637105897398,
-          "per_function_probe_samples": {
-            "js::vn#f133": 1350,
-            "js::ft#f123": 353
+          "samples": 18684,
+          "period_sum": 4671000000,
+          "probe_samples": 1625,
+          "probe_period_sum": 406250000,
+          "probe_sample_share": 0.08697281096125027,
+          "probe_offset_ranges": {
+            "js::ft#f123": [
+              [
+                47,
+                70
+              ]
+            ],
+            "js::vn#f133": [
+              [
+                47,
+                70
+              ]
+            ]
+          },
+          "per_function_probes": {
+            "js::ft#f123": {
+              "samples": 372,
+              "period_sum": 93000000
+            },
+            "js::vn#f133": {
+              "samples": 1253,
+              "period_sum": 313250000
+            }
           },
           "entry_stack_check_budget_bytes": {
             "js::ft#f123": 362480,
-            "js::vn#f133": 1070784
+            "js::vn#f133": 963920
           },
           "native_function_range_bytes": {
             "js::ft#f123": 1719344,
-            "js::vn#f133": 5366496
+            "js::vn#f133": 4731008
           },
-          "for_in_gpd_period_sum": 250000,
-          "for_in_reflect_own_keys_period_sum": 0,
-          "callchains_sha256": "be78df426a5b4b252f7759f9521c495d1e774d73fbd0a3a97126f8706789cae3",
-          "native_prefixes_sha256": "0bdd12e0c31e1d5c6e384d442a933112a72f445463a1566ab203200402f272d8"
+          "callchains_sha256": "66e0a8f7005d9f36a085be89d13c50f479c42fe47b832f64529fbf9e0e0b9ab3",
+          "native_prefixes_sha256": "6110432a10b0bf1413e57c3fafa4ca822b87b4d4311348317b217de06557a487"
         },
         "none-backtracking": {
-          "samples": 15017,
-          "period_sum": 3754250000,
-          "probe_samples": 8,
-          "probe_period_sum": 2000000,
-          "probe_sample_share": 0.0005327295731504295,
-          "per_function_probe_samples": {
-            "js::vn#f133": 8,
-            "js::ft#f123": 0
+          "samples": 13914,
+          "period_sum": 3478500000,
+          "probe_samples": 3,
+          "probe_period_sum": 750000,
+          "probe_sample_share": 0.00021561017680034498,
+          "probe_offset_ranges": {
+            "js::ft#f123": [
+              [
+                28,
+                42
+              ]
+            ],
+            "js::vn#f133": [
+              [
+                28,
+                42
+              ],
+              [
+                42,
+                56
+              ],
+              [
+                56,
+                70
+              ],
+              [
+                70,
+                84
+              ]
+            ]
+          },
+          "per_function_probes": {
+            "js::ft#f123": {
+              "samples": 0,
+              "period_sum": 0
+            },
+            "js::vn#f133": {
+              "samples": 3,
+              "period_sum": 750000
+            }
           },
           "entry_stack_check_budget_bytes": {
             "js::ft#f123": 7088,
-            "js::vn#f133": 25056
+            "js::vn#f133": 17728
           },
           "native_function_range_bytes": {
             "js::ft#f123": 839040,
-            "js::vn#f133": 2550528
+            "js::vn#f133": 2247152
           },
-          "for_in_gpd_period_sum": 0,
-          "for_in_reflect_own_keys_period_sum": 0,
-          "callchains_sha256": "0fbf1fdbb993020ed818716ad8b297ffdea035ad5fcffb29cb528d66188fbbaa",
-          "native_prefixes_sha256": "30d573f90eb1585a9a5aa57ff97aa02945fa15afc8974b24f7ebcdaf0d54c42a"
+          "callchains_sha256": "5bc8e98701d8b06f119e517f081facd421b600cdc39d0dae37534a5ae1a7f470",
+          "native_prefixes_sha256": "5c65fd3d508c6e21b2d94e28149799415966dbb292e69ae0670af2dcaa1ea9a2"
         }
       },
-      "limits": "Disjoint own user-cycle sample weights; inclusive caller paths overlap. Probe ranges verified in retained same-process native prefixes and objdump text. Entry stack-check budgets include ABI/alignment overhead. Not wall-time shares, exact allocation counts, or predictions of source-outline speedups. Allocator diagnostic has its own host and four processes per arm; scored RSC uses the normal frozen host."
+      "limits": "Own user-cycle sample weights. Page-touch regions and entry stack-check immediates decoded from retained same-process prefixes/objdump text; budgets include ABI/alignment overhead. Inclusive caller shares overlap. Not wall-time shares, exact allocation counts or predictions of source-optimization gains. Allocator A/B uses its own four-process-per-arm host; scored RSC uses the normal frozen host."
+    },
+    "ownership": {
+      "schema": "scriptw-rsc-owner-diagnosis-v1",
+      "unscored": true,
+      "profiles": {
+        "sync-current": {
+          "samples": 18684,
+          "period_sum": 4671000000,
+          "callchains_sha256": "66e0a8f7005d9f36a085be89d13c50f479c42fe47b832f64529fbf9e0e0b9ab3",
+          "owners": {
+            "wasm:helper::object_read": {
+              "own_samples": 1400,
+              "own_period_share": 0.074930421751231,
+              "inclusive_samples": 4023,
+              "inclusive_period_share": 0.2153179190751445
+            },
+            "wasm:builtin::Object.getOwnPropertyDescriptor": {
+              "own_samples": 346,
+              "own_period_share": 0.018518518518518517,
+              "inclusive_samples": 1033,
+              "inclusive_period_share": 0.055287946906444015
+            },
+            "wasm:helper::has_instance": {
+              "own_samples": 89,
+              "own_period_share": 0.004763433954185399,
+              "inclusive_samples": 2120,
+              "inclusive_period_share": 0.11346606722329265
+            },
+            "wasm:helper::ordinary_property_append": {
+              "own_samples": 665,
+              "own_period_share": 0.035591950331834724,
+              "inclusive_samples": 841,
+              "inclusive_period_share": 0.045011774780560905
+            },
+            "wasm:helper::for_in_advance": {
+              "own_samples": 642,
+              "own_period_share": 0.03436095054592164,
+              "inclusive_samples": 1133,
+              "inclusive_period_share": 0.0606401198886748
+            }
+          },
+          "paths": {
+            "gpd_under_object_read": {
+              "samples": 1011,
+              "period_share": 0.05411046885035324
+            },
+            "gpd_under_has_instance": {
+              "samples": 575,
+              "period_share": 0.030774994647827018
+            },
+            "gpd_under_for_in": {
+              "samples": 0,
+              "period_share": 0.0
+            },
+            "append_under_gpd": {
+              "samples": 379,
+              "period_share": 0.020284735602654678
+            }
+          }
+        },
+        "none-backtracking": {
+          "samples": 13914,
+          "period_sum": 3478500000,
+          "callchains_sha256": "5bc8e98701d8b06f119e517f081facd421b600cdc39d0dae37534a5ae1a7f470",
+          "owners": {
+            "wasm:helper::object_read": {
+              "own_samples": 1320,
+              "own_period_share": 0.0948684777921518,
+              "inclusive_samples": 3773,
+              "inclusive_period_share": 0.2711657323559005
+            },
+            "wasm:builtin::Object.getOwnPropertyDescriptor": {
+              "own_samples": 314,
+              "own_period_share": 0.022567198505102776,
+              "inclusive_samples": 984,
+              "inclusive_period_share": 0.07072013799051315
+            },
+            "wasm:helper::has_instance": {
+              "own_samples": 81,
+              "own_period_share": 0.005821474773609315,
+              "inclusive_samples": 2001,
+              "inclusive_period_share": 0.1438119879258301
+            },
+            "wasm:helper::ordinary_property_append": {
+              "own_samples": 603,
+              "own_period_share": 0.04333764553686934,
+              "inclusive_samples": 795,
+              "inclusive_period_share": 0.05713669685209142
+            },
+            "wasm:helper::for_in_advance": {
+              "own_samples": 625,
+              "own_period_share": 0.0449187868334052,
+              "inclusive_samples": 1094,
+              "inclusive_period_share": 0.07862584447319247
+            }
+          },
+          "paths": {
+            "gpd_under_object_read": {
+              "samples": 954,
+              "period_share": 0.0685640362225097
+            },
+            "gpd_under_has_instance": {
+              "samples": 556,
+              "period_share": 0.039959752766997265
+            },
+            "gpd_under_for_in": {
+              "samples": 0,
+              "period_share": 0.0
+            },
+            "append_under_gpd": {
+              "samples": 348,
+              "period_share": 0.02501078050884002
+            }
+          }
+        }
+      },
+      "limits": "User-cycle sample relationships, not exact call counts or wall-time shares. Inclusive owners and path subsets overlap. These motivate a private-descriptor experiment without predicting its gain."
     }
   },
   "allocator_diagnostic": {
-    "archive_prefix": "additional-evidence/target/performance-own-keys-20261103/allocator-diagnostic/",
+    "archive_prefix": "additional-evidence/target/performance-has-instance-20261104/allocator-diagnostic/",
     "receipt": {
-      "path": "target/performance-own-keys-20261103/allocator-diagnostic/receipt.json",
-      "sha256": "4413289030554bc10750578c2d05fa2f631db728e48e8fdbd591ea4963d4aea3",
-      "bytes": 6481
+      "path": "target/performance-has-instance-20261104/allocator-diagnostic/receipt.json",
+      "sha256": "905b2c065d14e9e81fafa6d178693649c6f35a48df1b449baa735c8839ca9737",
+      "bytes": 6543
     },
     "summary": {
       "fast": {
-        "native_preparation_ms": 13207.6924885,
+        "native_preparation_ms": 11912.2015715,
         "requests_ms": {
-          "sync": 14.8715445,
-          "async": 15.8243215
+          "sync": 13.614543,
+          "async": 14.538297
         }
       },
       "none-backtracking": {
-        "native_preparation_ms": 22398.404301,
+        "native_preparation_ms": 20066.746953,
         "requests_ms": {
-          "sync": 11.7046815,
-          "async": 12.321385
+          "sync": 10.6432835,
+          "async": 11.327257
         }
       }
     },
     "limits": "Unscored allocator-only diagnostic; identical source/P/R and OptLevel::None; four fresh processes per arm. Product defaults and scored timing configuration unchanged."
   },
   "evidence_archive": {
-    "file": "docs/rust-rewrite/situations-evidence-2026-11-03.tar.xz",
-    "sha256": "e41f1817b68a77bf41734ae77884e3c7408fecf7abe1061ae0d475f047fa0032",
-    "bytes": 2394980,
-    "regular_utf8_members": 1905,
-    "expanded_utf8_bytes": 166837083,
+    "file": "docs/rust-rewrite/situations-evidence-2026-11-04.tar.xz",
+    "sha256": "e75bda98c24c2269088160d27b76f3baab51e6019bc0a1b2c1af6b819d3d6017",
+    "bytes": 1403232,
+    "regular_utf8_members": 1324,
+    "expanded_utf8_bytes": 67616458,
     "over_5mb": false
   }
 }

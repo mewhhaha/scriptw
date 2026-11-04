@@ -66,3 +66,72 @@ fromProxy === marker
 "#,
     );
 }
+
+#[test]
+fn instanceof_holds_ordered_operands_through_reentrant_hooks_and_whole_throws() {
+    assert_script_true(
+        r#"
+var trace = [], original = {}, replacement = {}, selected, actual;
+actual = {
+  get [Symbol.hasInstance]() {
+    trace.push('get');
+    selected = replacement;
+    return function(value) {
+      trace.push('call');
+      if (this !== actual || value !== original) throw 'held operands';
+      var inner = { [Symbol.hasInstance]() { throw undefined; } };
+      var caught = false;
+      try { value instanceof inner; }
+      catch (error) { caught = true; if (error !== undefined) throw 'whole throw'; }
+      finally { trace.push('inner'); }
+      if (!caught) throw 'missing inner throw';
+      return { valueOf() { throw 'ToBoolean must not coerce'; } };
+    };
+  }
+};
+selected = actual;
+var current = original;
+function left() { trace.push('left'); return current; }
+function right() { trace.push('right'); current = replacement; return selected; }
+var result = left() instanceof right();
+result === true && current === replacement && selected === replacement
+  && trace.join(',') === 'left,right,get,call,inner';
+"#,
+    );
+}
+
+#[test]
+fn ordinary_entry_skips_hooks_before_bound_target_operator_reentry() {
+    assert_script_true(
+        r#"
+var intrinsic = Function.prototype[Symbol.hasInstance];
+var candidate = {}, marker = {}, reads = 0, calls = 0, outerReads = 0;
+var nonCallable = {
+  get [Symbol.hasInstance]() { throw 'ordinary entry read a hook'; },
+  get prototype() { throw 'ordinary entry read a prototype'; }
+};
+function Target() {}
+Object.defineProperty(Target, Symbol.hasInstance, {
+  get() {
+    reads++;
+    return function(value) {
+      calls++;
+      if (this !== Target || value !== candidate) throw 'bound target operands';
+      return { valueOf() { throw 'ToBoolean coercion'; } };
+    };
+  }
+});
+var bound = Target.bind(null);
+Object.defineProperty(bound, Symbol.hasInstance, {
+  get() { outerReads++; throw marker; }
+});
+var nonCallableResult = intrinsic.call(nonCallable, candidate);
+var boundResult = intrinsic.call(bound, candidate);
+var caught = false;
+try { candidate instanceof bound; }
+catch (error) { caught = error === marker; }
+nonCallableResult === false && boundResult === true && caught
+  && reads === 1 && calls === 1 && outerReads === 1;
+"#,
+    );
+}

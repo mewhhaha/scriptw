@@ -237,3 +237,39 @@ promise.then(function(args) {
 "#,
     );
 }
+
+#[test]
+fn has_instance_entries_use_operator_or_actual_native_method_realms() {
+    assert_thrower_behavior(
+        r#"
+var foreign = __scriptwCreateRealm().global;
+var localTypeError = TypeError, foreignTypeError = foreign.TypeError;
+var localMethod = Function.prototype[Symbol.hasInstance];
+var foreignMethod = foreign.Function.prototype[Symbol.hasInstance];
+function localConstructor() {}
+localConstructor.prototype = 1;
+var foreignConstructor = new foreign.Function('');
+foreignConstructor.prototype = 1;
+var foreignOperator = new foreign.Function('value', 'target', '"use strict"; return value instanceof target;');
+globalThis.TypeError = function() { throw 'replaced local TypeError'; };
+foreign.TypeError = function() { throw 'replaced foreign TypeError'; };
+function errorFrom(action, expected) {
+  var caught = false;
+  try { action(); } catch (error) {
+    caught = true;
+    assert(Object.getPrototypeOf(error) === expected.prototype, 'actual execution Realm');
+  }
+  assert(caught, 'operation must throw');
+}
+errorFrom(function() { return localMethod.call(foreignConstructor, {}); }, localTypeError);
+errorFrom(function() { return foreignMethod.call(localConstructor, {}); }, foreignTypeError);
+errorFrom(function() { return ({}) instanceof foreignConstructor; }, foreignTypeError);
+errorFrom(function() { return ({}) instanceof localConstructor; }, localTypeError);
+errorFrom(function() { return foreignOperator({}, 3); }, foreignTypeError);
+var primitive = 3, topError;
+try { ({}) instanceof primitive; } catch (error) { topError = error; }
+assert(Object.getPrototypeOf(topError) === localTypeError.prototype, 'Script operator Realm');
+print('ok');
+"#,
+    );
+}
