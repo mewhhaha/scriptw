@@ -1,6 +1,6 @@
 # Compact ordinary data storage
 
-The current private runtime ABI is layout 42. Compact ordinary property storage
+The current private runtime ABI is layout 51. Compact ordinary property storage
 belongs to the single Wasm GC object model and requires the experimental
 Wasmtime GC/reference feature baseline. Layout 31 adds the inline representation
 and shared store kernel described in
@@ -31,16 +31,27 @@ retain the general definition path. Distinct static data literals with 17–64
 fields retain the descriptor append path; larger forms retain general literal
 definition.
 
-For source literals, the immutable shape belongs to one literal site and
-physical ProgramInstance. It contains primitive string keys in source insertion
-order and the common data-attribute word. Literal shapes and own-data reads have
-separate checked dense u32 site namespaces, shared across all source bodies in
-P. Shapes never contain a receiver, prototype, Symbol or property value.
+For source literals, the compiler interns each ordered primitive-string key
+list and common data-attribute word into one checked dense u32 layout index.
+Equal layouts share that index across source bodies and module units in one P;
+different key order, keys or attributes remain distinct. The actual immutable
+shape is created lazily in the existing table of each physical ProgramInstance.
+Separately compiled programs have independent registries and instances have
+independent shape roots. Shapes never contain a receiver, prototype, Symbol or
+property value. Each object still obtains its prototype from its source Realm.
+
+Only the existing validated source-literal path registers these layouts. Shape
+emission uses the same keys and attribute word for both the compiler identity
+and the runtime shape. Own-data read caches retain a separate checked dense
+u32 namespace with one index per source read site. Layout interning changes
+neither GC types, runtime helpers nor the ProgramInstance table ABI, so it does
+not increment layout 51. Compiler/source identity still changes and prevents
+reuse of stale compiled program or native artifacts.
 
 Native function `length`/`name` metadata also uses compact ordinary storage.
 Its immutable shapes are shared through R's separate configurable/fixed metadata
 roots, with the appropriate nonenumerable, nonwritable data attributes. This is
-distinct from source-literal site ownership. Each callable still owns its
+distinct from source-literal layout ownership. Each callable still owns its
 current metadata values and follows ordinary structural mutation rules.
 
 The [shared-empty Array experiment](../runtime-ownership-20261031.json) failed
@@ -138,13 +149,24 @@ Shared shape-field access does not weaken these concrete snapshot witnesses.
 
 Each admitted static string read site can own a monomorphic cache in its
 ProgramInstance. Both the shaped PropertyRead carrier and canonical GetV with
-a literal String operand reach this seam. GetV retains its original operand,
-ToObject and ToPropertyKey order before admission. The runtime helper receives
-separate lookup and receiver values plus a completed PropertyKey; a miss uses
-common Get without repeating user key coercion. Boxed primitive lookups retain
+a literal String operand reach this seam. Operands retain their evaluation
+order; the compiler-owned literal String needs no observable key coercion.
+The runtime helper receives separate lookup and receiver values plus a completed
+PropertyKey, and owns nullish errors and primitive boxing on a miss. Common Get
+does not repeat user key coercion. Boxed primitive lookups retain
 the original primitive getter receiver. Computed keys, Get and GetMethod retain
 their existing spec-operation paths. Known primitive, Array and intrinsic-only
 targets retain generic Get; unresolved object reads remain candidates.
+
+P calls the existing typed `CachedPropertyRead` helper for every admitted read.
+R owns cache registration, warm-hit guards, value loads and complete Get fallback.
+P retains neither an invocation-long metadata root nor a duplicate storage-read
+path. Each helper call reloads the ProgramInstance's indexed cache table, with
+the same source-site identity, execution context and whole Completion result.
+This ownership change adds no helper or GC layout and does not increment ABI 51;
+compiler/source identity still rejects stale P and native artifacts. The extra
+call and cache-table lookup versus reduced P code and native frames require
+matched measurement.
 
 The optimized runtime checks the live concrete lookup, live compact storage and
 actual immutable shape before loading the current slot value through the common
@@ -175,9 +197,9 @@ per-object retained GC records are:
 | Inline, one or two keys | 2 | Ordinary header and inline compact storage |
 | Array compact | 3–5 | Ordinary header, array compact storage, tags, optional scalar backing and optional reference backing |
 
-The immutable shape and key array are shared per literal site and physical
-ProgramInstance. Pooled key strings, the prototype object and canonical empty
-private-element storage are not fresh per-object records. Value-expression
+The immutable shape and key array are shared per ordered literal layout and
+physical ProgramInstance. Pooled key strings, the prototype object and canonical
+empty private-element storage are not fresh per-object records. Value-expression
 allocations and the ProgramInstance's shared directories, touched metadata
 pages and admitted read-cache records are separate. A native callable has
 additional callable/context/code records outside this ordinary-header/storage

@@ -307,9 +307,12 @@ mod runtime_operations;
 mod template_objects;
 pub(crate) use template_objects::TemplateSourceExecution;
 
-/// Dense cache-table index minted by the shared registry of one emitted P.
-pub(crate) enum ProgramSiteKind {
-    CompactShape,
+/// Dense metadata-table index minted by the shared registry of one emitted P.
+pub(crate) enum ProgramSiteKind<'a> {
+    CompactShape {
+        names: &'a [&'a str],
+        attributes: crate::heap::DescriptorWord,
+    },
     OwnDataRead,
 }
 
@@ -1433,13 +1436,11 @@ impl<'a> FunctionBuilder<'a> {
         self.schema.replace_current_realm(realm, function);
     }
     pub(crate) fn emit_propagate_current_throw_if_needed(&mut self, function: &mut Function) {
-        self.completion.kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        self.emit_propagate_current_throw(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        self.completion.kind().if_equal_escape(
+            CompletionKind::Throw.code() as i32,
+            function,
+            |function| self.emit_propagate_current_throw(function),
+        );
     }
     pub(crate) fn emit_clear_throw_diagnostic(
         &self,
@@ -2069,7 +2070,7 @@ impl<'a> FunctionBuilder<'a> {
 
     pub(crate) fn next_program_site(
         &mut self,
-        kind: ProgramSiteKind,
+        kind: ProgramSiteKind<'_>,
     ) -> Result<ProgramSiteId, EmitError> {
         match &self.module_state {
             FunctionModuleState::Main(_, _) => {}

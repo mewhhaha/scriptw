@@ -1,14 +1,22 @@
 use super::*;
 
 impl FunctionBuilder<'_> {
-    /// One lazy shape root per literal site and physical ProgramInstance. Keys
-    /// are primitive strings in source insertion order, never runtime values.
+    /// One lazy shape root per ordered literal layout and physical
+    /// ProgramInstance. Keys and attributes are immutable; values and prototypes
+    /// remain owned by each fresh object.
     pub(in crate::objects) fn emit_compact_literal_shape(
         &mut self,
         names: &[&str],
-        site: crate::emit::ProgramSiteId,
         f: &mut Function,
     ) -> Result<GcLocal<CompactDataShape>, EmitError> {
+        let attributes = StoredPropertyAttributes::Data {
+            writable: true,
+            enumerable: true,
+            configurable: true,
+        }
+        .descriptor_word();
+        let site = self
+            .next_program_site(crate::emit::ProgramSiteKind::CompactShape { names, attributes })?;
         let schema = self.runtime_schema();
         let id = schema.reserve_i32_local(f);
         site.emit(id, f);
@@ -40,14 +48,7 @@ impl FunctionBuilder<'_> {
             schema.struct_type::<CompactDataShape>().construct(
                 (
                     GcOperand::reference(&key_table, schema),
-                    GcOperand::descriptor_word(
-                        StoredPropertyAttributes::Data {
-                            writable: true,
-                            enumerable: true,
-                            configurable: true,
-                        }
-                        .descriptor_word(),
-                    ),
+                    GcOperand::descriptor_word(attributes),
                 ),
                 f,
             ),

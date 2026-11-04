@@ -5397,8 +5397,10 @@ impl ModuleUnitGuard {
 }
 
 pub(crate) struct FunctionMetaRegistry {
-    /// Each cache kind has a dense namespace shared by all source bodies in P.
-    next_compact_shape_site: std::cell::Cell<u32>,
+    /// Immutable birth layouts share a slot across source bodies in this P.
+    /// Values and prototypes never enter this compile-time identity.
+    compact_shape_sites: std::cell::RefCell<BTreeMap<(Vec<String>, u32), u32>>,
+    /// Read caches retain their own dense, per-source-site namespace.
     next_own_data_read_site: std::cell::Cell<u32>,
     foreign_imports: crate::foreign::ForeignImportPlan,
     module_graph: Option<ModuleGraphPlan>,
@@ -5414,10 +5416,23 @@ pub(crate) struct FunctionMetaRegistry {
 impl FunctionMetaRegistry {
     pub(crate) fn next_program_site_index(
         &self,
-        kind: crate::emit::ProgramSiteKind,
+        kind: crate::emit::ProgramSiteKind<'_>,
     ) -> Result<u32, EmitError> {
         let next = match kind {
-            crate::emit::ProgramSiteKind::CompactShape => &self.next_compact_shape_site,
+            crate::emit::ProgramSiteKind::CompactShape { names, attributes } => {
+                let key = (
+                    names.iter().map(|name| (*name).to_owned()).collect(),
+                    attributes.bits(),
+                );
+                let mut shapes = self.compact_shape_sites.borrow_mut();
+                if let Some(&site) = shapes.get(&key) {
+                    return Ok(site);
+                }
+                let site = u32::try_from(shapes.len())
+                    .map_err(|_| EmitError::unsupported("program compact layouts exceed u32"))?;
+                shapes.insert(key, site);
+                return Ok(site);
+            }
             crate::emit::ProgramSiteKind::OwnDataRead => &self.next_own_data_read_site,
         };
         let site = next.get();
@@ -5471,7 +5486,7 @@ impl FunctionMetaRegistry {
         module_graph: Option<ModuleGraphPlan>,
     ) -> Self {
         Self {
-            next_compact_shape_site: std::cell::Cell::new(0),
+            compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,

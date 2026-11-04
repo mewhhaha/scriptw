@@ -45,6 +45,43 @@ function grid(rows,column,start,total){{
 }
 
 #[test]
+fn equal_birth_layouts_keep_values_prototypes_and_structural_transitions_per_object() {
+    assert_rows(
+        r#"
+function left(value) { return {x:value,y:2}; }
+function right(value) { return {x:value,y:3}; }
+function reversed(value) { return {y:4,x:value}; }
+function read(value) { return value.x; }
+function check(value, label) { if (!value) throw label; }
+var token={},other={},a=left(token),b=right(other),c=reversed(7);
+for(var i=0;i<40;i++) {
+  check(read(a)===token && read(b)===other && read(c)===7,'cross-site slots');
+}
+gc();
+check(a!==b && a.y===2 && b.y===3 && Object.keys(c).join(',')==='y,x','birth identity and order');
+var before=Object.getOwnPropertyDescriptor(a,'x');
+b.x=11; gc();
+check(read(a)===token && read(b)===11 && before.value===token,'independent live values');
+var gets=0;
+Object.defineProperty(a,'x',{get:function(){gets++;return this.y+10;},configurable:true});
+check(read(a)===12 && gets===1 && read(b)===11,'one-object accessor promotion');
+Object.freeze(b); gc();
+check(!Reflect.set(b,'x',12) && read(b)===11 && read(a)===12 && gets===2,'one-object attributes');
+var proto={get x(){check(this===c,'prototype receiver');return this.y+20;}};
+Object.setPrototypeOf(c,proto); delete c.x;
+check(read(c)===24 && read(b)===11,'prototype and deletion after cached reads');
+var d=right(-0);read(d);d.y=NaN;gc();
+check(Object.is(read(d),-0) && Number.isNaN(d.y),'exact scalar values');
+var symbol=Symbol('layout');d[symbol]=token;
+check(Object.is(read(d),-0) && d[symbol]===token && Object.keys(d).join(',')==='x,y','symbol transition');
+var proxy=new Proxy(left(9),{get:function(target,key,receiver){gets++;return Reflect.get(target,key,receiver);}});
+check(read(proxy)===9 && gets===3,'proxy keeps its own path');
+true;
+"#,
+    );
+}
+
+#[test]
 fn compact_rows_keep_number_bits_rounding_offsets_and_final_counter() {
     assert_rows(
         r#"

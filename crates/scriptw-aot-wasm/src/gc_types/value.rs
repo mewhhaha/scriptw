@@ -44,6 +44,15 @@ scalar_local!(I64Local, I64);
 scalar_local!(F64Local, F64);
 
 impl I32Local {
+    pub(crate) fn if_equal_escape(
+        self,
+        value: i32,
+        function: &mut Function,
+        escape: impl FnOnce(&mut Function),
+    ) {
+        function.if_i32_equal_escape(self.index, value, escape);
+    }
+
     pub(crate) fn set_constant(self, value: i32, function: &mut Function) {
         function.instruction(&Instruction::I32Const(value));
         self.store(function);
@@ -208,27 +217,6 @@ pub(crate) struct GcLocal<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     shape: PhantomData<fn() -> (T, N)>,
 }
 
-/// Invocation-local immutable metadata cache. Its fresh nullable local starts
-/// at the Wasm default and is never released for reuse or reset on a backedge.
-/// Keeping this separate from GcLocal prevents clearing a live frame cache.
-#[derive(Debug)]
-pub(crate) struct GcFrameCache<T: GcHeapType> {
-    root: GcLocal<T, Nullable>,
-}
-
-impl<T: GcHeapType> GcFrameCache<T> {
-    pub(crate) fn load(
-        &self,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) -> GcStackReference<T, Nullable> {
-        self.root.load(schema, function)
-    }
-
-    pub(crate) fn replace(&self, value: GcStackReference<T>, function: &mut Function) {
-        self.root.replace(value.nullable(), function);
-    }
-}
 impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     pub(crate) fn load(
         &self,
@@ -2274,19 +2262,6 @@ impl RuntimeSchema {
         }
     }
 
-    pub(crate) fn reserve_gc_frame_cache<T: GcHeapType>(
-        &self,
-        function: &mut Function,
-    ) -> GcFrameCache<T> {
-        let reference_type = self.reference_type::<T>(GcNullability::Nullable);
-        GcFrameCache {
-            root: GcLocal {
-                index: function.reserve_fresh_typed_local(ValType::Ref(reference_type)),
-                heap_type: reference_type.heap_type,
-                shape: PhantomData,
-            },
-        }
-    }
     pub(crate) fn parameter_i32(&self, index: u32, function: &Function) -> I32Local {
         assert_eq!(
             function.parameter_type(index),
@@ -3675,6 +3650,50 @@ pub(crate) struct PropertyKeyConstruction {
     keys: GcLocal<PropertyKeyTable>,
 }
 impl PropertyKeyConstruction {
+    /// Copy validated immutable key snapshots into fresh private storage. Only
+    /// the appended key is boxed; published tables remain read-only.
+    pub(crate) fn copy_with_appended_key(
+        schema: &RuntimeSchema,
+        slot: GcLocalSlot<PropertyKeyTable>,
+        source: &GcLocal<PropertyKeyTable>,
+        key: &crate::operations::PropertyKeyLocals,
+        function: &mut Function,
+    ) -> Self {
+        let length = schema.reserve_i32_local(function);
+        let next_length = schema.reserve_i32_local(function);
+        let array = schema.array_type::<PropertyKeyTable>();
+        array.length(source, schema, function);
+        length.store(function);
+        length.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        next_length.store(function);
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<StoredValue>()
+                .from_value(key.value(), function),
+            function,
+        );
+        let keys = slot.initialize(
+            array.filled(GcOperand::reference(&stored, schema), next_length, function),
+            function,
+        );
+        keys.load(schema, function);
+        function.instruction(&Instruction::I32Const(0));
+        source.load(schema, function);
+        function.instruction(&Instruction::I32Const(0));
+        length.load(function);
+        let index = array.type_index().raw();
+        function.instruction(&Instruction::ArrayCopy {
+            array_type_index_dst: index,
+            array_type_index_src: index,
+        });
+        stored.clear(function);
+        schema.release_i32_local(next_length, function);
+        schema.release_i32_local(length, function);
+        Self { keys }
+    }
+
     pub(crate) fn allocate(
         schema: &RuntimeSchema,
         slot: GcLocalSlot<PropertyKeyTable>,

@@ -22,9 +22,11 @@ mod number_to_string;
 mod property_key_hash;
 mod relational_comparison;
 mod scalar_number;
+mod strict_singleton;
 mod string_trim;
 pub(crate) use string_trim::EcmaTrimMode;
 mod to_object;
+mod typeof_comparison;
 
 /// A rooted String or Symbol already accepted as an ECMAScript property key.
 /// Computed raw values must pass through ToPropertyKey before this owner exists.
@@ -391,6 +393,29 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         validate_spec_operation_operands(operation, operands.len())?;
+        let direct_comparison = match operation {
+            SpecOperationIr::StrictEqualityComparison => {
+                self.try_compile_typeof_comparison_i32(&operands[0], &operands[1], function)?
+                    || self.try_compile_strict_singleton_comparison_i32(
+                        &operands[0],
+                        &operands[1],
+                        function,
+                    )?
+            }
+            SpecOperationIr::IsLooselyEqual => {
+                self.try_compile_typeof_comparison_i32(&operands[0], &operands[1], function)?
+            }
+            _ => false,
+        };
+        if direct_comparison {
+            let schema = self.runtime_schema();
+            let boolean = schema.reserve_i32_local(function);
+            boolean.store(function);
+            output.set_boolean(boolean, function);
+            self.completion().set_normal(output, function);
+            schema.release_i32_local(boolean, function);
+            return Ok(());
+        }
         if self.try_compile_concat_length_get_v(operation, operands, output, function)? {
             return Ok(());
         }
@@ -3625,6 +3650,9 @@ impl<'a> FunctionBuilder<'a> {
         rhs: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.try_compile_typeof_comparison_i32(lhs, rhs, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
@@ -6220,6 +6248,12 @@ impl<'a> FunctionBuilder<'a> {
         right: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.try_compile_typeof_comparison_i32(left, right, function)?
+            || self.try_compile_strict_singleton_comparison_i32(left, right, function)?
+        {
+            self.set_completion_kind(CompletionKind::Normal, function);
+            return Ok(());
+        }
         let left_value = self.runtime_schema().reserve_value_local(function);
         let right_value = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(left, &left_value, function)?;

@@ -92,3 +92,5 @@ mod reflect_descriptor_object_realm;
 mod aot_web_events;
 
 mod aot_readable_byte_stream;
+
+mod aot_for_in_prefix_copy;

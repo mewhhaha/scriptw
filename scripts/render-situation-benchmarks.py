@@ -14,6 +14,8 @@ ACTOR_LABELS = {'scriptw-fast': 'Scriptw Fast', 'scriptw-speed': 'Scriptw Speed'
 ACTOR_COLORS = {'scriptw-fast': '#3478a8', 'scriptw-speed': '#4a9a79',
                 'v8': '#d17b36'}
 CATEGORIES = (
+    ('enumeration', 'For-in enumeration', 'Retained public call · ms', ('for-in-wide.js',)),
+    ('type tests', 'Type classification', 'Retained public call · ms', ('typeof-dispatch.js', 'singleton-dispatch.js')),
     ('control', 'Control', 'Retained public call · ms', ('control-empty.js',)),
     ('global lookup', 'Global lookup', 'Retained public call · ms',
      ('global-shallow.js', 'global-deep8.js', 'global-bound-deep.js', 'global-getter-deep.js')),
@@ -27,6 +29,9 @@ CATEGORIES = (
      ('metadata-ordinary.js', 'metadata-function.js', 'metadata-intrinsic.js')),
 )
 SHORT_LABELS = {
+    'for-in-wide.js': '64 own keys · 16 passes',
+    'typeof-dispatch.js': 'Mixed typeof dispatch',
+    'singleton-dispatch.js': 'Strict null / undefined',
     'control-empty.js': 'Empty call',
     'global-shallow.js': 'Shallow', 'global-deep8.js': 'Deep · 8 captures',
     'global-bound-deep.js': 'Bound deep', 'global-getter-deep.js': 'Getter deep',

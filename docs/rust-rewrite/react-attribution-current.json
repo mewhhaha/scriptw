@@ -4,10 +4,65 @@
   "status": "captured",
   "timing_report_in_evidence": {
     "path": "reports/rsc-current.json",
-    "sha256": "542f1f4f3c69c12675d760b711ea4c9d99f713a35802d082babad47925e3dcc4"
+    "sha256": "afff14d7ed890ac43ba1ea00dc81f7e42d3da316196f54904104a4cb556941b9"
   },
   "excluded_from_scored_cohorts": true,
   "candidate_identity": {
+    "source_fingerprint": "048fd75ef7729aef0a0f1378b2fe49d010420781a7191f8a71fb3901caf91749",
+    "source_commit": "5a81f390bc28e61f7d41ca11abc514fd8a203c97",
+    "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+    "toolchain": {
+      "opt_level": "3",
+      "profile": "release",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+      "target": "x86_64-unknown-linux-gnu"
+    },
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "None",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "SinglePass",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "program_wasm_sha256": "7c1a3d31c9ad5928d847e96bb841087142374a3dd59ae9710874c64262580a3c",
+    "runtime": {
+      "key": "43564aeff1f949c0e4c882b7f29ca3194fbffd9b52153133042c4c1dd1716704",
+      "wasm_bytes": 38816286,
+      "wasm_sha256": "0efcbfc16860f669fff2838abf79e58af302c6e31188a8efb6222118cab187fa"
+    },
+    "inputs": {
+      "adapted_source_bytes": 64946,
+      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+      "source_bytes": 64835,
+      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+      "versions": {
+        "esbuild": "0.28.2",
+        "playwright": "1.64.1",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-server-dom-webpack": "19.3.1"
+      },
+      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+    }
+  },
+  "baseline_identity": {
     "source_fingerprint": "19d9bc50dcad245958f232ac8269790160f84720d9f643db7ac5d403186cf860",
     "source_commit": "90131a9519cd344ef4d5abf2a063bfc4db89deaf",
     "executable_sha256": "9903265c2087464bb9f81bc31aedf96287ccc865cd7217faae417619e9b0dcbd",
@@ -62,61 +117,6 @@
       "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
     }
   },
-  "baseline_identity": {
-    "source_fingerprint": "e0789502793702d955dd99efa8c3a089781dc76f00ce024dd90391369933f9cd",
-    "source_commit": "19b59f9536cc4a3df102d7e06bce24a9407a70d0",
-    "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-    "toolchain": {
-      "opt_level": "3",
-      "profile": "release",
-      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-      "target": "x86_64-unknown-linux-gnu"
-    },
-    "configuration": {
-      "collector": "Copying",
-      "compilation_jobs": 1,
-      "cranelift_opt_level": "None",
-      "driver_worker_stack_bytes": 67108864,
-      "epoch_deadline_ticks": 6000,
-      "epoch_interruption": true,
-      "epoch_tick_ms": 5,
-      "gc_initial_bytes": 16777216,
-      "max_wasm_stack_bytes": 33554432,
-      "native_parallel_compilation": false,
-      "pending_deadline_ms": 30000,
-      "register_allocation": "SinglePass",
-      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-      "target": "x86_64-unknown-linux-gnu",
-      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-      "wasmtime": "47.0.0",
-      "wasmtime_async_stack_bytes": 67108864
-    },
-    "program_wasm_sha256": "ba2166faa2f7d0cdcf72166707ddd9ad2444a155fa137b0122e0a412b42b3b0b",
-    "runtime": {
-      "key": "efa845c549f49bfa20b1c1bdb13bfe4017b87b660a994989e3675ef0a1e83e07",
-      "wasm_bytes": 39224975,
-      "wasm_sha256": "1d51b71fb3082074276ffb3e11be064513943a689c29863c7742883c9ea017ce"
-    },
-    "inputs": {
-      "adapted_source_bytes": 64946,
-      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-      "source_bytes": 64835,
-      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-      "versions": {
-        "esbuild": "0.28.2",
-        "playwright": "1.64.1",
-        "react": "19.3.1",
-        "react-dom": "19.3.1",
-        "react-server-dom-webpack": "19.3.1"
-      },
-      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-    }
-  },
   "pmu": {
     "fresh_processes": 24,
     "measured_request_windows": 2400,
@@ -126,530 +126,6 @@
     "minimum_running_fraction": 1,
     "cohorts": {
       "baseline-node-sync": {
-        "processes": [
-          {
-            "name": "candidate-node-sync-0",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-0/receipt.json",
-              "sha256": "81a50a1131a6eb5aeb72fbedae1df9f2ca830a9d82a84a845c93245a133dd838",
-              "bytes": 121877
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-0/observations.json",
-              "sha256": "45cebd95eb25b3595b70c5611f57f4a019e1449a1b65b86b3054ebb3a58159e5",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 150969848,
-              "instructions:u": 272932335,
-              "branches:u": 53964377,
-              "branch-misses:u": 623593
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1375201.5,
-              "instructions:u": 2560106.5,
-              "branches:u": 503108.5,
-              "branch-misses:u": 5091.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1509698.48,
-              "instructions:u": 2729323.35,
-              "branches:u": 539643.77,
-              "branch-misses:u": 6235.93
-            },
-            "ipc": 1.8078599045817414,
-            "branch_miss_fraction": 0.011555641604090046
-          },
-          {
-            "name": "candidate-node-sync-1",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-1/receipt.json",
-              "sha256": "deb05f16b3d275a1caed17642284992a313b4ae42a4a1d5d0de83517c5c0ab46",
-              "bytes": 121895
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-1/observations.json",
-              "sha256": "a8fdc44d72fe766a74e6ffb43974663bd6d5513a8641b86e78cab7139042069b",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 152478301,
-              "instructions:u": 273659536,
-              "branches:u": 54762722,
-              "branch-misses:u": 654779
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1337111.5,
-              "instructions:u": 2488144.5,
-              "branches:u": 493503.5,
-              "branch-misses:u": 5019.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1524783.01,
-              "instructions:u": 2736595.36,
-              "branches:u": 547627.22,
-              "branch-misses:u": 6547.79
-            },
-            "ipc": 1.7947441321503181,
-            "branch_miss_fraction": 0.011956655478155376
-          },
-          {
-            "name": "candidate-node-sync-2",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-2/receipt.json",
-              "sha256": "c57a9bd47b6777f3b6e76fb5b284890659e6014d7ca255787175320e36e5f9bd",
-              "bytes": 121874
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-sync-2/observations.json",
-              "sha256": "1f3e8ecc3c398ca18a9dfcb6570f264bbdb4dffbf81ca9b0ba5c079d92a7f2e3",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 148129372,
-              "instructions:u": 266442982,
-              "branches:u": 53169504,
-              "branch-misses:u": 621147
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1336170.0,
-              "instructions:u": 2489979.5,
-              "branches:u": 493770.5,
-              "branch-misses:u": 5038.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1481293.72,
-              "instructions:u": 2664429.82,
-              "branches:u": 531695.04,
-              "branch-misses:u": 6211.47
-            },
-            "ipc": 1.7987180962327984,
-            "branch_miss_fraction": 0.011682392222428856
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1337111.5,
-          "instructions:u": 2489979.5,
-          "branches:u": 493770.5,
-          "branch-misses:u": 5038.5
-        },
-        "process_instruction_medians": [
-          2560106.5,
-          2488144.5,
-          2489979.5
-        ],
-        "median_process_ipc": 1.7987180962327984,
-        "median_process_branch_miss_fraction": 0.011682392222428856
-      },
-      "baseline-node-async": {
-        "processes": [
-          {
-            "name": "candidate-node-async-0",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-0/receipt.json",
-              "sha256": "f06437045925f25fcb054e0f0811b8964182629b530f6e9857a9bfb7573efd11",
-              "bytes": 121895
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-0/observations.json",
-              "sha256": "3293c7189a271d6ee936abf624f4c0aab960699bf9eaecdef43ab6a6f711269e",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 162786581,
-              "instructions:u": 299208432,
-              "branches:u": 58411851,
-              "branch-misses:u": 666745
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1492072.0,
-              "instructions:u": 2822292.5,
-              "branches:u": 547663.0,
-              "branch-misses:u": 5423.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1627865.81,
-              "instructions:u": 2992084.32,
-              "branches:u": 584118.51,
-              "branch-misses:u": 6667.45
-            },
-            "ipc": 1.8380411343610688,
-            "branch_miss_fraction": 0.011414550105594154
-          },
-          {
-            "name": "candidate-node-async-1",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-1/receipt.json",
-              "sha256": "266c69115ded0cc00d415c0397e6c7721d0cfb4e32f0b55616bf1bf708c6b0ec",
-              "bytes": 121885
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-1/observations.json",
-              "sha256": "d41bb6da3bff20986d73e7c947f38fc5380a3ef2e39f030c0d6dc312005fb43c",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 157368636,
-              "instructions:u": 280992218,
-              "branches:u": 56064323,
-              "branch-misses:u": 675469
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1440153.5,
-              "instructions:u": 2644758.0,
-              "branches:u": 525179.0,
-              "branch-misses:u": 5597.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1573686.36,
-              "instructions:u": 2809922.18,
-              "branches:u": 560643.23,
-              "branch-misses:u": 6754.69
-            },
-            "ipc": 1.785566839379608,
-            "branch_miss_fraction": 0.012048107670897944
-          },
-          {
-            "name": "candidate-node-async-2",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-2/receipt.json",
-              "sha256": "4c92b576638e768a642663666774344cc437f64ec6f11775f7339220049047e8",
-              "bytes": 121893
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-node-async-2/observations.json",
-              "sha256": "d3345ff3c77e3687a6294ec18cbdd2ae35e11067404f7d63a6402d225d914621",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 161009020,
-              "instructions:u": 295945579,
-              "branches:u": 57694144,
-              "branch-misses:u": 661459
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1483569.5,
-              "instructions:u": 2810746.5,
-              "branches:u": 544195.5,
-              "branch-misses:u": 5520.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1610090.2,
-              "instructions:u": 2959455.79,
-              "branches:u": 576941.44,
-              "branch-misses:u": 6614.59
-            },
-            "ipc": 1.8380683206443962,
-            "branch_miss_fraction": 0.011464924412432569
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1483569.5,
-          "instructions:u": 2810746.5,
-          "branches:u": 544195.5,
-          "branch-misses:u": 5520.0
-        },
-        "process_instruction_medians": [
-          2822292.5,
-          2644758.0,
-          2810746.5
-        ],
-        "median_process_ipc": 1.8380411343610688,
-        "median_process_branch_miss_fraction": 0.011464924412432569
-      },
-      "baseline-scriptw-sync": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-sync-0",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-0/receipt.json",
-              "sha256": "e7b591f42c04f1c56efd967e405ef619e1150773511a3a1b192adaba22d9123b",
-              "bytes": 124715
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-0/observations.json",
-              "sha256": "3c8f39700472e9fff71a896025251d259a018f0e5374af907a48388248a6e7a9",
-              "bytes": 14724
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 4687444116,
-              "instructions:u": 9290472683,
-              "branches:u": 1258478881,
-              "branch-misses:u": 7472515
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 47567745.0,
-              "instructions:u": 94833304.0,
-              "branches:u": 12959025.0,
-              "branch-misses:u": 76803.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 46874441.16,
-              "instructions:u": 92904726.83,
-              "branches:u": 12584788.81,
-              "branch-misses:u": 74725.15
-            },
-            "ipc": 1.981991134846417,
-            "branch_miss_fraction": 0.005937735716361219
-          },
-          {
-            "name": "candidate-scriptw-sync-1",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-1/receipt.json",
-              "sha256": "3c26d8e3aa0a0ba1fdb283778f0c1b5d196d654739d1efb6978ad25b1732c4b6",
-              "bytes": 124717
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-1/observations.json",
-              "sha256": "fc9e89f4b19b46d4937327e200cb397425e6ed629364793880079af0aeabed66",
-              "bytes": 14725
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 4605755930,
-              "instructions:u": 9290478983,
-              "branches:u": 1258480111,
-              "branch-misses:u": 7368560
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 46591970.0,
-              "instructions:u": 94833009.0,
-              "branches:u": 12958969.0,
-              "branch-misses:u": 75720.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 46057559.3,
-              "instructions:u": 92904789.83,
-              "branches:u": 12584801.11,
-              "branch-misses:u": 73685.6
-            },
-            "ipc": 2.0171453121268628,
-            "branch_miss_fraction": 0.005855126303223715
-          },
-          {
-            "name": "candidate-scriptw-sync-2",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-2/receipt.json",
-              "sha256": "47a9b088e2b6ae5039449b352637e99581bb2b9e6717285cade241a7bd9a6c34",
-              "bytes": 124713
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-sync-2/observations.json",
-              "sha256": "938365431dfa4ffaec92f2577b71175cb265505422c5ff99eafc69a04713375d",
-              "bytes": 14725
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 4610273239,
-              "instructions:u": 9290474480,
-              "branches:u": 1258479190,
-              "branch-misses:u": 7323351
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 46836125.5,
-              "instructions:u": 94833144.0,
-              "branches:u": 12958990.5,
-              "branch-misses:u": 75315.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 46102732.39,
-              "instructions:u": 92904744.8,
-              "branches:u": 12584791.9,
-              "branch-misses:u": 73233.51
-            },
-            "ipc": 2.015167864977818,
-            "branch_miss_fraction": 0.00581920707008274
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 46836125.5,
-          "instructions:u": 94833144.0,
-          "branches:u": 12958990.5,
-          "branch-misses:u": 75720.5
-        },
-        "process_instruction_medians": [
-          94833304.0,
-          94833009.0,
-          94833144.0
-        ],
-        "median_process_ipc": 2.015167864977818,
-        "median_process_branch_miss_fraction": 0.005855126303223715
-      },
-      "baseline-scriptw-async": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-async-0",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-0/receipt.json",
-              "sha256": "c0615e20edc10108b124144739a3198612e559439eb0e011b47c9a906e31d815",
-              "bytes": 124909
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-0/observations.json",
-              "sha256": "48399978fe8245eff6c06535c111e31bcc4f2bb962759c23f46e0e0d26577c8b",
-              "bytes": 14727
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 5077462016,
-              "instructions:u": 9932481490,
-              "branches:u": 1355550248,
-              "branch-misses:u": 8042391
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 50843047.0,
-              "instructions:u": 100864887.0,
-              "branches:u": 13853702.0,
-              "branch-misses:u": 82075.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 50774620.16,
-              "instructions:u": 99324814.9,
-              "branches:u": 13555502.48,
-              "branch-misses:u": 80423.91
-            },
-            "ipc": 1.9561902105226896,
-            "branch_miss_fraction": 0.005932934623313204
-          },
-          {
-            "name": "candidate-scriptw-async-1",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-1/receipt.json",
-              "sha256": "fed10695c95941fa9c1bb68bd432b55f5e986d589ad9e119cd7d08f158c62cb7",
-              "bytes": 124907
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-1/observations.json",
-              "sha256": "6806aa298c1abb9d05e9a1d675d618bb01c7d23e58f9531790c3244e8439417e",
-              "bytes": 14726
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 5039125786,
-              "instructions:u": 9932483945,
-              "branches:u": 1355550538,
-              "branch-misses:u": 8113881
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 50870271.5,
-              "instructions:u": 100864851.5,
-              "branches:u": 13853635.5,
-              "branch-misses:u": 82717.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 50391257.86,
-              "instructions:u": 99324839.45,
-              "branches:u": 13555505.38,
-              "branch-misses:u": 81138.81
-            },
-            "ipc": 1.9710728342195822,
-            "branch_miss_fraction": 0.00598567207385078
-          },
-          {
-            "name": "candidate-scriptw-async-2",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-2/receipt.json",
-              "sha256": "da7af93d6e7e1febefd40b11c60342f6044ff6fba5a25d08c1d7a86811ffd5b7",
-              "bytes": 124905
-            },
-            "observations": {
-              "path": "target/performance-has-instance-20261104/candidate-scriptw-async-2/observations.json",
-              "sha256": "b40e364212eb61064aacfb7a4404f916252c563288ec33c49874de1934197444",
-              "bytes": 14727
-            },
-            "executable_sha256": "b468ae49f51608cdac1999ad235bb1a3928fddd78aaba499682e7222d3bcb8d8",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 5005793188,
-              "instructions:u": 9932480932,
-              "branches:u": 1355549969,
-              "branch-misses:u": 7872780
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 50619933.0,
-              "instructions:u": 100864899.5,
-              "branches:u": 13853663.5,
-              "branch-misses:u": 80388.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 50057931.88,
-              "instructions:u": 99324809.32,
-              "branches:u": 13555499.69,
-              "branch-misses:u": 78727.8
-            },
-            "ipc": 1.9841972208940566,
-            "branch_miss_fraction": 0.005807812459918252
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 50843047.0,
-          "instructions:u": 100864887.0,
-          "branches:u": 13853663.5,
-          "branch-misses:u": 82075.0
-        },
-        "process_instruction_medians": [
-          100864887.0,
-          100864851.5,
-          100864899.5
-        ],
-        "median_process_ipc": 1.9710728342195822,
-        "median_process_branch_miss_fraction": 0.005932934623313204
-      },
-      "candidate-node-sync": {
         "processes": [
           {
             "name": "candidate-node-sync-0",
@@ -780,7 +256,7 @@
         "median_process_ipc": 1.800023091276207,
         "median_process_branch_miss_fraction": 0.01175633501966646
       },
-      "candidate-node-async": {
+      "baseline-node-async": {
         "processes": [
           {
             "name": "candidate-node-async-0",
@@ -911,7 +387,7 @@
         "median_process_ipc": 1.8031570743204788,
         "median_process_branch_miss_fraction": 0.01182422199462888
       },
-      "candidate-scriptw-sync": {
+      "baseline-scriptw-sync": {
         "processes": [
           {
             "name": "candidate-scriptw-sync-0",
@@ -1042,7 +518,7 @@
         "median_process_ipc": 1.8847316565140415,
         "median_process_branch_miss_fraction": 0.00640551667317779
       },
-      "candidate-scriptw-async": {
+      "baseline-scriptw-async": {
         "processes": [
           {
             "name": "candidate-scriptw-async-0",
@@ -1172,6 +648,530 @@
         ],
         "median_process_ipc": 1.8755533539772173,
         "median_process_branch_miss_fraction": 0.0064068169561750585
+      },
+      "candidate-node-sync": {
+        "processes": [
+          {
+            "name": "candidate-node-sync-0",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-0/receipt.json",
+              "sha256": "072d8a94cad2c082e517003d97dbeb4b24e2d89450a72a1e659a62b9ac3996c9",
+              "bytes": 121885
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-0/observations.json",
+              "sha256": "cbe6656abf4d076a598970433e3a159ab7020f21c893637bff9ce6bcf654731b",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 155867569,
+              "instructions:u": 283124744,
+              "branches:u": 55362470,
+              "branch-misses:u": 641568
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1411430.5,
+              "instructions:u": 2646682.5,
+              "branches:u": 513519.5,
+              "branch-misses:u": 5172.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1558675.69,
+              "instructions:u": 2831247.44,
+              "branches:u": 553624.7,
+              "branch-misses:u": 6415.68
+            },
+            "ipc": 1.816444214896301,
+            "branch_miss_fraction": 0.011588500296319871
+          },
+          {
+            "name": "candidate-node-sync-1",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-1/receipt.json",
+              "sha256": "253637ada526413e96d90d5bc168297bb812db758ecf64248bb5cd4c0b249722",
+              "bytes": 121879
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-1/observations.json",
+              "sha256": "d4cd26c71b16409f68f9e7a89fb10abdb403f5849e3c9485325fdeba0b2108e2",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 148441149,
+              "instructions:u": 268807107,
+              "branches:u": 53643988,
+              "branch-misses:u": 624783
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1328409.5,
+              "instructions:u": 2492770.0,
+              "branches:u": 493957.5,
+              "branch-misses:u": 4897.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1484411.49,
+              "instructions:u": 2688071.07,
+              "branches:u": 536439.88,
+              "branch-misses:u": 6247.83
+            },
+            "ipc": 1.8108665205764474,
+            "branch_miss_fraction": 0.011646841021588477
+          },
+          {
+            "name": "candidate-node-sync-2",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-2/receipt.json",
+              "sha256": "f12b2c9f42c171e2ca53fb321cab9481bf6df8096d86c9c2cc07bebebac2d368",
+              "bytes": 121912
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-sync-2/observations.json",
+              "sha256": "6fe516a225a4e5bf342c1f9387fc24e92231e08f2d907ae8c5e1e1ec4ba644ed",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 162498869,
+              "instructions:u": 291989454,
+              "branches:u": 57103019,
+              "branch-misses:u": 662833
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1407117.0,
+              "instructions:u": 2668012.0,
+              "branches:u": 516090.5,
+              "branch-misses:u": 4990.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1624988.69,
+              "instructions:u": 2919894.54,
+              "branches:u": 571030.19,
+              "branch-misses:u": 6628.33
+            },
+            "ipc": 1.796870684681504,
+            "branch_miss_fraction": 0.01160766999026794
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1407117.0,
+          "instructions:u": 2646682.5,
+          "branches:u": 513519.5,
+          "branch-misses:u": 4990.5
+        },
+        "process_instruction_medians": [
+          2646682.5,
+          2492770.0,
+          2668012.0
+        ],
+        "median_process_ipc": 1.8108665205764474,
+        "median_process_branch_miss_fraction": 0.01160766999026794
+      },
+      "candidate-node-async": {
+        "processes": [
+          {
+            "name": "candidate-node-async-0",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-0/receipt.json",
+              "sha256": "aeff95b33ed7728047c310698866a1bbe8a786eb8a5e6d851fba19a792a7dd5f",
+              "bytes": 121901
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-0/observations.json",
+              "sha256": "5d1e4b80699e4723f8ce7d538a82d0303dc49998e21110357185de2a23f2e5f4",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 172669571,
+              "instructions:u": 297994705,
+              "branches:u": 58005075,
+              "branch-misses:u": 675126
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1543247.0,
+              "instructions:u": 2834691.0,
+              "branches:u": 549449.0,
+              "branch-misses:u": 5662.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1726695.71,
+              "instructions:u": 2979947.05,
+              "branches:u": 580050.75,
+              "branch-misses:u": 6751.26
+            },
+            "ipc": 1.725809030938057,
+            "branch_miss_fraction": 0.011639085028335883
+          },
+          {
+            "name": "candidate-node-async-1",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-1/receipt.json",
+              "sha256": "19d4127f15fbc2acec214562f19f777a9a65fa5a915c03371ed55868edc5f2d3",
+              "bytes": 121895
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-1/observations.json",
+              "sha256": "fa0bbc0d7edbd64a5c80248e308ea04b8a7fbd0e0bbb0c24b7d631d076d66f52",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 164247557,
+              "instructions:u": 278718446,
+              "branches:u": 55727744,
+              "branch-misses:u": 672761
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1448868.0,
+              "instructions:u": 2624848.5,
+              "branches:u": 522320.0,
+              "branch-misses:u": 5509.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1642475.57,
+              "instructions:u": 2787184.46,
+              "branches:u": 557277.44,
+              "branch-misses:u": 6727.61
+            },
+            "ipc": 1.6969411971223414,
+            "branch_miss_fraction": 0.01207228126801616
+          },
+          {
+            "name": "candidate-node-async-2",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-2/receipt.json",
+              "sha256": "3dda5ec006b10fe5e55cb91ac9158169727db998398f26ec6cc5b27026a6a451",
+              "bytes": 121893
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-node-async-2/observations.json",
+              "sha256": "b7fa59a1f586427f97da9e9b141f941f6653fb058e55e3f5f68442542c4740e0",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 157527292,
+              "instructions:u": 281814550,
+              "branches:u": 56137979,
+              "branch-misses:u": 672364
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1434806.0,
+              "instructions:u": 2647208.0,
+              "branches:u": 524206.5,
+              "branch-misses:u": 5488.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1575272.92,
+              "instructions:u": 2818145.5,
+              "branches:u": 561379.79,
+              "branch-misses:u": 6723.64
+            },
+            "ipc": 1.7889887296481932,
+            "branch_miss_fraction": 0.011976989766589211
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1448868.0,
+          "instructions:u": 2647208.0,
+          "branches:u": 524206.5,
+          "branch-misses:u": 5509.5
+        },
+        "process_instruction_medians": [
+          2834691.0,
+          2624848.5,
+          2647208.0
+        ],
+        "median_process_ipc": 1.725809030938057,
+        "median_process_branch_miss_fraction": 0.011976989766589211
+      },
+      "candidate-scriptw-sync": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-sync-0",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-0/receipt.json",
+              "sha256": "2ede8995363dd442706900132d2ee02951ac8ab2b2a4b268a17f3c552b610659",
+              "bytes": 124163
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-0/observations.json",
+              "sha256": "9089979a7294809de8f09626cfdc5d66a10a59882b5834f0bf24308747a55f21",
+              "bytes": 14620
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2242774076,
+              "instructions:u": 5341133103,
+              "branches:u": 754559464,
+              "branch-misses:u": 2956498
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 21366574.5,
+              "instructions:u": 50621926.0,
+              "branches:u": 7010522.5,
+              "branch-misses:u": 26479.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22427740.76,
+              "instructions:u": 53411331.03,
+              "branches:u": 7545594.64,
+              "branch-misses:u": 29564.98
+            },
+            "ipc": 2.381485126012309,
+            "branch_miss_fraction": 0.003918177613633377
+          },
+          {
+            "name": "candidate-scriptw-sync-1",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-1/receipt.json",
+              "sha256": "e6fd00eaf4ddd58bc963796c67a24dace6fd8a2b43909c9c230dba43c43d3cc2",
+              "bytes": 124167
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-1/observations.json",
+              "sha256": "4755c722c5e7e122af8414a0bc1d7ba20b437d9c8dc78ada34de66bd932a3686",
+              "bytes": 14620
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2279415363,
+              "instructions:u": 5341132999,
+              "branches:u": 754559369,
+              "branch-misses:u": 3058400
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 21778288.0,
+              "instructions:u": 50622043.5,
+              "branches:u": 7010546.0,
+              "branch-misses:u": 27306.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22794153.63,
+              "instructions:u": 53411329.99,
+              "branches:u": 7545593.69,
+              "branch-misses:u": 30584.0
+            },
+            "ipc": 2.343203036049731,
+            "branch_miss_fraction": 0.004053226459904973
+          },
+          {
+            "name": "candidate-scriptw-sync-2",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-2/receipt.json",
+              "sha256": "f4a1066543f56ebd0250e4ce2d984ca2d4ea0e9f039a680834924bdc2b11173c",
+              "bytes": 124164
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-sync-2/observations.json",
+              "sha256": "c6728fb10d6c9c30081684d8d0cada4e864a6c25dae074548f01c470e2f2f4fe",
+              "bytes": 14620
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2320232500,
+              "instructions:u": 5341137276,
+              "branches:u": 754560315,
+              "branch-misses:u": 2989882
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22352482.5,
+              "instructions:u": 50622057.5,
+              "branches:u": 7010560.0,
+              "branch-misses:u": 26667.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 23202325.0,
+              "instructions:u": 53411372.76,
+              "branches:u": 7545603.15,
+              "branch-misses:u": 29898.82
+            },
+            "ipc": 2.3019836486214205,
+            "branch_miss_fraction": 0.003962416178751728
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 21778288.0,
+          "instructions:u": 50622043.5,
+          "branches:u": 7010546.0,
+          "branch-misses:u": 26667.5
+        },
+        "process_instruction_medians": [
+          50621926.0,
+          50622043.5,
+          50622057.5
+        ],
+        "median_process_ipc": 2.343203036049731,
+        "median_process_branch_miss_fraction": 0.003962416178751728
+      },
+      "candidate-scriptw-async": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-async-0",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-0/receipt.json",
+              "sha256": "d5c199468297b71678918678b0ab1d6e355c3c8a9593672e860051f22bbd4a98",
+              "bytes": 124180
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-0/observations.json",
+              "sha256": "f98ef0444f5ea8dc3388a8ab634322fe939add707bc2ec2e4d1d6a46db887f58",
+              "bytes": 14625
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2408442247,
+              "instructions:u": 5741221696,
+              "branches:u": 819460166,
+              "branch-misses:u": 3329265
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 23143788.5,
+              "instructions:u": 54535439.0,
+              "branches:u": 7642043.0,
+              "branch-misses:u": 29866.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24084422.47,
+              "instructions:u": 57412216.96,
+              "branches:u": 8194601.66,
+              "branch-misses:u": 33292.65
+            },
+            "ipc": 2.3837904783273802,
+            "branch_miss_fraction": 0.004062753917925035
+          },
+          {
+            "name": "candidate-scriptw-async-1",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-1/receipt.json",
+              "sha256": "0f3c825c3f3b8570ce6a165105e98b0150e9c2fb461bdd6e5d4e1f7992e6fd06",
+              "bytes": 124177
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-1/observations.json",
+              "sha256": "b81e9f2238795dde42c93c4092a46ca579b8c0cfc4a9355e28e9ae39bf6ef729",
+              "bytes": 14622
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2420514690,
+              "instructions:u": 5741220873,
+              "branches:u": 819459894,
+              "branch-misses:u": 3330761
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 23266039.5,
+              "instructions:u": 54535441.5,
+              "branches:u": 7642045.5,
+              "branch-misses:u": 30390.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24205146.9,
+              "instructions:u": 57412208.73,
+              "branches:u": 8194598.94,
+              "branch-misses:u": 33307.61
+            },
+            "ipc": 2.3719008592341986,
+            "branch_miss_fraction": 0.004064580859157947
+          },
+          {
+            "name": "candidate-scriptw-async-2",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-2/receipt.json",
+              "sha256": "0f8054881621eca1c38228b14425c43017c203c221e0613a49285e19fd1f870a",
+              "bytes": 124177
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/for-in-copy/candidate-scriptw-async-2/observations.json",
+              "sha256": "b0a1f78c2b25a12e03f4ebea083d13665186e2906ee0b26c52c5dc164be55155",
+              "bytes": 14622
+            },
+            "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2401984407,
+              "instructions:u": 5741223045,
+              "branches:u": 819460372,
+              "branch-misses:u": 3373100
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22940019.5,
+              "instructions:u": 54535405.5,
+              "branches:u": 7642036.0,
+              "branch-misses:u": 30804.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24019844.07,
+              "instructions:u": 57412230.45,
+              "branches:u": 8194603.72,
+              "branch-misses:u": 33731.0
+            },
+            "ipc": 2.390199964774376,
+            "branch_miss_fraction": 0.004116245416196892
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 23143788.5,
+          "instructions:u": 54535439.0,
+          "branches:u": 7642043.0,
+          "branch-misses:u": 30390.5
+        },
+        "process_instruction_medians": [
+          54535439.0,
+          54535441.5,
+          54535405.5
+        ],
+        "median_process_ipc": 2.3837904783273802,
+        "median_process_branch_miss_fraction": 0.004064580859157947
       }
     }
   },
@@ -1181,437 +1181,39 @@
     "Counts are raw hardware events with full counter running time. They are not request timings, causal allocation shares, or a partition of the runtime gap.",
     "Current sampled callchains and allocator controls retain their own build and process identities. Older diagnostics remain in the Git-bound baseline archive. Inclusive sampling shares overlap and do not predict wall-time gains."
   ],
-  "sampled_diagnostics": {
-    "scope": "Current Fast sync worker only; 100 checked requests after three warmups; excluded from scored cohorts.",
-    "receipt": {
-      "path": "target/performance-own-property-20261104/profile/sync-current/receipt.json",
-      "sha256": "ee5a5efef2db0e39f0f9f4ee5b339df3e55f0553b7dee6ab9ad1f47aa9dc683f",
-      "bytes": 49086
-    },
-    "callchains": {
-      "path": "target/performance-own-property-20261104/profile/sync-current/callchains.json",
-      "sha256": "3a860d2b595637fccb113530855252a1c8d2459a580b71e111532b7dc5252515",
-      "bytes": 96974958
-    },
-    "archive_prefix": "additional-evidence/target/performance-own-property-20261104/profile/sync-current/",
-    "samples": 14701,
-    "period_sum": 3675250000,
-    "limits": "User-cycle sample weights, never wall-time shares or exact call counts. Own samples are disjoint; inclusive owners overlap. Frame-pointer chains can truncate or be invalid, and missing callers remain explicit. Caller return PCs resolve at IP-1. No silent cross-process rebasing.",
-    "archived_callchains_summary": "callchains-summary.json",
-    "derived_callchains_mapping": "../derived-callchains-mapping.json",
-    "full_derived_rows": "Regenerate from archived samples/maps using the retained symbolizer; original full-file hashes are preserved in derived-callchains-mapping.json.",
-    "leading_own_samples": [
-      {
-        "owner": "wasm:js::vn#f133",
-        "period_sum": 813500000,
-        "sample_share": 0.22134548670158494
-      },
-      {
-        "owner": "wasm:js::ft#f123",
-        "period_sum": 392750000,
-        "sample_share": 0.10686347867492008
-      },
-      {
-        "owner": "wasm:helper::object_read",
-        "period_sum": 186250000,
-        "sample_share": 0.05067682470580233
-      },
-      {
-        "owner": "wasm:helper::for_in_advance",
-        "period_sum": 160250000,
-        "sample_share": 0.043602476022039316
-      },
-      {
-        "owner": "wasm:js::f42",
-        "period_sum": 107250000,
-        "sample_share": 0.029181688320522415
-      },
-      {
-        "owner": "wasm:helper::ordinary_property_find",
-        "period_sum": 107250000,
-        "sample_share": 0.029181688320522415
-      },
-      {
-        "owner": "wasm:helper::ordinary_property_append",
-        "period_sum": 89500000,
-        "sample_share": 0.024352084892184205
-      },
-      {
-        "owner": "wasm:helper::intrinsic_property_find",
-        "period_sum": 82750000,
-        "sample_share": 0.02251547513774573
-      },
-      {
-        "owner": "wasm:js::et#f119",
-        "period_sum": 81750000,
-        "sample_share": 0.022243384803754845
-      },
-      {
-        "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-own-property-20261104/frozen/rsc_baseline)",
-        "period_sum": 76250000,
-        "sample_share": 0.02074688796680498
-      },
-      {
-        "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-own-property-20261104/frozen/rsc_baseline)",
-        "period_sum": 68250000,
-        "sample_share": 0.0185701652948779
-      },
-      {
-        "owner": "wasm:helper::object_own_keys",
-        "period_sum": 60750000,
-        "sample_share": 0.016529487789946264
-      },
-      {
-        "owner": "wasm:helper::pooled_string_resolve",
-        "period_sum": 59750000,
-        "sample_share": 0.016257397455955377
-      },
-      {
-        "owner": "wasm:js::Vt#f116",
-        "period_sum": 47500000,
-        "sample_share": 0.012924290864567036
-      },
-      {
-        "owner": "wasm:helper::ordinary_own_descriptor",
-        "period_sum": 46500000,
-        "sample_share": 0.012652200530576151
-      },
-      {
-        "owner": "wasm:helper::string_equality",
-        "period_sum": 46500000,
-        "sample_share": 0.012652200530576151
-      },
-      {
-        "owner": "wasm:helper::function_call",
-        "period_sum": 43500000,
-        "sample_share": 0.011835929528603496
-      },
-      {
-        "owner": "wasm:helper::object_get_own_property",
-        "period_sum": 42500000,
-        "sample_share": 0.011563839194612612
-      },
-      {
-        "owner": "wasm:helper::ordinary_set",
-        "period_sum": 41500000,
-        "sample_share": 0.011291748860621726
-      },
-      {
-        "owner": "host-or-unresolved:[unknown] (/usr/lib/libc.so.6)",
-        "period_sum": 41500000,
-        "sample_share": 0.011291748860621726
-      }
-    ],
-    "component_control": {
-      "git_commit": "90131a9519cd344ef4d5abf2a063bfc4db89deaf",
-      "limits": "Previous sampled/allocator diagnostics retain their own identities in the Git-bound baseline report; current samples belong only to this private-descriptor candidate."
-    },
-    "diagnosis": {
-      "schema": "scriptw-rsc-profile-diagnosis-v1",
-      "unscored": true,
-      "profiles": {
-        "sync-current": {
-          "samples": 14701,
-          "period_sum": 3675250000,
-          "probe_samples": 1636,
-          "probe_period_sum": 409000000,
-          "probe_sample_share": 0.11128494660227195,
-          "probe_offset_ranges": {
-            "js::ft#f123": [
-              [
-                47,
-                70
-              ]
-            ],
-            "js::vn#f133": [
-              [
-                47,
-                70
-              ]
-            ]
-          },
-          "per_function_probes": {
-            "js::ft#f123": {
-              "samples": 361,
-              "period_sum": 90250000
-            },
-            "js::vn#f133": {
-              "samples": 1275,
-              "period_sum": 318750000
-            }
-          },
-          "entry_stack_check_budget_bytes": {
-            "js::ft#f123": 362480,
-            "js::vn#f133": 963920
-          },
-          "native_function_range_bytes": {
-            "js::ft#f123": 1719344,
-            "js::vn#f133": 4731008
-          },
-          "callchains_sha256": "3a860d2b595637fccb113530855252a1c8d2459a580b71e111532b7dc5252515",
-          "native_prefixes_sha256": "a0ac94588bb0a0f0382b5373deb26c196bc7c34c88b5b1ffdea81bc1f5bd2e92"
-        },
-        "none-backtracking": {
-          "samples": 10028,
-          "period_sum": 2507000000,
-          "probe_samples": 6,
-          "probe_period_sum": 1500000,
-          "probe_sample_share": 0.0005983246908655763,
-          "probe_offset_ranges": {
-            "js::ft#f123": [
-              [
-                28,
-                42
-              ]
-            ],
-            "js::vn#f133": [
-              [
-                28,
-                42
-              ],
-              [
-                42,
-                56
-              ],
-              [
-                56,
-                70
-              ],
-              [
-                70,
-                84
-              ]
-            ]
-          },
-          "per_function_probes": {
-            "js::ft#f123": {
-              "samples": 0,
-              "period_sum": 0
-            },
-            "js::vn#f133": {
-              "samples": 6,
-              "period_sum": 1500000
-            }
-          },
-          "entry_stack_check_budget_bytes": {
-            "js::ft#f123": 7088,
-            "js::vn#f133": 17728
-          },
-          "native_function_range_bytes": {
-            "js::ft#f123": 839040,
-            "js::vn#f133": 2247152
-          },
-          "callchains_sha256": "8b4a6df857649ce3877cfb676a5c302cdcb94c8160cc96c1e485d2b1492b0b1b",
-          "native_prefixes_sha256": "23f83c763d0a2160a2ccd79fa7a674461b95c34cd28044193edca12070ced629"
-        }
-      },
-      "limits": "Own user-cycle sample weights. Page-touch regions and entry stack-check immediates decoded from retained same-process prefixes/objdump text; budgets include ABI/alignment overhead. Inclusive caller shares overlap. Not wall-time shares, exact allocation counts or predictions of source-optimization gains. Allocator A/B uses its own four-process-per-arm host; scored RSC uses the normal frozen host."
-    },
-    "ownership": {
-      "schema": "scriptw-rsc-owner-diagnosis-v1",
-      "unscored": true,
-      "profiles": {
-        "sync-current": {
-          "samples": 14701,
-          "period_sum": 3675250000,
-          "callchains_sha256": "3a860d2b595637fccb113530855252a1c8d2459a580b71e111532b7dc5252515",
-          "owners": {
-            "wasm:helper::object_read": {
-              "own_samples": 745,
-              "own_period_share": 0.05067682470580233,
-              "inclusive_samples": 1765,
-              "inclusive_period_share": 0.12005985987347799
-            },
-            "wasm:builtin::Object.getOwnPropertyDescriptor": {
-              "own_samples": 0,
-              "own_period_share": 0.0,
-              "inclusive_samples": 0,
-              "inclusive_period_share": 0.0
-            },
-            "wasm:helper::has_instance": {
-              "own_samples": 73,
-              "own_period_share": 0.004965648595333651,
-              "inclusive_samples": 756,
-              "inclusive_period_share": 0.05142507312427726
-            },
-            "wasm:helper::ordinary_property_append": {
-              "own_samples": 358,
-              "own_period_share": 0.024352084892184205,
-              "inclusive_samples": 468,
-              "inclusive_period_share": 0.03183456907693354
-            },
-            "wasm:helper::for_in_advance": {
-              "own_samples": 641,
-              "own_period_share": 0.043602476022039316,
-              "inclusive_samples": 1128,
-              "inclusive_period_share": 0.07672947418542957
-            },
-            "wasm:helper::object_get_own_property": {
-              "own_samples": 170,
-              "own_period_share": 0.011563839194612612,
-              "inclusive_samples": 380,
-              "inclusive_period_share": 0.02584858172913407
-            },
-            "wasm:helper::ordinary_own_descriptor": {
-              "own_samples": 186,
-              "own_period_share": 0.012652200530576151,
-              "inclusive_samples": 675,
-              "inclusive_period_share": 0.04591524386096184
-            }
-          },
-          "paths": {
-            "gpd_under_object_read": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "gpd_under_has_instance": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "gpd_under_for_in": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "append_under_gpd": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "private_under_object_read": {
-              "samples": 379,
-              "period_share": 0.02578055914563635
-            },
-            "private_under_has_instance": {
-              "samples": 183,
-              "period_share": 0.012448132780082987
-            },
-            "private_under_for_in": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "append_under_private": {
-              "samples": 0,
-              "period_share": 0.0
-            }
-          }
-        },
-        "none-backtracking": {
-          "samples": 10028,
-          "period_sum": 2507000000,
-          "callchains_sha256": "8b4a6df857649ce3877cfb676a5c302cdcb94c8160cc96c1e485d2b1492b0b1b",
-          "owners": {
-            "wasm:helper::object_read": {
-              "own_samples": 762,
-              "own_period_share": 0.0759872357399282,
-              "inclusive_samples": 1740,
-              "inclusive_period_share": 0.17351416035101716
-            },
-            "wasm:builtin::Object.getOwnPropertyDescriptor": {
-              "own_samples": 0,
-              "own_period_share": 0.0,
-              "inclusive_samples": 0,
-              "inclusive_period_share": 0.0
-            },
-            "wasm:helper::has_instance": {
-              "own_samples": 84,
-              "own_period_share": 0.008376545672118069,
-              "inclusive_samples": 738,
-              "inclusive_period_share": 0.07359393697646589
-            },
-            "wasm:helper::ordinary_property_append": {
-              "own_samples": 359,
-              "own_period_share": 0.03579976067012365,
-              "inclusive_samples": 485,
-              "inclusive_period_share": 0.04836457917830076
-            },
-            "wasm:helper::for_in_advance": {
-              "own_samples": 609,
-              "own_period_share": 0.060729956122856005,
-              "inclusive_samples": 1046,
-              "inclusive_period_share": 0.10430793777423215
-            },
-            "wasm:helper::object_get_own_property": {
-              "own_samples": 127,
-              "own_period_share": 0.012664539289988034,
-              "inclusive_samples": 337,
-              "inclusive_period_share": 0.03360590347028321
-            },
-            "wasm:helper::ordinary_own_descriptor": {
-              "own_samples": 221,
-              "own_period_share": 0.022038292780215397,
-              "inclusive_samples": 675,
-              "inclusive_period_share": 0.06731152772237735
-            }
-          },
-          "paths": {
-            "gpd_under_object_read": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "gpd_under_has_instance": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "gpd_under_for_in": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "append_under_gpd": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "private_under_object_read": {
-              "samples": 337,
-              "period_share": 0.03360590347028321
-            },
-            "private_under_has_instance": {
-              "samples": 179,
-              "period_share": 0.017850019944156362
-            },
-            "private_under_for_in": {
-              "samples": 0,
-              "period_share": 0.0
-            },
-            "append_under_private": {
-              "samples": 0,
-              "period_share": 0.0
-            }
-          }
-        }
-      },
-      "limits": "User-cycle sample relationships, not exact call counts or wall-time shares. Inclusive owners and path subsets overlap. These attribute remaining work after private descriptor transport; they do not predict gains or count allocation."
-    }
-  },
-  "allocator_diagnostic": {
-    "archive_prefix": "additional-evidence/target/performance-own-property-20261104/allocator-diagnostic/",
-    "receipt": {
-      "path": "target/performance-own-property-20261104/allocator-diagnostic/receipt.json",
-      "sha256": "f7e9ef06aa488bcc2b00d18d734a2d0da496e8364186c82454e02f044ad1cf4a",
-      "bytes": 6541
-    },
+  "sampling": {
+    "unscored": true,
+    "fresh_processes": 2,
+    "checked_flight_outputs": 406,
+    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/for-in-copy/profile/",
     "summary": {
-      "fast": {
-        "native_preparation_ms": 11902.8436765,
-        "requests_ms": {
-          "sync": 9.3418665,
-          "async": 11.618927
-        }
-      },
-      "none-backtracking": {
-        "native_preparation_ms": 20055.3315035,
-        "requests_ms": {
-          "sync": 6.487124,
-          "async": 8.586501
-        }
-      }
+      "path": "target/performance-v8-climb-20261104/for-in-copy/profile/summary.json",
+      "sha256": "30253d1a646ba05d09096f94d326f1846aa31956ebf2fc1b0ff9a7d434c8d875",
+      "bytes": 22066
     },
-    "limits": "Unscored allocator-only diagnostic; identical source/P/R and OptLevel::None; four fresh processes per arm. Product defaults and scored timing configuration unchanged."
+    "owner_tables": {
+      "path": "target/performance-v8-climb-20261104/for-in-copy/profile/owner-tables.json",
+      "sha256": "628df2917d0f2d6c1aeb90dcfabcfe547b9b375ba52157a7985e179e814bfddc",
+      "bytes": 463535
+    },
+    "probe_diagnosis": {
+      "path": "target/performance-v8-climb-20261104/for-in-copy/profile/diagnosis.json",
+      "sha256": "f6a3f3d0b2b14f23d3f8c6132831583aeac17d1895e409dd9a8c45c4ffbe5ddd",
+      "bytes": 2664
+    },
+    "limits": "One sampled child per mode; own user-cycle leaves are disjoint, inclusive owners overlap and FP chains can truncate. No causal allocation or wall-time gain claim."
+  },
+  "allocator_census_control": {
+    "git_commit": "5a81f390bc28e61f7d41ca11abc514fd8a203c97",
+    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/unobservable-work/batch-controls/allocator-census-publication/",
+    "limits": "Observational compile-only census on exact published baseline P. Off/on native artifacts identical. No spill reuse or timing claim."
   },
   "evidence_archive": {
     "file": "docs/rust-rewrite/situations-evidence-2026-11-04.tar.xz",
-    "sha256": "10fe21d21ee88b1025ddf76a4238c244832acfde620fe8196a6814cd3bcf8e90",
-    "bytes": 1694372,
-    "regular_utf8_members": 2056,
-    "expanded_utf8_bytes": 64749305,
+    "sha256": "94fd7b8eff9553369b779cb6da88cacef4bedf7773c0152ed3b6fafc3dff7e39",
+    "bytes": 4109260,
+    "regular_utf8_members": 8783,
+    "expanded_utf8_bytes": 154982716,
     "over_5mb": false
   }
 }

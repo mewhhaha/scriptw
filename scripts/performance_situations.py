@@ -258,6 +258,75 @@ export function run() {{
 '''
 
 
+TYPEOF_DISPATCH_SOURCE = '''var values, seed;
+export function prepare(input) {
+  seed = input;
+  var object = {value: input};
+  if (input & 2) object = null;
+  var callable = function value() {};
+  if (input & 2) {
+    callable = callable.bind(null);
+  } else {
+    var revoked = Proxy.revocable(callable, {});
+    callable = revoked.proxy;
+    revoked.revoke();
+  }
+  values = [undefined, object, false, 17, 23n, 'value', Symbol('kind'), callable];
+}
+export function run() {
+  var sum = seed;
+  for (var i = 0; i < 4096; i++) {
+    var value = values[(i + seed) & 7];
+    if (typeof value === 'undefined') sum += 1;
+    else if (typeof value == 'object') sum += 2;
+    else if ('boolean' === typeof value) sum += 3;
+    else if (typeof value == 'number') sum += 4;
+    else if (typeof value === 'bigint') sum += 5;
+    else if (typeof value == 'string') sum += 6;
+    else if (typeof value === 'symbol') sum += 7;
+    else if ('function' == typeof value) sum += 8;
+    else sum -= 1000;
+  }
+  print(sum);
+}
+'''
+
+
+SINGLETON_DISPATCH_SOURCE = TYPEOF_DISPATCH_SOURCE.split('export function run()', 1)[0].replace(
+    "[undefined, object, false, 17, 23n, 'value', Symbol('kind'), callable]",
+    "[void 0, null, object, 17, 23n, 'value', Symbol('kind'), callable]").replace(
+    'if (input & 2) object = null;', 'if (input & 2) object = false;') + '''export function run() {
+  var sum = seed;
+  for (var i = 0; i < 4096; i++) {
+    var value = values[(i + seed) & 7];
+    if (value === null) sum += 1;
+    else sum += 2;
+    if (value !== null) sum += 4;
+    else sum += 8;
+    if (value === void 0) sum += 16;
+    else sum += 32;
+    if (value !== void 0) sum += 64;
+    else sum += 128;
+  }
+  print(sum);
+}
+'''
+
+FOR_IN_WIDE_SOURCE = '''var row, seed;
+export function prepare(input) {
+  seed = input;
+  row = {};
+  for (var i = 0; i < 64; i++) row['key' + i] = (i * 13 + input) & 255;
+}
+export function run() {
+  var sum = seed;
+  for (var pass = 0; pass < 16; pass++) {
+    for (var key in row) sum += row[key];
+  }
+  print(sum);
+}
+'''
+
 def workloads():
     entries = []
 
@@ -314,6 +383,18 @@ export function run() { print(input); }
             lambda seed: seed + PROPERTY_READS // 8 * 58, 'function properties',
             '8192 passes; own length and name plus string length; eight prepared targets; equivalent values across object kinds',
             PROPERTY_READS * 3, 'Metadata reads: ' + kind)
+    add('typeof-dispatch', TYPEOF_DISPATCH_SOURCE,
+        lambda seed: seed + 4096 // 8 * 36, 'type tests',
+        '4096 mixed-value passes; 18432 literal typeof comparisons; scalar kinds, null/ordinary objects, bound/revoked callable proxies; array/loop/public bridge included',
+        4096 // 8 * 36, 'Literal typeof comparisons')
+    add('singleton-dispatch', SINGLETON_DISPATCH_SOURCE,
+        lambda seed: seed + 4096 // 8 * 867, 'type tests',
+        '4096 mixed-value passes; 16384 strict null/undefined comparisons; array/loop/public bridge included',
+        4096 * 4, 'Strict null/undefined comparisons')
+    add('for-in-wide', FOR_IN_WIDE_SOURCE,
+        lambda seed: seed + 16 * sum(((index * 13 + seed) & 255) for index in range(64)),
+        'enumeration', '1024 yielded own keys across sixteen enumerations of a 64-property ordinary record; inherited nonenumerable processing and value reads included',
+        1024, 'For-in: 64 own keys')
     return entries
 
 

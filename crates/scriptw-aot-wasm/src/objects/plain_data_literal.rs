@@ -102,9 +102,8 @@ impl<'ir> PlainDataLiteral<'ir> {
     ) -> Result<(), EmitError> {
         use crate::gc_types::*;
         let schema = builder.runtime_schema();
-        let site = builder.next_program_site(crate::emit::ProgramSiteKind::CompactShape)?;
         let names: Vec<&str> = self.fields.iter().map(|field| field.key).collect();
-        let shape = builder.emit_compact_literal_shape(&names, site, f)?;
+        let shape = builder.emit_compact_literal_shape(&names, f)?;
         let prototype = schema.reserve_value_local(f);
         builder.emit_source_literal_prototype_to_value(
             crate::environments::global_environment::SourceLiteralPrototype::Object,

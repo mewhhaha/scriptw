@@ -79,7 +79,8 @@ Before a changed backend's dependency build, source guards provide a fast diagno
 python3 -B scripts/limited_verification.py -- python3 -B scripts/check-source-guards.py
 ```
 
-They compile source-only Rust harnesses. Typed IR/Wasm modules remain in the full
+They compile source-only Rust harnesses, including runtime-link routing and host
+authority checks (`--target runtime_link`). Typed IR/Wasm modules remain in the full
 Cargo structural targets; guards do not replace native or semantic acceptance.
 Then run a focused target and the batch's broader checks under the same wrapper:
 

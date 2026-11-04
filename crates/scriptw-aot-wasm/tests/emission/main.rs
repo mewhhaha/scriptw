@@ -11,12 +11,15 @@ mod linked_bodies;
 mod product_programs;
 
 mod aot_guarded_number_update;
+mod arguments_elision;
 mod async_generator_scheduling_size;
 mod async_labelled_region_emission;
 mod class_initializer_function_identity;
+mod compact_birth_layouts;
 mod constant_number_condition_emission;
 mod embedding;
 mod emit_golden;
+mod for_in_prefix_copy;
 mod foreign_functions;
 mod guarded_push;
 mod has_instance_helper;
@@ -30,6 +33,9 @@ mod product_artifact;
 mod program_utf16_sharing;
 mod proper_tail_call_emission;
 mod property_read_plans;
+mod singleton_comparisons;
 mod string_match_call_emission;
+mod throw_guard_dedup;
+mod typeof_comparisons;
 
 mod regexp_shared_recovery;

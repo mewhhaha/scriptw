@@ -1,38 +1,29 @@
-# Static strict-equality kind domain
+# Strict equality over runtime values
 
-Current source status (2026-10-05): the T05 semantic Wasm-GC cutover is source-authored and unverified. Earlier source recipes, caller counts, and dated verification below describe their recorded checkpoints; they do not verify this cutover. ECMAScript requirements and retained fixtures remain acceptance criteria. Semantic values and Realm ownership now use the typed GC/compiler path described in [the GC value contract](../value-heap-gc.md). The retired representation assertions add no Test262 skips or new passing results.
+Strict equality evaluates both operands once, left to right, before comparing
+normal results. The usual expression compiler preserves getters, coercions,
+TDZ and arbitrary Throw values. A normal-result fact cannot remove operand work:
+`(1n >>> 0n) === 0n` still throws before equality.
 
-The singleton fast path in `compile_strict_equality_i32` exhaustively assigns
-every `ValueKind` to one of four existing algorithms. Number uses binary64
-equality, String uses code-unit equality, Function and BigInt use tagged
-payload equality, and the primitive identity and ordinary heap-reference kinds
-use raw-payload equality. Dynamic explicitly uses tagged equality rather than
-inheriting an accidental raw-payload default.
+Exact `ExprIr::Null`, `Undefined` and `Void` syntax establishes one possible
+normal-result tag. Both SpecOperation StrictEqualityComparison and ExprIr strict
+comparisons use the same checked singleton plan. They evaluate both complete
+operands, then compare the other value's tag. Effectful `void` operands retain
+source order and abrupt routing. Identifier spelling and inferred ValueKind
+never authorize this path; a shadowed `undefined` remains dynamic.
 
-There is no wildcard or defensive unreachable arm. Adding a value kind cannot
-compile until strict equality selects its representation-aware algorithm. The
-general runtime-tag path remains unchanged for expressions whose tags or kind
-sets are dynamic at runtime.
+Other strict comparisons retain tagged equality: binary64 Number equality,
+String code-unit equality, BigInt value equality and object/reference identity.
+SameValue and SameValueZero keep their distinct Number rules. Loose equality
+retains its conversion and HTMLDDA semantics. Callers retain inequality inversion
+and whole Normal completion publication; no runtime layout or ABI changes.
 
-This source-equivalent classification preserves the unequal-singleton early
-exit, operand order, String scratch-local discipline, tagged temporary-local
-lifecycle and completion publication.
+The encoded test checks both emitter routes and omitted all-kind operations
+against dynamic, shadowed, numeric and loose controls. Engine fixtures exercise
+both operand orders, every value category, GC/reentry, whole Throws, TDZ and
+HTMLDDA under strict and sloppy source modes.
 
 ```sh
-cargo test -p scriptw-aot-wasm --test structure_language -- strict_equality_static_kind_structure::
-cargo test -p scriptw-cli --test cli language_numerics::run_wasm_backend_succeeds_for_spec_strict_equality_fixture -- --exact --test-threads=1
+cargo test -p scriptw-aot-wasm --test emission -- singleton_comparisons::
+cargo test -p scriptw-engine --test aot_language -- aot_strict_singleton_comparisons::
 ```
-
-The bounded pinned controls are `S11.9.4_A5.js`, `S11.9.4_A7.js` and
-`bigint-and-bigint.js` under `language/expressions/strict-equals`. The total
-domain target passes `3/3`, the exact CLI witness passes `1/1`, and the three
-pinned controls pass all `6/6` Wasm-AOT executions with every failure bucket at
-zero. The shared `cargo xc`, formatting, diff, module-boundary and task-plan
-checks are green.
-
-Static result kinds describe normal completion only. Different kinds cannot
-prove that either operand is effect-free or completes normally: for example,
-`(1n >>> 0n) === 0n` must throw before equality is considered. Strict equality,
-SameValue, and SameValueZero therefore evaluate operands left to right before
-rejecting mismatched tags. Strict equality's static payload algorithms require
-two matching singleton kinds; other pairs use tagged equality after evaluation.

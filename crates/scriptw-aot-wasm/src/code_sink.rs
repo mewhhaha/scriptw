@@ -178,6 +178,9 @@ pub(crate) struct Function {
     operator_count: u32,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
+    excluded_i32_value: Option<(u32, i32)>,
+    checked_escape_frames: Vec<LabelDepth>,
+    last_instruction_escapes: bool,
 }
 
 impl Clone for Function {
@@ -193,6 +196,9 @@ impl Clone for Function {
             operator_count: self.operator_count,
             literal_operands: self.literal_operands.clone(),
             native_program_context: self.native_program_context,
+            excluded_i32_value: self.excluded_i32_value,
+            checked_escape_frames: self.checked_escape_frames.clone(),
+            last_instruction_escapes: self.last_instruction_escapes,
         }
     }
 }
@@ -217,6 +223,9 @@ impl Function {
             operator_count: 0,
             literal_operands: Vec::new(),
             native_program_context: None,
+            excluded_i32_value: None,
+            checked_escape_frames: Vec::new(),
+            last_instruction_escapes: false,
         }
     }
 
@@ -238,13 +247,14 @@ impl Function {
         if let Some(position) = self.free_locals.iter().position(|index| {
             self.locals.type_at(*index - self.parameters.len() as u32) == Some(ty)
         }) {
-            return self.free_locals.swap_remove(position);
+            let index = self.free_locals.swap_remove(position);
+            self.forget_i32_local(index);
+            return index;
         }
         self.reserve_fresh_typed_local(ty)
     }
 
-    /// A frame cache must start at the Wasm default on every invocation and
-    /// retain its identity through loop backedges. Never take a released slot.
+    /// Append a fresh local declaration when no released slot can be reused.
     pub(crate) fn reserve_fresh_typed_local(&mut self, ty: ValType) -> u32 {
         assert!(
             !self.frames.is_empty(),
@@ -265,7 +275,71 @@ impl Function {
             "only this body's dynamically reserved locals can be released"
         );
         assert!(!self.free_locals.contains(&index), "local released twice");
+        self.forget_i32_local(index);
         self.free_locals.push(index);
+    }
+
+    fn forget_i32_local(&mut self, index: u32) {
+        if self
+            .excluded_i32_value
+            .is_some_and(|(local, _)| local == index)
+        {
+            self.excluded_i32_value = None;
+        }
+    }
+
+    /// The matching arm must leave this guard on every path. The sink owns
+    /// the comparison and rejects branches into its continuation; the final
+    /// instruction must also escape. Only the unmatched arm can fall through.
+    pub(crate) fn if_i32_equal_escape(
+        &mut self,
+        local: u32,
+        value: i32,
+        escape: impl FnOnce(&mut Self),
+    ) {
+        let ty = self.parameter_type(local).or_else(|| {
+            local
+                .checked_sub(self.parameters.len() as u32)
+                .and_then(|index| self.locals.type_at(index))
+        });
+        assert_eq!(
+            ty,
+            Some(ValType::I32),
+            "checked guard requires an i32 local"
+        );
+        assert!(
+            !self.free_locals.contains(&local),
+            "checked guard local is live"
+        );
+        if self.excluded_i32_value == Some((local, value)) {
+            return;
+        }
+        self.instruction(&Instruction::LocalGet(local));
+        self.instruction(&Instruction::I32Const(value));
+        self.instruction(&Instruction::I32Eq);
+        self.instruction(&Instruction::If(wasm_encoder::BlockType::Empty));
+        let guard = self.label_depth();
+        self.checked_escape_frames.push(guard);
+        escape(self);
+        assert_eq!(
+            self.label_depth(),
+            guard,
+            "checked escape must balance its frames"
+        );
+        assert_eq!(
+            self.frames.last().unwrap().kind,
+            FrameKind::IfThen,
+            "checked escape cannot introduce a fallthrough else arm"
+        );
+        assert!(
+            self.last_instruction_escapes,
+            "checked arm must unconditionally escape"
+        );
+        assert_eq!(self.checked_escape_frames.pop(), Some(guard));
+        self.instruction(&Instruction::End);
+        if !self.free_locals.contains(&local) {
+            self.excluded_i32_value = Some((local, value));
+        }
     }
 
     fn depth(&self) -> u32 {
@@ -278,6 +352,13 @@ impl Function {
             "branch immediate {label} is out of range at label depth {}",
             self.depth()
         );
+        let target = self.frames[self.frames.len() - 1 - label as usize].identity;
+        assert!(
+            self.checked_escape_frames
+                .iter()
+                .all(|guard| guard.identity != target),
+            "checked escape cannot branch to its own continuation"
+        );
     }
 
     /// Account for an instruction before appending its bytes.
@@ -289,6 +370,49 @@ impl Function {
                 );
             }
             panic!("instruction emitted after the function body's final end");
+        }
+
+        match instruction {
+            Instruction::LocalSet(local) | Instruction::LocalTee(local) => {
+                self.forget_i32_local(*local);
+            }
+            Instruction::Block(_)
+            | Instruction::Loop(_)
+            | Instruction::If(_)
+            | Instruction::Else
+            | Instruction::End
+            | Instruction::TryTable(_, _)
+            | Instruction::Try(_)
+            | Instruction::Catch(_)
+            | Instruction::CatchAll
+            | Instruction::Delegate(_)
+            | Instruction::Br(_)
+            | Instruction::BrIf(_)
+            | Instruction::BrTable(_, _)
+            | Instruction::BrOnNull(_)
+            | Instruction::BrOnNonNull(_)
+            | Instruction::BrOnCast { .. }
+            | Instruction::BrOnCastFail { .. }
+            | Instruction::Return
+            | Instruction::ReturnCall(_)
+            | Instruction::ReturnCallRef(_)
+            | Instruction::ReturnCallIndirect { .. }
+            | Instruction::Throw(_)
+            | Instruction::ThrowRef
+            | Instruction::Rethrow(_)
+            | Instruction::Unreachable => self.excluded_i32_value = None,
+            Instruction::Suspend(_)
+            | Instruction::Resume { .. }
+            | Instruction::ResumeThrow { .. }
+            | Instruction::ResumeThrowRef { .. }
+            | Instruction::Switch { .. } => {
+                self.excluded_i32_value = None;
+                assert!(
+                    self.checked_escape_frames.is_empty(),
+                    "stack switching cannot establish a checked escape fact"
+                );
+            }
+            _ => {}
         }
 
         match instruction {
@@ -345,6 +469,7 @@ impl Function {
                     *label < enclosing_depth,
                     "delegate immediate {label} is out of range at enclosing label depth {enclosing_depth}"
                 );
+                self.check_branch(*label + 1);
                 self.frames.pop();
             }
             Instruction::Rethrow(label) => {
@@ -390,6 +515,18 @@ impl Function {
             }
             _ => {}
         }
+        self.last_instruction_escapes = matches!(
+            instruction,
+            Instruction::Br(_)
+                | Instruction::Return
+                | Instruction::ReturnCall(_)
+                | Instruction::ReturnCallRef(_)
+                | Instruction::ReturnCallIndirect { .. }
+                | Instruction::Throw(_)
+                | Instruction::ThrowRef
+                | Instruction::Rethrow(_)
+                | Instruction::Unreachable
+        );
         self.body.instruction(instruction);
         self.operator_count = self
             .operator_count
@@ -565,3 +702,7 @@ mod exception_tests;
 #[cfg(test)]
 #[path = "../tests/unit/gc_local_types.rs"]
 mod gc_local_type_tests;
+
+#[cfg(test)]
+#[path = "../tests/unit/throw_guard_fact.rs"]
+mod throw_guard_fact_tests;

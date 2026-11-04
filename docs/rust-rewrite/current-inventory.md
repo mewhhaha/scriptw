@@ -8,7 +8,7 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-Use the [16 focused programs and scores](benchmarks.md#focused-performance-situations)
+Use the [19 focused programs and scores](benchmarks.md#focused-performance-situations)
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
@@ -19,13 +19,17 @@ accepts `--case <file.js>`.
   transport bound; exclusion alone does not establish their cost. Preserve
   callee identity, Realm, captures, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Test compile-time sharing of equivalent immutable compact birth layouts.
-  The eight-literal/one-factory control retains the same timed read body apart
-  from four binding-slot constants; its layout identities differ. Intern ordered
-  primitive keys and attributes in the existing ProgramInstance shape table,
-  retaining per-object values/prototypes and live mutation/promotion guards.
-  Measure dynamic cache misses and the unchanged original workload before
-  assigning causal cost or predicting RSC gains. Owner: compact data planning.
+- Extend the existing closed Number-loop proof for captured Module arrays,
+  masked indices with fixed trip counts, row aliases and String-length leaves.
+  The metadata workloads currently miss these admission gates. Preserve live
+  storage guards, completed-prefix publication and the original loop's fallback;
+  getters, coercion, writes and reentry must retain ordinary semantics.
+  Owner: AOT scalar Number-loop planning.
+- Measure scalar replacement of strict arguments index/length reads. A missing
+  own index can expose the object through a prototype getter; short argument
+  lists must retain real object semantics. Preserve original actual count and
+  rooted snapshots across reentry before changing local-entry admission.
+  Owner: arguments binding and source-call planning.
 - Measure remaining RSC property, descriptor and allocation work after typed
   internal OwnKeys and canonical Module direct-cell capture admission. Keep
   [instruction counts and sampled callers](react-attribution-current.json)
@@ -38,17 +42,12 @@ accepts `--case <file.js>`.
   [sampled callers](react-attribution-current.json); preserve Proxy ordering,
   namespace TDZ, mapped arguments, typed arrays and execution Realm.
   Owner: AOT object operations.
-- Attribute Fast frame capacity before changing emitter value transport.
-  Under pinned regalloc2 0.15.2 / Cranelift 0.134.0, separate strictly block-local
-  spill homes from block parameters, branch arguments, other cross-block homes,
-  scratch and explicit GC-root slots. Compare persistent plus maximum block-local
-  capacity with the actual frame. Overlay local arenas only if that census
-  supports it; retain within-block uniqueness, size/alignment, edge-copy scratch,
-  output/debug locations and explicit GC stack maps. Validate allocator checks,
-  forced GC, exceptions, loops and recursion; measure preparation and requests.
-  [Allocator-only controls](react-attribution-current.json) remain separate from
-  source changes. Frame capacity is distinct from spill instruction count.
-  Owner: pinned native allocator and AOT code shape.
+- Measure normal-result and Throw transport before changing the Value/Completion
+  ABI. Compare an isolated native-EH experiment with whole completion returns,
+  including Realm, activation and invocation cleanup, frequent Throws and GC.
+  The retained allocator census separates cross-block/edge homes from strictly
+  local capacity; it does not attribute their semantic origin or prove a global
+  representation rewrite will win. Owner: AOT call/completion lowering.
 - Move embedding-only benchmark hosts to Engine examples so emitter iterations
   do not rebuild the Test262-linked CLI library. Reuse native producer/consumer
   runs for retained RSC requests while measuring cold setup separately. Prefer

@@ -2,7 +2,7 @@
 """Run source-only backend guards before building the compiler dependency graph.
 
 This is an additive diagnostic. The full Cargo structure_builtins,
-structure_language, intl_temporal and engine structure targets remain required
+structure_language, runtime_link, intl_temporal and engine structure targets remain required
 for native acceptance.
 """
 import argparse
@@ -31,6 +31,15 @@ TARGETS = {
         "global_object_environment_numeric_update_structure",
         "with_environment_compound_assignment_structure",
         "with_environment_numeric_update_structure",
+    }),
+    "runtime_link": frozenset({
+        "linked_bodies",
+        "compact_array_body",
+        "pooled_string_data",
+        "regexp_candidate_body",
+        "rooted_snapshot_exports",
+        "runtime_import_reachability",
+        "separated_helper_types",
     }),
     "intl_temporal": frozenset({
         "linked_bodies",

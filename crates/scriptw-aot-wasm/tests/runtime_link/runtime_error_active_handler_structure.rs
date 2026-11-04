@@ -39,9 +39,10 @@ fn fresh_runtime_error_delegates_to_the_canonical_current_throw_router() {
         "pub(crate) fn emit_clear_throw_diagnostic(",
     );
     assert!(checked_route.contains("CompletionKind::Throw.code() as i32"));
+    assert!(checked_route.contains(".if_equal_escape("));
     assert_eq!(
         checked_route
-            .matches("self.emit_propagate_current_throw(function);")
+            .matches("self.emit_propagate_current_throw(function)")
             .count(),
         1
     );

@@ -2,11 +2,11 @@
 
 use super::*;
 mod native_payload;
-use crate::EmitError;
 use crate::data::{PooledStringIndex, StringPool};
 use crate::program_hooks::ProvidedHooks;
 use crate::runtime_artifact::ModuleKind;
 use crate::runtime_helpers::RuntimeHelperFunctionBase;
+use crate::EmitError;
 
 mod language_features;
 mod literal_index;

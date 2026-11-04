@@ -262,3 +262,8 @@ unused(marker)===16 && observed(marker)===17 && capture()===marker && evaluated(
 "#,
     );
 }
+
+#[test]
+fn ordinary_observer_walks_preserve_reentry_nested_arguments_and_captures() {
+    assert_leaf_semantics(include_str!("../fixtures/unobserved_argument_forms.js"));
+}

@@ -93,6 +93,23 @@ fn statement(source: &StatementIr) -> bool {
                 && update.as_ref().is_none_or(expression)
                 && statement(body)
         }
+        StatementIr::ForInObject {
+            name, target, body, ..
+        } => unobserved_name(name) && expression(target) && statement(body),
+        StatementIr::TryCatch {
+            try_block,
+            catch_name,
+            catch_source_name,
+            catch_block,
+            generator_plan: None,
+            async_plan: None,
+            ..
+        } => {
+            unobserved_name(catch_name)
+                && unobserved_name(catch_source_name)
+                && block(try_block)
+                && block(catch_block)
+        }
         StatementIr::Switch {
             discriminant,
             lexical_declarations,
@@ -181,6 +198,14 @@ fn expression(value: &TypedExpr) -> bool {
             value,
             ..
         } => expression(target) && key(property) && expression(value),
+        ExprIr::OrdinaryPropertyAssignment(assignment) => {
+            expression(assignment.base_and_receiver())
+                && key(assignment.referenced_name())
+                && expression(assignment.rhs())
+        }
+        ExprIr::OrdinaryPropertyNumericUpdate(update) => {
+            expression(update.base_and_receiver()) && key(update.referenced_name())
+        }
         ExprIr::ArrayLiteral(values) => values.iter().all(expression),
         ExprIr::ObjectLiteral(properties) => properties.iter().all(|property| match property {
             ObjectPropertyIr::Data { value, .. }
@@ -232,7 +257,10 @@ fn expression(value: &TypedExpr) -> bool {
             else_expr,
         } => expression(condition) && expression(then_expr) && expression(else_expr),
         ExprIr::SpecOperation {
-            operation: SpecOperationIr::GetV,
+            operation:
+                SpecOperationIr::GetV
+                | SpecOperationIr::StrictEqualityComparison
+                | SpecOperationIr::IsLooselyEqual,
             operands,
         } => operands.iter().all(expression),
         // No source arguments reads, direct eval, capturing callable creation,
@@ -277,6 +305,77 @@ mod tests {
                 assert_eq!(storage, function.owned_env_bindings.as_slice());
                 assert!(arguments.take_for_binding().unwrap().into_present().is_none());
                 assert!(arguments.take_for_binding().is_err());
+            });
+        }
+    }
+
+    #[test]
+    fn ordinary_operand_walks_elide_five_formal_arguments_without_changing_storage() {
+        for body in [
+            "return row === value || row == value;",
+            "row[key] = value; return row;",
+            "return row[key]++;",
+            "try { return row[key](value); } catch (error) { return error === value; }",
+            "for (var name in row) value += row[name]; return value;",
+            "try { row[key] = value; } catch (error) { value = error; } for (var name in row) row[name]++; return row[key] == value;",
+        ] {
+            let source = format!(
+                "export function make(row, key, value, unused, extra) {{ {body} }}"
+            );
+            with_module(&source, |function| {
+                assert_eq!(function.params.len(), 5);
+                assert!(UnobservedStrictArguments::admit(function).is_some(), "{body}");
+                let (actual, mut arguments, storage) =
+                    UserFunctionActivationPlan::for_function(function)
+                        .unwrap()
+                        .into_parts();
+                assert!(core::ptr::eq(actual, function));
+                assert_eq!(storage, function.owned_env_bindings.as_slice());
+                assert!(arguments.take_for_binding().unwrap().into_present().is_none());
+                assert!(arguments.take_for_binding().is_err());
+            });
+        }
+    }
+
+    #[test]
+    fn ordinary_operand_walks_retain_every_nested_arguments_observer() {
+        for body in [
+            "return arguments[0] === row;",
+            "return row === arguments[0];",
+            "return arguments[0] == row;",
+            "return row == arguments[0];",
+            "arguments[0][key] = value;",
+            "row[arguments[0]] = value;",
+            "row[key] = arguments[0];",
+            "arguments[0][key]++;",
+            "row[arguments[0]]++;",
+            "try { return arguments[0]; } catch (error) { return error; }",
+            "try { return row[key]; } catch (error) { return arguments[0]; }",
+            "for (var name in arguments[0]) value += name; return value;",
+            "for (var name in row) value += arguments[0]; return value;",
+            "try { return eval('arguments[0]'); } catch (error) { return error; }",
+            "try { return row[key]; } catch (error) { return () => arguments[0]; }",
+            "for (var name in row) return () => value;",
+            // These opaque regions still have no admitted complete child walk.
+            "try { return row; } finally { row[key] = value; }",
+        ] {
+            let source =
+                format!("export function make(row, key, value, unused, extra) {{ {body} }}");
+            with_module(&source, |function| {
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_none(),
+                    "{body}"
+                );
+                let (_, mut arguments, storage) =
+                    UserFunctionActivationPlan::for_function(function)
+                        .unwrap()
+                        .into_parts();
+                assert_eq!(storage, function.owned_env_bindings.as_slice());
+                assert!(arguments
+                    .take_for_binding()
+                    .unwrap()
+                    .into_present()
+                    .is_some());
             });
         }
     }

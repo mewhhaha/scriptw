@@ -1,4 +1,4 @@
-//! Source read plans retain guarded own-data loads and complete Get fallbacks.
+//! Source read plans call one runtime owner for guarded hits and complete Get.
 use scriptw_aot_wasm::{
     emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
     RUNTIME_IMPORT_NAMESPACE,
@@ -19,6 +19,7 @@ pub(super) struct Module<'a> {
     function_types: BTreeMap<u32, u32>,
     exports: BTreeMap<String, u32>,
     bodies: BTreeMap<u32, Vec<Operator<'a>>>,
+    locals: BTreeMap<u32, Vec<ValType>>,
     globals: Vec<wasmparser::GlobalType>,
     global_exports: BTreeMap<String, u32>,
 }
@@ -77,6 +78,14 @@ impl<'a> Module<'a> {
                     .globals
                     .extend(reader.into_iter().map(|global| global.unwrap().ty)),
                 Payload::CodeSectionEntry(body) => {
+                    module.locals.insert(
+                        next_function,
+                        body.get_locals_reader()
+                            .expect("property-read locals decode")
+                            .into_iter()
+                            .map(|local| local.expect("property-read local decodes").1)
+                            .collect(),
+                    );
                     let body = if operators {
                         body.get_operators_reader()
                             .expect("property-read function opens")
@@ -341,68 +350,114 @@ fn frame_end(body: &[Operator<'_>], start: usize) -> usize {
     panic!("encoded control frame is balanced");
 }
 
-fn assert_inline_cache_hit_bypasses_runtime(body: &[Operator<'_>], cache: u32) {
-    let call = body
+fn concrete_reference_type(value: ValType) -> u32 {
+    let ValType::Ref(reference) = value else {
+        panic!("the actual helper/storage edge is a GC reference");
+    };
+    let HeapType::Concrete(UnpackedIndex::Module(index)) = reference.heap_type() else {
+        panic!("the actual helper/storage edge retains a concrete type");
+    };
+    index
+}
+
+fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
+    let CompositeInnerType::Struct(storage) = &module.types[storage as usize].composite_type.inner
+    else {
+        panic!("the compact store helper accepts a GC record");
+    };
+    assert_eq!(
+        storage.fields.len(),
+        1,
+        "the compact base owns its immutable shape"
+    );
+    let shape = concrete_reference_type(storage.fields[0].element_type.unpack());
+    let CompositeInnerType::Struct(shape_fields) =
+        &module.types[shape as usize].composite_type.inner
+    else {
+        panic!("the live storage shape is a GC record");
+    };
+    assert_eq!(
+        shape_fields.fields.len(),
+        2,
+        "shape owns primitive keys and attributes"
+    );
+    let keys = concrete_reference_type(shape_fields.fields[0].element_type.unpack());
+    let CompositeInnerType::Array(keys) = &module.types[keys as usize].composite_type.inner else {
+        panic!("the shape owns its key array");
+    };
+    let string = concrete_reference_type(keys.0.element_type.unpack());
+    let cache_types = module
+        .types
         .iter()
-        .position(|op| {
-            matches!(op,
-        Operator::Call { function_index } if *function_index == cache)
-        })
-        .unwrap();
-    let (miss, found) = body
-        .windows(3)
         .enumerate()
-        .filter_map(|(start, ops)| {
-            let [Operator::LocalGet { local_index }, Operator::I32Eqz, Operator::If { .. }] = ops
-            else {
+        .filter_map(|(index, ty)| {
+            let CompositeInnerType::Struct(fields) = &ty.composite_type.inner else {
                 return None;
             };
-            let end = frame_end(body, start + 2);
-            (start < call && call < end).then_some((start, *local_index))
+            if fields.fields.len() != 3 {
+                return None;
+            }
+            let reference = |field: usize, target, nullable| {
+                matches!(fields.fields[field].element_type,
+            StorageType::Val(ValType::Ref(r)) if r.is_nullable() == nullable
+                && r.heap_type() == HeapType::Concrete(UnpackedIndex::Module(target)))
+            };
+            (reference(0, string, false)
+                && reference(1, shape, true)
+                && fields.fields[2].element_type == StorageType::Val(ValType::I32))
+            .then_some(index as u32)
         })
-        .last()
-        .expect("the runtime cache call is dominated by the inline hit flag's miss branch");
-    let publication = body[..miss]
-        .windows(2)
-        .rposition(|ops| {
-            matches!(ops,
-        [Operator::I32Const { value: 1 }, Operator::LocalSet { local_index }]
-            if *local_index == found)
-        })
-        .expect("the direct typed load publishes its hit flag");
-    let proof = body[..publication]
-        .windows(3)
-        .rposition(|ops| {
-            matches!(
-                ops,
-                [Operator::RefEq, Operator::I32And, Operator::If { .. }]
-            )
-        })
-        .expect("actual shape and static key identity admit the typed slot load");
-    let hit = &body[proof + 3..publication];
+        .collect::<Vec<_>>();
+    assert_eq!(
+        cache_types.len(),
+        1,
+        "one canonical primitive key/shape/slot cache layout"
+    );
+    cache_types[0]
+}
+
+fn assert_runtime_owned_cache_read(module: &Module<'_>, source: &str, cache: u32, storage: u32) {
+    let (index, body) = module.named(source);
+    assert_eq!(
+        count(body, |op| matches!(op,
+        Operator::Call { function_index } if *function_index == cache)),
+        1,
+        "each admitted source read calls the actual runtime kernel once"
+    );
+    let cache_type = own_data_cache_type(module, storage);
     assert!(
-        hit.iter()
-            .any(|op| matches!(op, Operator::StructGet { .. }))
-            && hit.iter().any(|op| matches!(op, Operator::ArrayGet { .. })),
-        "P directly loads live inline and array-backed compact slots"
+        !module.locals[&index].iter().any(|ty| matches!(ty,
+        ValType::Ref(reference) if reference.heap_type()
+            == HeapType::Concrete(UnpackedIndex::Module(cache_type)))),
+        "P retains no invocation-long cache metadata root"
     );
     assert!(
-        !hit.iter().any(|op| matches!(
-            op,
-            Operator::Call { .. }
-                | Operator::ReturnCall { .. }
-                | Operator::CallRef { .. }
-                | Operator::StructNew { .. }
-                | Operator::ArrayNew { .. }
-                | Operator::ArrayNewDefault { .. }
-                | Operator::ArrayNewFixed { .. }
-        )),
-        "the admitted own-data region calls no runtime/user code and creates no snapshot"
+        !body.iter().any(|op| matches!(op,
+        Operator::StructGet { struct_type_index, .. }
+        | Operator::StructSet { struct_type_index, .. }
+        | Operator::StructNew { struct_type_index }
+            if *struct_type_index == cache_type)),
+        "cache registration and proof fields belong to R"
+    );
+    let mut storage_types = vec![storage];
+    storage_types.extend(module.types.iter().enumerate().filter_map(|(index, ty)| {
+        (ty.supertype_idx.map(|parent| parent.unpack()) == Some(UnpackedIndex::Module(storage)))
+            .then_some(index as u32)
+    }));
+    assert_eq!(
+        storage_types.len(),
+        3,
+        "the compact base has its two concrete representations"
+    );
+    assert!(
+        !body.iter().any(|op| matches!(op,
+        Operator::StructGet { struct_type_index, .. } if storage_types.contains(struct_type_index))),
+        "P does not duplicate the compact-storage shape or current-value read"
     );
 }
 
 #[test]
-fn own_data_cache_and_numeric_array_reads_keep_guarded_loads_and_get_fallbacks() {
+fn own_data_cache_reads_use_runtime_guards_and_numeric_reads_keep_get_fallbacks() {
     std::thread::Builder::new()
         .name("property-read-plan-emission".into())
         .stack_size(64 * 1024 * 1024)
@@ -520,8 +575,11 @@ function repeatedRead(record, count, callback) {
                 calls(unresolved, cache),
                 "unresolved literal-key GetV reaches the actual cache kernel"
             );
-            for body in [own, unresolved, repeated] {
-                assert_inline_cache_hit_bypasses_runtime(body, cache);
+            let (store, _) = runtime.named("helper::compact_data_store");
+            let program_store = program.imported_runtime_function(&runtime, store);
+            let program_storage = concrete_reference_type(program.function_type(program_store).params()[0]);
+            for source in ["js::ownCandidate#", "js::unresolvedRead#", "js::repeatedRead#"] {
+                assert_runtime_owned_cache_read(&program, source, cache, program_storage);
             }
             let (boxing, _) = runtime.named("helper::value_to_object");
             assert!(!calls(unresolved, program.imported_runtime_function(&runtime, boxing)),
@@ -566,42 +624,34 @@ function repeatedRead(record, count, callback) {
                 )) >= 2,
                 "R loads current scalar/reference values directly from guarded storage"
             );
-            let shape = runtime.witness_type(GcSnapshotLayout::CompactShape);
-            let string = runtime.witness_type(GcSnapshotLayout::String);
-            let cache_types = runtime.types.iter().enumerate().filter_map(|(index, ty)| {
-                let CompositeInnerType::Struct(fields) = &ty.composite_type.inner else { return None; };
-                if fields.fields.len() != 3 { return None; }
-                let reference = |field: usize, target, nullable| matches!(fields.fields[field].element_type,
-                    StorageType::Val(ValType::Ref(r)) if r.is_nullable() == nullable
-                        && r.heap_type() == HeapType::Concrete(UnpackedIndex::Module(target)));
-                (reference(0, string, false) && reference(1, shape, true)
-                    && fields.fields[2].element_type == StorageType::Val(ValType::I32))
-                    .then_some(index as u32)
-            }).collect::<Vec<_>>();
-            assert_eq!(cache_types.len(), 1, "one canonical primitive key/shape/slot cache layout");
-            let (initialize, retained) = repeated.windows(3).enumerate().find_map(|(start, ops)| {
-                let [Operator::LocalGet { local_index }, Operator::RefIsNull, Operator::If { .. }] = ops else { return None; };
-                let end = frame_end(repeated, start + 2);
-                repeated[start + 3..end].iter().any(|op| matches!(op,
-                    Operator::StructNew { struct_type_index } if *struct_type_index == cache_types[0]))
-                    .then_some((start, *local_index))
-            }).expect("an invocation-local metadata root initializes lazily at the source site");
-            assert_eq!(repeated.iter().filter(|op| matches!(op,
-                Operator::LocalSet { local_index } if *local_index == retained)).count(), 1,
-                "the retained proof root is never cleared or reinitialized on a loop backedge");
-            let loop_start = repeated.iter().enumerate().find_map(|(start, op)| {
-                (matches!(op, Operator::Loop { .. }) && start < initialize
-                    && initialize < frame_end(repeated, start)).then_some(start)
-            }).expect("the cache proof is retained within the actual emitted source loop");
-            let (call, _) = runtime.named("helper::proxy_call");
-            let call = program.imported_runtime_function(&runtime, call);
-            let object = runtime.witness_type(GcSnapshotLayout::Object);
-            let live_storage = repeated[loop_start..initialize].iter().rposition(|op| matches!(op,
+            let storage = concrete_reference_type(runtime.function_type(store).params()[0]);
+            let cache_type = own_data_cache_type(&runtime, storage);
+            assert_eq!(count(cached_body, |op| matches!(op,
+                Operator::StructNew { struct_type_index } if *struct_type_index == cache_type)), 1,
+                "R alone lazily registers the canonical cache metadata record");
+            let (allocate, _) = runtime.named("helper::compact_literal_allocate");
+            let object = concrete_reference_type(runtime.function_type(allocate).results()[0]);
+            let live_storage = cached_body.iter().position(|op| matches!(op,
                 Operator::StructGet { struct_type_index, field_index }
                     if *struct_type_index == object && *field_index == GcSnapshotField::ObjectProperties.index()))
-                .map(|offset| loop_start + offset).expect("the loop reloads actual current storage");
-            assert!(calls(&repeated[loop_start..live_storage], call),
-                "current storage admission remains after the observable source callback");
+                .expect("every helper call reloads the lookup's current own storage");
+            let admission = cached_body.windows(3).position(|ops| matches!(ops,
+                [Operator::RefEq, Operator::I32And, Operator::If { .. }]))
+                .expect("actual key and shape identity admit the cached slot");
+            assert!(live_storage < admission);
+            assert!(cached_body[live_storage..admission].iter().any(|op| matches!(op,
+                Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                    if *index == storage)), "current compact storage is proven before using cache metadata");
+            let cache_call = repeated.iter().position(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == cache)).unwrap();
+            let loop_start = repeated.iter().enumerate().find_map(|(start, op)| {
+                (matches!(op, Operator::Loop { .. }) && start < cache_call
+                    && cache_call < frame_end(repeated, start)).then_some(start)
+            }).expect("the runtime read remains inside the actual source loop");
+            let (call, _) = runtime.named("helper::proxy_call");
+            let call = program.imported_runtime_function(&runtime, call);
+            assert!(calls(&repeated[loop_start..cache_call], call),
+                "the runtime-owned live-storage proof runs after the observable callback");
             for (name, read) in [("numeric index", indexed), ("array length", length)] {
                 assert!(
                     !read.iter().any(|operator| matches!(

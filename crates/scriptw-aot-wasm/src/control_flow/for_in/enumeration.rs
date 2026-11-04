@@ -112,53 +112,17 @@ impl ForInVisitedKeys {
         function: &mut Function,
     ) {
         let schema = builder.runtime_schema();
-        let length = schema.reserve_i32_local(function);
-        let next_length = schema.reserve_i32_local(function);
-        let index = schema.reserve_i32_local(function);
-        schema
-            .array_type::<PropertyKeyTable>()
-            .length(&self.keys, schema, function);
-        length.store(function);
-        length.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        next_length.store(function);
-        let construction = PropertyKeyConstruction::allocate(
+        let key = PropertyKeyLocals::from_string(schema, key, function);
+        let construction = PropertyKeyConstruction::copy_with_appended_key(
             schema,
             schema.reserve_gc_local(function),
-            next_length,
+            &self.keys,
+            &key,
             function,
         );
-        function.instruction(&Instruction::I32Const(0));
-        index.store(function);
-        let copied = builder.open_frame(ControlFrameKind::Block, function);
-        let copy = builder.open_frame(ControlFrameKind::Loop, function);
-        index.load(function);
-        length.load(function);
-        function.instruction(&Instruction::I32GeU);
-        builder.emit_branch_if_to_target(copied, function);
-        let candidate = self.string_at(index, builder, function);
-        let candidate_key = PropertyKeyLocals::from_string(schema, &candidate, function);
-        construction.write(index, &candidate_key, schema, function);
-        candidate_key.clear(function);
-        candidate.clear(function);
-        index.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        index.store(function);
-        builder.emit_branch_to_target(copy, function);
-        builder.pop_control(ControlFrameKind::Loop);
-        function.instruction(&Instruction::End);
-        builder.pop_control(ControlFrameKind::Block);
-        function.instruction(&Instruction::End);
-        let key = PropertyKeyLocals::from_string(schema, key, function);
-        construction.write(length, &key, schema, function);
         key.clear(function);
         self.keys
             .replace(construction.publish(schema, function), function);
-        schema.release_i32_local(index, function);
-        schema.release_i32_local(next_length, function);
-        schema.release_i32_local(length, function);
     }
 
     fn clear(self, function: &mut Function) {

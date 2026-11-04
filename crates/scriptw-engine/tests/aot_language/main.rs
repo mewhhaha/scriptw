@@ -17,6 +17,7 @@ mod aot_class_name_source;
 mod aot_compact_array_literals;
 mod aot_compact_native_metadata;
 mod aot_compact_row_regions;
+mod aot_completion_guard_continuations;
 mod aot_compound_addition_flow;
 mod aot_compound_assignment_saved_value;
 mod aot_computed_numeric_method_calls;
@@ -66,3 +67,7 @@ mod aot_with_var_hoisting;
 mod aot_raw_key_own_data;
 
 mod aot_local_argument_calls;
+
+mod aot_typeof_comparisons;
+
+mod aot_strict_singleton_comparisons;

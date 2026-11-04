@@ -53,3 +53,10 @@ witness is `language/statements/for-in/order-property-on-prototype.js`.
 Await inside a for-in body still requires a resumable enumeration state and
 retains its explicit unsupported diagnostic. This change does not claim that
 separate suspension feature.
+
+Visited-key tables remain private and read-only after publication. Appending a
+key creates one new StoredValue and fills fresh construction storage with it,
+then copies the old immutable prefix with typed array.copy. Existing snapshots
+are shared without reboxing. This removes redundant boxes; reference copying
+and visited-key comparisons still have quadratic worst cases. Live descriptor,
+deletion, shadowing and prototype observations retain their existing owners.

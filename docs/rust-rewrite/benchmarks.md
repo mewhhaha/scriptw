@@ -7,255 +7,210 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-04** with pinned React 19.3.1 and compiler `19d9bc50dcad`.
+Measured **2026-11-04**, React **19.3.1**, compiler `048fd75ef772`
+(base `5a81f390b` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 10.144 | 12.349 |
-| Node 24.12.0 / V8 | 0.525 | 0.434 |
+| Scriptw | 6.003 | 6.661 |
+| Node 24.12.0 / V8 | 0.540 | 0.411 |
 
-![Matched retained RSC request timings](assets/rsc-current/runtime.svg)
+![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
 Each engine uses eight fresh processes across two balanced blocks, with three
-checked warmups and seven measured requests per mode. Each process retains one
+checked warmups and seven measured requests per mode. A process retains one
 Module/Realm and runs sync then async. Requests include full Flight serialization
-and consumption; JSON encoding and exact-output checks follow timing. Values are
-medians of process medians. Scriptc's React build failures remain unqualified;
-client React/DOM is a separate open scope.
+and consumption; JSON encoding and exact-output checks follow timing. Values
+are medians of process medians. The frozen prior-build control stays in the
+receipts; chart bars show the latest compiler and V8. Scriptc's React build
+remains unqualified; client React/DOM is a separate open scope.
 
-Cold Scriptw setup is **3.495 s JavaScript → Wasm**,
-**12.854 s native preparation** and
-**2.825 ms module initialization**.
-Program Wasm is **6,086,321 B** (5,540,898 B code; 490,228 B data);
-shared runtime Wasm is **38,816,458 B**. Native preparation, initialization and
-input preparation precede request timing. Child peak RSS includes compilation
-and process history; it is not the live guest heap.
+Cold Scriptw setup is **3.253 s JavaScript → Wasm**,
+**6.113 s native preparation**, and
+**2.332 ms module initialization**.
+Program Wasm is **4,343,634 B** (3,795,214 B code; 490,228 B data);
+shared runtime Wasm is **38,816,286 B**. All setup precedes request timing.
+Child peak RSS includes compilation and process history; it is not live guest heap.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
 Scriptw uses Wasmtime 47 **Fast / OptLevel::None / SinglePass**, a generic target,
 one CPU, 16-MiB copying GC and the recorded stack/deadline/cache settings.
-The [fresh hardware-counter diagnosis](react-attribution-current.json) captures
+The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
-engine/mode. Scriptw retires **63.63 million sync /
-76.22 million async user instructions per request**;
-Node retires **2.48 / 2.72 million**.
-Counters run for their complete windows without multiplexing. This counts the
-Scriptw execution worker and Node main thread; Node barrier/Promise-return edges
-remain included, while background compilation/GC threads are excluded. These are
-unscored instruction counts, not timing ratios or an allocation breakdown.
-Current sampled caller paths and exact native prefixes are retained in the
-evidence archive, separately from these hardware counts. Inclusive sample
-owners overlap; no sampled share predicts a wall-time gain.
+engine/mode. Scriptw retires **50.62 million sync /
+54.54 million async user instructions per request**;
+Node retires **2.65 / 2.65 million**.
+Counters run without multiplexing. They count Scriptw's execution worker and
+Node's main thread, including Node barrier/Promise-return edges; background
+compilation/GC threads are excluded. These are unscored counts, not causal shares.
 
-Current user-cycle sampling places **11.13%** of samples in the stack-probe
-regions of `vn` and `ft`. Their entry stack-check budgets are **963,920 B /
-362,480 B**. An allocator-only diagnostic keeps the same Wasm and
-`OptLevel::None`: Backtracking reduces these budgets to **17,728 B / 7,088 B**
-and probe samples to **0.060%**. In four fresh processes per arm, sync/async
-requests take **6.487 /
-8.587 ms**, versus
-**9.342 /
-11.619 ms** with SinglePass;
-native preparation rises from **11.90 s**
-to **20.06 s**.
-This diagnostic is separate from the scored chart and changes no default.
-Allocator choice also changes spill traffic and native code size; probe sample
-shares do not account for the complete timing difference.
+The emitted program shares immutable birth layouts and cached-read code in the
+existing runtime. Strict arguments elision walks complete ordinary operands;
+eval, capture and resumable refusals remain. Literal typeof and strict
+null/undefined comparisons use runtime predicates while preserving operand work
+and Throws. Visited-key extension copies existing immutable snapshots and boxes only the new key.
+Local argument entries retain their two-formal bound. Runtime value,
+environment, descriptor and call-transport costs remain; V8 parity is open.
 
-One typed runtime helper now owns both `instanceof` entry algorithms. Source
-operators evaluate their operands once and hold them across the call; the native
-method supplies its actual execution Realm. Hooks, bound-target transitions,
-prototype walking and whole Throws retain the existing state machine. The
-scored comparison keeps Fast's optimization and allocator settings unchanged.
-Total executed allocation and each mechanism's causal share remain unmeasured.
+Fresh user-cycle sampling attributes **24.65% sync /
+24.27% async** to six property/enumeration helpers' disjoint
+own samples. The `vn`/`ft` page-touch loops account for
+**2.23% /
+2.18%**. Each mode has one
+sampled process and 200 checked requests after three warmups. Frame-pointer
+chains can truncate; inclusive caller shares overlap. These observations do not
+partition wall time or predict a change's gain. The linked diagnostic retains
+raw samples, source identities and same-process prefixes.
 
-Eligible strict ordinary functions pass up to two arguments in Wasm locals to
-one canonical source body. Saved actual callable and defining-program guards
-permit direct calls; bounded constant/numeric leaves can inline at source level.
-Canonical Module root captures use validated direct cells with live import
-forwarding and TDZ checks. Internal OwnKeys consumers share a typed key table;
-public Reflect.ownKeys still creates the required JavaScript Array.
-Arguments observers and unsupported protocols retain ordinary dispatch. Fast and
-Speed both disable general native inlining; larger functions still pay for
-runtime value tags, environments and dynamic property semantics.
-
-Internal `[[GetOwnProperty]]` reads now return a private descriptor through one
-typed runtime boundary. Public Object/Reflect reflection alone materializes
-JavaScript descriptor objects. Ordinary/Array direct snapshots remain; Proxy
-validation, exotic storage dispatch and execution Realm retain their existing
-owners. The helper removes callable/argument-vector creation and six-field
-JavaScript descriptor reconstruction from internal reads. Snapshot records still
-allocate; total executed allocation remains unmeasured.
+Older allocator controls, source screens and rejected experiments retain their
+own source/binary identities in the inert archive. The allocator census found
+most SinglePass spill capacity in cross-block/edge homes; strictly block-local
+reuse was rejected as the main hill. Entry stack budgets are distinct from spill
+capacity, executed spill traffic and allocation counts. Total executed guest
+allocation remains unmeasured.
 
 Runtime ABI 51 supplies bounded UTF-8 codecs, byte streams with default readers,
-events, abort signals and tasks for these fixtures. Fetch/Request/URL integration,
-DOM nodes and full WHATWG conformance remain unsupported or unverified.
+events, abort signals and tasks for these fixtures. Fetch/Request/URL, DOM nodes
+and full WHATWG conformance remain unsupported or unverified.
 
 [Current report and process receipts](rsc-current.json) ·
-[Size attribution](rsc-wasm-size-current.json) ·
-[Inert evidence archive](situations-evidence-2026-11-04.tar.xz).
+[Size accounting](rsc-wasm-size-current.json) ·
+[Inert evidence](situations-evidence-2026-11-04.tar.xz).
 
 ## Focused performance situations
 
-Measured **2026-11-04**: 16 standalone Module programs, compiler `19d9bc50dcad`
-(base `90131a951` plus the archived performance patch),
+Measured **2026-11-04**: **19** standalone Module programs, compiler `048fd75ef772`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
-Each program has its own score, separate from RSC and fresh-entry kernels.
-No aggregate score combines their arbitrary operation counts.
+Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.010 | 0.001 |
-| `global-shallow.js` | 2.311 | 1.893 | 0.970 |
-| `global-deep8.js` | 2.907 | 2.154 | 0.993 |
-| `global-bound-deep.js` | 0.752 | 0.251 | 0.145 |
-| `global-getter-deep.js` | 3.228 | 2.426 | 1.008 |
-| `frame-compact.js` | 10.503 | 6.220 | 0.075 |
-| `frame-branches32.js` | 10.850 | 6.381 | 0.131 |
-| `frame-branches128.js` | 11.307 | 6.334 | 0.135 |
-| `frame-branches512.js` | 19.351 | 6.570 | 0.407 |
-| `args-unused.js` | 0.911 | 0.545 | 0.103 |
-| `args-observed.js` | 2.813 | 2.073 | 0.138 |
-| `property-stable.js` | 3.641 | 1.651 | 0.077 |
-| `property-mutated.js` | 3.192 | 1.705 | 0.067 |
-| `metadata-ordinary.js` | 4.591 | 2.877 | 0.020 |
-| `metadata-function.js` | 6.008 | 4.643 | 0.205 |
-| `metadata-intrinsic.js` | 5.944 | 4.375 | 0.233 |
+| `control-empty.js` | 0.010 | 0.009 | 0.001 |
+| `global-shallow.js` | 2.174 | 1.717 | 0.994 |
+| `global-deep8.js` | 2.732 | 1.926 | 0.975 |
+| `global-bound-deep.js` | 0.708 | 0.240 | 0.033 |
+| `global-getter-deep.js` | 3.018 | 2.192 | 0.983 |
+| `frame-compact.js` | 8.396 | 5.813 | 0.067 |
+| `frame-branches32.js` | 8.276 | 5.969 | 0.130 |
+| `frame-branches128.js` | 8.882 | 5.976 | 0.155 |
+| `frame-branches512.js` | 15.831 | 6.135 | 0.385 |
+| `args-unused.js` | 0.718 | 0.512 | 0.101 |
+| `args-observed.js` | 2.469 | 2.008 | 0.114 |
+| `property-stable.js` | 3.527 | 1.628 | 0.076 |
+| `property-mutated.js` | 3.113 | 1.607 | 0.067 |
+| `metadata-ordinary.js` | 2.476 | 1.508 | 0.020 |
+| `metadata-function.js` | 4.688 | 4.014 | 0.207 |
+| `metadata-intrinsic.js` | 4.322 | 3.510 | 0.232 |
+| `typeof-dispatch.js` | 0.976 | 0.370 | 0.025 |
+| `singleton-dispatch.js` | 0.888 | 0.351 | 0.013 |
+| `for-in-wide.js` | 2.066 | 1.998 | 0.069 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs three checked
 warmups and seven measured calls. Four inputs rotate identically in every actor;
-every call checks an independently computed integer checksum. Bars show current
-configurations; whiskers span the eight process medians. Block medians and
-process summaries remain in the [data](situations-current.json).
+every call checks an independent integer checksum. Bars show current configurations;
+whiskers span process medians. Block medians and process summaries remain in the
+[data](situations-current.json).
 
-Scriptw uses Wasmtime 47: **Fast = None / SinglePass**, **Speed = Speed /
-Backtracking**, generic target, 16-MiB copying GC, one CPU, 4-GiB cap and no swap.
-JavaScript/Wasm/native compilation, module initialization and `prepare(input)`
-precede the public `run()` clock. Every Wasmtime consumer has its compiler disabled.
-Node uses the same source bytes in `vm.SourceTextModule`, with normal JIT and
-natural GC; three warmups do not establish optimized steady state. Timings include
-each runtime's public-call bridge and `print` conversion/capture; output draining
-and validation follow timing. The empty control is shown without subtraction.
-Excluded setup can influence timed GC, feedback and JIT invalidation.
-
-The balanced RSC control compares the frozen prior compiler and current
-candidate in both blocks. Additional allocator diagnostics stay separate from
-the V8/Fast/Speed chart cohort. Older and current situation cohorts are separate
-runs; their process ranges and compiler identities must be retained when
-assessing small differences.
+**Fast = None / SinglePass**, **Speed = Speed / Backtracking**. Both use Wasmtime
+47, a generic target, one CPU, 16-MiB copying GC, a 4-GiB cap and no swap.
+The labels select P compilation; shared R uses its recorded precompiled image.
+Compilation, initialization and `prepare(input)` precede the public `run()` clock.
+Wasmtime consumers have their compiler disabled. Node uses the same source in
+`vm.SourceTextModule`, with normal JIT and natural GC; three warmups do not prove
+optimized steady state. Timings include the public bridge and print conversion;
+output draining and validation follow timing. Setup can influence timed GC/JIT.
+The empty control is shown without subtraction.
 
 ### Global lookup
 
-The four programs read six constructor values across 1,024 passes. Deep lookup
-retains eight nested padding captures; the bound control captures constructor
-references beside the worker. Proven unbound references in eligible ordinary
-Module functions now start at the defining Realm's Global Environment Record,
-retaining live lexicals, mutable properties and getters.
+Six constructor values are read over 1,024 passes. Deep lookup retains eight
+padding captures; bound aliases sit beside the worker. Shallow/deep also differ
+in padding arithmetic, and V8 may hoist aliases or global reads. Getter controls
+include calls and counter increments. These differences are not isolated lookup costs.
 
-![Global lookup situations](assets/situations-current/global-lookup.svg)
-
-Shallow/deep also differ in padding reads and arithmetic; their difference is not
-pure lexical-depth cost. Bound aliases may fold and V8 may hoist global reads.
-The V8 bound control varies with JIT history; retain process ranges and both
-block medians rather than treating one ratio as stable. The getter score includes
-getter calls and counter increments. Source counts are not executed lookup counts.
+![Global lookup](assets/situations-current/global-lookup.svg)
 
 ### Control-flow and call-site scaling
 
-All four programs make **8,192** entries into a function with one, 32, 128 or 512
-selected call sites, exercising every site with identical checksums. Eligible
-dense integer switches use guarded Wasm `br_table` dispatch. Fast ranges from
-**10.503 to 19.351 ms**;
-Speed from **6.220 to 6.570 ms**.
+All programs make 8,192 entries and exercise every selected site with matching
+checksums. Compact dispatch uses one polymorphic site and a dynamic key; switch
+arms use constant keys and separate sites. This does not isolate stack-probe cost.
+The 512-site native P image is **6.06 MiB Fast /
+2.38 MiB Speed**;
+portable P is **0.80 MiB**.
+Native serialized sizes include metadata and data.
 
-![Control-flow and call-site scaling](assets/situations-current/frame-size.svg)
+![Call-site scaling](assets/situations-current/frame-size.svg)
 
 ![Native program image growth](assets/situations-current/frame-native-image.svg)
 
-The 512-site native P image is **6.67 MiB Fast /
-2.52 MiB Speed**; portable P is
-**0.84 MiB**. Serialized native images include
-metadata and data. Compact dispatch uses a dynamic key and one polymorphic site;
-switch arms use constant keys and separate sites. This does not isolate stack
-frame growth or stack-probe cost. Eligible call sites now use local argument transport and guarded direct calls.
-Compact polymorphic dispatch still requires runtime selection.
-
 ### Arguments observation
 
-Both programs make 1,024 strict ordinary calls with captured state, reassign a
-formal parameter and compute the same result. The observed program also reads
-the original `arguments[0]` and `arguments.length`. Eligible strict functions
-omit unobservable arguments objects; Module planning removes unused synthetic
-cells before capture hops finalize. Real captures and observers retain storage.
-The observed case also loses unused `this`/`new.target` cells, so it is not an
-untouched control for that change. Its arguments object remains observable.
-The extra observation is timed work; the difference is not an allocation count.
+Both programs make 1,024 strict calls, reassign a formal and compute the same
+result. The observed case additionally reads the original arguments and length.
+The difference includes that timed work and is not an allocation count.
 
-![Arguments observation situations](assets/situations-current/arguments-observation.svg)
+![Arguments observation](assets/situations-current/arguments-observation.svg)
 
 ### Property mutation history
 
-Both programs perform 8,192 variable-key reads over 64 records. Mutation setup
-adds an accessor, deletes properties and restores the values before timing.
-Current guarded Number array hits and computed-String own-data hits bypass
-object/key conversion and generic lookup. Misses preserve full conversion,
-accessors, prototype traversal and proxy dispatch. Each read still inspects live
-storage; no new heap or property cache is introduced. These timings combine
-indexing, key production and record reads and do not isolate one operation's
-cost or allocation count.
+Both programs make 8,192 variable-key reads over 64 records. Untimed mutation
+adds an accessor, deletes properties and restores values. Reads retain live
+storage guards and complete conversion/accessor/prototype/Proxy fallback.
+Indexing, key production and record reads all contribute to the score.
 
-![Property mutation history situations](assets/situations-current/property-mutation-history.svg)
+![Property mutation history](assets/situations-current/property-mutation-history.svg)
 
 ### Function property reads
 
-Three programs read own `length`, own `name` and the name string's `length`
-over 8,192 passes and eight prepared targets. Ordinary records, JavaScript
-functions and native constructors expose identical values and checksums, with
-24,576 metadata reads per call; row-array indexing is also timed. Target
-construction precedes timing. This makes
-function/intrinsic descriptor transport visible beside an ordinary control;
-object-kind dispatch, string reads and V8 feedback remain part of each score.
+Each program reads own length, own name and the name string's length over 8,192
+passes and eight targets. Ordinary records, JavaScript functions and native
+constructors have matching values/checksums. Array indexing, object-kind dispatch,
+string reads and V8 feedback remain part of these scores.
 
-![Function property read situations](assets/situations-current/function-properties.svg)
+![Function property reads](assets/situations-current/function-properties.svg)
 
-An unscored layout control keeps eight distinct objects but creates them through
-one factory site. Its timed body differs only at four captured-binding slot
-constants: the same 8,428 bytes, 157 locals, 3,787 operators and three cached-read
-fallback sites. Fast takes **4.574 / 3.665 ms** for eight literal sites / one factory;
-Speed takes **2.827 / 1.667 ms**, while V8 stays near **0.020 ms**. This supports
-sharing equivalent immutable birth layouts as the next source experiment.
-Dynamic miss counts, native-body and GC-state equivalence remain unmeasured;
-no RSC gain follows from this control. Preparation differs, and these scores are
-separate from the chart cohort; receipts and encoded-body comparison are in the
-[report](situations-current.json) and evidence archive.
+### Type classification
+
+The typeof program performs 18,432 literal comparisons across 4,096 mixed-value
+passes. The strict singleton program performs 16,384 null/undefined comparisons.
+Inputs cover primitive and object values, bound functions and revoked callable
+Proxies. Array access, branches and loop arithmetic remain timed. All earlier
+program sources and checksums are unchanged. Independent semantic controls also
+cover operand Throws/TDZ and HTMLDDA, outside these timed programs.
+
+![Type classification](assets/situations-current/type-tests.svg)
+
+### Enumeration
+
+Sixteen for-in loops visit all 64 own enumerable properties of a prepared ordinary
+record, checking 1,024 yielded keys and numeric value reads. Inherited nonenumerable
+processing is included. Immutable visited-key snapshots are copied without
+reboxing; prefix reference copying and membership comparisons remain quadratic.
+Mutation, Proxy and suspension controls run separately as semantic regressions.
+
+![For-in enumeration](assets/situations-current/enumeration.svg)
 
 ### Public-call control and verification
 
-![Retained public-call control](assets/situations-current/control.svg)
+![Public-call control](assets/situations-current/control.svg)
 
-[Generate/run selected programs](../../CONTRIBUTING.md#focused-performance-situations)
-with `--case <file.js>`; choose `--policies fast` or `speed`.
-Scriptc has no matched retained-Module consumer here. These programs expose
-separate hills, not each mechanism's share of RSC time.
+All **456** situation processes and **4,560** calls passed exact checks.
+The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
+Fresh scoped verification passes **1,753 Engine**, **54 emission**,
+**637 structural** and **380 source-guard** checks. The **769 IR** cases
+reuse their original passing binary/receipts with unchanged IR/front-end inputs.
+AOT units pass **653** cases; four known bootstrap assertions remain failures.
+Full workspace CI and pinned Test262 were not rerun. Eleven unchanged workspace
+formatting failures and fourteen stale Intl recipes remain [owned](current-inventory.md).
 
-All **384** situation processes and **3,840** calls passed exact-output checks.
-The balanced RSC campaign adds 24 processes, including a frozen prior-build
-control; chart bars contain only the latest compiler and V8. Encoded-Wasm checks enforce
-the private descriptor signature and call boundary. Semantic controls cover
-recursive traps, descriptor snapshots across conversion effects, callable,
-integer-indexed, string and arguments storage, fresh public descriptor objects
-and the executing operation's Realm.
-
-Full workspace CI and pinned Test262 were not rerun. Detailed native/source
-verification receipts and the four reproduced pre-existing AOT bootstrap failures
-remain in the evidence. Workspace formatting fails on 12 unchanged files;
-14 stale Intl identity recipes remain [owned](current-inventory.md).
-
-[Report, identities and process summaries](situations-current.json) ·
-[Checksummed UTF-8 evidence](situations-evidence-2026-11-04.tar.xz).
+[Generate/run a hill](../../CONTRIBUTING.md#focused-performance-situations) with
+`--case <file.js>` and optional `--policies fast` or `speed`. Scriptc has no matched
+retained-Module consumer here. These scores are separate from RSC and the older
+fresh-entry kernels; they do not partition each mechanism's share of RSC cost.
 
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison

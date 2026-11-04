@@ -14,17 +14,21 @@ the shared callable owner. The HTMLDDA observation runs last and selects
 `"undefined"`, including when that value is otherwise callable. No public
 property lookup or inferred source kind substitutes for these runtime facts.
 
-The focused source guards retain one operand evaluation, exact primitive
-spellings and object default, whole-value callability, and HTMLDDA precedence.
-The contract now follows the runtime owner that replaced the earlier static
-`ValueKind` match; it does not require that retired optimization to return.
+Literal equality tests over resolved `ExprIr::TypeOf` use the same runtime
+facts directly. The operand still evaluates once before the tag, callability or
+HTMLDDA test, including for an impossible spelling. Both operand orders and
+strict/loose equality share the predicate; their callers retain Boolean
+completion publication and inequality inversion. Neither the type-result String
+nor the compared literal needs materialization. Dynamic comparison operands and
+unresolved-identifier `typeof` retain their reference and coercion paths.
+
+The external emission test checks actual source and spec-operation routes,
+encoded helper calls and fallback controls. Engine fixtures exercise all eight
+spellings, invalid spellings, TDZ, operand Throws, coercion, revoked callable and
+non-callable Proxies, and concrete HTMLDDA versus bound/proxy wrappers.
 
 ```sh
+cargo test -p scriptw-aot-wasm --test emission -- typeof_comparisons::
+cargo test -p scriptw-engine --test aot_language -- aot_typeof_comparisons::
 cargo test -p scriptw-aot-wasm --test structure_language -- typeof_static_kind_structure::
-cargo test -p scriptw-engine tests::wasm_backend_supports_typeof_core -- --exact --test-threads=1
-cargo test -p scriptw-engine --test aot_realm_modules -- aot_runtime_import_reachability::
 ```
-
-The earlier static-domain target passed `3/3`, and the exact core `typeof`
-engine witness passed `1/1`. Those are predecessor results, not verification of
-the current guard updates. Their joined checkpoint remains pending.
