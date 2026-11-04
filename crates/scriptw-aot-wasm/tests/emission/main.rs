@@ -33,6 +33,7 @@ mod product_artifact;
 mod program_utf16_sharing;
 mod proper_tail_call_emission;
 mod property_read_plans;
+mod scalar_masked_rows;
 mod singleton_comparisons;
 mod string_match_call_emission;
 mod throw_guard_dedup;

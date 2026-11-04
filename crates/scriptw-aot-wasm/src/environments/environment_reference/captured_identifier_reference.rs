@@ -21,7 +21,7 @@ struct IdentifierReferenceCaptureSlot {
 impl FunctionBuilder<'_> {
     /// Authenticate the finalized identity, then reuse the active storage's
     /// lexical hop adjustment. No value or initialization fact is inferred.
-    fn module_cell_storage(
+    pub(crate) fn module_cell_storage(
         &self,
         proof: &scriptw_ir::ProvenBindingCellIr,
         source_name: &str,

@@ -9,9 +9,66 @@ pub(super) enum ArrayRead {
 
 /// Construction fixes the sole receiver, induction binding and loop shape.
 pub(super) struct ArrayReadLoop {
-    array: LocalBindingId,
+    array: ArrayReceiver,
     counter: LocalBindingId,
+    iteration: ArrayIteration,
+    row_alias: Option<LocalBindingId>,
     paths: ReadPaths,
+}
+
+#[derive(PartialEq, Eq)]
+enum ArrayReceiver {
+    Local(LocalBindingId),
+    Cell(scriptw_ir::ProvenBindingCellIr),
+}
+
+impl ArrayReceiver {
+    fn of(builder: &FunctionBuilder<'_>, value: &TypedExpr) -> Option<Self> {
+        if let Some(local) = private_local(builder, value) {
+            return Some(Self::Local(local));
+        }
+        let ExprIr::EnvironmentIdentifier(identifier) = &value.expr else {
+            return None;
+        };
+        if !matches!(
+            identifier.operation,
+            scriptw_ir::EnvironmentIdentifierOperationIr::Read
+        ) {
+            return None;
+        }
+        let scriptw_ir::EnvironmentIdentifierResolutionStart::Cell(proof) =
+            identifier.resolution_start()
+        else {
+            return None;
+        };
+        if !matches!(
+            proof.origin(),
+            scriptw_ir::ProvenBindingCellOrigin::Captured { .. }
+        ) {
+            return None;
+        }
+        builder.module_cell_storage(&proof, &identifier.name).ok()?;
+        Some(Self::Cell(proof))
+    }
+
+    fn is_local(&self, id: LocalBindingId) -> bool {
+        matches!(self, Self::Local(local) if *local == id)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ArrayIteration {
+    Length,
+    Masked { limit: u32, mask: u32 },
+}
+
+impl ArrayIteration {
+    fn mask(self) -> Option<u32> {
+        match self {
+            Self::Length => None,
+            Self::Masked { mask, .. } => Some(mask),
+        }
+    }
 }
 
 enum ReadPaths {
@@ -78,7 +135,11 @@ impl<'a> PropertyReadView<'a> {
                 };
                 let key = match &key.expr {
                     ExprIr::String(key) => ReadKey::StaticString(key),
-                    ExprIr::Identifier(_) => ReadKey::Computed(key),
+                    ExprIr::Identifier(_)
+                    | ExprIr::BitwiseNumeric {
+                        op: BitwiseBinaryOp::And,
+                        ..
+                    } => ReadKey::Computed(key),
                     _ => return None,
                 };
                 (target, key)
@@ -91,6 +152,17 @@ impl<'a> PropertyReadView<'a> {
 
 impl ArrayReadLoop {
     pub(super) fn new(
+        builder: &FunctionBuilder<'_>,
+        init: Option<&ForInitIr>,
+        test: &TypedExpr,
+        update: Option<&TypedExpr>,
+        body: &StatementIr,
+    ) -> Option<Self> {
+        Self::length_bound(builder, test, update)
+            .or_else(|| Self::masked_rows(builder, init, test, update, body))
+    }
+
+    fn length_bound(
         builder: &FunctionBuilder<'_>,
         test: &TypedExpr,
         update: Option<&TypedExpr>,
@@ -130,14 +202,159 @@ impl ArrayReadLoop {
             return None;
         }
         Some(Self {
+            array: ArrayReceiver::Local(array),
+            counter,
+            iteration: ArrayIteration::Length,
+            row_alias: None,
+            paths: ReadPaths::LengthOnly,
+        })
+    }
+
+    /// A positive literal trip keeps every induction value in the exact
+    /// Number/ToInt32 overlap. The mask need not be a power of two: every
+    /// resulting slot is bounded by the mask, checked against real length.
+    /// The declaration must be first so speculative row preparation never
+    /// moves a source write ahead of a possibly throwing row read.
+    fn masked_rows(
+        builder: &FunctionBuilder<'_>,
+        init: Option<&ForInitIr>,
+        test: &TypedExpr,
+        update: Option<&TypedExpr>,
+        body: &StatementIr,
+    ) -> Option<Self> {
+        let (lhs, rhs) = match &test.expr {
+            ExprIr::CompareNumber {
+                op: RelationalBinaryOp::LessThan,
+                lhs,
+                rhs,
+            }
+            | ExprIr::CompareValue {
+                op: RelationalBinaryOp::LessThan,
+                lhs,
+                rhs,
+            } => (lhs, rhs),
+            _ => return None,
+        };
+        let counter = private_local(builder, lhs)?;
+        let ExprIr::Number(limit) = rhs.expr else {
+            return None;
+        };
+        let limit = super::chunked::bounded_counter_literal(limit)?;
+        if limit == 0 || limit > 1 << 20 {
+            return None;
+        }
+        let ForInitIr::Var(initial) = init? else {
+            return None;
+        };
+        let [initial] = initial.as_slice() else {
+            return None;
+        };
+        if builder.private_local_binding(&initial.name) != Some(counter) {
+            return None;
+        }
+        let ExprIr::Number(first) = initial.init.as_ref()?.expr else {
+            return None;
+        };
+        if super::chunked::bounded_counter_literal(first)? >= limit {
+            return None;
+        }
+        let ExprIr::UpdateIdentifier {
+            name,
+            op: NumericUpdateOp::Increment,
+            value_kind,
+            ..
+        } = &update?.expr
+        else {
+            return None;
+        };
+        if matches!(value_kind, NumericUpdateValueKind::BigInt)
+            || builder.private_local_binding(name) != Some(counter)
+        {
+            return None;
+        }
+        let StatementIr::Block(body) = body else {
+            return None;
+        };
+        if body.lexical_environment.is_some() {
+            return None;
+        }
+        let StatementIr::Var(declarations) = body.statements.first()? else {
+            return None;
+        };
+        let [row] = declarations.as_slice() else {
+            return None;
+        };
+        let row_alias = builder.private_local_binding(&row.name)?;
+        if row_alias == counter
+            || builder
+                .local_binding(row_alias)
+                .initialization_check()
+                .is_some()
+        {
+            return None;
+        }
+        let read = PropertyReadView::of(row.init.as_ref()?)?;
+        let array = ArrayReceiver::of(builder, read.target)?;
+        if array.is_local(counter) || array.is_local(row_alias) {
+            return None;
+        }
+        let ReadKey::Computed(index) = read.key else {
+            return None;
+        };
+        let ExprIr::BitwiseNumeric {
+            op: BitwiseBinaryOp::And,
+            lhs,
+            rhs,
+        } = &index.expr
+        else {
+            return None;
+        };
+        if private_local(builder, lhs) != Some(counter) {
+            return None;
+        }
+        let ExprIr::Number(mask) = rhs.expr else {
+            return None;
+        };
+        let mask = super::chunked::bounded_counter_literal(mask)?;
+        if mask >= 1 << 20 {
+            return None;
+        }
+        Some(Self {
             array,
             counter,
+            iteration: ArrayIteration::Masked { limit, mask },
+            row_alias: Some(row_alias),
             paths: ReadPaths::LengthOnly,
         })
     }
 
     pub(super) fn is_array(&self, id: LocalBindingId) -> bool {
-        self.array == id
+        self.array.is_local(id) || self.row_alias == Some(id)
+    }
+
+    pub(super) fn row_alias(&self) -> Option<LocalBindingId> {
+        self.row_alias
+    }
+
+    pub(super) fn accept_row_declaration(
+        &self,
+        builder: &FunctionBuilder<'_>,
+        declarations: &[scriptw_ir::VarDeclaratorIr],
+    ) -> Option<()> {
+        let alias = self.row_alias?;
+        let [row] = declarations else {
+            return None;
+        };
+        if builder.private_local_binding(&row.name) != Some(alias) {
+            return None;
+        }
+        let read = PropertyReadView::of(row.init.as_ref()?)?;
+        if ArrayReceiver::of(builder, read.target).as_ref() != Some(&self.array)
+            || !self.is_counter_key(builder, read.key)
+        {
+            return None;
+        }
+        Some(())
     }
 
     pub(super) fn counter(&self, bindings: &[NumberBinding]) -> Option<usize> {
@@ -154,7 +371,21 @@ impl ArrayReadLoop {
         let ReadKey::Computed(index) = key else {
             return false;
         };
-        private_local(builder, index) == Some(self.counter)
+        match self.iteration {
+            ArrayIteration::Length => private_local(builder, index) == Some(self.counter),
+            ArrayIteration::Masked { mask, .. } => {
+                let ExprIr::BitwiseNumeric {
+                    op: BitwiseBinaryOp::And,
+                    lhs,
+                    rhs,
+                } = &index.expr
+                else {
+                    return false;
+                };
+                private_local(builder, lhs) == Some(self.counter)
+                    && matches!(rhs.expr, ExprIr::Number(bits) if f64::from_bits(bits) == f64::from(mask))
+            }
+        }
     }
 
     pub(super) fn read(
@@ -162,7 +393,10 @@ impl ArrayReadLoop {
         builder: &FunctionBuilder<'_>,
         read: PropertyReadView<'_>,
     ) -> Option<(ArrayRead, Option<LocalBindingId>)> {
-        if private_local(builder, read.target) == Some(self.array) {
+        if ArrayReceiver::of(builder, read.target).as_ref() == Some(&self.array) {
+            if self.row_alias.is_some() {
+                return None;
+            }
             if read.key.is_length() {
                 return Some((ArrayRead::Length, None));
             }
@@ -173,12 +407,21 @@ impl ArrayReadLoop {
             return Some((ArrayRead::Element, None));
         }
         let (path, row) = CompactReadPath::new(builder, read)?;
-        let row = PropertyReadView::of(row)?;
-        if private_local(builder, row.target) != Some(self.array)
-            || !self.is_counter_key(builder, row.key)
-            || path
-                .input()
-                .is_some_and(|id| id == self.array || id == self.counter)
+        if let Some(alias) = self.row_alias {
+            if private_local(builder, row) != Some(alias) {
+                return None;
+            }
+        } else {
+            let row = PropertyReadView::of(row)?;
+            if ArrayReceiver::of(builder, row.target).as_ref() != Some(&self.array)
+                || !self.is_counter_key(builder, row.key)
+            {
+                return None;
+            }
+        }
+        if path
+            .input()
+            .is_some_and(|id| self.is_array(id) || id == self.counter)
         {
             return None;
         }
@@ -205,6 +448,9 @@ impl ArrayReadLoop {
         bindings: &[NumberBinding],
         body: &[NumberExpression],
     ) -> bool {
+        if self.row_alias.is_some() && !self.is_compact() {
+            return false;
+        }
         let Some(counter) = self.counter(bindings) else {
             return false;
         };
@@ -237,6 +483,7 @@ pub(super) struct ArrayReadBorrow<'a> {
     length: I64Local,
     length_number: F64Local,
     slot: I32Local,
+    mask: Option<u32>,
 }
 
 enum ReadBacking<'a> {
@@ -281,38 +528,72 @@ impl<'a> ArrayReadBorrow<'a> {
                 ReadPaths::LengthOnly | ReadPaths::Numbers => {
                     ReadBacking::Numbers(s.reserve_gc_local(function).initialize_null(s, function))
                 }
-                ReadPaths::Compact(paths) => {
-                    ReadBacking::Compact(CompactPathBorrow::new(paths, builder, function))
-                }
+                ReadPaths::Compact(paths) => ReadBacking::Compact(CompactPathBorrow::new(
+                    paths,
+                    plan.row_alias,
+                    builder,
+                    function,
+                )),
             },
             length: s.reserve_i64_local(function),
             length_number: s.reserve_f64_local(function),
             slot: s.reserve_i32_local(function),
+            mask: plan.iteration.mask(),
         };
         borrow.length.set_constant(0, function);
         accepted.load(function);
         builder.open_frame(ControlFrameKind::If, function);
         accepted.set_constant(0, function);
         let decline = builder.open_frame(ControlFrameKind::Block, function);
-        let source = builder.local_binding(plan.array);
-        if let Some(initialized) = source.initialization_check() {
-            initialized.load(function);
+        // A literal-trip loop does not evaluate its array expression when the
+        // test is false. Decline before even inspecting a captured TDZ cell.
+        if let ArrayIteration::Masked { limit, .. } = plan.iteration {
+            builder
+                .local_binding(plan.counter)
+                .value()
+                .scalar()
+                .load(function);
+            function.instruction(&Instruction::F64ReinterpretI64);
+            function.instruction(&Instruction::F64Const(Ieee64::from(f64::from(limit))));
+            function.instruction(&Instruction::F64Lt);
             function.instruction(&Instruction::I32Eqz);
             builder.emit_branch_if_to_target(decline, function);
         }
-        builder
-            .local_binding(plan.array)
-            .value()
-            .tag()
-            .load(function);
+        let source = s.reserve_value_local(function);
+        source.set_undefined(function);
+        match &plan.array {
+            ArrayReceiver::Local(id) => {
+                let local = builder.local_binding(*id);
+                if let Some(initialized) = local.initialization_check() {
+                    initialized.load(function);
+                    function.instruction(&Instruction::I32Eqz);
+                    builder.emit_branch_if_to_target(decline, function);
+                }
+                source.copy_from(local.value(), function);
+            }
+            ArrayReceiver::Cell(proof) => {
+                let BindingStorage::EnvSlot { slot, hops } = builder
+                    .module_cell_storage(proof, proof.source_name())
+                    .expect("the sealed array receiver authenticates this captured cell")
+                else {
+                    unreachable!("proven captured array receiver uses a cell");
+                };
+                let environment = builder.resolve_env_handle_local(hops, function);
+                let cell = builder.emit_environment_cell_local(&environment, slot, function);
+                let initialized = builder.emit_read_environment_cell(&cell, &source, function);
+                initialized.load(function);
+                s.release_i32_local(initialized, function);
+                cell.clear(function);
+                environment.clear(function);
+                function.instruction(&Instruction::I32Eqz);
+                builder.emit_branch_if_to_target(decline, function);
+            }
+        }
+        source.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Array.tag()));
         function.instruction(&Instruction::I32Ne);
         builder.emit_branch_if_to_target(decline, function);
-        builder
-            .local_binding(plan.array)
-            .value()
-            .reference()
-            .load(function);
+        source.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
                 .heap_type,
@@ -320,11 +601,7 @@ impl<'a> ArrayReadBorrow<'a> {
         function.instruction(&Instruction::I32Eqz);
         builder.emit_branch_if_to_target(decline, function);
         borrow.array.replace(
-            builder
-                .local_binding(plan.array)
-                .value()
-                .cast_reference::<ArrayObject>(s, function)
-                .nullable(),
+            source.cast_reference::<ArrayObject>(s, function).nullable(),
             function,
         );
         s.field(ArrayObjectSchema::MODE)
@@ -367,6 +644,15 @@ impl<'a> ArrayReadBorrow<'a> {
         borrow.length.load(function);
         function.instruction(&Instruction::I64LtU);
         builder.emit_branch_if_to_target(decline, function);
+        if let ArrayIteration::Masked { limit, mask } = plan.iteration {
+            borrow.length.load(function);
+            function.instruction(&Instruction::I64Const(i64::from(mask)));
+            function.instruction(&Instruction::I64LeU);
+            builder.emit_branch_if_to_target(decline, function);
+            // The original trip limit and the masked backing extent are
+            // distinct. Capacity/density above use the actual array length.
+            borrow.length.set_constant(i64::from(limit), function);
+        }
         let counter = builder.local_binding(plan.counter).value().scalar();
         // The enclosing scalar guard established this initialized Number.
         // Keep binary64 storage so an untouched negative zero stays negative.
@@ -405,6 +691,7 @@ impl<'a> ArrayReadBorrow<'a> {
         accepted.set_constant(1, function);
         builder.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
+        source.clear(function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         accepted.load(function);
@@ -434,7 +721,18 @@ impl<'a> ArrayReadBorrow<'a> {
         let ReadBacking::Compact(rows) = &self.backing else {
             return None;
         };
-        Some(rows.prepare_loop(self.slot, self.length, done, builder, function))
+        Some(rows.prepare_loop(self.slot, self.length, self.mask, done, builder, function))
+    }
+
+    pub(super) fn publish_row_alias(
+        &self,
+        iterated: I32Local,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
+        if let (ReadBacking::Compact(rows), Some(mask)) = (&self.backing, self.mask) {
+            rows.publish_row_alias(iterated, self.slot, mask, builder, function);
+        }
     }
 
     pub(super) fn emit_compact_path(&self, path: CompactPathId, function: &mut Function) {

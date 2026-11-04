@@ -54,6 +54,7 @@ impl CompactPathId {
 #[derive(PartialEq, Eq)]
 pub(super) enum CompactReadPath {
     Number(CachedReadName),
+    StringLength(CachedReadName),
     ArrayNumber(CachedReadName, LocalBindingId),
 }
 
@@ -62,6 +63,19 @@ impl CompactReadPath {
         builder: &FunctionBuilder<'_>,
         read: PropertyReadView<'a>,
     ) -> Option<(Self, &'a TypedExpr)> {
+        if matches!(
+            read.key,
+            dense_array::ReadKey::Length | dense_array::ReadKey::StaticString("length")
+        ) {
+            if let Some(inner) = PropertyReadView::of(read.target) {
+                if let dense_array::ReadKey::StaticString(name) = inner.key {
+                    return Some((
+                        Self::StringLength(CachedReadName::new(builder, name)?),
+                        inner.target,
+                    ));
+                }
+            }
+        }
         if let dense_array::ReadKey::StaticString(name) = read.key {
             return Some((
                 Self::Number(CachedReadName::new(builder, name)?),
@@ -85,27 +99,29 @@ impl CompactReadPath {
 
     pub(super) fn input(&self) -> Option<LocalBindingId> {
         match self {
-            Self::Number(_) => None,
+            Self::Number(_) | Self::StringLength(_) => None,
             Self::ArrayNumber(_, index) => Some(*index),
         }
     }
 
     fn name(&self) -> &CachedReadName {
         match self {
-            Self::Number(name) | Self::ArrayNumber(name, _) => name,
+            Self::Number(name) | Self::StringLength(name) | Self::ArrayNumber(name, _) => name,
         }
     }
 
     fn tag(&self) -> WasmRuntimeValueTag {
         match self {
             Self::Number(_) => WasmRuntimeValueTag::Number,
+            Self::StringLength(_) => WasmRuntimeValueTag::String,
             Self::ArrayNumber(_, _) => WasmRuntimeValueTag::Array,
         }
     }
 }
 
-/// The canonical table/shape plus checked slot and column metadata suffice.
-/// No projected values, retained rows or alternative storage are allocated.
+/// Borrow the canonical table/shape and checked slot/column metadata. The
+/// optional source alias is published from this same table at the completed
+/// prefix exit; no projected objects or extra retained-row roots are needed.
 pub(super) struct CompactPathBorrow<'a> {
     paths: &'a [CompactReadPath],
     values: GcLocal<PackedValueTable, Nullable>,
@@ -113,17 +129,20 @@ pub(super) struct CompactPathBorrow<'a> {
     slots: Vec<I32Local>,
     columns: Vec<Option<I32Local>>,
     numbers: Vec<F64Local>,
+    row_alias: Option<LocalBindingId>,
 }
 
 impl<'a> CompactPathBorrow<'a> {
     pub(super) fn new(
         paths: &'a [CompactReadPath],
+        row_alias: Option<LocalBindingId>,
         builder: &FunctionBuilder<'_>,
         function: &mut Function,
     ) -> Self {
         let s = builder.runtime_schema();
         Self {
             paths,
+            row_alias,
             values: s.reserve_gc_local(function).initialize_null(s, function),
             shape: s.reserve_gc_local(function).initialize_null(s, function),
             slots: paths
@@ -212,6 +231,7 @@ impl<'a> CompactPathBorrow<'a> {
         &self,
         slot: I32Local,
         length: I64Local,
+        mask: Option<u32>,
         done: ControlTarget,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
@@ -220,6 +240,7 @@ impl<'a> CompactPathBorrow<'a> {
             rows: self,
             slot,
             length,
+            mask,
             done,
         };
         prepared.guard_bound(builder, function);
@@ -297,52 +318,82 @@ impl<'a> CompactPathBorrow<'a> {
             function.instruction(&Instruction::I32Const(path.tag().tag()));
             function.instruction(&Instruction::I32Ne);
             builder.emit_branch_if_to_target(declined, function);
-            if let Some(column) = column {
+            if matches!(path, CompactReadPath::StringLength(_)) {
                 scratch.value.reference().load(function);
                 function.instruction(&Instruction::RefTestNonNull(
-                    s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                    s.reference_type::<StringValue>(crate::gc_types::GcNullability::NonNullable)
                         .heap_type,
                 ));
                 function.instruction(&Instruction::I32Eqz);
                 builder.emit_branch_if_to_target(declined, function);
-                scratch.cast_array(builder, function);
-                s.field(ArrayObjectSchema::MODE)
-                    .read(&scratch.array, s, function);
-                function.instruction(&Instruction::I32Const(
-                    ArrayIndexedStorageMode::PackedNumbers.encode(),
-                ));
-                function.instruction(&Instruction::I32Ne);
-                builder.emit_branch_if_to_target(declined, function);
-                s.field(ArrayObjectSchema::LENGTH)
-                    .read(&scratch.array, s, function)
-                    .store_i64(scratch.length, function);
-                scratch.length.load(function);
-                function.instruction(&Instruction::I64Const(1 << 20));
-                function.instruction(&Instruction::I64GtU);
-                builder.emit_branch_if_to_target(declined, function);
-                s.field(ArrayObjectSchema::COUNT)
-                    .read(&scratch.array, s, function);
-                scratch.length.load(function);
-                function.instruction(&Instruction::I64Ne);
-                builder.emit_branch_if_to_target(declined, function);
-                column.load(function);
-                function.instruction(&Instruction::I64ExtendI32U);
-                scratch.length.load(function);
-                function.instruction(&Instruction::I64GeU);
-                builder.emit_branch_if_to_target(declined, function);
-                scratch.load_numbers(builder, function);
-                s.array_type::<NumberBitsI64Array>()
-                    .length(&scratch.numbers, s, function);
-                function.instruction(&Instruction::I64ExtendI32U);
-                scratch.length.load(function);
-                function.instruction(&Instruction::I64LtU);
-                builder.emit_branch_if_to_target(declined, function);
-                s.array_type::<NumberBitsI64Array>()
-                    .read(&scratch.numbers, *column, s, function);
+                let string = s.reserve_gc_local(function).initialize(
+                    scratch.value.cast_reference::<StringValue>(s, function),
+                    function,
+                );
+                let units = s.reserve_gc_local(function).initialize(
+                    s.field(StringValueSchema::CODE_UNITS)
+                        .read(&string, s, function)
+                        .reference(),
+                    function,
+                );
+                s.array_type::<CodeUnitArray>().length(&units, s, function);
+                function.instruction(&Instruction::F64ConvertI32U);
+                units.clear(function);
+                string.clear(function);
             } else {
-                scratch.value.scalar().load(function);
+                if let Some(column) = column {
+                    scratch.value.reference().load(function);
+                    function.instruction(&Instruction::RefTestNonNull(
+                        s.reference_type::<ArrayObject>(
+                            crate::gc_types::GcNullability::NonNullable,
+                        )
+                        .heap_type,
+                    ));
+                    function.instruction(&Instruction::I32Eqz);
+                    builder.emit_branch_if_to_target(declined, function);
+                    scratch.cast_array(builder, function);
+                    s.field(ArrayObjectSchema::MODE)
+                        .read(&scratch.array, s, function);
+                    function.instruction(&Instruction::I32Const(
+                        ArrayIndexedStorageMode::PackedNumbers.encode(),
+                    ));
+                    function.instruction(&Instruction::I32Ne);
+                    builder.emit_branch_if_to_target(declined, function);
+                    s.field(ArrayObjectSchema::LENGTH)
+                        .read(&scratch.array, s, function)
+                        .store_i64(scratch.length, function);
+                    scratch.length.load(function);
+                    function.instruction(&Instruction::I64Const(1 << 20));
+                    function.instruction(&Instruction::I64GtU);
+                    builder.emit_branch_if_to_target(declined, function);
+                    s.field(ArrayObjectSchema::COUNT)
+                        .read(&scratch.array, s, function);
+                    scratch.length.load(function);
+                    function.instruction(&Instruction::I64Ne);
+                    builder.emit_branch_if_to_target(declined, function);
+                    column.load(function);
+                    function.instruction(&Instruction::I64ExtendI32U);
+                    scratch.length.load(function);
+                    function.instruction(&Instruction::I64GeU);
+                    builder.emit_branch_if_to_target(declined, function);
+                    scratch.load_numbers(builder, function);
+                    s.array_type::<NumberBitsI64Array>()
+                        .length(&scratch.numbers, s, function);
+                    function.instruction(&Instruction::I64ExtendI32U);
+                    scratch.length.load(function);
+                    function.instruction(&Instruction::I64LtU);
+                    builder.emit_branch_if_to_target(declined, function);
+                    s.array_type::<NumberBitsI64Array>().read(
+                        &scratch.numbers,
+                        *column,
+                        s,
+                        function,
+                    );
+                } else {
+                    scratch.value.scalar().load(function);
+                }
+                function.instruction(&Instruction::F64ReinterpretI64);
             }
-            function.instruction(&Instruction::F64ReinterpretI64);
             number.store(function);
         }
         accepted.set_constant(1, function);
@@ -353,6 +404,47 @@ impl<'a> CompactPathBorrow<'a> {
         }
         scratch.release(builder, function);
         accepted
+    }
+
+    pub(super) fn publish_row_alias(
+        &self,
+        iterated: I32Local,
+        next_slot: I32Local,
+        mask: u32,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
+        let Some(id) = self.row_alias else {
+            return;
+        };
+        let s = builder.runtime_schema();
+        iterated.load(function);
+        builder.open_frame(ControlFrameKind::If, function);
+        // The mirror advances only after a complete source body/update. No
+        // admitted operation or guard writes this table or reenters source.
+        // Even on a failed next-row guard, the previous slot is unchanged.
+        let last = s.reserve_i32_local(function);
+        next_slot.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Sub);
+        function.instruction(&Instruction::I32Const(mask as i32));
+        function.instruction(&Instruction::I32And);
+        last.store(function);
+        let stored = s.reserve_gc_local(function).initialize(
+            s.array_type::<PackedValueTable>()
+                .read(&self.values, last, s, function)
+                .reference()
+                .require_non_null(function),
+            function,
+        );
+        s.release_i32_local(last, function);
+        let binding = builder.local_binding(id);
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, binding.value(), s, function);
+        binding.mark_initialized(function);
+        stored.clear(function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
     }
 
     pub(super) fn emit_number(&self, path: CompactPathId, function: &mut Function) {
@@ -392,6 +484,7 @@ pub(super) struct PreparedCompactRows<'a, 'p> {
     rows: &'a CompactPathBorrow<'p>,
     slot: I32Local,
     length: I64Local,
+    mask: Option<u32>,
     done: ControlTarget,
 }
 
@@ -411,9 +504,20 @@ impl PreparedCompactRows<'_, '_> {
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
     ) {
-        let ready = self
-            .rows
-            .try_prepare_row(setup, self.slot, builder, function);
+        let masked = self.mask.map(|mask| {
+            let slot = builder.runtime_schema().reserve_i32_local(function);
+            self.slot.load(function);
+            function.instruction(&Instruction::I32Const(mask as i32));
+            function.instruction(&Instruction::I32And);
+            slot.store(function);
+            slot
+        });
+        let ready =
+            self.rows
+                .try_prepare_row(setup, masked.unwrap_or(self.slot), builder, function);
+        if let Some(slot) = masked {
+            builder.runtime_schema().release_i32_local(slot, function);
+        }
         ready.load(function);
         builder.runtime_schema().release_i32_local(ready, function);
         function.instruction(&Instruction::I32Eqz);

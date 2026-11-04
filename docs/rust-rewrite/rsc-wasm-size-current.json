@@ -3,21 +3,21 @@
   "date": "2026-11-04",
   "measurement": "static encoded-byte accounting for the measured candidate RSC raw P",
   "aggregate": {
-    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/fast-comparison-campaign/aggregate.json",
-    "sha256": "d3eeac03a8b65f008c4fb8e67f081e62df287479b7ee99d42478e1a12e05cef9",
-    "campaign_path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/fast-comparison-campaign/campaign.json",
-    "campaign_sha256": "4d6d0137ae4f22c4504181d9241f3f828dd456f4b95779920c3624a34b922774"
+    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/fast-comparison-campaign/aggregate.json",
+    "sha256": "f94dfa3674fa168e6362337e460543f0bd20d2ad0e291feb3ec0bf055776a696",
+    "campaign_path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/fast-comparison-campaign/campaign.json",
+    "campaign_sha256": "7c17dde229829e42be87325267f7259264f5d255f4f1db30236f6b4932bc8070"
   },
   "first_candidate_process": {
-    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-copy/fast-comparison-campaign/block-0-0-candidate/report.json",
-    "report_sha256": "eaacc140d0922f6b3f0ccaa9491bd0fd4e8977fb67b3d9fe44a30904a77bd896",
+    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/scalar-loop/fast-comparison-campaign/block-0-0-candidate/report.json",
+    "report_sha256": "eae7d7abde7975b487d3255291bd46aa971e0868026100ef4da86ca3b588ae73",
     "program_wasm_bytes": 4343634,
     "program_wasm_sha256": "7c1a3d31c9ad5928d847e96bb841087142374a3dd59ae9710874c64262580a3c"
   },
   "compiler": {
-    "source_commit": "5a81f390bc28e61f7d41ca11abc514fd8a203c97",
-    "source_fingerprint": "048fd75ef7729aef0a0f1378b2fe49d010420781a7191f8a71fb3901caf91749",
-    "executable_sha256": "74883fa6577bb95ca75432ae6f2d58f14a8aed75c83762ef1b4869e46d7e3dc0",
+    "source_commit": "3f65dc859a99d8a466a359a75d197352f3ac2f09",
+    "source_fingerprint": "5385a6345b8622028a25c18daecb817c8393c1df549d02ad91d0d4661a5ad184",
+    "executable_sha256": "94fb560154574007bb4c5b997e6d0f57f1236af80944b7b015b181149ca37759",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",

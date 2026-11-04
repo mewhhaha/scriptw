@@ -187,6 +187,21 @@ leaf storage scales with touched pages. Cache polymorphism, startup allocation
 and large-program timing effects require separate measurement. No cache
 default-policy or performance claim follows from this representation contract.
 
+## Closed numeric row loops
+
+The existing scalar Number-loop proof can borrow a dense canonical Array from a
+private local or authenticated captured Module cell. Masked row loops require a
+positive bounded literal trip, a nonnegative literal mask, and a first private
+`var` row declaration. The complete body must remain effect-free Number work;
+callbacks, row escapes, writes and uninspected declarations refuse admission.
+Own Number fields and primitive String UTF-16 length use live concrete-storage,
+shape, descriptor, type and extent guards. A failed row guard publishes only the
+completed numeric prefix before the original loop resumes. The final private
+row alias is reread from that same rooted immutable packed table; no admitted
+operation can mutate it or reenter JavaScript. Captured-cell TDZ, imported-cell
+authentication and generic accessor/Proxy/coercion behavior keep their existing
+owners. This adds no heap representation, helper or runtime ABI.
+
 ## Allocation accounting and evidence limits
 
 For a fresh admitted ordinary source literal before structural conversion,

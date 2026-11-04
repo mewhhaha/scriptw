@@ -19,12 +19,11 @@ accepts `--case <file.js>`.
   transport bound; exclusion alone does not establish their cost. Preserve
   callee identity, Realm, captures, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Extend the existing closed Number-loop proof for captured Module arrays,
-  masked indices with fixed trip counts, row aliases and String-length leaves.
-  The metadata workloads currently miss these admission gates. Preserve live
-  storage guards, completed-prefix publication and the original loop's fallback;
-  getters, coercion, writes and reentry must retain ordinary semantics.
-  Owner: AOT scalar Number-loop planning.
+- Reduce remaining function and intrinsic metadata costs after closed numeric
+  row-loop admission. Measure concrete current own-data descriptor coverage
+  before expanding storage borrowing or slot caching. Preserve live guards,
+  private alias publication and complete accessor/Proxy/coercion fallback.
+  Owner: AOT scalar Number-loop planning and object reads.
 - Measure scalar replacement of strict arguments index/length reads. A missing
   own index can expose the object through a prototype getter; short argument
   lists must retain real object semantics. Preserve original actual count and
@@ -42,11 +41,13 @@ accepts `--case <file.js>`.
   [sampled callers](react-attribution-current.json); preserve Proxy ordering,
   namespace TDZ, mapped arguments, typed arrays and execution Realm.
   Owner: AOT object operations.
-- Measure normal-result and Throw transport before changing the Value/Completion
-  ABI. Compare an isolated native-EH experiment with whole completion returns,
-  including Realm, activation and invocation cleanup, frequent Throws and GC.
-  The retained allocator census separates cross-block/edge homes from strictly
-  local capacity; it does not attribute their semantic origin or prove a global
+- Attribute cross-block/edge homes to actual result families before changing the
+  Value/Completion ABI. General Completion has five lanes, including kind and
+  target. Measure a typed Normal-or-Throw property-read result before narrowing
+  the source-call family; ordinary Return normalization, resumable outcomes and
+  proper tail-call signatures have distinct requirements. Compare native EH only
+  with Realm/activation/invocation cleanup and whole thrown values preserved.
+  The allocator census does not identify semantic origins or prove a global
   representation rewrite will win. Owner: AOT call/completion lowering.
 - Move embedding-only benchmark hosts to Engine examples so emitter iterations
   do not rebuild the Test262-linked CLI library. Reuse native producer/consumer

@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-04**, React **19.3.1**, compiler `048fd75ef772`
-(base `5a81f390b` plus the archived source patch).
+Measured **2026-11-04**, React **19.3.1**, compiler `5385a6345b86`
+(base `3f65dc859` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 6.003 | 6.661 |
-| Node 24.12.0 / V8 | 0.540 | 0.411 |
+| Scriptw | 5.779 | 6.184 |
+| Node 24.12.0 / V8 | 0.488 | 0.415 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -26,9 +26,9 @@ are medians of process medians. The frozen prior-build control stays in the
 receipts; chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
 
-Cold Scriptw setup is **3.253 s JavaScript → Wasm**,
-**6.113 s native preparation**, and
-**2.332 ms module initialization**.
+Cold Scriptw setup is **3.148 s JavaScript → Wasm**,
+**5.834 s native preparation**, and
+**2.329 ms module initialization**.
 Program Wasm is **4,343,634 B** (3,795,214 B code; 490,228 B data);
 shared runtime Wasm is **38,816,286 B**. All setup precedes request timing.
 Child peak RSS includes compilation and process history; it is not live guest heap.
@@ -41,7 +41,7 @@ The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
 engine/mode. Scriptw retires **50.62 million sync /
 54.54 million async user instructions per request**;
-Node retires **2.65 / 2.65 million**.
+Node retires **2.50 / 2.75 million**.
 Counters run without multiplexing. They count Scriptw's execution worker and
 Node's main thread, including Node barrier/Promise-return edges; background
 compilation/GC threads are excluded. These are unscored counts, not causal shares.
@@ -51,14 +51,18 @@ existing runtime. Strict arguments elision walks complete ordinary operands;
 eval, capture and resumable refusals remain. Literal typeof and strict
 null/undefined comparisons use runtime predicates while preserving operand work
 and Throws. Visited-key extension copies existing immutable snapshots and boxes only the new key.
+Closed numeric row loops can borrow authenticated captured arrays, use masked
+indices and read own Number fields and primitive String lengths. Complete live
+guards retain the original loop and completed-prefix fallback; no calls or
+allocations enter the admitted loop.
 Local argument entries retain their two-formal bound. Runtime value,
 environment, descriptor and call-transport costs remain; V8 parity is open.
 
-Fresh user-cycle sampling attributes **24.65% sync /
-24.27% async** to six property/enumeration helpers' disjoint
+Fresh user-cycle sampling attributes **24.51% sync /
+24.75% async** to six property/enumeration helpers' disjoint
 own samples. The `vn`/`ft` page-touch loops account for
-**2.23% /
-2.18%**. Each mode has one
+**2.22% /
+2.48%**. Each mode has one
 sampled process and 200 checked requests after three warmups. Frame-pointer
 chains can truncate; inclusive caller shares overlap. These observations do not
 partition wall time or predict a change's gain. The linked diagnostic retains
@@ -81,31 +85,31 @@ and full WHATWG conformance remain unsupported or unverified.
 
 ## Focused performance situations
 
-Measured **2026-11-04**: **19** standalone Module programs, compiler `048fd75ef772`,
+Measured **2026-11-04**: **19** standalone Module programs, compiler `5385a6345b86`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.009 | 0.001 |
-| `global-shallow.js` | 2.174 | 1.717 | 0.994 |
-| `global-deep8.js` | 2.732 | 1.926 | 0.975 |
-| `global-bound-deep.js` | 0.708 | 0.240 | 0.033 |
-| `global-getter-deep.js` | 3.018 | 2.192 | 0.983 |
-| `frame-compact.js` | 8.396 | 5.813 | 0.067 |
-| `frame-branches32.js` | 8.276 | 5.969 | 0.130 |
-| `frame-branches128.js` | 8.882 | 5.976 | 0.155 |
-| `frame-branches512.js` | 15.831 | 6.135 | 0.385 |
-| `args-unused.js` | 0.718 | 0.512 | 0.101 |
-| `args-observed.js` | 2.469 | 2.008 | 0.114 |
-| `property-stable.js` | 3.527 | 1.628 | 0.076 |
-| `property-mutated.js` | 3.113 | 1.607 | 0.067 |
-| `metadata-ordinary.js` | 2.476 | 1.508 | 0.020 |
-| `metadata-function.js` | 4.688 | 4.014 | 0.207 |
-| `metadata-intrinsic.js` | 4.322 | 3.510 | 0.232 |
-| `typeof-dispatch.js` | 0.976 | 0.370 | 0.025 |
-| `singleton-dispatch.js` | 0.888 | 0.351 | 0.013 |
-| `for-in-wide.js` | 2.066 | 1.998 | 0.069 |
+| `control-empty.js` | 0.010 | 0.010 | 0.001 |
+| `global-shallow.js` | 2.306 | 1.833 | 1.002 |
+| `global-deep8.js` | 2.866 | 2.082 | 0.999 |
+| `global-bound-deep.js` | 0.740 | 0.246 | 0.129 |
+| `global-getter-deep.js` | 3.145 | 2.272 | 0.989 |
+| `frame-compact.js` | 8.339 | 5.846 | 0.073 |
+| `frame-branches32.js` | 8.513 | 6.055 | 0.095 |
+| `frame-branches128.js` | 9.198 | 6.040 | 0.137 |
+| `frame-branches512.js` | 16.725 | 6.236 | 0.322 |
+| `args-unused.js` | 0.732 | 0.521 | 0.103 |
+| `args-observed.js` | 2.533 | 2.027 | 0.140 |
+| `property-stable.js` | 3.628 | 1.705 | 0.077 |
+| `property-mutated.js` | 3.144 | 1.614 | 0.067 |
+| `metadata-ordinary.js` | 0.566 | 0.266 | 0.020 |
+| `metadata-function.js` | 4.750 | 4.126 | 0.220 |
+| `metadata-intrinsic.js` | 4.347 | 3.634 | 0.234 |
+| `typeof-dispatch.js` | 0.962 | 0.383 | 0.032 |
+| `singleton-dispatch.js` | 0.950 | 0.360 | 0.017 |
+| `for-in-wide.js` | 2.071 | 1.996 | 0.071 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs three checked
@@ -200,7 +204,7 @@ Mutation, Proxy and suspension controls run separately as semantic regressions.
 
 All **456** situation processes and **4,560** calls passed exact checks.
 The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
-Fresh scoped verification passes **1,753 Engine**, **54 emission**,
+Fresh scoped verification passes **1,754 Engine**, **55 emission**,
 **637 structural** and **380 source-guard** checks. The **769 IR** cases
 reuse their original passing binary/receipts with unchanged IR/front-end inputs.
 AOT units pass **653** cases; four known bootstrap assertions remain failures.

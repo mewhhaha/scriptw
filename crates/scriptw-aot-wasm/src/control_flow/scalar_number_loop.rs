@@ -247,6 +247,7 @@ struct LoopProof<'a, 'b> {
     remaining: usize,
     imul: Vec<InvariantImul>,
     invariant: Option<RegionInvariant>,
+    row_alias_initialized: bool,
 }
 
 impl ScalarNumberLoop {
@@ -307,8 +308,9 @@ impl ScalarNumberLoop {
             bindings: Vec::new(),
             remaining: MAX_NODES,
             imul: Vec::new(),
-            invariant: ArrayReadLoop::new(builder, source_test, update)
+            invariant: ArrayReadLoop::new(builder, init, source_test, update, body)
                 .map(RegionInvariant::ArrayReads),
+            row_alias_initialized: false,
         };
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
@@ -559,6 +561,9 @@ impl LoopProof<'_, '_> {
             let Some(RegionInvariant::ArrayReads(array)) = self.invariant.as_mut() else {
                 return None;
             };
+            if array.row_alias().is_some() && !self.row_alias_initialized {
+                return None;
+            }
             let (read, column) = array.read(self.builder, read)?;
             if let Some(column) = column {
                 self.binding_id(column, false)?;
@@ -674,6 +679,15 @@ impl LoopProof<'_, '_> {
         match statement {
             StatementIr::Empty => {}
             StatementIr::Expression(value) => expressions.push(self.expression(value, depth)?),
+            StatementIr::Var(declarations)
+                if expressions.is_empty() && !self.row_alias_initialized =>
+            {
+                let Some(RegionInvariant::ArrayReads(array)) = &self.invariant else {
+                    return None;
+                };
+                array.accept_row_declaration(self.builder, declarations)?;
+                self.row_alias_initialized = true;
+            }
             StatementIr::Block(block) if block.lexical_environment.is_none() => {
                 for statement in &block.statements {
                     self.statement(statement, expressions, depth)?;
@@ -1238,6 +1252,9 @@ impl FunctionBuilder<'_> {
                     .scalar()
                     .store(function);
             }
+        }
+        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
+            array.publish_row_alias(iterated, self, function);
         }
         if let Some(value) = value {
             iterated.load(function);
