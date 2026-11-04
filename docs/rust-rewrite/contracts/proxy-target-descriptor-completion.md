@@ -38,14 +38,13 @@ FunctionObject, argument vector or JavaScript descriptor transport object is
 constructed for these internal Array acquisitions. Absent entries remain absent,
 and later consumers retain ownership of inherited Set behavior and definition.
 
-Every other concrete target type, including namespace, arguments,
-TypedArray, boxed primitive, Function and Proxy, retains the existing native
-acquisition path. The actual Object.getOwnPropertyDescriptor owner handles
-recursive target hooks and descriptor validation. The private
-completed descriptor object is never exposed to user code. Its own data fields
-supply the existing Fact, Get or Set projection without invoking property values
-or adding another descriptor algorithm. The same target-descriptor factory
-continues to serve the public Proxy descriptor algorithm's compatibility check.
+Every other concrete target type, including namespace, arguments, TypedArray,
+boxed primitive, Function and Proxy, crosses the typed `ObjectGetOwnProperty`
+runtime helper. It retains the same recursive hooks and storage dispatcher,
+returning a private completed descriptor with its whole Completion. The result
+is rooted before Throw propagation. No public callable, argument vector,
+JavaScript descriptor object or six-field reconstruction participates. The same
+factory continues to serve Proxy descriptor compatibility checks.
 
 Each of the four outer invariant consumers acquires a completed projection;
 a reserved raw projection cannot enter that consumer boundary. A normal Get
@@ -62,15 +61,13 @@ These ordering requirements follow
 Literal global declaration descriptor acquisition retains its existing direct
 Fact path and declaration policy.
 
-Actual callers use the existing trusted Proxy execution or set-path Realm
-projection. The native fallback's builtin entry and private input encoder carry
-that projection into the real descriptor call. A lexical environment is never
-interpreted as a native Realm record. Planning retains the descriptor builtin
-for every emitted caller, including source operators and outlined helpers.
+Actual callers pass the executing Realm, Environment and Program directly to
+the helper. A lexical environment is never interpreted as a native Realm record,
+and no public descriptor builtin is rooted solely for internal acquisition.
 Nested descriptor errors and outer Get/Delete invariant errors use the executing
 operation's intrinsic TypeError. Inline source Delete propagates generated
 errors into the active catch/finally handler; builtin/helper completions retain
-their existing return behavior. Existing original user throws remain unchanged.
+their existing return behavior. Original user throws remain unchanged.
 
 The additional strict/sloppy ordinary snapshot control redefines data and
 accessor properties during observable trap-result descriptor conversion, for

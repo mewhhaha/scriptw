@@ -3,9 +3,6 @@ use crate::gc_types::{PropertyKeyConstruction, PropertyKeyTable, StringValue};
 
 mod enumeration;
 
-pub(crate) const FOR_IN_INTRINSICS: [StandardBuiltinId; 1] =
-    [StandardBuiltinId::ObjectGetOwnPropertyDescriptor];
-
 impl FunctionBuilder<'_> {
     pub(crate) fn compile_for_in(
         &mut self,

@@ -623,6 +623,29 @@ impl OwnPropertyKeysCallResult {
         table
     }
 }
+/// GetOwnProperty returns its whole completion and a rooted descriptor snapshot.
+/// Null represents absence on success and is also returned on abrupt completion.
+#[must_use = "root the descriptor snapshot and completion before checking for Throw"]
+pub(crate) struct OwnPropertyDescriptorCallResult {
+    private: (),
+}
+impl OwnPropertyDescriptorCallResult {
+    pub(crate) fn bind(
+        self,
+        schema: &RuntimeSchema,
+        completion: &CompletionLocals,
+        function: &mut Function,
+    ) -> GcLocal<PropertyDescriptor, Nullable> {
+        let descriptor = ReferenceHelperResult {
+            private: std::marker::PhantomData,
+        }
+        .bind(schema, schema.reserve_gc_local(function), function);
+        completion
+            .value()
+            .store_call_result(completion.kind(), completion.target(), function);
+        descriptor
+    }
+}
 /// ResolveBinding returns its complete completion and the held Reference.
 /// Root every GC edge before the caller can propagate an abrupt completion.
 #[must_use = "the completion and held Reference must be consumed together"]
@@ -899,6 +922,7 @@ macro_rules! helper_field {
     (@result_type StatusCompletion) => { StatusCompletionCallResult };
     (@result_type RealmImport) => { RealmImportCallResult };
     (@result_type OwnPropertyKeys) => { OwnPropertyKeysCallResult };
+    (@result_type OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult };
     (@result_type EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult };
     (@result_type ModuleGather) => { ModuleGatherCallResult };
     (@result_type RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult };
@@ -921,6 +945,11 @@ macro_rules! helper_field {
     (@result_abi OwnPropertyKeys) => { {
         let mut types = crate::module::COMPLETION_TYPES.to_vec();
         types.push(AbiType::Gc(GcLayout::PropertyKeyTable, GcNullability::Nullable));
+        types
+    } };
+    (@result_abi OwnPropertyDescriptor) => { {
+        let mut types = crate::module::COMPLETION_TYPES.to_vec();
+        types.push(AbiType::Gc(GcLayout::PropertyDescriptor, GcNullability::Nullable));
         types
     } };
     (@result_abi EnvironmentIdentifierResolution) => { {
@@ -953,6 +982,7 @@ macro_rules! helper_field {
     (@result StatusCompletion) => { StatusCompletionCallResult { private: () } };
     (@result RealmImport) => { RealmImportCallResult { private: () } };
     (@result OwnPropertyKeys) => { OwnPropertyKeysCallResult { private: () } };
+    (@result OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult { private: () } };
     (@result EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult { private: () } };
     (@result ModuleGather) => { ModuleGatherCallResult { private: () } };
     (@result RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult { private: () } };
@@ -1309,6 +1339,7 @@ runtime_helper_domain! {
     HasInstance / HasInstanceArguments / HasInstanceParameters / "has_instance" { entry:I32,object:Value,constructor:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectOwnKeys / ObjectOwnKeysArguments / ObjectOwnKeysParameters / "object_own_keys" { target:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyKeys;
+    ObjectGetOwnProperty / ObjectGetOwnPropertyArguments / ObjectGetOwnPropertyParameters / "object_get_own_property" { target:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyDescriptor;
     BigIntEquality / BigIntEqualityArguments / BigIntEqualityParameters / "bigint_equality" { left:(Ref BigIntValue NonNullable),right:(Ref BigIntValue NonNullable) } => I32;
     PrivateElementAdd / PrivateElementAddArguments / PrivateElementAddParameters / "private_element_add" { receiver:Value,element:(Ref PrivateElement NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
     PrivateFieldDefine / PrivateFieldDefineArguments / PrivateFieldDefineParameters / "private_field_define" { receiver:Value,private_environment:(Ref PrivateEnvironment Nullable),class_scope:I64,name_ordinal:I32,value:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1415,6 +1446,7 @@ impl RuntimeHelperId {
             Self::HasInstance => HelperOwner::Runtime,
             Self::ForInAdvance => HelperOwner::Runtime,
             Self::ObjectOwnKeys => HelperOwner::Runtime,
+            Self::ObjectGetOwnProperty => HelperOwner::Runtime,
             Self::BigIntEquality => HelperOwner::Runtime,
             Self::ObjectGetPrototypeOf => HelperOwner::Runtime,
             Self::ObjectIsExtensible => HelperOwner::Runtime,
@@ -1583,6 +1615,7 @@ impl RuntimeHelperId {
             Self::HasInstance => true,
             Self::ForInAdvance => true,
             Self::ObjectOwnKeys => true,
+            Self::ObjectGetOwnProperty => true,
             Self::BigIntEquality => true,
             Self::ObjectGetPrototypeOf => true,
             Self::ObjectIsExtensible => true,

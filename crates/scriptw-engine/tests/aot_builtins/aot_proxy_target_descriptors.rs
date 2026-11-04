@@ -58,3 +58,11 @@ fn ordinary_descriptor_snapshots_survive_reentrant_redefinition_and_refresh_late
         "ordinary-descriptor-snapshot-mutation:ok",
     );
 }
+
+#[test]
+fn exotic_descriptors_preserve_snapshots_and_materialize_independent_public_results() {
+    assert_modes(
+        include_str!("../fixtures/proxy_target_descriptors/exotic_snapshot_mutation.js"),
+        "exotic-descriptor-snapshot-mutation:ok",
+    );
+}

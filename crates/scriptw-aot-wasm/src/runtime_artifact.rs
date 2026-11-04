@@ -92,7 +92,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // changing the shared runtime's function/type layout without a new heap layout.
 // Version 50 shares InstanceofOperator and OrdinaryHasInstance through one
 // typed helper, changing R's function/type ABI without changing the heap.
-const LAYOUT_VERSION: u32 = 50;
+// Version 51 gives internal GetOwnProperty a typed descriptor/completion
+// helper. The helper function/type ABI changes; the GC object model does not.
+const LAYOUT_VERSION: u32 = 51;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

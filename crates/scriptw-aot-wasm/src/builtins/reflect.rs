@@ -1,6 +1,5 @@
 //! Reflect invokes the shared internal-method owners with whole GC values.
 use super::super::*;
-use crate::functions::NativeObjectAlgorithm;
 use crate::gc_types::{CompletionLocals, ValueLocals};
 use crate::objects::PropertyKeyLocals;
 
@@ -197,14 +196,8 @@ impl FunctionBuilder<'_> {
                         builder.emit_object_delete(target.0, &key, result, function)?
                     }
                     ReflectPropertyBuiltin::GetOwnPropertyDescriptor => {
-                        // Run the sole GPD algorithm in this executing native
-                        // Realm. Its private result is already the fresh
-                        // FromPropertyDescriptor object or Undefined.
-                        builder.emit_native_object_algorithm_call(
-                            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-                            &[target.0, key.value()],
-                            result,
-                            function,
+                        builder.emit_get_own_property_descriptor_object(
+                            target.0, &key, result, function,
                         )?;
                     }
                 }

@@ -24,6 +24,7 @@ mod host_html_dda_structure;
 mod iterator_helper_dispatch;
 mod numeric_bitwise_emission;
 mod own_keys_helper;
+mod own_property_helper;
 mod packed_array_storage;
 mod product_artifact;
 mod program_utf16_sharing;

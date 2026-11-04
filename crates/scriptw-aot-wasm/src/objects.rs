@@ -40,6 +40,7 @@ mod intrinsic_properties;
 mod module_namespace;
 mod native_constructor;
 mod object_literal_property;
+mod own_property;
 mod packed_array_builtin;
 mod packed_array_index;
 mod plain_data_literal;

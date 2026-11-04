@@ -1,6 +1,6 @@
 //! Zip captures complete direct records before padding or helper publication.
 use super::*;
-use crate::functions::{ArgumentListConstruction, NativeObjectAlgorithm};
+use crate::functions::ArgumentListConstruction;
 
 #[derive(Clone, Copy)]
 pub(in crate::builtins::standard) enum IteratorZipInput {
@@ -397,7 +397,6 @@ impl FunctionBuilder<'_> {
         index.store(f);
         let pending = s.reserve_completion(f);
         pending.initialize(f);
-        let descriptor = s.reserve_value_local(f);
         let value = s.reserve_value_local(f);
         let finish = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
@@ -406,25 +405,20 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(finish, f);
         let key = keys.read_key(index, self, f)?;
-        self.emit_native_object_algorithm_call(
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-            &[input, key.value()],
-            &pending,
-            f,
-        )?;
+        let descriptor = self.emit_object_get_own_property(input, &key, &pending, f)?;
         self.emit_zip_acquisition_abrupt(head, None, &pending, output, exit, f)?;
-        pending.value().tag().load(f);
-        f.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        f.instruction(&Instruction::I32Ne);
+        descriptor.load(s, f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        descriptor.copy_from(pending.value(), f);
-        let enumerable = self.emit_helper_key("enumerable", f)?;
-        self.emit_object_read(&descriptor, &descriptor, &enumerable, &pending, f)?;
-        enumerable.clear(f);
-        self.emit_zip_acquisition_abrupt(head, None, &pending, output, exit, f)?;
-        self.compile_truthy_tagged_i32(pending.value(), f)?;
+        let flags = s.reserve_i32_local(f);
+        s.field(crate::gc_types::PropertyDescriptorSchema::FLAGS)
+            .read(&descriptor, s, f)
+            .store(flags, f);
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        s.release_i32_local(flags, f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_object_read(input, input, &key, &pending, f)?;
         self.emit_zip_acquisition_abrupt(head, None, &pending, output, exit, f)?;
@@ -450,6 +444,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        descriptor.clear(f);
         key.clear(f);
         self.emit_zip_increment(index, f);
         self.emit_branch_to_target(next, f);
@@ -458,7 +453,6 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         value.clear(f);
-        descriptor.clear(f);
         pending.clear(f);
         s.release_i32_local(index, f);
         s.release_i32_local(length, f);

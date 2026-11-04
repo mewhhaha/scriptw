@@ -137,6 +137,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::HasInstance
             | RuntimeHelperId::ForInAdvance
             | RuntimeHelperId::ObjectOwnKeys
+            | RuntimeHelperId::ObjectGetOwnProperty
             | RuntimeHelperId::BigIntEquality
             | RuntimeHelperId::RegExpMatcher
             | RuntimeHelperId::RegExpCompiler

@@ -1,14 +1,13 @@
 //! Proxy [[GetOwnProperty]] preserves trap/target/conversion step order.
 use super::*;
 use crate::emit::AccessorThrowRouting;
-use crate::functions::NativeObjectAlgorithm;
-use crate::objects::ProxySlotLocals;
 
 impl FunctionBuilder<'_> {
     pub(super) fn emit_proxy_get_own_property_descriptor(
         &mut self,
         slots: &ProxySlotLocals,
         key: &PropertyKeyLocals,
+        descriptor: &GcLocal<PropertyDescriptor, Nullable>,
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
@@ -42,12 +41,9 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::I32Or);
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_native_object_algorithm_call(
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-            &[slots.target(), key.value()],
-            result,
-            function,
-        )?;
+        let returned = self.emit_object_get_own_property(slots.target(), key, result, function)?;
+        descriptor.replace(returned.load(schema, function), function);
+        returned.clear(function);
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -179,7 +175,18 @@ impl FunctionBuilder<'_> {
         )?;
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        self.emit_native_descriptor_object(&completed.object_fields(), result, function)?;
+        let absent = schema
+            .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
+            .initialize_null(schema, function);
+        let record = self.emit_merge_property_descriptor(
+            &absent,
+            &completed.object_fields().from_runtime_checked(),
+            function,
+        )?;
+        descriptor.replace(record.load(schema, function).nullable(), function);
+        record.clear(function);
+        absent.clear(function);
+        result.initialize(function);
         completed.clear(schema, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -219,7 +226,12 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_throw_current_function_realm_type_error(message, result, function)?;
+        self.emit_throw_runtime_error(
+            scriptw_ir::NativeErrorKind::TypeError,
+            message,
+            result,
+            function,
+        )?;
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);

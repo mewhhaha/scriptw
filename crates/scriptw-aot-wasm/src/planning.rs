@@ -1,6 +1,5 @@
 use super::*;
 mod module_graph;
-use crate::control_flow::FOR_IN_INTRINSICS;
 pub(crate) use module_graph::ModuleGraphPlan;
 use scriptw_ir::{ArrayAccumulationElementIr, ArrayAccumulationIr};
 use scriptw_ir::{
@@ -414,12 +413,6 @@ impl RuntimeBootstrapPlan {
             StandardBuiltinId::FunctionConstructor,
             StandardBuiltinId::EvalFunction,
             StandardBuiltinId::ObjectConstructor,
-            // Global declaration facts and the completed ObjectRead/
-            // ObjectReadProxy Get core use the actual descriptor facade for
-            // ordinary, exotic and Proxy receivers. Retain its real body and
-            // installer before pooling or helper emission, even without a
-            // source-level descriptor reference.
-            StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
             // Receiver Set delegates to its complete native [[DefineOwnProperty]]
             // owner, including Proxy and indexed exotic receivers.
             StandardBuiltinId::ReflectDefineProperty,
@@ -491,7 +484,6 @@ impl RuntimeBootstrapPlan {
                 StandardBuiltinId::ShadowRealmWrappedFunctionCall,
                 StandardBuiltinId::ShadowRealmImportFulfilled,
                 StandardBuiltinId::ShadowRealmImportRejected,
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
                 StandardBuiltinId::PromiseConstructor,
             ] {
                 self.require_standard_builtin(dependency);
@@ -854,13 +846,11 @@ impl RuntimeBootstrapPlan {
         ) {
             // Reviver/serialization snapshot own keys and descriptors; fresh
             // parser/root publications use the same real definition owner.
-            self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
             self.require_standard_builtin(StandardBuiltinId::ReflectDefineProperty);
         }
         if builtin == StandardBuiltinId::IteratorZipKeyed {
             // Keyed acquisition snapshots enumerable own descriptors before
             // Get; resume publishes each result through real DefineOwnProperty.
-            self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
             self.require_standard_builtin(StandardBuiltinId::ReflectDefineProperty);
         }
         if builtin == StandardBuiltinId::ReflectDefineProperty {
@@ -908,40 +898,12 @@ impl RuntimeBootstrapPlan {
         }
         if matches!(
             builtin,
-            StandardBuiltinId::ProxyConstructor
-                | StandardBuiltinId::FunctionPrototypeBind
-                | StandardBuiltinId::ReflectGet
-                | StandardBuiltinId::ReflectSet
-                | StandardBuiltinId::ReflectHas
-                | StandardBuiltinId::ReflectDeleteProperty
-                | StandardBuiltinId::ObjectDefineProperty
-                | StandardBuiltinId::ReflectDefineProperty
-                | StandardBuiltinId::ReflectGetOwnPropertyDescriptor
-                | StandardBuiltinId::ReflectOwnKeys
-                | StandardBuiltinId::ObjectGetOwnPropertyNames
-                | StandardBuiltinId::ObjectGetOwnPropertySymbols
-                | StandardBuiltinId::ObjectPrototypeHasOwnProperty
-                | StandardBuiltinId::ObjectPrototypeLookupGetter
-                | StandardBuiltinId::ObjectPrototypeLookupSetter
-                | StandardBuiltinId::ObjectPrototypePropertyIsEnumerable
-        ) {
-            // These entry points dispatch through the generic descriptor
-            // builtin so exotic and nested-Proxy [[GetOwnProperty]] semantics
-            // are observed exactly once. Keep its real body rooted rather than
-            // calling a lazy stub.
-            self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
-        }
-        if matches!(
-            builtin,
             StandardBuiltinId::IteratorPrototypeConstructorSetter
                 | StandardBuiltinId::IteratorPrototypeToStringTagSetter
                 | StandardBuiltinId::ErrorPrototypeStackSetter
         ) {
-            // SetterThatIgnoresPrototypeProperties performs
-            // [[GetOwnProperty]] through the descriptor builtin and
-            // CreateDataPropertyOrThrow through Object.defineProperty, the
-            // generic bodies that own every exotic and Proxy receiver.
-            self.require_standard_builtin(StandardBuiltinId::ObjectGetOwnPropertyDescriptor);
+            // Descriptor acquisition uses the private runtime helper;
+            // CreateDataPropertyOrThrow retains the native definition owner.
             self.require_standard_builtin(StandardBuiltinId::ObjectDefineProperty);
         }
         match builtin {
@@ -4344,20 +4306,15 @@ pub(crate) fn statement_references_function(statement: &StatementIr, target: &Fu
 }
 
 fn for_in_head_intrinsic_references_function(head: &TypedExpr, target: &FunctionId) -> bool {
-    FOR_IN_INTRINSICS
-        .iter()
-        .any(|builtin| builtin.function_id() == *target)
-        || [
-            (ValueKind::Number, StandardBuiltinId::NumberConstructor),
-            (ValueKind::String, StandardBuiltinId::StringConstructor),
-            (ValueKind::Boolean, StandardBuiltinId::BooleanConstructor),
-            (ValueKind::Symbol, StandardBuiltinId::SymbolConstructor),
-            (ValueKind::BigInt, StandardBuiltinId::BigIntConstructor),
-        ]
-        .iter()
-        .any(|(kind, builtin)| {
-            head.possible_kinds.contains(*kind) && builtin.function_id() == *target
-        })
+    [
+        (ValueKind::Number, StandardBuiltinId::NumberConstructor),
+        (ValueKind::String, StandardBuiltinId::StringConstructor),
+        (ValueKind::Boolean, StandardBuiltinId::BooleanConstructor),
+        (ValueKind::Symbol, StandardBuiltinId::SymbolConstructor),
+        (ValueKind::BigInt, StandardBuiltinId::BigIntConstructor),
+    ]
+    .iter()
+    .any(|(kind, builtin)| head.possible_kinds.contains(*kind) && builtin.function_id() == *target)
 }
 
 pub(crate) fn for_init_references_function(init: &ForInitIr, target: &FunctionId) -> bool {

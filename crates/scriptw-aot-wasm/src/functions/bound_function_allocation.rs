@@ -130,21 +130,15 @@ impl FunctionBuilder<'_> {
         metadata.set_number(length_bits, function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
 
-        // This private native entry performs the actual [[GetOwnProperty]],
-        // including a callable Proxy's trap. The public Object method is never
-        // reread, and an abrupt descriptor lookup remains in `pending`.
-        self.emit_native_object_algorithm_call(
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-            &[target, length_key.value()],
-            &pending,
-            function,
-        )?;
+        // Retain the caller's cleanup route while acquiring the private own
+        // descriptor. A callable Proxy still performs its trap exactly once.
+        let descriptor =
+            self.emit_object_get_own_property(target, &length_key, &pending, function)?;
         self.emit_bind_metadata_abrupt_exit(&pending, result, exit, function);
-        pending.value().tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Ne);
+        descriptor.load(schema, function);
+        function.instruction(&Instruction::RefIsNull);
+        descriptor.clear(function);
+        function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_object_read_with_throw_routing(
             target,

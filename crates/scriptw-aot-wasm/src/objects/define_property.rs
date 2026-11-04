@@ -193,7 +193,7 @@ impl FunctionBuilder<'_> {
     /// Complete a new descriptor or merge a compatible partial descriptor with
     /// the current one. Kind conversion preserves only E/C and resets the new
     /// side's values and writable before applying supplied fields.
-    fn emit_merge_property_descriptor(
+    pub(super) fn emit_merge_property_descriptor(
         &mut self,
         current: &GcLocal<PropertyDescriptor, Nullable>,
         incoming: &WasmDescriptor<'_>,
@@ -1607,8 +1607,8 @@ impl FunctionBuilder<'_> {
         Ok(result)
     }
 
-    /// Actual non-Proxy storage descriptor dispatcher. Public recursive queries
-    /// remain with the real GPD algorithm; this kernel owns only concrete
+    /// Actual non-Proxy storage descriptor dispatcher. Recursive queries remain
+    /// with the private GetOwnProperty helper; this kernel owns only concrete
     /// ordinary/exotic storage and never reinterprets a reference as an address.
     pub(crate) fn emit_non_proxy_own_descriptor(
         &mut self,

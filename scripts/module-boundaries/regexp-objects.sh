@@ -487,18 +487,22 @@ require_fixed_string_count \
 check_raw_line_budget "$object_get_own_descriptor_parent" 4400
 check_raw_line_budget "$object_get_own_descriptor_file" 1480
 
-# 10.5.5 Proxy [[GetOwnProperty]] is the descriptor owner's private child: the
-# parent declares it privately and calls its one entry, and the child owns the
-# live-slot read, the trap call, the recursive targetDesc and the conversion.
-object_get_own_descriptor_proxy_file="crates/scriptw-aot-wasm/src/builtins/object/get_own_property_descriptor/proxy.rs"
+# 10.5.5 Proxy [[GetOwnProperty]] stays inside the private typed runtime owner.
+# Public methods alone materialize the observable FromPropertyDescriptor object.
+object_get_own_descriptor_kernel="crates/scriptw-aot-wasm/src/objects/own_property.rs"
+object_get_own_descriptor_proxy_file="crates/scriptw-aot-wasm/src/objects/own_property/proxy.rs"
+require_file "$object_get_own_descriptor_kernel"
 require_file "$object_get_own_descriptor_proxy_file"
 check_no_inline_legacy_includes "$object_get_own_descriptor_proxy_file"
-require_exact_line_count "$object_get_own_descriptor_file" 'mod proxy;' 1 'private Proxy [[GetOwnProperty]] module declaration'
-require_fixed_string_count "$object_get_own_descriptor_file" 'builder.emit_proxy_get_own_property_descriptor(' 1 'Proxy [[GetOwnProperty]] step call'
+require_exact_line_count "$object_get_own_descriptor_kernel" 'mod proxy;' 1 'private Proxy [[GetOwnProperty]] module declaration'
+require_fixed_string_count "$object_get_own_descriptor_kernel" 'builder.emit_proxy_get_own_property_descriptor(' 1 'Proxy [[GetOwnProperty]] step call'
 require_fixed_string_count "$object_get_own_descriptor_proxy_file" 'pub(super) fn emit_proxy_get_own_property_descriptor(' 1 'Proxy [[GetOwnProperty]] step entry'
 require_fixed_string_count "$object_get_own_descriptor_proxy_file" 'self.emit_to_property_descriptor(' 1 'Proxy trap-result ToPropertyDescriptor call'
 require_fixed_string_count "$object_get_own_descriptor_proxy_file" 'self.emit_complete_property_descriptor(' 1 'Proxy trap-result CompletePropertyDescriptor call'
-require_fixed_string_count "$object_get_own_descriptor_proxy_file" 'self.emit_native_descriptor_object(' 1 'Proxy result FromPropertyDescriptor call'
+require_fixed_string_count "$object_get_own_descriptor_proxy_file" 'self.emit_merge_property_descriptor(' 1 'Proxy completed private descriptor publication'
+if grep -Eq 'emit_native_descriptor_object|emit_from_property_descriptor|emit_throw_current_function_realm' "$object_get_own_descriptor_proxy_file"; then
+  fail "$object_get_own_descriptor_proxy_file must retain private descriptors and the supplied execution Realm"
+fi
 if grep -Eq 'emit_function_or_proxy_call|emit_to_property_descriptor|getOwnPropertyDescriptor trap' "$object_get_own_descriptor_file"; then
   fail "$object_get_own_descriptor_file must leave the Proxy trap step to its private child"
 fi

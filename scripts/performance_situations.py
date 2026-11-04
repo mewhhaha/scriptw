@@ -227,6 +227,37 @@ export function run() {{
 '''
 
 
+def function_property_source(kind):
+    targets = '[Array, Map, Set, Date, Number, String, Boolean, Uint8Array]'
+    if kind == 'ordinary':
+        targets = '''[{length: 1, name: 'Array'}, {length: 0, name: 'Map'},
+    {length: 0, name: 'Set'}, {length: 7, name: 'Date'},
+    {length: 1, name: 'Number'}, {length: 1, name: 'String'},
+    {length: 1, name: 'Boolean'}, {length: 3, name: 'Uint8Array'}]'''
+    elif kind == 'function':
+        targets = '''[function Array(a) {}, function Map() {}, function Set() {},
+    function Date(a, b, c, d, e, f, g) {}, function Number(a) {},
+    function String(a) {}, function Boolean(a) {}, function Uint8Array(a, b, c) {}]'''
+    elif kind != 'intrinsic':
+        raise ValueError('function property kind must be ordinary, function or intrinsic')
+    return f'''var rows, seed;
+export function prepare(input) {{
+  seed = input;
+  var targets = {targets};
+  rows = [];
+  for (var i = 0; i < 64; i++) rows.push(targets[(input + i) & 7]);
+}}
+export function run() {{
+  var sum = seed;
+  for (var i = 0; i < 8192; i++) {{
+    var row = rows[i & 63];
+    sum += row.length + row.name.length;
+  }}
+  print(sum);
+}}
+'''
+
+
 def workloads():
     entries = []
 
@@ -278,6 +309,11 @@ export function run() { print(input); }
         add(name, property_source(mutated), property_checksum, 'property mutation history',
             '8192 identical reads of 64 records after prepare; alternating literal and constructed keys; no string-backing claim',
             PROPERTY_READS, name.replace('-', ' '))
+    for kind in ('ordinary', 'function', 'intrinsic'):
+        add('metadata-' + kind, function_property_source(kind),
+            lambda seed: seed + PROPERTY_READS // 8 * 58, 'function properties',
+            '8192 passes; own length and name plus string length; eight prepared targets; equivalent values across object kinds',
+            PROPERTY_READS * 3, 'Metadata reads: ' + kind)
     return entries
 
 

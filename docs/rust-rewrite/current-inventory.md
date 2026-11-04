@@ -8,7 +8,7 @@ commands and resource policy. [Acceptance](conformance-acceptance.md) and
 
 ## Next work
 
-Use the [13 focused programs and scores](benchmarks.md#focused-performance-situations)
+Use the [16 focused programs and scores](benchmarks.md#focused-performance-situations)
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
@@ -19,31 +19,36 @@ accepts `--case <file.js>`.
   transport bound; exclusion alone does not establish their cost. Preserve
   callee identity, Realm, captures, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Reduce repeated property selection after the raw Number-array and computed
-  String own-data probes. Measure name-to-slot lookup and representation checks
-  within the [property scores](situations-current.json); retain live mutation,
-  accessors, prototypes, proxies and coercion/exception order on misses.
-  Owner: AOT operations and the existing object model.
+- Test compile-time sharing of equivalent immutable compact birth layouts.
+  The eight-literal/one-factory control retains the same timed read body apart
+  from four binding-slot constants; its layout identities differ. Intern ordered
+  primitive keys and attributes in the existing ProgramInstance shape table,
+  retaining per-object values/prototypes and live mutation/promotion guards.
+  Measure dynamic cache misses and the unchanged original workload before
+  assigning causal cost or predicting RSC gains. Owner: compact data planning.
 - Measure remaining RSC property, descriptor and allocation work after typed
   internal OwnKeys and canonical Module direct-cell capture admission. Keep
   [instruction counts and sampled callers](react-attribution-current.json)
   separate from scored timings; inclusive sample shares overlap. Preserve live
   import aliases, TDZ, cross-Realm errors and Proxy invariants. Total executed
   allocation remains unmeasured. Owner: IR/AOT lowering and object operations.
-- Remove JavaScript descriptor transport from internal `[[GetOwnProperty]]`
-  reads. Extract the existing recursive owner into one whole-Completion plus
-  nullable private descriptor helper; public reflection alone materializes
-  JavaScript descriptor objects. The [current profiles](react-attribution-current.json)
-  place descriptor calls mainly under object reads and HasInstance, rather than
-  ForIn. Preserve snapshots across effects, Proxy ordering, namespace TDZ,
-  mapped arguments, typed arrays and the actual execution Realm. Add a focused
-  exotic/intrinsic read benchmark alongside ordinary controls; measure retired
-  work and allocation before predicting gains. Owner: AOT object operations.
-- Reduce remaining Fast frame and spill costs. The [allocator-only control](react-attribution-current.json)
-  still improves retained requests while increasing native preparation. Measure
-  a broader workload set and amortization before changing default policy;
-  keep allocator changes separate from source transformations.
-  Owner: AOT code shape/native policy.
+- Measure remaining descriptor snapshots, name-to-slot selection and executed
+  allocation after private `[[GetOwnProperty]]` transport. Use the matched
+  ordinary/JavaScript-function/native-constructor read situations and
+  [sampled callers](react-attribution-current.json); preserve Proxy ordering,
+  namespace TDZ, mapped arguments, typed arrays and execution Realm.
+  Owner: AOT object operations.
+- Attribute Fast frame capacity before changing emitter value transport.
+  Under pinned regalloc2 0.15.2 / Cranelift 0.134.0, separate strictly block-local
+  spill homes from block parameters, branch arguments, other cross-block homes,
+  scratch and explicit GC-root slots. Compare persistent plus maximum block-local
+  capacity with the actual frame. Overlay local arenas only if that census
+  supports it; retain within-block uniqueness, size/alignment, edge-copy scratch,
+  output/debug locations and explicit GC stack maps. Validate allocator checks,
+  forced GC, exceptions, loops and recursion; measure preparation and requests.
+  [Allocator-only controls](react-attribution-current.json) remain separate from
+  source changes. Frame capacity is distinct from spill instruction count.
+  Owner: pinned native allocator and AOT code shape.
 - Move embedding-only benchmark hosts to Engine examples so emitter iterations
   do not rebuild the Test262-linked CLI library. Reuse native producer/consumer
   runs for retained RSC requests while measuring cold setup separately. Prefer

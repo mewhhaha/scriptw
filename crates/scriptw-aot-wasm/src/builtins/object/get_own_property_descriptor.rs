@@ -1,15 +1,12 @@
-//! Sole native GetOwnProperty owner, including recursive Proxy targets.
+//! Public FromPropertyDescriptor materialization over private [[GetOwnProperty]].
 use super::*;
 use crate::gc_types::{
     CompletionLocals, GcLocal, I32Local, Nullable, PropertyDescriptor, PropertyDescriptorSchema,
-    ProxyObject, StoredValue, ValueLocals,
+    StoredValue, ValueLocals,
 };
-use crate::objects::ProxyRevocationRoute;
 use crate::objects::{
     DescriptorFlag, DescriptorObjectFields, DescriptorObjectPrototype, PropertyKeyLocals,
 };
-
-mod proxy;
 
 impl FunctionBuilder<'_> {
     pub(in crate::builtins) fn compile_object_get_own_property_descriptor_builtin(
@@ -31,31 +28,33 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, function);
         self.emit_builtin_arg_to_value(1, &key_value, function);
         let key = self.emit_value_to_property_key_locals(&key_value, function)?;
-        pending.value().reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<ProxyObject>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
+        self.emit_get_own_property_descriptor_object(pending.value(), &key, &output, function)?;
+        key.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.completion().copy_from(&output, function);
+        output.clear(function);
+        pending.clear(function);
+        key_value.clear(function);
+        input.clear(function);
+        Ok(())
+    }
+
+    /// Only public descriptor results materialize an observable ordinary object.
+    /// Its prototype belongs to this native method's executing Realm.
+    pub(in crate::builtins) fn emit_get_own_property_descriptor_object(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        output: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let descriptor = self.emit_object_get_own_property(target, key, output, function)?;
+        output.kind().load(function);
+        function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
+        function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
-        let proxy = schema.reserve_gc_local(function).initialize(
-            pending
-                .value()
-                .cast_reference::<ProxyObject>(schema, function),
-            function,
-        );
-        self.emit_load_live_proxy_slots(
-            &proxy,
-            ProxyRevocationRoute::CurrentFunctionRealm,
-            &output,
-            function,
-            |builder, slots, function| {
-                builder.emit_proxy_get_own_property_descriptor(slots, &key, &output, function)
-            },
-        )?;
-        proxy.clear(function);
-        function.instruction(&Instruction::Else);
-        let descriptor = self.emit_non_proxy_own_descriptor(pending.value(), &key, function)?;
         descriptor.load(schema, function);
         function.instruction(&Instruction::RefIsNull);
         self.open_frame(ControlFrameKind::If, function);
@@ -65,21 +64,13 @@ impl FunctionBuilder<'_> {
             descriptor.load(schema, function).require_non_null(function),
             function,
         );
-        self.emit_native_stored_descriptor_object(&record, &output, function)?;
+        self.emit_native_stored_descriptor_object(&record, output, function)?;
         record.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         descriptor.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        key.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        self.completion().copy_from(&output, function);
-        output.clear(function);
-        pending.clear(function);
-        key_value.clear(function);
-        input.clear(function);
         Ok(())
     }
 

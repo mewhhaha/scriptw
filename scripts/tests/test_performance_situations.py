@@ -17,16 +17,16 @@ ROOT = Path(__file__).resolve().parents[2]
 class SituationTests(unittest.TestCase):
     def test_inventory_has_bounded_independently_climbable_families(self):
         entries = situations.workloads()
-        self.assertEqual(len(entries), 13)
-        self.assertEqual(len({entry['file'] for entry in entries}), 13)
+        self.assertEqual(len(entries), 16)
+        self.assertEqual(len({entry['file'] for entry in entries}), 16)
         self.assertEqual({entry['category'] for entry in entries}, {
             'control', 'global lookup', 'frame size', 'arguments observation',
-            'property mutation history'})
+            'property mutation history', 'function properties'})
         for entry in entries:
             with self.subTest(file=entry['file']):
                 self.assertLess(len(entry['source'].encode()), 40000)
                 self.assertGreater(entry['operations'], 0)
-                self.assertLessEqual(entry['operations'], 8192)
+                self.assertLessEqual(entry['operations'], 24576)
                 self.assertEqual([item['input'] for item in entry['invocations']], [3, 5, 7, 11])
                 self.assertEqual(entry['stdout'], entry['invocations'][0]['stdout'])
                 self.assertEqual(entry['source'].count('export function prepare('), 1)
@@ -45,6 +45,7 @@ class SituationTests(unittest.TestCase):
         entries = {entry['file']: entry for entry in situations.workloads()}
         for family in (['frame-compact', 'frame-branches32', 'frame-branches128', 'frame-branches512'],
                        ['args-unused', 'args-observed'], ['property-stable', 'property-mutated'],
+                       ['metadata-ordinary', 'metadata-function', 'metadata-intrinsic'],
                        ['global-shallow', 'global-deep8', 'global-bound-deep']):
             gold = entries[family[0] + '.js']['invocations']
             self.assertTrue(all(entries[name + '.js']['invocations'] == gold for name in family))
@@ -81,6 +82,8 @@ class SituationTests(unittest.TestCase):
         self.assertNotIn('delete row.x;', entries['property-stable.js'])
         with self.assertRaises(ValueError):
             situations.frame_source(3)
+        with self.assertRaises(ValueError):
+            situations.function_property_source('proxy')
 
     def test_global_comparison_references_are_nearest_worker_captures(self):
         names = ('Map', 'Set', 'Uint8Array', 'DataView', 'Date', 'Number')

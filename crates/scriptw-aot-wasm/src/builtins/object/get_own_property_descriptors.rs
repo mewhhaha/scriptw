@@ -1,6 +1,5 @@
 //! A fixed own-key snapshot precedes per-key descriptor acquisition/publication.
 use super::*;
-use crate::functions::NativeObjectAlgorithm;
 use crate::gc_types::{CompletionLocals, ValueLocals};
 
 impl FunctionBuilder<'_> {
@@ -45,12 +44,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(exit, function);
         let key = keys.read_key(index, self, function)?;
-        self.emit_native_object_algorithm_call(
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-            &[&object, key.value()],
-            &pending,
-            function,
-        )?;
+        self.emit_get_own_property_descriptor_object(&object, &key, &pending, function)?;
         self.emit_native_object_abrupt_exit(&pending, &output, cleanup, function);
         pending.value().tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));

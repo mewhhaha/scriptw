@@ -2,7 +2,6 @@
 //! existing module registry, evaluation Promise, and intrinsic reaction jobs.
 
 use crate::emit::AccessorThrowRouting;
-use crate::functions::NativeObjectAlgorithm;
 use crate::gc_types::*;
 use crate::operations::PropertyKeyLocals;
 use crate::*;
@@ -215,18 +214,11 @@ impl FunctionBuilder<'_> {
         let key = PropertyKeyLocals::from_string(schema, &name, function);
         output.initialize(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
-        self.emit_native_object_algorithm_call(
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor,
-            &[&namespace, key.value()],
-            &pending,
-            function,
-        )?;
+        let descriptor = self.emit_object_get_own_property(&namespace, &key, &pending, function)?;
         self.emit_shadow_realm_import_abrupt_exit(&pending, &output, exit, function);
-        pending.value().tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
+        descriptor.load(schema, function);
+        function.instruction(&Instruction::RefIsNull);
+        descriptor.clear(function);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_throw_current_function_realm_type_error(
             RuntimeErrorMessage::SHADOW_REALM_MISSING_EXPORT,

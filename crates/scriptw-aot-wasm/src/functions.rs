@@ -750,13 +750,6 @@ pub(crate) enum FunctionPrototypeMaterialization {
     BootstrapSupplied,
 }
 
-/// Private recursive object algorithms whose native code runs in the caller's
-/// Realm rather than the compiler entry Realm.
-#[derive(Clone, Copy)]
-pub(crate) enum NativeObjectAlgorithm {
-    GetOwnPropertyDescriptor,
-}
-
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_alloc_realm_record(
         &mut self,
@@ -1244,59 +1237,6 @@ impl FunctionBuilder<'_> {
             }
         }
         Ok(construction.finish(self, function))
-    }
-
-    /// Invoke a private object algorithm in the executing function's Realm.
-    /// Its code identity is fixed by this closed domain, independently of any
-    /// public property mutation. Internal recursion must retain the originating
-    /// builtin Realm when it creates an error or a fresh result object.
-    pub(crate) fn emit_native_object_algorithm_call(
-        &mut self,
-        algorithm: NativeObjectAlgorithm,
-        args: &[&crate::gc_types::ValueLocals],
-        result: &crate::gc_types::CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let builtin = match algorithm {
-            NativeObjectAlgorithm::GetOwnPropertyDescriptor => {
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor
-            }
-        };
-        let meta = self
-            .functions
-            .get(&builtin.function_id())
-            .cloned()
-            .ok_or_else(|| EmitError::unsupported("missing rooted native object algorithm"))?;
-        let schema = self.runtime_schema();
-        let capture = schema
-            .reserve_gc_local::<crate::gc_types::BuiltinClosureCapture, crate::gc_types::Nullable>(
-                function,
-            )
-            .initialize_null(schema, function);
-        let realm = self.emit_execution_realm(function);
-        let context = self.emit_realm_function_materialization_context_from_realm(&realm, function);
-        let callable = schema.reserve_gc_local(function).initialize(
-            self.emit_function_value_payload_in_realm_with_capture(
-                &meta, &context, &capture, function,
-            )?,
-            function,
-        );
-        self.release_realm_function_materialization_context(context, function);
-        realm.clear(function);
-        let callee = schema.reserve_value_local(function);
-        let receiver = schema.reserve_value_local(function);
-        callee.set_reference(&callable, schema, function);
-        receiver.set_undefined(function);
-        let arguments = self.emit_pre_evaluated_arg_vector(args, function);
-        self.emit_function_or_proxy_call_with_argv(
-            &callee, &receiver, &arguments, result, function,
-        )?;
-        arguments.clear(function);
-        receiver.clear(function);
-        callee.clear(function);
-        callable.clear(function);
-        capture.clear(function);
-        Ok(())
     }
 
     pub(crate) fn emit_direct_js_call(

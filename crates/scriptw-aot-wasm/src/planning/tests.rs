@@ -79,7 +79,7 @@ fn dynamic_property_keys_root_every_possible_shape_accessor() {
 }
 
 #[test]
-fn for_in_roots_internal_methods_and_primitive_prototype_installers() {
+fn for_in_roots_primitive_prototype_installers_without_a_public_descriptor_callable() {
     for (source, constructor) in [
         (
             "for (var key in 7) {}",
@@ -103,12 +103,14 @@ fn for_in_roots_internal_methods_and_primitive_prototype_installers() {
         ),
     ] {
         let script = lower_script(source);
-        for builtin in FOR_IN_INTRINSICS.into_iter().chain([constructor]) {
-            assert!(
-                script_references_standard_builtin(&script, builtin),
-                "missing {builtin:?} dependency for {source}"
-            );
-        }
+        assert!(
+            script_references_standard_builtin(&script, constructor),
+            "missing {constructor:?} dependency for {source}"
+        );
+        assert!(!script_references_standard_builtin(
+            &script,
+            StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
+        ));
     }
 }
 
@@ -740,7 +742,7 @@ fn accessor_definers_root_the_canonical_definition_path() {
         assert!(plan
             .standard_roots
             .contains(&StandardBuiltinId::ObjectDefineProperty));
-        assert!(plan
+        assert!(!plan
             .standard_roots
             .contains(&StandardBuiltinId::ObjectGetOwnPropertyDescriptor));
     }
@@ -773,7 +775,7 @@ fn boolean_property_definitions_root_the_ordinary_definition_body() {
 }
 
 #[test]
-fn descriptor_entry_points_root_generic_descriptor_lookup() {
+fn internal_descriptor_entries_do_not_root_the_public_descriptor_callable() {
     for builtin in [
         StandardBuiltinId::ObjectDefineProperty,
         StandardBuiltinId::ReflectDefineProperty,
@@ -787,7 +789,7 @@ fn descriptor_entry_points_root_generic_descriptor_lookup() {
         plan.require_standard_builtin(builtin);
 
         assert!(plan.standard_roots.contains(&builtin));
-        assert!(plan
+        assert!(!plan
             .standard_roots
             .contains(&StandardBuiltinId::ObjectGetOwnPropertyDescriptor));
     }
@@ -818,7 +820,6 @@ fn object_has_own_roots_generic_descriptor_lookup() {
     for builtin in [
         StandardBuiltinId::ObjectHasOwn,
         StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-        StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
     ] {
         assert!(plan.standard_roots.contains(&builtin));
     }
@@ -850,32 +851,22 @@ fn object_integrity_builtins_root_reflective_property_operations() {
     for (integrity_builtin, dependencies) in [
         (
             StandardBuiltinId::ObjectSeal,
-            &[
-                StandardBuiltinId::ReflectDefineProperty,
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
-            ][..],
+            &[StandardBuiltinId::ReflectDefineProperty][..],
         ),
         (
             StandardBuiltinId::ObjectFreeze,
             &[
                 StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
                 StandardBuiltinId::ReflectDefineProperty,
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
             ][..],
         ),
         (
             StandardBuiltinId::ObjectIsSealed,
-            &[
-                StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
-            ][..],
+            &[StandardBuiltinId::ReflectGetOwnPropertyDescriptor][..],
         ),
         (
             StandardBuiltinId::ObjectIsFrozen,
-            &[
-                StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-                StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
-            ][..],
+            &[StandardBuiltinId::ReflectGetOwnPropertyDescriptor][..],
         ),
     ] {
         let mut plan = RuntimeBootstrapPlan::default();
@@ -901,7 +892,6 @@ fn enumerable_own_properties_root_reflective_property_operations() {
         for builtin in [
             enumerable_own_properties_builtin,
             StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-            StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
         ] {
             assert!(plan.standard_roots.contains(&builtin));
         }
@@ -917,11 +907,7 @@ fn object_property_copy_builtins_root_reflective_property_operations() {
         let mut plan = RuntimeBootstrapPlan::default();
         plan.require_standard_builtin(builtin);
 
-        for dependency in [
-            builtin,
-            StandardBuiltinId::ReflectGetOwnPropertyDescriptor,
-            StandardBuiltinId::ObjectGetOwnPropertyDescriptor,
-        ] {
+        for dependency in [builtin, StandardBuiltinId::ReflectGetOwnPropertyDescriptor] {
             assert!(plan.standard_roots.contains(&dependency));
         }
 

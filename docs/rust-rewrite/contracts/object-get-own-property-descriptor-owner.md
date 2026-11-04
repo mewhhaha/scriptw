@@ -1,38 +1,41 @@
-# Object.getOwnPropertyDescriptor compiler owner
+# GetOwnProperty runtime owner
 
-The 2026-10-05 source draft keeps the native entry in the private
-`builtins/object/get_own_property_descriptor.rs` owner and Proxy processing in
-its private `proxy.rs` child. The standard dispatcher calls the entry directly.
+`objects/own_property.rs` owns one typed `ObjectGetOwnProperty` runtime helper.
+It takes an object Value, an already converted PropertyKey, and the executing
+Realm, Environment and Program. It returns the whole Completion followed by a
+nullable `PropertyDescriptor`. Null means absence on normal completion; every
+abrupt exit returns null and retains the original Throw. The caller roots both
+results before checking completion, including callers that must close acquired
+iterators before propagating failure.
 
-The entry completes ToObject before ToPropertyKey. Non-Proxy objects use the
-single shared non-Proxy GetOwnProperty storage kernel, including Array,
-Arguments, String boxes, TypedArray, functions and module namespaces. The
-nullable typed PropertyDescriptor result represents absence. Present records
-are published through the sole FromPropertyDescriptor owner as fresh ordinary
-objects with the executing Realm's Object prototype. Values and getter/setter
-identities remain complete GC values.
+The helper reuses the non-Proxy storage dispatcher for ordinary objects, Arrays,
+Arguments, String boxes, TypedArrays, functions and module namespaces. Mutable
+storage descriptors are copied before publication. Mapped argument values and
+namespace TDZ are observed at acquisition; no descriptor cache is introduced.
 
-Proxy processing keeps the normative trap, target and conversion order. It
-acquires GetMethod and calls the trap with the handler receiver. An invalid
-primitive trap result is rejected before target observations. Target
-GetOwnProperty completes recursively before IsExtensible and observable
-ToPropertyDescriptor. An undefined trap result with an absent target descriptor
-returns without IsExtensible. Present trap descriptors are completed once,
-validated by the shared compatibility kernel and the remaining nonconfigurable
-and nonwritable invariants, and published as fresh objects. Missing traps
-forward through the private NativeObjectAlgorithm call authority. No public
-Object/Reflect property lookup or scalar argument adapter supplies that call.
+The private `own_property/proxy.rs` child retains the Proxy algorithm. GetMethod
+and the trap call precede recursive target acquisition, IsExtensible and
+observable ToPropertyDescriptor reads. Missing traps recurse through the same
+runtime helper. An undefined trap result with an absent target descriptor skips
+IsExtensible. Present descriptors are completed once, checked by the existing
+compatibility kernel and nonconfigurable/nonwritable constraints, then stored
+as private records. Recursive target snapshots survive later conversion effects.
+Generated errors use the supplied execution Realm; the helper has no callable
+context. Nested user calls retain their actual callee Realm and whole Throws.
 
-The execution-Realm selector also serves generated internal-method helper
-bodies that have no ordinary callable entry. Their nearest defining environment
-or active Realm supplies the native callable; normal builtin bodies use their
-actual FunctionContext Realm.
+`builtins/object/get_own_property_descriptor.rs` owns public materialization.
+Object.getOwnPropertyDescriptor completes ToObject before ToPropertyKey;
+Reflect.getOwnPropertyDescriptor retains its object requirement before key
+conversion. Both then acquire the private snapshot and expose a fresh ordinary
+descriptor with the native method's executing-Realm Object prototype. The same
+adapter supplies observable entries of Object.getOwnPropertyDescriptors.
+Internal Get, Proxy invariants, ForIn, bind metadata, Iterator.zipKeyed and
+ShadowRealm import checks never construct that JavaScript transport object or
+a temporary public descriptor callable.
 
-The historical 2026-08-28 ownership checkpoint verified the previous source.
-Its results do not verify this GC rewrite. The authored
-`scriptw-engine/tests/aot_gc_object_entries.rs` controls cover recursive Proxy step
-order, fresh results and original Throw identity; existing semantic descriptor
-controls remain required. Obsolete source-spelling and linear-heap guards are
-retired. The draft has had no compilation, emitted-Wasm validation or execution.
-Run the complete implementation checkpoint under the confirmed 4096 MiB process
-tree cap before assigning acceptance or changing published conformance counts.
+Runtime layout 51 records the helper function/type ABI change. The GC object
+model is unchanged; canonical R source identity remains part of its cache key.
+Previous layout-50 cache/package entries are rejected and rebuilt. Encoded R/P
+acceptance lives in `tests/emission/own_property_helper.rs`; Engine descriptor,
+Realm, Proxy, iterator, namespace and exotic controls remain required. This
+contract describes the implementation, not a full Test262 acceptance claim.

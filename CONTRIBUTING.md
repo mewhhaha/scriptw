@@ -96,6 +96,7 @@ ordinary emitter library that Engine also uses; private unit checks remain in
 
 ```sh
 python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-aot-wasm --test emission -- has_instance_helper:: --test-threads=1
+python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-aot-wasm --test emission -- own_property_helper:: --test-threads=1
 python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-aot-wasm --test emission -- own_keys_helper:: --test-threads=1
 ```
 

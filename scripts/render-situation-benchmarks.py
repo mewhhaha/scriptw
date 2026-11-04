@@ -23,6 +23,8 @@ CATEGORIES = (
      ('args-unused.js', 'args-observed.js')),
     ('property mutation history', 'Property mutation history', 'Retained public call · ms',
      ('property-stable.js', 'property-mutated.js')),
+    ('function properties', 'Function property reads', 'Retained public call · ms',
+     ('metadata-ordinary.js', 'metadata-function.js', 'metadata-intrinsic.js')),
 )
 SHORT_LABELS = {
     'control-empty.js': 'Empty call',
@@ -32,6 +34,8 @@ SHORT_LABELS = {
     'frame-branches128.js': '128 source sites', 'frame-branches512.js': '512 source sites',
     'args-unused.js': 'Arguments unused', 'args-observed.js': 'Arguments observed',
     'property-stable.js': 'Stable properties', 'property-mutated.js': 'After mutation',
+    'metadata-ordinary.js': 'Ordinary records', 'metadata-function.js': 'JS functions',
+    'metadata-intrinsic.js': 'Native constructors',
 }
 FRAME_CASES = ('frame-compact.js', 'frame-branches32.js', 'frame-branches128.js', 'frame-branches512.js')
 
@@ -248,8 +252,10 @@ def main():
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
-    print('Verified six situation benchmark charts' if args.check else
-          f'Wrote {len(outputs)} situation benchmark charts to {args.output_dir}')
+    if args.check:
+        print(f'Verified {len(outputs)} situation benchmark charts')
+        return
+    print(f'Wrote {len(outputs)} situation benchmark charts to {args.output_dir}')
 
 
 if __name__ == '__main__':
