@@ -9,20 +9,22 @@ pub(super) enum ArrayRead {
 
 /// Construction fixes the sole receiver, induction binding and loop shape.
 pub(super) struct ArrayReadLoop {
-    array: ArrayReceiver,
+    array: RegionInputSource,
     counter: LocalBindingId,
     iteration: ArrayIteration,
     row_alias: Option<LocalBindingId>,
     paths: ReadPaths,
 }
 
+/// A source-local or authenticated captured cell, without callbacks.
+/// Consumers separately validate its current value kind and representation.
 #[derive(PartialEq, Eq)]
-pub(super) enum ArrayReceiver {
+pub(super) enum RegionInputSource {
     Local(LocalBindingId),
     Cell(scriptw_ir::ProvenBindingCellIr),
 }
 
-impl ArrayReceiver {
+impl RegionInputSource {
     pub(super) fn of(builder: &FunctionBuilder<'_>, value: &TypedExpr) -> Option<Self> {
         if let Some(local) = private_local(builder, value) {
             return Some(Self::Local(local));
@@ -60,7 +62,7 @@ impl ArrayReceiver {
     ) {
         let s = builder.runtime_schema();
         match self {
-            ArrayReceiver::Local(id) => {
+            RegionInputSource::Local(id) => {
                 let local = builder.local_binding(*id);
                 if let Some(initialized) = local.initialization_check() {
                     initialized.load(function);
@@ -69,12 +71,12 @@ impl ArrayReceiver {
                 }
                 source.copy_from(local.value(), function);
             }
-            ArrayReceiver::Cell(proof) => {
+            RegionInputSource::Cell(proof) => {
                 let BindingStorage::EnvSlot { slot, hops } = builder
                     .module_cell_storage(proof, proof.source_name())
-                    .expect("the sealed array receiver authenticates this captured cell")
+                    .expect("the sealed region input authenticates this captured cell")
                 else {
-                    unreachable!("proven captured array receiver uses a cell");
+                    unreachable!("proven captured region input uses a cell");
                 };
                 let environment = builder.resolve_env_handle_local(hops, function);
                 let cell = builder.emit_environment_cell_local(&environment, slot, function);
@@ -195,8 +197,8 @@ impl<'a> PropertyReadView<'a> {
                         operation: SpecOperationIr::GetV,
                         ..
                     } => {
-                        // A structural view only. CyclicReadKey authenticates
-                        // both the key-array receiver and the exact induction.
+                        // A structural view only. Each region consumer must
+                        // authenticate its actual receiver/key and induction.
                         ReadKey::Computed(key)
                     }
                     _ => return None,
@@ -210,6 +212,25 @@ impl<'a> PropertyReadView<'a> {
 }
 
 impl ArrayReadLoop {
+    pub(super) fn masked_numbers(
+        array: RegionInputSource,
+        counter: LocalBindingId,
+        limit: u32,
+        mask: u32,
+    ) -> Self {
+        Self {
+            array,
+            counter,
+            iteration: ArrayIteration::Masked { limit, mask },
+            row_alias: None,
+            paths: ReadPaths::Numbers,
+        }
+    }
+
+    pub(super) fn has_receiver(&self, receiver: &RegionInputSource) -> bool {
+        &self.array == receiver
+    }
+
     pub(super) fn new(
         builder: &FunctionBuilder<'_>,
         init: Option<&ForInitIr>,
@@ -261,7 +282,7 @@ impl ArrayReadLoop {
             return None;
         }
         Some(Self {
-            array: ArrayReceiver::Local(array),
+            array: RegionInputSource::Local(array),
             counter,
             iteration: ArrayIteration::Length,
             row_alias: None,
@@ -382,7 +403,7 @@ impl ArrayReadLoop {
             }
             _ => return None,
         };
-        let array = ArrayReceiver::of(builder, read.target)?;
+        let array = RegionInputSource::of(builder, read.target)?;
         if array.is_local(counter) || row_alias.is_some_and(|alias| array.is_local(alias)) {
             return None;
         }
@@ -437,7 +458,7 @@ impl ArrayReadLoop {
             return None;
         }
         let read = PropertyReadView::of(row.init.as_ref()?)?;
-        if ArrayReceiver::of(builder, read.target).as_ref() != Some(&self.array)
+        if RegionInputSource::of(builder, read.target).as_ref() != Some(&self.array)
             || !self.is_counter_key(builder, read.key)
         {
             return None;
@@ -481,7 +502,7 @@ impl ArrayReadLoop {
         builder: &FunctionBuilder<'_>,
         read: PropertyReadView<'_>,
     ) -> Option<(ArrayRead, Option<LocalBindingId>)> {
-        if ArrayReceiver::of(builder, read.target).as_ref() == Some(&self.array) {
+        if RegionInputSource::of(builder, read.target).as_ref() == Some(&self.array) {
             if self.row_alias.is_some() {
                 return None;
             }
@@ -501,7 +522,7 @@ impl ArrayReadLoop {
             }
         } else {
             let row = PropertyReadView::of(row)?;
-            if ArrayReceiver::of(builder, row.target).as_ref() != Some(&self.array)
+            if RegionInputSource::of(builder, row.target).as_ref() != Some(&self.array)
                 || !self.is_counter_key(builder, row.key)
             {
                 return None;
@@ -551,7 +572,7 @@ impl ArrayReadLoop {
     pub(super) fn body_preserves_counter(
         &self,
         bindings: &[NumberBinding],
-        body: &[NumberExpression],
+        body: &[NumberStatement],
     ) -> bool {
         if self.row_alias.is_some() && !self.is_compact() {
             return false;
@@ -863,14 +884,32 @@ impl<'a> ArrayReadBorrow<'a> {
         self.slot.store(function);
     }
 
+    pub(super) fn load_slot(&self, function: &mut Function) {
+        self.slot.load(function);
+    }
+
     pub(super) fn emit_element(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        self.emit_element_at(self.slot, builder, function);
+    }
+
+    pub(super) fn emit_element_at(
+        &self,
+        index: I32Local,
+        builder: &FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
         let s = builder.runtime_schema();
         let ReadBacking::Numbers(numbers) = &self.backing else {
             unreachable!("direct Number reads require their matching guarded backing");
         };
         s.array_type::<NumberBitsI64Array>()
-            .read(numbers, self.slot, s, function);
+            .read(numbers, index, s, function);
         function.instruction(&Instruction::F64ReinterpretI64);
+    }
+
+    pub(super) fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        self.array.set_null(builder.runtime_schema(), function);
+        self.backing.clear_roots(builder, function);
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {

@@ -7,6 +7,10 @@
 use super::*;
 use crate::emit::LocalBindingId;
 
+mod statements;
+use statements::NumberStatement;
+mod number_inputs;
+use number_inputs::{NumberInputBorrow, NumberInputs};
 mod dense_array;
 use dense_array::{ArrayRead, ArrayReadBorrow, ArrayReadLoop, PropertyReadView};
 mod compact_path;
@@ -63,6 +67,8 @@ enum NumberExpression {
     Binding(usize),
     ArrayLength,
     ArrayElement,
+    InputElement(usize),
+    MaskedInputIndex,
     CompactPath(CompactPathId),
     JoinedLength,
     Negate(Box<Self>),
@@ -98,6 +104,7 @@ enum NumberPredicate {
 struct NumberBinding {
     id: LocalBindingId,
     written: bool,
+    initialized_in_body: bool,
     domain: NumberDomain,
 }
 
@@ -138,6 +145,13 @@ struct LoopLocals<'a> {
 }
 
 impl LoopLocals<'_> {
+    fn number_inputs(&self) -> &NumberInputBorrow<'_> {
+        let Some(RegionFact::NumberInputs(inputs)) = self.invariant else {
+            unreachable!("numeric input leaves require their sealed roots");
+        };
+        inputs
+    }
+
     fn array(&self) -> &ArrayReadBorrow<'_> {
         let Some(RegionFact::ArrayReads(borrow)) = self.invariant else {
             unreachable!("dense reads require their matching entry fact");
@@ -156,6 +170,7 @@ impl LoopLocals<'_> {
 /// One region owns one closed fact. Conflicting receivers/operations decline.
 enum RegionInvariant {
     ArrayReads(ArrayReadLoop),
+    NumberInputs(NumberInputs),
     JoinedStringLength(JoinedStringArrayLength),
 }
 
@@ -163,6 +178,7 @@ impl RegionInvariant {
     fn is_receiver(&self, id: LocalBindingId) -> bool {
         match self {
             Self::ArrayReads(array) => array.is_array(id),
+            Self::NumberInputs(inputs) => inputs.is_receiver(id),
             Self::JoinedStringLength(joined) => joined.receiver() == id,
         }
     }
@@ -170,6 +186,7 @@ impl RegionInvariant {
 
 enum RegionFact<'a> {
     ArrayReads(ArrayReadBorrow<'a>),
+    NumberInputs(NumberInputBorrow<'a>),
     JoinedStringLength(JoinedLengthFact),
 }
 
@@ -177,6 +194,7 @@ impl RegionFact<'_> {
     fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         match self {
             Self::ArrayReads(array) => array.release(builder, function),
+            Self::NumberInputs(inputs) => inputs.release(builder, function),
             Self::JoinedStringLength(length) => length.release(builder, function),
         }
     }
@@ -186,7 +204,7 @@ impl RegionFact<'_> {
 pub(super) struct ScalarNumberLoop {
     bindings: Vec<NumberBinding>,
     test: NumberPredicate,
-    body: Vec<NumberExpression>,
+    body: Vec<NumberStatement>,
     update: Option<NumberExpression>,
     imul: Vec<InvariantImul>,
     invariant: Option<RegionInvariant>,
@@ -251,6 +269,7 @@ struct LoopProof<'a, 'b> {
     imul: Vec<InvariantImul>,
     invariant: Option<RegionInvariant>,
     row_alias_initialized: bool,
+    number_index_initialized: bool,
 }
 
 impl ScalarNumberLoop {
@@ -261,13 +280,7 @@ impl ScalarNumberLoop {
         value: Option<LoopLocal>,
         function: &mut Function,
     ) {
-        for (index, expression) in self.body.iter().enumerate() {
-            if let Some(value) = value.filter(|_| index + 1 == self.body.len()) {
-                expression.emit_into(builder, locals, value, function);
-            } else {
-                expression.emit_discard(builder, locals, function);
-            }
-        }
+        NumberStatement::emit_list(&self.body, builder, locals, value, function);
     }
 
     fn emit_iteration(
@@ -283,8 +296,10 @@ impl ScalarNumberLoop {
         if let Some(update) = &self.update {
             update.emit_discard(builder, locals, function);
         }
-        if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
-            array.advance(function);
+        match locals.invariant {
+            Some(RegionFact::ArrayReads(array)) => array.advance(function),
+            Some(RegionFact::NumberInputs(inputs)) => inputs.advance(function),
+            _ => {}
         }
     }
 
@@ -312,8 +327,13 @@ impl ScalarNumberLoop {
             remaining: MAX_NODES,
             imul: Vec::new(),
             invariant: ArrayReadLoop::new(builder, init, source_test, update, body)
-                .map(RegionInvariant::ArrayReads),
+                .map(RegionInvariant::ArrayReads)
+                .or_else(|| {
+                    NumberInputs::new(builder, init, source_test, update, body)
+                        .map(RegionInvariant::NumberInputs)
+                }),
             row_alias_initialized: false,
+            number_index_initialized: false,
         };
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
@@ -324,6 +344,11 @@ impl ScalarNumberLoop {
         };
         if let Some(RegionInvariant::ArrayReads(array)) = &proof.invariant {
             if !array.body_preserves_counter(&proof.bindings, &expressions) {
+                return None;
+            }
+        }
+        if let Some(RegionInvariant::NumberInputs(inputs)) = &proof.invariant {
+            if !inputs.complete(&proof.bindings, &expressions) {
                 return None;
             }
         }
@@ -386,6 +411,9 @@ impl ScalarNumberLoop {
     ) -> Result<ScalarNumberLoopEntry<'_>, EmitError> {
         function.instruction(&Instruction::I32Const(1));
         for binding in &self.bindings {
+            if binding.initialized_in_body {
+                continue;
+            }
             let source = builder.local_binding(binding.id);
             source.value().tag().load(function);
             function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
@@ -445,6 +473,9 @@ impl ScalarNumberLoop {
                     RegionInvariant::ArrayReads(plan) => RegionFact::ArrayReads(
                         ArrayReadBorrow::new(plan, builder, accepted, function),
                     ),
+                    RegionInvariant::NumberInputs(plan) => {
+                        RegionFact::NumberInputs(plan.guard(builder, accepted, function))
+                    }
                     RegionInvariant::JoinedStringLength(plan) => {
                         // Speculate only after Number/initialization admission.
                         // This view proves a repeated false entry test has no
@@ -538,6 +569,7 @@ impl LoopProof<'_, '_> {
         self.bindings.push(NumberBinding {
             id,
             written,
+            initialized_in_body: false,
             domain: NumberDomain::Number,
         });
         Some(index)
@@ -561,6 +593,14 @@ impl LoopProof<'_, '_> {
             return Some(NumberExpression::JoinedLength);
         }
         if let Some(read) = PropertyReadView::of(value) {
+            if let Some(RegionInvariant::NumberInputs(inputs)) = &mut self.invariant {
+                if !self.number_index_initialized {
+                    return None;
+                }
+                return inputs
+                    .read(self.builder, read)
+                    .map(NumberExpression::InputElement);
+            }
             let Some(RegionInvariant::ArrayReads(array)) = self.invariant.as_mut() else {
                 return None;
             };
@@ -668,6 +708,19 @@ impl LoopProof<'_, '_> {
                     self.expression(rhs, depth)?,
                 )
             }
+            ExprIr::SpecOperation {
+                operation: SpecOperationIr::StrictEqualityComparison,
+                operands,
+            } if matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) => {
+                let [left, right] = operands.as_slice() else {
+                    return None;
+                };
+                NumberPredicate::Equal(
+                    true,
+                    self.expression(left, depth)?,
+                    self.expression(right, depth)?,
+                )
+            }
             _ => NumberPredicate::Truthy(self.expression(value, depth)?),
         })
     }
@@ -675,13 +728,58 @@ impl LoopProof<'_, '_> {
     fn statement(
         &mut self,
         statement: &StatementIr,
-        expressions: &mut Vec<NumberExpression>,
+        expressions: &mut Vec<NumberStatement>,
         depth: usize,
     ) -> Option<()> {
         let depth = self.visit(depth)?;
         match statement {
             StatementIr::Empty => {}
-            StatementIr::Expression(value) => expressions.push(self.expression(value, depth)?),
+            StatementIr::Expression(value) => {
+                expressions.push(NumberStatement::Expression(self.expression(value, depth)?))
+            }
+            StatementIr::If {
+                condition,
+                then_branch,
+                else_branch,
+            } if matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) => {
+                let test = self.predicate(condition, depth)?;
+                let mut consequent = Vec::new();
+                let mut alternate = Vec::new();
+                self.statement(then_branch, &mut consequent, depth)?;
+                self.statement(else_branch.as_deref()?, &mut alternate, depth)?;
+                // Each accepted branch returns a Number statement value; no
+                // Empty/Undefined completion is invented at an If join.
+                if !consequent.last()?.has_value() || !alternate.last()?.has_value() {
+                    return None;
+                }
+                expressions.push(NumberStatement::If {
+                    test,
+                    consequent,
+                    alternate,
+                });
+            }
+            StatementIr::Var(declarations)
+                if expressions.is_empty()
+                    && !self.number_index_initialized
+                    && matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) =>
+            {
+                let Some(RegionInvariant::NumberInputs(inputs)) = &self.invariant else {
+                    unreachable!()
+                };
+                let [declaration] = declarations.as_slice() else {
+                    return None;
+                };
+                if self.builder.private_local_binding(&declaration.name) != Some(inputs.index()) {
+                    return None;
+                }
+                let index = self.binding_id(inputs.index(), true)?;
+                self.bindings[index].initialized_in_body = true;
+                self.number_index_initialized = true;
+                expressions.push(NumberStatement::Initialize(NumberExpression::Assign(
+                    index,
+                    Box::new(NumberExpression::MaskedInputIndex),
+                )));
+            }
             StatementIr::Var(declarations)
                 if expressions.is_empty() && !self.row_alias_initialized =>
             {
@@ -723,6 +821,7 @@ impl NumberExpression {
                     NumberDomain::Number
                 }
             }
+            Self::MaskedInputIndex => NumberDomain::Signed32,
             Self::ArrayLength | Self::Bitwise(BitwiseBinaryOp::UShr, _, _) => {
                 NumberDomain::Unsigned32
             }
@@ -739,6 +838,7 @@ impl NumberExpression {
             ),
             Self::Binding(_)
             | Self::ArrayElement
+            | Self::InputElement(_)
             | Self::CompactPath(_)
             | Self::JoinedLength
             | Self::Negate(_)
@@ -849,6 +949,8 @@ impl NumberExpression {
             | Self::Binding(_)
             | Self::ArrayLength
             | Self::ArrayElement
+            | Self::InputElement(_)
+            | Self::MaskedInputIndex
             | Self::CompactPath(_)
             | Self::JoinedLength => {}
         }
@@ -873,6 +975,7 @@ impl NumberExpression {
                     self.emit_number_to_uint32(builder, locals, function);
                 }
             },
+            Self::MaskedInputIndex => locals.number_inputs().emit_index(function),
             Self::Bitwise(op, lhs, rhs) => {
                 lhs.emit_uint32(builder, locals, function);
                 rhs.emit_uint32(builder, locals, function);
@@ -1009,6 +1112,13 @@ impl NumberExpression {
             Self::Binding(index) => locals.values[*index].load_number(function),
             Self::ArrayLength => locals.array().emit_length(function),
             Self::ArrayElement => locals.array().emit_element(builder, function),
+            Self::InputElement(input) => locals
+                .number_inputs()
+                .emit_element(*input, locals, builder, function),
+            Self::MaskedInputIndex => {
+                locals.number_inputs().emit_index(function);
+                function.instruction(&Instruction::F64ConvertI32S);
+            }
             Self::CompactPath(path) => locals.array().emit_compact_path(*path, function),
             Self::JoinedLength => locals.joined().emit(function),
             Self::Negate(value) => {
@@ -1144,11 +1254,15 @@ impl FunctionBuilder<'_> {
             .bindings
             .iter()
             .map(|binding| {
-                self.local_binding(binding.id)
-                    .value()
-                    .scalar()
-                    .load(function);
-                function.instruction(&Instruction::F64ReinterpretI64);
+                if binding.initialized_in_body {
+                    function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
+                } else {
+                    self.local_binding(binding.id)
+                        .value()
+                        .scalar()
+                        .load(function);
+                    function.instruction(&Instruction::F64ReinterpretI64);
+                }
                 let local = match binding.domain {
                     NumberDomain::Number | NumberDomain::SafeInteger => {
                         LoopLocal::Number(schema.reserve_f64_local(function))
@@ -1176,7 +1290,8 @@ impl FunctionBuilder<'_> {
         let value = plan
             .body
             .last()
-            .map(|expression| match expression.domain(&locals) {
+            .and_then(|statement| statement.domain(&locals))
+            .map(|domain| match domain {
                 NumberDomain::Number | NumberDomain::SafeInteger => {
                     LoopLocal::Number(schema.reserve_f64_local(function))
                 }
@@ -1274,12 +1389,22 @@ impl FunctionBuilder<'_> {
         }
         for (binding, local) in plan.bindings.iter().zip(&locals.values) {
             if binding.written {
+                if binding.initialized_in_body {
+                    iterated.load(function);
+                    self.open_frame(ControlFrameKind::If, function);
+                }
                 local.load_number(function);
                 function.instruction(&Instruction::I64ReinterpretF64);
                 self.local_binding(binding.id)
                     .value()
                     .scalar()
                     .store(function);
+                if binding.initialized_in_body {
+                    let value = self.local_binding(binding.id).value();
+                    value.set_number(value.scalar(), function);
+                    self.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                }
             }
         }
         if let Some(RegionFact::ArrayReads(array)) = locals.invariant {

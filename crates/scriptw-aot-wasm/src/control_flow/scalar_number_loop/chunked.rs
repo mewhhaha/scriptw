@@ -87,10 +87,10 @@ impl ChunkedLoop {
         for expression in &plan.body {
             expression.collect_writes(&mut writes);
         }
-        if writes[counter].is_some()
-            || plan.body.iter().map(node_count).sum::<usize>() * UNROLL as usize
-                > MAX_EXPANDED_NODES
-        {
+        let body_nodes = plan.body.iter().try_fold(0_usize, |count, statement| {
+            Some(count + node_count(statement.expression()?))
+        })?;
+        if writes[counter].is_some() || body_nodes * UNROLL as usize > MAX_EXPANDED_NODES {
             return None;
         }
         Some(Self {
@@ -271,6 +271,8 @@ fn node_count(value: &NumberExpression) -> usize {
         | NumberExpression::Binding(_)
         | NumberExpression::ArrayLength
         | NumberExpression::ArrayElement
+        | NumberExpression::InputElement(_)
+        | NumberExpression::MaskedInputIndex
         | NumberExpression::CompactPath(_)
         | NumberExpression::JoinedLength
         | NumberExpression::Update(_, _, _) => 0,
@@ -436,7 +438,9 @@ impl Affine32 {
     }
 
     fn one_step(plan: &ScalarNumberLoop, counter: usize) -> Option<Self> {
-        let [NumberExpression::Assign(binding, value)] = plan.body.as_slice() else {
+        let [NumberStatement::Expression(NumberExpression::Assign(binding, value))] =
+            plan.body.as_slice()
+        else {
             return None;
         };
         if *binding == counter

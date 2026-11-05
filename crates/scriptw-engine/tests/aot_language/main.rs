@@ -88,3 +88,5 @@ mod aot_scalar_row_projection;
 mod aot_simple_parameters;
 
 mod aot_computed_key_projection;
+
+mod aot_typed_number_inputs;

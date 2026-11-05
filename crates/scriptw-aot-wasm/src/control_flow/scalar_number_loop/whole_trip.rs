@@ -192,7 +192,7 @@ impl ExactSum {
         if iterations == 0 {
             return None;
         }
-        let [body] = plan.body.as_slice() else {
+        let [NumberStatement::Expression(body)] = plan.body.as_slice() else {
             return None;
         };
         let (accumulator, term) = match body {

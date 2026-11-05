@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-05**, React **19.3.1**, compiler `267ec3510f5d`
-(base `2d8b5896c` plus the archived source patch).
+Measured **2026-11-05**, React **19.3.1**, compiler `21ad728e4380`
+(base `cff119329` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 5.709 | 6.101 |
-| Node 24.12.0 / V8 | 0.491 | 0.435 |
+| Scriptw | 5.773 | 6.199 |
+| Node 24.12.0 / V8 | 0.495 | 0.412 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -25,12 +25,11 @@ and consumption; JSON encoding and exact-output checks follow timing. Values
 are medians of process medians. The frozen prior-build control stays in the
 receipts; chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
-The computed-key optimization leaves RSC's program and runtime Wasm byte-identical
-to the control; this checkpoint establishes no React execution improvement.
+Program and runtime Wasm are byte-identical to the control; this checkpoint establishes no React execution improvement.
 
-Cold Scriptw setup is **3.124 s JavaScript → Wasm**,
-**5.608 s native preparation**, and
-**2.266 ms module initialization**.
+Cold Scriptw setup is **3.252 s JavaScript → Wasm**,
+**5.656 s native preparation**, and
+**2.281 ms module initialization**.
 Program Wasm is **4,231,662 B** (3,683,242 B code; 490,228 B data);
 shared runtime Wasm is **38,816,202 B**. All setup precedes request timing.
 Child peak RSS includes compilation and process history; it is not live guest heap.
@@ -45,7 +44,7 @@ The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
 engine/mode. Scriptw retires **50.19 million sync /
 54.08 million async user instructions per request**;
-Node retires **2.52 / 2.69 million**.
+Node retires **2.51 / 2.70 million**.
 Counters run without multiplexing. They count Scriptw's execution worker and
 Node's main thread, including Node barrier/Promise-return edges; background
 compilation/GC threads are excluded. These are unscored counts, not causal shares.
@@ -77,14 +76,18 @@ Recipes, accessors, Proxies and incomplete regions keep their original semantics
 Scratch roots clear before the generic continuation. Projection allocates one
 numeric array. Canonical recipe reads can also allocate or normalize intrinsic metadata without invoking JavaScript; rejected preflight
 work remains an explicit cost.
+Closed numeric branches can borrow one or two current dense Number arrays with
+a proven bounded masked index. Entry validates the phase and both backings;
+the body preserves each original comparison, branch and arithmetic operation.
+Unsupported values and effects retain the original loop.
 Local argument entries retain their two-formal bound. Runtime value,
 environment, descriptor and call-transport costs remain; V8 parity is open.
 
-Fresh user-cycle sampling attributes **25.79% sync /
-24.17% async** to six property/enumeration helpers' disjoint
+Fresh user-cycle sampling attributes **25.68% sync /
+23.83% async** to six property/enumeration helpers' disjoint
 own samples. The `vn`/`ft` page-touch loops account for
-**2.17% /
-2.30%**. Each mode has one
+**2.35% /
+2.05%**. Each mode has one
 sampled process and 200 checked requests after three warmups. Frame-pointer
 chains can truncate; inclusive caller shares overlap. These observations do not
 partition wall time or predict a change's gain. The linked diagnostic retains
@@ -107,33 +110,33 @@ and full WHATWG conformance remain unsupported or unverified.
 
 ## Focused performance situations
 
-Measured **2026-11-05**: **21** standalone Module programs, compiler `267ec3510f5d`,
+Measured **2026-11-05**: **21** standalone Module programs, compiler `21ad728e4380`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.009 | 0.002 |
-| `global-shallow.js` | 2.169 | 1.726 | 1.062 |
-| `global-deep8.js` | 2.740 | 1.955 | 1.033 |
-| `global-bound-deep.js` | 0.694 | 0.236 | 0.071 |
-| `global-getter-deep.js` | 3.051 | 2.222 | 0.979 |
-| `frame-compact.js` | 8.100 | 5.754 | 0.079 |
-| `frame-branches32.js` | 8.273 | 6.084 | 0.096 |
-| `frame-branches128.js` | 8.846 | 6.003 | 0.135 |
-| `frame-branches512.js` | 13.930 | 6.146 | 0.292 |
-| `args-unused.js` | 0.721 | 0.510 | 0.089 |
-| `args-observed.js` | 2.438 | 1.958 | 0.132 |
-| `property-stable.js` | 0.154 | 0.076 | 0.075 |
-| `property-mutated.js` | 0.153 | 0.078 | 0.066 |
-| `metadata-ordinary.js` | 0.209 | 0.085 | 0.020 |
-| `metadata-function.js` | 0.203 | 0.084 | 0.206 |
-| `metadata-intrinsic.js` | 0.205 | 0.087 | 0.228 |
-| `typeof-dispatch.js` | 0.939 | 0.362 | 0.024 |
-| `singleton-dispatch.js` | 0.910 | 0.349 | 0.013 |
-| `strict-equality-numbers.js` | 2.534 | 1.202 | 0.045 |
-| `strict-equality-mixed.js` | 2.594 | 1.346 | 0.067 |
-| `for-in-wide.js` | 2.077 | 1.949 | 0.067 |
+| `control-empty.js` | 0.010 | 0.010 | 0.002 |
+| `global-shallow.js` | 2.240 | 1.799 | 1.000 |
+| `global-deep8.js` | 2.791 | 2.004 | 0.995 |
+| `global-bound-deep.js` | 0.715 | 0.243 | 0.074 |
+| `global-getter-deep.js` | 3.147 | 2.338 | 1.023 |
+| `frame-compact.js` | 8.145 | 5.783 | 0.068 |
+| `frame-branches32.js` | 8.259 | 5.991 | 0.094 |
+| `frame-branches128.js` | 8.686 | 5.985 | 0.140 |
+| `frame-branches512.js` | 13.699 | 6.145 | 0.191 |
+| `args-unused.js` | 0.727 | 0.517 | 0.101 |
+| `args-observed.js` | 2.501 | 2.032 | 0.137 |
+| `property-stable.js` | 0.155 | 0.075 | 0.075 |
+| `property-mutated.js` | 0.154 | 0.078 | 0.067 |
+| `metadata-ordinary.js` | 0.208 | 0.086 | 0.020 |
+| `metadata-function.js` | 0.203 | 0.085 | 0.207 |
+| `metadata-intrinsic.js` | 0.212 | 0.088 | 0.231 |
+| `typeof-dispatch.js` | 0.947 | 0.364 | 0.024 |
+| `singleton-dispatch.js` | 0.907 | 0.354 | 0.013 |
+| `strict-equality-numbers.js` | 0.120 | 0.062 | 0.021 |
+| `strict-equality-mixed.js` | 2.614 | 1.346 | 0.069 |
+| `for-in-wide.js` | 2.087 | 1.981 | 0.068 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs three checked
@@ -241,7 +244,7 @@ Mutation, Proxy and suspension controls run separately as semantic regressions.
 
 All **504** situation processes and **5,040** calls passed exact checks.
 The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
-Fresh scoped verification passes **1,769 Engine**, **63 emission**,
+Fresh scoped verification passes **1,770 Engine**, **65 emission**,
 **637 structural** and **380 source-guard** checks. The **769 IR** cases
 reuse their original passing binary/receipts with unchanged IR/front-end inputs.
 AOT units pass **653** cases; four known bootstrap assertions remain failures.

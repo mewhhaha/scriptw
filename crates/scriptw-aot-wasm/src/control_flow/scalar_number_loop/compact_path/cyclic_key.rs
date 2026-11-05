@@ -1,10 +1,10 @@
 //! A second canonical dense table supplies primitive keys for one full period.
-use super::super::dense_array::{ArrayReceiver, ReadKey};
+use super::super::dense_array::{ReadKey, RegionInputSource};
 use super::*;
 
 #[derive(PartialEq, Eq)]
 pub(in crate::control_flow::scalar_number_loop) struct CyclicReadKey {
-    array: ArrayReceiver,
+    array: RegionInputSource,
     mask: u32,
 }
 
@@ -15,7 +15,7 @@ impl CyclicReadKey {
         counter: LocalBindingId,
     ) -> Option<Self> {
         let read = PropertyReadView::of(expression)?;
-        let array = ArrayReceiver::of(builder, read.target)?;
+        let array = RegionInputSource::of(builder, read.target)?;
         let ReadKey::Computed(index) = read.key else {
             return None;
         };

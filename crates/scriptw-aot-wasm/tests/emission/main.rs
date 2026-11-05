@@ -52,3 +52,5 @@ mod scalar_row_projection;
 mod retained_operands;
 
 mod computed_key_projection;
+
+mod typed_number_inputs;

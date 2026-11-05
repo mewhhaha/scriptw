@@ -18,10 +18,10 @@ accepts `--case <file.js>`.
   non-simple parameter TDZ, arguments snapshots and captures, as well as
   callee identity, Realm, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Extend the existing numeric region to ordered conditionals, dominated local
-  definitions and bounded phase indexing. Measure the unchanged strict-equality
-  case before adding further comparison or classification leaves. Preserve
-  arithmetic order, input effects, zero-trip state and complete fallback.
+- Extend the ordered numeric region to mixed strict comparisons and type
+  classification through existing semantic kernels. Measure pure repeating-input
+  projection and remove redundant induction before adding a general Value region.
+  Preserve arithmetic order, input effects, zero-trip state and complete fallback.
   Owner: AOT scalar-loop planning and numeric inputs.
 - Reduce preflight and allocation costs in closed numeric row loops. Complete
   read-only periods project Number/string-length leaves through canonical own-data
@@ -156,10 +156,12 @@ accepts `--case <file.js>`.
   a substitute or infer its results from newer runs.
 - Repair four pre-existing AOT bootstrap assertions: compact native metadata,
   deferred Error demand, intrinsic property-layout allocation and eager layout
-  ownership. All four reproduce on the frozen prior test executable; they remain
-  failures in the latest focused checkpoint. Owner: AOT runtime bootstrap recipes
-  and their encoded-allocation assertions. Preserve the original expected and
-  actual values while determining whether recipes or assertions need correction.
+  ownership. Three eager-inventory checks predate the Web API constructors
+  (34 versus 24 constructors; 81 versus 61 layouts). Eager DOMException prototype
+  initialization reads Error.prototype and forces the Error graph. Preserve
+  DOMException inheritance while repairing that demand boundary and the inventory
+  checks. All four remain failures. Owner: AOT runtime bootstrap recipes and
+  their encoded-allocation assertions.
 - Repair pre-existing workspace formatting, stale shortcut inventory, identity
   and module-boundary audit findings. The RSC checkpoint still reports 14 stale
   Intl source-identity recipes. Preserve original evidence and compiler

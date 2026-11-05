@@ -4,13 +4,13 @@
   "status": "captured",
   "timing_report_in_evidence": {
     "path": "reports/rsc-current.json",
-    "sha256": "e917b7ae76a80d4f132dcf2576f1571570915069fa5594322c61a6b88049f106"
+    "sha256": "096e09c648b7a5ffba057d231fd2d795f3da37cd15c894dd0b3a0a642634fce6"
   },
   "excluded_from_scored_cohorts": true,
   "candidate_identity": {
-    "source_fingerprint": "267ec3510f5db2fa176f16975f84874b859e8bc6843c55544801d3f8fd20d364",
-    "source_commit": "2d8b5896c4d61528a0e802906b1d016118475ce8",
-    "executable_sha256": "142eb280817c6e302f130ccec6f0c2b3fc0a96f31f430dc5aea69862c9b36d20",
+    "source_fingerprint": "21ad728e4380ca45e70dc0896fd0f79b001ec107867979a1a109de5c7ebdeb0c",
+    "source_commit": "cff1193296b63317839e1a689583a0600953035a",
+    "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -63,9 +63,9 @@
     }
   },
   "baseline_identity": {
-    "source_fingerprint": "59022867cdb853893fabece731921f401d45f88e7374ecee0587b727ce6f2023",
-    "source_commit": "0a8e918b5e7c0344cf4f3e75a492fe6f3f512094",
-    "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
+    "source_fingerprint": "267ec3510f5db2fa176f16975f84874b859e8bc6843c55544801d3f8fd20d364",
+    "source_commit": "2d8b5896c4d61528a0e802906b1d016118475ce8",
+    "executable_sha256": "142eb280817c6e302f130ccec6f0c2b3fc0a96f31f430dc5aea69862c9b36d20",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -126,530 +126,6 @@
     "minimum_running_fraction": 1,
     "cohorts": {
       "baseline-node-sync": {
-        "processes": [
-          {
-            "name": "candidate-node-sync-0",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-0/receipt.json",
-              "sha256": "a865b22830d5ed86269f30531ec910008f717a6e0643bdba545c3f49dcad6995",
-              "bytes": 121880
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-0/observations.json",
-              "sha256": "53b18a015457ba20d7534a5d559b79afc9ffd4962dd965878b552b6872ef7d35",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 149466168,
-              "instructions:u": 267133043,
-              "branches:u": 53214318,
-              "branch-misses:u": 628033
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1354598.5,
-              "instructions:u": 2498310.0,
-              "branches:u": 494698.5,
-              "branch-misses:u": 5152.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1494661.68,
-              "instructions:u": 2671330.43,
-              "branches:u": 532143.18,
-              "branch-misses:u": 6280.33
-            },
-            "ipc": 1.7872475529044138,
-            "branch_miss_fraction": 0.011801955255726476
-          },
-          {
-            "name": "candidate-node-sync-1",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-1/receipt.json",
-              "sha256": "7a9291b3d00cf979c7ce8729940ca411396680a92fd880467b1344ff187a5d11",
-              "bytes": 121900
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-1/observations.json",
-              "sha256": "643a0c052ff7c855593f68bc42bf4519d49f7726821e4ef690402f97a2b1bd03",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 153983308,
-              "instructions:u": 277983434,
-              "branches:u": 55344577,
-              "branch-misses:u": 659547
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1348648.5,
-              "instructions:u": 2533186.0,
-              "branches:u": 499449.5,
-              "branch-misses:u": 4956.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1539833.08,
-              "instructions:u": 2779834.34,
-              "branches:u": 553445.77,
-              "branch-misses:u": 6595.47
-            },
-            "ipc": 1.8052829076772399,
-            "branch_miss_fraction": 0.011917102555504218
-          },
-          {
-            "name": "candidate-node-sync-2",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-2/receipt.json",
-              "sha256": "9ddeb5c42ce83a3c7ec157c8194fd37d738ba66590f03b687cc0a99140320033",
-              "bytes": 121894
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-sync-2/observations.json",
-              "sha256": "120aefba4cf0fe62a0fb0a7dd85ad88385cb63f5720a52ae75a2674e966470b1",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 156139572,
-              "instructions:u": 271526314,
-              "branches:u": 54301786,
-              "branch-misses:u": 636952
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1339584.5,
-              "instructions:u": 2482732.0,
-              "branches:u": 492500.5,
-              "branch-misses:u": 4973.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1561395.72,
-              "instructions:u": 2715263.14,
-              "branches:u": 543017.86,
-              "branch-misses:u": 6369.52
-            },
-            "ipc": 1.738997427250537,
-            "branch_miss_fraction": 0.011729853600027079
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1348648.5,
-          "instructions:u": 2498310.0,
-          "branches:u": 494698.5,
-          "branch-misses:u": 4973.5
-        },
-        "process_instruction_medians": [
-          2498310.0,
-          2533186.0,
-          2482732.0
-        ],
-        "median_process_ipc": 1.7872475529044138,
-        "median_process_branch_miss_fraction": 0.011801955255726476
-      },
-      "baseline-node-async": {
-        "processes": [
-          {
-            "name": "candidate-node-async-0",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-0/receipt.json",
-              "sha256": "f4af4ad327ecfeafe6896adf2fe1d9c0f3f63bc5f37097e307754522c34d9c1e",
-              "bytes": 121890
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-0/observations.json",
-              "sha256": "666199fa96765b9b483b14587d40484a3948150db8fd393f64ec211a90f8f32b",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 156174832,
-              "instructions:u": 280000467,
-              "branches:u": 55841835,
-              "branch-misses:u": 665069
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1423859.0,
-              "instructions:u": 2633545.0,
-              "branches:u": 522771.5,
-              "branch-misses:u": 5417.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1561748.32,
-              "instructions:u": 2800004.67,
-              "branches:u": 558418.35,
-              "branch-misses:u": 6650.69
-            },
-            "ipc": 1.792865491925101,
-            "branch_miss_fraction": 0.011909870082170473
-          },
-          {
-            "name": "candidate-node-async-1",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-1/receipt.json",
-              "sha256": "9685825c0f5cee619ab21f0266472b18e69849d2ec98a8ee89dbf0b19c92e200",
-              "bytes": 121875
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-1/observations.json",
-              "sha256": "16c519625ba8a721ff9e94d7d432fd54c75c0e4e1afc44a48fed0c78ddb368c0",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 156499512,
-              "instructions:u": 277338302,
-              "branches:u": 55111652,
-              "branch-misses:u": 642897
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1448225.5,
-              "instructions:u": 2650341.5,
-              "branches:u": 525280.5,
-              "branch-misses:u": 5532.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1564995.12,
-              "instructions:u": 2773383.02,
-              "branches:u": 551116.52,
-              "branch-misses:u": 6428.97
-            },
-            "ipc": 1.7721352511310067,
-            "branch_miss_fraction": 0.011665355268247085
-          },
-          {
-            "name": "candidate-node-async-2",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-2/receipt.json",
-              "sha256": "20184843596658110cbfcd1ea65748b9d1df7a18b24d7e9ecea64700335681c9",
-              "bytes": 121890
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-node-async-2/observations.json",
-              "sha256": "b4971a460ef3fe319123277ba925aa0f0e3cecaf6b49df0e487d2a2d3b4284cc",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 155921574,
-              "instructions:u": 279183599,
-              "branches:u": 55710641,
-              "branch-misses:u": 666516
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1423165.0,
-              "instructions:u": 2628469.0,
-              "branches:u": 521957.0,
-              "branch-misses:u": 5455.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1559215.74,
-              "instructions:u": 2791835.99,
-              "branches:u": 557106.41,
-              "branch-misses:u": 6665.16
-            },
-            "ipc": 1.7905386139829502,
-            "branch_miss_fraction": 0.01196389034547278
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1423859.0,
-          "instructions:u": 2633545.0,
-          "branches:u": 522771.5,
-          "branch-misses:u": 5455.5
-        },
-        "process_instruction_medians": [
-          2633545.0,
-          2650341.5,
-          2628469.0
-        ],
-        "median_process_ipc": 1.7905386139829502,
-        "median_process_branch_miss_fraction": 0.011909870082170473
-      },
-      "baseline-scriptw-sync": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-sync-0",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-0/receipt.json",
-              "sha256": "98f41e66a57576de3a4233d97d591cd5f5c4f5b58bc9ae59c5cb5fe60c1668f4",
-              "bytes": 124162
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-0/observations.json",
-              "sha256": "5f239e81e62a5e9274d50559882d283ca8be380864db07cd004524271839a2c7",
-              "bytes": 14620
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2204474520,
-              "instructions:u": 5282372343,
-              "branches:u": 747173898,
-              "branch-misses:u": 2810647
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 20982436.5,
-              "instructions:u": 50191528.0,
-              "branches:u": 6966829.5,
-              "branch-misses:u": 25287.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 22044745.2,
-              "instructions:u": 52823723.43,
-              "branches:u": 7471738.98,
-              "branch-misses:u": 28106.47
-            },
-            "ipc": 2.396204762212448,
-            "branch_miss_fraction": 0.0037617039453913042
-          },
-          {
-            "name": "candidate-scriptw-sync-1",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-1/receipt.json",
-              "sha256": "0ed0df6cb76ce3987ea4d32509d47336eebcf21e08fc38b092842a2cfd484bfb",
-              "bytes": 124161
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-1/observations.json",
-              "sha256": "bffab1a1cc66600758d714726af962211681b23a7a4aec97fdf331946b12270e",
-              "bytes": 14619
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2198142328,
-              "instructions:u": 5282370093,
-              "branches:u": 747173513,
-              "branch-misses:u": 2815410
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 20939971.5,
-              "instructions:u": 50191366.0,
-              "branches:u": 6966794.0,
-              "branch-misses:u": 25450.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 21981423.28,
-              "instructions:u": 52823700.93,
-              "branches:u": 7471735.13,
-              "branch-misses:u": 28154.1
-            },
-            "ipc": 2.4031064893810643,
-            "branch_miss_fraction": 0.0037680805743444496
-          },
-          {
-            "name": "candidate-scriptw-sync-2",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-2/receipt.json",
-              "sha256": "28a06ab5a528bc88ccd84c908d9df6fd0463dfe04205eec0dec5b04b04c7ec0c",
-              "bytes": 124165
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-sync-2/observations.json",
-              "sha256": "276d3bf522488a815ffdaa9435fdfeaf9b3283935c37da50720c2bf5107ea1b1",
-              "bytes": 14620
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2239190437,
-              "instructions:u": 5282374191,
-              "branches:u": 747174327,
-              "branch-misses:u": 2789492
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 21572553.5,
-              "instructions:u": 50191423.0,
-              "branches:u": 6966808.0,
-              "branch-misses:u": 25156.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 22391904.37,
-              "instructions:u": 52823741.91,
-              "branches:u": 7471743.27,
-              "branch-misses:u": 27894.92
-            },
-            "ipc": 2.3590553548795814,
-            "branch_miss_fraction": 0.0037333884465760026
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 20982436.5,
-          "instructions:u": 50191423.0,
-          "branches:u": 6966808.0,
-          "branch-misses:u": 25287.5
-        },
-        "process_instruction_medians": [
-          50191528.0,
-          50191366.0,
-          50191423.0
-        ],
-        "median_process_ipc": 2.396204762212448,
-        "median_process_branch_miss_fraction": 0.0037617039453913042
-      },
-      "baseline-scriptw-async": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-async-0",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-0/receipt.json",
-              "sha256": "30d8e030c58c33feb71c8b79e91ded18396b2db5c4e086c00666f34b6144d019",
-              "bytes": 124181
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-0/observations.json",
-              "sha256": "4db7d7e863e550e4dfd4fab3b40129fb78b5769492a58771bb9619a5c8e6202e",
-              "bytes": 14622
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2427044616,
-              "instructions:u": 5687768826,
-              "branches:u": 813299517,
-              "branch-misses:u": 3208271
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 23206341.0,
-              "instructions:u": 54082224.5,
-              "branches:u": 7596063.0,
-              "branch-misses:u": 29216.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 24270446.16,
-              "instructions:u": 56877688.26,
-              "branches:u": 8132995.17,
-              "branch-misses:u": 32082.71
-            },
-            "ipc": 2.343495784339549,
-            "branch_miss_fraction": 0.0039447595048799225
-          },
-          {
-            "name": "candidate-scriptw-async-1",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-1/receipt.json",
-              "sha256": "a4e365b07facf7a009f854dd69fb2c1914fd758fb2694fefb9174fd11845b027",
-              "bytes": 124179
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-1/observations.json",
-              "sha256": "4434db15ac6beaf10d71f3697bab6f1a063cd14a2dae4467442f625c36807475",
-              "bytes": 14622
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2429993193,
-              "instructions:u": 5687771045,
-              "branches:u": 813300077,
-              "branch-misses:u": 3195936
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 23179480.0,
-              "instructions:u": 54082184.5,
-              "branches:u": 7596062.5,
-              "branch-misses:u": 28826.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 24299931.93,
-              "instructions:u": 56877710.45,
-              "branches:u": 8133000.77,
-              "branch-misses:u": 31959.36
-            },
-            "ipc": 2.3406530772944434,
-            "branch_miss_fraction": 0.003929590184952115
-          },
-          {
-            "name": "candidate-scriptw-async-2",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-2/receipt.json",
-              "sha256": "e9a201bae2662a47d21c65c8efa0da91c48b0c0cb078c438f58e453e55eb0cb8",
-              "bytes": 124178
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/row-preflight/candidate-scriptw-async-2/observations.json",
-              "sha256": "137fdc1807cd8985b94c68a9e1ab8680ebbd8d58851bdb68b93202e09e788666",
-              "bytes": 14622
-            },
-            "executable_sha256": "500e11ec6aae28a5e77eb4160dcc80041d2a9e8876008373fe3c63f41f78cc57",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2374843270,
-              "instructions:u": 5687761244,
-              "branches:u": 813298061,
-              "branch-misses:u": 3109706
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 22677913.0,
-              "instructions:u": 54082155.0,
-              "branches:u": 7596059.0,
-              "branch-misses:u": 28183.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 23748432.7,
-              "instructions:u": 56877612.44,
-              "branches:u": 8132980.61,
-              "branch-misses:u": 31097.06
-            },
-            "ipc": 2.3950048897332077,
-            "branch_miss_fraction": 0.0038235748357452436
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 23179480.0,
-          "instructions:u": 54082184.5,
-          "branches:u": 7596062.5,
-          "branch-misses:u": 28826.5
-        },
-        "process_instruction_medians": [
-          54082224.5,
-          54082184.5,
-          54082155.0
-        ],
-        "median_process_ipc": 2.343495784339549,
-        "median_process_branch_miss_fraction": 0.003929590184952115
-      },
-      "candidate-node-sync": {
         "processes": [
           {
             "name": "candidate-node-sync-0",
@@ -780,7 +256,7 @@
         "median_process_ipc": 1.8149578347989879,
         "median_process_branch_miss_fraction": 0.01168309697127479
       },
-      "candidate-node-async": {
+      "baseline-node-async": {
         "processes": [
           {
             "name": "candidate-node-async-0",
@@ -911,7 +387,7 @@
         "median_process_ipc": 1.7860836556527095,
         "median_process_branch_miss_fraction": 0.011616906733877557
       },
-      "candidate-scriptw-sync": {
+      "baseline-scriptw-sync": {
         "processes": [
           {
             "name": "candidate-scriptw-sync-0",
@@ -1042,7 +518,7 @@
         "median_process_ipc": 2.384845785127549,
         "median_process_branch_miss_fraction": 0.003770565707612135
       },
-      "candidate-scriptw-async": {
+      "baseline-scriptw-async": {
         "processes": [
           {
             "name": "candidate-scriptw-async-0",
@@ -1172,6 +648,530 @@
         ],
         "median_process_ipc": 2.3696074840502406,
         "median_process_branch_miss_fraction": 0.0038659046666201353
+      },
+      "candidate-node-sync": {
+        "processes": [
+          {
+            "name": "candidate-node-sync-0",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-0/receipt.json",
+              "sha256": "79c0be5b0dcee7daa91633418bff74bbb17ff8619982f77e6c5eebd7d3b6cf33",
+              "bytes": 121887
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-0/observations.json",
+              "sha256": "813cf5d12e35a257d9228d39afe050585b8c490b70ea496cc1537ad92e6603ad",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 152682704,
+              "instructions:u": 274096278,
+              "branches:u": 54585388,
+              "branch-misses:u": 648083
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1350205.5,
+              "instructions:u": 2513769.0,
+              "branches:u": 496443.5,
+              "branch-misses:u": 5057.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1526827.04,
+              "instructions:u": 2740962.78,
+              "branches:u": 545853.88,
+              "branch-misses:u": 6480.83
+            },
+            "ipc": 1.7952018848185973,
+            "branch_miss_fraction": 0.01187282940995125
+          },
+          {
+            "name": "candidate-node-sync-1",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-1/receipt.json",
+              "sha256": "7d572eb93b1469a06efe168683d374054151bf2ea238b855739f598cfb045ce5",
+              "bytes": 121882
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-1/observations.json",
+              "sha256": "3490bf6500630d55d2e90f8f9c663e565ececc7030a4f38f7d61e12211d5c3fe",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 149069399,
+              "instructions:u": 269043360,
+              "branches:u": 53659346,
+              "branch-misses:u": 623060
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1339600.0,
+              "instructions:u": 2496534.5,
+              "branches:u": 494271.0,
+              "branch-misses:u": 4904.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1490693.99,
+              "instructions:u": 2690433.6,
+              "branches:u": 536593.46,
+              "branch-misses:u": 6230.6
+            },
+            "ipc": 1.8048195122863546,
+            "branch_miss_fraction": 0.011611397574618222
+          },
+          {
+            "name": "candidate-node-sync-2",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-2/receipt.json",
+              "sha256": "aefa635a6fe8b35ffae397502a3555d26d0f82d79ef770d3b66abf4ce28f38fb",
+              "bytes": 121912
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-2/observations.json",
+              "sha256": "9adde2a84d66a51be25feff6f0f34d8b85036c50adddde129f0aa17137428b12",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 163424436,
+              "instructions:u": 290015066,
+              "branches:u": 56883317,
+              "branch-misses:u": 676684
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1406864.0,
+              "instructions:u": 2647897.5,
+              "branches:u": 513783.5,
+              "branch-misses:u": 5171.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1634244.36,
+              "instructions:u": 2900150.66,
+              "branches:u": 568833.17,
+              "branch-misses:u": 6766.84
+            },
+            "ipc": 1.7746126166835907,
+            "branch_miss_fraction": 0.011896001071808101
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1350205.5,
+          "instructions:u": 2513769.0,
+          "branches:u": 496443.5,
+          "branch-misses:u": 5057.0
+        },
+        "process_instruction_medians": [
+          2513769.0,
+          2496534.5,
+          2647897.5
+        ],
+        "median_process_ipc": 1.7952018848185973,
+        "median_process_branch_miss_fraction": 0.01187282940995125
+      },
+      "candidate-node-async": {
+        "processes": [
+          {
+            "name": "candidate-node-async-0",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-0/receipt.json",
+              "sha256": "d60ad71749f15df3b9ec7254247248024e123854e25d0b5e2c28b70779bb9cdd",
+              "bytes": 121905
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-0/observations.json",
+              "sha256": "e46336285ee4e1caeee47c4e56f0a7fd56a5c6ca20031488956b1bfcbd38685a",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 160568885,
+              "instructions:u": 288400641,
+              "branches:u": 57547109,
+              "branch-misses:u": 690382
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1438940.0,
+              "instructions:u": 2657692.0,
+              "branches:u": 526250.5,
+              "branch-misses:u": 5385.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1605688.85,
+              "instructions:u": 2884006.41,
+              "branches:u": 575471.09,
+              "branch-misses:u": 6903.82
+            },
+            "ipc": 1.7961178530946391,
+            "branch_miss_fraction": 0.011996814644502819
+          },
+          {
+            "name": "candidate-node-async-1",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-1/receipt.json",
+              "sha256": "f6f84f18dbcf30fb41efd72ccc6fbe1607682f0895875c2867519fb57e5ab1a7",
+              "bytes": 121899
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-1/observations.json",
+              "sha256": "9bb366c1e73b802b63b2098af1d780d8b3c3f3356e55974a6e47f8ea19656c0b",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 164166293,
+              "instructions:u": 286578802,
+              "branches:u": 56925559,
+              "branch-misses:u": 679568
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1464091.5,
+              "instructions:u": 2696918.0,
+              "branches:u": 532937.5,
+              "branch-misses:u": 5590.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1641662.93,
+              "instructions:u": 2865788.02,
+              "branches:u": 569255.59,
+              "branch-misses:u": 6795.68
+            },
+            "ipc": 1.7456616505313913,
+            "branch_miss_fraction": 0.011937836218700988
+          },
+          {
+            "name": "candidate-node-async-2",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-2/receipt.json",
+              "sha256": "397dc454dfdc0752ff5934dbae1e9fbceec8606cae513c31cb113f4c99102717",
+              "bytes": 121908
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-2/observations.json",
+              "sha256": "566c49e490f37533cca4ee3b14f87c04dede57740e1033407ffcae9dd4dee675",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 170613387,
+              "instructions:u": 298704742,
+              "branches:u": 58353089,
+              "branch-misses:u": 669268
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1519280.0,
+              "instructions:u": 2814515.5,
+              "branches:u": 546637.5,
+              "branch-misses:u": 5535.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1706133.87,
+              "instructions:u": 2987047.42,
+              "branches:u": 583530.89,
+              "branch-misses:u": 6692.68
+            },
+            "ipc": 1.7507696626408338,
+            "branch_miss_fraction": 0.0114692814291288
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1464091.5,
+          "instructions:u": 2696918.0,
+          "branches:u": 532937.5,
+          "branch-misses:u": 5535.0
+        },
+        "process_instruction_medians": [
+          2657692.0,
+          2696918.0,
+          2814515.5
+        ],
+        "median_process_ipc": 1.7507696626408338,
+        "median_process_branch_miss_fraction": 0.011937836218700988
+      },
+      "candidate-scriptw-sync": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-sync-0",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-0/receipt.json",
+              "sha256": "d1012af0975b51ca0ebff5da7a8e31562aed646cffced3a71bda6587298604a9",
+              "bytes": 124160
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-0/observations.json",
+              "sha256": "70c57cc8830025b3654d64cb84ab95a2bd6d2528f91ee1bee94c7898ea2df735",
+              "bytes": 14620
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2205710916,
+              "instructions:u": 5282378083,
+              "branches:u": 747175007,
+              "branch-misses:u": 2789376
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 20964522.5,
+              "instructions:u": 50191443.5,
+              "branches:u": 6966807.5,
+              "branch-misses:u": 25151.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22057109.16,
+              "instructions:u": 52823780.83,
+              "branches:u": 7471750.07,
+              "branch-misses:u": 27893.76
+            },
+            "ipc": 2.3948641885399273,
+            "branch_miss_fraction": 0.0037332297973933703
+          },
+          {
+            "name": "candidate-scriptw-sync-1",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-1/receipt.json",
+              "sha256": "db15ccf5fc21fe050ad58e20f9a01f2fc7cd388dfbf9e6e013c02d3eff5f54cd",
+              "bytes": 124160
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-1/observations.json",
+              "sha256": "04dd14cbbe8d414243d0560593974131ecb13f508467a03889adb55771701135",
+              "bytes": 14620
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2176596353,
+              "instructions:u": 5282371625,
+              "branches:u": 747173824,
+              "branch-misses:u": 2780108
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 20732835.5,
+              "instructions:u": 50191405.5,
+              "branches:u": 6966812.5,
+              "branch-misses:u": 25166.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 21765963.53,
+              "instructions:u": 52823716.25,
+              "branches:u": 7471738.24,
+              "branch-misses:u": 27801.08
+            },
+            "ipc": 2.426895376223209,
+            "branch_miss_fraction": 0.0037208316334165366
+          },
+          {
+            "name": "candidate-scriptw-sync-2",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-2/receipt.json",
+              "sha256": "dd8b54d5d781fc3ff2053e72cd1592367417c0b5ec40644851ac044dbe2da47b",
+              "bytes": 124165
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-2/observations.json",
+              "sha256": "1dc950a939e7441f7cd25b3b2e3ee0f737ff43db9623bfb2e3fe76766d6ae786",
+              "bytes": 14620
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2270138575,
+              "instructions:u": 5282373422,
+              "branches:u": 747174174,
+              "branch-misses:u": 2870354
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 21913856.0,
+              "instructions:u": 50191304.5,
+              "branches:u": 6966788.5,
+              "branch-misses:u": 25973.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22701385.75,
+              "instructions:u": 52823734.22,
+              "branches:u": 7471741.74,
+              "branch-misses:u": 28703.54
+            },
+            "ipc": 2.3268947015712467,
+            "branch_miss_fraction": 0.0038416129730950792
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 20964522.5,
+          "instructions:u": 50191405.5,
+          "branches:u": 6966807.5,
+          "branch-misses:u": 25166.5
+        },
+        "process_instruction_medians": [
+          50191443.5,
+          50191405.5,
+          50191304.5
+        ],
+        "median_process_ipc": 2.3948641885399273,
+        "median_process_branch_miss_fraction": 0.0037332297973933703
+      },
+      "candidate-scriptw-async": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-async-0",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-0/receipt.json",
+              "sha256": "5deb774a3186a7a754e61c0f471e403b073cb7ccf6f6a5063109bda786123e34",
+              "bytes": 124176
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-0/observations.json",
+              "sha256": "9e0def33dc3816110aceb58c1d24a0f6d8556d1ab1da1e2e1ff8f095969dc019",
+              "bytes": 14622
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2372737468,
+              "instructions:u": 5687768242,
+              "branches:u": 813299461,
+              "branch-misses:u": 3125024
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22574135.5,
+              "instructions:u": 54082271.5,
+              "branches:u": 7596077.5,
+              "branch-misses:u": 28383.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 23727374.68,
+              "instructions:u": 56877682.42,
+              "branches:u": 8132994.61,
+              "branch-misses:u": 31250.24
+            },
+            "ipc": 2.3971334033824934,
+            "branch_miss_fraction": 0.003842402644848181
+          },
+          {
+            "name": "candidate-scriptw-async-1",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-1/receipt.json",
+              "sha256": "9b98bd550d71e3a5a0e7ad43c0572cd86d862ca3a55b61f9990c921d83c7fee4",
+              "bytes": 124176
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-1/observations.json",
+              "sha256": "d6958c8c81b45f25dfac1dc307a91f7c3e6b1116e9f9c12fa37fd5416c15bdb8",
+              "bytes": 14621
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2403454965,
+              "instructions:u": 5687764260,
+              "branches:u": 813298625,
+              "branch-misses:u": 3129492
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 23382616.5,
+              "instructions:u": 54082235.0,
+              "branches:u": 7596082.0,
+              "branch-misses:u": 28327.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24034549.65,
+              "instructions:u": 56877642.6,
+              "branches:u": 8132986.25,
+              "branch-misses:u": 31294.92
+            },
+            "ipc": 2.366495042689514,
+            "branch_miss_fraction": 0.003847900271563843
+          },
+          {
+            "name": "candidate-scriptw-async-2",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-2/receipt.json",
+              "sha256": "04bc245485920d86512ae403dcee730086858c9e194b8ffb3d16054477faa552",
+              "bytes": 124175
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-2/observations.json",
+              "sha256": "0811bcd71ce369aabbdc4437b85e1138d1127e4dc61c777936d0533bf01d0dc3",
+              "bytes": 14621
+            },
+            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2377327695,
+              "instructions:u": 5687766422,
+              "branches:u": 813299159,
+              "branch-misses:u": 3132446
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22701011.5,
+              "instructions:u": 54082204.5,
+              "branches:u": 7596065.0,
+              "branch-misses:u": 28229.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 23773276.95,
+              "instructions:u": 56877664.22,
+              "branches:u": 8132991.59,
+              "branch-misses:u": 31324.46
+            },
+            "ipc": 2.392504169266408,
+            "branch_miss_fraction": 0.003851529864916533
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 22701011.5,
+          "instructions:u": 54082235.0,
+          "branches:u": 7596077.5,
+          "branch-misses:u": 28327.0
+        },
+        "process_instruction_medians": [
+          54082271.5,
+          54082235.0,
+          54082204.5
+        ],
+        "median_process_ipc": 2.392504169266408,
+        "median_process_branch_miss_fraction": 0.003847900271563843
       }
     }
   },
@@ -1185,37 +1185,37 @@
     "unscored": true,
     "fresh_processes": 2,
     "checked_flight_outputs": 406,
-    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/cyclic-projection/profile/",
+    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/typed-region/profile/",
     "summary": {
-      "path": "target/performance-v8-climb-20261104/cyclic-projection/profile/summary.json",
-      "sha256": "77009188d3966231b499bcdac43b611a61b4310211d20262a8d98e15354dffda",
-      "bytes": 22047
+      "path": "target/performance-v8-climb-20261104/typed-region/profile/summary.json",
+      "sha256": "183fd5f598e3b549b2c14784c3846fe926a88f6a4a2ba92fd91579e85136bcfa",
+      "bytes": 21995
     },
     "owner_tables": {
-      "path": "target/performance-v8-climb-20261104/cyclic-projection/profile/owner-tables.json",
-      "sha256": "4d5b78923905d60cbdde4c68f9a92b49dbb0c5a674c729540a5908787a5401d5",
-      "bytes": 473377
+      "path": "target/performance-v8-climb-20261104/typed-region/profile/owner-tables.json",
+      "sha256": "c86e4349115b4a582d4b540b2d6801fad8afec78656ac7077ddc6f6205d0b47d",
+      "bytes": 496173
     },
     "probe_diagnosis": {
-      "path": "target/performance-v8-climb-20261104/cyclic-projection/profile/diagnosis.json",
-      "sha256": "6a6735632a3e569ffe9d858da290e54a808d5f905cd87149322e62b9589090c1",
+      "path": "target/performance-v8-climb-20261104/typed-region/profile/diagnosis.json",
+      "sha256": "09395a78ed026b96540af9e9336251224cd8b077566957f28753b9d4a8bf40e1",
       "bytes": 2663
     },
     "limits": "One sampled child per mode; own user-cycle leaves are disjoint, inclusive owners overlap and FP chains can truncate. No causal allocation or wall-time gain claim."
   },
   "allocator_census_control": {
     "published_report": {
-      "git_commit": "2d8b5896c4d61528a0e802906b1d016118475ce8",
+      "git_commit": "cff1193296b63317839e1a689583a0600953035a",
       "path": "docs/rust-rewrite/react-attribution-current.json",
-      "sha256": "6eef5a214b7fc87c571cb0855a8b524baaacf71607e2fe13cb44f03096e8333b",
-      "bytes": 54822
+      "sha256": "5ea37e2ddb3b24e1cb5f0c2a940a1aaf63f9ef93769cba615df17bcb7072e871",
+      "bytes": 54995
     },
     "evidence_archive": {
       "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
-      "sha256": "8a21b4dd25da0051606b60ed94e7cd4a3dc1e0ca5093ee40542c764185f7fbb3",
-      "bytes": 5003188,
-      "regular_utf8_members": 10662,
-      "expanded_utf8_bytes": 172009369,
+      "sha256": "9fde9270bf1efbbea23a3f4c38a9f3a075c922e1784c0e0bb5c8acc850428178",
+      "bytes": 3144728,
+      "regular_utf8_members": 3766,
+      "expanded_utf8_bytes": 161478847,
       "over_5mb": false
     },
     "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/unobservable-work/batch-controls/allocator-census-publication/",
@@ -1223,10 +1223,10 @@
   },
   "evidence_archive": {
     "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
-    "sha256": "9fde9270bf1efbbea23a3f4c38a9f3a075c922e1784c0e0bb5c8acc850428178",
-    "bytes": 3144728,
-    "regular_utf8_members": 3766,
-    "expanded_utf8_bytes": 161478847,
+    "sha256": "debad8525551cdd252cc0ac8013472e66e8b2144a3fa7ed170e63587ee7b7885",
+    "bytes": 1789420,
+    "regular_utf8_members": 1881,
+    "expanded_utf8_bytes": 86714278,
     "over_5mb": false
   }
 }
