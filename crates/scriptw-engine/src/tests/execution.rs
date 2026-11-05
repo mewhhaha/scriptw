@@ -391,6 +391,7 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
             "scriptw_host::byte_array_allocate",
             "scriptw_host::collect_gc",
             "scriptw_host::reject_runtime_semantics",
+            "scriptw_host::report_cleanup_exception",
         ],
         "runtime-free imports: {imports:?}"
     );

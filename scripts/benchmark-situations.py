@@ -371,7 +371,7 @@ def run(args):
                     runtimes[actor] = reduce_runtime(rows, case['operations'])
             report['cases'].append(dict(case, runtimes=runtimes))
         pending = output / 'report.pending'
-        pending.write_text(json.dumps(report, indent=2) + '\n')
+        pending.write_text(json.dumps(report, separators=(',', ':')) + '\n')
         pending.replace(output / 'report.json')
 
     def unchanged():

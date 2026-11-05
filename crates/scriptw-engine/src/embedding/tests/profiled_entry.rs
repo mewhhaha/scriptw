@@ -1,4 +1,4 @@
-//! Profile the execution role, not the caller waiting for its dispatched work.
+//! Profile work on the caller thread and include synchronous host callback work.
 use super::*;
 
 fn script_runtime(source: &str) -> EmbeddedRuntime {
@@ -27,7 +27,7 @@ fn entry(runtime: &EmbeddedRuntime, store: &mut WasmtimeStore<WasmStoreState>) -
 
 #[test]
 #[cfg(target_os = "linux")]
-fn profiled_evaluation_samples_actual_execution_worker_and_host_subspan() {
+fn profiled_evaluation_samples_caller_execution_and_host_subspan() {
     use std::{thread::ThreadId, time::Duration};
 
     struct CpuHook {
@@ -38,18 +38,18 @@ fn profiled_evaluation_samples_actual_execution_worker_and_host_subspan() {
     impl HostHooks for CpuHook {
         fn print_line(&self, _: &str) {
             let thread = std::thread::current().id();
-            assert_ne!(thread, self.caller);
+            assert_eq!(thread, self.caller);
             let start = WasmThreadCpuInstant::now().unwrap();
-            assert_eq!(
+            assert!(matches!(
                 start.duration_since(&self.caller_clock),
-                WasmThreadCpuObservation::Unavailable(WasmThreadCpuUnavailable::DifferentThread)
-            );
+                WasmThreadCpuObservation::Sampled(_)
+            ));
             let mut value = 1_u64;
             for _ in 0..2_000_000 {
                 value = std::hint::black_box(value.wrapping_mul(17).wrapping_add(3));
             }
             let WasmThreadCpuObservation::Sampled(cpu) = start.elapsed() else {
-                panic!("host callback stayed on its execution worker");
+                panic!("host callback moved away from the caller's execution thread");
             };
             self.spans.lock().unwrap().push((thread, cpu));
         }
@@ -82,11 +82,11 @@ fn profiled_evaluation_samples_actual_execution_worker_and_host_subspan() {
     assert!(spans.iter().all(|(thread, _)| *thread == spans[0].0));
     let hook_cpu: Duration = spans.iter().map(|(_, cpu)| *cpu).sum();
     let WasmThreadCpuObservation::Sampled(worker_cpu) = cpu else {
-        panic!("Linux execution-worker CPU is available");
+        panic!("Linux caller-thread CPU is available");
     };
     assert!(
         worker_cpu >= hook_cpu,
-        "worker span encloses both host subspans"
+        "call span encloses both host subspans"
     );
 }
 

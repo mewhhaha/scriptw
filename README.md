@@ -17,6 +17,7 @@ SCRIPTW_WASM_DUMP=hello.wasm ./target/release/scriptw build wasm hello.js
 
 Rust applications can [embed Scriptw](docs/rust-rewrite/contracts/foreign-modules.md)
 in their own Wasmtime Engine, Store and Linker, with synchronous and async host functions.
+Top-level embedded calls use a guarded stack on the caller’s thread.
 
 ## Benchmarks
 
@@ -50,8 +51,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 5.74 ms | 0.487 ms |
-| Async | 6.17 ms | 0.404 ms |
+| Sync | 5.70 ms | 0.491 ms |
+| Async | 6.15 ms | 0.392 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,11 +61,11 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.14 s JavaScript → Wasm**, **5.61 s native preparation**,
-and **2.28 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
+Cold Scriptw setup: **3.14 s JavaScript → Wasm**, **5.55 s native preparation**,
+and **2.18 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
 code, 0.47 MiB data); shared runtime Wasm is **36.94 MiB**.
-[Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
-[Allocation counts](docs/rust-rewrite/react-allocation-current.json) ·
+[Recorded size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
+[Recorded allocation counts](docs/rust-rewrite/react-allocation-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json).
 
@@ -98,14 +99,15 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-05**): 1,771 Engine cases,
-67 Wasm-emission, 637 structural and
-380 source-guard checks pass; 769 IR cases reuse unchanged inputs and original receipts.
-AOT units pass 653 cases; four known bootstrap assertions still fail.
-The focused benchmarks passed 60,984 checked calls; React RSC passed 480 exact
-Flight checks. These scopes do not replace the published full Test262 run.
-Full workspace CI was not rerun; eleven formatting failures and fourteen stale
-Intl recipes remain [owned](docs/rust-rewrite/current-inventory.md).
+Latest scoped verification (**2026-11-05**): 1,771 Engine integration cases
+pass. Engine unit coverage combines 1,092 preserved passes with one corrected
+expectation checked separately; the original failure remains in the receipts.
+Unchanged compiler scopes reuse original receipts: 67 emission, 637 structural,
+769 IR, and 653 AOT passes with four known bootstrap failures. All 380 source
+guards, 60,984 focused benchmark calls and 480 exact RSC Flight checks pass.
+These scopes do not replace the published full Test262 run. Full workspace CI
+was not rerun; eleven formatting failures and fourteen stale Intl recipes
+remain [owned](docs/rust-rewrite/current-inventory.md).
 
 ## Caveats
 

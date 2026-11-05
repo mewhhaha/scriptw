@@ -589,7 +589,7 @@ pub(super) fn execute(
     report["warmups"] = json!(warmups);
     report["phases_ns"] = json!({"native_admission":native_admission_ns,"setup":setup_ns,"module_initialization":initialize_ns});
     report["initialization_count"] = json!(1);
-    report["call_boundary"] = json!("public EmbeddedInstance::call including worker dispatch, guest execution, output capture and completion; excludes input conversion, prepare and per-call output draining/checksum validation; natural GC; same retained function/Store/Realm");
+    report["call_boundary"] = json!("public EmbeddedInstance::call including caller-thread guarded-fiber entry, guest execution, output capture and completion; excludes input conversion, prepare and per-call output draining/checksum validation; natural GC; same retained function/Store/Realm");
     report["observations"] = json!(observations);
     Ok(report)
 }

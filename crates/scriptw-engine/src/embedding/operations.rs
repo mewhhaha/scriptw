@@ -236,6 +236,8 @@ impl EmbeddedInstance {
     /// Invoke a retained callable with an explicit receiver and exact JS args.
     /// Bound functions, proxies, strict `this`, throws and Realm entry use the
     /// same runtime dispatch as calls emitted from JavaScript source.
+    /// Top-level execution and synchronous host callbacks use the caller's
+    /// thread on a guarded stack. Reentry receives an independent stack.
     pub fn call(
         &self,
         store: &mut WasmtimeStore<WasmStoreState>,

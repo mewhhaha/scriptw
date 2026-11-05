@@ -24,6 +24,11 @@ or Node's worker APIs. SIMD is not an additional requirement of this policy.
 
 ## Host compatibility
 
+Rust embedding entry runs synchronously on the caller thread using a guarded
+64-MiB Wasmtime fiber stack. Synchronous host callbacks retain that thread's
+affinity. Reentrant entry receives an independent 64-MiB scoped-thread stack;
+the Wasm stack limit remains 32 MiB.
+
 An emitted program is linked to Scriptw's runtime module and host imports,
 including the `scriptw_host` namespace. Matching runtime bytes, Intl data and
 host adapters are part of the execution environment.

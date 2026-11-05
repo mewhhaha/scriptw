@@ -2281,6 +2281,7 @@ dependencies = [
  "sha2",
  "wasmparser 0.245.1",
  "wasmtime",
+ "wasmtime-internal-fiber",
 ]
 
 [[package]]

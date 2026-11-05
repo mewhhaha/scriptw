@@ -10,6 +10,7 @@ use scriptw_ir::foreign::{
 
 mod async_operations;
 mod compact_records;
+mod execution_fiber_controls;
 mod profiled_entry;
 mod reentrant_execution;
 mod timers;
