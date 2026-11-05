@@ -50,8 +50,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 5.77 ms | 0.495 ms |
-| Async | 6.20 ms | 0.412 ms |
+| Sync | 6.69 ms | 0.579 ms |
+| Async | 7.09 ms | 0.442 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,17 +60,18 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.25 s JavaScript → Wasm**, **5.66 s native preparation**,
-and **2.28 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
+Cold Scriptw setup: **3.72 s JavaScript → Wasm**, **6.51 s native preparation**,
+and **2.53 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
 code, 0.47 MiB data); shared runtime Wasm is **37.02 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
+[Allocation counts](docs/rust-rewrite/react-allocation-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
 [Recorded RSC build](docs/rust-rewrite/rsc-current.json).
 
 **Focused performance situations · 2026-11-05:** 21 checked programs compare
 global lookup, calls, arguments, mutation, metadata, type tests, equality and enumeration
-against V8. Eight fresh processes per configuration; three checked warmups and
-seven measured calls. Compilation and input preparation precede timing.
+against V8. Eight fresh processes per configuration; 100 checked warmups and
+21 measured calls. Compilation and input preparation precede timing.
 
 [Individual scores and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
 [Data](docs/rust-rewrite/situations-current.json).
@@ -101,7 +102,7 @@ Latest scoped verification (**2026-11-05**): 1,770 Engine cases,
 65 Wasm-emission, 637 structural and
 380 source-guard checks pass; 769 IR cases reuse unchanged inputs and original receipts.
 AOT units pass 653 cases; four known bootstrap assertions still fail.
-The focused benchmarks passed 5,040 checked calls; React RSC passed 480 exact
+The focused benchmarks passed 60,984 checked calls; React RSC passed 480 exact
 Flight checks. These scopes do not replace the published full Test262 run.
 Full workspace CI was not rerun; eleven formatting failures and fourteen stale
 Intl recipes remain [owned](docs/rust-rewrite/current-inventory.md).

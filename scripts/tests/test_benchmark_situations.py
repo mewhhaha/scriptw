@@ -100,7 +100,8 @@ class Admission(unittest.TestCase):
                     m.validate_cargo([row], frozen, changed)
 
     def test_every_prepared_input_and_warmup_is_checked(self):
-        self.assertEqual(self.validate(execution()), list(range(13, 20)))
+        self.assertEqual(self.validate(execution()),
+                         list(range(10 + m.WARMUPS, 10 + m.WARMUPS + m.SAMPLES)))
         for index in range(m.SAMPLES + m.WARMUPS):
             row = execution()
             row['observations'][index]['stdout'] = 'wrong\n'
@@ -237,7 +238,7 @@ class Reduction(unittest.TestCase):
         for index, median in enumerate((10, 20, 30, 40, 50, 60, 70, 1000)):
             samples = [median] * m.SAMPLES
             if index < 4:
-                samples = [median] * 4 + [1000000] * 3
+                samples = [median] * (m.SAMPLES // 2 + 1) + [1000000] * (m.SAMPLES // 2)
             rows.append(dict(block=index // m.ROUNDS, round=index % m.ROUNDS, command=str(index),
                              samples_ns=samples, median_ns=median, status='ok',
                              accounting=dict(peak_rss_bytes=1024 * (index + 1))))

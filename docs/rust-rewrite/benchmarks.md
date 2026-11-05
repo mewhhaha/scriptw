@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-05**, React **19.3.1**, compiler `21ad728e4380`
-(base `cff119329` plus the archived source patch).
+Measured **2026-11-05**, React **19.3.1**, compiler `971be2adbe2f`
+(base `086fe17fa` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 5.773 | 6.199 |
-| Node 24.12.0 / V8 | 0.495 | 0.412 |
+| Scriptw | 6.693 | 7.089 |
+| Node 24.12.0 / V8 | 0.579 | 0.442 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -27,9 +27,9 @@ receipts; chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
 Program and runtime Wasm are byte-identical to the control; this checkpoint establishes no React execution improvement.
 
-Cold Scriptw setup is **3.252 s JavaScript → Wasm**,
-**5.656 s native preparation**, and
-**2.281 ms module initialization**.
+Cold Scriptw setup is **3.719 s JavaScript → Wasm**,
+**6.509 s native preparation**, and
+**2.533 ms module initialization**.
 Program Wasm is **4,231,662 B** (3,683,242 B code; 490,228 B data);
 shared runtime Wasm is **38,816,202 B**. All setup precedes request timing.
 Child peak RSS includes compilation and process history; it is not live guest heap.
@@ -44,10 +44,54 @@ The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
 engine/mode. Scriptw retires **50.19 million sync /
 54.08 million async user instructions per request**;
-Node retires **2.51 / 2.70 million**.
+Node retires **2.53 / 2.72 million**.
 Counters run without multiplexing. They count Scriptw's execution worker and
 Node's main thread, including Node barrier/Promise-return edges; background
 compilation/GC threads are excluded. These are unscored counts, not causal shares.
+
+An exact-artifact allocation diagnostic uses one host binary in off/on/on/off
+order, three warmups and seven measured requests per mode: **80 exact Flight
+checks**, with **40 valid counting epochs**. Measured
+requests allocate a median **49,794 GC objects / 2,016,016 B** synchronously and
+**53,305 / 2,209,728 B** asynchronously. Physical `StoredValue` wrappers account
+for **19,935 / 637,920 B** and **21,064 / 674,048 B**, respectively. These are
+aligned reservations, including dead objects and host-bridge work; copied
+survivors are excluded. They do not identify source allocation sites or retained
+memory. Both program/runtime Wasm match the scored reference byte-for-byte;
+all four required heap controls pass. Timings stay unscored.
+[Counts, source identities and limits](react-allocation-current.json).
+
+Thirteen physical types are authenticated from actual helper signatures and
+field graphs. These are medians of process medians for the measured request
+boundary; labels describe heap types, not allocation sites. Per-type medians
+need not sum to the total. In particular, ValueArray is not an argument-origin
+count, and descriptor allocations do not establish why they occurred.
+
+| Physical type | Sync · objects / B | Async · objects / B |
+| --- | ---: | ---: |
+| StoredValue | 19,935 / 637,920 | 21,064 / 674,048 |
+| CodeUnitArray | 3,371 / 282,416 | 3,925 / 358,576 |
+| PropertyDescriptor | 8,412 / 269,184 | 8,790 / 281,280 |
+| ValueArray | 3,150 / 120,112 | 3,428 / 135,616 |
+| StringValue | 3,284 / 105,088 | 3,827 / 122,464 |
+| PropertyKeyTable | 1,916 / 97,648 | 1,956 / 99,600 |
+| PropertyEntry | 1,904 / 91,392 | 1,993 / 95,664 |
+| OrdinaryObject | 1,327 / 63,696 | 1,413 / 67,824 |
+| OrdinaryPropertyIndex | 820 / 52,832 | 864 / 55,648 |
+| PropertyTable | 820 / 39,536 | 864 / 41,648 |
+| OrdinaryPropertyStorage | 938 / 30,016 | 1,000 / 32,000 |
+| BindingCell | 346 / 27,680 | 359 / 28,720 |
+| ForInEnumerationRecord | 99 / 3,168 | 101 / 3,232 |
+
+A separate hardware-entry diagnostic passes eight exact known-count controls
+and 20 Flight checks. One process per mode counts seven request windows without
+changing Wasm or JIT bytes: `ft`/`vn` enter **242 / 276** times per synchronous
+request and **254 / 291** asynchronously. Five times their combined entries is
+at most **2,590 / 2,725** first-five argument wrappers, roughly 13% of the counted
+StoredValue totals, before caller, actual-arity and vector-reuse restrictions.
+This is a conditional upper bound, not measured boxing or removable time.
+The entry traps perturb execution; these timings stay unscored.
+Raw maps, entry bytes and enabled/running counter intervals remain in the archive.
 
 The emitted program shares immutable birth layouts and cached-read code in the
 existing runtime. Strict arguments elision walks complete ordinary operands;
@@ -76,18 +120,19 @@ Recipes, accessors, Proxies and incomplete regions keep their original semantics
 Scratch roots clear before the generic continuation. Projection allocates one
 numeric array. Canonical recipe reads can also allocate or normalize intrinsic metadata without invoking JavaScript; rejected preflight
 work remains an explicit cost.
-Closed numeric branches can borrow one or two current dense Number arrays with
-a proven bounded masked index. Entry validates the phase and both backings;
-the body preserves each original comparison, branch and arithmetic operation.
-Unsupported values and effects retain the original loop.
+Closed strict comparisons can precompute a pure repeating input period from
+two current dense arrays through the canonical equality kernel. One private
+numeric buffer and a bounded integer induction retain the original branches,
+arithmetic order and publication. Strings, BigInts and references keep exact
+semantics. Unsupported values and effects retain the original loop.
 Local argument entries retain their two-formal bound. Runtime value,
 environment, descriptor and call-transport costs remain; V8 parity is open.
 
-Fresh user-cycle sampling attributes **25.68% sync /
-23.83% async** to six property/enumeration helpers' disjoint
+Fresh user-cycle sampling attributes **25.30% sync /
+23.97% async** to six property/enumeration helpers' disjoint
 own samples. The `vn`/`ft` page-touch loops account for
-**2.35% /
-2.05%**. Each mode has one
+**2.17% /
+2.27%**. Each mode has one
 sampled process and 200 checked requests after three warmups. Frame-pointer
 chains can truncate; inclusive caller shares overlap. These observations do not
 partition wall time or predict a change's gain. The linked diagnostic retains
@@ -97,8 +142,8 @@ Older allocator controls, source screens and rejected experiments retain their
 own source/binary identities in the inert archive. The allocator census found
 most SinglePass spill capacity in cross-block/edge homes; strictly block-local
 reuse was rejected as the main hill. Entry stack budgets are distinct from spill
-capacity, executed spill traffic and allocation counts. Total executed guest
-allocation remains unmeasured.
+capacity, executed spill traffic and allocation counts. GC allocation
+reservations are recorded above; their source origins remain unmeasured.
 
 Runtime ABI 51 supplies bounded UTF-8 codecs, byte streams with default readers,
 events, abort signals and tasks for these fixtures. Fetch/Request/URL, DOM nodes
@@ -110,37 +155,37 @@ and full WHATWG conformance remain unsupported or unverified.
 
 ## Focused performance situations
 
-Measured **2026-11-05**: **21** standalone Module programs, compiler `21ad728e4380`,
+Measured **2026-11-05**: **21** standalone Module programs, compiler `971be2adbe2f`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.010 | 0.002 |
-| `global-shallow.js` | 2.240 | 1.799 | 1.000 |
-| `global-deep8.js` | 2.791 | 2.004 | 0.995 |
-| `global-bound-deep.js` | 0.715 | 0.243 | 0.074 |
-| `global-getter-deep.js` | 3.147 | 2.338 | 1.023 |
-| `frame-compact.js` | 8.145 | 5.783 | 0.068 |
-| `frame-branches32.js` | 8.259 | 5.991 | 0.094 |
-| `frame-branches128.js` | 8.686 | 5.985 | 0.140 |
-| `frame-branches512.js` | 13.699 | 6.145 | 0.191 |
-| `args-unused.js` | 0.727 | 0.517 | 0.101 |
-| `args-observed.js` | 2.501 | 2.032 | 0.137 |
-| `property-stable.js` | 0.155 | 0.075 | 0.075 |
-| `property-mutated.js` | 0.154 | 0.078 | 0.067 |
-| `metadata-ordinary.js` | 0.208 | 0.086 | 0.020 |
-| `metadata-function.js` | 0.203 | 0.085 | 0.207 |
-| `metadata-intrinsic.js` | 0.212 | 0.088 | 0.231 |
-| `typeof-dispatch.js` | 0.947 | 0.364 | 0.024 |
-| `singleton-dispatch.js` | 0.907 | 0.354 | 0.013 |
-| `strict-equality-numbers.js` | 0.120 | 0.062 | 0.021 |
-| `strict-equality-mixed.js` | 2.614 | 1.346 | 0.069 |
-| `for-in-wide.js` | 2.087 | 1.981 | 0.068 |
+| `control-empty.js` | 0.009 | 0.009 | 0.000 |
+| `global-shallow.js` | 2.224 | 1.709 | 0.949 |
+| `global-deep8.js` | 2.727 | 1.978 | 1.077 |
+| `global-bound-deep.js` | 0.700 | 0.240 | 0.004 |
+| `global-getter-deep.js` | 3.071 | 2.243 | 0.982 |
+| `frame-compact.js` | 8.268 | 5.851 | 0.057 |
+| `frame-branches32.js` | 8.272 | 6.026 | 0.081 |
+| `frame-branches128.js` | 8.690 | 5.953 | 0.113 |
+| `frame-branches512.js` | 13.821 | 6.202 | 0.178 |
+| `args-unused.js` | 0.732 | 0.510 | 0.003 |
+| `args-observed.js` | 2.434 | 1.999 | 0.003 |
+| `property-stable.js` | 0.154 | 0.074 | 0.071 |
+| `property-mutated.js` | 0.155 | 0.078 | 0.062 |
+| `metadata-ordinary.js` | 0.209 | 0.085 | 0.012 |
+| `metadata-function.js` | 0.204 | 0.085 | 0.206 |
+| `metadata-intrinsic.js` | 0.206 | 0.086 | 0.219 |
+| `typeof-dispatch.js` | 0.943 | 0.383 | 0.014 |
+| `singleton-dispatch.js` | 0.906 | 0.357 | 0.010 |
+| `strict-equality-numbers.js` | 0.109 | 0.048 | 0.012 |
+| `strict-equality-mixed.js` | 0.104 | 0.048 | 0.034 |
+| `for-in-wide.js` | 2.052 | 1.959 | 0.038 |
 
 Each value is the median of eight fresh-process medians across two balanced
-blocks. Every process initializes one Module/Realm, then runs three checked
-warmups and seven measured calls. Four inputs rotate identically in every actor;
+blocks. Every process initializes one Module/Realm, then runs 100 checked
+warmups and 21 measured calls. Four inputs rotate identically in every actor;
 every call checks an independent integer checksum. Bars show current configurations;
 whiskers span process medians. Block medians and process summaries remain in the
 [data](situations-current.json).
@@ -151,7 +196,7 @@ The labels select P compilation; shared R is built with SpeedAndSize /
 Backtracking and uses its recorded native-image admission path.
 Compilation, initialization and `prepare(input)` precede the public `run()` clock.
 Wasmtime consumers have their compiler disabled. Node uses the same source in
-`vm.SourceTextModule`, with normal JIT and natural GC; three warmups do not prove
+`vm.SourceTextModule`, with normal JIT and natural GC; 100 warmups do not prove
 optimized steady state. Timings include the public bridge and print conversion;
 output draining and validation follow timing. Setup can influence timed GC/JIT.
 The empty control is shown without subtraction. Benchmark scratch and prepared
@@ -228,6 +273,15 @@ checksum arithmetic remain timed. Independent models check every input.
 
 ![Dynamic strict equality](assets/situations-current/strict-equality.svg)
 
+A separate warmup sensitivity check uses four fresh processes per engine/case,
+100 checked warmups and 21 measured calls with the same frozen host and workloads.
+Number equality measures **0.051 ms Speed /
+0.012 ms V8**; mixed equality measures
+**0.052 /
+0.036 ms**. Normal V8 JIT and natural GC
+remain enabled; 100 warmups do not prove optimized steady state. These separate
+observations stay outside the chart cohort; raw receipts remain in the archive.
+
 ### Enumeration
 
 Sixteen for-in loops visit all 64 own enumerable properties of a prepared ordinary
@@ -242,7 +296,7 @@ Mutation, Proxy and suspension controls run separately as semantic regressions.
 
 ![Public-call control](assets/situations-current/control.svg)
 
-All **504** situation processes and **5,040** calls passed exact checks.
+All **504** situation processes and **60,984** calls passed exact checks.
 The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
 Fresh scoped verification passes **1,770 Engine**, **65 emission**,
 **637 structural** and **380 source-guard** checks. The **769 IR** cases

@@ -126,6 +126,7 @@ impl ArrayIteration {
 enum ReadPaths {
     LengthOnly,
     Numbers,
+    Values,
     Compact(Vec<CompactReadPath>),
 }
 
@@ -212,7 +213,7 @@ impl<'a> PropertyReadView<'a> {
 }
 
 impl ArrayReadLoop {
-    pub(super) fn masked_numbers(
+    pub(super) fn masked_values(
         array: RegionInputSource,
         counter: LocalBindingId,
         limit: u32,
@@ -223,7 +224,7 @@ impl ArrayReadLoop {
             counter,
             iteration: ArrayIteration::Masked { limit, mask },
             row_alias: None,
-            paths: ReadPaths::Numbers,
+            paths: ReadPaths::Values,
         }
     }
 
@@ -625,20 +626,53 @@ pub(super) struct ArrayReadBorrow<'a> {
 
 enum ReadBacking<'a> {
     Numbers(GcLocal<NumberBitsI64Array, Nullable>),
+    Values {
+        numbers: GcLocal<NumberBitsI64Array, Nullable>,
+        values: GcLocal<PackedValueTable, Nullable>,
+    },
     Compact(CompactPathBorrow<'a>),
 }
 
 impl ReadBacking<'_> {
-    fn mode(&self) -> ArrayIndexedStorageMode {
-        match self {
-            Self::Numbers(_) => ArrayIndexedStorageMode::PackedNumbers,
-            Self::Compact(_) => ArrayIndexedStorageMode::PackedValues,
+    fn guard_mode(
+        &self,
+        array: &GcLocal<ArrayObject, Nullable>,
+        builder: &mut FunctionBuilder<'_>,
+        decline: ControlTarget,
+        function: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        let exact = match self {
+            Self::Numbers(_) => Some(ArrayIndexedStorageMode::PackedNumbers),
+            Self::Compact(_) => Some(ArrayIndexedStorageMode::PackedValues),
+            Self::Values { .. } => None,
+        };
+        if let Some(mode) = exact {
+            s.field(ArrayObjectSchema::MODE).read(array, s, function);
+            function.instruction(&Instruction::I32Const(mode.encode()));
+            function.instruction(&Instruction::I32Ne);
+        } else {
+            for mode in [
+                ArrayIndexedStorageMode::PackedNumbers,
+                ArrayIndexedStorageMode::PackedValues,
+            ] {
+                s.field(ArrayObjectSchema::MODE).read(array, s, function);
+                function.instruction(&Instruction::I32Const(mode.encode()));
+                function.instruction(&Instruction::I32Eq);
+            }
+            function.instruction(&Instruction::I32Or);
+            function.instruction(&Instruction::I32Eqz);
         }
+        builder.emit_branch_if_to_target(decline, function);
     }
 
     fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         match self {
             Self::Numbers(numbers) => numbers.set_null(builder.runtime_schema(), function),
+            Self::Values { numbers, values } => {
+                numbers.set_null(builder.runtime_schema(), function);
+                values.set_null(builder.runtime_schema(), function);
+            }
             Self::Compact(rows) => rows.clear_roots(builder, function),
         }
     }
@@ -646,6 +680,10 @@ impl ReadBacking<'_> {
     fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         match self {
             Self::Numbers(numbers) => numbers.clear(function),
+            Self::Values { numbers, values } => {
+                numbers.clear(function);
+                values.clear(function);
+            }
             Self::Compact(rows) => rows.release(builder, function),
         }
     }
@@ -665,6 +703,10 @@ impl<'a> ArrayReadBorrow<'a> {
                 ReadPaths::LengthOnly | ReadPaths::Numbers => {
                     ReadBacking::Numbers(s.reserve_gc_local(function).initialize_null(s, function))
                 }
+                ReadPaths::Values => ReadBacking::Values {
+                    numbers: s.reserve_gc_local(function).initialize_null(s, function),
+                    values: s.reserve_gc_local(function).initialize_null(s, function),
+                },
                 ReadPaths::Compact(paths) => ReadBacking::Compact(CompactPathBorrow::new(
                     paths,
                     plan.row_alias,
@@ -715,11 +757,9 @@ impl<'a> ArrayReadBorrow<'a> {
             source.cast_reference::<ArrayObject>(s, function).nullable(),
             function,
         );
-        s.field(ArrayObjectSchema::MODE)
-            .read(&borrow.array, s, function);
-        function.instruction(&Instruction::I32Const(borrow.backing.mode().encode()));
-        function.instruction(&Instruction::I32Ne);
-        builder.emit_branch_if_to_target(decline, function);
+        borrow
+            .backing
+            .guard_mode(&borrow.array, builder, decline, function);
         s.field(ArrayObjectSchema::LENGTH)
             .read(&borrow.array, s, function)
             .store_i64(borrow.length, function);
@@ -743,6 +783,42 @@ impl<'a> ArrayReadBorrow<'a> {
                 );
                 s.array_type::<NumberBitsI64Array>()
                     .length(numbers, s, function);
+            }
+            ReadBacking::Values { numbers, values } => {
+                let capacity = s.reserve_i32_local(function);
+                s.field(ArrayObjectSchema::MODE)
+                    .read(&borrow.array, s, function);
+                function.instruction(&Instruction::I32Const(
+                    ArrayIndexedStorageMode::PackedNumbers.encode(),
+                ));
+                function.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, function);
+                numbers.replace(
+                    s.field(ArrayObjectSchema::NUMBERS)
+                        .read(&borrow.array, s, function)
+                        .reference()
+                        .nullable(),
+                    function,
+                );
+                s.array_type::<NumberBitsI64Array>()
+                    .length(numbers, s, function);
+                capacity.store(function);
+                function.instruction(&Instruction::Else);
+                values.replace(
+                    s.field(ArrayObjectSchema::VALUES)
+                        .read(&borrow.array, s, function)
+                        .reference(),
+                    function,
+                );
+                values.load(s, function).is_null(function);
+                builder.emit_branch_if_to_target(decline, function);
+                s.array_type::<PackedValueTable>()
+                    .length(values, s, function);
+                capacity.store(function);
+                builder.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                capacity.load(function);
+                s.release_i32_local(capacity, function);
             }
             ReadBacking::Compact(rows) => {
                 rows.capture(&borrow.array, builder, function);
@@ -884,32 +960,50 @@ impl<'a> ArrayReadBorrow<'a> {
         self.slot.store(function);
     }
 
-    pub(super) fn load_slot(&self, function: &mut Function) {
-        self.slot.load(function);
-    }
-
     pub(super) fn emit_element(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
-        self.emit_element_at(self.slot, builder, function);
-    }
-
-    pub(super) fn emit_element_at(
-        &self,
-        index: I32Local,
-        builder: &FunctionBuilder<'_>,
-        function: &mut Function,
-    ) {
         let s = builder.runtime_schema();
         let ReadBacking::Numbers(numbers) = &self.backing else {
             unreachable!("direct Number reads require their matching guarded backing");
         };
         s.array_type::<NumberBitsI64Array>()
-            .read(numbers, index, s, function);
+            .read(numbers, self.slot, s, function);
         function.instruction(&Instruction::F64ReinterpretI64);
     }
 
-    pub(super) fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
-        self.array.set_null(builder.runtime_schema(), function);
-        self.backing.clear_roots(builder, function);
+    pub(super) fn emit_value_at(
+        &self,
+        index: I32Local,
+        output: &ValueLocals,
+        builder: &mut FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        let ReadBacking::Values { numbers, values } = &self.backing else {
+            unreachable!("strict pairs require their sealed packed-value backing");
+        };
+        values.load(s, function).is_null(function);
+        builder.open_frame(ControlFrameKind::If, function);
+        let bits = s.reserve_i64_local(function);
+        s.array_type::<NumberBitsI64Array>()
+            .read(numbers, index, s, function)
+            .store_i64(bits, function);
+        output.set_number(bits, function);
+        s.release_i64_local(bits, function);
+        function.instruction(&Instruction::Else);
+        let stored = s.reserve_gc_local(function).initialize(
+            s.array_type::<PackedValueTable>()
+                .read(values, index, s, function)
+                .reference()
+                .require_non_null(function),
+            function,
+        );
+        // COUNT==LENGTH and canonical packed mode prove a present current own
+        // immutable StoredValue. Descriptor overrides retire the packed mode.
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, output, s, function);
+        stored.clear(function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {

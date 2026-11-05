@@ -18,11 +18,11 @@ accepts `--case <file.js>`.
   non-simple parameter TDZ, arguments snapshots and captures, as well as
   callee identity, Realm, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
-- Extend the ordered numeric region to mixed strict comparisons and type
-  classification through existing semantic kernels. Measure pure repeating-input
-  projection and remove redundant induction before adding a general Value region.
-  Preserve arithmetic order, input effects, zero-trip state and complete fallback.
-  Owner: AOT scalar-loop planning and numeric inputs.
+- Measure type classification and singleton dispatch after strict-pair period
+  projection. Prefer private binding facts and existing semantic kernels before
+  adding a general Value region. Preserve arithmetic order, input effects,
+  invalidation, zero-trip state and complete fallback.
+  Owner: AOT scalar-loop planning and value refinement.
 - Reduce preflight and allocation costs in closed numeric row loops. Complete
   read-only periods project Number/string-length leaves through canonical own-data
   reads, with literal keys or an authenticated dense String table. Measure the remaining
@@ -41,8 +41,22 @@ accepts `--case <file.js>`.
   internal OwnKeys and canonical Module direct-cell capture admission. Keep
   [instruction counts and sampled callers](react-attribution-current.json)
   separate from scored timings; inclusive sample shares overlap. Preserve live
-  import aliases, TDZ, cross-Realm errors and Proxy invariants. Total executed
-  allocation remains unmeasured. Owner: IR/AOT lowering and object operations.
+  import aliases, TDZ, cross-Realm errors and Proxy invariants. The exact-artifact
+  [GC census](react-allocation-current.json) measures physical reservations;
+  allocation origins and representation savings remain unmeasured.
+  Owner: IR/AOT lowering and object operations.
+- Classify the measured StoredValue payloads before changing storage. Synchronous
+  RSC requests allocate 19,935 wrappers among 49,794 GC objects; this does not
+  identify argument, property or binding writes. A single-reference storage pilot
+  must preserve deferred property recipes and legacy descriptor ownership tokens,
+  and avoid newly boxing numeric computation. BindingCell identity and shared
+  writes need separate evidence. Owner: runtime value/storage representation.
+- Preserve packed arrays through read-only indexed descriptor queries. The
+  current mutable lookup can materialize every packed element before returning
+  one snapshot. Measure actual RSC incidence and keep snapshot values/attributes,
+  holes and prototype behavior, with materialization retained for real writes.
+  The GC census counts 8,412 descriptors per synchronous request; it does not
+  attribute them to this path. Owner: AOT Array internal methods.
 - Measure remaining descriptor snapshots, name-to-slot selection and executed
   allocation after private `[[GetOwnProperty]]` transport. Use the matched
   ordinary/JavaScript-function/native-constructor read situations and

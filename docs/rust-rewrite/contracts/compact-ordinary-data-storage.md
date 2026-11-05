@@ -284,26 +284,37 @@ Only the row table publishes an actual optional alias; borrowed key tables and
 projection roots clear before a generic continuation. No runtime ABI, permanent
 cache or object layout is added.
 
-A closed numeric branch region can instead borrow one or two existing packed
-Number backings directly. The same canonical Array mode, dense extent, capacity
-and bounds guards authenticate every addressable element before source work.
-A first private `var` index must be `(counter + phase) & mask`: the counter has
-bounded nonnegative literal induction, phase must currently be an integral
-signed-32 Number, and the mask is a bounded contiguous low-bit mask. The original
-binary64 addition is exact in this domain; only its observed ToInt32 low bits
-use wrapping i32 arithmetic. The body keeps ordered Number arithmetic and
-structured `if` branches, including strict equality's NaN and signed-zero rules.
+A closed numeric branch region can project one pure strict-equality pair over
+its complete repeated masked period. Both receivers pass the canonical concrete
+Array, packed mode, dense logical extent and backing-capacity guards; inputs may
+use PackedNumbers or PackedValues. Indexed descriptors, accessors, holes and
+Proxy receivers retain the original loop. Current StoredValues preserve every
+primitive payload and reference identity; no numeric kind hint changes equality.
+The existing strict-equality kernel alone produces the period's Boolean results,
+stored as Number zero/one bits in one private NumberBits array. The source loop
+then reads that projection and retains its original ordered Number arithmetic,
+structured branches and completion/publication tail. No generic Value-region
+interpreter, persistent cache, helper ABI or object model is introduced.
 
-The full body/test/update proof excludes callbacks, input writes, captured
-outputs, index/counter rewrites and all uninspected statements. Each branch must
-have a Number statement value. The index's previous Value is neither inspected
-at entry nor published on a failed admission/zero trip; completed iterations
-publish its final Number through the existing source-local owner. Failed input
-admission clears every borrow before the whole original loop, retaining TDZ,
-getters, Proxies, holes, conversions and partial-iteration Throw behavior.
-No projection allocation, new heap layout or runtime ABI is involved. Existing
-chunked and whole-trip transformations still refuse this invariant-bearing
-region: no comparison or original iteration is aggregated or unrolled.
+A first private `var` index must be `(counter + phase) & mask`. Literal induction
+proves `0 <= first < limit <= 2^20`, more than one full low-bit period, Increment,
+and no body counter writes. After the complete body/write proof, its source
+counter is sealed Signed32 and supplies the sole loop test, update and masked
+index; no second mirror advances. Existing literal and integer entry checks
+retain the negative-zero fallback. Phase must currently be an integral signed-32 Number, so the
+original binary64 sum is exact before its observed low bits use wrapping i32.
+The accumulator and all unrelated local domains retain their existing rules.
+
+The complete body/test/update proof excludes callbacks, input writes, captured
+outputs, index/counter rewrites and uninspected statements. Only direct strict
+pairs at the same index enter the all-kind preflight; numeric loose equality
+stays a separate Number-only operation. Each branch must have a Number statement
+value. The index's previous Value is neither inspected at entry nor published on
+a failed admission/zero trip. Input/backing and temporary Value roots clear
+before either source loop; the projection clears at the existing exit owner.
+Failed admission retains exact TDZ, getter/Proxy, conversion and partial-iteration
+Throw behavior. Chunked and whole-trip transformations still refuse this
+invariant-bearing region: source arithmetic is never aggregated or unrolled.
 
 ## Allocation accounting and evidence limits
 

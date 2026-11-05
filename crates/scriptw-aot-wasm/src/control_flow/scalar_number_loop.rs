@@ -10,7 +10,7 @@ use crate::emit::LocalBindingId;
 mod statements;
 use statements::NumberStatement;
 mod number_inputs;
-use number_inputs::{NumberInputBorrow, NumberInputs};
+use number_inputs::{StrictPairInputs, StrictPairProjection};
 mod dense_array;
 use dense_array::{ArrayRead, ArrayReadBorrow, ArrayReadLoop, PropertyReadView};
 mod compact_path;
@@ -67,7 +67,6 @@ enum NumberExpression {
     Binding(usize),
     ArrayLength,
     ArrayElement,
-    InputElement(usize),
     MaskedInputIndex,
     CompactPath(CompactPathId),
     JoinedLength,
@@ -99,6 +98,7 @@ enum NumberPredicate {
     Not(Box<Self>),
     Compare(RelationalBinaryOp, NumberExpression, NumberExpression),
     Equal(bool, NumberExpression, NumberExpression),
+    ProjectedStrict(bool),
 }
 
 struct NumberBinding {
@@ -145,9 +145,9 @@ struct LoopLocals<'a> {
 }
 
 impl LoopLocals<'_> {
-    fn number_inputs(&self) -> &NumberInputBorrow<'_> {
-        let Some(RegionFact::NumberInputs(inputs)) = self.invariant else {
-            unreachable!("numeric input leaves require their sealed roots");
+    fn strict_pair(&self) -> &StrictPairProjection {
+        let Some(RegionFact::StrictPairInputs(inputs)) = self.invariant else {
+            unreachable!("strict predicates require their sealed projection");
         };
         inputs
     }
@@ -170,7 +170,7 @@ impl LoopLocals<'_> {
 /// One region owns one closed fact. Conflicting receivers/operations decline.
 enum RegionInvariant {
     ArrayReads(ArrayReadLoop),
-    NumberInputs(NumberInputs),
+    StrictPairInputs(StrictPairInputs),
     JoinedStringLength(JoinedStringArrayLength),
 }
 
@@ -178,7 +178,7 @@ impl RegionInvariant {
     fn is_receiver(&self, id: LocalBindingId) -> bool {
         match self {
             Self::ArrayReads(array) => array.is_array(id),
-            Self::NumberInputs(inputs) => inputs.is_receiver(id),
+            Self::StrictPairInputs(inputs) => inputs.is_receiver(id),
             Self::JoinedStringLength(joined) => joined.receiver() == id,
         }
     }
@@ -186,7 +186,7 @@ impl RegionInvariant {
 
 enum RegionFact<'a> {
     ArrayReads(ArrayReadBorrow<'a>),
-    NumberInputs(NumberInputBorrow<'a>),
+    StrictPairInputs(StrictPairProjection),
     JoinedStringLength(JoinedLengthFact),
 }
 
@@ -194,7 +194,7 @@ impl RegionFact<'_> {
     fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         match self {
             Self::ArrayReads(array) => array.release(builder, function),
-            Self::NumberInputs(inputs) => inputs.release(builder, function),
+            Self::StrictPairInputs(inputs) => inputs.release(builder, function),
             Self::JoinedStringLength(length) => length.release(builder, function),
         }
     }
@@ -293,13 +293,15 @@ impl ScalarNumberLoop {
     ) {
         self.emit_body(builder, locals, value, function);
         iterated.set_constant(1, function);
-        if let Some(update) = &self.update {
-            update.emit_discard(builder, locals, function);
-        }
-        match locals.invariant {
-            Some(RegionFact::ArrayReads(array)) => array.advance(function),
-            Some(RegionFact::NumberInputs(inputs)) => inputs.advance(function),
-            _ => {}
+        if let Some(RegionFact::StrictPairInputs(inputs)) = locals.invariant {
+            inputs.advance(locals, function);
+        } else {
+            if let Some(update) = &self.update {
+                update.emit_discard(builder, locals, function);
+            }
+            if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
+                array.advance(function);
+            }
         }
     }
 
@@ -329,8 +331,8 @@ impl ScalarNumberLoop {
             invariant: ArrayReadLoop::new(builder, init, source_test, update, body)
                 .map(RegionInvariant::ArrayReads)
                 .or_else(|| {
-                    NumberInputs::new(builder, init, source_test, update, body)
-                        .map(RegionInvariant::NumberInputs)
+                    StrictPairInputs::new(builder, init, source_test, update, body)
+                        .map(RegionInvariant::StrictPairInputs)
                 }),
             row_alias_initialized: false,
             number_index_initialized: false,
@@ -344,11 +346,6 @@ impl ScalarNumberLoop {
         };
         if let Some(RegionInvariant::ArrayReads(array)) = &proof.invariant {
             if !array.body_preserves_counter(&proof.bindings, &expressions) {
-                return None;
-            }
-        }
-        if let Some(RegionInvariant::NumberInputs(inputs)) = &proof.invariant {
-            if !inputs.complete(&proof.bindings, &expressions) {
                 return None;
             }
         }
@@ -382,6 +379,13 @@ impl ScalarNumberLoop {
         }
         for (binding, domain) in proof.bindings.iter_mut().zip(writes) {
             binding.domain = domain.unwrap_or(NumberDomain::Number);
+        }
+        if let Some(RegionInvariant::StrictPairInputs(inputs)) = &proof.invariant {
+            // This complete induction proof additionally seals the counter's
+            // range through its final Increment, independently of input values.
+            if !inputs.complete(&mut proof.bindings, &expressions) {
+                return None;
+            }
         }
         // This conservative budget includes test and update proof nodes too;
         // four body expansions therefore never exceed MAX_NODES source nodes.
@@ -473,8 +477,8 @@ impl ScalarNumberLoop {
                     RegionInvariant::ArrayReads(plan) => RegionFact::ArrayReads(
                         ArrayReadBorrow::new(plan, builder, accepted, function),
                     ),
-                    RegionInvariant::NumberInputs(plan) => {
-                        RegionFact::NumberInputs(plan.guard(builder, accepted, function))
+                    RegionInvariant::StrictPairInputs(plan) => {
+                        RegionFact::StrictPairInputs(plan.guard(builder, accepted, function)?)
                     }
                     RegionInvariant::JoinedStringLength(plan) => {
                         // Speculate only after Number/initialization admission.
@@ -593,14 +597,6 @@ impl LoopProof<'_, '_> {
             return Some(NumberExpression::JoinedLength);
         }
         if let Some(read) = PropertyReadView::of(value) {
-            if let Some(RegionInvariant::NumberInputs(inputs)) = &mut self.invariant {
-                if !self.number_index_initialized {
-                    return None;
-                }
-                return inputs
-                    .read(self.builder, read)
-                    .map(NumberExpression::InputElement);
-            }
             let Some(RegionInvariant::ArrayReads(array)) = self.invariant.as_mut() else {
                 return None;
             };
@@ -686,6 +682,39 @@ impl LoopProof<'_, '_> {
 
     fn predicate(&mut self, value: &TypedExpr, depth: usize) -> Option<NumberPredicate> {
         let depth = self.visit(depth)?;
+        // Only direct strict pairs enter the mixed-value preflight. Numeric
+        // equality, including loose equality, keeps its separate Number proof.
+        let strict = match &value.expr {
+            ExprIr::StrictEquality { op, lhs, rhs }
+                if matches!(
+                    op,
+                    EqualityBinaryOp::StrictEqual | EqualityBinaryOp::StrictNotEqual
+                ) =>
+            {
+                Some((
+                    matches!(op, EqualityBinaryOp::StrictEqual),
+                    lhs.as_ref(),
+                    rhs.as_ref(),
+                ))
+            }
+            ExprIr::SpecOperation {
+                operation: SpecOperationIr::StrictEqualityComparison,
+                operands,
+            } => {
+                let [left, right] = operands.as_slice() else {
+                    return None;
+                };
+                Some((true, left, right))
+            }
+            _ => None,
+        };
+        if let (Some((equal, left, right)), Some(RegionInvariant::StrictPairInputs(inputs))) =
+            (strict, &mut self.invariant)
+        {
+            if self.number_index_initialized && inputs.pair(self.builder, left, right).is_some() {
+                return Some(NumberPredicate::ProjectedStrict(equal));
+            }
+        }
         Some(match &value.expr {
             ExprIr::Boolean(value) => NumberPredicate::Boolean(*value),
             ExprIr::LogicalNot { expr } => {
@@ -711,7 +740,7 @@ impl LoopProof<'_, '_> {
             ExprIr::SpecOperation {
                 operation: SpecOperationIr::StrictEqualityComparison,
                 operands,
-            } if matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) => {
+            } if matches!(self.invariant, Some(RegionInvariant::StrictPairInputs(_))) => {
                 let [left, right] = operands.as_slice() else {
                     return None;
                 };
@@ -741,7 +770,7 @@ impl LoopProof<'_, '_> {
                 condition,
                 then_branch,
                 else_branch,
-            } if matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) => {
+            } if matches!(self.invariant, Some(RegionInvariant::StrictPairInputs(_))) => {
                 let test = self.predicate(condition, depth)?;
                 let mut consequent = Vec::new();
                 let mut alternate = Vec::new();
@@ -761,9 +790,9 @@ impl LoopProof<'_, '_> {
             StatementIr::Var(declarations)
                 if expressions.is_empty()
                     && !self.number_index_initialized
-                    && matches!(self.invariant, Some(RegionInvariant::NumberInputs(_))) =>
+                    && matches!(self.invariant, Some(RegionInvariant::StrictPairInputs(_))) =>
             {
-                let Some(RegionInvariant::NumberInputs(inputs)) = &self.invariant else {
+                let Some(RegionInvariant::StrictPairInputs(inputs)) = &self.invariant else {
                     unreachable!()
                 };
                 let [declaration] = declarations.as_slice() else {
@@ -838,7 +867,6 @@ impl NumberExpression {
             ),
             Self::Binding(_)
             | Self::ArrayElement
-            | Self::InputElement(_)
             | Self::CompactPath(_)
             | Self::JoinedLength
             | Self::Negate(_)
@@ -949,7 +977,6 @@ impl NumberExpression {
             | Self::Binding(_)
             | Self::ArrayLength
             | Self::ArrayElement
-            | Self::InputElement(_)
             | Self::MaskedInputIndex
             | Self::CompactPath(_)
             | Self::JoinedLength => {}
@@ -975,7 +1002,7 @@ impl NumberExpression {
                     self.emit_number_to_uint32(builder, locals, function);
                 }
             },
-            Self::MaskedInputIndex => locals.number_inputs().emit_index(function),
+            Self::MaskedInputIndex => locals.strict_pair().emit_index(locals, function),
             Self::Bitwise(op, lhs, rhs) => {
                 lhs.emit_uint32(builder, locals, function);
                 rhs.emit_uint32(builder, locals, function);
@@ -1112,11 +1139,8 @@ impl NumberExpression {
             Self::Binding(index) => locals.values[*index].load_number(function),
             Self::ArrayLength => locals.array().emit_length(function),
             Self::ArrayElement => locals.array().emit_element(builder, function),
-            Self::InputElement(input) => locals
-                .number_inputs()
-                .emit_element(*input, locals, builder, function),
             Self::MaskedInputIndex => {
-                locals.number_inputs().emit_index(function);
+                locals.strict_pair().emit_index(locals, function);
                 function.instruction(&Instruction::F64ConvertI32S);
             }
             Self::CompactPath(path) => locals.array().emit_compact_path(*path, function),
@@ -1181,7 +1205,7 @@ impl NumberExpression {
 impl NumberPredicate {
     fn collect_writes(&self, writes: &mut [Option<NumberDomain>]) {
         match self {
-            Self::Boolean(_) => {}
+            Self::Boolean(_) | Self::ProjectedStrict(_) => {}
             Self::Truthy(value) => value.collect_writes(writes),
             Self::Not(value) => value.collect_writes(writes),
             Self::Compare(_, lhs, rhs) | Self::Equal(_, lhs, rhs) => {
@@ -1200,6 +1224,14 @@ impl NumberPredicate {
         match self {
             Self::Boolean(value) => {
                 function.instruction(&Instruction::I32Const(i32::from(*value)));
+            }
+            Self::ProjectedStrict(equal) => {
+                locals
+                    .strict_pair()
+                    .emit_predicate(locals, builder, function);
+                if !equal {
+                    function.instruction(&Instruction::I32Eqz);
+                }
             }
             Self::Truthy(value) => {
                 let schema = builder.runtime_schema();
@@ -1446,10 +1478,10 @@ impl FunctionBuilder<'_> {
     ) {
         let next = self.open_frame(ControlFrameKind::Loop, function);
         if compact.is_none() {
-            if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
-                array.emit_test(function);
-            } else {
-                plan.test.emit(self, locals, function);
+            match locals.invariant {
+                Some(RegionFact::ArrayReads(array)) => array.emit_test(function),
+                Some(RegionFact::StrictPairInputs(inputs)) => inputs.emit_test(locals, function),
+                _ => plan.test.emit(self, locals, function),
             }
             function.instruction(&Instruction::I32Eqz);
             self.emit_branch_if_to_target(done, function);

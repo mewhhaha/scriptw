@@ -21,7 +21,7 @@ from limited_verification import kernel_group, limited_environment, require_kern
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'scriptw-situation-benchmarks-v1'
-SAMPLES, WARMUPS, BLOCKS, ROUNDS = 7, 3, 2, 4
+SAMPLES, WARMUPS, BLOCKS, ROUNDS = 21, 100, 2, 4
 ADAPTER = 'crates/scriptw-cli/tests/fixtures/v8_baseline/node-situations.cjs'
 HOST_SOURCE = 'crates/scriptw-cli/examples/compiler_precompiled_baseline.rs'
 IDENTITY_FIELDS = ('source_commit', 'source_fingerprint', 'compiler_identity_scheme', 'executable_sha256')

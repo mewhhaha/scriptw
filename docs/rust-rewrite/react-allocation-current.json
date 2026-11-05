@@ -1,0 +1,5500 @@
+{
+  "schema": "scriptw-rsc-physical-allocation-census-v1",
+  "date": "2026-11-05",
+  "complete": true,
+  "exact_flight_checks": 80,
+  "valid_on_request_epochs": 40,
+  "scored_source_manifest_sha256": "255360fa7cd75366fe790313dab6a578f30fd5b280dd7f7c2f07d93f0a880280",
+  "labels": [
+    [
+      "P",
+      "63",
+      "StoredValue"
+    ],
+    [
+      "P",
+      "141",
+      "BindingCell"
+    ],
+    [
+      "P",
+      "148",
+      "StringValue"
+    ],
+    [
+      "P",
+      "149",
+      "CodeUnitArray"
+    ],
+    [
+      "P",
+      "103",
+      "ValueArray"
+    ],
+    [
+      "P",
+      "286",
+      "PropertyKeyTable"
+    ],
+    [
+      "P",
+      "165",
+      "ForInEnumerationRecord"
+    ],
+    [
+      "P",
+      "71",
+      "OrdinaryObject"
+    ],
+    [
+      "P",
+      "94",
+      "OrdinaryPropertyStorage"
+    ],
+    [
+      "P",
+      "77",
+      "PropertyTable"
+    ],
+    [
+      "P",
+      "95",
+      "OrdinaryPropertyIndex"
+    ],
+    [
+      "P",
+      "76",
+      "PropertyEntry"
+    ],
+    [
+      "P",
+      "72",
+      "PropertyDescriptor"
+    ],
+    [
+      "R",
+      "63",
+      "StoredValue"
+    ],
+    [
+      "R",
+      "141",
+      "BindingCell"
+    ],
+    [
+      "R",
+      "148",
+      "StringValue"
+    ],
+    [
+      "R",
+      "149",
+      "CodeUnitArray"
+    ],
+    [
+      "R",
+      "103",
+      "ValueArray"
+    ],
+    [
+      "R",
+      "286",
+      "PropertyKeyTable"
+    ],
+    [
+      "R",
+      "165",
+      "ForInEnumerationRecord"
+    ],
+    [
+      "R",
+      "71",
+      "OrdinaryObject"
+    ],
+    [
+      "R",
+      "94",
+      "OrdinaryPropertyStorage"
+    ],
+    [
+      "R",
+      "77",
+      "PropertyTable"
+    ],
+    [
+      "R",
+      "95",
+      "OrdinaryPropertyIndex"
+    ],
+    [
+      "R",
+      "76",
+      "PropertyEntry"
+    ],
+    [
+      "R",
+      "72",
+      "PropertyDescriptor"
+    ]
+  ],
+  "cases": {
+    "rsc-sync": {
+      "request_allocations": {
+        "warmups": {
+          "observations": 6,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 49795.0,
+                "process_medians": [
+                  49795,
+                  49795
+                ],
+                "minimum": 49794,
+                "maximum": 50586
+              },
+              "bytes": {
+                "median_of_process_medians": 2016048.0,
+                "process_medians": [
+                  2016048,
+                  2016048
+                ],
+                "minimum": 2016016,
+                "maximum": 2054224
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 19935.0,
+                "process_medians": [
+                  19935,
+                  19935
+                ],
+                "minimum": 19935,
+                "maximum": 20027
+              },
+              "bytes": {
+                "median_of_process_medians": 637920.0,
+                "process_medians": [
+                  637920,
+                  637920
+                ],
+                "minimum": 637920,
+                "maximum": 640864
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 346.0,
+                "process_medians": [
+                  346,
+                  346
+                ],
+                "minimum": 346,
+                "maximum": 346
+              },
+              "bytes": {
+                "median_of_process_medians": 27680.0,
+                "process_medians": [
+                  27680,
+                  27680
+                ],
+                "minimum": 27680,
+                "maximum": 27680
+              }
+            }
+          },
+          "collections": [
+            0
+          ]
+        },
+        "measured": {
+          "observations": 14,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 49794.0,
+                "process_medians": [
+                  49794,
+                  49794
+                ],
+                "minimum": 49794,
+                "maximum": 49794
+              },
+              "bytes": {
+                "median_of_process_medians": 2016016.0,
+                "process_medians": [
+                  2016016,
+                  2016016
+                ],
+                "minimum": 2016016,
+                "maximum": 2016016
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 19935.0,
+                "process_medians": [
+                  19935,
+                  19935
+                ],
+                "minimum": 19935,
+                "maximum": 19935
+              },
+              "bytes": {
+                "median_of_process_medians": 637920.0,
+                "process_medians": [
+                  637920,
+                  637920
+                ],
+                "minimum": 637920,
+                "maximum": 637920
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 346.0,
+                "process_medians": [
+                  346,
+                  346
+                ],
+                "minimum": 346,
+                "maximum": 346
+              },
+              "bytes": {
+                "median_of_process_medians": 27680.0,
+                "process_medians": [
+                  27680,
+                  27680
+                ],
+                "minimum": 27680,
+                "maximum": 27680
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        }
+      },
+      "with_validation_allocations": {
+        "warmups": {
+          "observations": 6,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 49910.0,
+                "process_medians": [
+                  49910,
+                  49910
+                ],
+                "minimum": 49909,
+                "maximum": 50701
+              },
+              "bytes": {
+                "median_of_process_medians": 2069728.0,
+                "process_medians": [
+                  2069728,
+                  2069728
+                ],
+                "minimum": 2069696,
+                "maximum": 2107904
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 19968.0,
+                "process_medians": [
+                  19968,
+                  19968
+                ],
+                "minimum": 19968,
+                "maximum": 20060
+              },
+              "bytes": {
+                "median_of_process_medians": 638976.0,
+                "process_medians": [
+                  638976,
+                  638976
+                ],
+                "minimum": 638976,
+                "maximum": 641920
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 346.0,
+                "process_medians": [
+                  346,
+                  346
+                ],
+                "minimum": 346,
+                "maximum": 346
+              },
+              "bytes": {
+                "median_of_process_medians": 27680.0,
+                "process_medians": [
+                  27680,
+                  27680
+                ],
+                "minimum": 27680,
+                "maximum": 27680
+              }
+            }
+          },
+          "collections": [
+            0
+          ]
+        },
+        "measured": {
+          "observations": 14,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 49909.0,
+                "process_medians": [
+                  49909,
+                  49909
+                ],
+                "minimum": 49909,
+                "maximum": 49909
+              },
+              "bytes": {
+                "median_of_process_medians": 2069696.0,
+                "process_medians": [
+                  2069696,
+                  2069696
+                ],
+                "minimum": 2069696,
+                "maximum": 2069696
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 19968.0,
+                "process_medians": [
+                  19968,
+                  19968
+                ],
+                "minimum": 19968,
+                "maximum": 19968
+              },
+              "bytes": {
+                "median_of_process_medians": 638976.0,
+                "process_medians": [
+                  638976,
+                  638976
+                ],
+                "minimum": 638976,
+                "maximum": 638976
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 346.0,
+                "process_medians": [
+                  346,
+                  346
+                ],
+                "minimum": 346,
+                "maximum": 346
+              },
+              "bytes": {
+                "median_of_process_medians": 27680.0,
+                "process_medians": [
+                  27680,
+                  27680
+                ],
+                "minimum": 27680,
+                "maximum": 27680
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        }
+      }
+    },
+    "rsc-async": {
+      "request_allocations": {
+        "warmups": {
+          "observations": 6,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 53305.0,
+                "process_medians": [
+                  53305,
+                  53305
+                ],
+                "minimum": 53305,
+                "maximum": 53338
+              },
+              "bytes": {
+                "median_of_process_medians": 2209728.0,
+                "process_medians": [
+                  2209728,
+                  2209728
+                ],
+                "minimum": 2209728,
+                "maximum": 2211360
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 21064.0,
+                "process_medians": [
+                  21064,
+                  21064
+                ],
+                "minimum": 21064,
+                "maximum": 21068
+              },
+              "bytes": {
+                "median_of_process_medians": 674048.0,
+                "process_medians": [
+                  674048,
+                  674048
+                ],
+                "minimum": 674048,
+                "maximum": 674176
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 359.0,
+                "process_medians": [
+                  359,
+                  359
+                ],
+                "minimum": 359,
+                "maximum": 359
+              },
+              "bytes": {
+                "median_of_process_medians": 28720.0,
+                "process_medians": [
+                  28720,
+                  28720
+                ],
+                "minimum": 28720,
+                "maximum": 28720
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        },
+        "measured": {
+          "observations": 14,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 53305.0,
+                "process_medians": [
+                  53305,
+                  53305
+                ],
+                "minimum": 53305,
+                "maximum": 53305
+              },
+              "bytes": {
+                "median_of_process_medians": 2209728.0,
+                "process_medians": [
+                  2209728,
+                  2209728
+                ],
+                "minimum": 2209728,
+                "maximum": 2209728
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 21064.0,
+                "process_medians": [
+                  21064,
+                  21064
+                ],
+                "minimum": 21064,
+                "maximum": 21064
+              },
+              "bytes": {
+                "median_of_process_medians": 674048.0,
+                "process_medians": [
+                  674048,
+                  674048
+                ],
+                "minimum": 674048,
+                "maximum": 674048
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 359.0,
+                "process_medians": [
+                  359,
+                  359
+                ],
+                "minimum": 359,
+                "maximum": 359
+              },
+              "bytes": {
+                "median_of_process_medians": 28720.0,
+                "process_medians": [
+                  28720,
+                  28720
+                ],
+                "minimum": 28720,
+                "maximum": 28720
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        }
+      },
+      "with_validation_allocations": {
+        "warmups": {
+          "observations": 6,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 53420.0,
+                "process_medians": [
+                  53420,
+                  53420
+                ],
+                "minimum": 53420,
+                "maximum": 53453
+              },
+              "bytes": {
+                "median_of_process_medians": 2265376.0,
+                "process_medians": [
+                  2265376,
+                  2265376
+                ],
+                "minimum": 2265376,
+                "maximum": 2267008
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 21097.0,
+                "process_medians": [
+                  21097,
+                  21097
+                ],
+                "minimum": 21097,
+                "maximum": 21101
+              },
+              "bytes": {
+                "median_of_process_medians": 675104.0,
+                "process_medians": [
+                  675104,
+                  675104
+                ],
+                "minimum": 675104,
+                "maximum": 675232
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 359.0,
+                "process_medians": [
+                  359,
+                  359
+                ],
+                "minimum": 359,
+                "maximum": 359
+              },
+              "bytes": {
+                "median_of_process_medians": 28720.0,
+                "process_medians": [
+                  28720,
+                  28720
+                ],
+                "minimum": 28720,
+                "maximum": 28720
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        },
+        "measured": {
+          "observations": 14,
+          "processes": 2,
+          "totals": {
+            "All GC allocations": {
+              "objects": {
+                "median_of_process_medians": 53420.0,
+                "process_medians": [
+                  53420,
+                  53420
+                ],
+                "minimum": 53420,
+                "maximum": 53420
+              },
+              "bytes": {
+                "median_of_process_medians": 2265376.0,
+                "process_medians": [
+                  2265376,
+                  2265376
+                ],
+                "minimum": 2265376,
+                "maximum": 2265376
+              }
+            },
+            "StoredValue": {
+              "objects": {
+                "median_of_process_medians": 21097.0,
+                "process_medians": [
+                  21097,
+                  21097
+                ],
+                "minimum": 21097,
+                "maximum": 21097
+              },
+              "bytes": {
+                "median_of_process_medians": 675104.0,
+                "process_medians": [
+                  675104,
+                  675104
+                ],
+                "minimum": 675104,
+                "maximum": 675104
+              }
+            },
+            "BindingCell": {
+              "objects": {
+                "median_of_process_medians": 359.0,
+                "process_medians": [
+                  359,
+                  359
+                ],
+                "minimum": 359,
+                "maximum": 359
+              },
+              "bytes": {
+                "median_of_process_medians": 28720.0,
+                "process_medians": [
+                  28720,
+                  28720
+                ],
+                "minimum": 28720,
+                "maximum": 28720
+              }
+            }
+          },
+          "collections": [
+            0,
+            1
+          ]
+        }
+      }
+    }
+  },
+  "limits": [
+    "Unscored diagnostic; all4children share one host binary in off/on/on/off order.",
+    "Both program/runtime bytes equal the scored artifacts, including all standard and custom sections.",
+    "Aligned physical GC reservations include headers/padding, dead objects and host bridge; copied survivors excluded.",
+    "StoredValue is a physical wrapper type; neither these counts nor BindingCell counts identify which writes, argument vectors, properties or snapshots created the wrappers.",
+    "Rust allocations, live retained memory, copied bytes, instruction costs and Node allocations remain outside the census.",
+    "Thirteen physical labels are authenticated by exact helper signatures/field graphs. Other aliases/raw IDs remain explicit. Type labels do not identify allocation origins."
+  ],
+  "scored_baseline": {
+    "git_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
+    "compiler_source_fingerprint": "21ad728e4380ca45e70dc0896fd0f79b001ec107867979a1a109de5c7ebdeb0c",
+    "program_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
+    "runtime_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53"
+  },
+  "diagnostic_identity": {
+    "source_fingerprint": "b07826525d496a9841ebccd96513d7bce9a46a43652a14e71a3fa1d84f5b8362",
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "None",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "SinglePass",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "inputs": {
+      "adapted_source_bytes": 64946,
+      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+      "source_bytes": 64835,
+      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+      "versions": {
+        "esbuild": "0.28.2",
+        "playwright": "1.64.1",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-server-dom-webpack": "19.3.1"
+      },
+      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+    },
+    "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
+    "runtime": {
+      "key": "47deb80b886ecec31cdacf87b9d73fe38e1b6799ab22100639553544eda54416",
+      "wasm_bytes": 38816202,
+      "wasm_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53"
+    }
+  },
+  "evidence_prefix": "additional-evidence/target/performance-v8-climb-20261104/allocation-census-next/publication-evidence/",
+  "expanded_physical_types": {
+    "schema": "scriptw-allocation-expanded-labels-v1",
+    "limits": "Unscored physical GC reservations, including host bridge and dead allocations; copied survivors excluded. Type aliases do not denote allocation origins. Per-type medians need not sum to median total. No timing or retained-heap claim.",
+    "exact_flight_checks": 80,
+    "valid_on_epochs": 40,
+    "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
+    "runtime": {
+      "key": "47deb80b886ecec31cdacf87b9d73fe38e1b6799ab22100639553544eda54416",
+      "wasm_bytes": 38816202,
+      "wasm_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53"
+    },
+    "cases": {
+      "rsc-sync": {
+        "processes": 2,
+        "observations": 14,
+        "objects": {
+          "median_of_process_medians": 49794.0,
+          "process_medians": [
+            49794,
+            49794
+          ],
+          "minimum": 49794,
+          "maximum": 49794
+        },
+        "bytes": {
+          "median_of_process_medians": 2016016.0,
+          "process_medians": [
+            2016016,
+            2016016
+          ],
+          "minimum": 2016016,
+          "maximum": 2016016
+        },
+        "collections": {
+          "median_of_process_medians": 0.0,
+          "process_medians": [
+            0,
+            0
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "physical_types": [
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                63
+              ],
+              [
+                "R",
+                63
+              ]
+            ],
+            "semantic_labels": [
+              "StoredValue"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 19935.0,
+              "process_medians": [
+                19935,
+                19935
+              ],
+              "minimum": 19935,
+              "maximum": 19935
+            },
+            "bytes": {
+              "median_of_process_medians": 637920.0,
+              "process_medians": [
+                637920,
+                637920
+              ],
+              "minimum": 637920,
+              "maximum": 637920
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                149
+              ],
+              [
+                "R",
+                149
+              ]
+            ],
+            "semantic_labels": [
+              "CodeUnitArray"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3371.0,
+              "process_medians": [
+                3371,
+                3371
+              ],
+              "minimum": 3371,
+              "maximum": 3371
+            },
+            "bytes": {
+              "median_of_process_medians": 282416.0,
+              "process_medians": [
+                282416,
+                282416
+              ],
+              "minimum": 282416,
+              "maximum": 282416
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                72
+              ],
+              [
+                "R",
+                72
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyDescriptor"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 8412.0,
+              "process_medians": [
+                8412,
+                8412
+              ],
+              "minimum": 8412,
+              "maximum": 8412
+            },
+            "bytes": {
+              "median_of_process_medians": 269184.0,
+              "process_medians": [
+                269184,
+                269184
+              ],
+              "minimum": 269184,
+              "maximum": 269184
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                103
+              ],
+              [
+                "R",
+                103
+              ]
+            ],
+            "semantic_labels": [
+              "ValueArray"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3150.0,
+              "process_medians": [
+                3150,
+                3150
+              ],
+              "minimum": 3150,
+              "maximum": 3150
+            },
+            "bytes": {
+              "median_of_process_medians": 120112.0,
+              "process_medians": [
+                120112,
+                120112
+              ],
+              "minimum": 120112,
+              "maximum": 120112
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                148
+              ],
+              [
+                "R",
+                148
+              ]
+            ],
+            "semantic_labels": [
+              "StringValue"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3284.0,
+              "process_medians": [
+                3284,
+                3284
+              ],
+              "minimum": 3284,
+              "maximum": 3284
+            },
+            "bytes": {
+              "median_of_process_medians": 105088.0,
+              "process_medians": [
+                105088,
+                105088
+              ],
+              "minimum": 105088,
+              "maximum": 105088
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                286
+              ],
+              [
+                "R",
+                286
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyKeyTable"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1916.0,
+              "process_medians": [
+                1916,
+                1916
+              ],
+              "minimum": 1916,
+              "maximum": 1916
+            },
+            "bytes": {
+              "median_of_process_medians": 97648.0,
+              "process_medians": [
+                97648,
+                97648
+              ],
+              "minimum": 97648,
+              "maximum": 97648
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                76
+              ],
+              [
+                "R",
+                76
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyEntry"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1904.0,
+              "process_medians": [
+                1904,
+                1904
+              ],
+              "minimum": 1904,
+              "maximum": 1904
+            },
+            "bytes": {
+              "median_of_process_medians": 91392.0,
+              "process_medians": [
+                91392,
+                91392
+              ],
+              "minimum": 91392,
+              "maximum": 91392
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                71
+              ],
+              [
+                "R",
+                71
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryObject"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1327.0,
+              "process_medians": [
+                1327,
+                1327
+              ],
+              "minimum": 1327,
+              "maximum": 1327
+            },
+            "bytes": {
+              "median_of_process_medians": 63696.0,
+              "process_medians": [
+                63696,
+                63696
+              ],
+              "minimum": 63696,
+              "maximum": 63696
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                95
+              ],
+              [
+                "R",
+                95
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryPropertyIndex"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 820.0,
+              "process_medians": [
+                820,
+                820
+              ],
+              "minimum": 820,
+              "maximum": 820
+            },
+            "bytes": {
+              "median_of_process_medians": 52832.0,
+              "process_medians": [
+                52832,
+                52832
+              ],
+              "minimum": 52832,
+              "maximum": 52832
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                77
+              ],
+              [
+                "R",
+                77
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyTable"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 820.0,
+              "process_medians": [
+                820,
+                820
+              ],
+              "minimum": 820,
+              "maximum": 820
+            },
+            "bytes": {
+              "median_of_process_medians": 39536.0,
+              "process_medians": [
+                39536,
+                39536
+              ],
+              "minimum": 39536,
+              "maximum": 39536
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                94
+              ],
+              [
+                "R",
+                94
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryPropertyStorage"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 938.0,
+              "process_medians": [
+                938,
+                938
+              ],
+              "minimum": 938,
+              "maximum": 938
+            },
+            "bytes": {
+              "median_of_process_medians": 30016.0,
+              "process_medians": [
+                30016,
+                30016
+              ],
+              "minimum": 30016,
+              "maximum": 30016
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                141
+              ],
+              [
+                "R",
+                141
+              ]
+            ],
+            "semantic_labels": [
+              "BindingCell"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 346.0,
+              "process_medians": [
+                346,
+                346
+              ],
+              "minimum": 346,
+              "maximum": 346
+            },
+            "bytes": {
+              "median_of_process_medians": 27680.0,
+              "process_medians": [
+                27680,
+                27680
+              ],
+              "minimum": 27680,
+              "maximum": 27680
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                110
+              ],
+              [
+                "R",
+                110
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 258.0,
+              "process_medians": [
+                258,
+                258
+              ],
+              "minimum": 258,
+              "maximum": 258
+            },
+            "bytes": {
+              "median_of_process_medians": 20640.0,
+              "process_medians": [
+                20640,
+                20640
+              ],
+              "minimum": 20640,
+              "maximum": 20640
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                111
+              ],
+              [
+                "R",
+                111
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 258.0,
+              "process_medians": [
+                258,
+                258
+              ],
+              "minimum": 258,
+              "maximum": 258
+            },
+            "bytes": {
+              "median_of_process_medians": 20640.0,
+              "process_medians": [
+                20640,
+                20640
+              ],
+              "minimum": 20640,
+              "maximum": 20640
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                102
+              ],
+              [
+                "R",
+                102
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 234.0,
+              "process_medians": [
+                234,
+                234
+              ],
+              "minimum": 234,
+              "maximum": 234
+            },
+            "bytes": {
+              "median_of_process_medians": 18528.0,
+              "process_medians": [
+                18528,
+                18528
+              ],
+              "minimum": 18528,
+              "maximum": 18528
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                158
+              ],
+              [
+                "R",
+                158
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 19.0,
+              "process_medians": [
+                19,
+                19
+              ],
+              "minimum": 19,
+              "maximum": 19
+            },
+            "bytes": {
+              "median_of_process_medians": 16944.0,
+              "process_medians": [
+                16944,
+                16944
+              ],
+              "minimum": 16944,
+              "maximum": 16944
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                114
+              ],
+              [
+                "R",
+                114
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 258.0,
+              "process_medians": [
+                258,
+                258
+              ],
+              "minimum": 258,
+              "maximum": 258
+            },
+            "bytes": {
+              "median_of_process_medians": 16512.0,
+              "process_medians": [
+                16512,
+                16512
+              ],
+              "minimum": 16512,
+              "maximum": 16512
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                83
+              ],
+              [
+                "R",
+                83
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 318.0,
+              "process_medians": [
+                318,
+                318
+              ],
+              "minimum": 318,
+              "maximum": 318
+            },
+            "bytes": {
+              "median_of_process_medians": 15264.0,
+              "process_medians": [
+                15264,
+                15264
+              ],
+              "minimum": 15264,
+              "maximum": 15264
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                143
+              ],
+              [
+                "R",
+                143
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 278.0,
+              "process_medians": [
+                278,
+                278
+              ],
+              "minimum": 278,
+              "maximum": 278
+            },
+            "bytes": {
+              "median_of_process_medians": 13344.0,
+              "process_medians": [
+                13344,
+                13344
+              ],
+              "minimum": 13344,
+              "maximum": 13344
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                137
+              ],
+              [
+                "R",
+                137
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 174.0,
+              "process_medians": [
+                174,
+                174
+              ],
+              "minimum": 174,
+              "maximum": 174
+            },
+            "bytes": {
+              "median_of_process_medians": 11136.0,
+              "process_medians": [
+                11136,
+                11136
+              ],
+              "minimum": 11136,
+              "maximum": 11136
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                117
+              ],
+              [
+                "R",
+                117
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 317.0,
+              "process_medians": [
+                317,
+                317
+              ],
+              "minimum": 317,
+              "maximum": 317
+            },
+            "bytes": {
+              "median_of_process_medians": 10144.0,
+              "process_medians": [
+                10144,
+                10144
+              ],
+              "minimum": 10144,
+              "maximum": 10144
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                97
+              ],
+              [
+                "R",
+                97
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 164.0,
+              "process_medians": [
+                164,
+                164
+              ],
+              "minimum": 164,
+              "maximum": 164
+            },
+            "bytes": {
+              "median_of_process_medians": 6960.0,
+              "process_medians": [
+                6960,
+                6960
+              ],
+              "minimum": 6960,
+              "maximum": 6960
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                145
+              ],
+              [
+                "R",
+                145
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 174.0,
+              "process_medians": [
+                174,
+                174
+              ],
+              "minimum": 174,
+              "maximum": 174
+            },
+            "bytes": {
+              "median_of_process_medians": 6112.0,
+              "process_medians": [
+                6112,
+                6112
+              ],
+              "minimum": 6112,
+              "maximum": 6112
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                144
+              ],
+              [
+                "R",
+                144
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 174.0,
+              "process_medians": [
+                174,
+                174
+              ],
+              "minimum": 174,
+              "maximum": 174
+            },
+            "bytes": {
+              "median_of_process_medians": 5584.0,
+              "process_medians": [
+                5584,
+                5584
+              ],
+              "minimum": 5584,
+              "maximum": 5584
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                138
+              ],
+              [
+                "R",
+                138
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 174.0,
+              "process_medians": [
+                174,
+                174
+              ],
+              "minimum": 174,
+              "maximum": 174
+            },
+            "bytes": {
+              "median_of_process_medians": 5568.0,
+              "process_medians": [
+                5568,
+                5568
+              ],
+              "minimum": 5568,
+              "maximum": 5568
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                156
+              ],
+              [
+                "R",
+                156
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 87.0,
+              "process_medians": [
+                87,
+                87
+              ],
+              "minimum": 87,
+              "maximum": 87
+            },
+            "bytes": {
+              "median_of_process_medians": 5568.0,
+              "process_medians": [
+                5568,
+                5568
+              ],
+              "minimum": 5568,
+              "maximum": 5568
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                96
+              ],
+              [
+                "R",
+                96
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 142.0,
+              "process_medians": [
+                142,
+                142
+              ],
+              "minimum": 142,
+              "maximum": 142
+            },
+            "bytes": {
+              "median_of_process_medians": 5104.0,
+              "process_medians": [
+                5104,
+                5104
+              ],
+              "minimum": 5104,
+              "maximum": 5104
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                118
+              ],
+              [
+                "R",
+                118
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 142.0,
+              "process_medians": [
+                142,
+                142
+              ],
+              "minimum": 142,
+              "maximum": 142
+            },
+            "bytes": {
+              "median_of_process_medians": 4544.0,
+              "process_medians": [
+                4544,
+                4544
+              ],
+              "minimum": 4544,
+              "maximum": 4544
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                90
+              ],
+              [
+                "R",
+                90
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 71.0,
+              "process_medians": [
+                71,
+                71
+              ],
+              "minimum": 71,
+              "maximum": 71
+            },
+            "bytes": {
+              "median_of_process_medians": 3408.0,
+              "process_medians": [
+                3408,
+                3408
+              ],
+              "minimum": 3408,
+              "maximum": 3408
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                165
+              ],
+              [
+                "R",
+                165
+              ]
+            ],
+            "semantic_labels": [
+              "ForInEnumerationRecord"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 99.0,
+              "process_medians": [
+                99,
+                99
+              ],
+              "minimum": 99,
+              "maximum": 99
+            },
+            "bytes": {
+              "median_of_process_medians": 3168.0,
+              "process_medians": [
+                3168,
+                3168
+              ],
+              "minimum": 3168,
+              "maximum": 3168
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                88
+              ],
+              [
+                "R",
+                88
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 71.0,
+              "process_medians": [
+                71,
+                71
+              ],
+              "minimum": 71,
+              "maximum": 71
+            },
+            "bytes": {
+              "median_of_process_medians": 2272.0,
+              "process_medians": [
+                2272,
+                2272
+              ],
+              "minimum": 2272,
+              "maximum": 2272
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                82
+              ],
+              [
+                "R",
+                82
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 71.0,
+              "process_medians": [
+                71,
+                71
+              ],
+              "minimum": 71,
+              "maximum": 71
+            },
+            "bytes": {
+              "median_of_process_medians": 2272.0,
+              "process_medians": [
+                2272,
+                2272
+              ],
+              "minimum": 2272,
+              "maximum": 2272
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                290
+              ],
+              [
+                "R",
+                290
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 7.0,
+              "process_medians": [
+                7,
+                7
+              ],
+              "minimum": 7,
+              "maximum": 7
+            },
+            "bytes": {
+              "median_of_process_medians": 672.0,
+              "process_medians": [
+                672,
+                672
+              ],
+              "minimum": 672,
+              "maximum": 672
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                201
+              ],
+              [
+                "R",
+                201
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 8.0,
+              "process_medians": [
+                8,
+                8
+              ],
+              "minimum": 8,
+              "maximum": 8
+            },
+            "bytes": {
+              "median_of_process_medians": 512.0,
+              "process_medians": [
+                512,
+                512
+              ],
+              "minimum": 512,
+              "maximum": 512
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                178
+              ],
+              [
+                "R",
+                178
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 8.0,
+              "process_medians": [
+                8,
+                8
+              ],
+              "minimum": 8,
+              "maximum": 8
+            },
+            "bytes": {
+              "median_of_process_medians": 512.0,
+              "process_medians": [
+                512,
+                512
+              ],
+              "minimum": 512,
+              "maximum": 512
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                175
+              ],
+              [
+                "R",
+                175
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 6.0,
+              "process_medians": [
+                6,
+                6
+              ],
+              "minimum": 6,
+              "maximum": 6
+            },
+            "bytes": {
+              "median_of_process_medians": 384.0,
+              "process_medians": [
+                384,
+                384
+              ],
+              "minimum": 384,
+              "maximum": 384
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                190
+              ],
+              [
+                "R",
+                190
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 320.0,
+              "process_medians": [
+                320,
+                320
+              ],
+              "minimum": 320,
+              "maximum": 320
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                179
+              ],
+              [
+                "R",
+                179
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 240.0,
+              "process_medians": [
+                240,
+                240
+              ],
+              "minimum": 240,
+              "maximum": 240
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                157
+              ],
+              [
+                "R",
+                157
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 192.0,
+              "process_medians": [
+                192,
+                192
+              ],
+              "minimum": 192,
+              "maximum": 192
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                162
+              ],
+              [
+                "R",
+                162
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 4.0,
+              "process_medians": [
+                4,
+                4
+              ],
+              "minimum": 4,
+              "maximum": 4
+            },
+            "bytes": {
+              "median_of_process_medians": 192.0,
+              "process_medians": [
+                192,
+                192
+              ],
+              "minimum": 192,
+              "maximum": 192
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                197
+              ],
+              [
+                "R",
+                197
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 160.0,
+              "process_medians": [
+                160,
+                160
+              ],
+              "minimum": 160,
+              "maximum": 160
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                164
+              ],
+              [
+                "R",
+                164
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 4.0,
+              "process_medians": [
+                4,
+                4
+              ],
+              "minimum": 4,
+              "maximum": 4
+            },
+            "bytes": {
+              "median_of_process_medians": 128.0,
+              "process_medians": [
+                128,
+                128
+              ],
+              "minimum": 128,
+              "maximum": 128
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                198
+              ],
+              [
+                "R",
+                198
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 128.0,
+              "process_medians": [
+                128,
+                128
+              ],
+              "minimum": 128,
+              "maximum": 128
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                245
+              ],
+              [
+                "R",
+                245
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 4.0,
+              "process_medians": [
+                4,
+                4
+              ],
+              "minimum": 4,
+              "maximum": 4
+            },
+            "bytes": {
+              "median_of_process_medians": 128.0,
+              "process_medians": [
+                128,
+                128
+              ],
+              "minimum": 128,
+              "maximum": 128
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                200
+              ],
+              [
+                "R",
+                200
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 112.0,
+              "process_medians": [
+                112,
+                112
+              ],
+              "minimum": 112,
+              "maximum": 112
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                89
+              ],
+              [
+                "R",
+                89
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                122
+              ],
+              [
+                "R",
+                122
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 80.0,
+              "process_medians": [
+                80,
+                80
+              ],
+              "minimum": 80,
+              "maximum": 80
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                168
+              ],
+              [
+                "R",
+                168
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 80.0,
+              "process_medians": [
+                80,
+                80
+              ],
+              "minimum": 80,
+              "maximum": 80
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                106
+              ],
+              [
+                "R",
+                106
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                130
+              ],
+              [
+                "R",
+                130
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                98
+              ],
+              [
+                "R",
+                98
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                131
+              ],
+              [
+                "R",
+                131
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                180
+              ],
+              [
+                "R",
+                180
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                120
+              ],
+              [
+                "R",
+                120
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                121
+              ],
+              [
+                "R",
+                121
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                127
+              ],
+              [
+                "R",
+                127
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                160
+              ],
+              [
+                "R",
+                160
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                171
+              ],
+              [
+                "R",
+                171
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 1073741824,
+            "wasm_aliases": [],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": true,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                124
+              ],
+              [
+                "R",
+                124
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                125
+              ],
+              [
+                "R",
+                125
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                126
+              ],
+              [
+                "R",
+                126
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                187
+              ],
+              [
+                "R",
+                187
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                191
+              ],
+              [
+                "R",
+                191
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                199
+              ],
+              [
+                "R",
+                199
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                240
+              ],
+              [
+                "R",
+                240
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                241
+              ],
+              [
+                "R",
+                241
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          }
+        ]
+      },
+      "rsc-async": {
+        "processes": 2,
+        "observations": 14,
+        "objects": {
+          "median_of_process_medians": 53305.0,
+          "process_medians": [
+            53305,
+            53305
+          ],
+          "minimum": 53305,
+          "maximum": 53305
+        },
+        "bytes": {
+          "median_of_process_medians": 2209728.0,
+          "process_medians": [
+            2209728,
+            2209728
+          ],
+          "minimum": 2209728,
+          "maximum": 2209728
+        },
+        "collections": {
+          "median_of_process_medians": 0.0,
+          "process_medians": [
+            0,
+            0
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "physical_types": [
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                63
+              ],
+              [
+                "R",
+                63
+              ]
+            ],
+            "semantic_labels": [
+              "StoredValue"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 21064.0,
+              "process_medians": [
+                21064,
+                21064
+              ],
+              "minimum": 21064,
+              "maximum": 21064
+            },
+            "bytes": {
+              "median_of_process_medians": 674048.0,
+              "process_medians": [
+                674048,
+                674048
+              ],
+              "minimum": 674048,
+              "maximum": 674048
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                149
+              ],
+              [
+                "R",
+                149
+              ]
+            ],
+            "semantic_labels": [
+              "CodeUnitArray"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3925.0,
+              "process_medians": [
+                3925,
+                3925
+              ],
+              "minimum": 3925,
+              "maximum": 3925
+            },
+            "bytes": {
+              "median_of_process_medians": 358576.0,
+              "process_medians": [
+                358576,
+                358576
+              ],
+              "minimum": 358576,
+              "maximum": 358576
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                72
+              ],
+              [
+                "R",
+                72
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyDescriptor"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 8790.0,
+              "process_medians": [
+                8790,
+                8790
+              ],
+              "minimum": 8790,
+              "maximum": 8790
+            },
+            "bytes": {
+              "median_of_process_medians": 281280.0,
+              "process_medians": [
+                281280,
+                281280
+              ],
+              "minimum": 281280,
+              "maximum": 281280
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                103
+              ],
+              [
+                "R",
+                103
+              ]
+            ],
+            "semantic_labels": [
+              "ValueArray"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3428.0,
+              "process_medians": [
+                3428,
+                3428
+              ],
+              "minimum": 3428,
+              "maximum": 3428
+            },
+            "bytes": {
+              "median_of_process_medians": 135616.0,
+              "process_medians": [
+                135616,
+                135616
+              ],
+              "minimum": 135616,
+              "maximum": 135616
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                148
+              ],
+              [
+                "R",
+                148
+              ]
+            ],
+            "semantic_labels": [
+              "StringValue"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3827.0,
+              "process_medians": [
+                3827,
+                3827
+              ],
+              "minimum": 3827,
+              "maximum": 3827
+            },
+            "bytes": {
+              "median_of_process_medians": 122464.0,
+              "process_medians": [
+                122464,
+                122464
+              ],
+              "minimum": 122464,
+              "maximum": 122464
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                286
+              ],
+              [
+                "R",
+                286
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyKeyTable"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1956.0,
+              "process_medians": [
+                1956,
+                1956
+              ],
+              "minimum": 1956,
+              "maximum": 1956
+            },
+            "bytes": {
+              "median_of_process_medians": 99600.0,
+              "process_medians": [
+                99600,
+                99600
+              ],
+              "minimum": 99600,
+              "maximum": 99600
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                76
+              ],
+              [
+                "R",
+                76
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyEntry"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1993.0,
+              "process_medians": [
+                1993,
+                1993
+              ],
+              "minimum": 1993,
+              "maximum": 1993
+            },
+            "bytes": {
+              "median_of_process_medians": 95664.0,
+              "process_medians": [
+                95664,
+                95664
+              ],
+              "minimum": 95664,
+              "maximum": 95664
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                71
+              ],
+              [
+                "R",
+                71
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryObject"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1413.0,
+              "process_medians": [
+                1413,
+                1413
+              ],
+              "minimum": 1413,
+              "maximum": 1413
+            },
+            "bytes": {
+              "median_of_process_medians": 67824.0,
+              "process_medians": [
+                67824,
+                67824
+              ],
+              "minimum": 67824,
+              "maximum": 67824
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                95
+              ],
+              [
+                "R",
+                95
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryPropertyIndex"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 864.0,
+              "process_medians": [
+                864,
+                864
+              ],
+              "minimum": 864,
+              "maximum": 864
+            },
+            "bytes": {
+              "median_of_process_medians": 55648.0,
+              "process_medians": [
+                55648,
+                55648
+              ],
+              "minimum": 55648,
+              "maximum": 55648
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                77
+              ],
+              [
+                "R",
+                77
+              ]
+            ],
+            "semantic_labels": [
+              "PropertyTable"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 864.0,
+              "process_medians": [
+                864,
+                864
+              ],
+              "minimum": 864,
+              "maximum": 864
+            },
+            "bytes": {
+              "median_of_process_medians": 41648.0,
+              "process_medians": [
+                41648,
+                41648
+              ],
+              "minimum": 41648,
+              "maximum": 41648
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                94
+              ],
+              [
+                "R",
+                94
+              ]
+            ],
+            "semantic_labels": [
+              "OrdinaryPropertyStorage"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1000.0,
+              "process_medians": [
+                1000,
+                1000
+              ],
+              "minimum": 1000,
+              "maximum": 1000
+            },
+            "bytes": {
+              "median_of_process_medians": 32000.0,
+              "process_medians": [
+                32000,
+                32000
+              ],
+              "minimum": 32000,
+              "maximum": 32000
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                141
+              ],
+              [
+                "R",
+                141
+              ]
+            ],
+            "semantic_labels": [
+              "BindingCell"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 359.0,
+              "process_medians": [
+                359,
+                359
+              ],
+              "minimum": 359,
+              "maximum": 359
+            },
+            "bytes": {
+              "median_of_process_medians": 28720.0,
+              "process_medians": [
+                28720,
+                28720
+              ],
+              "minimum": 28720,
+              "maximum": 28720
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                110
+              ],
+              [
+                "R",
+                110
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 281.0,
+              "process_medians": [
+                281,
+                281
+              ],
+              "minimum": 281,
+              "maximum": 281
+            },
+            "bytes": {
+              "median_of_process_medians": 22480.0,
+              "process_medians": [
+                22480,
+                22480
+              ],
+              "minimum": 22480,
+              "maximum": 22480
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                111
+              ],
+              [
+                "R",
+                111
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 281.0,
+              "process_medians": [
+                281,
+                281
+              ],
+              "minimum": 281,
+              "maximum": 281
+            },
+            "bytes": {
+              "median_of_process_medians": 22480.0,
+              "process_medians": [
+                22480,
+                22480
+              ],
+              "minimum": 22480,
+              "maximum": 22480
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                158
+              ],
+              [
+                "R",
+                158
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 20.0,
+              "process_medians": [
+                20,
+                20
+              ],
+              "minimum": 20,
+              "maximum": 20
+            },
+            "bytes": {
+              "median_of_process_medians": 21552.0,
+              "process_medians": [
+                21552,
+                21552
+              ],
+              "minimum": 21552,
+              "maximum": 21552
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                102
+              ],
+              [
+                "R",
+                102
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 240.0,
+              "process_medians": [
+                240,
+                240
+              ],
+              "minimum": 240,
+              "maximum": 240
+            },
+            "bytes": {
+              "median_of_process_medians": 18912.0,
+              "process_medians": [
+                18912,
+                18912
+              ],
+              "minimum": 18912,
+              "maximum": 18912
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                114
+              ],
+              [
+                "R",
+                114
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 281.0,
+              "process_medians": [
+                281,
+                281
+              ],
+              "minimum": 281,
+              "maximum": 281
+            },
+            "bytes": {
+              "median_of_process_medians": 17984.0,
+              "process_medians": [
+                17984,
+                17984
+              ],
+              "minimum": 17984,
+              "maximum": 17984
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                83
+              ],
+              [
+                "R",
+                83
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 338.0,
+              "process_medians": [
+                338,
+                338
+              ],
+              "minimum": 338,
+              "maximum": 338
+            },
+            "bytes": {
+              "median_of_process_medians": 16224.0,
+              "process_medians": [
+                16224,
+                16224
+              ],
+              "minimum": 16224,
+              "maximum": 16224
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                143
+              ],
+              [
+                "R",
+                143
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 288.0,
+              "process_medians": [
+                288,
+                288
+              ],
+              "minimum": 288,
+              "maximum": 288
+            },
+            "bytes": {
+              "median_of_process_medians": 13824.0,
+              "process_medians": [
+                13824,
+                13824
+              ],
+              "minimum": 13824,
+              "maximum": 13824
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                137
+              ],
+              [
+                "R",
+                137
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 182.0,
+              "process_medians": [
+                182,
+                182
+              ],
+              "minimum": 182,
+              "maximum": 182
+            },
+            "bytes": {
+              "median_of_process_medians": 11648.0,
+              "process_medians": [
+                11648,
+                11648
+              ],
+              "minimum": 11648,
+              "maximum": 11648
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                117
+              ],
+              [
+                "R",
+                117
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 330.0,
+              "process_medians": [
+                330,
+                330
+              ],
+              "minimum": 330,
+              "maximum": 330
+            },
+            "bytes": {
+              "median_of_process_medians": 10560.0,
+              "process_medians": [
+                10560,
+                10560
+              ],
+              "minimum": 10560,
+              "maximum": 10560
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                97
+              ],
+              [
+                "R",
+                97
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 178.0,
+              "process_medians": [
+                178,
+                178
+              ],
+              "minimum": 178,
+              "maximum": 178
+            },
+            "bytes": {
+              "median_of_process_medians": 7520.0,
+              "process_medians": [
+                7520,
+                7520
+              ],
+              "minimum": 7520,
+              "maximum": 7520
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                145
+              ],
+              [
+                "R",
+                145
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 182.0,
+              "process_medians": [
+                182,
+                182
+              ],
+              "minimum": 182,
+              "maximum": 182
+            },
+            "bytes": {
+              "median_of_process_medians": 6384.0,
+              "process_medians": [
+                6384,
+                6384
+              ],
+              "minimum": 6384,
+              "maximum": 6384
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                156
+              ],
+              [
+                "R",
+                156
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 99.0,
+              "process_medians": [
+                99,
+                99
+              ],
+              "minimum": 99,
+              "maximum": 99
+            },
+            "bytes": {
+              "median_of_process_medians": 6336.0,
+              "process_medians": [
+                6336,
+                6336
+              ],
+              "minimum": 6336,
+              "maximum": 6336
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                144
+              ],
+              [
+                "R",
+                144
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 182.0,
+              "process_medians": [
+                182,
+                182
+              ],
+              "minimum": 182,
+              "maximum": 182
+            },
+            "bytes": {
+              "median_of_process_medians": 5840.0,
+              "process_medians": [
+                5840,
+                5840
+              ],
+              "minimum": 5840,
+              "maximum": 5840
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                138
+              ],
+              [
+                "R",
+                138
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 182.0,
+              "process_medians": [
+                182,
+                182
+              ],
+              "minimum": 182,
+              "maximum": 182
+            },
+            "bytes": {
+              "median_of_process_medians": 5824.0,
+              "process_medians": [
+                5824,
+                5824
+              ],
+              "minimum": 5824,
+              "maximum": 5824
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                96
+              ],
+              [
+                "R",
+                96
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 152.0,
+              "process_medians": [
+                152,
+                152
+              ],
+              "minimum": 152,
+              "maximum": 152
+            },
+            "bytes": {
+              "median_of_process_medians": 5456.0,
+              "process_medians": [
+                5456,
+                5456
+              ],
+              "minimum": 5456,
+              "maximum": 5456
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                118
+              ],
+              [
+                "R",
+                118
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 152.0,
+              "process_medians": [
+                152,
+                152
+              ],
+              "minimum": 152,
+              "maximum": 152
+            },
+            "bytes": {
+              "median_of_process_medians": 4864.0,
+              "process_medians": [
+                4864,
+                4864
+              ],
+              "minimum": 4864,
+              "maximum": 4864
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                90
+              ],
+              [
+                "R",
+                90
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 75.0,
+              "process_medians": [
+                75,
+                75
+              ],
+              "minimum": 75,
+              "maximum": 75
+            },
+            "bytes": {
+              "median_of_process_medians": 3584.0,
+              "process_medians": [
+                3584,
+                3584
+              ],
+              "minimum": 3584,
+              "maximum": 3584
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                165
+              ],
+              [
+                "R",
+                165
+              ]
+            ],
+            "semantic_labels": [
+              "ForInEnumerationRecord"
+            ],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 101.0,
+              "process_medians": [
+                101,
+                101
+              ],
+              "minimum": 101,
+              "maximum": 101
+            },
+            "bytes": {
+              "median_of_process_medians": 3232.0,
+              "process_medians": [
+                3232,
+                3232
+              ],
+              "minimum": 3232,
+              "maximum": 3232
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                88
+              ],
+              [
+                "R",
+                88
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 75.0,
+              "process_medians": [
+                75,
+                75
+              ],
+              "minimum": 75,
+              "maximum": 75
+            },
+            "bytes": {
+              "median_of_process_medians": 2400.0,
+              "process_medians": [
+                2400,
+                2400
+              ],
+              "minimum": 2400,
+              "maximum": 2400
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                82
+              ],
+              [
+                "R",
+                82
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 75.0,
+              "process_medians": [
+                75,
+                75
+              ],
+              "minimum": 75,
+              "maximum": 75
+            },
+            "bytes": {
+              "median_of_process_medians": 2400.0,
+              "process_medians": [
+                2400,
+                2400
+              ],
+              "minimum": 2400,
+              "maximum": 2400
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                290
+              ],
+              [
+                "R",
+                290
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 16.0,
+              "process_medians": [
+                16,
+                16
+              ],
+              "minimum": 16,
+              "maximum": 16
+            },
+            "bytes": {
+              "median_of_process_medians": 1536.0,
+              "process_medians": [
+                1536,
+                1536
+              ],
+              "minimum": 1536,
+              "maximum": 1536
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                178
+              ],
+              [
+                "R",
+                178
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 14.0,
+              "process_medians": [
+                14,
+                14
+              ],
+              "minimum": 14,
+              "maximum": 14
+            },
+            "bytes": {
+              "median_of_process_medians": 896.0,
+              "process_medians": [
+                896,
+                896
+              ],
+              "minimum": 896,
+              "maximum": 896
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                175
+              ],
+              [
+                "R",
+                175
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 10.0,
+              "process_medians": [
+                10,
+                10
+              ],
+              "minimum": 10,
+              "maximum": 10
+            },
+            "bytes": {
+              "median_of_process_medians": 640.0,
+              "process_medians": [
+                640,
+                640
+              ],
+              "minimum": 640,
+              "maximum": 640
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                201
+              ],
+              [
+                "R",
+                201
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 8.0,
+              "process_medians": [
+                8,
+                8
+              ],
+              "minimum": 8,
+              "maximum": 8
+            },
+            "bytes": {
+              "median_of_process_medians": 512.0,
+              "process_medians": [
+                512,
+                512
+              ],
+              "minimum": 512,
+              "maximum": 512
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                179
+              ],
+              [
+                "R",
+                179
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 9.0,
+              "process_medians": [
+                9,
+                9
+              ],
+              "minimum": 9,
+              "maximum": 9
+            },
+            "bytes": {
+              "median_of_process_medians": 432.0,
+              "process_medians": [
+                432,
+                432
+              ],
+              "minimum": 432,
+              "maximum": 432
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                190
+              ],
+              [
+                "R",
+                190
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 320.0,
+              "process_medians": [
+                320,
+                320
+              ],
+              "minimum": 320,
+              "maximum": 320
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                157
+              ],
+              [
+                "R",
+                157
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 4.0,
+              "process_medians": [
+                4,
+                4
+              ],
+              "minimum": 4,
+              "maximum": 4
+            },
+            "bytes": {
+              "median_of_process_medians": 256.0,
+              "process_medians": [
+                256,
+                256
+              ],
+              "minimum": 256,
+              "maximum": 256
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                162
+              ],
+              [
+                "R",
+                162
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 240.0,
+              "process_medians": [
+                240,
+                240
+              ],
+              "minimum": 240,
+              "maximum": 240
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                197
+              ],
+              [
+                "R",
+                197
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 160.0,
+              "process_medians": [
+                160,
+                160
+              ],
+              "minimum": 160,
+              "maximum": 160
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                164
+              ],
+              [
+                "R",
+                164
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 160.0,
+              "process_medians": [
+                160,
+                160
+              ],
+              "minimum": 160,
+              "maximum": 160
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                168
+              ],
+              [
+                "R",
+                168
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 160.0,
+              "process_medians": [
+                160,
+                160
+              ],
+              "minimum": 160,
+              "maximum": 160
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                245
+              ],
+              [
+                "R",
+                245
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 5.0,
+              "process_medians": [
+                5,
+                5
+              ],
+              "minimum": 5,
+              "maximum": 5
+            },
+            "bytes": {
+              "median_of_process_medians": 160.0,
+              "process_medians": [
+                160,
+                160
+              ],
+              "minimum": 160,
+              "maximum": 160
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                106
+              ],
+              [
+                "R",
+                106
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 4.0,
+              "process_medians": [
+                4,
+                4
+              ],
+              "minimum": 4,
+              "maximum": 4
+            },
+            "bytes": {
+              "median_of_process_medians": 128.0,
+              "process_medians": [
+                128,
+                128
+              ],
+              "minimum": 128,
+              "maximum": 128
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                198
+              ],
+              [
+                "R",
+                198
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 128.0,
+              "process_medians": [
+                128,
+                128
+              ],
+              "minimum": 128,
+              "maximum": 128
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                200
+              ],
+              [
+                "R",
+                200
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 112.0,
+              "process_medians": [
+                112,
+                112
+              ],
+              "minimum": 112,
+              "maximum": 112
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                89
+              ],
+              [
+                "R",
+                89
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                171
+              ],
+              [
+                "R",
+                171
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                176
+              ],
+              [
+                "R",
+                176
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                294
+              ],
+              [
+                "R",
+                294
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                295
+              ],
+              [
+                "R",
+                295
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 3.0,
+              "process_medians": [
+                3,
+                3
+              ],
+              "minimum": 3,
+              "maximum": 3
+            },
+            "bytes": {
+              "median_of_process_medians": 96.0,
+              "process_medians": [
+                96,
+                96
+              ],
+              "minimum": 96,
+              "maximum": 96
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                122
+              ],
+              [
+                "R",
+                122
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 80.0,
+              "process_medians": [
+                80,
+                80
+              ],
+              "minimum": 80,
+              "maximum": 80
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                130
+              ],
+              [
+                "R",
+                130
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 2.0,
+              "process_medians": [
+                2,
+                2
+              ],
+              "minimum": 2,
+              "maximum": 2
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2818572288,
+            "wasm_aliases": [
+              [
+                "P",
+                98
+              ],
+              [
+                "R",
+                98
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                131
+              ],
+              [
+                "R",
+                131
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                180
+              ],
+              [
+                "R",
+                180
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 64.0,
+              "process_medians": [
+                64,
+                64
+              ],
+              "minimum": 64,
+              "maximum": 64
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                120
+              ],
+              [
+                "R",
+                120
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                121
+              ],
+              [
+                "R",
+                121
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                127
+              ],
+              [
+                "R",
+                127
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                160
+              ],
+              [
+                "R",
+                160
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 48.0,
+              "process_medians": [
+                48,
+                48
+              ],
+              "minimum": 48,
+              "maximum": 48
+            }
+          },
+          {
+            "kind_bits": 1073741824,
+            "wasm_aliases": [],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": true,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                124
+              ],
+              [
+                "R",
+                124
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                125
+              ],
+              [
+                "R",
+                125
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                126
+              ],
+              [
+                "R",
+                126
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                187
+              ],
+              [
+                "R",
+                187
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                191
+              ],
+              [
+                "R",
+                191
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                199
+              ],
+              [
+                "R",
+                199
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                240
+              ],
+              [
+                "R",
+                240
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          },
+          {
+            "kind_bits": 2952790016,
+            "wasm_aliases": [
+              [
+                "P",
+                241
+              ],
+              [
+                "R",
+                241
+              ]
+            ],
+            "semantic_labels": [],
+            "unresolved_kind_bucket": false,
+            "objects": {
+              "median_of_process_medians": 1.0,
+              "process_medians": [
+                1,
+                1
+              ],
+              "minimum": 1,
+              "maximum": 1
+            },
+            "bytes": {
+              "median_of_process_medians": 32.0,
+              "process_medians": [
+                32,
+                32
+              ],
+              "minimum": 32,
+              "maximum": 32
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expanded_label_evidence_prefix": "additional-evidence/target/performance-v8-climb-20261104/allocation-expanded-labels-staged/reduction/publication-evidence/",
+  "source_entry_diagnostic": {
+    "schema": "scriptw-rsc-hardware-entry-counts-v1",
+    "complete": true,
+    "unscored": true,
+    "known_count_controls": 8,
+    "exact_flight_checks": 20,
+    "identity": {
+      "binary_sha256": "1f29203f93acdfc2e816edbf65b70b951cc0322707a57e71bf6fe6141052f474",
+      "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
+      "runtime": {
+        "key": "47deb80b886ecec31cdacf87b9d73fe38e1b6799ab22100639553544eda54416",
+        "wasm_bytes": 38816202,
+        "wasm_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53"
+      },
+      "source_fingerprint": "971be2adbe2f77bad2359f60e23f6face41cfb660ec6a61338e69b8864df71c9"
+    },
+    "cases": {
+      "rsc-sync": {
+        "processes": 1,
+        "measured_windows": 7,
+        "counts": {
+          "js::ft#f123": [
+            242,
+            242,
+            242,
+            242,
+            242,
+            242,
+            242
+          ],
+          "js::vn#f133": [
+            276,
+            276,
+            276,
+            276,
+            276,
+            276,
+            276
+          ]
+        },
+        "median_entries": {
+          "js::ft#f123": 242,
+          "js::vn#f133": 276
+        },
+        "conditional_first_five_prefix_upper_bound": 2590
+      },
+      "rsc-async": {
+        "processes": 1,
+        "measured_windows": 7,
+        "counts": {
+          "js::ft#f123": [
+            254,
+            254,
+            254,
+            254,
+            254,
+            254,
+            254
+          ],
+          "js::vn#f133": [
+            291,
+            291,
+            291,
+            291,
+            291,
+            291,
+            291
+          ]
+        },
+        "median_entries": {
+          "js::ft#f123": 254,
+          "js::vn#f133": 291
+        },
+        "conditional_first_five_prefix_upper_bound": 2725
+      }
+    },
+    "controls_receipt_sha256": "994126c602d0d65a462778bb91af1d82fc791c53b85cbb96d62b38a45e50f5fd",
+    "limits": [
+      "Task-bound user-only pinned count-only execution breakpoints; enabled/running times match. Eight known-count/zero/disabled/tail/burst controls passed.",
+      "Same-process native entry maps and prefixes authenticated before/after each mode. Original Wasm and JIT bytes unchanged.",
+      "One child per mode, three warmups and seven measured requests. #DB traps perturb execution; all timings excluded.",
+      "Counts are attempted native entries, not completed calls. Five times entries is only a conditional upper bound for first-five argument wrappers; arity, caller eligibility and vector reuse are unmeasured. No allocation attribution, instruction saving or speedup claim."
+    ]
+  },
+  "evidence_archive": {
+    "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
+    "sha256": "17b844c47bf392c25ad93ad1f57c5b98bf976cb0265ebb66a7edc9fa71b65b05",
+    "bytes": 4277140,
+    "regular_utf8_members": 3511,
+    "expanded_utf8_bytes": 158421633,
+    "over_5mb": false
+  }
+}

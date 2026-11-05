@@ -266,9 +266,10 @@ python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python
 
 Use fresh output directories. `--case <file.js>` selects a hill; `--policies fast`
 or `--policies speed` selects a Scriptw compilation policy. Each default cohort
-uses two balanced blocks and eight fresh processes per case/actor, with three
-checked warmups and seven measured calls. Native compilation precedes those
-processes; every Wasmtime consumer has its compiler disabled. Record preparation
+uses two balanced blocks and eight fresh processes per case/actor, with 100
+checked warmups and 21 measured calls. Normal V8 JIT and natural GC remain
+enabled; this warmup count does not prove optimized steady state. Native compilation
+precedes those processes; every Wasmtime consumer has its compiler disabled. Record preparation
 time and native-image size separately. Mutation and getter controls have their
 own scores; their differences are not allocation counts or isolated stack costs.
 Scriptc has no matched retained-Module consumer in this workflow.

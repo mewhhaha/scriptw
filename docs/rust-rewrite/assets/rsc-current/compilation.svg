@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Current React Server Components cold compilation</dc:title>
-    <dc:description>{"date": "2026-11-05", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/cyclic-projection/fast-comparison-campaign/block-0-0-candidate/report.json": "d82023efe5574bbc1a6e500fb3f91471a543ed5aec87b3cf55fcc600bba59dba", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/cyclic-projection/frozen/compiler_precompiled_baseline-producer.json": "23f365498db5122fe7c1daf4baf47534bb3be6a688aa5c2c0af89c606424ff28", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/cyclic-projection/frozen/rsc_baseline": "142eb280817c6e302f130ccec6f0c2b3fc0a96f31f430dc5aea69862c9b36d20", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/cyclic-projection/frozen/rsc_baseline-producer.json": "df9dd796feb5f2114d69cf40b61607e47e6a0d2a1f331f8356024ad4aff85afd", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/compiler_precompiled_baseline-producer.json": "78511e51847ff964a93584a483f468041d2e4e482815d3c588c9151ff6775567", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/rsc_baseline": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/rsc_baseline-producer.json": "ce8353759032a36ec4bdf6f853811b713761480c9e3e286551e3bb4c3f8fe8fc", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/measure_rsc.py": "856883a895e016d7e7741ae109a207ce31058b63d3a671ba64796bb187a5a66e", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/number_inputs.rs": "e8090e482c92b6d51957d9518c931c31a33c9f33f209ff2b9e36381c7310241a", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-aot-wasm/src/control_flow/scalar_number_loop/statements.rs": "6c1926ad9d04de0c8a78081ee612f3ca77058da4e77433cf55de335d8bf23123", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-aot-wasm/tests/emission/fixtures/strict-equality-numbers.mjs": "fdc1a4acfe2fd82a63dfa05954f572f1d5af83fcf0ef3537a4e3163860aa8b5b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-aot-wasm/tests/emission/typed_number_inputs.rs": "740139629b61d8d35c1d17569483b842a273b26404a37a20fa556c304bdeebf3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-engine/tests/aot_language/aot_typed_number_inputs.rs": "31a0dd15b86bc1f17c8efe3bb8001dd9fcc3f9157c80ef366edaeb41e403f1fa", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/crates/scriptw-engine/tests/fixtures/typed_number_inputs.js": "dd8a2e498734cfde20496ae4d3e94fdcbe8b5ef53152e091e50905ecc8c98129", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/manifest.json": "255360fa7cd75366fe790313dab6a578f30fd5b280dd7f7c2f07d93f0a880280", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/source/tracked.patch": "26485d1427b7d145123af3c22951594283ea308686a6690de858857e8e917886", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "campaign": "target/performance-v8-climb-20261104/typed-region/fast-comparison-campaign/campaign.json", "campaign_sha256": "ee6f00d3e89288d78abca570dbdbd8578aeb2d4a65b5665252e0430fc6c12075", "case_order": ["rsc-sync", "rsc-async"], "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
+    <dc:description>{"date": "2026-11-05", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/frozen/compiler_precompiled_baseline-producer.json": "f4bd07ae98ef956462620b8b0435cbcaff966c0366e2195fb397a283607d4226", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/frozen/rsc_baseline": "1f29203f93acdfc2e816edbf65b70b951cc0322707a57e71bf6fe6141052f474", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/frozen/rsc_baseline-producer.json": "6c8865c3ab0affcf4be40fee1a74ae43efb4f063e430f81a03b2544a86e3c87c", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/measure_rsc.py": "2cf7201f6693b590e1197534a09a9d400de9ba77ebf731176426a0ce6b0f99ad", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/source/crates/scriptw-aot-wasm/tests/emission/fixtures/strict-equality-mixed.mjs": "2b75d7b6ced234bda70302b8b95c8d71c6c64c065898ef907ae77aa4a4c1215f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/source/manifest.json": "d137d2e336430e7f13021fba606b61778e104ee7ce00d5308139cf756fb32bc8", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/source/tracked.patch": "1849434b2410408a60190185995a71f4f29724fd116816376ac0cd2bf3fdccd3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/fast-comparison-campaign/block-0-0-candidate/report.json": "fe52b6499f002bfa5f2048242145366dc539430acffb840a545f10a9a7d8d077", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/compiler_precompiled_baseline-producer.json": "78511e51847ff964a93584a483f468041d2e4e482815d3c588c9151ff6775567", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/rsc_baseline": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/typed-region/frozen/rsc_baseline-producer.json": "ce8353759032a36ec4bdf6f853811b713761480c9e3e286551e3bb4c3f8fe8fc", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "campaign": "target/performance-v8-climb-20261104/strict-predicate/fast-comparison-campaign/campaign.json", "campaign_sha256": "b2c5781f6fbf89a80ba4df5ed7dd1d4a53e3ec327a99652c00b1d2236469f5d6", "case_order": ["rsc-sync", "rsc-async"], "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -61,82 +61,93 @@ L 558.72 247.968
     </g>
     <g id="ytick_2">
      <g id="line2d_4">
-      <path d="M 63.36 212.689162
-L 558.72 212.689162
+      <path d="M 63.36 217.17222
+L 558.72 217.17222
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_5"/>
      <g id="text_3">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="216.867873" transform="rotate(-0 56.36 216.867873)">2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="221.350931" transform="rotate(-0 56.36 221.350931)">2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_6">
-      <path d="M 63.36 177.410324
-L 558.72 177.410324
+      <path d="M 63.36 186.376441
+L 558.72 186.376441
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_7"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="181.589035" transform="rotate(-0 56.36 181.589035)">4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="190.555152" transform="rotate(-0 56.36 190.555152)">4</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_8">
-      <path d="M 63.36 142.131486
-L 558.72 142.131486
+      <path d="M 63.36 155.580661
+L 558.72 155.580661
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_9"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="146.310197" transform="rotate(-0 56.36 146.310197)">6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="159.759372" transform="rotate(-0 56.36 159.759372)">6</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_10">
-      <path d="M 63.36 106.852649
-L 558.72 106.852649
+      <path d="M 63.36 124.784882
+L 558.72 124.784882
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_11"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="111.03136" transform="rotate(-0 56.36 111.03136)">8</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="128.963593" transform="rotate(-0 56.36 128.963593)">8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_12">
-      <path d="M 63.36 71.573811
-L 558.72 71.573811
+      <path d="M 63.36 93.989102
+L 558.72 93.989102
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_13"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="75.752522" transform="rotate(-0 56.36 75.752522)">10</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="98.167813" transform="rotate(-0 56.36 98.167813)">10</text>
      </g>
     </g>
-    <g id="text_8">
+    <g id="ytick_7">
+     <g id="line2d_14">
+      <path d="M 63.36 63.193322
+L 558.72 63.193322
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_15"/>
+     <g id="text_8">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="67.372033" transform="rotate(-0 56.36 67.372033)">12</text>
+     </g>
+    </g>
+    <g id="text_9">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="35.719922" y="150.552" transform="rotate(-90 35.719922 150.552)">Cold compile + native preparation · s</text>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 220.224 247.968
 L 401.856 247.968
-L 401.856 198.373166
-L 220.224 198.373166
+L 401.856 198.818323
+L 220.224 198.818323
 z
 " clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
    </g>
    <g id="patch_4">
-    <path d="M 220.224 198.373166
-L 401.856 198.373166
-L 401.856 190.6117
-L 220.224 190.6117
+    <path d="M 220.224 198.818323
+L 401.856 198.818323
+L 401.856 191.069315
+L 220.224 191.069315
 z
 " clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
    </g>
    <g id="patch_5">
-    <path d="M 220.224 190.6117
-L 401.856 190.6117
+    <path d="M 220.224 191.069315
+L 401.856 191.069315
 L 401.856 90.845419
 L 220.224 90.845419
 z
@@ -152,19 +163,19 @@ L 63.36 53.136
 L 558.72 247.968
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
-   <g id="text_9">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="225.508474" transform="rotate(-0 311.04 225.508474)">2.81</text>
-   </g>
    <g id="text_10">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="311.04" y="196.830323" transform="rotate(-0 311.04 196.830323)">0.44</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="225.731052" transform="rotate(-0 311.04 225.731052)">3.19</text>
    </g>
    <g id="text_11">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="143.06645" transform="rotate(-0 311.04 143.06645)">5.66</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="311.04" y="197.28171" transform="rotate(-0 311.04 197.28171)">0.50</text>
    </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="311.04" y="83.202841" transform="rotate(-0 311.04 83.202841)">8.91 s</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="311.04" y="143.295258" transform="rotate(-0 311.04 143.295258)">6.51</text>
    </g>
    <g id="text_13">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="311.04" y="83.202841" transform="rotate(-0 311.04 83.202841)">10.20 s</text>
+   </g>
+   <g id="text_14">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · cold compilation phases</text>
    </g>
    <g id="legend_1">
@@ -176,7 +187,7 @@ L 73.26 63.694281
 z
 " style="fill: #6687a3"/>
     </g>
-    <g id="text_14">
+    <g id="text_15">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="104.06" y="71.394281" transform="rotate(-0 104.06 71.394281)">Front end + lower</text>
     </g>
     <g id="patch_9">
@@ -187,7 +198,7 @@ L 224.381094 63.694281
 z
 " style="fill: #e5a23d"/>
     </g>
-    <g id="text_15">
+    <g id="text_16">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="255.181094" y="71.394281" transform="rotate(-0 255.181094 71.394281)">Wasm emission</text>
     </g>
     <g id="patch_10">
@@ -198,7 +209,7 @@ L 362.79375 63.694281
 z
 " style="fill: #4a9a79"/>
     </g>
-    <g id="text_16">
+    <g id="text_17">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="393.59375" y="71.394281" transform="rotate(-0 393.59375 71.394281)">Native preparation</text>
     </g>
    </g>

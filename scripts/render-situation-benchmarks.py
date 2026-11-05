@@ -61,9 +61,9 @@ def validate(report):
     require(report.get('schema') == SCHEMA, 'foreign situation report')
     require(report.get('status') in ('complete', 'failed', 'incomplete'), 'unknown report status')
     policy = report.get('policy', {})
-    require(policy.get('samples') == 7 and policy.get('warmups') == 3
+    require(policy.get('samples') == 21 and policy.get('warmups') == 100
             and policy.get('blocks') == 2 and policy.get('processes_per_actor_per_block') == 4,
-            'measurement cohort must be 7 samples, 3 warmups and 8 processes')
+            'measurement cohort must be 21 samples, 100 warmups and 8 processes')
     require(policy.get('actors') == list(ACTORS), 'three-actor inventory differs')
     cases = report.get('cases', [])
     require(isinstance(cases, list), 'case inventory is not a list')

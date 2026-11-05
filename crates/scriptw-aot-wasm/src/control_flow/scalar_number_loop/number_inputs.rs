@@ -1,17 +1,17 @@
-//! Two existing dense Number borrows share one authenticated masked induction.
+//! One pure strict pair is projected over its complete repeated masked period.
 use super::*;
 use dense_array::{private_local, ReadKey, RegionInputSource};
 
-pub(super) struct NumberInputs {
+pub(super) struct StrictPairInputs {
     counter: LocalBindingId,
     index: LocalBindingId,
     phase: RegionInputSource,
     limit: u32,
     mask: u32,
-    arrays: Vec<ArrayReadLoop>,
+    arrays: Option<[ArrayReadLoop; 2]>,
 }
 
-impl NumberInputs {
+impl StrictPairInputs {
     pub(super) fn new(
         builder: &FunctionBuilder<'_>,
         init: Option<&ForInitIr>,
@@ -52,7 +52,8 @@ impl NumberInputs {
         let ExprIr::Number(first) = initial.init.as_ref()?.expr else {
             return None;
         };
-        if chunked::bounded_counter_literal(first)? >= limit {
+        let first = chunked::bounded_counter_literal(first)?;
+        if first >= limit {
             return None;
         }
         let ExprIr::UpdateIdentifier {
@@ -102,7 +103,7 @@ impl NumberInputs {
             return None;
         };
         let mask = chunked::bounded_counter_literal(bits)?;
-        if mask >= 1 << 20 || !(mask + 1).is_power_of_two() {
+        if mask >= 1 << 20 || !(mask + 1).is_power_of_two() || limit - first <= mask + 1 {
             return None;
         }
         let ExprIr::CoerciveAdd { lhs, rhs } = &lhs.expr else {
@@ -121,7 +122,7 @@ impl NumberInputs {
             phase,
             limit,
             mask,
-            arrays: Vec::new(),
+            arrays: None,
         })
     }
 
@@ -130,46 +131,53 @@ impl NumberInputs {
     }
 
     pub(super) fn is_receiver(&self, id: LocalBindingId) -> bool {
-        self.phase.is_local(id) || self.arrays.iter().any(|array| array.is_array(id))
+        self.phase.is_local(id)
+            || self
+                .arrays
+                .as_ref()
+                .is_some_and(|arrays| arrays.iter().any(|array| array.is_array(id)))
     }
 
-    pub(super) fn read(
+    pub(super) fn pair(
         &mut self,
         builder: &FunctionBuilder<'_>,
-        read: PropertyReadView<'_>,
-    ) -> Option<usize> {
-        let ReadKey::Computed(index) = read.key else {
-            return None;
+        left: &TypedExpr,
+        right: &TypedExpr,
+    ) -> Option<()> {
+        let source = |operand: &TypedExpr| {
+            let read = PropertyReadView::of(operand)?;
+            let ReadKey::Computed(index) = read.key else {
+                return None;
+            };
+            if private_local(builder, index) != Some(self.index) {
+                return None;
+            }
+            let source = RegionInputSource::of(builder, read.target)?;
+            if source.is_local(self.index) || source.is_local(self.counter) || source == self.phase
+            {
+                return None;
+            }
+            Some(source)
         };
-        if private_local(builder, index) != Some(self.index) {
-            return None;
+        // Validate both operands before mutating the sealed input set.
+        let left = source(left)?;
+        let right = source(right)?;
+        if self.arrays.is_none() {
+            self.arrays = Some([left, right].map(|source| {
+                ArrayReadLoop::masked_values(source, self.counter, self.limit, self.mask)
+            }));
+            return Some(());
         }
-        let source = RegionInputSource::of(builder, read.target)?;
-        if source.is_local(self.index) || source.is_local(self.counter) || source == self.phase {
-            return None;
-        }
-        if let Some(index) = self
-            .arrays
-            .iter()
-            .position(|array| array.has_receiver(&source))
-        {
-            return Some(index);
-        }
-        if self.arrays.len() == 2 {
-            return None;
-        }
-        let index = self.arrays.len();
-        self.arrays.push(ArrayReadLoop::masked_numbers(
-            source,
-            self.counter,
-            self.limit,
-            self.mask,
-        ));
-        Some(index)
+        let arrays = self.arrays.as_ref().expect("one sealed pair");
+        (arrays[0].has_receiver(&left) && arrays[1].has_receiver(&right)).then_some(())
     }
 
-    pub(super) fn complete(&self, bindings: &[NumberBinding], body: &[NumberStatement]) -> bool {
-        if self.arrays.is_empty() {
+    pub(super) fn complete(
+        &self,
+        bindings: &mut [NumberBinding],
+        body: &[NumberStatement],
+    ) -> bool {
+        if self.arrays.is_none() {
             return false;
         }
         let Some(counter) = bindings.iter().position(|b| b.id == self.counter) else {
@@ -190,17 +198,25 @@ impl NumberInputs {
         for statement in rest {
             statement.collect_writes(&mut writes);
         }
-        writes[counter].is_none()
-            && writes[index].is_none()
-            && !bindings.iter().any(|b| self.is_receiver(b.id))
+        if writes[counter].is_some()
+            || writes[index].is_some()
+            || bindings.iter().any(|b| self.is_receiver(b.id))
+        {
+            return false;
+        }
+        // Literal 0 <= first < limit <= 2^20, Increment, and no body counter
+        // writes prove every value through loop exit fits Signed32. Existing
+        // literal and integer entry checks retain the negative-zero fallback.
+        bindings[counter].domain = NumberDomain::Signed32;
+        true
     }
 
-    pub(super) fn guard<'a>(
-        &'a self,
+    pub(super) fn guard(
+        &self,
         builder: &mut FunctionBuilder<'_>,
         accepted: I32Local,
         function: &mut Function,
-    ) -> NumberInputBorrow<'a> {
+    ) -> Result<StrictPairProjection, EmitError> {
         let schema = builder.runtime_schema();
         let phase = schema.reserve_i32_local(function);
         phase.set_constant(0, function);
@@ -254,50 +270,124 @@ impl NumberInputs {
         source.clear(function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        let arrays: Vec<_> = self
+        let arrays = self
             .arrays
-            .iter()
-            .map(|array| ArrayReadBorrow::new(array, builder, accepted, function))
-            .collect();
+            .as_ref()
+            .expect("complete proof seals one pair")
+            .each_ref()
+            .map(|array| ArrayReadBorrow::new(array, builder, accepted, function));
+        let projection = schema
+            .reserve_gc_local::<NumberBitsI64Array, Nullable>(function)
+            .initialize_null(schema, function);
         accepted.load(function);
-        function.instruction(&Instruction::I32Eqz);
         builder.open_frame(ControlFrameKind::If, function);
-        for array in &arrays {
-            array.clear_roots(builder, function);
-        }
+        let cursor = schema.reserve_i32_local(function);
+        cursor.set_constant((self.mask + 1) as i32, function);
+        projection.replace(
+            schema
+                .array_type::<NumberBitsI64Array>()
+                .filled(GcOperand::i64(0), cursor, function)
+                .nullable(),
+            function,
+        );
+        cursor.set_constant(0, function);
+        let left = schema.reserve_value_local(function);
+        let right = schema.reserve_value_local(function);
+        left.set_undefined(function);
+        right.set_undefined(function);
+        let bits = schema.reserve_i64_local(function);
+        let done = builder.open_frame(ControlFrameKind::Block, function);
+        let repeat = builder.open_frame(ControlFrameKind::Loop, function);
+        cursor.load(function);
+        function.instruction(&Instruction::I32Const((self.mask + 1) as i32));
+        function.instruction(&Instruction::I32GeU);
+        builder.emit_branch_if_to_target(done, function);
+        // Both canonical dense borrows are rooted before allocation. These
+        // reads and the existing exact comparator cannot invoke source code.
+        arrays[0].emit_value_at(cursor, &left, builder, function);
+        arrays[1].emit_value_at(cursor, &right, builder, function);
+        builder.emit_tagged_payload_equality_i32(&left, &right, function)?;
+        function.instruction(&Instruction::F64ConvertI32U);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        bits.store(function);
+        schema.array_type::<NumberBitsI64Array>().write(
+            &projection,
+            cursor,
+            GcOperand::i64_local(bits),
+            schema,
+            function,
+        );
+        cursor.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        cursor.store(function);
+        builder.emit_branch_to_target(repeat, function);
+        builder.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        builder.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        schema.release_i64_local(bits, function);
+        right.clear(function);
+        left.clear(function);
+        schema.release_i32_local(cursor, function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        NumberInputBorrow {
-            arrays,
+        // No input roots survive into the source loop or its original fallback.
+        // Only the private Number projection and primitive induction are needed.
+        for array in arrays {
+            array.release(builder, function);
+        }
+        Ok(StrictPairProjection {
+            projection,
             phase,
+            counter: self.counter,
+            limit: self.limit,
             mask: self.mask,
             index: self.index,
-        }
+        })
     }
 }
 
-pub(super) struct NumberInputBorrow<'a> {
-    arrays: Vec<ArrayReadBorrow<'a>>,
+pub(super) struct StrictPairProjection {
+    projection: GcLocal<NumberBitsI64Array, Nullable>,
     phase: I32Local,
+    counter: LocalBindingId,
+    limit: u32,
     mask: u32,
     index: LocalBindingId,
 }
 
-impl NumberInputBorrow<'_> {
-    pub(super) fn emit_index(&self, function: &mut Function) {
-        // 0 <= counter <= 2^20 and integral signed-32 phase make the original
-        // binary64 sum exact. Wrapping i32 addition preserves precisely the
-        // low bits subsequently observed by ToInt32 and the nonnegative mask.
-        self.arrays[0].load_slot(function);
+impl StrictPairProjection {
+    fn counter(&self, locals: &LoopLocals<'_>) -> I32Local {
+        let index = locals
+            .bindings
+            .iter()
+            .position(|b| b.id == self.counter)
+            .expect("sealed induction binding");
+        let LoopLocal::Signed32(counter) = locals.values[index] else {
+            unreachable!("the complete induction proof seals Signed32")
+        };
+        counter
+    }
+
+    pub(super) fn emit_test(&self, locals: &LoopLocals<'_>, function: &mut Function) {
+        self.counter(locals).load(function);
+        function.instruction(&Instruction::I32Const(self.limit as i32));
+        function.instruction(&Instruction::I32LtU);
+    }
+
+    pub(super) fn emit_index(&self, locals: &LoopLocals<'_>, function: &mut Function) {
+        // The bounded counter plus integral signed-i32 phase is exact in f64.
+        // Wrapping addition retains precisely the masked ToInt32 low bits.
+        self.counter(locals).load(function);
         self.phase.load(function);
         function.instruction(&Instruction::I32Add);
         function.instruction(&Instruction::I32Const(self.mask as i32));
         function.instruction(&Instruction::I32And);
     }
 
-    pub(super) fn emit_element(
+    pub(super) fn emit_predicate(
         &self,
-        input: usize,
         locals: &LoopLocals<'_>,
         builder: &FunctionBuilder<'_>,
         function: &mut Function,
@@ -310,17 +400,23 @@ impl NumberInputBorrow<'_> {
         let LoopLocal::Signed32(index) = locals.values[index] else {
             unreachable!("masked index is nonnegative signed32")
         };
-        self.arrays[input].emit_element_at(index, builder, function);
+        let s = builder.runtime_schema();
+        s.array_type::<NumberBitsI64Array>()
+            .read(&self.projection, index, s, function);
+        // The sealed projection stores exactly the canonical f64 bits of 0/1.
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Eqz);
     }
 
-    pub(super) fn advance(&self, function: &mut Function) {
-        self.arrays[0].advance(function);
+    pub(super) fn advance(&self, locals: &LoopLocals<'_>, function: &mut Function) {
+        self.counter(locals).load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        self.counter(locals).store(function);
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
-        for array in self.arrays {
-            array.release(builder, function);
-        }
+        self.projection.clear(function);
         builder
             .runtime_schema()
             .release_i32_local(self.phase, function);
