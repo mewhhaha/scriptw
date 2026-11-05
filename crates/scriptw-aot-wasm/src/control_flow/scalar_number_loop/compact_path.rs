@@ -1,4 +1,6 @@
 //! Static own-data paths are validated across the complete read-only region.
+mod cyclic_key;
+use cyclic_key::{CyclicKeyBorrow, CyclicReadKey};
 mod dictionary;
 mod projection;
 use super::invariant_imul::CachedRuntimeName;
@@ -58,6 +60,7 @@ impl CompactPathId {
 #[derive(PartialEq, Eq)]
 pub(super) enum CompactReadPath {
     Number(CachedReadName),
+    CyclicNumber(CyclicReadKey),
     StringLength(CachedReadName),
     ArrayNumber(CachedReadName, LocalBindingId),
 }
@@ -66,6 +69,7 @@ impl CompactReadPath {
     pub(super) fn new<'a>(
         builder: &FunctionBuilder<'_>,
         read: PropertyReadView<'a>,
+        counter: LocalBindingId,
     ) -> Option<(Self, &'a TypedExpr)> {
         if matches!(
             read.key,
@@ -86,6 +90,11 @@ impl CompactReadPath {
                 read.target,
             ));
         }
+        if let dense_array::ReadKey::Computed(key) = read.key {
+            if let Some(key) = CyclicReadKey::new(builder, key, counter) {
+                return Some((Self::CyclicNumber(key), read.target));
+            }
+        }
         let dense_array::ReadKey::Computed(index) = read.key else {
             return None;
         };
@@ -103,20 +112,30 @@ impl CompactReadPath {
 
     pub(super) fn input(&self) -> Option<LocalBindingId> {
         match self {
-            Self::Number(_) | Self::StringLength(_) => None,
+            Self::Number(_) | Self::StringLength(_) | Self::CyclicNumber(_) => None,
             Self::ArrayNumber(_, index) => Some(*index),
         }
     }
 
-    fn name(&self) -> &CachedReadName {
+    fn name(&self) -> Option<&CachedReadName> {
         match self {
-            Self::Number(name) | Self::StringLength(name) | Self::ArrayNumber(name, _) => name,
+            Self::Number(name) | Self::StringLength(name) | Self::ArrayNumber(name, _) => {
+                Some(name)
+            }
+            Self::CyclicNumber(_) => None,
+        }
+    }
+
+    pub(super) fn cyclic_key(&self) -> Option<&CyclicReadKey> {
+        match self {
+            Self::CyclicNumber(key) => Some(key),
+            _ => None,
         }
     }
 
     fn tag(&self) -> WasmRuntimeValueTag {
         match self {
-            Self::Number(_) => WasmRuntimeValueTag::Number,
+            Self::Number(_) | Self::CyclicNumber(_) => WasmRuntimeValueTag::Number,
             Self::StringLength(_) => WasmRuntimeValueTag::String,
             Self::ArrayNumber(_, _) => WasmRuntimeValueTag::Array,
         }
@@ -723,7 +742,11 @@ impl<'a, 'p> FirstRowKeys<'a, 'p> {
             .zip(&self.rows.slots)
             .zip(&self.rows.names)
         {
-            let cached = path.name().cached(builder, function);
+            let Some(key) = path.name() else {
+                builder.emit_branch_to_target(declined, function);
+                continue;
+            };
+            let cached = key.cached(builder, function);
             name.replace(cached.load(s, function), function);
             cached.clear(function);
             name.load(s, function).is_null(function);

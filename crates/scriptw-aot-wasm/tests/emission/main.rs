@@ -50,3 +50,5 @@ mod scalar_row_modes;
 mod scalar_row_projection;
 
 mod retained_operands;
+
+mod computed_key_projection;

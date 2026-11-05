@@ -239,7 +239,11 @@ impl FirstRowKeys<'_, '_> {
             .zip(&self.rows.slots)
             .zip(&self.rows.names)
         {
-            let cached = path.name().cached(builder, f);
+            let Some(key) = path.name() else {
+                builder.emit_branch_to_target(declined, f);
+                continue;
+            };
+            let cached = key.cached(builder, f);
             name.replace(cached.load(s, f), f);
             cached.clear(f);
             name.load(s, f).is_null(f);

@@ -12,19 +12,26 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Measure unnecessary initialization guards on proven simple local formals,
-  then remaining call transport and activation allocation. React's five-formal
+- Measure remaining call transport and activation allocation. React's five-formal
   `vn`/`ft` helpers remain outside the two-formal local-entry bound; exclusion
   alone does not establish their cost. Preserve source binding ownership,
   non-simple parameter TDZ, arguments snapshots and captures, as well as
-  callee identity, Realm, captures, receiver, depth and abrupt completion.
+  callee identity, Realm, receiver, depth and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
+- Extend the existing numeric region to ordered conditionals, dominated local
+  definitions and bounded phase indexing. Measure the unchanged strict-equality
+  case before adding further comparison or classification leaves. Preserve
+  arithmetic order, input effects, zero-trip state and complete fallback.
+  Owner: AOT scalar-loop planning and numeric inputs.
 - Reduce preflight and allocation costs in closed numeric row loops. Complete
-  read-only periods now project Number/string-length leaves through canonical
-  own-data reads into the existing numeric array layout. Measure the remaining
+  read-only periods project Number/string-length leaves through canonical own-data
+  reads, with literal keys or an authenticated dense String table. Measure the remaining
   ordinary-metadata gap, short-loop refusals and native frames; preserve whole-loop
-  fallback and original alias identity. Mixed/Number strict equality remains
-  a separate hill. Owner: AOT scalar-loop planning and object reads.
+  fallback and original alias identity. Owner: AOT scalar-loop planning and object reads.
+- Measure Script function storage caused by analysis-wide arguments visibility.
+  Establish a passing current SSR baseline before changing recovery. Preserve
+  global records, eval/prelude modes, captures and arguments; Module-only lookup
+  and cell authorities must remain scoped to Modules. Owner: IR storage planning.
 - Measure scalar replacement of strict arguments index/length reads. A missing
   own index can expose the object through a prototype getter; short argument
   lists must retain real object semantics. Preserve original actual count and

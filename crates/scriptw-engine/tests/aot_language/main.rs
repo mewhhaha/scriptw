@@ -84,3 +84,7 @@ mod aot_scalar_dictionary_rows;
 mod aot_dictionary_read_cache;
 
 mod aot_scalar_row_projection;
+
+mod aot_simple_parameters;
+
+mod aot_computed_key_projection;

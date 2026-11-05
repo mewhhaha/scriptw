@@ -4,6 +4,8 @@ use super::*;
 pub(super) struct RowProjection {
     values: GcLocal<NumberBitsI64Array, Nullable>,
     period: u32,
+    row_mask: u32,
+    keys: Vec<Option<CyclicKeyBorrow>>,
     width: u32,
 }
 
@@ -14,7 +16,12 @@ impl RowProjection {
         builder: &FunctionBuilder<'_>,
         function: &mut Function,
     ) -> Option<Self> {
-        let period = period?;
+        let row_period = period?;
+        let period = paths
+            .iter()
+            .filter_map(CompactReadPath::cyclic_key)
+            .map(CyclicReadKey::period)
+            .fold(row_period, u32::max);
         if !period.is_power_of_two()
             || paths.is_empty()
             || paths
@@ -32,6 +39,14 @@ impl RowProjection {
                 .reserve_gc_local(function)
                 .initialize_null(builder.runtime_schema(), function),
             period,
+            row_mask: row_period - 1,
+            keys: paths
+                .iter()
+                .map(|path| {
+                    path.cyclic_key()
+                        .map(|key| CyclicKeyBorrow::new(key, builder, function))
+                })
+                .collect(),
             width,
         })
     }
@@ -64,12 +79,16 @@ impl RowProjection {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let s = builder.runtime_schema();
-        for (path, name) in rows.paths.iter().zip(&rows.names) {
-            let cached = path.name().cached(builder, function);
-            name.replace(cached.load(s, function), function);
-            cached.clear(function);
-            name.load(s, function).is_null(function);
-            builder.emit_branch_if_to_target(done, function);
+        for ((path, name), key) in rows.paths.iter().zip(&rows.names).zip(&self.keys) {
+            if let (Some(plan), Some(key)) = (path.cyclic_key(), key) {
+                key.prepare(plan, builder, done, function);
+            } else if let Some(text) = path.name() {
+                let cached = text.cached(builder, function);
+                name.replace(cached.load(s, function), function);
+                cached.clear(function);
+                name.load(s, function).is_null(function);
+                builder.emit_branch_if_to_target(done, function);
+            }
         }
         // The preallocation gate uses the same current own-data decoder as
         // every preflight row; no streaming shape/slot admission precedes it.
@@ -152,13 +171,26 @@ impl RowProjection {
         let s = builder.runtime_schema();
         let accepted = s.reserve_i32_local(function);
         accepted.set_constant(0, function);
+        let row_slot = if self.row_mask + 1 == self.period {
+            None
+        } else {
+            let row_slot = s.reserve_i32_local(function);
+            slot.load(function);
+            function.instruction(&Instruction::I32Const(self.row_mask as i32));
+            function.instruction(&Instruction::I32And);
+            row_slot.store(function);
+            Some(row_slot)
+        };
         let stored = s.reserve_gc_local(function).initialize(
             s.array_type::<PackedValueTable>()
-                .read(&rows.values, slot, s, function)
+                .read(&rows.values, row_slot.unwrap_or(slot), s, function)
                 .reference()
                 .require_non_null(function),
             function,
         );
+        if let Some(row_slot) = row_slot {
+            s.release_i32_local(row_slot, function);
+        }
         let row = s.reserve_value_local(function);
         s.struct_type::<StoredValue>()
             .read_into(&stored, &row, s, function);
@@ -167,12 +199,22 @@ impl RowProjection {
         let result = s.reserve_completion(function);
         result.initialize(function);
         let declined = builder.open_frame(ControlFrameKind::Block, function);
-        for ((path, name), number) in rows.paths.iter().zip(&rows.names).zip(&rows.numbers) {
-            let text = s
-                .reserve_gc_local(function)
-                .initialize(name.load(s, function).require_non_null(function), function);
-            key.set_reference(&text, s, function);
-            text.clear(function);
+        for (((path, name), number), cyclic) in rows
+            .paths
+            .iter()
+            .zip(&rows.names)
+            .zip(&rows.numbers)
+            .zip(&self.keys)
+        {
+            if let Some(cyclic) = cyclic {
+                cyclic.read(slot, &key, builder, declined, function);
+            } else {
+                let text = s
+                    .reserve_gc_local(function)
+                    .initialize(name.load(s, function).require_non_null(function), function);
+                key.set_reference(&text, s, function);
+                text.clear(function);
+            }
             let found = builder.emit_raw_string_own_data_read(&row, &key, &result, function)?;
             found.load(function);
             s.release_i32_local(found, function);
@@ -249,9 +291,15 @@ impl RowProjection {
 
     pub(super) fn clear_roots(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
         self.values.set_null(builder.runtime_schema(), function);
+        for key in self.keys.iter().flatten() {
+            key.clear_roots(builder, function);
+        }
     }
 
     pub(super) fn release(self, function: &mut Function) {
         self.values.clear(function);
+        for key in self.keys.into_iter().flatten() {
+            key.release(function);
+        }
     }
 }

@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Frame case native P image sizes</dc:title>
-    <dc:description>{"matplotlib": "3.11.2", "report_sha256": "376639625002d03a33bfde8eb219293eab2026d92318a0a9b797764f1896ec59", "report_status": "complete", "samples": 7, "schema": "scriptw-situation-benchmarks-v1", "source_commit": "0a8e918b5e7c0344cf4f3e75a492fe6f3f512094", "source_fingerprint": "59022867cdb853893fabece731921f401d45f88e7374ecee0587b727ce6f2023", "source_sha256": {"frame-branches128.js": null, "frame-branches32.js": null, "frame-branches512.js": null, "frame-compact.js": null}, "warmups": 3}</dc:description>
+    <dc:description>{"matplotlib": "3.11.2", "report_sha256": "81ae3332256ee466eab73de6e3b565267f506e70ff33f4581b27ca0d3189da87", "report_status": "complete", "samples": 7, "schema": "scriptw-situation-benchmarks-v1", "source_commit": "2d8b5896c4d61528a0e802906b1d016118475ce8", "source_fingerprint": "267ec3510f5db2fa176f16975f84874b859e8bc6843c55544801d3f8fd20d364", "source_sha256": {"frame-branches128.js": null, "frame-branches32.js": null, "frame-branches512.js": null, "frame-compact.js": null}, "warmups": 3}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>

@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-05**, React **19.3.1**, compiler `59022867cdb8`
-(base `0a8e918b5` plus the archived source patch).
+Measured **2026-11-05**, React **19.3.1**, compiler `267ec3510f5d`
+(base `2d8b5896c` plus the archived source patch).
 Both sync and async Flight outputs match Node exactly.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 5.930 | 6.495 |
-| Node 24.12.0 / V8 | 0.495 | 0.406 |
+| Scriptw | 5.709 | 6.101 |
+| Node 24.12.0 / V8 | 0.491 | 0.435 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -23,13 +23,14 @@ checked warmups and seven measured requests per mode. A process retains one
 Module/Realm and runs sync then async. Requests include full Flight serialization
 and consumption; JSON encoding and exact-output checks follow timing. Values
 are medians of process medians. The frozen prior-build control stays in the
-receipts; its sync/async requests are about 2%/4% faster than the candidate.
-Chart bars show the latest compiler and V8. Scriptc's React build
+receipts; chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
+The computed-key optimization leaves RSC's program and runtime Wasm byte-identical
+to the control; this checkpoint establishes no React execution improvement.
 
-Cold Scriptw setup is **3.150 s JavaScript → Wasm**,
-**5.686 s native preparation**, and
-**2.284 ms module initialization**.
+Cold Scriptw setup is **3.124 s JavaScript → Wasm**,
+**5.608 s native preparation**, and
+**2.266 ms module initialization**.
 Program Wasm is **4,231,662 B** (3,683,242 B code; 490,228 B data);
 shared runtime Wasm is **38,816,202 B**. All setup precedes request timing.
 Child peak RSS includes compilation and process history; it is not live guest heap.
@@ -44,7 +45,7 @@ The [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
 engine/mode. Scriptw retires **50.19 million sync /
 54.08 million async user instructions per request**;
-Node retires **2.50 / 2.63 million**.
+Node retires **2.52 / 2.69 million**.
 Counters run without multiplexing. They count Scriptw's execution worker and
 Node's main thread, including Node barrier/Promise-return edges; background
 compilation/GC threads are excluded. These are unscored counts, not causal shares.
@@ -61,13 +62,15 @@ allocations enter the admitted loop.
 Function own-data probes use the current ordinary dictionary without the
 former storage gate. The seven infallible Boolean operations publish directly.
 Retained private operands use initialized compiler storage; source lexical TDZ
-and suspended reference owners remain unchanged.
+and suspended reference owners retain their protocols.
 Cached literal reads retain their original twelve-input/five-result boundary.
 Closed row loops can borrow current dictionary data after checking live
 extent, current key/descriptor/value and complete field guards. For repeated
 low-bit masked rows with Number/string-length leaves, canonical own-data
 reads validate a complete read-only period before any source body and copy its
-leaves to one existing numeric array. A miss resumes the whole original loop; a successful preflight uses
+leaves to one existing numeric array. A second authenticated dense array may
+supply primitive String keys; both masks define one combined period. Unsupported
+keys, holes, accessors and Proxies decline before source work. A miss resumes the whole original loop; a successful preflight uses
 numeric-only loads with the original arithmetic and row identity. Other admitted
 rows retain compact/dictionary guarded backedges and completed-prefix fallback.
 Recipes, accessors, Proxies and incomplete regions keep their original semantics.
@@ -77,11 +80,11 @@ work remains an explicit cost.
 Local argument entries retain their two-formal bound. Runtime value,
 environment, descriptor and call-transport costs remain; V8 parity is open.
 
-Fresh user-cycle sampling attributes **24.42% sync /
-24.27% async** to six property/enumeration helpers' disjoint
+Fresh user-cycle sampling attributes **25.79% sync /
+24.17% async** to six property/enumeration helpers' disjoint
 own samples. The `vn`/`ft` page-touch loops account for
-**2.33% /
-1.98%**. Each mode has one
+**2.17% /
+2.30%**. Each mode has one
 sampled process and 200 checked requests after three warmups. Frame-pointer
 chains can truncate; inclusive caller shares overlap. These observations do not
 partition wall time or predict a change's gain. The linked diagnostic retains
@@ -104,33 +107,33 @@ and full WHATWG conformance remain unsupported or unverified.
 
 ## Focused performance situations
 
-Measured **2026-11-05**: **21** standalone Module programs, compiler `59022867cdb8`,
+Measured **2026-11-05**: **21** standalone Module programs, compiler `267ec3510f5d`,
 Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.010 | 0.010 | 0.002 |
-| `global-shallow.js` | 2.271 | 1.806 | 1.040 |
-| `global-deep8.js` | 2.885 | 2.064 | 1.107 |
-| `global-bound-deep.js` | 0.705 | 0.242 | 0.140 |
-| `global-getter-deep.js` | 3.119 | 2.235 | 0.981 |
-| `frame-compact.js` | 8.200 | 5.796 | 0.069 |
-| `frame-branches32.js` | 8.510 | 6.108 | 0.099 |
-| `frame-branches128.js` | 9.085 | 6.278 | 0.137 |
-| `frame-branches512.js` | 14.259 | 6.283 | 0.415 |
-| `args-unused.js` | 0.732 | 0.503 | 0.105 |
-| `args-observed.js` | 2.474 | 2.003 | 0.136 |
-| `property-stable.js` | 3.555 | 1.791 | 0.076 |
-| `property-mutated.js` | 3.182 | 1.611 | 0.066 |
-| `metadata-ordinary.js` | 0.212 | 0.087 | 0.020 |
-| `metadata-function.js` | 0.209 | 0.086 | 0.209 |
-| `metadata-intrinsic.js` | 0.211 | 0.089 | 0.234 |
-| `typeof-dispatch.js` | 0.958 | 0.372 | 0.026 |
-| `singleton-dispatch.js` | 0.915 | 0.357 | 0.021 |
-| `strict-equality-numbers.js` | 2.586 | 1.217 | 0.021 |
-| `strict-equality-mixed.js` | 2.603 | 1.328 | 0.068 |
-| `for-in-wide.js` | 2.071 | 1.969 | 0.070 |
+| `control-empty.js` | 0.010 | 0.009 | 0.002 |
+| `global-shallow.js` | 2.169 | 1.726 | 1.062 |
+| `global-deep8.js` | 2.740 | 1.955 | 1.033 |
+| `global-bound-deep.js` | 0.694 | 0.236 | 0.071 |
+| `global-getter-deep.js` | 3.051 | 2.222 | 0.979 |
+| `frame-compact.js` | 8.100 | 5.754 | 0.079 |
+| `frame-branches32.js` | 8.273 | 6.084 | 0.096 |
+| `frame-branches128.js` | 8.846 | 6.003 | 0.135 |
+| `frame-branches512.js` | 13.930 | 6.146 | 0.292 |
+| `args-unused.js` | 0.721 | 0.510 | 0.089 |
+| `args-observed.js` | 2.438 | 1.958 | 0.132 |
+| `property-stable.js` | 0.154 | 0.076 | 0.075 |
+| `property-mutated.js` | 0.153 | 0.078 | 0.066 |
+| `metadata-ordinary.js` | 0.209 | 0.085 | 0.020 |
+| `metadata-function.js` | 0.203 | 0.084 | 0.206 |
+| `metadata-intrinsic.js` | 0.205 | 0.087 | 0.228 |
+| `typeof-dispatch.js` | 0.939 | 0.362 | 0.024 |
+| `singleton-dispatch.js` | 0.910 | 0.349 | 0.013 |
+| `strict-equality-numbers.js` | 2.534 | 1.202 | 0.045 |
+| `strict-equality-mixed.js` | 2.594 | 1.346 | 0.067 |
+| `for-in-wide.js` | 2.077 | 1.949 | 0.067 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs three checked
@@ -238,7 +241,7 @@ Mutation, Proxy and suspension controls run separately as semantic regressions.
 
 All **504** situation processes and **5,040** calls passed exact checks.
 The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
-Fresh scoped verification passes **1,766 Engine**, **61 emission**,
+Fresh scoped verification passes **1,769 Engine**, **63 emission**,
 **637 structural** and **380 source-guard** checks. The **769 IR** cases
 reuse their original passing binary/receipts with unchanged IR/front-end inputs.
 AOT units pass **653** cases; four known bootstrap assertions remain failures.

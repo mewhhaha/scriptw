@@ -17,13 +17,13 @@ pub(super) struct ArrayReadLoop {
 }
 
 #[derive(PartialEq, Eq)]
-enum ArrayReceiver {
+pub(super) enum ArrayReceiver {
     Local(LocalBindingId),
     Cell(scriptw_ir::ProvenBindingCellIr),
 }
 
 impl ArrayReceiver {
-    fn of(builder: &FunctionBuilder<'_>, value: &TypedExpr) -> Option<Self> {
+    pub(super) fn of(builder: &FunctionBuilder<'_>, value: &TypedExpr) -> Option<Self> {
         if let Some(local) = private_local(builder, value) {
             return Some(Self::Local(local));
         }
@@ -51,7 +51,45 @@ impl ArrayReceiver {
         Some(Self::Cell(proof))
     }
 
-    fn is_local(&self, id: LocalBindingId) -> bool {
+    pub(super) fn load(
+        &self,
+        source: &ValueLocals,
+        builder: &mut FunctionBuilder<'_>,
+        decline: ControlTarget,
+        function: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        match self {
+            ArrayReceiver::Local(id) => {
+                let local = builder.local_binding(*id);
+                if let Some(initialized) = local.initialization_check() {
+                    initialized.load(function);
+                    function.instruction(&Instruction::I32Eqz);
+                    builder.emit_branch_if_to_target(decline, function);
+                }
+                source.copy_from(local.value(), function);
+            }
+            ArrayReceiver::Cell(proof) => {
+                let BindingStorage::EnvSlot { slot, hops } = builder
+                    .module_cell_storage(proof, proof.source_name())
+                    .expect("the sealed array receiver authenticates this captured cell")
+                else {
+                    unreachable!("proven captured array receiver uses a cell");
+                };
+                let environment = builder.resolve_env_handle_local(hops, function);
+                let cell = builder.emit_environment_cell_local(&environment, slot, function);
+                let initialized = builder.emit_read_environment_cell(&cell, source, function);
+                initialized.load(function);
+                s.release_i32_local(initialized, function);
+                cell.clear(function);
+                environment.clear(function);
+                function.instruction(&Instruction::I32Eqz);
+                builder.emit_branch_if_to_target(decline, function);
+            }
+        }
+    }
+
+    pub(super) fn is_local(&self, id: LocalBindingId) -> bool {
         matches!(self, Self::Local(local) if *local == id)
     }
 }
@@ -151,7 +189,16 @@ impl<'a> PropertyReadView<'a> {
                     | ExprIr::BitwiseNumeric {
                         op: BitwiseBinaryOp::And,
                         ..
-                    } => ReadKey::Computed(key),
+                    }
+                    | ExprIr::PropertyRead { .. }
+                    | ExprIr::SpecOperation {
+                        operation: SpecOperationIr::GetV,
+                        ..
+                    } => {
+                        // A structural view only. CyclicReadKey authenticates
+                        // both the key-array receiver and the exact induction.
+                        ReadKey::Computed(key)
+                    }
                     _ => return None,
                 };
                 (target, key)
@@ -225,8 +272,8 @@ impl ArrayReadLoop {
     /// A positive literal trip keeps every induction value in the exact
     /// Number/ToInt32 overlap. The mask need not be a power of two: every
     /// resulting slot is bounded by the mask, checked against real length.
-    /// The declaration must be first so speculative row preparation never
-    /// moves a source write ahead of a possibly throwing row read.
+    /// A row declaration or direct accumulation must be first so speculative
+    /// preparation never moves a source write ahead of a throwing row read.
     fn masked_rows(
         builder: &FunctionBuilder<'_>,
         init: Option<&ForInitIr>,
@@ -284,30 +331,59 @@ impl ArrayReadLoop {
         {
             return None;
         }
-        let StatementIr::Block(body) = body else {
-            return None;
+        let first_statement = match body {
+            StatementIr::Block(block) if block.lexical_environment.is_none() => {
+                block.statements.first()?
+            }
+            StatementIr::Expression(_) => body,
+            _ => return None,
         };
-        if body.lexical_environment.is_some() {
-            return None;
-        }
-        let StatementIr::Var(declarations) = body.statements.first()? else {
-            return None;
+        let (row_alias, read) = match first_statement {
+            StatementIr::Var(declarations) => {
+                let [row] = declarations.as_slice() else {
+                    return None;
+                };
+                let alias = builder.private_local_binding(&row.name)?;
+                if alias == counter
+                    || builder
+                        .local_binding(alias)
+                        .initialization_check()
+                        .is_some()
+                {
+                    return None;
+                }
+                (Some(alias), PropertyReadView::of(row.init.as_ref()?)?)
+            }
+            StatementIr::Expression(TypedExpr {
+                expr: ExprIr::CompoundAssignIdentifier { value, .. },
+                ..
+            }) => {
+                // Find only the direct row read of this accumulation. The
+                // complete body/test/update still pass the scalar proof.
+                let property = PropertyReadView::of(value)?;
+                (None, PropertyReadView::of(property.target)?)
+            }
+            StatementIr::Expression(TypedExpr {
+                expr: ExprIr::AssignIdentifier { name, value },
+                ..
+            }) => {
+                let accumulator = builder.private_local_binding(name)?;
+                let ExprIr::CoerciveAdd { lhs, rhs } = &value.expr else {
+                    return None;
+                };
+                if private_local(builder, lhs) != Some(accumulator) {
+                    return None;
+                }
+                // Lowered += can retain its left read as an explicit Add.
+                // Authenticate that read before discovering the RHS receiver;
+                // the complete scalar proof still owns arithmetic and effects.
+                let property = PropertyReadView::of(rhs)?;
+                (None, PropertyReadView::of(property.target)?)
+            }
+            _ => return None,
         };
-        let [row] = declarations.as_slice() else {
-            return None;
-        };
-        let row_alias = builder.private_local_binding(&row.name)?;
-        if row_alias == counter
-            || builder
-                .local_binding(row_alias)
-                .initialization_check()
-                .is_some()
-        {
-            return None;
-        }
-        let read = PropertyReadView::of(row.init.as_ref()?)?;
         let array = ArrayReceiver::of(builder, read.target)?;
-        if array.is_local(counter) || array.is_local(row_alias) {
+        if array.is_local(counter) || row_alias.is_some_and(|alias| array.is_local(alias)) {
             return None;
         }
         let ReadKey::Computed(index) = read.key else {
@@ -335,7 +411,7 @@ impl ArrayReadLoop {
             array,
             counter,
             iteration: ArrayIteration::Masked { limit, mask },
-            row_alias: Some(row_alias),
+            row_alias,
             paths: ReadPaths::LengthOnly,
         })
     }
@@ -418,7 +494,7 @@ impl ArrayReadLoop {
             self.paths = ReadPaths::Numbers;
             return Some((ArrayRead::Element, None));
         }
-        let (path, row) = CompactReadPath::new(builder, read)?;
+        let (path, row) = CompactReadPath::new(builder, read, self.counter)?;
         if let Some(alias) = self.row_alias {
             if private_local(builder, row) != Some(alias) {
                 return None;
@@ -428,6 +504,23 @@ impl ArrayReadLoop {
             if ArrayReceiver::of(builder, row.target).as_ref() != Some(&self.array)
                 || !self.is_counter_key(builder, row.key)
             {
+                return None;
+            }
+        }
+        if let Some(key) = path.cyclic_key() {
+            // The declaration rewrites this alias for every source iteration;
+            // it cannot also supply an invariant key table.
+            if self
+                .row_alias
+                .is_some_and(|alias| key.is_local_receiver(alias))
+            {
+                return None;
+            }
+            let ArrayIteration::Masked { limit, mask } = self.iteration else {
+                return None;
+            };
+            let period = (mask + 1).max(key.period());
+            if !(mask + 1).is_power_of_two() || limit <= period {
                 return None;
             }
         }
@@ -474,6 +567,17 @@ impl ArrayReadLoop {
             return false;
         }
         if let ReadPaths::Compact(paths) = &self.paths {
+            if paths
+                .iter()
+                .filter_map(CompactReadPath::cyclic_key)
+                .any(|key| {
+                    bindings
+                        .iter()
+                        .any(|binding| key.is_local_receiver(binding.id))
+                })
+            {
+                return false;
+            }
             for input in paths.iter().filter_map(CompactReadPath::input) {
                 if !bindings
                     .iter()
@@ -574,34 +678,7 @@ impl<'a> ArrayReadBorrow<'a> {
         }
         let source = s.reserve_value_local(function);
         source.set_undefined(function);
-        match &plan.array {
-            ArrayReceiver::Local(id) => {
-                let local = builder.local_binding(*id);
-                if let Some(initialized) = local.initialization_check() {
-                    initialized.load(function);
-                    function.instruction(&Instruction::I32Eqz);
-                    builder.emit_branch_if_to_target(decline, function);
-                }
-                source.copy_from(local.value(), function);
-            }
-            ArrayReceiver::Cell(proof) => {
-                let BindingStorage::EnvSlot { slot, hops } = builder
-                    .module_cell_storage(proof, proof.source_name())
-                    .expect("the sealed array receiver authenticates this captured cell")
-                else {
-                    unreachable!("proven captured array receiver uses a cell");
-                };
-                let environment = builder.resolve_env_handle_local(hops, function);
-                let cell = builder.emit_environment_cell_local(&environment, slot, function);
-                let initialized = builder.emit_read_environment_cell(&cell, &source, function);
-                initialized.load(function);
-                s.release_i32_local(initialized, function);
-                cell.clear(function);
-                environment.clear(function);
-                function.instruction(&Instruction::I32Eqz);
-                builder.emit_branch_if_to_target(decline, function);
-            }
-        }
+        plan.array.load(&source, builder, decline, function);
         source.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Array.tag()));
         function.instruction(&Instruction::I32Ne);

@@ -50,8 +50,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 5.93 ms | 0.495 ms |
-| Async | 6.50 ms | 0.406 ms |
+| Sync | 5.71 ms | 0.491 ms |
+| Async | 6.10 ms | 0.435 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -60,8 +60,8 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.15 s JavaScript → Wasm**, **5.69 s native preparation**,
-and **2.28 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
+Cold Scriptw setup: **3.12 s JavaScript → Wasm**, **5.61 s native preparation**,
+and **2.27 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
 code, 0.47 MiB data); shared runtime Wasm is **37.02 MiB**.
 [Size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
 [Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
@@ -97,8 +97,8 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-05**): 1,766 Engine cases,
-61 Wasm-emission, 637 structural and
+Latest scoped verification (**2026-11-05**): 1,769 Engine cases,
+63 Wasm-emission, 637 structural and
 380 source-guard checks pass; 769 IR cases reuse unchanged inputs and original receipts.
 AOT units pass 653 cases; four known bootstrap assertions still fail.
 The focused benchmarks passed 5,040 checked calls; React RSC passed 480 exact

@@ -266,6 +266,24 @@ existing period/trip/path bounds imply finite checked projection storage; no
 workload name, field spelling or measured trip count authorizes admission.
 Allocation cost, guard-miss overhead and native performance remain to measure.
 
+Computed own-data reads can also use a second canonical dense Array of primitive
+String keys. The row and key indices must use the same private induction with
+bounded low-bit masks whose periods are powers of two. Preflight covers aligned
+pairs over the maximum period, including when the key period exceeds the row
+period; it never forms a Cartesian product or converts a dynamic key. The real
+array mode, length, count, capacity and current StoredValue/String guards precede
+the canonical own-data probe. Accessors, holes, Proxies, non-String keys or
+non-Number results decline to the whole original loop before source work.
+
+The same existing numeric projection and scalar backedge serve both static and
+cyclic keys. A direct scalar accumulation may discover its row receiver without
+introducing a synthetic source alias. Existing complete body/test/update proof
+still excludes writes to either input, callbacks and captured accumulators.
+The per-iteration row alias cannot supply the invariant key table.
+Only the row table publishes an actual optional alias; borrowed key tables and
+projection roots clear before a generic continuation. No runtime ABI, permanent
+cache or object layout is added.
+
 ## Allocation accounting and evidence limits
 
 For a fresh admitted ordinary source literal before structural conversion,
