@@ -51,8 +51,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 | Retained request | Scriptw | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 5.70 ms | 0.491 ms |
-| Async | 6.15 ms | 0.392 ms |
+| Sync | 5.80 ms | 0.488 ms |
+| Async | 6.27 ms | 0.413 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
@@ -61,7 +61,7 @@ requests per mode. Requests include full Flight serialization and consumption;
 final JSON encoding and validation follow timing. Scriptw uses Cranelift
 **Fast / OptLevel::None**; native compilation and module initialization precede timing.
 
-Cold Scriptw setup: **3.14 s JavaScript → Wasm**, **5.55 s native preparation**,
+Cold Scriptw setup: **3.15 s JavaScript → Wasm**, **5.62 s native preparation**,
 and **2.18 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
 code, 0.47 MiB data); shared runtime Wasm is **36.94 MiB**.
 [Recorded size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
@@ -99,12 +99,11 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-05**): 1,771 Engine integration cases
-pass. Engine unit coverage combines 1,092 preserved passes with one corrected
-expectation checked separately; the original failure remains in the receipts.
-Unchanged compiler scopes reuse original receipts: 67 emission, 637 structural,
-769 IR, and 653 AOT passes with four known bootstrap failures. All 380 source
-guards, 60,984 focused benchmark calls and 480 exact RSC Flight checks pass.
+Latest scoped verification (**2026-11-05**): 1,093 Engine unit and 1,776
+integration cases pass, alongside 69 emission, 637 structural and 380 source-guard
+checks. AOT units pass 661 cases; four known bootstrap assertions remain failures.
+The 769 unchanged IR cases reuse original source/binary receipts. All 60,984
+focused benchmark calls and 480 exact RSC Flight checks pass.
 These scopes do not replace the published full Test262 run. Full workspace CI
 was not rerun; eleven formatting failures and fourteen stale Intl recipes
 remain [owned](docs/rust-rewrite/current-inventory.md).

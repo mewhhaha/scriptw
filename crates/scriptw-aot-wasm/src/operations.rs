@@ -1732,33 +1732,15 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) {
-        let schema = self.runtime_schema();
-        let left_bits = schema.reserve_i64_local(function);
-        let right_bits = schema.reserve_i64_local(function);
-        self.emit_to_uint32_i64_from_number_payload(left, left_bits, function);
-        self.emit_to_uint32_i64_from_number_payload(right, right_bits, function);
-        left_bits.load(function);
-        function.instruction(&Instruction::I32WrapI64);
-        right_bits.load(function);
-        function.instruction(&Instruction::I32WrapI64);
-        match op {
-            BitwiseBinaryOp::And => function.instruction(&Instruction::I32And),
-            BitwiseBinaryOp::Or => function.instruction(&Instruction::I32Or),
-            BitwiseBinaryOp::Xor => function.instruction(&Instruction::I32Xor),
-            BitwiseBinaryOp::Shl => function.instruction(&Instruction::I32Shl),
-            BitwiseBinaryOp::Shr => function.instruction(&Instruction::I32ShrS),
-            BitwiseBinaryOp::UShr => function.instruction(&Instruction::I32ShrU),
-        };
-        function.instruction(&if matches!(op, BitwiseBinaryOp::UShr) {
-            Instruction::F64ConvertI32U
-        } else {
-            Instruction::F64ConvertI32S
-        });
-        function.instruction(&Instruction::I64ReinterpretF64);
-        output.scalar().store(function);
+        emit_number_bitwise_payload(
+            self.runtime_schema(),
+            op,
+            left,
+            right,
+            output.scalar(),
+            function,
+        );
         output.set_number(output.scalar(), function);
-        schema.release_i64_local(right_bits, function);
-        schema.release_i64_local(left_bits, function);
     }
 
     pub(crate) fn compile_expr_to_object_locals(
@@ -2142,24 +2124,7 @@ impl<'a> FunctionBuilder<'a> {
         out_local: crate::gc_types::I64Local,
         function: &mut Function,
     ) {
-        number_payload_local.load(function);
-        function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
-        function.instruction(&Instruction::I64ReinterpretF64);
-        out_local.store(function);
-
-        out_local.load(function);
-        function.instruction(&Instruction::F64ReinterpretI64);
-        out_local.load(function);
-        function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Const(Ieee64::from(4_294_967_296.0)));
-        function.instruction(&Instruction::F64Div);
-        function.instruction(&Instruction::F64Floor);
-        function.instruction(&Instruction::F64Const(Ieee64::from(4_294_967_296.0)));
-        function.instruction(&Instruction::F64Mul);
-        function.instruction(&Instruction::F64Sub);
-        function.instruction(&Instruction::I64TruncSatF64U);
-        out_local.store(function);
+        emit_number_to_uint32_payload(number_payload_local, out_local, function);
     }
 
     /// Emits ECMA-262 ToUint16 steps 2-5 for a Number payload.
@@ -6523,4 +6488,66 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(result, function);
         Ok(())
     }
+}
+
+/// The same exact binary64 ToUint32 kernel serves tagged operations and proved
+/// Number bodies; the latter do not need a temporary tagged Value.
+pub(crate) fn emit_number_to_uint32_payload(
+    number_payload_local: crate::gc_types::I64Local,
+    out_local: crate::gc_types::I64Local,
+    function: &mut Function,
+) {
+    number_payload_local.load(function);
+    function.instruction(&Instruction::F64ReinterpretI64);
+    function.instruction(&Instruction::F64Trunc);
+    function.instruction(&Instruction::I64ReinterpretF64);
+    out_local.store(function);
+
+    out_local.load(function);
+    function.instruction(&Instruction::F64ReinterpretI64);
+    out_local.load(function);
+    function.instruction(&Instruction::F64ReinterpretI64);
+    function.instruction(&Instruction::F64Const(Ieee64::from(4_294_967_296.0)));
+    function.instruction(&Instruction::F64Div);
+    function.instruction(&Instruction::F64Floor);
+    function.instruction(&Instruction::F64Const(Ieee64::from(4_294_967_296.0)));
+    function.instruction(&Instruction::F64Mul);
+    function.instruction(&Instruction::F64Sub);
+    function.instruction(&Instruction::I64TruncSatF64U);
+    out_local.store(function);
+}
+
+pub(crate) fn emit_number_bitwise_payload(
+    schema: &crate::gc_types::RuntimeSchema,
+    op: BitwiseBinaryOp,
+    left: I64Local,
+    right: I64Local,
+    output: I64Local,
+    function: &mut Function,
+) {
+    let left_bits = schema.reserve_i64_local(function);
+    let right_bits = schema.reserve_i64_local(function);
+    emit_number_to_uint32_payload(left, left_bits, function);
+    emit_number_to_uint32_payload(right, right_bits, function);
+    left_bits.load(function);
+    function.instruction(&Instruction::I32WrapI64);
+    right_bits.load(function);
+    function.instruction(&Instruction::I32WrapI64);
+    match op {
+        BitwiseBinaryOp::And => function.instruction(&Instruction::I32And),
+        BitwiseBinaryOp::Or => function.instruction(&Instruction::I32Or),
+        BitwiseBinaryOp::Xor => function.instruction(&Instruction::I32Xor),
+        BitwiseBinaryOp::Shl => function.instruction(&Instruction::I32Shl),
+        BitwiseBinaryOp::Shr => function.instruction(&Instruction::I32ShrS),
+        BitwiseBinaryOp::UShr => function.instruction(&Instruction::I32ShrU),
+    };
+    function.instruction(&if matches!(op, BitwiseBinaryOp::UShr) {
+        Instruction::F64ConvertI32U
+    } else {
+        Instruction::F64ConvertI32S
+    });
+    function.instruction(&Instruction::I64ReinterpretF64);
+    output.store(function);
+    schema.release_i64_local(right_bits, function);
+    schema.release_i64_local(left_bits, function);
 }

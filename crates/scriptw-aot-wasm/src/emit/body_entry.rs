@@ -5,6 +5,9 @@ mod literal_roots;
 
 impl<'a> FunctionBuilder<'a> {
     pub(super) fn clear_body_entry_roots(&mut self, function: &mut Function) {
+        if let Some(projected) = self.projected_arguments.take() {
+            projected.clear(self.schema, function);
+        }
         if let Some(activation) = self.source_activation.take() {
             activation.clear(function);
         }

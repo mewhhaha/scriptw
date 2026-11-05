@@ -91,3 +91,7 @@ mod aot_simple_parameters;
 mod aot_computed_key_projection;
 
 mod aot_typed_number_inputs;
+
+mod aot_strict_arguments_projection;
+
+mod aot_numeric_body;

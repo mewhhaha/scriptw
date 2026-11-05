@@ -10,6 +10,8 @@ use crate::gc_types::{
 };
 use scriptw_ir::{LexicalEnvironmentIr, NativeErrorKind, DIRECT_EVAL_EXECUTION_CONTEXT_NAME};
 
+mod arguments_projection;
+pub(crate) use arguments_projection::ProjectedArgumentsLocals;
 pub(crate) mod environment_reference;
 mod eval_declaration_instantiation;
 mod function_body_environment;
@@ -837,7 +839,16 @@ impl<'a> FunctionBuilder<'a> {
                 .last_mut()
                 .expect("binding scope stack must exist")
                 .insert(LEXICAL_ARGUMENTS_NAME.to_string(), arguments_storage);
-            self.initialize_arguments_binding(arguments_storage, arguments_protocol, function)?;
+            if let Some(proof) = self.strict_arguments_projection.take() {
+                self.initialize_projected_arguments_binding(
+                    proof,
+                    arguments_storage,
+                    arguments_protocol,
+                    function,
+                )?;
+            } else {
+                self.initialize_arguments_binding(arguments_storage, arguments_protocol, function)?;
+            }
         }
 
         for param in self.params {

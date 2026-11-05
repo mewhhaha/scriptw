@@ -10,7 +10,7 @@ const MAX_LEAF_NODES: usize = 16;
 const MAX_LEAF_ARGUMENTS: usize = 4;
 
 #[derive(Clone, Copy, Debug)]
-enum NumericLeafBinaryOp {
+pub(super) enum NumericLeafBinaryOp {
     Add,
     Sub,
     Mul,
@@ -18,11 +18,12 @@ enum NumericLeafBinaryOp {
 }
 
 #[derive(Clone, Debug)]
-enum NumericLeafExpression {
+pub(super) enum NumericLeafExpression {
     Parameter(usize),
     Constant(u64),
     Negate(Box<Self>),
     Binary(NumericLeafBinaryOp, Box<Self>, Box<Self>),
+    Bitwise(BitwiseBinaryOp, Box<Self>, Box<Self>),
 }
 
 /// Construction admits no calls, mutable binding reads, coercions on the
@@ -73,23 +74,39 @@ impl NumericLeafPlan {
         function: &FunctionIr,
         remaining: &mut usize,
     ) -> Option<NumericLeafExpression> {
+        NumericLeafExpression::parse(value, remaining, false, &mut |value| {
+            let ExprIr::Identifier(name) = &value.expr else {
+                return None;
+            };
+            function
+                .params
+                .iter()
+                .position(|parameter| parameter.name == *name)
+        })
+    }
+}
+
+impl NumericLeafExpression {
+    /// All inputs are independently proved Number payloads. The old pure-leaf
+    /// constructor keeps its arithmetic-only domain; body plans may also use
+    /// the existing exact Number bitwise kernel.
+    pub(super) fn parse(
+        value: &TypedExpr,
+        remaining: &mut usize,
+        bitwise: bool,
+        input: &mut impl FnMut(&TypedExpr) -> Option<usize>,
+    ) -> Option<Self> {
         *remaining = remaining.checked_sub(1)?;
         Some(match &value.expr {
-            ExprIr::Identifier(name) => NumericLeafExpression::Parameter(
-                function
-                    .params
-                    .iter()
-                    .position(|param| param.name == *name)?,
-            ),
-            ExprIr::Number(bits) => NumericLeafExpression::Constant(*bits),
-            ExprIr::UnaryPlus { expr } => return Self::expression(expr, function, remaining),
-            ExprIr::UnaryMinusNumeric { expr } => NumericLeafExpression::Negate(Box::new(
-                Self::expression(expr, function, remaining)?,
-            )),
-            ExprIr::CoerciveAdd { lhs, rhs } => NumericLeafExpression::Binary(
+            ExprIr::Number(bits) => Self::Constant(*bits),
+            ExprIr::UnaryPlus { expr } => return Self::parse(expr, remaining, bitwise, input),
+            ExprIr::UnaryMinusNumeric { expr } => {
+                Self::Negate(Box::new(Self::parse(expr, remaining, bitwise, input)?))
+            }
+            ExprIr::CoerciveAdd { lhs, rhs } => Self::Binary(
                 NumericLeafBinaryOp::Add,
-                Box::new(Self::expression(lhs, function, remaining)?),
-                Box::new(Self::expression(rhs, function, remaining)?),
+                Box::new(Self::parse(lhs, remaining, bitwise, input)?),
+                Box::new(Self::parse(rhs, remaining, bitwise, input)?),
             ),
             ExprIr::BinaryNumber { op, lhs, rhs }
             | ExprIr::CoerciveBinaryNumber { op, lhs, rhs } => {
@@ -100,22 +117,31 @@ impl NumericLeafPlan {
                     ArithmeticBinaryOp::Div => NumericLeafBinaryOp::Div,
                     ArithmeticBinaryOp::Mod | ArithmeticBinaryOp::Exp => return None,
                 };
-                NumericLeafExpression::Binary(
+                Self::Binary(
                     op,
-                    Box::new(Self::expression(lhs, function, remaining)?),
-                    Box::new(Self::expression(rhs, function, remaining)?),
+                    Box::new(Self::parse(lhs, remaining, bitwise, input)?),
+                    Box::new(Self::parse(rhs, remaining, bitwise, input)?),
                 )
             }
-            _ => return None,
+            ExprIr::BitwiseNumeric { op, lhs, rhs } if bitwise => Self::Bitwise(
+                *op,
+                Box::new(Self::parse(lhs, remaining, bitwise, input)?),
+                Box::new(Self::parse(rhs, remaining, bitwise, input)?),
+            ),
+            _ => Self::Parameter(input(value)?),
         })
     }
-}
 
-impl NumericLeafExpression {
     /// The whole expression is allocation-free and cannot throw. Its bounded
     /// tree may keep primitive payloads on the Wasm operand stack unchanged.
-    fn emit(&self, arguments: &[ValueLocals], function: &mut Function) {
+    fn emit(
+        &self,
+        schema: &crate::gc_types::RuntimeSchema,
+        arguments: &[ValueLocals],
+        function: &mut Function,
+    ) {
         self.emit_parameters(
+            schema,
             &|index, function| {
                 arguments[index].scalar().load(function);
                 function.instruction(&Instruction::F64ReinterpretI64);
@@ -124,7 +150,12 @@ impl NumericLeafExpression {
         );
     }
 
-    fn emit_parameters(&self, parameter: &impl Fn(usize, &mut Function), function: &mut Function) {
+    pub(super) fn emit_parameters(
+        &self,
+        schema: &crate::gc_types::RuntimeSchema,
+        parameter: &impl Fn(usize, &mut Function),
+        function: &mut Function,
+    ) {
         match self {
             Self::Parameter(index) => parameter(*index, function),
             Self::Constant(bits) => {
@@ -132,12 +163,29 @@ impl NumericLeafExpression {
                 function.instruction(&Instruction::F64ReinterpretI64);
             }
             Self::Negate(value) => {
-                value.emit_parameters(parameter, function);
+                value.emit_parameters(schema, parameter, function);
                 function.instruction(&Instruction::F64Neg);
             }
+            Self::Bitwise(op, lhs, rhs) => {
+                let left = schema.reserve_i64_local(function);
+                let right = schema.reserve_i64_local(function);
+                lhs.emit_parameters(schema, parameter, function);
+                function.instruction(&Instruction::I64ReinterpretF64);
+                left.store(function);
+                rhs.emit_parameters(schema, parameter, function);
+                function.instruction(&Instruction::I64ReinterpretF64);
+                right.store(function);
+                crate::operations::emit_number_bitwise_payload(
+                    schema, *op, left, right, left, function,
+                );
+                left.load(function);
+                function.instruction(&Instruction::F64ReinterpretI64);
+                schema.release_i64_local(right, function);
+                schema.release_i64_local(left, function);
+            }
             Self::Binary(op, lhs, rhs) => {
-                lhs.emit_parameters(parameter, function);
-                rhs.emit_parameters(parameter, function);
+                lhs.emit_parameters(schema, parameter, function);
+                rhs.emit_parameters(schema, parameter, function);
                 function.instruction(&match op {
                     NumericLeafBinaryOp::Add => Instruction::F64Add,
                     NumericLeafBinaryOp::Sub => Instruction::F64Sub,
@@ -174,6 +222,7 @@ impl BinaryNumericLeafPlan {
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::I32Const(1));
         self.0.expression.emit_parameters(
+            schema,
             &|index, function| {
                 schema.parameter_f64(index as u32, function).load(function);
             },
@@ -295,7 +344,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
-        plan.expression.emit(&values, function);
+        plan.expression.emit(schema, &values, function);
         function.instruction(&Instruction::I64ReinterpretF64);
         output.scalar().store(function);
         output.set_number(output.scalar(), function);

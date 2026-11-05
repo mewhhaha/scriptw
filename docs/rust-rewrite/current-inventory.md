@@ -32,11 +32,15 @@ accepts `--case <file.js>`.
   Establish a passing current SSR baseline before changing recovery. Preserve
   global records, eval/prelude modes, captures and arguments; Module-only lookup
   and cell authorities must remain scoped to Modules. Owner: IR storage planning.
-- Measure scalar replacement of strict arguments index/length reads. A missing
-  own index can expose the object through a prototype getter; short argument
-  lists must retain real object semantics. Preserve original actual count and
-  rooted snapshots across reentry before changing local-entry admission.
+- Expand strict read-only arguments snapshots only with complete observer proofs
+  and measured gains. Missing own indices can expose the real object through a
+  prototype getter; preserve actual count, rooted snapshots and complete fallback.
   Owner: arguments binding and source-call planning.
+- Separate captured-binding boxing from call/activation costs with matched
+  admitted callbacks and fixed write slopes. A direct Value3 cell payload needs
+  complete snapshots, target-local metadata, mapped-argument detachment and native
+  host-schema migration; physical type totals do not establish allocation origins.
+  Owner: AOT environment storage and embedding schema.
 - Measure remaining RSC property, descriptor and allocation work after typed
   internal OwnKeys and canonical Module direct-cell capture admission. Keep
   [instruction counts and sampled callers](react-attribution-current.json)

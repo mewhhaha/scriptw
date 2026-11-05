@@ -122,6 +122,9 @@ impl<'a> FunctionBuilder<'a> {
         }
         self.emit_enter_source_activation(&mut function)?;
         let source_activation_epilogue = self.open_source_activation_epilogue(&mut function);
+        if let Some(plan) = self.numeric_body.take() {
+            self.emit_numeric_body_prefix(plan, &mut function)?;
+        }
         let schema = self.runtime_schema();
         let frame = self
             .body_entry_locals()

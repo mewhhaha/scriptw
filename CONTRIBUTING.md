@@ -27,6 +27,9 @@ activates dev-dependency features in the CLI. Retain Cargo JSON and compare its
 target dependency features with the baseline; runtime-image host features are a
 separate graph.
 
+Situation campaigns hash host/Node/time at admission and termination, including
+failed runs, and check file metadata before each use.
+
 Run native builds and tests through the resource wrapper:
 
 ```sh

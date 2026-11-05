@@ -361,6 +361,10 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) function_id: Option<FunctionId>,
     pub(crate) function_flavor: FunctionFlavor,
     pub(crate) function_arguments_protocol: FunctionArgumentsProtocol,
+    pub(crate) numeric_body: Option<crate::functions::NumericBodyPlan>,
+    pub(crate) strict_arguments_projection:
+        Option<crate::arguments_protocol::StrictArgumentsProjection>,
+    pub(crate) projected_arguments: Option<crate::environments::ProjectedArgumentsLocals>,
     pub(crate) lexical_derived_activation: Option<&'a DerivedConstructorActivationIr>,
     pub(crate) is_derived_constructor: bool,
     pub(crate) strict: bool,
@@ -1705,7 +1709,7 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<Self, EmitError> {
         let (function, arguments_protocol, owned_env_bindings) =
             UserFunctionActivationPlan::for_function(function)?.into_parts();
-        Ok(Self::new(
+        let mut builder = Self::new(
             schema,
             &function.body,
             function.template_source,
@@ -1732,7 +1736,11 @@ impl<'a> FunctionBuilder<'a> {
             function.is_derived_constructor,
             runtime_bootstrap_plan,
             runtime_helper_base,
-        ))
+        );
+        builder.numeric_body = crate::functions::NumericBodyPlan::admit(function);
+        builder.strict_arguments_projection =
+            crate::arguments_protocol::StrictArgumentsProjection::admit(function);
+        Ok(builder)
     }
 
     fn new_host_builtin(
@@ -2021,6 +2029,9 @@ impl<'a> FunctionBuilder<'a> {
             function_id,
             function_flavor,
             function_arguments_protocol,
+            numeric_body: None,
+            strict_arguments_projection: None,
+            projected_arguments: None,
             lexical_derived_activation,
             is_derived_constructor,
             strict,

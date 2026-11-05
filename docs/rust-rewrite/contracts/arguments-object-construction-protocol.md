@@ -128,6 +128,41 @@ environment chains and capture hops are finalized. Sloppy simple parameters
 keep their original mapped-slot validation; only the consumed leaf proof can
 elide their mapping-only storage later.
 
+## Strict index-zero and length snapshots
+
+A separate source-bound proof admits only a simple, synchronous strict ordinary
+function whose complete inspected body observes its own arguments binding through
+literal `arguments[0]` and `arguments.length` value reads. It authenticates named
+activation storage against the source-name/owned-slot pair. Capturing the binding,
+escaping or writing it, invoking an indexed value as a Reference, direct eval,
+non-simple parameters, suspension and uninspected plans decline the entire proof.
+The initial statement domain is closed to ordinary expressions, var declarations,
+return/throw, If and blocks without lexical environment plans.
+
+The vector entry, full activation storage and mapped/unmapped protocol remain
+unchanged. Before any formal initialization or body effect, the invocation copies
+index zero into a rooted Value3 and retains the actual vector length. When that
+length is positive, own index zero and length are unobservable data properties:
+reads use the immutable snapshot/count, while the original binding is initialized
+to an inaccessible Undefined placeholder. Formal writes cannot change the snapshot.
+Strict legacy reflection cannot expose this invocation's implicit object.
+
+A zero count eagerly constructs the canonical unmapped object. Every subsequent
+arguments read, including length, then executes its original generic operation.
+An inherited index getter may expose that object, alter its index/length, reenter
+JavaScript or throw; later reads see those effects. This is not a missing-index
+Undefined shortcut. Invocation roots survive callbacks and normal/Throw exits;
+proper tail calls retire the original source activation and discard the frame.
+No local-argument entry, argument count limit or runtime ABI is added.
+
+Encoded controls use actual R type witnesses authenticated against P's complete
+shared recursive prefix. They require conditional object allocation, pure snapshot
+reads, original zero-count read paths, and unchanged 11-input/5-result vector
+entries for both the unchanged scored source and a five-formal control. Engine
+controls cover all value kinds, reassigned formals, extra/absent arguments,
+prototype getter mutation/reentry/GC/Throws, construction, captured writes and
+Reference/closure/mapped refusals. Native results remain a separate qualification.
+
 ## Consumption
 
 Parameter binding, local-count planning and root-var reuse consume `Absent`
@@ -212,5 +247,10 @@ that the new batch has already passed or that a benchmark speedup was measured.
 
 This protocol does not add lazy arguments, specialize unknown parameters with
 numeric guards, replace the arguments representation, change descriptor layout,
-or broaden the supported language surface. Bodies requiring reentry keep their
+or broaden the supported language surface. Sloppy bodies requiring reentry keep their
 ordinary construction path. T09 remains in progress.
+
+
+A bounded straight-line Number body may preflight inside its canonical local-argument entry, after the actual callable/Realm/environment and source activation are established and before FDI. The same `LocalArgumentsPlan` and argument-observer proof apply; the vector adapter still tail-enters that body. No new callable ABI or source target inference is introduced. This body proof additionally requires private simple formals/vars, finalized captured declarative cells, static own-data reads, ordered Number expressions/assignments and a final Return. It refuses calls, control-flow branches, eval, lexical environments, named self bindings, captured locals, arguments observers and resumable/class protocols.
+
+Only concrete ordinary own-data Number fields, Number captured reads, and initialized mutable direct cells pass. Preflight invokes no source code; any absence/accessor/Proxy/coercion/TDZ/const/indirect-cell mismatch reaches unchanged FDI/body once. Successful source assignments publish each captured value immediately through the canonical immutable StoredValue/cell writer. They are never deferred to a loop or call exit. The exact existing Number bitwise kernel and ordered f64 operations are shared with the pure numeric-leaf owner. All speculative roots are retired before generic continuation or the shared source activation epilogue. Source call-depth admission, epoch checks, proper retirement and constructor return handling stay owned by the original entry.

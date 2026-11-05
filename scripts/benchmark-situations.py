@@ -14,6 +14,7 @@ import platform
 import re
 import shutil
 import statistics
+import stat
 import sys
 
 from benchmark_metrics import digest, measure_process
@@ -41,6 +42,64 @@ def integer(value, *, positive=False):
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+class FrozenTool:
+    """Digest at admission/closure; metadata witnesses between those boundaries.
+
+    This detects ordinary mutation, not OS-enforced cryptographic immutability.
+    Paths have already been resolved by the caller.
+    """
+
+    def __init__(self, path, expected_sha256, receipt):
+        self.path = path
+        self.expected_sha256 = expected_sha256
+        self.receipt = receipt
+        initial = self.full_receipt()
+        receipt['initial'] = initial
+        require(initial['valid'], 'tool admission failed: ' + str(path))
+        self.witness = initial['after']
+
+    def metadata(self):
+        current = self.path.stat()
+        require(stat.S_ISREG(current.st_mode), 'tool is not a regular file: ' + str(self.path))
+        return dict(dev=current.st_dev, ino=current.st_ino, size=current.st_size,
+                    mtime_ns=current.st_mtime_ns, ctime_ns=current.st_ctime_ns,
+                    mode=current.st_mode)
+
+    def full_receipt(self):
+        receipt = dict(expected_sha256=self.expected_sha256, actual_sha256=None,
+                       before=None, after=None, metadata_stable=False, valid=False, errors=[])
+        try:
+            receipt['before'] = self.metadata()
+        except (ValueError, OSError) as error:
+            receipt['errors'].append(str(error))
+        # A changed witness must not bypass the terminal digest of a readable file.
+        if receipt['before'] is not None:
+            try:
+                receipt['actual_sha256'] = digest(self.path)
+            except OSError as error:
+                receipt['errors'].append(str(error))
+        try:
+            receipt['after'] = self.metadata()
+        except (ValueError, OSError) as error:
+            receipt['errors'].append(str(error))
+        receipt['metadata_stable'] = (receipt['before'] is not None
+                                      and receipt['before'] == receipt['after'])
+        receipt['valid'] = (not receipt['errors'] and receipt['metadata_stable']
+                            and receipt['actual_sha256'] == self.expected_sha256)
+        return receipt
+
+    def check(self):
+        require(self.metadata() == self.witness, 'tool metadata changed: ' + str(self.path))
+
+    def finish(self):
+        terminal = self.full_receipt()
+        terminal['matches_initial_metadata'] = (terminal['before'] == self.witness
+                                                and terminal['after'] == self.witness)
+        terminal['valid'] = terminal['valid'] and terminal['matches_initial_metadata']
+        self.receipt['terminal'] = terminal
+        return terminal['valid']
 
 
 def stamp():
@@ -357,6 +416,12 @@ def run(args):
             original=str(args.producer_receipt), path='build/host-producer-receipt.json',
             sha256=digest(receipt_path))
     prepared = {}
+    frozen_tools = {}
+    report['policy']['tool_integrity'] = (
+        'host/Node/time: full SHA256 and stable regular-file stat at admission and in terminal finally; '
+        'per-use dev/ino/size/mtime_ns/ctime_ns/mode witnesses; '
+        'metadata witnesses are not OS-enforced cryptographic immutability; '
+        'fixture/tooling/prepared-image digest checks unchanged')
 
     def checkpoint():
         report['cases'] = []
@@ -378,8 +443,8 @@ def run(args):
         for item in inputs:
             require(digest(item['original']) == item['sha256'] and digest(output / item['path']) == item['sha256'],
                     'original or retained fixture changed: ' + item['path'])
-        for name, path in (('host', host), ('node', node), ('time', time_binary)):
-            require(digest(path) == report['tools'][name]['sha256'], 'tool changed: ' + name)
+        for tool in frozen_tools.values():
+            tool.check()
         for item in report['tooling']:
             require(digest(item['original']) == item['sha256']
                     and digest(output / item['path']) == item['sha256'], 'original or retained tooling changed')
@@ -445,6 +510,10 @@ def run(args):
 
     checkpoint()
     try:
+        for name, path in (('host', host), ('node', node), ('time', time_binary)):
+            receipt = {}
+            report['tools'][name]['integrity'] = receipt
+            frozen_tools[name] = FrozenTool(path, report['tools'][name]['sha256'], receipt)
         event = invoke('host-identity', 'host', 'identity', [host, 'identity'], 60)
         identity = value(event)
         validate_identity(identity, digest(host))
@@ -508,6 +577,12 @@ def run(args):
     except (ValueError, KeyError, TypeError, OSError) as error:
         report.update(status='failed', failure=str(error))
     finally:
+        terminal_failures = []
+        for name, tool in frozen_tools.items():
+            if not tool.finish():
+                terminal_failures.append(name)
+        if terminal_failures:
+            report.update(complete=False, status='failed', terminal_tool_failures=terminal_failures)
         report['finished_at'] = stamp()
         report['retained_files'] = [dict(path=str(path.relative_to(output)), bytes=path.stat().st_size, sha256=digest(path))
             for directory in ('sources', 'tooling', 'build', 'logs', 'images', 'manifests')

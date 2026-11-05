@@ -55,3 +55,7 @@ mod retained_operands;
 mod computed_key_projection;
 
 mod typed_number_inputs;
+
+mod strict_arguments_projection;
+
+mod numeric_body;

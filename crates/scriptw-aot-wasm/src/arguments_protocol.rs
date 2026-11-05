@@ -4,6 +4,9 @@ use scriptw_ir::{
 
 use crate::EmitError;
 
+mod strict_projection;
+pub(crate) use strict_projection::{ArgumentsProjectionRead, StrictArgumentsProjection};
+
 mod unobservable_leaf;
 mod unobserved_strict;
 pub(crate) use unobservable_leaf::UserFunctionActivationPlan;

@@ -714,6 +714,9 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.compile_projected_arguments_read(expr, output, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         match &expr.expr {
             ExprIr::ForeignCall(call) => self.emit_foreign_call(call, output, function)?,
