@@ -12,6 +12,11 @@ The helper reuses the non-Proxy storage dispatcher for ordinary objects, Arrays,
 Arguments, String boxes, TypedArrays, functions and module namespaces. Mutable
 storage descriptors are copied before publication. Mapped argument values and
 namespace TDZ are observed at acquisition; no descriptor cache is introduced.
+Concrete packed Array reads synthesize the requested descriptor without
+materializing the whole backing. Values-mode snapshots retain the existing
+immutable value edge; Number mode boxes only that element. Actual descriptor
+writes continue to require storage-owned records. Runtime layout remains 51;
+changed R source identity invalidates old compiled images normally.
 
 The private `own_property/proxy.rs` child retains the Proxy algorithm. GetMethod
 and the trap call precede recursive target acquisition, IsExtensible and

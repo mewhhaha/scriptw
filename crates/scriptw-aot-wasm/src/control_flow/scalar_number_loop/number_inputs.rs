@@ -276,26 +276,35 @@ impl StrictPairInputs {
             .expect("complete proof seals one pair")
             .each_ref()
             .map(|array| ArrayReadBorrow::new(array, builder, accepted, function));
-        let projection = schema
-            .reserve_gc_local::<NumberBitsI64Array, Nullable>(function)
-            .initialize_null(schema, function);
+        let projection = if self.mask < 64 {
+            let word = schema.reserve_i64_local(function);
+            word.set_constant(0, function);
+            PredicateStorage::Bits(word)
+        } else {
+            PredicateStorage::Numbers(
+                schema
+                    .reserve_gc_local::<NumberBitsI64Array, Nullable>(function)
+                    .initialize_null(schema, function),
+            )
+        };
         accepted.load(function);
         builder.open_frame(ControlFrameKind::If, function);
         let cursor = schema.reserve_i32_local(function);
-        cursor.set_constant((self.mask + 1) as i32, function);
-        projection.replace(
-            schema
-                .array_type::<NumberBitsI64Array>()
-                .filled(GcOperand::i64(0), cursor, function)
-                .nullable(),
-            function,
-        );
+        if let PredicateStorage::Numbers(array) = &projection {
+            cursor.set_constant((self.mask + 1) as i32, function);
+            array.replace(
+                schema
+                    .array_type::<NumberBitsI64Array>()
+                    .filled(GcOperand::i64(0), cursor, function)
+                    .nullable(),
+                function,
+            );
+        }
         cursor.set_constant(0, function);
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
         left.set_undefined(function);
         right.set_undefined(function);
-        let bits = schema.reserve_i64_local(function);
         let done = builder.open_frame(ControlFrameKind::Block, function);
         let repeat = builder.open_frame(ControlFrameKind::Loop, function);
         cursor.load(function);
@@ -307,16 +316,33 @@ impl StrictPairInputs {
         arrays[0].emit_value_at(cursor, &left, builder, function);
         arrays[1].emit_value_at(cursor, &right, builder, function);
         builder.emit_tagged_payload_equality_i32(&left, &right, function)?;
-        function.instruction(&Instruction::F64ConvertI32U);
-        function.instruction(&Instruction::I64ReinterpretF64);
-        bits.store(function);
-        schema.array_type::<NumberBitsI64Array>().write(
-            &projection,
-            cursor,
-            GcOperand::i64_local(bits),
-            schema,
-            function,
-        );
+        match &projection {
+            PredicateStorage::Bits(word) => {
+                // The exact equality kernel leaves canonical i32 0/1. The
+                // sealed cursor is < period <= 64; bit 63 is data, not a sign.
+                function.instruction(&Instruction::I64ExtendI32U);
+                cursor.load(function);
+                function.instruction(&Instruction::I64ExtendI32U);
+                function.instruction(&Instruction::I64Shl);
+                word.load(function);
+                function.instruction(&Instruction::I64Or);
+                word.store(function);
+            }
+            PredicateStorage::Numbers(array) => {
+                let bits = schema.reserve_i64_local(function);
+                function.instruction(&Instruction::F64ConvertI32U);
+                function.instruction(&Instruction::I64ReinterpretF64);
+                bits.store(function);
+                schema.array_type::<NumberBitsI64Array>().write(
+                    array,
+                    cursor,
+                    GcOperand::i64_local(bits),
+                    schema,
+                    function,
+                );
+                schema.release_i64_local(bits, function);
+            }
+        }
         cursor.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
@@ -326,14 +352,13 @@ impl StrictPairInputs {
         function.instruction(&Instruction::End);
         builder.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        schema.release_i64_local(bits, function);
         right.clear(function);
         left.clear(function);
         schema.release_i32_local(cursor, function);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         // No input roots survive into the source loop or its original fallback.
-        // Only the private Number projection and primitive induction are needed.
+        // Only the private predicate carrier and primitive induction are needed.
         for array in arrays {
             array.release(builder, function);
         }
@@ -348,8 +373,15 @@ impl StrictPairInputs {
     }
 }
 
+/// The same exact preflight chooses a private carrier from the sealed period.
+/// Small periods have no projection allocation or GC reference in the loop.
+enum PredicateStorage {
+    Bits(I64Local),
+    Numbers(GcLocal<NumberBitsI64Array, Nullable>),
+}
+
 pub(super) struct StrictPairProjection {
-    projection: GcLocal<NumberBitsI64Array, Nullable>,
+    projection: PredicateStorage,
     phase: I32Local,
     counter: LocalBindingId,
     limit: u32,
@@ -400,12 +432,25 @@ impl StrictPairProjection {
         let LoopLocal::Signed32(index) = locals.values[index] else {
             unreachable!("masked index is nonnegative signed32")
         };
-        let s = builder.runtime_schema();
-        s.array_type::<NumberBitsI64Array>()
-            .read(&self.projection, index, s, function);
-        // The sealed projection stores exactly the canonical f64 bits of 0/1.
-        function.instruction(&Instruction::I64Eqz);
-        function.instruction(&Instruction::I32Eqz);
+        match &self.projection {
+            PredicateStorage::Bits(word) => {
+                word.load(function);
+                index.load(function);
+                function.instruction(&Instruction::I64ExtendI32U);
+                function.instruction(&Instruction::I64ShrU);
+                function.instruction(&Instruction::I32WrapI64);
+                function.instruction(&Instruction::I32Const(1));
+                function.instruction(&Instruction::I32And);
+            }
+            PredicateStorage::Numbers(array) => {
+                let s = builder.runtime_schema();
+                s.array_type::<NumberBitsI64Array>()
+                    .read(array, index, s, function);
+                // Large periods retain the canonical f64 bits of zero/one.
+                function.instruction(&Instruction::I64Eqz);
+                function.instruction(&Instruction::I32Eqz);
+            }
+        }
     }
 
     pub(super) fn advance(&self, locals: &LoopLocals<'_>, function: &mut Function) {
@@ -416,7 +461,12 @@ impl StrictPairProjection {
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
-        self.projection.clear(function);
+        match self.projection {
+            PredicateStorage::Bits(word) => {
+                builder.runtime_schema().release_i64_local(word, function);
+            }
+            PredicateStorage::Numbers(array) => array.clear(function),
+        }
         builder
             .runtime_schema()
             .release_i32_local(self.phase, function);

@@ -167,4 +167,56 @@ function arrayTdz(right) {
 }
 log='';rhs=[1,2,3,4];Object.defineProperty(rhs,'0',{get:function(){log+='R';return 1;}});
 sameList(arrayTdz(rhs),[5,0,0,true]);same(log,'');
+// Both private carriers retain the same source iterations and final index.
+// The dynamic mask/limit control cannot enter complete-period projection.
+function carrierOriginal(left,right,phase,start,mask,limit) {
+  var sum=start,slot='before';
+  for(var i=0;i<limit;i++){var slot=(i+phase)&mask;
+    if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}
+  return [sum,i,slot];
+}
+function carrier64(left,right,phase,start) {
+  var sum=start,slot='before';
+  try {for(var i=0;i<131;i++){var slot=(i+phase)&63;
+    if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}}
+  catch(error){return [sum,i,slot,error];}
+  return [sum,i,slot];
+}
+function carrier128(left,right,phase,start) {
+  var sum=start,slot='before';
+  for(var i=0;i<259;i++){var slot=(i+phase)&127;
+    if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}
+  return [sum,i,slot];
+}
+function carrierOne(left,right,phase,start) {
+  var sum=start;
+  for(var i=0;i<8;i++){var slot=(i+phase)&0;
+    if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}
+  return [sum,i,slot];
+}
+var wideLeft=[],wideRight=[];
+for(var k=0;k<128;k++){wideLeft.push(0);wideRight.push(1);}
+wideRight[63]=0;sameList(carrier64(wideLeft,wideRight,0,0),[-184,131,2]);
+wideRight[63]=1;sameList(carrier64(wideLeft,wideRight,0,0),[-196,131,2]);
+wideRight[0]=0;sameList(carrier64(wideLeft,wideRight,0,0),[-190,131,2]);
+sameList(carrier64(wideLeft,wideLeft,0,0),[326,131,2]);
+// A new invocation must not retain prior one bits. This also crosses bit63/64
+// in the larger carrier and exercises all-kind equality with uninterned values.
+for(var k=0;k<128;k++) {
+  wideLeft[k]=groups[(k>>2)%groups.length][0][k&3];
+  wideRight[k]=groups[(k>>2)%groups.length][1][k&3];
+}
+for(var offset of [0,1,63,64,-1,-64,2147483647,-2147483648]) {
+  for(var start of [0,-0,9007199254740992,Infinity,-Infinity,NaN]) {
+    sameList(carrier64(wideLeft,wideRight,offset,start),carrierOriginal(wideLeft,wideRight,offset,start,63,131));
+    sameList(carrier128(wideLeft,wideRight,offset,start),carrierOriginal(wideLeft,wideRight,offset,start,127,259));
+    sameList(carrierOne(wideLeft,wideRight,offset,start),carrierOriginal(wideLeft,wideRight,offset,start,0,8));
+  }
+}
+same(coercions,0);gc();
+wideLeft=[];wideRight=[];
+for(var k=0;k<64;k++){wideLeft.push(0);wideRight.push(1);}
+calls=0;
+Object.defineProperty(wideRight,'63',{get:function(){calls++;gc();throw marker;},configurable:true});
+sameList(carrier64(wideLeft,wideRight,0,7),[-87,63,63,marker]);same(calls,1);
 print('typed-number-inputs:ok');

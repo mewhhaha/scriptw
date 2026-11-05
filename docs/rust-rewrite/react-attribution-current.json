@@ -4,13 +4,13 @@
   "status": "captured",
   "timing_report_in_evidence": {
     "path": "reports/rsc-current.json",
-    "sha256": "bb56cfb3c374cb253bdd894d0916ce417b1e005f9b1e0caa152854419ea37836"
+    "sha256": "7fe18dd7b2566966266f27dde33c512760f37afcc1b4c417209743e33ade6fa9"
   },
   "excluded_from_scored_cohorts": true,
   "candidate_identity": {
-    "source_fingerprint": "971be2adbe2f77bad2359f60e23f6face41cfb660ec6a61338e69b8864df71c9",
-    "source_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
-    "executable_sha256": "1f29203f93acdfc2e816edbf65b70b951cc0322707a57e71bf6fe6141052f474",
+    "source_fingerprint": "92d17baf84cb9cee8fea4187ac01e810a0b8af06411dd3df59a1e7f0069b66df",
+    "source_commit": "f267e94cf25b6de0dcf5a4d14e1b2d7d09616664",
+    "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -40,9 +40,9 @@
     },
     "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
     "runtime": {
-      "key": "47deb80b886ecec31cdacf87b9d73fe38e1b6799ab22100639553544eda54416",
-      "wasm_bytes": 38816202,
-      "wasm_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53"
+      "key": "74873715a107ceff7548fff07489b947cb0213ec75dd0d75394a813cf41d794b",
+      "wasm_bytes": 38731099,
+      "wasm_sha256": "2a60a584a47f10a0679b4772a1cf4bd9545baf69ad6ba19d566cfbcfca95e66b"
     },
     "inputs": {
       "adapted_source_bytes": 64946,
@@ -63,9 +63,9 @@
     }
   },
   "baseline_identity": {
-    "source_fingerprint": "21ad728e4380ca45e70dc0896fd0f79b001ec107867979a1a109de5c7ebdeb0c",
-    "source_commit": "cff1193296b63317839e1a689583a0600953035a",
-    "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
+    "source_fingerprint": "971be2adbe2f77bad2359f60e23f6face41cfb660ec6a61338e69b8864df71c9",
+    "source_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
+    "executable_sha256": "1f29203f93acdfc2e816edbf65b70b951cc0322707a57e71bf6fe6141052f474",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -126,530 +126,6 @@
     "minimum_running_fraction": 1,
     "cohorts": {
       "baseline-node-sync": {
-        "processes": [
-          {
-            "name": "candidate-node-sync-0",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-0/receipt.json",
-              "sha256": "79c0be5b0dcee7daa91633418bff74bbb17ff8619982f77e6c5eebd7d3b6cf33",
-              "bytes": 121887
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-0/observations.json",
-              "sha256": "813cf5d12e35a257d9228d39afe050585b8c490b70ea496cc1537ad92e6603ad",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 152682704,
-              "instructions:u": 274096278,
-              "branches:u": 54585388,
-              "branch-misses:u": 648083
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1350205.5,
-              "instructions:u": 2513769.0,
-              "branches:u": 496443.5,
-              "branch-misses:u": 5057.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1526827.04,
-              "instructions:u": 2740962.78,
-              "branches:u": 545853.88,
-              "branch-misses:u": 6480.83
-            },
-            "ipc": 1.7952018848185973,
-            "branch_miss_fraction": 0.01187282940995125
-          },
-          {
-            "name": "candidate-node-sync-1",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-1/receipt.json",
-              "sha256": "7d572eb93b1469a06efe168683d374054151bf2ea238b855739f598cfb045ce5",
-              "bytes": 121882
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-1/observations.json",
-              "sha256": "3490bf6500630d55d2e90f8f9c663e565ececc7030a4f38f7d61e12211d5c3fe",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 149069399,
-              "instructions:u": 269043360,
-              "branches:u": 53659346,
-              "branch-misses:u": 623060
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1339600.0,
-              "instructions:u": 2496534.5,
-              "branches:u": 494271.0,
-              "branch-misses:u": 4904.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1490693.99,
-              "instructions:u": 2690433.6,
-              "branches:u": 536593.46,
-              "branch-misses:u": 6230.6
-            },
-            "ipc": 1.8048195122863546,
-            "branch_miss_fraction": 0.011611397574618222
-          },
-          {
-            "name": "candidate-node-sync-2",
-            "engine": "node",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-2/receipt.json",
-              "sha256": "aefa635a6fe8b35ffae397502a3555d26d0f82d79ef770d3b66abf4ce28f38fb",
-              "bytes": 121912
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-sync-2/observations.json",
-              "sha256": "9adde2a84d66a51be25feff6f0f34d8b85036c50adddde129f0aa17137428b12",
-              "bytes": 29832
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 163424436,
-              "instructions:u": 290015066,
-              "branches:u": 56883317,
-              "branch-misses:u": 676684
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1406864.0,
-              "instructions:u": 2647897.5,
-              "branches:u": 513783.5,
-              "branch-misses:u": 5171.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1634244.36,
-              "instructions:u": 2900150.66,
-              "branches:u": 568833.17,
-              "branch-misses:u": 6766.84
-            },
-            "ipc": 1.7746126166835907,
-            "branch_miss_fraction": 0.011896001071808101
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1350205.5,
-          "instructions:u": 2513769.0,
-          "branches:u": 496443.5,
-          "branch-misses:u": 5057.0
-        },
-        "process_instruction_medians": [
-          2513769.0,
-          2496534.5,
-          2647897.5
-        ],
-        "median_process_ipc": 1.7952018848185973,
-        "median_process_branch_miss_fraction": 0.01187282940995125
-      },
-      "baseline-node-async": {
-        "processes": [
-          {
-            "name": "candidate-node-async-0",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-0/receipt.json",
-              "sha256": "d60ad71749f15df3b9ec7254247248024e123854e25d0b5e2c28b70779bb9cdd",
-              "bytes": 121905
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-0/observations.json",
-              "sha256": "e46336285ee4e1caeee47c4e56f0a7fd56a5c6ca20031488956b1bfcbd38685a",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 160568885,
-              "instructions:u": 288400641,
-              "branches:u": 57547109,
-              "branch-misses:u": 690382
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1438940.0,
-              "instructions:u": 2657692.0,
-              "branches:u": 526250.5,
-              "branch-misses:u": 5385.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1605688.85,
-              "instructions:u": 2884006.41,
-              "branches:u": 575471.09,
-              "branch-misses:u": 6903.82
-            },
-            "ipc": 1.7961178530946391,
-            "branch_miss_fraction": 0.011996814644502819
-          },
-          {
-            "name": "candidate-node-async-1",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-1/receipt.json",
-              "sha256": "f6f84f18dbcf30fb41efd72ccc6fbe1607682f0895875c2867519fb57e5ab1a7",
-              "bytes": 121899
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-1/observations.json",
-              "sha256": "9bb366c1e73b802b63b2098af1d780d8b3c3f3356e55974a6e47f8ea19656c0b",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 164166293,
-              "instructions:u": 286578802,
-              "branches:u": 56925559,
-              "branch-misses:u": 679568
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1464091.5,
-              "instructions:u": 2696918.0,
-              "branches:u": 532937.5,
-              "branch-misses:u": 5590.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1641662.93,
-              "instructions:u": 2865788.02,
-              "branches:u": 569255.59,
-              "branch-misses:u": 6795.68
-            },
-            "ipc": 1.7456616505313913,
-            "branch_miss_fraction": 0.011937836218700988
-          },
-          {
-            "name": "candidate-node-async-2",
-            "engine": "node",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-2/receipt.json",
-              "sha256": "397dc454dfdc0752ff5934dbae1e9fbceec8606cae513c31cb113f4c99102717",
-              "bytes": 121908
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-node-async-2/observations.json",
-              "sha256": "566c49e490f37533cca4ee3b14f87c04dede57740e1033407ffcae9dd4dee675",
-              "bytes": 29833
-            },
-            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 170613387,
-              "instructions:u": 298704742,
-              "branches:u": 58353089,
-              "branch-misses:u": 669268
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 1519280.0,
-              "instructions:u": 2814515.5,
-              "branches:u": 546637.5,
-              "branch-misses:u": 5535.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 1706133.87,
-              "instructions:u": 2987047.42,
-              "branches:u": 583530.89,
-              "branch-misses:u": 6692.68
-            },
-            "ipc": 1.7507696626408338,
-            "branch_miss_fraction": 0.0114692814291288
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 1464091.5,
-          "instructions:u": 2696918.0,
-          "branches:u": 532937.5,
-          "branch-misses:u": 5535.0
-        },
-        "process_instruction_medians": [
-          2657692.0,
-          2696918.0,
-          2814515.5
-        ],
-        "median_process_ipc": 1.7507696626408338,
-        "median_process_branch_miss_fraction": 0.011937836218700988
-      },
-      "baseline-scriptw-sync": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-sync-0",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-0/receipt.json",
-              "sha256": "d1012af0975b51ca0ebff5da7a8e31562aed646cffced3a71bda6587298604a9",
-              "bytes": 124160
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-0/observations.json",
-              "sha256": "70c57cc8830025b3654d64cb84ab95a2bd6d2528f91ee1bee94c7898ea2df735",
-              "bytes": 14620
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2205710916,
-              "instructions:u": 5282378083,
-              "branches:u": 747175007,
-              "branch-misses:u": 2789376
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 20964522.5,
-              "instructions:u": 50191443.5,
-              "branches:u": 6966807.5,
-              "branch-misses:u": 25151.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 22057109.16,
-              "instructions:u": 52823780.83,
-              "branches:u": 7471750.07,
-              "branch-misses:u": 27893.76
-            },
-            "ipc": 2.3948641885399273,
-            "branch_miss_fraction": 0.0037332297973933703
-          },
-          {
-            "name": "candidate-scriptw-sync-1",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-1/receipt.json",
-              "sha256": "db15ccf5fc21fe050ad58e20f9a01f2fc7cd388dfbf9e6e013c02d3eff5f54cd",
-              "bytes": 124160
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-1/observations.json",
-              "sha256": "04dd14cbbe8d414243d0560593974131ecb13f508467a03889adb55771701135",
-              "bytes": 14620
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2176596353,
-              "instructions:u": 5282371625,
-              "branches:u": 747173824,
-              "branch-misses:u": 2780108
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 20732835.5,
-              "instructions:u": 50191405.5,
-              "branches:u": 6966812.5,
-              "branch-misses:u": 25166.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 21765963.53,
-              "instructions:u": 52823716.25,
-              "branches:u": 7471738.24,
-              "branch-misses:u": 27801.08
-            },
-            "ipc": 2.426895376223209,
-            "branch_miss_fraction": 0.0037208316334165366
-          },
-          {
-            "name": "candidate-scriptw-sync-2",
-            "engine": "scriptw",
-            "mode": "sync",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-2/receipt.json",
-              "sha256": "dd8b54d5d781fc3ff2053e72cd1592367417c0b5ec40644851ac044dbe2da47b",
-              "bytes": 124165
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-sync-2/observations.json",
-              "sha256": "1dc950a939e7441f7cd25b3b2e3ee0f737ff43db9623bfb2e3fe76766d6ae786",
-              "bytes": 14620
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2270138575,
-              "instructions:u": 5282373422,
-              "branches:u": 747174174,
-              "branch-misses:u": 2870354
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 21913856.0,
-              "instructions:u": 50191304.5,
-              "branches:u": 6966788.5,
-              "branch-misses:u": 25973.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 22701385.75,
-              "instructions:u": 52823734.22,
-              "branches:u": 7471741.74,
-              "branch-misses:u": 28703.54
-            },
-            "ipc": 2.3268947015712467,
-            "branch_miss_fraction": 0.0038416129730950792
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 20964522.5,
-          "instructions:u": 50191405.5,
-          "branches:u": 6966807.5,
-          "branch-misses:u": 25166.5
-        },
-        "process_instruction_medians": [
-          50191443.5,
-          50191405.5,
-          50191304.5
-        ],
-        "median_process_ipc": 2.3948641885399273,
-        "median_process_branch_miss_fraction": 0.0037332297973933703
-      },
-      "baseline-scriptw-async": {
-        "processes": [
-          {
-            "name": "candidate-scriptw-async-0",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-0/receipt.json",
-              "sha256": "5deb774a3186a7a754e61c0f471e403b073cb7ccf6f6a5063109bda786123e34",
-              "bytes": 124176
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-0/observations.json",
-              "sha256": "9e0def33dc3816110aceb58c1d24a0f6d8556d1ab1da1e2e1ff8f095969dc019",
-              "bytes": 14622
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2372737468,
-              "instructions:u": 5687768242,
-              "branches:u": 813299461,
-              "branch-misses:u": 3125024
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 22574135.5,
-              "instructions:u": 54082271.5,
-              "branches:u": 7596077.5,
-              "branch-misses:u": 28383.5
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 23727374.68,
-              "instructions:u": 56877682.42,
-              "branches:u": 8132994.61,
-              "branch-misses:u": 31250.24
-            },
-            "ipc": 2.3971334033824934,
-            "branch_miss_fraction": 0.003842402644848181
-          },
-          {
-            "name": "candidate-scriptw-async-1",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-1/receipt.json",
-              "sha256": "9b98bd550d71e3a5a0e7ad43c0572cd86d862ca3a55b61f9990c921d83c7fee4",
-              "bytes": 124176
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-1/observations.json",
-              "sha256": "d6958c8c81b45f25dfac1dc307a91f7c3e6b1116e9f9c12fa37fd5416c15bdb8",
-              "bytes": 14621
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2403454965,
-              "instructions:u": 5687764260,
-              "branches:u": 813298625,
-              "branch-misses:u": 3129492
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 23382616.5,
-              "instructions:u": 54082235.0,
-              "branches:u": 7596082.0,
-              "branch-misses:u": 28327.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 24034549.65,
-              "instructions:u": 56877642.6,
-              "branches:u": 8132986.25,
-              "branch-misses:u": 31294.92
-            },
-            "ipc": 2.366495042689514,
-            "branch_miss_fraction": 0.003847900271563843
-          },
-          {
-            "name": "candidate-scriptw-async-2",
-            "engine": "scriptw",
-            "mode": "async",
-            "receipt": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-2/receipt.json",
-              "sha256": "04bc245485920d86512ae403dcee730086858c9e194b8ffb3d16054477faa552",
-              "bytes": 124175
-            },
-            "observations": {
-              "path": "target/performance-v8-climb-20261104/typed-region/candidate-scriptw-async-2/observations.json",
-              "sha256": "0811bcd71ce369aabbdc4437b85e1138d1127e4dc61c777936d0533bf01d0dc3",
-              "bytes": 14621
-            },
-            "executable_sha256": "6c20f2fa7cb9aed32c37281a8d876e417a871ce39f6b91f76d11fbac187f4d02",
-            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
-            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
-            "raw_counts": {
-              "cycles:u": 2377327695,
-              "instructions:u": 5687766422,
-              "branches:u": 813299159,
-              "branch-misses:u": 3132446
-            },
-            "median_raw_counts_per_request": {
-              "cycles:u": 22701011.5,
-              "instructions:u": 54082204.5,
-              "branches:u": 7596065.0,
-              "branch-misses:u": 28229.0
-            },
-            "mean_raw_counts_per_request": {
-              "cycles:u": 23773276.95,
-              "instructions:u": 56877664.22,
-              "branches:u": 8132991.59,
-              "branch-misses:u": 31324.46
-            },
-            "ipc": 2.392504169266408,
-            "branch_miss_fraction": 0.003851529864916533
-          }
-        ],
-        "median_of_process_median_raw_counts_per_request": {
-          "cycles:u": 22701011.5,
-          "instructions:u": 54082235.0,
-          "branches:u": 7596077.5,
-          "branch-misses:u": 28327.0
-        },
-        "process_instruction_medians": [
-          54082271.5,
-          54082235.0,
-          54082204.5
-        ],
-        "median_process_ipc": 2.392504169266408,
-        "median_process_branch_miss_fraction": 0.003847900271563843
-      },
-      "candidate-node-sync": {
         "processes": [
           {
             "name": "candidate-node-sync-0",
@@ -780,7 +256,7 @@
         "median_process_ipc": 1.8095727588574524,
         "median_process_branch_miss_fraction": 0.011760474294751532
       },
-      "candidate-node-async": {
+      "baseline-node-async": {
         "processes": [
           {
             "name": "candidate-node-async-0",
@@ -911,7 +387,7 @@
         "median_process_ipc": 1.7972203183916409,
         "median_process_branch_miss_fraction": 0.011730217325267276
       },
-      "candidate-scriptw-sync": {
+      "baseline-scriptw-sync": {
         "processes": [
           {
             "name": "candidate-scriptw-sync-0",
@@ -1042,7 +518,7 @@
         "median_process_ipc": 2.4041921174928893,
         "median_process_branch_miss_fraction": 0.003826880328842813
       },
-      "candidate-scriptw-async": {
+      "baseline-scriptw-async": {
         "processes": [
           {
             "name": "candidate-scriptw-async-0",
@@ -1172,6 +648,530 @@
         ],
         "median_process_ipc": 2.379028037241153,
         "median_process_branch_miss_fraction": 0.0039022146799986496
+      },
+      "candidate-node-sync": {
+        "processes": [
+          {
+            "name": "candidate-node-sync-0",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-0/receipt.json",
+              "sha256": "e83a6822d7048908ee6a472a47f68e71b837361c2e057a673da8f4b8b5ffcec3",
+              "bytes": 121887
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-0/observations.json",
+              "sha256": "33d009f1432d6cc1c49e752e152123cad7d16f55a4612372aaf26159357bf111",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 152443429,
+              "instructions:u": 274434808,
+              "branches:u": 54415424,
+              "branch-misses:u": 625853
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1360957.0,
+              "instructions:u": 2538163.0,
+              "branches:u": 499462.0,
+              "branch-misses:u": 4953.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1524434.29,
+              "instructions:u": 2744348.08,
+              "branches:u": 544154.24,
+              "branch-misses:u": 6258.53
+            },
+            "ipc": 1.8002403239040234,
+            "branch_miss_fraction": 0.011501389753022966
+          },
+          {
+            "name": "candidate-node-sync-1",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-1/receipt.json",
+              "sha256": "63ef6d28cdc6a6e1ad6f5caf34140f0d5f5473d5ead598537824a8a53e4bab93",
+              "bytes": 121897
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-1/observations.json",
+              "sha256": "767f9b0cbf4cb3d2a9d96a894260bf1d9caf4a1078bb09a65db9226ee7cd1d17",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 155829049,
+              "instructions:u": 276476960,
+              "branches:u": 54979471,
+              "branch-misses:u": 661965
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1363516.5,
+              "instructions:u": 2532939.0,
+              "branches:u": 499419.0,
+              "branch-misses:u": 5227.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1558290.49,
+              "instructions:u": 2764769.6,
+              "branches:u": 549794.71,
+              "branch-misses:u": 6619.65
+            },
+            "ipc": 1.7742324795937117,
+            "branch_miss_fraction": 0.012040221340070732
+          },
+          {
+            "name": "candidate-node-sync-2",
+            "engine": "node",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-2/receipt.json",
+              "sha256": "f34adbc21ec3f44a52e937fe62d3ca696e78a37e88849ddc7bd2eaba68eb2b49",
+              "bytes": 121900
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-sync-2/observations.json",
+              "sha256": "03ff0142ddd3d70b280df3293a8729bf3a1513509aa0a6aef550c0ccf09e8c81",
+              "bytes": 29832
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 160772991,
+              "instructions:u": 289551843,
+              "branches:u": 56522655,
+              "branch-misses:u": 640618
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1407874.0,
+              "instructions:u": 2668279.5,
+              "branches:u": 515803.0,
+              "branch-misses:u": 5045.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1607729.91,
+              "instructions:u": 2895518.43,
+              "branches:u": 565226.55,
+              "branch-misses:u": 6406.18
+            },
+            "ipc": 1.800998048235602,
+            "branch_miss_fraction": 0.011333827117639821
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1363516.5,
+          "instructions:u": 2538163.0,
+          "branches:u": 499462.0,
+          "branch-misses:u": 5045.5
+        },
+        "process_instruction_medians": [
+          2538163.0,
+          2532939.0,
+          2668279.5
+        ],
+        "median_process_ipc": 1.8002403239040234,
+        "median_process_branch_miss_fraction": 0.011501389753022966
+      },
+      "candidate-node-async": {
+        "processes": [
+          {
+            "name": "candidate-node-async-0",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-0/receipt.json",
+              "sha256": "9d92b95163595790690ffeb543d7642f891eec1e7988194aa11010f66dd74940",
+              "bytes": 121895
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-0/observations.json",
+              "sha256": "bba49fd01909fa6c4321cc10aa4ee1816bea6d3f61f4e342b946792345ab38a6",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 160302886,
+              "instructions:u": 290212145,
+              "branches:u": 57250102,
+              "branch-misses:u": 674451
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1470928.5,
+              "instructions:u": 2735141.0,
+              "branches:u": 536678.5,
+              "branch-misses:u": 5605.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1603028.86,
+              "instructions:u": 2902121.45,
+              "branches:u": 572501.02,
+              "branch-misses:u": 6744.51
+            },
+            "ipc": 1.810398753519634,
+            "branch_miss_fraction": 0.011780782504108028
+          },
+          {
+            "name": "candidate-node-async-1",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-1/receipt.json",
+              "sha256": "eb9647bb976688eba478f8287702c58c942477f5cbb80010eb619614794e6503",
+              "bytes": 121904
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-1/observations.json",
+              "sha256": "a69807464c1aec0ab3c2efc21520ba5c32a4ffc152fa747576f1fecbaf2c84c7",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 164338187,
+              "instructions:u": 299389405,
+              "branches:u": 58433717,
+              "branch-misses:u": 688044
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1504485.0,
+              "instructions:u": 2825664.0,
+              "branches:u": 548216.5,
+              "branch-misses:u": 5647.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1643381.87,
+              "instructions:u": 2993894.05,
+              "branches:u": 584337.17,
+              "branch-misses:u": 6880.44
+            },
+            "ipc": 1.8217884136691858,
+            "branch_miss_fraction": 0.01177477722322542
+          },
+          {
+            "name": "candidate-node-async-2",
+            "engine": "node",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-2/receipt.json",
+              "sha256": "1e5e6e6b73417e5cb9a6aa105e66d26e843ccdf0f1d40f189a8df05cf9de57a4",
+              "bytes": 121898
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-node-async-2/observations.json",
+              "sha256": "68eac7766dcb7385cb5efbb189c93c5cbf1dee7d84bb26b660f150d654eece7f",
+              "bytes": 29833
+            },
+            "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 162414789,
+              "instructions:u": 297044960,
+              "branches:u": 58009943,
+              "branch-misses:u": 663289
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 1485089.5,
+              "instructions:u": 2804015.0,
+              "branches:u": 544340.5,
+              "branch-misses:u": 5507.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 1624147.89,
+              "instructions:u": 2970449.6,
+              "branches:u": 580099.43,
+              "branch-misses:u": 6632.89
+            },
+            "ipc": 1.8289280294542636,
+            "branch_miss_fraction": 0.011434057089144184
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 1485089.5,
+          "instructions:u": 2804015.0,
+          "branches:u": 544340.5,
+          "branch-misses:u": 5605.5
+        },
+        "process_instruction_medians": [
+          2735141.0,
+          2825664.0,
+          2804015.0
+        ],
+        "median_process_ipc": 1.8217884136691858,
+        "median_process_branch_miss_fraction": 0.01177477722322542
+      },
+      "candidate-scriptw-sync": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-sync-0",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-0/receipt.json",
+              "sha256": "0c1a69afd3b8adabaac862b2c9347d0c995a3c4a9d53ad762b25a0e0d71d04b0",
+              "bytes": 124169
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-0/observations.json",
+              "sha256": "eef9f9278bd532465ac5b5dcf5d7e07c9a1edb936e8f6f29c0897b28ff59b0db",
+              "bytes": 14620
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2255547526,
+              "instructions:u": 5299484049,
+              "branches:u": 747282263,
+              "branch-misses:u": 2962595
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 21516152.5,
+              "instructions:u": 50362500.0,
+              "branches:u": 6967888.0,
+              "branch-misses:u": 26904.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22555475.26,
+              "instructions:u": 52994840.49,
+              "branches:u": 7472822.63,
+              "branch-misses:u": 29625.95
+            },
+            "ipc": 2.349533311939622,
+            "branch_miss_fraction": 0.003964492597625055
+          },
+          {
+            "name": "candidate-scriptw-sync-1",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-1/receipt.json",
+              "sha256": "856e6d2a9dc6832daf63ce7c0c26ce7445794a4652f1f439ba631c274401c3b6",
+              "bytes": 124168
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-1/observations.json",
+              "sha256": "cb9fcdc2f9243b36ceb71e7a94570ca2e13f9e105ebda57e34ecbefe15547c08",
+              "bytes": 14620
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2224737620,
+              "instructions:u": 5299482959,
+              "branches:u": 747282034,
+              "branch-misses:u": 2893725
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 21210048.0,
+              "instructions:u": 50362576.0,
+              "branches:u": 6967905.0,
+              "branch-misses:u": 26181.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 22247376.2,
+              "instructions:u": 52994829.59,
+              "branches:u": 7472820.34,
+              "branch-misses:u": 28937.25
+            },
+            "ipc": 2.382070996309219,
+            "branch_miss_fraction": 0.0038723331598254375
+          },
+          {
+            "name": "candidate-scriptw-sync-2",
+            "engine": "scriptw",
+            "mode": "sync",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-2/receipt.json",
+              "sha256": "1a9b7de18ed3a1ccf464ba298dc8821dc8b7637f45c965736bfeb428a9044bf8",
+              "bytes": 124190
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-sync-2/observations.json",
+              "sha256": "4294c9bb7d6d193f377231683efd9cf62c53f2945174b0a236d1e2ccb09c8eb6",
+              "bytes": 14624
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2432319971,
+              "instructions:u": 5299478963,
+              "branches:u": 747281386,
+              "branch-misses:u": 3072277
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 23217113.0,
+              "instructions:u": 50362458.5,
+              "branches:u": 6967882.5,
+              "branch-misses:u": 27100.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24323199.71,
+              "instructions:u": 52994789.63,
+              "branches:u": 7472813.86,
+              "branch-misses:u": 30722.77
+            },
+            "ipc": 2.1787754186063046,
+            "branch_miss_fraction": 0.004111271948636494
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 21516152.5,
+          "instructions:u": 50362500.0,
+          "branches:u": 6967888.0,
+          "branch-misses:u": 26904.0
+        },
+        "process_instruction_medians": [
+          50362500.0,
+          50362576.0,
+          50362458.5
+        ],
+        "median_process_ipc": 2.349533311939622,
+        "median_process_branch_miss_fraction": 0.003964492597625055
+      },
+      "candidate-scriptw-async": {
+        "processes": [
+          {
+            "name": "candidate-scriptw-async-0",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-0/receipt.json",
+              "sha256": "2728401ce0563aa29d4271a958b5a168ca7d5082a3c52d0feed17e98cedae30d",
+              "bytes": 124186
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-0/observations.json",
+              "sha256": "49bb76028cd59b1a831c5128e514f8732bc1d54aaf4a79e9572c1f599f1955f2",
+              "bytes": 14623
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2395331928,
+              "instructions:u": 5705663665,
+              "branches:u": 813389810,
+              "branch-misses:u": 3181742
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22913623.0,
+              "instructions:u": 54261199.0,
+              "branches:u": 7596982.5,
+              "branch-misses:u": 28925.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 23953319.28,
+              "instructions:u": 57056636.65,
+              "branches:u": 8133898.1,
+              "branch-misses:u": 31817.42
+            },
+            "ipc": 2.3819929080826747,
+            "branch_miss_fraction": 0.003911706245742125
+          },
+          {
+            "name": "candidate-scriptw-async-1",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-1/receipt.json",
+              "sha256": "39e1443543a5de29a041e3d9398b95333c7c9446272f6514321b5acde3841bcc",
+              "bytes": 124183
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-1/observations.json",
+              "sha256": "92fe9c187b11692b2ab4dcd6033d7ca9ec695d51990791ccf45c8a8cc93dfd66",
+              "bytes": 14622
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2420588987,
+              "instructions:u": 5705661970,
+              "branches:u": 813389481,
+              "branch-misses:u": 3164873
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 23114611.0,
+              "instructions:u": 54261197.5,
+              "branches:u": 7596983.5,
+              "branch-misses:u": 28671.5
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 24205889.87,
+              "instructions:u": 57056619.7,
+              "branches:u": 8133894.81,
+              "branch-misses:u": 31648.73
+            },
+            "ipc": 2.357137870428558,
+            "branch_miss_fraction": 0.0038909686858859195
+          },
+          {
+            "name": "candidate-scriptw-async-2",
+            "engine": "scriptw",
+            "mode": "async",
+            "receipt": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-2/receipt.json",
+              "sha256": "530100679f523670311ff16d63149617b63bab511caf2873710855a2a67b9010",
+              "bytes": 124184
+            },
+            "observations": {
+              "path": "target/performance-v8-climb-20261104/packed-readonly/candidate-scriptw-async-2/observations.json",
+              "sha256": "7ab87bba45762238e4c1cb4e1a423b54444b2b428aeca232db19ad0712edfc8e",
+              "bytes": 14623
+            },
+            "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
+            "adapter_sha256": "c49db2e04b48e9c878baddea63bbca759c32bc4c9ebbb340c737f7456bad90e4",
+            "node_driver_sha256": "cafbc33e331a187a13e79197c9259c5d3f4af29b7d850bbbd2e96df3686c1a0a",
+            "raw_counts": {
+              "cycles:u": 2395729753,
+              "instructions:u": 5705659648,
+              "branches:u": 813389061,
+              "branch-misses:u": 3217142
+            },
+            "median_raw_counts_per_request": {
+              "cycles:u": 22871336.0,
+              "instructions:u": 54261047.5,
+              "branches:u": 7596942.5,
+              "branch-misses:u": 29259.0
+            },
+            "mean_raw_counts_per_request": {
+              "cycles:u": 23957297.53,
+              "instructions:u": 57056596.48,
+              "branches:u": 8133890.61,
+              "branch-misses:u": 32171.42
+            },
+            "ipc": 2.3815956874331143,
+            "branch_miss_fraction": 0.003955231455958811
+          }
+        ],
+        "median_of_process_median_raw_counts_per_request": {
+          "cycles:u": 22913623.0,
+          "instructions:u": 54261197.5,
+          "branches:u": 7596982.5,
+          "branch-misses:u": 28925.0
+        },
+        "process_instruction_medians": [
+          54261199.0,
+          54261197.5,
+          54261047.5
+        ],
+        "median_process_ipc": 2.3815956874331143,
+        "median_process_branch_miss_fraction": 0.003911706245742125
       }
     }
   },
@@ -1185,48 +1185,65 @@
     "unscored": true,
     "fresh_processes": 2,
     "checked_flight_outputs": 406,
-    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/strict-predicate/profile/",
+    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/packed-readonly/profile/",
     "summary": {
-      "path": "target/performance-v8-climb-20261104/strict-predicate/profile/summary.json",
-      "sha256": "106bb8c8168e90eed08cd3863d38825edf9712a04c598026d83a145cd0e3923d",
-      "bytes": 22043
+      "path": "target/performance-v8-climb-20261104/packed-readonly/profile/summary.json",
+      "sha256": "123cd4c803c4ee36f3e0a417c856ef1bc55f8f1419736327b69d595ad01d1d9e",
+      "bytes": 22025
     },
     "owner_tables": {
-      "path": "target/performance-v8-climb-20261104/strict-predicate/profile/owner-tables.json",
-      "sha256": "48fa202d6d6d97e385eebe0c12d531583d90f13583aedf2fd9e5b355b6b22d58",
-      "bytes": 461223
+      "path": "target/performance-v8-climb-20261104/packed-readonly/profile/owner-tables.json",
+      "sha256": "fe1e27add8134ceb73800126b5f902843bd71811eee585cd2f3d5b9a681fa5d7",
+      "bytes": 507654
     },
     "probe_diagnosis": {
-      "path": "target/performance-v8-climb-20261104/strict-predicate/profile/diagnosis.json",
-      "sha256": "52b7fbb0bccf3d3078eab1de995fd6b2a31f597e7a4468d23411ce44bd09260f",
-      "bytes": 2662
+      "path": "target/performance-v8-climb-20261104/packed-readonly/profile/diagnosis.json",
+      "sha256": "853f13916ec756be141ab73de6b6f04697d8433d1a8ab15567765cffda1a088d",
+      "bytes": 2663
     },
     "limits": "One sampled child per mode; own user-cycle leaves are disjoint, inclusive owners overlap and FP chains can truncate. No causal allocation or wall-time gain claim."
   },
   "allocator_census_control": {
     "published_report": {
-      "git_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
+      "git_commit": "f267e94cf25b6de0dcf5a4d14e1b2d7d09616664",
       "path": "docs/rust-rewrite/react-attribution-current.json",
-      "sha256": "845b5a1c9b16f18a998b5fba0ceeb740abb821ef0eb8281c8768d16481223c68",
-      "bytes": 54946
+      "sha256": "08a6d94fca978f42d4937b3875d60335e357067049256e18a759504f6b9efa99",
+      "bytes": 54935
     },
     "evidence_archive": {
       "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
-      "sha256": "debad8525551cdd252cc0ac8013472e66e8b2144a3fa7ed170e63587ee7b7885",
-      "bytes": 1789420,
-      "regular_utf8_members": 1881,
-      "expanded_utf8_bytes": 86714278,
+      "sha256": "17b844c47bf392c25ad93ad1f57c5b98bf976cb0265ebb66a7edc9fa71b65b05",
+      "bytes": 4277140,
+      "regular_utf8_members": 3511,
+      "expanded_utf8_bytes": 158421633,
       "over_5mb": false
     },
-    "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/unobservable-work/batch-controls/allocator-census-publication/",
-    "limits": "Older observational compile-only census retains its recorded P/source identity in the Git-bound prior archive; it is not a census of the current program. No spill reuse or timing claim."
+    "original_control": {
+      "published_report": {
+        "git_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
+        "path": "docs/rust-rewrite/react-attribution-current.json",
+        "sha256": "845b5a1c9b16f18a998b5fba0ceeb740abb821ef0eb8281c8768d16481223c68",
+        "bytes": 54946
+      },
+      "evidence_archive": {
+        "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
+        "sha256": "debad8525551cdd252cc0ac8013472e66e8b2144a3fa7ed170e63587ee7b7885",
+        "bytes": 1789420,
+        "regular_utf8_members": 1881,
+        "expanded_utf8_bytes": 86714278,
+        "over_5mb": false
+      },
+      "archive_prefix": "additional-evidence/target/performance-v8-climb-20261104/unobservable-work/batch-controls/allocator-census-publication/",
+      "limits": "Older observational compile-only census retains its recorded P/source identity in the Git-bound prior archive; it is not a census of the current program. No spill reuse or timing claim."
+    },
+    "limits": "Historical compile-only control retains its own recorded program/source identity and original archive reference; it is not a census of current P or R. No spill reuse or timing claim."
   },
   "evidence_archive": {
     "file": "docs/rust-rewrite/situations-evidence-2026-11-05.tar.xz",
-    "sha256": "17b844c47bf392c25ad93ad1f57c5b98bf976cb0265ebb66a7edc9fa71b65b05",
-    "bytes": 4277140,
-    "regular_utf8_members": 3511,
-    "expanded_utf8_bytes": 158421633,
+    "sha256": "a2d2f830ce9033fa7fef3f00cad40e59479d59243aa11f126ad218bf8c60c879",
+    "bytes": 4258564,
+    "regular_utf8_members": 2495,
+    "expanded_utf8_bytes": 162405540,
     "over_5mb": false
   }
 }

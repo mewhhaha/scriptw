@@ -2,6 +2,17 @@
 use super::*;
 use crate::gc_types::{PackedValueTable, StoredValue};
 
+// Existing value reads keep their exact emitted path. Descriptor observations
+// request an immutable edge, reusing PackedValues and boxing only Number bits.
+#[derive(Clone, Copy)]
+enum PackedArrayProbeResult<'a> {
+    Value {
+        output: Option<&'a ValueLocals>,
+        found: I32Local,
+    },
+    Stored(&'a GcLocal<StoredValue, Nullable>),
+}
+
 impl FunctionBuilder<'_> {
     fn packed_values(
         &self,
@@ -26,6 +37,76 @@ impl FunctionBuilder<'_> {
         found: I32Local,
         f: &mut Function,
     ) {
+        self.emit_packed_array_probe_result(
+            storage,
+            index,
+            PackedArrayProbeResult::Value { output, found },
+            f,
+        );
+    }
+
+    pub(in crate::objects) fn emit_packed_array_read_descriptor(
+        &mut self,
+        storage: &GcLocal<ArrayObject>,
+        index: I64Local,
+        f: &mut Function,
+    ) -> GcLocal<PropertyDescriptor, Nullable> {
+        let s = self.runtime_schema();
+        let stored = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize_null(s, f);
+        let output = s
+            .reserve_gc_local::<PropertyDescriptor, Nullable>(f)
+            .initialize_null(s, f);
+        self.emit_packed_array_probe_result(
+            storage,
+            index,
+            PackedArrayProbeResult::Stored(&stored),
+            f,
+        );
+        stored.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let present = s
+            .reserve_gc_local(f)
+            .initialize(stored.load(s, f).require_non_null(f), f);
+        let absent = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
+        output.replace(
+            s.struct_type::<PropertyDescriptor>()
+                .construct(
+                    (
+                        GcOperand::descriptor_word(
+                            StoredPropertyAttributes::Data {
+                                writable: true,
+                                enumerable: true,
+                                configurable: true,
+                            }
+                            .descriptor_word(),
+                        ),
+                        GcOperand::subtype_reference(&present, s),
+                        GcOperand::reference(&absent, s),
+                        GcOperand::reference(&absent, s),
+                    ),
+                    f,
+                )
+                .nullable(),
+            f,
+        );
+        absent.clear(f);
+        present.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        stored.clear(f);
+        output
+    }
+
+    fn emit_packed_array_probe_result(
+        &mut self,
+        storage: &GcLocal<ArrayObject>,
+        index: I64Local,
+        result: PackedArrayProbeResult<'_>,
+        f: &mut Function,
+    ) {
         let s = self.runtime_schema();
         s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedValues, f);
         self.open_frame(ControlFrameKind::If, f);
@@ -48,15 +129,22 @@ impl FunctionBuilder<'_> {
         value.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        if let Some(output) = output {
-            let present = s
-                .reserve_gc_local(f)
-                .initialize(value.load(s, f).require_non_null(f), f);
-            s.struct_type::<StoredValue>()
-                .read_into(&present, output, s, f);
-            present.clear(f);
+        match result {
+            PackedArrayProbeResult::Value { output, found } => {
+                if let Some(output) = output {
+                    let present = s
+                        .reserve_gc_local(f)
+                        .initialize(value.load(s, f).require_non_null(f), f);
+                    s.struct_type::<StoredValue>()
+                        .read_into(&present, output, s, f);
+                    present.clear(f);
+                }
+                found.set_constant(1, f);
+            }
+            PackedArrayProbeResult::Stored(output) => {
+                output.replace(value.load(s, f), f);
+            }
         }
-        found.set_constant(1, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         value.clear(f);
@@ -65,7 +153,29 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         values.clear(f);
         f.instruction(&Instruction::Else);
-        self.emit_packed_number_probe(storage, index, output, found, f);
+        match result {
+            PackedArrayProbeResult::Value { output, found } => {
+                self.emit_packed_number_probe(storage, index, output, found, f);
+            }
+            PackedArrayProbeResult::Stored(output) => {
+                let value = s.reserve_value_local(f);
+                let found = s.reserve_i32_local(f);
+                found.set_constant(0, f);
+                self.emit_packed_number_probe(storage, index, Some(&value), found, f);
+                found.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                output.replace(
+                    s.struct_type::<StoredValue>()
+                        .from_value(&value, f)
+                        .nullable(),
+                    f,
+                );
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                s.release_i32_local(found, f);
+                value.clear(f);
+            }
+        }
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
     }

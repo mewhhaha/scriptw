@@ -45,18 +45,17 @@ accepts `--case <file.js>`.
   [GC census](react-allocation-current.json) measures physical reservations;
   allocation origins and representation savings remain unmeasured.
   Owner: IR/AOT lowering and object operations.
-- Classify the measured StoredValue payloads before changing storage. Synchronous
+- Measure direct-reference List storage using the StoredValue payload census. Synchronous
   RSC requests allocate 19,935 wrappers among 49,794 GC objects; this does not
   identify argument, property or binding writes. A single-reference storage pilot
   must preserve deferred property recipes and legacy descriptor ownership tokens,
   and avoid newly boxing numeric computation. BindingCell identity and shared
   writes need separate evidence. Owner: runtime value/storage representation.
-- Preserve packed arrays through read-only indexed descriptor queries. The
-  current mutable lookup can materialize every packed element before returning
-  one snapshot. Measure actual RSC incidence and keep snapshot values/attributes,
-  holes and prototype behavior, with materialization retained for real writes.
-  The GC census counts 8,412 descriptors per synchronous request; it does not
-  attribute them to this path. Owner: AOT Array internal methods.
+- Reduce duplicate descriptor snapshots on read-only packed-Array queries.
+  Keep backing storage, values, attributes, holes and prototype behavior intact,
+  with materialization retained for real writes. Measure repeated queries as well
+  as isolated reads. The current RSC census counts 8,412 descriptors per synchronous
+  request; it does not attribute them to this path. Owner: AOT Array internal methods.
 - Measure remaining descriptor snapshots, name-to-slot selection and executed
   allocation after private `[[GetOwnProperty]]` transport. Use the matched
   ordinary/JavaScript-function/native-constructor read situations and

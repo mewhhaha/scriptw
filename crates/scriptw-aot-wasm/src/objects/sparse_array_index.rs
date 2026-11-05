@@ -47,11 +47,51 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(found, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        let output = self.emit_descriptor_backed_array_index(&storage, index, f);
+        storage.clear(f);
+        output
+    }
+
+    /// Read-only indexed lookup never retires a packed backing. Existing mutable
+    /// descriptors are still snapshotted by the completed GetOwnProperty owner.
+    pub(crate) fn emit_array_indexed_read_descriptor(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        index: I64Local,
+        f: &mut Function,
+    ) -> GcLocal<PropertyDescriptor, Nullable> {
+        let schema = self.runtime_schema();
+        let output = schema
+            .reserve_gc_local::<PropertyDescriptor, Nullable>(f)
+            .initialize_null(schema, f);
+        schema.array_storage_is_packed(array, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let snapshot = self.emit_packed_array_read_descriptor(array, index, f);
+        output.replace(snapshot.load(schema, f), f);
+        snapshot.clear(f);
+        f.instruction(&Instruction::Else);
+        let descriptor = self.emit_descriptor_backed_array_index(array, index, f);
+        output.replace(descriptor.load(schema, f), f);
+        descriptor.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        output
+    }
+
+    /// Shared existing dense/sparse lookup. Mutation callers first materialize
+    /// an occupied packed index; a missing packed index has no descriptor entry.
+    fn emit_descriptor_backed_array_index(
+        &mut self,
+        storage: &GcLocal<ArrayObject>,
+        index: I64Local,
+        f: &mut Function,
+    ) -> GcLocal<PropertyDescriptor, Nullable> {
+        let schema = self.runtime_schema();
         let buckets = schema.reserve_gc_local(f).initialize(
             schema
                 .struct_type::<ArrayObject>()
                 .field(ArrayObjectSchema::BUCKETS)
-                .read(&storage, schema, f)
+                .read(storage, schema, f)
                 .reference(),
             f,
         );
@@ -63,9 +103,9 @@ impl FunctionBuilder<'_> {
         let output = schema
             .reserve_gc_local::<PropertyDescriptor, Nullable>(f)
             .initialize_null(schema, f);
-        schema.array_storage_mode_is(&storage, ArrayIndexedStorageMode::DenseDescriptors, f);
+        schema.array_storage_mode_is(storage, ArrayIndexedStorageMode::DenseDescriptors, f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_dense_array_descriptor(&storage, index, &output, f);
+        self.emit_dense_array_descriptor(storage, index, &output, f);
         f.instruction(&Instruction::Else);
         capacity.load(f);
         self.open_frame(ControlFrameKind::If, f);
@@ -126,7 +166,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         schema.release_i32_local(capacity, f);
         buckets.clear(f);
-        storage.clear(f);
         output
     }
 

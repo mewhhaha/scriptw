@@ -17,12 +17,20 @@ StoredValues; accessors and nondefault attributes use real descriptors.
 `emit_array_own_indexed_value` probes without allocating and returns a separate
 found bit. A present `undefined` after descriptor transition is distinguishable
 from a hole. Ordinary Get retains its completion-aware accessor/prototype path
-on a miss. Descriptor queries for absent indices preserve packed mode, which
-allows normal append/Array.push definition probes to remain packed. A request
-for a present descriptor constructs a complete private dense descriptor graph
-and publishes it before returning a reference. Every returned mutable
-descriptor handle therefore belongs to the actual active store; no temporary
-descriptor can absorb a later mutation.
+on a miss. Read-only indexed descriptor queries preserve packed mode for both
+present and absent indices. They synthesize only the requested W/E/C data
+record, reusing the exact immutable StoredValue in PackedValues and boxing only
+the selected raw Number bits in PackedNumbers. Holes remain absent; Array length
+and prototype semantics remain with their existing owners. The completed
+GetOwnProperty boundary still snapshots the result before any later source
+reentry. Replacing or deleting a packed slot cannot mutate its old StoredValue.
+
+Mutable descriptor acquisition remains separate: a present packed index first
+constructs and publishes the complete private dense descriptor graph. Define,
+attribute changes and length-shrink deletion retain this owner. Every mutable
+handle belongs to the actual active store, so a temporary descriptor cannot
+absorb a later write. Both read and mutation paths share the same dense/sparse
+lookup; no extra helper, ABI, cache or object representation is introduced.
 
 Source numeric reads use the same packed backing before allocating a property
 name. Canonical `GetV` probes after operand evaluation and `ToObject`;
@@ -110,6 +118,7 @@ Required focused acceptance after the coherent batch is compiled:
 ```sh
 python3 scripts/limited_verification.py -- cargo test -p scriptw-aot-wasm --lib gc_types::type_registration_tests -- --test-threads=1
 python3 scripts/limited_verification.py -- cargo test -p scriptw-aot-wasm --test emission packed_array_storage -- --test-threads=1
+python3 scripts/limited_verification.py -- cargo test -p scriptw-aot-wasm --test emission packed_array_descriptors -- --test-threads=1
 python3 scripts/limited_verification.py -- cargo test -p scriptw-engine --test aot_gc_entries aot_gc_packed_array_storage -- --test-threads=1
 python3 scripts/limited_verification.py -- cargo test -p scriptw-engine --test aot_language aot_packed_array_producers -- --test-threads=1
 ```

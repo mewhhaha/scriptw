@@ -3,21 +3,21 @@
   "date": "2026-11-05",
   "measurement": "static encoded-byte accounting for the measured candidate RSC raw P",
   "aggregate": {
-    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/fast-comparison-campaign/aggregate.json",
-    "sha256": "5a031b1134d43506dd7810a38fae85fb0c5a9fd3b1fbff93f4ad72209574bcd8",
-    "campaign_path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/fast-comparison-campaign/campaign.json",
-    "campaign_sha256": "b2c5781f6fbf89a80ba4df5ed7dd1d4a53e3ec327a99652c00b1d2236469f5d6"
+    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/packed-readonly/fast-comparison-campaign/aggregate.json",
+    "sha256": "d9835894304d9035bdb3491d13008f1b90300e738b1de297978874b599f1b051",
+    "campaign_path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/packed-readonly/fast-comparison-campaign/campaign.json",
+    "campaign_sha256": "0539b2301a5b3d5dd52399abd9dbef7afa6670f631e4e4595c4383d4ebfbf2b7"
   },
   "first_candidate_process": {
-    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-predicate/fast-comparison-campaign/block-0-0-candidate/report.json",
-    "report_sha256": "7e51cb0e599dd5d9358ddc8372c43eb1fe6b5d7f94a7f69f9c087850e8bf5b7c",
+    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/packed-readonly/fast-comparison-campaign/block-0-0-candidate/report.json",
+    "report_sha256": "92e32c1d152763b26fb42b8a219af8abde2835be1206c845b82e49d2af4b1fb6",
     "program_wasm_bytes": 4231662,
     "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541"
   },
   "compiler": {
-    "source_commit": "086fe17fa1f0c59e5a29bf37704ba8675de252b0",
-    "source_fingerprint": "971be2adbe2f77bad2359f60e23f6face41cfb660ec6a61338e69b8864df71c9",
-    "executable_sha256": "1f29203f93acdfc2e816edbf65b70b951cc0322707a57e71bf6fe6141052f474",
+    "source_commit": "f267e94cf25b6de0dcf5a4d14e1b2d7d09616664",
+    "source_fingerprint": "92d17baf84cb9cee8fea4187ac01e810a0b8af06411dd3df59a1e7f0069b66df",
+    "executable_sha256": "6ac2b6e2547afa2713535da4c8883f825c9d7724beb6cc90161767371bb3759a",
     "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
     "toolchain": {
       "opt_level": "3",
@@ -63,9 +63,9 @@
     },
     "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
   },
-  "runtime_key": "47deb80b886ecec31cdacf87b9d73fe38e1b6799ab22100639553544eda54416",
-  "runtime_wasm_sha256": "3e6493ab4c88e59e46ae481f89cb44e52b4b462c62cb6cf7adeeae8af0ac3b53",
-  "runtime_wasm_bytes": 38816202,
+  "runtime_key": "74873715a107ceff7548fff07489b947cb0213ec75dd0d75394a813cf41d794b",
+  "runtime_wasm_sha256": "2a60a584a47f10a0679b4772a1cf4bd9545baf69ad6ba19d566cfbcfca95e66b",
+  "runtime_wasm_bytes": 38731099,
   "program_wasm_bytes": 4231662,
   "program_wasm_sha256": "19d2643a0889ee0de5ed99c1677c0d2bd2df2bfe77356a4e54f4a11793bb1541",
   "wasm_header_bytes": 8,

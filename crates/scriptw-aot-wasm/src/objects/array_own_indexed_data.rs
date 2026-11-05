@@ -19,7 +19,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         self.emit_packed_array_value(&storage, index, output, found, f);
         f.instruction(&Instruction::Else);
-        let descriptor = self.emit_array_indexed_descriptor(array, index, f);
+        let descriptor = self.emit_array_indexed_read_descriptor(array, index, f);
         descriptor.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);

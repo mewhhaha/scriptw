@@ -9,7 +9,24 @@ use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
-fn check(source: &str, names: &[(&str, bool)]) {
+fn bitset_write(body: &[Operator<'_>]) -> bool {
+    body.windows(7).any(|ops| {
+        matches!(
+            ops,
+            [
+                Operator::I64ExtendI32U,
+                Operator::LocalGet { .. },
+                Operator::I64ExtendI32U,
+                Operator::I64Shl,
+                Operator::LocalGet { .. },
+                Operator::I64Or,
+                Operator::LocalSet { .. }
+            ]
+        )
+    })
+}
+
+fn check(source: &str, names: &[(&str, Option<u32>)]) {
     let ir = lower(&parse(source, ParseOptions::module()).unwrap());
     assert!(ir.is_wasm_supported(), "{:?}", ir.diagnostics);
     let artifact = emit_with_rooted_snapshot(
@@ -43,7 +60,9 @@ fn check(source: &str, names: &[(&str, bool)]) {
         runtime.function_type(bigint_definition)
     );
     let bodies = module_bodies(&artifact.bytes);
-    for (name, admitted) in names {
+    for (name, period) in names {
+        let admitted = period.is_some();
+        let bitset = period.is_some_and(|period| period <= 64);
         let variants = bodies
             .iter()
             .filter(|body| body.name.starts_with(&format!("js::{name}#")))
@@ -55,17 +74,22 @@ fn check(source: &str, names: &[(&str, bool)]) {
             let hot = regions.iter().filter(|region| read_only(region)
                 && region.iter().any(|op| matches!(op, Operator::F64Add))
                 && region.iter().any(|op| matches!(op, Operator::F64Sub))
-                && region.iter().filter(|op| matches!(op, Operator::ArrayGet{array_type_index} if *array_type_index == numbers)).count() == 1
+                && (region.iter().any(|op| matches!(op, Operator::I64ShrU))
+                    || region.iter().filter(|op| matches!(op, Operator::ArrayGet{array_type_index} if *array_type_index == numbers)).count() == 1)
             ).collect::<Vec<_>>();
             assert_eq!(
                 hot.len(),
-                usize::from(*admitted),
+                usize::from(admitted),
                 "closed projected strict pair: {}",
                 variant.name
             );
             if !admitted {
                 assert!(!body.iter().any(|op| matches!(op, Operator::ArrayNew { array_type_index } if *array_type_index == numbers)),
                     "a refused complete proof emits no speculative projection");
+                assert!(
+                    !bitset_write(body),
+                    "a refused proof also emits no speculative bitset preflight"
+                );
                 continue;
             }
             let hot = hot[0];
@@ -89,18 +113,61 @@ fn check(source: &str, names: &[(&str, bool)]) {
                 )),
                 "the body only reads the private predicate projection"
             );
-            assert_eq!(body.iter().filter(|op| matches!(op, Operator::ArrayNew{array_type_index} if *array_type_index == numbers)).count(), 1,
-                "one existing NumberBits array holds the complete period");
+            assert_eq!(body.iter().filter(|op| matches!(op, Operator::ArrayNew{array_type_index} if *array_type_index == numbers)).count(), usize::from(!bitset),
+                "small periods have no projection allocation; large periods use one existing NumberBits array");
+            if bitset {
+                assert!(
+                    hot.iter().all(|op| !matches!(
+                        op,
+                        Operator::ArrayGet { .. } | Operator::ArrayLen | Operator::RefIsNull
+                    )),
+                    "the small hot loop has no GC projection access"
+                );
+                assert_eq!(
+                    hot.iter()
+                        .filter(|op| matches!(op, Operator::I64ShrU))
+                        .count(),
+                    1
+                );
+                assert!(
+                    hot.windows(4).any(|ops| matches!(
+                        ops,
+                        [
+                            Operator::I64ShrU,
+                            Operator::I32WrapI64,
+                            Operator::I32Const { value: 1 },
+                            Operator::I32And
+                        ]
+                    )),
+                    "unsigned extraction retains bit63 and publishes canonical i32 zero/one"
+                );
+            } else {
+                assert!(!hot.iter().any(|op| matches!(op, Operator::I64ShrU)));
+            }
             let preflight = regions
                 .iter()
                 .filter(|region| {
-                    region.iter().any(|op|
-                matches!(op, Operator::ArraySet{array_type_index} if *array_type_index == numbers)
-            )
+                    bitset_write(region) || region.iter().any(|op|
+                matches!(op, Operator::ArraySet{array_type_index} if *array_type_index == numbers))
                 })
                 .collect::<Vec<_>>();
             assert_eq!(preflight.len(), 1, "one complete-period preflight");
             let preflight = preflight[0];
+            assert_eq!(
+                preflight
+                    .iter()
+                    .filter(|op| matches!(op, Operator::I64Shl))
+                    .count(),
+                usize::from(bitset)
+            );
+            assert_eq!(
+                preflight
+                    .iter()
+                    .filter(|op| matches!(op, Operator::I64Or))
+                    .count(),
+                usize::from(bitset)
+            );
+            assert_eq!(preflight.iter().filter(|op| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == numbers)).count(), usize::from(!bitset));
             for backing in [numbers, values] {
                 assert_eq!(preflight.iter().filter(|op| matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == backing)).count(), 2,
                     "each input supports its current canonical packed backing");
@@ -148,9 +215,12 @@ fn check(source: &str, names: &[(&str, bool)]) {
                 3,
                 "both branch offsets plus the true-arm addition remain; no Number counter update"
             );
-            assert!(
-                hot.iter().any(|op| matches!(op, Operator::I64Eqz)),
-                "the projection stores exactly Number zero/one bits"
+            assert_eq!(
+                hot.iter()
+                    .filter(|op| matches!(op, Operator::I64Eqz))
+                    .count(),
+                usize::from(!bitset),
+                "large projections alone use Number zero/one bits"
             );
             assert!(
                 regions.iter().any(|region| region
@@ -171,11 +241,11 @@ fn unchanged_number_and_mixed_sources_share_one_projected_strict_backedge() {
         .spawn(|| {
             check(
                 include_str!("fixtures/strict-equality-numbers.mjs"),
-                &[("run", true)],
+                &[("run", Some(16))],
             );
             check(
                 include_str!("fixtures/strict-equality-mixed.mjs"),
-                &[("run", true)],
+                &[("run", Some(32))],
             );
         })
         .unwrap()
@@ -209,10 +279,22 @@ export function differentIndex(left,right,phase) {var sum=0;for(var i=0;i<32;i++
 export function noElse(left,right,phase) {var sum=0;for(var i=0;i<32;i++){var slot=(i+phase)&3;if(left[slot]===right[slot])sum+=1;}return sum;}
 export function lexical(left,right,phase) {var sum=0;for(var i=0;i<32;i++){let slot=(i+phase)&3;if(left[slot]===right[slot])sum+=1;else sum-=1;}return sum;}
 export function zero(left,right,phase) {var sum=0;for(var i=0;i<0;i++){var slot=(i+phase)&3;if(left[slot]===right[slot])sum+=1;else sum-=1;}return slot;}
-"#, &[("local",true),("positiveFirst",true),("boundedLast",true),("negativeFirst",false),("loose",false),
-("onePeriod",false),("shortPeriod",false),("overBound",false),("numericElements",false),
-("secondPair",false),("callback",false),("writeInput",false),("movingIndex",false),
-("movingCounter",false),("movingPhase",false),("capturedIndex",false),("capturedSum",false),
-("prefix",false),("differentIndex",false),("noElse",false),("lexical",false),("zero",false)]);
+"#, &[("local",Some(4)),("positiveFirst",Some(4)),("boundedLast",Some(4)),("negativeFirst",None),("loose",None),
+("onePeriod",None),("shortPeriod",None),("overBound",None),("numericElements",None),
+("secondPair",None),("callback",None),("writeInput",None),("movingIndex",None),
+("movingCounter",None),("movingPhase",None),("capturedIndex",None),("capturedSum",None),
+("prefix",None),("differentIndex",None),("noElse",None),("lexical",None),("zero",None)]);
+    }).unwrap().join().unwrap();
+}
+
+#[test]
+fn strict_projection_uses_scalar_bits_through_bit63_and_array_storage_afterward() {
+    std::thread::Builder::new().name("strict-predicate-carriers".into()).stack_size(64*1024*1024).spawn(|| {
+        check(r#"
+export function one(left,right,phase) {var sum=0;for(var i=0;i<8;i++){var slot=(i+phase)&0;if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}return sum+i+slot;}
+export function sixtyFour(left,right,phase) {var sum=0;for(var i=0;i<131;i++){var slot=(i+phase)&63;if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}return sum+i+slot;}
+export function oneTwentyEight(left,right,phase) {var sum=0;for(var i=0;i<259;i++){var slot=(i+phase)&127;if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}return sum+i+slot;}
+export function invalidMask(left,right,phase) {var sum=0;for(var i=0;i<259;i++){var slot=(i+phase)&64;if(left[slot]===right[slot])sum+=(slot&3)+1;else sum-=(slot&1)+1;}return sum+i+slot;}
+"#, &[("one",Some(1)),("sixtyFour",Some(64)),("oneTwentyEight",Some(128)),("invalidMask",None)]);
     }).unwrap().join().unwrap();
 }

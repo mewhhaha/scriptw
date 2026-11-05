@@ -290,10 +290,13 @@ Array, packed mode, dense logical extent and backing-capacity guards; inputs may
 use PackedNumbers or PackedValues. Indexed descriptors, accessors, holes and
 Proxy receivers retain the original loop. Current StoredValues preserve every
 primitive payload and reference identity; no numeric kind hint changes equality.
-The existing strict-equality kernel alone produces the period's Boolean results,
-stored as Number zero/one bits in one private NumberBits array. The source loop
-then reads that projection and retains its original ordered Number arithmetic,
-structured branches and completion/publication tail. No generic Value-region
+The existing strict-equality kernel alone produces the period's Boolean results.
+Periods through 64 keep one bit per result in a private i64 local; unsigned
+extraction preserves bit 63 and requires no projection allocation or GC access
+inside the source loop. Larger periods retain Number zero/one bits in one private
+NumberBits array. Both carriers use the same complete preflight and preserve
+the original ordered Number arithmetic, structured branches and
+completion/publication tail. No generic Value-region
 interpreter, persistent cache, helper ABI or object model is introduced.
 
 A first private `var` index must be `(counter + phase) & mask`. Literal induction
@@ -311,7 +314,7 @@ pairs at the same index enter the all-kind preflight; numeric loose equality
 stays a separate Number-only operation. Each branch must have a Number statement
 value. The index's previous Value is neither inspected at entry nor published on
 a failed admission/zero trip. Input/backing and temporary Value roots clear
-before either source loop; the projection clears at the existing exit owner.
+before either source loop; the projection releases at the existing exit owner.
 Failed admission retains exact TDZ, getter/Proxy, conversion and partial-iteration
 Throw behavior. Chunked and whole-trip transformations still refuse this
 invariant-bearing region: source arithmetic is never aggregated or unrolled.

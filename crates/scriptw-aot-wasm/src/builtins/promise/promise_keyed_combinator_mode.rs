@@ -244,7 +244,7 @@ impl FunctionBuilder<'_> {
         index.load(function);
         function.instruction(&Instruction::I64ExtendI32U);
         index64.store(function);
-        let nullable_slot = self.emit_array_indexed_descriptor(&keys, index64, function);
+        let nullable_slot = self.emit_array_indexed_read_descriptor(&keys, index64, function);
         let slot = schema.reserve_gc_local(function).initialize(
             nullable_slot
                 .load(schema, function)

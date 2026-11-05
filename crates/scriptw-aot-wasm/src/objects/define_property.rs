@@ -1550,7 +1550,7 @@ impl FunctionBuilder<'_> {
         index.load(function);
         function.instruction(&Instruction::I64ExtendI32U);
         index64.store(function);
-        let descriptor = self.emit_array_indexed_descriptor(array, index64, function);
+        let descriptor = self.emit_array_indexed_read_descriptor(array, index64, function);
         result.replace(descriptor.load(schema, function), function);
         descriptor.clear(function);
         schema.release_i64_local(index64, function);
