@@ -569,6 +569,11 @@ fn abi50_package_is_replaced_before_typed_own_descriptors_are_admitted() {
     assert_previous_build_package_replaced(50);
 }
 
+#[test]
+fn abi51_package_is_replaced_before_for_in_visited_sets_are_admitted() {
+    assert_previous_build_package_replaced(51);
+}
+
 fn assert_previous_build_package_replaced(previous_version: u32) {
     let package = fixture();
     let identity = minimal_identity();

@@ -58,7 +58,7 @@ fn inspect_actual_enumeration_artifact(source: &str) {
         }
     }
     // Follow the actual appended BindingCell edge into the unique physical
-    // cursor and both accepted-key tables. They contain real StoredValues.
+    // cursor, accepted-key snapshot and canonical Set entries containing StoredValues.
     let owners = structures
         .iter()
         .filter_map(|(&cell, structure)| {
@@ -75,7 +75,8 @@ fn inspect_actual_enumeration_artifact(source: &str) {
             }
             let cursor_fields = &structures.get(&cursor)?.fields;
             if cursor_fields.len() != 4
-                || cursor_fields.iter().any(|field| !field.mutable)
+                || cursor_fields[..3].iter().any(|field| !field.mutable)
+                || cursor_fields[3].mutable
                 || cursor_fields[2].element_type.unpack() != ValType::I32
             {
                 return None;
@@ -85,7 +86,25 @@ fn inspect_actual_enumeration_artifact(source: &str) {
                 return None;
             }
             let (nullable, keys) = concrete_reference(cursor_fields[1].element_type)?;
-            if !nullable || concrete_reference(cursor_fields[3].element_type) != Some((false, keys))
+            if !nullable {
+                return None;
+            }
+            let (nullable, visited) = concrete_reference(cursor_fields[3].element_type)?;
+            let set = &structures.get(&visited)?.fields;
+            if nullable || set.len() != 8 || set[0].mutable {
+                return None;
+            }
+            let (nullable, entries) = concrete_reference(set[1].element_type)?;
+            if nullable || !set[1].mutable {
+                return None;
+            }
+            let (nullable, entry) = concrete_reference(arrays.get(&entries)?.0.element_type)?;
+            let entry = &structures.get(&entry)?.fields;
+            if !nullable
+                || entry.len() != 2
+                || entry[0].mutable
+                || concrete_reference(entry[0].element_type) != Some((false, value))
+                || entry[1].element_type.unpack() != ValType::I64
             {
                 return None;
             }
@@ -156,8 +175,8 @@ fn inspect_actual_enumeration_artifact(source: &str) {
         "advance reads every persisted cursor field"
     );
     assert!(
-        cursor_write.into_iter().all(|count| count > 0),
-        "native advance publishes actual transitions"
+        cursor_write[..3].iter().all(|count| *count > 0) && cursor_write[3] == 0,
+        "native advance updates current/snapshot/index but never replaces its Set"
     );
     assert!(
         edge_loads > 0 && edge_publications_and_retirements > 1,

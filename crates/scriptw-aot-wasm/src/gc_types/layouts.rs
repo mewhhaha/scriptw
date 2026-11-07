@@ -1424,7 +1424,7 @@ gc_layout_registry! {
             CURRENT: GcRef<StoredValue>, Mutable, NonNullable;
             REMAINING_KEYS: GcRef<PropertyKeyTable>, Mutable, Nullable;
             NEXT_KEY: I32Value, Mutable, NonNullable;
-            VISITED_KEYS: GcRef<PropertyKeyTable>, Mutable, NonNullable;
+            VISITED_SET: GcRef<SetObject>, Immutable, NonNullable;
         }
         struct IteratorRecord => IteratorRecordSchema {
             ITERATOR: GcRef<StoredValue>, Immutable, NonNullable;

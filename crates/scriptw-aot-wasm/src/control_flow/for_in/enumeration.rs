@@ -1,62 +1,22 @@
 //! The sole native ForIn creation/advance algorithm, shared by eager and resumable consumers.
 
 use super::*;
-use crate::gc_types::{ForInEnumerationRecord, ForInEnumerationRecordSchema};
-use crate::operations::PropertyKeyLocals;
+use crate::gc_types::{ForInEnumerationRecord, ForInEnumerationRecordSchema, SetObject};
 use crate::runtime_helpers::{
     ForInAdvanceArguments, ForInAdvanceParameters, HelperParameters, RuntimeHelperId,
 };
 
-/// Only String keys enter the visited set; its private table never publishes a
-/// JavaScript Array or invokes a user iterator/species operation.
+/// Only String keys enter this private, unpublished canonical Set. Its identity
+/// stays rooted in the cursor while the collection owner grows its storage.
 struct ForInVisitedKeys {
-    keys: GcLocal<PropertyKeyTable>,
+    set: GcLocal<SetObject>,
 }
 
 impl ForInVisitedKeys {
-    fn new(builder: &mut FunctionBuilder<'_>, function: &mut Function) -> Self {
-        let schema = builder.runtime_schema();
-        let zero = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(0));
-        zero.store(function);
-        let construction = PropertyKeyConstruction::allocate(
-            schema,
-            schema.reserve_gc_local(function),
-            zero,
-            function,
-        );
-        let keys = schema
-            .reserve_gc_local(function)
-            .initialize(construction.publish(schema, function), function);
-        schema.release_i32_local(zero, function);
-        Self { keys }
-    }
-
-    fn string_at(
-        &self,
-        index: I32Local,
-        builder: &mut FunctionBuilder<'_>,
-        function: &mut Function,
-    ) -> GcLocal<StringValue> {
-        let schema = builder.runtime_schema();
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .array_type::<PropertyKeyTable>()
-                .read(&self.keys, index, schema, function)
-                .reference(),
-            function,
-        );
-        let value = schema.reserve_value_local(function);
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, &value, schema, function);
-        let string = schema.reserve_gc_local(function).initialize(
-            value.cast_reference::<StringValue>(schema, function),
-            function,
-        );
-        value.clear(function);
-        stored.clear(function);
-        string
+    fn new(builder: &mut FunctionBuilder<'_>, function: &mut Function) -> Result<Self, EmitError> {
+        Ok(Self {
+            set: builder.emit_private_string_set(function)?,
+        })
     }
 
     fn contains(
@@ -65,68 +25,21 @@ impl ForInVisitedKeys {
         found: I32Local,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) {
-        let schema = builder.runtime_schema();
-        let length = schema.reserve_i32_local(function);
-        let index = schema.reserve_i32_local(function);
-        schema
-            .array_type::<PropertyKeyTable>()
-            .length(&self.keys, schema, function);
-        length.store(function);
-        function.instruction(&Instruction::I32Const(0));
-        found.store(function);
-        function.instruction(&Instruction::I32Const(0));
-        index.store(function);
-        let complete = builder.open_frame(ControlFrameKind::Block, function);
-        let scan = builder.open_frame(ControlFrameKind::Loop, function);
-        index.load(function);
-        length.load(function);
-        function.instruction(&Instruction::I32GeU);
-        builder.emit_branch_if_to_target(complete, function);
-        let candidate = self.string_at(index, builder, function);
-        builder.emit_string_payload_equality_i32(&candidate, key, function);
-        candidate.clear(function);
-        builder.open_frame(ControlFrameKind::If, function);
-        function.instruction(&Instruction::I32Const(1));
-        found.store(function);
-        builder.emit_branch_to_target(complete, function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        index.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        index.store(function);
-        builder.emit_branch_to_target(scan, function);
-        builder.pop_control(ControlFrameKind::Loop);
-        function.instruction(&Instruction::End);
-        builder.pop_control(ControlFrameKind::Block);
-        function.instruction(&Instruction::End);
-        schema.release_i32_local(index, function);
-        schema.release_i32_local(length, function);
+    ) -> Result<(), EmitError> {
+        builder.emit_private_string_set_has(&self.set, key, found, function)
     }
 
-    fn append(
-        &mut self,
+    fn insert(
+        &self,
         key: &GcLocal<StringValue>,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) {
-        let schema = builder.runtime_schema();
-        let key = PropertyKeyLocals::from_string(schema, key, function);
-        let construction = PropertyKeyConstruction::copy_with_appended_key(
-            schema,
-            schema.reserve_gc_local(function),
-            &self.keys,
-            &key,
-            function,
-        );
-        key.clear(function);
-        self.keys
-            .replace(construction.publish(schema, function), function);
+    ) -> Result<(), EmitError> {
+        builder.emit_private_string_set_add(&self.set, key, function)
     }
 
     fn clear(self, function: &mut Function) {
-        self.keys.clear(function);
+        self.set.clear(function);
     }
 }
 
@@ -141,7 +54,7 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let current = schema.reserve_value_local(function);
         current.set_scalar(ScalarValue::Null, function);
-        let visited = ForInVisitedKeys::new(self, function);
+        let visited = ForInVisitedKeys::new(self, function)?;
         self.compile_nullish_tagged_i32(source.tag(), function)?;
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -165,7 +78,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&stored, schema),
                     GcOperand::null(schema),
                     GcOperand::i32(0),
-                    GcOperand::reference(&visited.keys, schema),
+                    GcOperand::reference(&visited.set, schema),
                 ),
                 function,
             ),
@@ -241,11 +154,11 @@ impl FunctionBuilder<'_> {
         let found = schema.reserve_i32_local(function);
         let should_yield = schema.reserve_i32_local(function);
         output.initialize(function);
-        let mut visited = ForInVisitedKeys {
-            keys: schema.reserve_gc_local(function).initialize(
+        let visited = ForInVisitedKeys {
+            set: schema.reserve_gc_local(function).initialize(
                 schema
                     .struct_type::<ForInEnumerationRecord>()
-                    .field(ForInEnumerationRecordSchema::VISITED_KEYS)
+                    .field(ForInEnumerationRecordSchema::VISITED_SET)
                     .read(record, schema, function)
                     .reference(),
                 function,
@@ -349,28 +262,16 @@ impl FunctionBuilder<'_> {
             key.value().cast_reference::<StringValue>(schema, function),
             function,
         );
-        visited.contains(&string, found, self, function);
+        visited.contains(&string, found, self, function)?;
         found.load(function);
         self.emit_branch_if_to_target(next_property, function);
-        let descriptor = self.emit_proxy_target_own_descriptor(&current, &key, function)?;
-        descriptor.emit_found_i32(schema, function);
+        self.emit_own_property_enumerability(&current, &key, found, should_yield, function)?;
+        found.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(next_property, function);
         // Missing properties do not shadow a prototype; nonenumerable existing
         // properties do. Their getters never run during this observation.
-        visited.append(&string, self, function);
-        schema
-            .struct_type::<ForInEnumerationRecord>()
-            .field(ForInEnumerationRecordSchema::VISITED_KEYS)
-            .write(
-                record,
-                GcOperand::reference(&visited.keys, schema),
-                schema,
-                function,
-            );
-        descriptor.emit_enumerable_i32(schema, function);
-        should_yield.store(function);
-        descriptor.clear(function);
+        visited.insert(&string, self, function)?;
         string.clear(function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);

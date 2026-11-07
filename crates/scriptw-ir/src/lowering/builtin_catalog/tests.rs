@@ -44,17 +44,17 @@ fn immutable_catalogs_are_reused_with_bounded_complete_entries() {
     }
     assert_eq!(
         global_property_baseline(HostSurfacePolicy::Product).len(),
-        69
+        82
     );
     assert_eq!(
         global_property_baseline(HostSurfacePolicy::Test262).len(),
-        84
+        97
     );
     assert!(std::ptr::eq(
         function_signature_baseline(),
         function_signature_baseline()
     ));
-    assert_eq!(function_signature_baseline().len(), 933);
+    assert_eq!(function_signature_baseline().len(), 997);
     for builtin in StandardBuiltinId::all_functions() {
         assert!(function_signature_baseline().contains_key(&builtin.function_id()));
     }

@@ -54,10 +54,12 @@ accepts `--case <file.js>`.
   representation change wins. Preserve deferred recipes, descriptor ownership
   tokens and full numeric semantics; measure total request time and allocation.
   Owner: runtime value/storage representation.
-- Remove quadratic for-in visited-key scans and prefix copying. Measure fixed-yield
-  width scaling separately from value reads; preserve live descriptors, deleted-key
-  prototype behavior, nonenumerable shadowing, Proxy ordering and suspended cursors.
-  Owner: AOT enumeration and collection storage.
+- Attribute remaining for-in OwnKeys, descriptor and value-read costs with
+  fixed-yield width controls. Investigate a closed scalar loop region that proves
+  no callbacks or receiver mutation, with actual ordinary/null-prototype guards,
+  before omitting visited tracking. Preserve Number arithmetic, head bindings,
+  fallback progress, live descriptors, Proxy ordering and suspended cursors.
+  Owner: AOT loop lowering and IR facts.
 - Reduce duplicate descriptor snapshots on read-only packed-Array queries.
   Keep backing storage, values, attributes, holes and prototype behavior intact,
   with materialization retained for real writes. Measure repeated queries as well

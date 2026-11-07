@@ -7926,6 +7926,8 @@ mod tests {
                     Installer::IntlDurationFormat
                 ),
                 (Builtin::ShadowRealmConstructor, Installer::ShadowRealm),
+                (Builtin::TextEncoderConstructor, Installer::TextEncoder),
+                (Builtin::TextDecoderConstructor, Installer::TextDecoder),
             ]
         );
     }

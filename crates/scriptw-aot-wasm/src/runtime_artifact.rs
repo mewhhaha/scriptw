@@ -94,7 +94,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // typed helper, changing R's function/type ABI without changing the heap.
 // Version 51 gives internal GetOwnProperty a typed descriptor/completion
 // helper. The helper function/type ABI changes; the GC object model does not.
-const LAYOUT_VERSION: u32 = 51;
+// Version 52 retains a canonical SetObject in the private ForIn cursor,
+// replacing its visited-key array with an immutable strong Set edge.
+const LAYOUT_VERSION: u32 = 52;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

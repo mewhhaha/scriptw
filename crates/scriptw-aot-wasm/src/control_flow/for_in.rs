@@ -1,5 +1,5 @@
 use super::*;
-use crate::gc_types::{PropertyKeyConstruction, PropertyKeyTable, StringValue};
+use crate::gc_types::{PropertyKeyTable, StringValue};
 
 mod enumeration;
 

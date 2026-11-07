@@ -1,5 +1,5 @@
-//! Completed [[GetOwnProperty]] snapshots. Actual ordinary objects and Arrays
-//! copy private descriptors; remaining exotics use the typed recursive runtime owner.
+//! Shared [[GetOwnProperty]] observation. Snapshot consumers copy ordinary/Array
+//! descriptors; ForIn reads its two scalar predicates before further work.
 
 use super::*;
 use crate::gc_types::{I32Local, RuntimeSchema};
@@ -152,22 +152,57 @@ impl CompletedProxyTargetDescriptor {
     }
 }
 
-impl FunctionBuilder<'_> {
-    /// Ordinary [[GetOwnProperty]] invokes no user code. Copy its mutable
-    /// descriptor record before later consumer effects; only internal value edges
-    /// are shared. StoredValue is immutable; a recipe memoizes one identity.
-    fn emit_completed_ordinary_own_descriptor(
-        &mut self,
-        object: &GcLocal<OrdinaryObject>,
-        key: &PropertyKeyLocals,
-        descriptor: &GcLocal<PropertyDescriptor, Nullable>,
+// Storage references must not escape as completed snapshots. The scalar form
+// consumes the two predicates immediately, before any later callback can run.
+#[derive(Clone, Copy)]
+enum OwnDescriptorObservation<'a> {
+    Snapshot(&'a GcLocal<PropertyDescriptor, Nullable>),
+    Enumerability {
+        found: I32Local,
+        enumerable: I32Local,
+    },
+}
+
+impl OwnDescriptorObservation<'_> {
+    fn storage(
+        self,
+        source: GcLocal<PropertyDescriptor, Nullable>,
+        builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let source = self.emit_ordinary_own_descriptor_reference(object, key, function)?;
-        self.emit_completed_descriptor_snapshot(source, descriptor, function);
-        Ok(())
+    ) {
+        match self {
+            Self::Snapshot(output) => {
+                builder.emit_completed_descriptor_snapshot(source, output, function);
+            }
+            Self::Enumerability { .. } => self.completed(source, builder, function),
+        }
     }
 
+    fn completed(
+        self,
+        source: GcLocal<PropertyDescriptor, Nullable>,
+        builder: &FunctionBuilder<'_>,
+        function: &mut Function,
+    ) {
+        let schema = builder.runtime_schema();
+        match self {
+            Self::Snapshot(output) => {
+                output.replace(source.load(schema, function), function);
+                source.clear(function);
+            }
+            Self::Enumerability { found, enumerable } => {
+                let source = CompletedProxyTargetDescriptor { descriptor: source };
+                source.emit_found_i32(schema, function);
+                found.store(function);
+                source.emit_enumerable_i32(schema, function);
+                enumerable.store(function);
+                source.clear(function);
+            }
+        }
+    }
+}
+
+impl FunctionBuilder<'_> {
     /// Consume a storage lookup, preserving a fresh mutable descriptor record.
     /// A later consumer may invoke user code that redefines the source property;
     /// only immutable value edges may be shared with that property's live record.
@@ -272,6 +307,41 @@ impl FunctionBuilder<'_> {
         let descriptor = schema
             .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
             .initialize_null(schema, function);
+        self.emit_own_descriptor_observation(
+            target,
+            key,
+            OwnDescriptorObservation::Snapshot(&descriptor),
+            function,
+        )?;
+        Ok(CompletedProxyTargetDescriptor { descriptor })
+    }
+
+    /// Read live presence/enumerability through the same classifier and lookup.
+    /// Ordinary storage is consumed immediately; exotics retain their whole Throw.
+    pub(crate) fn emit_own_property_enumerability(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        found: I32Local,
+        enumerable: I32Local,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.emit_own_descriptor_observation(
+            target,
+            key,
+            OwnDescriptorObservation::Enumerability { found, enumerable },
+            function,
+        )
+    }
+
+    fn emit_own_descriptor_observation(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        observation: OwnDescriptorObservation<'_>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
         target.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             schema
@@ -283,7 +353,8 @@ impl FunctionBuilder<'_> {
             target.cast_reference::<OrdinaryObject>(schema, function),
             function,
         );
-        self.emit_completed_ordinary_own_descriptor(&object, key, &descriptor, function)?;
+        let source = self.emit_ordinary_own_descriptor_reference(&object, key, function)?;
+        observation.storage(source, self, function);
         object.clear(function);
         function.instruction(&Instruction::Else);
         // Concrete Arrays need their exotic indexed/length lookup, but no
@@ -303,7 +374,7 @@ impl FunctionBuilder<'_> {
             function,
         );
         let source = self.emit_array_own_descriptor_reference(&array, key, function)?;
-        self.emit_completed_descriptor_snapshot(source, &descriptor, function);
+        observation.storage(source, self, function);
         array.clear(function);
         function.instruction(&Instruction::Else);
         let result = schema.reserve_completion(function);
@@ -316,14 +387,13 @@ impl FunctionBuilder<'_> {
         self.emit_propagate_current_throw(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        descriptor.replace(returned.load(schema, function), function);
-        returned.clear(function);
+        observation.completed(returned, self, function);
         result.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        Ok(CompletedProxyTargetDescriptor { descriptor })
+        Ok(())
     }
 
     pub(super) fn emit_direct_own_descriptor_for_proxy_get(

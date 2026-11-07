@@ -732,6 +732,11 @@ fn abi50_runtime_cache_is_replaced_before_typed_own_descriptors_are_admitted() {
     assert_previous_runtime_cache_entry_replaced(50);
 }
 
+#[test]
+fn abi51_runtime_cache_is_replaced_before_for_in_visited_sets_are_admitted() {
+    assert_previous_runtime_cache_entry_replaced(51);
+}
+
 fn assert_previous_runtime_cache_entry_replaced(previous_version: u32) {
     let identity = identity();
     let cache = MemoryCache::new();

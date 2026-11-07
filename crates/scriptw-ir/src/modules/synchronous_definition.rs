@@ -277,8 +277,9 @@ impl ModuleExecutionDefinitions {
                 ModuleActivationKindIr::Async => FunctionExecutionKind::Async,
             };
             if unit.kind == ModuleActivationKindIr::Synchronous {
-                remove_wrapper_for_of_continuations(
+                remove_wrapper_iteration_continuations(
                     owner.body(),
+                    &mut analysis.for_in_continuation_owners,
                     &mut analysis.complete_for_of_owners,
                 );
             }
@@ -593,19 +594,35 @@ impl ModuleExecutionDefinitions {
     }
 }
 
-fn remove_wrapper_for_of_continuations(
+fn remove_wrapper_iteration_continuations(
     body: &FunctionBody,
-    owners: &mut BTreeMap<usize, crate::analysis::CompleteResumableForOfOwner>,
+    for_in: &mut BTreeMap<usize, crate::analysis::ForInContinuationOwner>,
+    for_of: &mut BTreeMap<usize, crate::analysis::CompleteResumableForOfOwner>,
 ) {
     // The trusted async-arrow wrapper was analyzed before its canonical module
     // protocol was installed. Synchronous evaluation has no continuation after
     // its private instantiation boundary; its original iteration records stay.
-    struct ModuleBody<'a>(&'a mut BTreeMap<usize, crate::analysis::CompleteResumableForOfOwner>);
+    struct ModuleBody<'a> {
+        for_in: &'a mut BTreeMap<usize, crate::analysis::ForInContinuationOwner>,
+        for_of: &'a mut BTreeMap<usize, crate::analysis::CompleteResumableForOfOwner>,
+    }
     impl<'ast> Visitor<'ast> for ModuleBody<'_> {
         type BreakTy = ();
 
+        fn visit_for_in_loop(
+            &mut self,
+            source: &'ast boa_ast::statement::iteration::ForInLoop,
+        ) -> ControlFlow<()> {
+            let owner = self
+                .for_in
+                .get_mut(&(std::ptr::from_ref(source) as usize))
+                .expect("source ForIn retains its analyzed iteration owner");
+            *owner = crate::analysis::ForInContinuationOwner::ImmediateOrLinear;
+            source.visit_with(self)
+        }
+
         fn visit_for_of_loop(&mut self, source: &'ast ForOfLoop) -> ControlFlow<()> {
-            self.0.remove(&(std::ptr::from_ref(source) as usize));
+            self.for_of.remove(&(std::ptr::from_ref(source) as usize));
             source.visit_with(self)
         }
 
@@ -613,7 +630,7 @@ fn remove_wrapper_for_of_continuations(
             ControlFlow::Continue(())
         }
     }
-    let _ = body.visit_with(&mut ModuleBody(owners));
+    let _ = body.visit_with(&mut ModuleBody { for_in, for_of });
 }
 
 fn reader_expression(expression: &Expression) -> &Expression {

@@ -7,14 +7,14 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-05**, React **19.3.1**, compiler `a7805b2f163d`
-(base `17c40d931` plus the archived source patch).
+Measured **2026-11-07**, React **19.3.1**, compiler `0ca455c47636`.
 Both sync and async Flight outputs match Node exactly.
+32-row catalog; async adds a resolved Promise, with no I/O.
 
 | Engine | Sync · ms | Async · ms |
 | --- | ---: | ---: |
-| Scriptw | 5.797 | 6.266 |
-| Node 24.12.0 / V8 | 0.488 | 0.413 |
+| Scriptw Fast | 7.148 | 7.783 |
+| Node 24 / V8 | 0.578 | 0.460 |
 
 ![Retained RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -26,18 +26,27 @@ are medians of process medians. The frozen prior-build control stays in the
 receipts; chart bars show the latest compiler and V8. Scriptc's React build
 remains unqualified; client React/DOM is a separate open scope.
 
-Cold Scriptw setup is **3.154 s JavaScript → Wasm**,
-**5.621 s native preparation**, and
-**2.183 ms module initialization**.
-Program Wasm is **4,231,662 B** (3,683,242 B code; 490,228 B data);
-shared runtime Wasm is **38,731,099 B**. All setup precedes request timing.
+Cold Scriptw setup is **4.120 s JavaScript → Wasm**,
+**7.189 s native preparation**, and
+**2.666 ms module initialization**.
+All setup precedes request timing. The linked size/allocation/PMU diagnostics
+retain their original earlier build identities; their counts were not refreshed.
 Child peak RSS includes compilation and process history; it is not live guest heap.
+
+The matched prior-build control is essentially neutral for requests: sync time
+is 0.4% higher and async time 1.2% lower. Cold JavaScript-to-Wasm time is 6.2%
+higher and native preparation 3.9% higher in this cohort. Native preparation
+includes P/R admission, packaged R loading and P compilation.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
 Scriptw compiles P with Wasmtime 47 **Fast / OptLevel::None / SinglePass**.
 Shared R is built with **SpeedAndSize / Backtracking**. Its successful native
-bundle admission is silent; absence of a hit trace does not establish fallback. The cohort uses
+bundle admission is silent in scored runs. A separate four-process, 80-check trace
+hit the packaged runtime every time. It did not reproduce the scored emission
+spikes: candidate emission samples split around 505 and 740 ms, while traced
+emission took 439–453 ms. The scored emission median is 32.6% higher; its cause
+remains unassigned. The cohort uses
 a generic target, one CPU, 16-MiB copying GC and the recorded stack/deadline/cache settings.
 The **recorded baseline** [hardware-counter diagnostic](react-attribution-current.json) records
 100 checked requests after three warmups in each of three fresh processes per
@@ -62,7 +71,7 @@ Physical StoredValue wrappers account for **19,935 /
 These aligned GC reservations include dead objects and host-bridge work;
 copied survivors are excluded. They do not identify allocation origins or retained
 memory. These counts retain their original compiler/host and exact P/R identities.
-No fresh allocation census was run for the caller-thread cohort. Timings stay unscored.
+No fresh allocation census was run for the current cohort. Timings stay unscored.
 [Counts, source identities and limits](react-allocation-current.json).
 
 Recorded totals and authenticated physical labels use medians of process medians.
@@ -97,10 +106,10 @@ preflight costs remain timed. Strict read-only arguments index-zero/length reads
 use invocation snapshots; missing indices retain the real object and generic Get.
 Bounded numeric bodies guard own Number data and captured cells before source work,
 then preserve arithmetic order and immediate canonical writes. Refusals use the
-original body. The RSC program/runtime bytes are unchanged by these admissions;
+original body. The current RSC source, program and runtime identities are recorded separately;
 V8 parity remains open.
 
-A separate **one-process, unscored** Speed/Backtracking P diagnostic produced
+A recorded prior **one-process, unscored** Speed/Backtracking P diagnostic produced
 20 exact Flight checks: 6.219 ms sync, 6.667 ms async, and 9.456 s native preparation.
 It is not part of the Fast cohort and establishes no policy win or regression.
 
@@ -122,43 +131,44 @@ reuse was rejected as the main hill. Entry stack budgets are distinct from spill
 capacity, executed spill traffic and allocation counts. GC allocation
 reservations are recorded above; their source origins remain unmeasured.
 
-Runtime ABI 51 supplies bounded UTF-8 codecs, byte streams with default readers,
+Runtime ABI 52 retains private hashed String Set storage for for-in cursors.
+The runtime supplies bounded UTF-8 codecs, byte streams with default readers,
 events, abort signals and tasks for these fixtures. Fetch/Request/URL, DOM nodes
 and full WHATWG conformance remain unsupported or unverified.
 
 [Current report and process receipts](rsc-current.json) ·
 [Size accounting](rsc-wasm-size-current.json) ·
-[Inert current evidence](situations-evidence-2026-11-05-calls.tar.xz).
+[Inert current evidence](situations-evidence-2026-11-07-for-in.tar.xz).
 
 ## Focused performance situations
 
-Measured **2026-11-05**: **21** standalone Module programs, compiler `a7805b2f163d`,
-Node **24.12.0 / V8 13.6.233.17-node.37**, Rust **1.97.1**.
+Measured **2026-11-07**: **21** standalone Module programs, compiler `0ca455c47636`.
+Node and Rust versions retain their exact identities in the report.
 Each program has its own score; no aggregate combines arbitrary operation counts.
 
 | Program · retained call | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.005435 | 0.005381 | 0.000376 |
-| `global-shallow.js` | 2.283 | 1.830 | 0.999 |
-| `global-deep8.js` | 2.894 | 2.072 | 1.062 |
-| `global-bound-deep.js` | 0.711 | 0.243 | 0.004 |
-| `global-getter-deep.js` | 3.213 | 2.439 | 1.011 |
-| `frame-compact.js` | 8.860 | 6.160 | 0.061 |
-| `frame-branches32.js` | 8.780 | 6.407 | 0.088 |
-| `frame-branches128.js` | 9.409 | 6.811 | 0.121 |
-| `frame-branches512.js` | 12.508 | 6.522 | 0.192 |
-| `args-unused.js` | 0.666 | 0.384 | 0.003 |
-| `args-observed.js` | 1.159 | 0.813 | 0.003 |
-| `property-stable.js` | 0.151 | 0.073 | 0.073 |
-| `property-mutated.js` | 0.153 | 0.075 | 0.062 |
-| `metadata-ordinary.js` | 0.200 | 0.083 | 0.012 |
-| `metadata-function.js` | 0.197 | 0.082 | 0.215 |
-| `metadata-intrinsic.js` | 0.201 | 0.085 | 0.231 |
-| `typeof-dispatch.js` | 0.961 | 0.409 | 0.014 |
-| `singleton-dispatch.js` | 0.965 | 0.372 | 0.013 |
-| `strict-equality-numbers.js` | 0.084 | 0.035 | 0.012 |
-| `strict-equality-mixed.js` | 0.090 | 0.040 | 0.036 |
-| `for-in-wide.js` | 2.186 | 2.119 | 0.040 |
+| `control-empty.js` | 0.00544 | 0.00535 | 0.000376 |
+| `global-shallow.js` | 2.3 | 1.81 | 0.988 |
+| `global-deep8.js` | 2.77 | 2.02 | 0.992 |
+| `global-bound-deep.js` | 0.697 | 0.235 | 0.00426 |
+| `global-getter-deep.js` | 3.07 | 2.26 | 0.979 |
+| `frame-compact.js` | 8.26 | 5.79 | 0.0581 |
+| `frame-branches32.js` | 8.43 | 6.08 | 0.0826 |
+| `frame-branches128.js` | 8.88 | 5.96 | 0.113 |
+| `frame-branches512.js` | 12.7 | 6.19 | 0.18 |
+| `args-unused.js` | 0.65 | 0.369 | 0.00312 |
+| `args-observed.js` | 1.11 | 0.79 | 0.00314 |
+| `property-stable.js` | 0.152 | 0.072 | 0.0718 |
+| `property-mutated.js` | 0.152 | 0.0742 | 0.0627 |
+| `metadata-ordinary.js` | 0.201 | 0.0828 | 0.0125 |
+| `metadata-function.js` | 0.195 | 0.0819 | 0.212 |
+| `metadata-intrinsic.js` | 0.199 | 0.0837 | 0.226 |
+| `typeof-dispatch.js` | 0.948 | 0.388 | 0.0139 |
+| `singleton-dispatch.js` | 0.919 | 0.363 | 0.0105 |
+| `strict-equality-numbers.js` | 0.0819 | 0.0341 | 0.0148 |
+| `strict-equality-mixed.js` | 0.0889 | 0.0394 | 0.0352 |
+| `for-in-wide.js` | 0.669 | 0.58 | 0.0382 |
 
 Each value is the median of eight fresh-process medians across two balanced
 blocks. Every process initializes one Module/Realm, then runs 100 checked
@@ -192,7 +202,7 @@ include calls and counter increments. These differences are not isolated lookup 
 All programs make 8,192 entries and exercise every selected site with matching
 checksums. Compact dispatch uses one polymorphic site and a dynamic key; switch
 arms use constant keys and separate sites. This does not isolate stack-probe cost.
-The 512-site native P image is **5.43 MiB Fast /
+The recorded prior 512-site native P image is **5.43 MiB Fast /
 2.30 MiB Speed**;
 portable P is **0.72 MiB**.
 Native serialized sizes include metadata and data.
@@ -268,38 +278,65 @@ checksum arithmetic remain timed. Independent models check every input.
 
 ### Enumeration
 
-Sixteen for-in loops visit all 64 own enumerable properties of a prepared ordinary
-record, checking 1,024 yielded keys and numeric value reads. Inherited nonenumerable
-processing is included. Immutable visited-key snapshots are copied without
-reboxing; prefix reference copying and membership comparisons remain quadratic.
-Mutation, Proxy and suspension controls run separately as semantic regressions.
+Sixteen for-in loops visit 64 own enumerable properties, checking 1,024
+yielded keys and numeric value reads. Private hashed String Set storage removes
+visited-prefix copying. Live descriptor checks, nonenumerable shadowing,
+deleted-key prototype behavior, Proxy ordering and suspended cursors retain
+the compiled Wasm object model. Ordinary scalar reads observe existence and
+enumerability without a full descriptor clone; other descriptor-query paths
+retain their own work.
+Hash collisions still require exact String equality.
 
 ![For-in enumeration](assets/situations-current/enumeration.svg)
+
+A separate direct comparison with the prior published build passes 4,840 calls
+across 40 fresh processes. Fast is **3.01× faster** and Speed **3.40× faster**;
+both balanced blocks improve. Its raw observations remain in the evidence archive.
+
+The separate **unscored width diagnostic** fixes 1,024 yields per call over
+null-prototype records: counting keys and summing values are separate programs.
+Preparation uses fixed-length String keys and stays outside timing.
+Bars and this table show the current compiler and V8; the balanced five-actor
+control retains both compiler images with their original identities.
+
+| Own keys | Body | Scriptw Fast · ms | Scriptw Speed · ms | V8 · ms |
+| ---: | --- | ---: | ---: | ---: |
+| 8 | count | 0.471 | 0.438 | 0.0358 |
+| 8 | value | 0.624 | 0.523 | 0.0478 |
+| 32 | count | 0.442 | 0.42 | 0.0293 |
+| 32 | value | 0.591 | 0.509 | 0.0387 |
+| 64 | count | 0.46 | 0.427 | 0.0272 |
+| 64 | value | 0.629 | 0.55 | 0.0411 |
+| 256 | count | 0.447 | 0.423 | 0.0285 |
+| 256 | value | 0.583 | 0.51 | 0.0416 |
+
+![For-in width](assets/situations-current/enumeration-width.svg)
+
+All 360 balanced width processes and 43,560 calls
+pass exact checks. [Width data and paired image receipts](for-in-width-current.json).
+This diagnostic does not isolate OwnKeys, hashing, property reads or GC costs.
+Its baseline is the separately qualified set-only build. One wide-value Speed
+block is 2% slower, despite an improved overall median; block variation remains
+part of the result.
 
 ### Public-call control and verification
 
 ![Public-call control](assets/situations-current/control.svg)
 
-All **504** situation processes and **60,984** calls passed exact checks.
-The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
-A balanced arguments control adds **80 processes / 9,680 checked calls**;
-its compiler order reverses in the second block. A matched frame control adds
-**40 processes / 4,840 calls** and records 3.08% higher Fast time and 5.39% higher
-Speed time; Speed block directions differ. A separate matched 128-site control
-records 1.87% / 5.09% higher time in both blocks. All 19 unchanged programs retain
-byte-identical P and native payloads, and embedded native R also matches. The
-remaining host-cohort cost is unattributed; this is not an all-workload speedup.
-Charts show only the latest full matrix.
+All **504** situation processes and **60,984** calls pass exact checks. The balanced RSC campaign adds 24 processes and 480 exact Flight checks.
+The separate width control is documented above. Prior arguments/frame controls
+remain in their original archive; they were not relabeled current.
 
-Fresh scoped verification passes **1,093 Engine unit** and **1,776 integration**
-cases, **69 emission**, **637 structural** and **380 source-guard** checks.
-All eight new private projection/numeric proofs pass. AOT units pass **661**
-cases; the exact four known bootstrap failures remain counted. Only **769 IR**
-cases reuse unchanged source/dependency and original binary/log identities.
-Benchmark products keep their measured source; two test-only Realm setup
-corrections have separate delivered-source and recovered-test receipts.
-Full workspace CI and pinned Test262 were not rerun. Eleven workspace formatting
-failures and fourteen stale Intl recipes remain [owned](current-inventory.md).
+Latest scoped verification (**2026-11-07**, compiler `0ca455c47636`): 1,093 Engine unit
+and 1,781 integration cases pass; 70 emission, 637 structural
+and 380 source-guard checks pass. AOT units pass 664 cases; four known
+bootstrap assertions remain failures. 1,630 IR unit cases pass on this source; 771 IR integration
+cases retain original source/binary receipts with an unchanged-input proof.
+All 60,984 focused calls, 43,560 width-control calls
+and 480 exact RSC checks pass.
+These scopes do not replace the published full Test262 run. Full workspace CI
+was not rerun; eleven formatting failures and fourteen stale Intl recipes
+remain [owned](current-inventory.md).
 
 [Generate/run a hill](../../CONTRIBUTING.md#focused-performance-situations) with
 `--case <file.js>` and optional `--policies fast` or `speed`. Scriptc has no matched

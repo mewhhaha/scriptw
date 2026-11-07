@@ -73,7 +73,8 @@ fn inspect_async_for_in_artifact(source: &str, requires_reference: bool) {
             let cursor_fields = &structures.get(&cursor)?.fields;
             if !nullable
                 || cursor_fields.len() != 4
-                || cursor_fields.iter().any(|field| !field.mutable)
+                || cursor_fields[..3].iter().any(|field| !field.mutable)
+                || cursor_fields[3].mutable
                 || cursor_fields[2].element_type.unpack() != ValType::I32
             {
                 return None;
@@ -83,7 +84,25 @@ fn inspect_async_for_in_artifact(source: &str, requires_reference: bool) {
                 return None;
             }
             let (nullable, keys) = concrete_reference(cursor_fields[1].element_type)?;
-            if !nullable || concrete_reference(cursor_fields[3].element_type) != Some((false, keys))
+            if !nullable {
+                return None;
+            }
+            let (nullable, visited) = concrete_reference(cursor_fields[3].element_type)?;
+            let set = &structures.get(&visited)?.fields;
+            if nullable || set.len() != 8 || set[0].mutable {
+                return None;
+            }
+            let (nullable, entries) = concrete_reference(set[1].element_type)?;
+            if nullable || !set[1].mutable {
+                return None;
+            }
+            let (nullable, entry) = concrete_reference(arrays.get(&entries)?.0.element_type)?;
+            let entry = &structures.get(&entry)?.fields;
+            if !nullable
+                || entry.len() != 2
+                || entry[0].mutable
+                || concrete_reference(entry[0].element_type) != Some((false, value))
+                || entry[1].element_type.unpack() != ValType::I64
             {
                 return None;
             }
@@ -208,7 +227,8 @@ fn inspect_async_for_in_artifact(source: &str, requires_reference: bool) {
     assert!(
         cursor_new > 0
             && cursor_reads.into_iter().all(|count| count > 0)
-            && cursor_writes.into_iter().all(|count| count > 0),
+            && cursor_writes[..3].iter().all(|count| *count > 0)
+            && cursor_writes[3] == 0,
         "actual shared creation/advance consumes every persisted cursor field"
     );
     assert!(

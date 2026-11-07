@@ -29,6 +29,7 @@ CATEGORIES = (
     ('function properties', 'Function property reads', 'Retained public call · ms',
      ('metadata-ordinary.js', 'metadata-function.js', 'metadata-intrinsic.js')),
 )
+WIDTH_CASES = tuple(f'for-in-{kind}-{width}.js' for width in (8, 32, 64, 256) for kind in ('count', 'value'))
 SHORT_LABELS = {
     'strict-equality-numbers.js': 'Number pairs',
     'strict-equality-mixed.js': 'Mixed value pairs',
@@ -45,6 +46,9 @@ SHORT_LABELS = {
     'metadata-ordinary.js': 'Ordinary records', 'metadata-function.js': 'JS functions',
     'metadata-intrinsic.js': 'Native constructors',
 }
+for width in (8, 32, 64, 256):
+    SHORT_LABELS[f'for-in-count-{width}.js'] = f'{width} keys · count'
+    SHORT_LABELS[f'for-in-value-{width}.js'] = f'{width} keys · values'
 FRAME_CASES = ('frame-compact.js', 'frame-branches32.js', 'frame-branches128.js', 'frame-branches512.js')
 
 
@@ -103,7 +107,7 @@ def chart_context():
 def svg_bytes(fig, title, report, report_sha, source_hashes):
     import io
     matplotlib, _ = chart_context()
-    metadata = dict(schema=SCHEMA, report_sha256=report_sha,
+    metadata = dict(schema=report.get('schema', SCHEMA), report_sha256=report_sha,
                     source_commit=report.get('source_identity', {}).get('source_commit'),
                     source_fingerprint=report.get('source_identity', {}).get('source_fingerprint'),
                     source_sha256=source_hashes, report_status=report['status'],
@@ -122,11 +126,12 @@ def apply_style(plt, salt):
                            'text.usetex': False})
 
 
-def runtime_chart(report, report_sha, cases, category, title, ylabel, preview=None):
+def runtime_chart(report, report_sha, cases, category, title, ylabel, preview=None, case_order=None):
     matplotlib, plt = chart_context()
     lookup = {case['file']: case for case in cases if case.get('category') == category}
-    ordered = [lookup[name] for name in next(group for key, _, _, group in CATEGORIES if key == category)
-               if name in lookup]
+    if case_order is None:
+        case_order = next(group for key, _, _, group in CATEGORIES if key == category)
+    ordered = [lookup[name] for name in case_order if name in lookup]
     height = max(3.8, 1.2 + .82 * len(ordered))
     with apply_style(plt, 'scriptw-situations-' + category.replace(' ', '-')):
         fig, ax = plt.subplots(figsize=(9.2, height))
@@ -152,6 +157,8 @@ def runtime_chart(report, report_sha, cases, category, title, ylabel, preview=No
                         ax.text(x, 0, status, ha='center', va='bottom', rotation=90,
                                 fontsize=7, color='#666b70', clip_on=False)
             ax.set_xticks(centers, [SHORT_LABELS.get(case['file'], case['label']) for case in ordered])
+            if category == 'enumeration width':
+                ax.tick_params(axis='x', labelrotation=20)
             ax.set_ylabel(ylabel)
             prefix = 'INCOMPLETE · ' if report['status'] != 'complete' else ''
             ax.set_title(prefix + title, loc='left', fontweight='bold', pad=13)
@@ -234,10 +241,39 @@ def frame_image_chart(report, report_sha, preview=None):
             plt.close(fig)
 
 
+def width_cases(report):
+    require(report.get('schema') == 'scriptw-for-in-width-current-v1'
+            and report.get('status') == 'complete' and report.get('complete'),
+            'width report must be a complete published diagnostic')
+    policy = report['policy']
+    require(policy.get('samples') == 21 and policy.get('warmups') == 100
+            and policy.get('blocks') == 2 and policy.get('processes_per_actor_per_block') == 4,
+            'width cohort differs')
+    fixtures = {case['file']: case for case in report['workloads']}
+    require(set(WIDTH_CASES) <= set(fixtures), 'width fixture inventory differs')
+    cases = []
+    actors = {'scriptw-fast': 'candidate-fast', 'scriptw-speed': 'candidate-speed', 'v8': 'v8'}
+    for name in WIDTH_CASES:
+        case = dict(fixtures[name], category='enumeration width', runtimes={})
+        for actor, raw_actor in actors.items():
+            rows = [row for row in report['rows'] if row['file'] == name and row['actor'] == raw_actor]
+            require(len(rows) == 8 and all(row['accounting']['exit_code'] == 0
+                    and not row['accounting']['timed_out'] for row in rows), 'width process inventory differs')
+            medians = [row['median_ns'] for row in rows]
+            require(all(type(value) is int and value > 0 for value in medians), 'width process median differs')
+            require(statistics.median(medians) == report['summary'][name][raw_actor]['median_ns'],
+                    'width summary differs')
+            case['runtimes'][actor] = dict(status='complete', median_ns=statistics.median(medians),
+                process_medians_ns=medians, range_ns=[min(medians), max(medians)])
+        cases.append(case)
+    return cases
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', required=True, type=Path)
     parser.add_argument('--output-dir', required=True, type=Path)
+    parser.add_argument('--width-report', type=Path, help='optional published unscored width diagnostic; shows current Fast/Speed/V8 only')
     parser.add_argument('--preview-dir', type=Path)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
@@ -253,6 +289,16 @@ def main():
             report, report_sha, cases, category, title, ylabel, preview)
     preview = args.preview_dir / 'frame-native-image.png' if args.preview_dir else None
     outputs[args.output_dir / 'frame-native-image.svg'] = frame_image_chart(report, report_sha, preview)
+    if args.width_report:
+        width_path = args.width_report.resolve(strict=True)
+        width_report = json.loads(width_path.read_text())
+        preview = None
+        if args.preview_dir:
+            preview = args.preview_dir / 'enumeration-width.png'
+        outputs[args.output_dir / 'enumeration-width.svg'] = runtime_chart(
+            width_report, digest(width_path), width_cases(width_report), 'enumeration width',
+            'For-in width · 1,024 yields per call · unscored', 'Retained public call · ms',
+            preview, case_order=WIDTH_CASES)
     for path, content in outputs.items():
         if args.check:
             require(path.is_file() and path.read_bytes() == content,

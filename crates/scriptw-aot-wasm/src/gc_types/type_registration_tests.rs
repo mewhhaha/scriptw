@@ -7,6 +7,7 @@ use wasmparser::{CompositeInnerType, Parser, Payload, SubType, Validator, WasmFe
 
 mod array_storage_fusion;
 mod compact_records;
+mod for_in_visited_set;
 
 fn encoded(kind: ModuleKind<'_>) -> (FinalizedRuntimeModule, Vec<u8>) {
     let runtime =

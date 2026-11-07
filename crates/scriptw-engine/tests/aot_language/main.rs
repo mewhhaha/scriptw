@@ -33,6 +33,7 @@ mod aot_empty_function;
 mod aot_equality_operand_effects;
 mod aot_exact_context_budget;
 mod aot_for_in_codegen;
+mod aot_for_in_visited_set;
 mod aot_for_of_head_completion;
 mod aot_function_own_data_probe;
 mod aot_guarded_number_add;

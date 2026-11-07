@@ -44,6 +44,13 @@ JavaScript. AsyncModuleActivation uses the corresponding async ABI with closed
 Allocate/Instantiate/Execute modes; it retains ordinary async source semantics,
 while instantiation creates neither source effects nor await jobs. Its canonical
 invocation environment remains distinct from the suspended current lexical chain.
+Installing the trusted synchronous module protocol removes ForIn/ForOf
+continuation owners introduced by its generated async wrapper. The visitor
+stops at nested function bodies, whose source continuations stay intact.
+Synchronous module loops use ordinary control flow; the private instantiation
+suspension does not reserve source loop states. Actual top-level await keeps
+the async module continuation and original cursor across awaits. Module `with`
+remains a strict-mode early error.
 See [module instantiation](module-instantiation.md).
 
 ## Boundaries that stay separate

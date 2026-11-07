@@ -9,7 +9,8 @@ and runs once after advancement; a resumed body never repeats it.
 
 One `ForInEnumerationRecord` in the existing Wasm GC schema owns a boxed current
 object/prototype StoredValue, a nullable accepted PropertyKeyTable snapshot, an
-i32 next index and a visited String-key table. Null current means completion;
+i32 next index and an immutable strong edge to a private canonical SetObject.
+Only String keys enter its hashed storage. Null current means completion;
 absent remaining keys means this prototype level has not observed OwnKeys yet.
 There is no JavaScript iterator or separate object model. Nullish sources are
 completed cursors; other primitives are boxed once after source evaluation.
@@ -48,12 +49,9 @@ checkpoint and restore V through existing sequence and Empty-source-item
 wrappers; nested scopes retain their original completion behavior. Normal body
 completion and matching Continue meet before the next advance.
 
-Two actual emitted-Wasm controls are authored against the paired source semantic
-cohorts. They validate the full lower-bound feature set and follow the actual
-13-field BindingCell edge to the four-field cursor and exact table/value types.
-They require real cursor creation, all field transitions and invocation-edge
-publication, reload and retirement instructions. The prior Array and With GC
-controls retain their names and algorithms, extending only the newly appended
-field expectation. No compilation, test, runtime, source guard or generation
-has run for this source batch. Async/async-generator and foreign linear domains
-retain their existing separate owners and admission boundaries.
+Encoded controls consume the paired source semantic cohorts. They follow the
+actual 13-field BindingCell edge to the four-field cursor, accepted key table,
+and canonical Set entries containing StoredValues. They require real cursor
+creation, current/snapshot/index transitions, an immutable visited-Set edge,
+and invocation-edge publication, reload and retirement. The complete
+[resumable family](resumable-for-in-family.md) shares this native owner.

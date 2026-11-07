@@ -277,6 +277,19 @@ time and native-image size separately. Mutation and getter controls have their
 own scores; their differences are not allocation counts or isolated stack costs.
 Scriptc has no matched retained-Module consumer in this workflow.
 
+Check the published situation cards and the separate fixed-yield width panel together:
+
+```sh
+python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python -B scripts/render-situation-benchmarks.py \
+  --report docs/rust-rewrite/situations-current.json \
+  --width-report docs/rust-rewrite/for-in-width-current.json \
+  --output-dir docs/rust-rewrite/assets/situations-current --check
+```
+
+The width panel keeps 1,024 yields per call across 8–256 keys, with counting and
+value reads measured separately. Its paired controls retain both compiler identities;
+charts show the current compiler and V8.
+
 After a later Cargo build replaces the original executable, a frozen host can
 use `--producer-receipt <receipt.json>`. The receipt must retain the exact Cargo
 `artifact` row, the frozen host's `sha256` and its `source_manifest_sha256`.
@@ -368,7 +381,7 @@ standalone `EventTarget`/`Event`, `DOMException`, `queueMicrotask`, `setTimeout`
 `clearTimeout`. These use the existing compiled Wasm GC object model. UTF-8 label
 aliases are accepted; other decoder encodings reject explicitly. BYOB readers,
 generic object streams, pipe/tee operations, Fetch/URL and DOM nodes are separate
-capabilities, not implied by this surface. The changes use Runtime ABI 47.
+capabilities, not implied by this surface. Current artifacts use Runtime ABI 52.
 Current-source sync and async React RSC fixture output passes exact Flight checks;
 that does not establish full Web API or WHATWG Streams conformance.
 

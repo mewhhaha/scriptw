@@ -1013,3 +1013,127 @@ fn real_direct_eval_conservatively_retains_module_function_var_cells() {
         }
     }
 }
+
+#[test]
+fn module_iteration_owners_follow_source_execution_and_keep_real_awaits() {
+    fn flatten_scopes<'a>(statements: &'a [StatementIr], flattened: &mut Vec<&'a StatementIr>) {
+        for statement in statements {
+            match statement {
+                StatementIr::Block(block) => flatten_scopes(&block.statements, flattened),
+                StatementIr::LexicalBlock(statements) => flatten_scopes(statements, flattened),
+                StatementIr::EmptyStatementCompletion(item) => {
+                    flatten_scopes(std::slice::from_ref(item.statement()), flattened)
+                }
+                statement => flattened.push(statement),
+            }
+        }
+    }
+
+    for (source, expected) in [
+        (
+            "for (var key in {first: 1}) print(key); for (const value of ['last']) print(value);",
+            FunctionProtocolIr::ModuleActivation,
+        ),
+        (
+            "for (var key in {first: 1}) { await key; } for (const value of ['last']) { await value; }",
+            FunctionProtocolIr::AsyncModuleActivation,
+        ),
+    ] {
+        let source = format!(
+            "{source}\nexport function* nestedGenerator(view, values) {{ for (const key in view) yield key; for (const value of values) yield value; }}\nexport async function nestedAsync(view, values) {{ for (const key in view) await key; for (const value of values) await value; }}"
+        );
+        let program = lower_module_graph(&sources(&[("entry.js", &source)], ParseGoal::Module));
+        assert!(program.is_wasm_supported(), "{expected:?}: {source}: {:?}", program.diagnostics);
+        let script = program.script.as_ref().unwrap();
+        let activation = &activation_graph(script).unwrap().activations()[0];
+        let owner = script.functions.iter()
+            .find(|function| &function.id == activation.function()).unwrap();
+        assert_eq!(owner.protocol, expected);
+        let mut statements = Vec::new();
+        flatten_scopes(&owner.body.statements, &mut statements);
+        let mut iterations = Vec::new();
+        for statement in statements {
+            match statement {
+                StatementIr::ForInObject { .. } => {
+                    assert_eq!(expected, FunctionProtocolIr::ModuleActivation);
+                    iterations.push("for-in");
+                }
+                StatementIr::ForOfIterator { .. } => {
+                    assert_eq!(expected, FunctionProtocolIr::ModuleActivation);
+                    iterations.push("for-of");
+                }
+                StatementIr::AsyncGeneratorForIn(plan) => {
+                    assert_eq!(expected, FunctionProtocolIr::AsyncModuleActivation);
+                    assert_eq!(plan.execution(), scriptw_ir::ResumableRegionProtocolIr::Async);
+                    let mut body = Vec::new();
+                    flatten_scopes(&plan.body().block().statements, &mut body);
+                    assert!(body.iter().any(|statement| matches!(statement, StatementIr::AsyncAwait { .. })));
+                    iterations.push("for-in");
+                }
+                StatementIr::AsyncGeneratorForOf(plan) => {
+                    assert_eq!(expected, FunctionProtocolIr::AsyncModuleActivation);
+                    assert_eq!(plan.execution(), scriptw_ir::ResumableRegionProtocolIr::Async);
+                    let mut body = Vec::new();
+                    flatten_scopes(&plan.body().block().statements, &mut body);
+                    assert!(body.iter().any(|statement| matches!(statement, StatementIr::AsyncAwait { .. })));
+                    iterations.push("for-of");
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(iterations, ["for-in", "for-of"]);
+        match expected {
+            FunctionProtocolIr::ModuleActivation => {
+                let plan = owner.generator_plan.as_ref().unwrap();
+                assert_eq!(plan.state_count, 2);
+                assert_eq!(plan.suspension_points.len(), 1);
+                assert_eq!(plan.suspension_points[0].suspend_state, 0);
+                assert_eq!(plan.suspension_points[0].resume_state, 1);
+            }
+            FunctionProtocolIr::AsyncModuleActivation => assert!(owner.generator_plan.is_none()),
+            _ => unreachable!(),
+        }
+        for (name, execution) in [
+            ("nestedGenerator", scriptw_ir::ResumableRegionProtocolIr::Generator),
+            ("nestedAsync", scriptw_ir::ResumableRegionProtocolIr::Async),
+        ] {
+            let nested = script.functions.iter().find(|function| function.name == name).unwrap();
+            let mut statements = Vec::new();
+            flatten_scopes(&nested.body.statements, &mut statements);
+            let mut iterations = Vec::new();
+            for statement in statements {
+                match statement {
+                    StatementIr::AsyncGeneratorForIn(plan) => {
+                        assert_eq!(plan.execution(), execution);
+                        iterations.push("for-in");
+                    }
+                    StatementIr::AsyncGeneratorForOf(plan) => {
+                        assert_eq!(plan.execution(), execution);
+                        iterations.push("for-of");
+                    }
+                    _ => {}
+                }
+            }
+            assert_eq!(iterations, ["for-in", "for-of"], "{name}");
+        }
+    }
+}
+
+#[test]
+fn module_with_is_rejected_before_iteration_continuation_analysis() {
+    for source in [
+        "for (var key in {}) { with ({}) {} }",
+        "for (var key in {}) { await key; with ({}) {} }",
+    ] {
+        let program = lower_module_graph(&sources(&[("entry.js", source)], ParseGoal::Module));
+        assert!(program.script.is_none());
+        assert!(
+            program.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code() == Some(scriptw_ir::EarlyErrorCode::StrictModeWithStatement)
+                    && diagnostic.phase() == scriptw_ir::IrDiagnosticPhase::Early
+            }),
+            "{:?}",
+            program.diagnostics
+        );
+    }
+}

@@ -3650,50 +3650,6 @@ pub(crate) struct PropertyKeyConstruction {
     keys: GcLocal<PropertyKeyTable>,
 }
 impl PropertyKeyConstruction {
-    /// Copy validated immutable key snapshots into fresh private storage. Only
-    /// the appended key is boxed; published tables remain read-only.
-    pub(crate) fn copy_with_appended_key(
-        schema: &RuntimeSchema,
-        slot: GcLocalSlot<PropertyKeyTable>,
-        source: &GcLocal<PropertyKeyTable>,
-        key: &crate::operations::PropertyKeyLocals,
-        function: &mut Function,
-    ) -> Self {
-        let length = schema.reserve_i32_local(function);
-        let next_length = schema.reserve_i32_local(function);
-        let array = schema.array_type::<PropertyKeyTable>();
-        array.length(source, schema, function);
-        length.store(function);
-        length.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        next_length.store(function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(key.value(), function),
-            function,
-        );
-        let keys = slot.initialize(
-            array.filled(GcOperand::reference(&stored, schema), next_length, function),
-            function,
-        );
-        keys.load(schema, function);
-        function.instruction(&Instruction::I32Const(0));
-        source.load(schema, function);
-        function.instruction(&Instruction::I32Const(0));
-        length.load(function);
-        let index = array.type_index().raw();
-        function.instruction(&Instruction::ArrayCopy {
-            array_type_index_dst: index,
-            array_type_index_src: index,
-        });
-        stored.clear(function);
-        schema.release_i32_local(next_length, function);
-        schema.release_i32_local(length, function);
-        Self { keys }
-    }
-
     pub(crate) fn allocate(
         schema: &RuntimeSchema,
         slot: GcLocalSlot<PropertyKeyTable>,

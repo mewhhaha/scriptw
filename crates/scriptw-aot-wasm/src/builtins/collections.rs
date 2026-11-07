@@ -8,6 +8,7 @@ mod hashing;
 mod iterable_algorithms;
 mod iteration;
 mod map_get_or_insert;
+mod private_string_set;
 mod receiver;
 mod set_operations;
 mod storage;

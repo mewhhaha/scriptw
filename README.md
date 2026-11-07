@@ -18,6 +18,7 @@ SCRIPTW_WASM_DUMP=hello.wasm ./target/release/scriptw build wasm hello.js
 Rust applications can [embed Scriptw](docs/rust-rewrite/contracts/foreign-modules.md)
 in their own Wasmtime Engine, Store and Linker, with synchronous and async host functions.
 Top-level embedded calls use a guarded stack on the caller’s thread.
+Module `for-in` and `for-of` loops work across top-level `await`.
 
 ## Benchmarks
 
@@ -47,35 +48,27 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-05:** both modes produce the exact expected Flight output.
+**React 19.3.1 RSC · 2026-11-07**, compiler `0ca455c47636`: exact Flight output.
 
-| Retained request | Scriptw | Node 24 / V8 |
+| Retained request | Scriptw Fast | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 5.80 ms | 0.488 ms |
-| Async | 6.27 ms | 0.413 ms |
+| Sync | 7.15 ms | 0.578 ms |
+| Async | 7.78 ms | 0.460 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Eight fresh processes per engine; three checked warmups and seven measured
-requests per mode. Requests include full Flight serialization and consumption;
-final JSON encoding and validation follow timing. Scriptw uses Cranelift
-**Fast / OptLevel::None**; native compilation and module initialization precede timing.
+requests per mode. Full Flight serialization and consumption are timed;
+compilation, initialization and final validation are outside request timing.
+32-row catalog; async adds a resolved Promise, with no I/O.
 
-Cold Scriptw setup: **3.15 s JavaScript → Wasm**, **5.62 s native preparation**,
-and **2.18 ms module initialization**. Program Wasm is **4.04 MiB** (3.51 MiB
-code, 0.47 MiB data); shared runtime Wasm is **36.94 MiB**.
-[Recorded size breakdown](docs/rust-rewrite/rsc-wasm-size-current.json) ·
-[Recorded allocation counts](docs/rust-rewrite/react-allocation-current.json) ·
-[Benchmark details and caveats](docs/rust-rewrite/benchmarks.md) ·
-[Recorded RSC build](docs/rust-rewrite/rsc-current.json).
+**Focused performance situations · 2026-11-07:** 21 checked programs compare
+lookup, calls, arguments, properties, type tests, equality and enumeration
+against V8. A separate fixed-yield width panel checks 8–256 own keys.
+Eight fresh processes per configuration; 100 checked warmups and 21 samples.
 
-**Focused performance situations · 2026-11-05:** 21 checked programs compare
-global lookup, calls, arguments, mutation, metadata, type tests, equality and enumeration
-against V8. Eight fresh processes per configuration; 100 checked warmups and
-21 measured calls. Compilation and input preparation precede timing.
-
-[Individual scores and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
-[Data](docs/rust-rewrite/situations-current.json).
+[Scores, width panel and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
+[RSC data](docs/rust-rewrite/rsc-current.json) · [Situation data](docs/rust-rewrite/situations-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->
@@ -99,11 +92,13 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-05**): 1,093 Engine unit and 1,776
-integration cases pass, alongside 69 emission, 637 structural and 380 source-guard
-checks. AOT units pass 661 cases; four known bootstrap assertions remain failures.
-The 769 unchanged IR cases reuse original source/binary receipts. All 60,984
-focused benchmark calls and 480 exact RSC Flight checks pass.
+Latest scoped verification (**2026-11-07**, compiler `0ca455c47636`): 1,093 Engine unit
+and 1,781 integration cases pass; 70 emission, 637 structural
+and 380 source-guard checks pass. AOT units pass 664 cases; four known
+bootstrap assertions remain failures. 1,630 IR unit cases pass on this source; 771 IR integration
+cases retain original source/binary receipts with an unchanged-input proof.
+All 60,984 focused calls, 43,560 width-control calls
+and 480 exact RSC checks pass.
 These scopes do not replace the published full Test262 run. Full workspace CI
 was not rerun; eleven formatting failures and fourteen stale Intl recipes
 remain [owned](docs/rust-rewrite/current-inventory.md).
@@ -121,7 +116,8 @@ remain [owned](docs/rust-rewrite/current-inventory.md).
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 51:** rebuild older Portable bundles and native images.
+- **Runtime ABI 52:** private for-in cursors now retain hashed Set storage.
+  Rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·
 [Current work](docs/rust-rewrite/current-inventory.md) ·
