@@ -362,6 +362,15 @@ Speed/Backtracking diagnostic; keep it outside the matched Fast cohort. A single
 probe is not a complete comparison; freeze binaries before repeating the balanced
 process campaign. The published evidence archive retains that campaign's driver.
 
+[RSC attribution](docs/rust-rewrite/react-attribution-current.json) separates
+request-window hardware counters, frame-pointer samples and exact native entry
+counts. Its [inert evidence archive](docs/rust-rewrite/rsc-attribution-evidence-2026-11-07.tar.xz)
+retains the drivers, input identities, emitted samples, same-process maps and
+known-count controls. Drivers require a qualified frozen host and its matching
+baseline JSON; rebuilding requires a new baseline identity. These diagnostics
+include caller control edges, exclude setup/output checks and never supply scored
+request timings. Binary perf data and native executables are not in the archive.
+
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone
 Scriptw/Scriptc attempts retain compilation and execution errors explicitly.

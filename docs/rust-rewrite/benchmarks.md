@@ -29,7 +29,7 @@ remains unqualified; client React/DOM is a separate open scope.
 Cold Scriptw setup is **4.120 s JavaScript → Wasm**,
 **7.189 s native preparation**, and
 **2.666 ms module initialization**.
-All setup precedes request timing. The linked size/allocation/PMU diagnostics
+All setup precedes request timing. The linked size/allocation diagnostics
 retain their original earlier build identities; their counts were not refreshed.
 Child peak RSS includes compilation and process history; it is not live guest heap.
 
@@ -48,14 +48,97 @@ spikes: candidate emission samples split around 505 and 740 ms, while traced
 emission took 439–453 ms. The scored emission median is 32.6% higher; its cause
 remains unassigned. The cohort uses
 a generic target, one CPU, 16-MiB copying GC and the recorded stack/deadline/cache settings.
-The **recorded baseline** [hardware-counter diagnostic](react-attribution-current.json) records
-100 checked requests after three warmups in each of three fresh processes per
-engine/mode. Scriptw retires **50.36 million sync /
-54.26 million async user instructions per request**;
-Node retires **2.54 / 2.80 million**.
-Counters run without multiplexing. They count Scriptw's execution worker and
-Node's main thread, including Node barrier/Promise-return edges; background
-compilation/GC threads are excluded. These are unscored counts, not causal shares.
+
+### RSC request attribution
+
+Measured **2026-11-07** on the same frozen compiler `0ca455c47636` and exact
+program/runtime pair as the timing cohort. **4,368 exact Flight checks** pass
+across counters, sampling and entry-count diagnostics. These are unscored runs;
+the 100/200-request series has different JIT/GC history from the seven-sample scores.
+
+Three fresh processes per engine/mode count 100 requests after three warmups.
+User-only counters target the authenticated Scriptw caller or Node main thread,
+including control edges and excluding background threads. Every group runs
+without multiplexing. Values are medians of process medians.
+Node literal-null control windows execute **0.332 / 0.338 million instructions**;
+these are reported separately and are not subtracted from rendering counts.
+
+| Compilation policy / engine | Sync · million instructions | Async · million instructions |
+| --- | ---: | ---: |
+| Scriptw Fast | 48.747 | 52.611 |
+| Scriptw Speed diagnostic | 45.282 | 48.961 |
+| Node / V8 | 2.532 | 2.694 |
+
+Fast executes **19.25× / 19.53×** Node's instructions, despite higher aggregate
+IPC and a lower branch-miss fraction. Speed changes both optimization and
+register allocation: it reduces instructions by **7.1% / 6.9%** and user cycles
+by **22.4% / 27.1%**. This is a combined policy diagnostic, not a register-allocator
+attribution or a scored wall-time improvement.
+
+Three sampled Scriptw processes per mode cover 200 checked requests each:
+**83,231 sync / 87,985 async** user-cycle samples. The following disjoint
+function-name categories use the mean of per-process shares, summing to 100%.
+
+| Sampled code location | Sync | Async |
+| --- | ---: | ---: |
+| Object/property/enumeration functions | 38.09% | 36.54% |
+| Compiled JavaScript bodies/adapters | 25.20% | 25.83% |
+| Other compiled runtime functions | 17.76% | 17.61% |
+| Other resolved host functions | 8.38% | 9.30% |
+| Wasmtime GC support routines | 3.87% | 4.07% |
+| Wasmtime subtype routines | 3.50% | 3.49% |
+| Selected Promise/stream/text-codec functions | 1.81% | 1.79% |
+| Unresolved samples | 1.39% | 1.36% |
+
+These are code locations, not removable time or allocation origins. Inlined
+allocation, guards and value transport stay charged to their containing bodies.
+GC support includes allocation/reference operations as well as collection.
+The selected Promise/Web API leaves exclude transitive rendering and other async
+code. Frame-pointer caller chains can truncate; inclusive shares overlap.
+
+Hardware execute breakpoints count actual helper entries over seven requests per
+mode. Every count is identical across those requests; two fresh eight-case
+controls cover direct, indirect, recursive, tail, zero, disabled and burst entries.
+Debug traps perturb execution, so no associated timing is scored.
+
+| Native entry | Sync / request | Async / request |
+| --- | ---: | ---: |
+| Generic property read | 7,823 | 8,269 |
+| Ordinary-property search | 10,604 | 11,187 |
+| Ordinary descriptor query | 9,711 | 10,207 |
+| Cached property read | 2,548 | 2,698 |
+| Intrinsic-property search | 5,410 | 5,704 |
+| Ordinary-property append | 1,707 | 1,790 |
+| Internal receiver data write | 390 | 420 |
+| `Reflect.defineProperty` | 240 | 250 |
+
+These overlapping entry populations are not JavaScript expression or allocation
+counts. Source and caller inspection identify three concrete experiments:
+
+1. Some internal receiver writes build a JavaScript descriptor carrier, call
+   `Reflect.defineProperty`, then convert it back into a typed descriptor. An
+   actual-ordinary-receiver guard can reuse canonical definition directly while
+   retaining exotic fallback. Reflect appears in about **3.9% / 3.8%** of observed
+   caller chains; this excludes earlier carrier construction and predicts no gain.
+2. Ordinary Get repeats the lookup after its initial data probe reports absence
+   or an accessor. Retaining the result could remove that repeated work; current
+   helper counts do not establish the duplicate fraction.
+3. Compact-property descriptor queries can allocate even when for-in only needs
+   presence/enumerability. Pass the observation demand through the existing seam
+   before considering a broader object-storage rewrite.
+
+No storage-promotion helper entries occur inside these windows; this does not
+exclude dictionary construction or promotions during setup. No fresh physical
+allocation census was taken. Final encoding/checking allocates between requests
+in the retained Realm and can influence later GC.
+
+Six separate Node sampling processes retain **3,933 / 4,234** samples and show
+VM-context/global-interceptor work. Those diagnostics add V8 function-map and
+interpreter-stack flags; they do not replace the normal Node counter/timing
+cohorts. An ordinary main-isolate Node alternative remains unmeasured.
+
+[Counts, identities, category members and limits](react-attribution-current.json) ·
+[Inert raw samples, maps, controls and drivers](rsc-attribution-evidence-2026-11-07.tar.xz).
 
 The **recorded packed-array baseline** allocation diagnostic admits the complete program
 and runtime bytes before four off/on/on/off children. It records **80 exact
@@ -112,17 +195,6 @@ V8 parity remains open.
 A recorded prior **one-process, unscored** Speed/Backtracking P diagnostic produced
 20 exact Flight checks: 6.219 ms sync, 6.667 ms async, and 9.456 s native preparation.
 It is not part of the Fast cohort and establishes no policy win or regression.
-
-Recorded baseline user-cycle sampling attributes **25.51% sync /
-24.99% async** to six property/enumeration helpers' disjoint
-own samples. The `vn`/`ft` page-touch loops account for
-**2.06% /
-2.25%**. Each mode has one
-sampled process and 200 checked requests after three warmups. Frame-pointer
-chains can truncate; inclusive caller shares overlap. These observations do not
-partition wall time or predict a change's gain. The linked diagnostic retains
-raw samples, source identities and same-process prefixes. These worker-thread
-diagnostics were not refreshed for caller-thread entry; control-edge boundaries differ.
 
 Older allocator controls, source screens and rejected experiments retain their
 own source/binary identities in the inert archive. The allocator census found

@@ -61,6 +61,9 @@ Eight fresh processes per engine; three checked warmups and seven measured
 requests per mode. Full Flight serialization and consumption are timed;
 compilation, initialization and final validation are outside request timing.
 32-row catalog; async adds a resolved Promise, with no I/O.
+[Request profiling](docs/rust-rewrite/benchmarks.md#rsc-request-attribution)
+finds roughly 19× V8's instructions, with object/property machinery the largest
+named CPU bucket. These diagnostics are separate from the timing scores.
 
 **Focused performance situations · 2026-11-07:** 21 checked programs compare
 lookup, calls, arguments, properties, type tests, equality and enumeration

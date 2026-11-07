@@ -41,13 +41,15 @@ accepts `--case <file.js>`.
   complete snapshots, target-local metadata, mapped-argument detachment and native
   host-schema migration; physical type totals do not establish allocation origins.
   Owner: AOT environment storage and embedding schema.
-- Measure remaining RSC property, descriptor and allocation work after typed
-  internal OwnKeys and canonical Module direct-cell capture admission. Keep
-  [instruction counts and sampled callers](react-attribution-current.json)
-  separate from scored timings; inclusive sample shares overlap. Preserve live
-  import aliases, TDZ, cross-Realm errors and Proxy invariants. The exact-artifact
-  [GC census](react-allocation-current.json) measures physical reservations;
-  allocation origins and representation savings remain unmeasured.
+- Remove the internal descriptor carrier for actual ordinary receiver writes,
+  using canonical definition and the existing exotic fallback. Fresh RSC counts
+  show 240/250 Reflect.defineProperty entries per sync/async request. Then measure
+  retained absence/accessor lookup results and scalar descriptor observations.
+  [Fresh attribution](react-attribution-current.json) locates 36.5–38.1% of sampled
+  cycles in named object/property/enumeration functions; these are not predicted
+  savings. Preserve partial fields, refusal/strictness, receivers, live imports,
+  TDZ, cross-Realm errors and Proxy invariants. The older [GC census](react-allocation-current.json)
+  measures physical reservations; fresh allocation origins remain unmeasured.
   Owner: IR/AOT lowering and object operations.
 - Attribute StoredValue decoding and binding writes before another list-storage
   rewrite. The physical census does not identify allocation origins or prove a
