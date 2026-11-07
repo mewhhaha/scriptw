@@ -29,6 +29,7 @@ mod host_html_dda_structure;
 mod infallible_booleans;
 mod iterator_helper_dispatch;
 mod numeric_bitwise_emission;
+mod ordinary_receiver_definition;
 mod own_keys_helper;
 mod own_property_helper;
 mod packed_array_descriptors;

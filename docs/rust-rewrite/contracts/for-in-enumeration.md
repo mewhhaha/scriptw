@@ -18,6 +18,10 @@ ForIn reads presence and enumerability immediately from the existing descriptor
 lookup. Ordinary objects and Arrays do not clone the descriptor for this scalar
 observation; other consumers retain completed snapshots. Exotics keep the same
 lookup, callback sequence and whole Throw propagation.
+Compact storage reads slot attributes directly, intrinsic storage reads row
+flags, and dictionary storage reads its existing descriptor flags. These scalar
+ordinary observations allocate no descriptor and do not resolve property values
+or deferred recipes. Array storage retains its indexed/length descriptor rules.
 
 Only after exhausting a level does internal GetPrototypeOf obtain the next
 prototype. These operations use compiler-owned internal-method owners, so

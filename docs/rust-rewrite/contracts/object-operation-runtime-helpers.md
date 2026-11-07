@@ -1,10 +1,7 @@
 # Shared object-operation runtime helpers
 
-The public object emitters now consume the existing typed runtime helpers for
+The public object emitters consume typed runtime helpers for
 Get, GetPrototypeOf, SetPrototypeOf, Delete, IsExtensible and PreventExtensions.
-Previously, Promise algorithms, argument collection, constructor prototype
-lookup, Intl option reads and several reflection paths bypassed these declared
-helpers and copied their physical object kernels into the caller's Wasm body.
 
 The six physical kernels are private methods in `objects.rs`. Their typed
 operation facades and registered compiler entries live together in its private
@@ -38,6 +35,15 @@ slot validation still precedes trap acquisition, nested targets retain the
 receiver and key, and the original descriptor and accessor algorithms remain
 inside that kernel.
 
+Actual ordinary objects and FunctionObject headers use one rooted own-property
+observation: absent, data value or getter. Compact, intrinsic and dictionary
+storage are queried once; getters retain the original receiver, and intrinsic
+recipes resolve in their defining Realm. Primitive boxes retain the descriptor
+fallback so virtual String indices and length remain visible. Arrays retain
+their data fast path; other exotics retain canonical descriptor acquisition.
+The same observation drives the shared getter/prototype continuation without
+allocating an ordinary descriptor snapshot or resolving an unused setter.
+
 Each helper retains its original nullable caller Environment parameter. Helper
 entry installs that exact parameter before the physical operation. Error Realm
 selection continues through the original defining Environment/active Realm
@@ -60,7 +66,3 @@ protocols, array deletion and JSON reviver behavior alongside the queued Array
 lifecycle cohort. Artifact coverage should require one emitted body for each
 of the six helper names and a direct caller outside that body. Existing body
 size limits remain unchanged.
-
-This batch is source-written. Formatting, compilation, runtime controls and
-encoded-size/RSS measurements remain pending the combined checkpoint. It makes
-no claim about the amount of native compiler memory saved.

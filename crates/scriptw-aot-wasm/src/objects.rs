@@ -40,6 +40,7 @@ mod intrinsic_properties;
 mod module_namespace;
 mod native_constructor;
 mod object_literal_property;
+mod ordinary_get_probe;
 mod own_property;
 mod packed_array_builtin;
 mod packed_array_index;
@@ -161,7 +162,7 @@ pub(crate) type WasmPartialDescriptor<'v> = PartialDescriptor<WasmLocals<'v>>;
 pub(crate) type WasmDescriptor<'v> = ValidatedDescriptor<WasmLocals<'v>>;
 
 /// OrdinarySet can only update a value or create a complete data property.
-/// Callers cannot put accessor fields behind the direct Array definition path.
+/// Callers cannot put accessor fields behind the direct ordinary/Array path.
 enum SetReceiverDataDefinition<'v> {
     Update(&'v ValueLocals),
     Create(&'v ValueLocals),
@@ -1846,19 +1847,23 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let exit = self.open_frame(ControlFrameKind::Block, function);
-        let ordinary = self.emit_ordinary_own_data_read(target, key, result, function)?;
-        ordinary.load(function);
-        self.emit_branch_if_to_target(exit, function);
+        let probe = self.emit_ordinary_get_probe(target, key, function)?;
+        probe.emit_supported_i32(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
         let handled = self.emit_array_own_data_read(target, key, result, function)?;
         handled.load(function);
         self.emit_branch_if_to_target(exit, function);
         let descriptor = self.emit_proxy_target_own_descriptor(target, key, function)?;
-        let value = schema.reserve_value_local(function);
-        descriptor.emit_found_i32(schema, function);
+        probe.observe_completed_descriptor(&descriptor, self, function);
+        descriptor.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        let value = probe.value();
+        probe.emit_found_i32(function);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.emit_accessor_i32(schema, function);
+        probe.emit_getter_i32(function);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.read_getter(&value, schema, function);
         value.tag().load(function);
         function.instruction(&Instruction::I32Const(
             WasmRuntimeValueTag::Undefined as i32,
@@ -1869,7 +1874,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Else);
         let arguments = self.emit_pre_evaluated_arg_vector(&[], function);
         self.emit_function_handle_call_with_argv_inner(
-            &value,
+            value,
             Some(receiver),
             &arguments,
             result,
@@ -1880,8 +1885,7 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::Else);
-        descriptor.read_value(&value, self, function);
-        result.set_normal(&value, function);
+        result.set_normal(value, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::Else);
@@ -1907,7 +1911,7 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         result.initialize(function);
         function.instruction(&Instruction::Else);
-        self.emit_ordinary_get_prototype_of(target, &value, function);
+        self.emit_ordinary_get_prototype_of(target, value, function);
         value.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
         function.instruction(&Instruction::I32Eq);
@@ -1917,7 +1921,7 @@ impl<'a> FunctionBuilder<'a> {
         schema
             .call_helper(
                 crate::runtime_helpers::ObjectReadArguments::new(
-                    &value,
+                    value,
                     receiver,
                     key,
                     self.current_environment(),
@@ -1934,12 +1938,10 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(terminal, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        value.clear(function);
-        descriptor.clear(function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         schema.release_i32_local(handled, function);
-        schema.release_i32_local(ordinary, function);
+        probe.clear(schema, function);
         Ok(())
     }
 
@@ -2595,8 +2597,8 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    /// A concrete Array consumes normalized data fields directly. Other receiver
-    /// kinds retain their existing ToPropertyDescriptor/native dispatch boundary.
+    /// Ordinary objects and Arrays consume normalized data fields directly.
+    /// Exotic receivers retain their observable definition protocol.
     fn emit_set_receiver_data_definition(
         &mut self,
         receiver: &ValueLocals,
@@ -2623,6 +2625,20 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_array_define_own_property(&array, key, &incoming, result, function)?;
         array.clear(function);
         function.instruction(&Instruction::Else);
+        receiver.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let object = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        self.emit_ordinary_define_own_property(&object, key, &incoming, result, function)?;
+        object.clear(function);
+        function.instruction(&Instruction::Else);
         self.emit_define_own_property_from_fields(
             receiver,
             key,
@@ -2630,6 +2646,8 @@ impl<'a> FunctionBuilder<'a> {
             result,
             function,
         )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(())

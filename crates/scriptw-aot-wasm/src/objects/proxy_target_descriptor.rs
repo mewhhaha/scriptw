@@ -353,8 +353,17 @@ impl FunctionBuilder<'_> {
             target.cast_reference::<OrdinaryObject>(schema, function),
             function,
         );
-        let source = self.emit_ordinary_own_descriptor_reference(&object, key, function)?;
-        observation.storage(source, self, function);
+        match observation {
+            OwnDescriptorObservation::Snapshot(_) => {
+                let source = self.emit_ordinary_own_descriptor_reference(&object, key, function)?;
+                observation.storage(source, self, function);
+            }
+            OwnDescriptorObservation::Enumerability { found, enumerable } => {
+                self.emit_ordinary_own_property_enumerability(
+                    &object, key, found, enumerable, function,
+                )?;
+            }
+        }
         object.clear(function);
         function.instruction(&Instruction::Else);
         // Concrete Arrays need their exotic indexed/length lookup, but no

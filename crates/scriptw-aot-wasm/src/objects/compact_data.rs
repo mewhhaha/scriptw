@@ -259,7 +259,7 @@ impl FunctionBuilder<'_> {
 
     /// A canonical string key and the actual immutable shape decide the slot.
     /// Symbols never compare equal and cannot be retained in shape metadata.
-    fn emit_compact_slot_probe(
+    pub(super) fn emit_compact_slot_probe(
         &mut self,
         storage: &GcLocal<CompactDataStorage>,
         key: &PropertyKeyLocals,
@@ -828,6 +828,116 @@ impl FunctionBuilder<'_> {
         found.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        schema.release_i32_local(flags, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        descriptor.clear(f);
+        entry.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        base.clear(f);
+        Ok(())
+    }
+
+    /// ForIn observes these scalars before any callback. Compact shapes and
+    /// intrinsic rows already own the attributes; neither needs a descriptor
+    /// record or a materialized property value for this observation.
+    pub(super) fn emit_ordinary_own_property_enumerability(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        found: I32Local,
+        enumerable: I32Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        found.set_constant(0, f);
+        enumerable.set_constant(0, f);
+        let base = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(object, schema, f)
+                .reference(),
+            f,
+        );
+        base.is_subtype::<CompactDataStorage>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let compact = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<CompactDataStorage>(schema, f),
+            f,
+        );
+        let slot = schema.reserve_i32_local(f);
+        self.emit_compact_slot_probe(&compact, key, slot, found, f)?;
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let attributes = self.emit_compact_data_attributes(&compact, f);
+        attributes.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        enumerable.store(f);
+        attributes.clear(schema, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(slot, f);
+        compact.clear(f);
+        f.instruction(&Instruction::Else);
+        base.is_subtype::<IntrinsicPropertyStorage>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let intrinsic = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, f),
+            f,
+        );
+        let index = schema.reserve_i32_local(f);
+        schema
+            .call_helper(
+                crate::runtime_helpers::IntrinsicPropertyFindArguments::new(&intrinsic, key),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .store(index, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        found.store(f);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let row = self.emit_intrinsic_property_row(&intrinsic, index, f);
+        row.flags().load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        enumerable.store(f);
+        row.clear(schema, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(index, f);
+        intrinsic.clear(f);
+        f.instruction(&Instruction::Else);
+        let entry = self.emit_ordinary_property_entry(object, key, f)?;
+        let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        descriptor.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        found.store(f);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let flags = schema.reserve_i32_local(f);
+        schema
+            .field(PropertyDescriptorSchema::FLAGS)
+            .read(&descriptor, schema, f)
+            .store(flags, f);
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        enumerable.store(f);
         schema.release_i32_local(flags, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

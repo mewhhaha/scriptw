@@ -105,16 +105,19 @@ fn backend_classifies_dynamic_keys_and_preserves_prototype_fallback() {
         "fn emit_non_proxy_object_get(",
         "pub(crate) fn emit_canonical_numeric_property_key_i32(",
     );
+    let probe = read
+        .find("self.emit_ordinary_get_probe(target, key, function)?;")
+        .unwrap();
     let own = read
         .find("self.emit_proxy_target_own_descriptor(target, key, function)?;")
         .unwrap();
     let prototype = read
-        .find("self.emit_ordinary_get_prototype_of(target, &value, function);")
+        .find("self.emit_ordinary_get_prototype_of(target, value, function);")
         .unwrap();
     let inherited = read
         .find("crate::runtime_helpers::ObjectReadArguments::new(")
         .unwrap();
-    assert!(own < prototype && prototype < inherited);
+    assert!(probe < own && own < prototype && prototype < inherited);
     assert!(read.contains("receiver,"));
     assert!(!read.contains("ValueKind::String =>"));
     assert!(!read.contains("emit_string_index_0_to_4_or_minus_one("));

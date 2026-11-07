@@ -12,22 +12,20 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Measure remaining call transport and activation allocation. React's five-formal
-  `vn`/`ft` helpers remain outside the two-formal local-entry bound; exclusion
-  alone does not establish their cost. Preserve source binding ownership,
-  non-simple parameter TDZ, arguments snapshots and captures, as well as
-  callee identity, Realm, receiver, depth and abrupt completion.
+- Extend the existing scalar-loop owner with guarded captured-call fusion on
+  `args-unused.js` and `frame-compact.js` (Fast: 0.694 / 8.772 ms; V8: 0.00337 /
+  0.0622 ms). Measure call entries and instructions before implementation;
+  target a measured 2x gain on both kernels without RSC/control regressions.
+  Require code/source/defining-program guards, alias-identity handling,
+  complete preflight before writes and the untouched original loop as fallback.
+  Preserve binding ownership, TDZ, arguments snapshots, Realm, receiver, depth
+  and abrupt completion.
   Owner: IR/AOT source-call planning and dispatch.
 - Measure type classification and singleton dispatch after strict-pair period
   projection. Prefer private binding facts and existing semantic kernels before
   adding a general Value region. Preserve arithmetic order, input effects,
   invalidation, zero-trip state and complete fallback.
   Owner: AOT scalar-loop planning and value refinement.
-- Reduce preflight and allocation costs in closed numeric row loops. Complete
-  read-only periods project Number/string-length leaves through canonical own-data
-  reads, with literal keys or an authenticated dense String table. Measure the remaining
-  ordinary-metadata gap, short-loop refusals and native frames; preserve whole-loop
-  fallback and original alias identity. Owner: AOT scalar-loop planning and object reads.
 - Measure Script function storage caused by analysis-wide arguments visibility.
   Establish a passing current SSR baseline before changing recovery. Preserve
   global records, eval/prelude modes, captures and arguments; Module-only lookup
@@ -36,37 +34,37 @@ accepts `--case <file.js>`.
   and measured gains. Missing own indices can expose the real object through a
   prototype getter; preserve actual count, rooted snapshots and complete fallback.
   Owner: arguments binding and source-call planning.
-- Separate captured-binding boxing from call/activation costs with matched
-  admitted callbacks and fixed write slopes. A direct Value3 cell payload needs
-  complete snapshots, target-local metadata, mapped-argument detachment and native
-  host-schema migration; physical type totals do not establish allocation origins.
-  Owner: AOT environment storage and embedding schema.
-- Remove the internal descriptor carrier for actual ordinary receiver writes,
-  using canonical definition and the existing exotic fallback. Fresh RSC counts
-  show 240/250 Reflect.defineProperty entries per sync/async request. Then measure
-  retained absence/accessor lookup results and scalar descriptor observations.
-  [Fresh attribution](react-attribution-current.json) locates 36.5–38.1% of sampled
-  cycles in named object/property/enumeration functions; these are not predicted
-  savings. Preserve partial fields, refusal/strictness, receivers, live imports,
-  TDZ, cross-Realm errors and Proxy invariants. The older [GC census](react-allocation-current.json)
-  measures physical reservations; fresh allocation origins remain unmeasured.
-  Owner: IR/AOT lowering and object operations.
+- Measure captured-cell writes separately from call transport. A direct mutable
+  Value3 cell payload is a candidate only after mapping snapshots, target-local
+  metadata, arguments detachment and host-schema effects are covered. Source
+  patterns imply 1,024/8,192 writes in the two kernels; these are not measured
+  allocation origins. Do not make shared StoredValue mutable. Owner: AOT
+  environment storage and embedding schema.
+- Count property-cache hits, misses and negative-cache eligibility on RSC before
+  changing the cache. A narrow absence proof can cover compact ordinary heads
+  with a null prototype or the unchanged canonical ObjectPrototype layout;
+  reload prototype/storage guards and reject dictionary heads and exotics.
+  Separate eligibility from actual repeat hits and measure without counters.
+  The [fresh function samples](react-attribution-current.json) locate code,
+  rather than identifying cache outcomes or allocation origins.
+  Owner: AOT object operations and benchmark tooling.
 - Attribute StoredValue decoding and binding writes before another list-storage
   rewrite. The physical census does not identify allocation origins or prove a
   representation change wins. Preserve deferred recipes, descriptor ownership
   tokens and full numeric semantics; measure total request time and allocation.
   Owner: runtime value/storage representation.
-- Attribute remaining for-in OwnKeys, descriptor and value-read costs with
-  fixed-yield width controls. Investigate a closed scalar loop region that proves
-  no callbacks or receiver mutation, with actual ordinary/null-prototype guards,
-  before omitting visited tracking. Preserve Number arithmetic, head bindings,
-  fallback progress, live descriptors, Proxy ordering and suspended cursors.
+- Re-run fixed-yield width controls on the current source before attributing
+  remaining for-in OwnKeys, descriptor and value-read costs. The existing width
+  table and SVGs retain source `0ca455c47636` and are historical. Investigate a
+  closed scalar loop region with actual ordinary/null-prototype guards before
+  omitting visited tracking. Preserve Number arithmetic, head bindings, fallback
+  progress, live descriptors, Proxy ordering and suspended cursors.
   Owner: AOT loop lowering and IR facts.
 - Reduce duplicate descriptor snapshots on read-only packed-Array queries.
   Keep backing storage, values, attributes, holes and prototype behavior intact,
   with materialization retained for real writes. Measure repeated queries as well
-  as isolated reads. The current RSC census counts 8,412 descriptors per synchronous
-  request; it does not attribute them to this path. Owner: AOT Array internal methods.
+  as isolated reads. The historical physical census recorded 8,412 descriptor
+  reservations per synchronous request; it does not attribute them to this path. Owner: AOT Array internal methods.
 - Measure remaining descriptor snapshots, name-to-slot selection and executed
   allocation after private `[[GetOwnProperty]]` transport. Use the matched
   ordinary/JavaScript-function/native-constructor read situations and

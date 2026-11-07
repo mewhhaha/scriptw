@@ -7,6 +7,14 @@ WasmDescriptor accepted by the shared DefineOwnProperty owner. Normal false
 becomes a current-execution-Realm TypeError; the original whole Throw propagates
 unchanged. Normal true returns the original target.
 
+OrdinarySet receiver updates carry a validated value-only descriptor; creation
+carries value plus true writable/enumerable/configurable flags. Actual ordinary
+objects and Arrays consume those normalized fields directly through canonical
+definition. Ordinary writes do not construct a JavaScript descriptor carrier or
+call Reflect.defineProperty to decode it again. Exotic receivers retain their
+definition protocol, including observable Proxy descriptor objects and partial
+field presence. Refusal remains a Boolean for the original strictness owner.
+
 Object.defineProperties retains these same converted partial descriptors in
 private immutable GC records. Absent fields remain absent; conversion does not
 complete the descriptor or expose a JavaScript carrier. Complete

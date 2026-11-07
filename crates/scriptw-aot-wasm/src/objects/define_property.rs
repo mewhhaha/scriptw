@@ -583,7 +583,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_ordinary_define_own_property(
+    pub(super) fn emit_ordinary_define_own_property(
         &mut self,
         header: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,

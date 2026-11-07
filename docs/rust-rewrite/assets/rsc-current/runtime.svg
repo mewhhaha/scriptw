@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Current React Server Components runtime</dc:title>
-    <dc:description>{"date": "2026-11-07", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/aot_language-producer.json": "58da80f077fbba59ab93e086f63baaa9964f91ccfb8c84e34d9e958c223dc9e3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/compiler_precompiled_baseline-producer.json": "5a69b0971662a97d3f54e7816463d01231ebde54725052f02e98dcc2dbb1c486", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/emission-producer.json": "43e7cdda9fe4811fff2ff770edf4c3e6567a6845c058002a837611171a6128f3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json": "307e230e934085e4e312a9675820028f924d08e13e604df546759946635ea133", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/scriptw-producer.json": "0c72e7d2ba699a24e9dfe021d03f7c8fc14b495cba4f4b61ee1dce1f48110cca", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/common.py": "1494fe066244794d0d55b682826090c3cb838080f3aa2a764cb2280cdd6a8198", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/pilot-tools/measure_rsc.py": "00fccb74246effbabab5ce76539bc0a8a2164cf3b6658566d80d12c3c03e9e6d", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/run_phase.py": "41122475a338bef9cc6592b4af773774792e496863d7af11c82b856ce7f64757", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/baseline/react-allocation-current.json": "76ffefad68d0eeabdb1c1e35a2bb92e30773edb6b4469b90376db82b25a40462", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/baseline/rsc-current.json": "78cd467855c868b2bd9d85d4c424bf132a20003e12145eae81f1cc3d8bc4a35e", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/baseline/situations-current.json": "caa4bd436d52f449c13e840ada2d0e5d5d7e5175219a44c0c9931b2570f2b444", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/README.md": "65115814c52c6dae505866fc4079db605363f3c60dee57add658c42b7144a2cb", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/builtins/collections.rs": "c8c90611692b0b70ae338e63ae997b6457e222f98e838ccadcdbd184369c9097", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/builtins/collections/private_string_set.rs": "fadecd5792434315c7595795bb9fecd853c98ae9bb1b021395a7a5abb6edab02", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/control_flow/for_in.rs": "9c232ef9fb95273c458da89f3d840b5a380714947d55a11d2be2007e81259295", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/control_flow/for_in/enumeration.rs": "800d49e0ebe59437a984e444676c3d8752f51de85411c59208ee12e5b3a6b103", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/gc_types/layouts.rs": "5786db820223394f8b9b5903fadeed9840f186be5a7902270de017322224c12c", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/gc_types/type_registration_tests.rs": "b15cc8adc0b6ec5c4e833a1cf31fae09aea4a27af2ebe22f7ebaea5da91114f8", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/gc_types/type_registration_tests/for_in_visited_set.rs": "c7e5aba816bdb3e52fba912ffd0b496b8c1cf4d8b698a5014aff124428a16ba3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/gc_types/value.rs": "2e983e1471971e16538a7a69d8cf7b303fa6aef0db9ef9522b7f3702cbe14940", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": "9d33e3b818d884dbffbd2895e85e1947da49f8ce27ff7f8b66c462ff36ddad9e", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/runtime_artifact.rs": "90086dfdd15c55b0475861093eafb67b6d03dff25e1d6c644673139697b2f78b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/runtime_artifact/build_package/tests.rs": "4b145ae4f33e1f06260d5c832b7bd9f27d5c237052b9f1f133216296848a5a68", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs": "f0f0aec638f3bf6dbf476c8a97c8e97bbdaac39aabbce2cf36742d342fbdb9aa", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": "29ec5de917f8c52b0eb1acb9caa78fd2b3386d6a5550cbe1e0c3edc08a242b8a", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/emission/for_in_visited_set.rs": "947ba7a6a73e0162401c4413ca11f44b61f8530b9a08b0876bd6e5660c9ad3e3", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/emission/main.rs": "f822ac7599a5f0450ec06089f21321714cf77712a18b8dc596edfd8e0628ca75", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs": "6ec93a6de547dd6971ce9e91ab8f834e75a61d49f5d41e53541674694b626d74", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs": "0ecf376e9e6497e4e37c619fb7c24f0e251bedc0022e2288cdd7211c37d3c994", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs": "0406d688fde47ecaf9e3dfbfc5d6a35054d0f019a4565d171704fc0205065cca", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-engine/tests/aot_language/aot_for_in_visited_set.rs": "f3306c7dcd4ce9e3d20462cbf49e7477af2b1d210a4efcaffbfbf1b8b5251f9b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-engine/tests/aot_language/main.rs": "f0ed1bafc8388cabe2793cb25537d0b48c8bf1fc70ff98e2bb694508f2dd39fa", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-engine/tests/fixtures/for_in_visited_set.js": "f9000e92469e9e24708025cda2d03a2156756c6cb2e70445092eabba44b1af51", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-engine/tests/fixtures/for_in_visited_set_async.js": "e65ddfb72c336813de8782c965b026579366e39f953c4baf41f61a1ddaeb0c17", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-ir/src/builtins/catalog.rs": "53e66c91b84f965a4a78d8b2cdb3adb0694d46be386ea9e47457a692886a2e3b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-ir/src/lowering/builtin_catalog/tests.rs": "50973b4ff7520f43a8aff6878fdbe483668370573ab87179295baffd1f991fc5", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-ir/src/modules/synchronous_definition.rs": "6702152e5dfde5324157cfe81789d3a16b6b021d0fc437624454cf606b90cb31", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/crates/scriptw-ir/tests/module_instantiation.rs": "c5a07966ba4f9755396d7ef56cf3be8a9547406a5a13f66a00c931a4f4ce2c04", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/docs/rust-rewrite/contracts/for-in-enumeration.md": "cb8ecce735486e15f012eaee43fe60716a70a3b0d09fd590a708de01551dcb9e", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/docs/rust-rewrite/contracts/function-protocol.md": "a06f30ea0eef244f49a9d4e883b10363ef850c3f6b4ccf5e42e00b5f7cb6c22a", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/files/docs/rust-rewrite/contracts/generator-for-in-native-enumeration.md": "a3735e9a948a422125f8c266ac83e8bfd6a302524d211a6a8c761ebdc9aae9d1", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/followup-admission.json": "b58ce327cbbfc8acd000cdccdaa661b57b07f11656cc00b7ba6167449adaafc6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/manifest.json": "49895ea4afe1cd82dd85257f6c46c47d75016366129784c1180445b258c88c99", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/source-final-3/tracked.patch": "51d81e0456cd1e0c60747fb0a94b939e993449ccb19a20ad66e1fa1ee8cd5dd2", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/trial-admission.json": "3daa82f42c96245b13c6826adbfa01715fce64932a14c9d3c0034e464cf7e557", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/aot_language-producer.json": "e2c126ed975d180676e5d38165fa4053169ad66fac0d6bddc7399c40287981e9", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/compiler_precompiled_baseline-producer.json": "9fe8ad643388fe71b9ffb8637ef0d8c414f28166c317d43fc6e2372c769a435f", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/emission-producer.json": "0507c4745819d88f0cbab69744463c1fb467b3f794a007836cda502340d45e91", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/rsc_baseline": "14cdb4fd88e783dc6413826c012b0d3a089e6b3d181329b612bf4f2094047e1b", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/rsc_baseline-producer.json": "75dfe0f54307ab3c803ec3dc7f9b2dce6170075b1f288e00c9d7f39cf7e8e476", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/build-2/frozen/scriptw-producer.json": "24273069b14ef41583f496f62d99d3d5d7ec2e5781c4425bb91057040256328a", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/strict-arguments-execution/rsc-pilot-1/block-0-0-candidate/report.json": "c6237cb8fbe0977160e8105d2c7227994f0e9b93544b498d4220855df0c177ed", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63", "target/performance-v8-climb-20261104/for-in-set-execution/focused-final-3/receipt.json": "7a5cd6d94b76b7b26513b371cf0cc80642261c7e64d9154ee8690c66e2a2e179"}, "measurement": {"blocks": 2, "campaign": "target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/campaign.json", "campaign_sha256": "6dad11244c6a43413ff934a72c2f3e839e8366407fe532dea7b1f91c319e7685", "case_order": ["rsc-sync", "rsc-async"], "checked_invocations": 480, "clock": "retained applicationRun through complete Flight; JSON and exact validation outside timer", "execution_processes": 24, "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
+    <dc:description>{"date": "2026-11-07", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json": "307e230e934085e4e312a9675820028f924d08e13e604df546759946635ea133", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/aggregate.json": "d34e901738b2e4b0bee91f91a82fb81d779f88d73aef02fdcf26771a4271c538", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/block-0-0-candidate/report.json": "eff46db3d033605155feae5b87eefbb2065cafd84c3c8f110a4674d0d56d0aa8", "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/campaign.json": "6dad11244c6a43413ff934a72c2f3e839e8366407fe532dea7b1f91c319e7685", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/focused-final-5/receipt.json": "53e4c1a89b553d2587a5c2be44e8d90ac3bf92797188efcd8b819eabc2a030c0", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/common.py": "0c9f0c949b02cb80bff8563a6af723080d1922db157c4b0d738de236f7a527e1", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/measure_rsc.py": "8eba660abd8f191bffc36f52ada85f0c7a94d890dea35e9282f331e52fc42e05", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad", "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d"}, "measurement": {"blocks": 2, "campaign": "target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json", "campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430", "case_order": ["rsc-sync", "rsc-async"], "checked_invocations": 480, "clock": "retained applicationRun through complete Flight; JSON encoding and exact output validation outside the timer", "exact_output": "All sync/async Flight output checked against Node; serialization and consumption are timed; JSON encoding and exact-output validation follow timing.", "execution_processes": 24, "process_order": [["baseline", "candidate", "v8"], ["v8", "candidate", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v1"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -67,122 +67,122 @@ L 558.72 247.968
     </g>
     <g id="ytick_2">
      <g id="line2d_5">
-      <path d="M 63.36 221.024079
-L 558.72 221.024079
+      <path d="M 63.36 222.727736
+L 558.72 222.727736
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="225.20279" transform="rotate(-0 56.36 225.20279)">2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="226.906447" transform="rotate(-0 56.36 226.906447)">1</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_7">
-      <path d="M 63.36 194.080158
-L 558.72 194.080158
+      <path d="M 63.36 197.487471
+L 558.72 197.487471
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="198.258869" transform="rotate(-0 56.36 198.258869)">4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="201.666182" transform="rotate(-0 56.36 201.666182)">2</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_9">
-      <path d="M 63.36 167.136238
-L 558.72 167.136238
+      <path d="M 63.36 172.247207
+L 558.72 172.247207
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="171.314949" transform="rotate(-0 56.36 171.314949)">6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="176.425918" transform="rotate(-0 56.36 176.425918)">3</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_11">
-      <path d="M 63.36 140.192317
-L 558.72 140.192317
+      <path d="M 63.36 147.006942
+L 558.72 147.006942
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_12"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="144.371028" transform="rotate(-0 56.36 144.371028)">8</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="151.185653" transform="rotate(-0 56.36 151.185653)">4</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_13">
-      <path d="M 63.36 113.248396
-L 558.72 113.248396
+      <path d="M 63.36 121.766678
+L 558.72 121.766678
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_14"/>
      <g id="text_8">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="117.427107" transform="rotate(-0 56.36 117.427107)">10</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="125.945389" transform="rotate(-0 56.36 125.945389)">5</text>
      </g>
     </g>
     <g id="ytick_7">
      <g id="line2d_15">
-      <path d="M 63.36 86.304475
-L 558.72 86.304475
+      <path d="M 63.36 96.526413
+L 558.72 96.526413
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_9">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="90.483186" transform="rotate(-0 56.36 90.483186)">12</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="100.705124" transform="rotate(-0 56.36 100.705124)">6</text>
      </g>
     </g>
     <g id="ytick_8">
      <g id="line2d_17">
-      <path d="M 63.36 59.360554
-L 558.72 59.360554
+      <path d="M 63.36 71.286149
+L 558.72 71.286149
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_18"/>
      <g id="text_10">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="63.539265" transform="rotate(-0 56.36 63.539265)">14</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="75.46486" transform="rotate(-0 56.36 75.46486)">7</text>
      </g>
     </g>
     <g id="text_11">
-     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="35.719922" y="150.552" transform="rotate(-90 35.719922 150.552)">Retained request · ms</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="42.718672" y="150.552" transform="rotate(-90 42.718672 150.552)">Retained request · ms</text>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 85.876364 247.968
 L 177.014026 247.968
-L 177.014026 151.672744
-L 85.876364 151.672744
+L 177.014026 119.834649
+L 85.876364 119.834649
 z
 " clip-path="url(#p833538aeba)" style="fill: #3478a8"/>
    </g>
    <g id="patch_4">
     <path d="M 353.928312 247.968
 L 445.065974 247.968
-L 445.065974 143.117463
-L 353.928312 143.117463
+L 445.065974 110.945432
+L 353.928312 110.945432
 z
 " clip-path="url(#p833538aeba)" style="fill: #3478a8"/>
    </g>
    <g id="patch_5">
     <path d="M 177.014026 247.968
 L 268.151688 247.968
-L 268.151688 240.185067
-L 177.014026 240.185067
+L 268.151688 235.492621
+L 177.014026 235.492621
 z
 " clip-path="url(#p833538aeba)" style="fill: #d17b36"/>
    </g>
    <g id="patch_6">
     <path d="M 445.065974 247.968
 L 536.203636 247.968
-L 536.203636 241.772252
-L 445.065974 241.772252
+L 536.203636 237.823963
+L 445.065974 237.823963
 z
 " clip-path="url(#p833538aeba)" style="fill: #d17b36"/>
    </g>
    <g id="LineCollection_1">
-    <path d="M 131.445195 153.570849
-L 131.445195 118.229317
+    <path d="M 131.445195 125.427551
+L 131.445195 111.061499
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
-    <path d="M 399.497143 145.877996
+    <path d="M 399.497143 113.781012
 L 399.497143 95.7555
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
    </g>
@@ -193,34 +193,34 @@ L -3 -0
 " style="stroke: #555b61"/>
     </defs>
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="131.445195" y="153.570849" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="399.497143" y="145.877996" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="131.445195" y="125.427551" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="399.497143" y="113.781012" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="line2d_20">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="131.445195" y="118.229317" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="131.445195" y="111.061499" style="fill: #1f77b4; stroke: #555b61"/>
      <use xlink:href="#mf1cd270943" x="399.497143" y="95.7555" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="LineCollection_2">
-    <path d="M 222.582857 240.672947
-L 222.582857 239.3966
+    <path d="M 222.582857 235.802041
+L 222.582857 234.736372
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
-    <path d="M 490.634805 241.974918
-L 490.634805 240.941403
+    <path d="M 490.634805 238.007182
+L 490.634805 237.549197
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
    </g>
    <g id="line2d_21">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="222.582857" y="240.672947" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="490.634805" y="241.974918" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="222.582857" y="235.802041" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="490.634805" y="238.007182" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="line2d_22">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="222.582857" y="239.3966" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="490.634805" y="240.941403" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="222.582857" y="234.736372" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="490.634805" y="237.549197" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="patch_7">
@@ -234,16 +234,16 @@ L 558.72 247.968
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_12">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="131.445195" y="111.067207" transform="rotate(-0 131.445195 111.067207)">7.148</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="131.445195" y="103.89939" transform="rotate(-0 131.445195 103.89939)">5.077</text>
    </g>
    <g id="text_13">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="399.497143" y="88.593391" transform="rotate(-0 399.497143 88.593391)">7.783</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="399.497143" y="88.593391" transform="rotate(-0 399.497143 88.593391)">5.429</text>
    </g>
    <g id="text_14">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="222.582857" y="232.234491" transform="rotate(-0 222.582857 232.234491)">0.578</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="222.582857" y="227.574263" transform="rotate(-0 222.582857 227.574263)">0.494</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="490.634805" y="233.779293" transform="rotate(-0 490.634805 233.779293)">0.460</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="490.634805" y="230.387088" transform="rotate(-0 490.634805 230.387088)">0.402</text>
    </g>
    <g id="text_16">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · retained RSC module</text>

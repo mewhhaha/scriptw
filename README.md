@@ -48,30 +48,20 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-07**, compiler `0ca455c47636`: exact Flight output.
+**React 19.3.1 RSC · 2026-11-07**, source fingerprint `5aa48ad8a545`: exact Flight output.
 
 | Retained request | Scriptw Fast | Node 24 / V8 |
 | --- | ---: | ---: |
-| Sync | 7.15 ms | 0.578 ms |
-| Async | 7.78 ms | 0.460 ms |
+| Sync | 5.077 ms | 0.494 ms |
+| Async | 5.429 ms | 0.402 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
-Eight fresh processes per engine; three checked warmups and seven measured
-requests per mode. Full Flight serialization and consumption are timed;
-compilation, initialization and final validation are outside request timing.
-32-row catalog; async adds a resolved Promise, with no I/O.
-[Request profiling](docs/rust-rewrite/benchmarks.md#rsc-request-attribution)
-finds roughly 19× V8's instructions, with object/property machinery the largest
-named CPU bucket. These diagnostics are separate from the timing scores.
+Eight fresh processes per engine in two balanced blocks, with three warmups and seven timed requests. Full Flight serialization and consumption are timed; compilation, initialization, JSON encoding and final validation are outside the window. Against the matched prior build, Fast is 11.4% faster sync and 11.6% faster async. The 32-row catalog's async form adds a resolved Promise and markup; it performs no I/O. [Fresh attribution and limits](docs/rust-rewrite/benchmarks.md#rsc-request-attribution) · [RSC identities and receipts](docs/rust-rewrite/rsc-current.json).
 
-**Focused performance situations · 2026-11-07:** 21 checked programs compare
-lookup, calls, arguments, properties, type tests, equality and enumeration
-against V8. A separate fixed-yield width panel checks 8–256 own keys.
-Eight fresh processes per configuration; 100 checked warmups and 21 samples.
+**Focused performance situations · 2026-11-07**, source fingerprint `5aa48ad8a545`: 21 standalone programs compare Fast, Speed and V8. The separate fixed-yield width panel remains historical on source `0ca455c47636` and its prior archive.
 
-[Scores, width panel and caveats](docs/rust-rewrite/benchmarks.md#focused-performance-situations) ·
-[RSC data](docs/rust-rewrite/rsc-current.json) · [Situation data](docs/rust-rewrite/situations-current.json).
+[Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [RSC data](docs/rust-rewrite/rsc-current.json) · [Situation data](docs/rust-rewrite/situations-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->
@@ -95,16 +85,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-07**, compiler `0ca455c47636`): 1,093 Engine unit
-and 1,781 integration cases pass; 70 emission, 637 structural
-and 380 source-guard checks pass. AOT units pass 664 cases; four known
-bootstrap assertions remain failures. 1,630 IR unit cases pass on this source; 771 IR integration
-cases retain original source/binary receipts with an unchanged-input proof.
-All 60,984 focused calls, 43,560 width-control calls
-and 480 exact RSC checks pass.
-These scopes do not replace the published full Test262 run. Full workspace CI
-was not rerun; eleven formatting failures and fourteen stale Intl recipes
-remain [owned](docs/rust-rewrite/current-inventory.md).
+Latest scoped verification (**2026-11-07**, compiler `5aa48ad8a545`): 2,535 runtime/emitter checks and 1,757 unit checks pass; four existing AOT unit assertions fail. All 380 source guards, eight production CLI checks, 60,984 situation calls and 480 RSC checks pass. Full Test262 and workspace CI were not rerun; eleven formatting failures and fourteen stale Intl recipes remain [owned](docs/rust-rewrite/current-inventory.md).
 
 ## Caveats
 
