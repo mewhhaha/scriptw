@@ -255,7 +255,8 @@ impl FunctionBuilder<'_> {
         let list = ArgumentListConstruction::new(self, f);
         let count = s.reserve_i32_local(f);
         let index = s.reserve_i32_local(f);
-        let flags = s.reserve_i32_local(f);
+        let found = s.reserve_i32_local(f);
+        let enumerable = s.reserve_i32_local(f);
         keys.length(count, s, f);
         json_i32(index, 0, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
@@ -270,30 +271,14 @@ impl FunctionBuilder<'_> {
         let key = keys.read_key(index, self, f)?;
         self.emit_json_tag_test(key.value(), WasmRuntimeValueTag::String, f);
         self.open_frame(ControlFrameKind::If, f);
-        let descriptor = self.emit_direct_own_descriptor_fact(holder, &key, f)?;
-        descriptor.load(s, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let present = s
-            .reserve_gc_local(f)
-            .initialize(descriptor.load(s, f).require_non_null(f), f);
-        s.struct_type::<PropertyDescriptor>()
-            .field(PropertyDescriptorSchema::FLAGS)
-            .read(&present, s, f)
-            .store(flags, f);
-        flags.load(f);
-        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        self.emit_own_property_enumerability(holder, &key, found, enumerable, f)?;
+        found.load(f);
+        enumerable.load(f);
         f.instruction(&Instruction::I32And);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         list.append(key.value(), s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        present.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        descriptor.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         key.clear(f);
@@ -306,7 +291,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.release_i32_local(flags, f);
+        s.release_i32_local(enumerable, f);
+        s.release_i32_local(found, f);
         s.release_i32_local(index, f);
         s.release_i32_local(count, f);
         keys.clear(f);

@@ -1,13 +1,71 @@
 {
-  "schema": "scriptw-react-attribution-current-v5",
+  "schema": "scriptw-react-attribution-current-v6",
   "date": "2026-11-08",
   "status": "captured",
   "excluded_from_scored_cohorts": true,
   "source_manifest": {
-    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
-    "sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25"
+    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/manifest.json",
+    "sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946"
   },
   "candidate_identity": {
+    "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+    "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+    "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+    "toolchain": {
+      "opt_level": "3",
+      "profile": "release",
+      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+      "target": "x86_64-unknown-linux-gnu"
+    },
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "None",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "SinglePass",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "program_wasm_bytes": 4327610,
+    "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+    "runtime": {
+      "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+      "wasm_bytes": 38769947,
+      "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+    },
+    "inputs": {
+      "adapted_source_bytes": 64946,
+      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+      "source_bytes": 64835,
+      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+      "versions": {
+        "esbuild": "0.28.2",
+        "playwright": "1.64.1",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-server-dom-webpack": "19.3.1"
+      },
+      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+    },
+    "native_mode": "fast",
+    "native_mode_scope": "matched Fast cohort"
+  },
+  "baseline_identity": {
     "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
     "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
     "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
@@ -65,83 +123,19 @@
     "native_mode": "fast",
     "native_mode_scope": "matched Fast cohort"
   },
-  "baseline_identity": {
-    "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-    "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-    "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-    "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-    "toolchain": {
-      "opt_level": "3",
-      "profile": "release",
-      "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-      "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-      "target": "x86_64-unknown-linux-gnu"
-    },
-    "configuration": {
-      "collector": "Copying",
-      "compilation_jobs": 1,
-      "cranelift_opt_level": "None",
-      "driver_worker_stack_bytes": 67108864,
-      "epoch_deadline_ticks": 6000,
-      "epoch_interruption": true,
-      "epoch_tick_ms": 5,
-      "gc_initial_bytes": 16777216,
-      "max_wasm_stack_bytes": 33554432,
-      "native_parallel_compilation": false,
-      "pending_deadline_ms": 30000,
-      "register_allocation": "SinglePass",
-      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-      "target": "x86_64-unknown-linux-gnu",
-      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-      "wasmtime": "47.0.0",
-      "wasmtime_async_stack_bytes": 67108864
-    },
-    "program_wasm_bytes": 4232136,
-    "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
-    "runtime": {
-      "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
-      "wasm_bytes": 38738181,
-      "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
-    },
-    "inputs": {
-      "adapted_source_bytes": 64946,
-      "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-      "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-      "source_bytes": 64835,
-      "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-      "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-      "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-      "versions": {
-        "esbuild": "0.28.2",
-        "playwright": "1.64.1",
-        "react": "19.3.1",
-        "react-dom": "19.3.1",
-        "react-server-dom-webpack": "19.3.1"
-      },
-      "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-    },
-    "native_mode": "fast",
-    "native_mode_scope": "matched Fast cohort"
-  },
   "scored_rsc_evidence": {
     "campaign": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json",
-      "sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb"
+      "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json",
+      "sha256": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c"
     },
     "aggregate": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json",
-      "sha256": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b"
+      "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/aggregate.json",
+      "sha256": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6"
     }
   },
-  "diagnostic_campaigns": {
-    "census": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/campaign.json",
-      "sha256": "42ebfc77de9873b1ff035fa9ca4eb410c6a7233010b3bd4e76d75e45e789ca34"
-    },
-    "pmu": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/campaign.json",
-      "sha256": "42ebfc77de9873b1ff035fa9ca4eb410c6a7233010b3bd4e76d75e45e789ca34"
-    }
+  "diagnostic_campaign": {
+    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/campaign.json",
+    "sha256": "19ce4f95f6bd93a5420b08b823b3d8c37fd029545511273f09195486296dda8e"
   },
   "pmu": {
     "processes": 18,
@@ -162,48 +156,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/receipt.json",
-                "sha256": "41f2877d7dc1e1d7db6cfbfb50272e1bb5a3d38a18d1d6bf2367bc908f157294"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/receipt.json",
+                "sha256": "762d0e3604bb79072efd93ef877022b91dcafc581c6157bbf1b0f0ef7edddb9c"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 17460397.5,
-                "instructions:u": 39944721.0,
-                "branches:u": 5593143.0,
-                "branch-misses:u": 22645.5
+                "cycles:u": 27238952.0,
+                "instructions:u": 39879149.5,
+                "branches:u": 5586051.0,
+                "branch-misses:u": 27976.5
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/receipt.json",
-                "sha256": "d3b363c7e9bde6ed444b0c680b3094305603e68b52a147b467818bf6a9afbeb1"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/receipt.json",
+                "sha256": "47be6fec47d21ba3c258301d33d1a229a62771c419841aaa2ed25a137412142f"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 17589548.5,
-                "instructions:u": 39944688.0,
-                "branches:u": 5593143.0,
-                "branch-misses:u": 22287.5
+                "cycles:u": 18489146.0,
+                "instructions:u": 39879208.5,
+                "branches:u": 5586067.0,
+                "branch-misses:u": 22279.5
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/receipt.json",
-                "sha256": "bbfacf09d64026255d9411d4126bd9bc4384ae547d23da8e7bf0ec34fda33390"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/receipt.json",
+                "sha256": "d088a0b8d62115365a3ff46113388c923c9e85b6cb2d78baa80485f42811c28c"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 17800233.0,
-                "instructions:u": 39944669.5,
-                "branches:u": 5593139.5,
-                "branch-misses:u": 23276.0
+                "cycles:u": 18420893.5,
+                "instructions:u": 39879202.5,
+                "branches:u": 5586053.5,
+                "branch-misses:u": 22926.5
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 17589548.5,
-            "instructions:u": 39944688.0,
-            "branches:u": 5593143.0,
-            "branch-misses:u": 22645.5
+            "cycles:u": 18489146.0,
+            "instructions:u": 39879202.5,
+            "branches:u": 5586053.5,
+            "branch-misses:u": 22926.5
           }
         },
         "async": {
@@ -211,48 +205,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/receipt.json",
-                "sha256": "dfe2a72a9fbc58e0ac61b3598ff2f437a91e1d24cd21afa712866cbf783a3524"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/receipt.json",
+                "sha256": "84fd0f5caafcb1a5d79bb9e673cd6d4abe2590976b07814f0632f75cc53bd26e"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 19415326.0,
-                "instructions:u": 43486086.5,
-                "branches:u": 6174697.5,
-                "branch-misses:u": 25187.0
+                "cycles:u": 19071468.5,
+                "instructions:u": 43419399.0,
+                "branches:u": 6167512.0,
+                "branch-misses:u": 25150.5
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/receipt.json",
-                "sha256": "fb3eedabd92b05c822161a79a0c53b0499df1171bdf311dbd7683bccb286480c"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/receipt.json",
+                "sha256": "ce4e6556169dd17a1b0ba46fc98180f794aae250fdfb0e6101083987290cd19b"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 18925336.0,
-                "instructions:u": 43486078.5,
-                "branches:u": 6174704.0,
-                "branch-misses:u": 25239.5
+                "cycles:u": 21126330.5,
+                "instructions:u": 43419419.0,
+                "branches:u": 6167511.0,
+                "branch-misses:u": 25579.5
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/receipt.json",
-                "sha256": "727e48e50e8b4835e2b8466acc19c2544b9579992b963590a84d1fe0e47052ec"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/receipt.json",
+                "sha256": "b38d8ac2c4b5ae45b8b277da909d9eecf238f0023a3b0ba36434029a1caf903d"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 19146436.5,
-                "instructions:u": 43486276.5,
-                "branches:u": 6174736.5,
-                "branch-misses:u": 27250.0
+                "cycles:u": 21144855.0,
+                "instructions:u": 43419442.0,
+                "branches:u": 6167510.5,
+                "branch-misses:u": 26658.5
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 19146436.5,
-            "instructions:u": 43486086.5,
-            "branches:u": 6174704.0,
-            "branch-misses:u": 25239.5
+            "cycles:u": 21126330.5,
+            "instructions:u": 43419419.0,
+            "branches:u": 6167511.0,
+            "branch-misses:u": 25579.5
           }
         }
       },
@@ -262,48 +256,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/receipt.json",
-                "sha256": "b8cf65c8274410b15bb1682d70f4c2ba8bcdc48be65375b0574b381504036903"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/receipt.json",
+                "sha256": "2dc850b2a6c1f14726cfd35ff050fbe1ec37f65219d3854667180691c0fb9bbc"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 13321630.0,
-                "instructions:u": 36827292.5,
-                "branches:u": 5460766.0,
-                "branch-misses:u": 16095.5
+                "cycles:u": 21529319.0,
+                "instructions:u": 36761763.0,
+                "branches:u": 5453679.0,
+                "branch-misses:u": 19035.0
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/receipt.json",
-                "sha256": "fd909e68da763de3f265e5608e442c4b9ec400c68359c21d5ea5662d3d90ec0f"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/receipt.json",
+                "sha256": "38553383537773b7ff0d16a37e69c089be68c4fc482b1036ac755cfa09f07b65"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 13715223.0,
-                "instructions:u": 36827263.0,
-                "branches:u": 5460768.5,
-                "branch-misses:u": 15882.5
+                "cycles:u": 13774270.0,
+                "instructions:u": 36761818.0,
+                "branches:u": 5453693.0,
+                "branch-misses:u": 17228.0
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/receipt.json",
-                "sha256": "2774309858d1ea2861002b6ac92ed41fc57307ae937fb253fc68e3d0be0f0180"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/receipt.json",
+                "sha256": "169a3b86068ee623a7f7ba7fb3d044c9160e78424ae8187dc8a8376a4a81bc8f"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 13563641.5,
-                "instructions:u": 36827201.0,
-                "branches:u": 5460760.0,
-                "branch-misses:u": 15901.5
+                "cycles:u": 13721773.0,
+                "instructions:u": 36761886.0,
+                "branches:u": 5453708.0,
+                "branch-misses:u": 16573.5
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 13563641.5,
-            "instructions:u": 36827263.0,
-            "branches:u": 5460766.0,
-            "branch-misses:u": 15901.5
+            "cycles:u": 13774270.0,
+            "instructions:u": 36761818.0,
+            "branches:u": 5453693.0,
+            "branch-misses:u": 17228.0
           }
         },
         "async": {
@@ -311,48 +305,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/receipt.json",
-                "sha256": "2e0899fd49727f65015f711a0a7dcccbf732539a9439c36e99756f69f9b266ce"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/receipt.json",
+                "sha256": "312bbe21b916adfc806fe3e9680575796fa6214728bef045b51eda958ae8ebba"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 14914027.5,
-                "instructions:u": 40200914.0,
-                "branches:u": 6035331.5,
-                "branch-misses:u": 18506.5
+                "cycles:u": 14832464.5,
+                "instructions:u": 40134144.0,
+                "branches:u": 6028109.0,
+                "branch-misses:u": 19001.5
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/receipt.json",
-                "sha256": "13c7bc49981a58620ad0a9f386e9c372ae486d4ca8a98a80b04b283bb43292c7"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/receipt.json",
+                "sha256": "aa77522b92fdc985c0b0e4119b0910c526de78483a16c2c3caa32f79b2370f0f"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 14689264.0,
-                "instructions:u": 40201019.0,
-                "branches:u": 6035337.5,
-                "branch-misses:u": 18029.0
+                "cycles:u": 15684784.0,
+                "instructions:u": 40134240.5,
+                "branches:u": 6028129.0,
+                "branch-misses:u": 19110.5
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/receipt.json",
-                "sha256": "0b083c9dcafe92c3b51620c45dff08a1bf860e2a1e51a8f1c99e38bed2f9d4f6"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/receipt.json",
+                "sha256": "52e9200936f350b81f6b1de68d953f0c58e0bf2b547f4edefc317eb7f0b5ff50"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 15495718.0,
-                "instructions:u": 40200860.0,
-                "branches:u": 6035311.0,
-                "branch-misses:u": 18316.5
+                "cycles:u": 14506365.0,
+                "instructions:u": 40134086.0,
+                "branches:u": 6028101.5,
+                "branch-misses:u": 18997.5
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 14914027.5,
-            "instructions:u": 40200914.0,
-            "branches:u": 6035331.5,
-            "branch-misses:u": 18316.5
+            "cycles:u": 14832464.5,
+            "instructions:u": 40134144.0,
+            "branches:u": 6028109.0,
+            "branch-misses:u": 19001.5
           }
         }
       },
@@ -362,48 +356,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/receipt.json",
-                "sha256": "cdee4f2440ab81f16b38bd14e18bbf29310e621b74f81733399463a258124eef"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/receipt.json",
+                "sha256": "cccbd5a1052bdf47347bfce2e47cd98491d1506cb316529a067e880419068672"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1365239.5,
-                "instructions:u": 2559641.5,
-                "branches:u": 502381.0,
-                "branch-misses:u": 4964.5
+                "cycles:u": 1366392.5,
+                "instructions:u": 2512669.5,
+                "branches:u": 496588.5,
+                "branch-misses:u": 5239.0
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/receipt.json",
-                "sha256": "25c96769f65f0824b4d9996012b29ae712dddd3738e23b8f861e802de0b123b6"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/receipt.json",
+                "sha256": "8ec8043c5a357077a2a8def5207260efb8a45d95b04d5e0620a1be46b9033682"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1353005.0,
-                "instructions:u": 2536522.0,
-                "branches:u": 499639.0,
-                "branch-misses:u": 5037.5
+                "cycles:u": 1355795.5,
+                "instructions:u": 2549916.0,
+                "branches:u": 501165.5,
+                "branch-misses:u": 4956.5
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/receipt.json",
-                "sha256": "f290d2e886215167b868279b1d925469b1894749eccfeb63b68263e16f0723d8"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/receipt.json",
+                "sha256": "a734ab3a2ce22ffaa132b2c3d82158f4d3cbb92af7438d54f307f69c02cf6363"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1356714.5,
-                "instructions:u": 2541786.5,
-                "branches:u": 500716.5,
-                "branch-misses:u": 5180.5
+                "cycles:u": 1387349.5,
+                "instructions:u": 2501932.5,
+                "branches:u": 495321.5,
+                "branch-misses:u": 5108.5
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 1356714.5,
-            "instructions:u": 2541786.5,
-            "branches:u": 500716.5,
-            "branch-misses:u": 5037.5
+            "cycles:u": 1366392.5,
+            "instructions:u": 2512669.5,
+            "branches:u": 496588.5,
+            "branch-misses:u": 5108.5
           }
         },
         "async": {
@@ -411,48 +405,48 @@
             {
               "repetition": 0,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/receipt.json",
-                "sha256": "9653f0ae421091539b47fc3caca46a3e981cdbc8366349d5ec43598ffcc7ecd0"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/receipt.json",
+                "sha256": "f521a941f4982807c4d888af61039c4e2fa0bc6f9bbba6bdeb7c25bbfd332431"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1445820.5,
-                "instructions:u": 2669739.5,
-                "branches:u": 528488.5,
-                "branch-misses:u": 5552.0
+                "cycles:u": 1445997.5,
+                "instructions:u": 2658970.5,
+                "branches:u": 526222.5,
+                "branch-misses:u": 5578.5
               }
             },
             {
               "repetition": 1,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/receipt.json",
-                "sha256": "a58cba5efb423f7dcdd657206973c55861291d07bacb92c5ef4d7f38ea9ce03d"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/receipt.json",
+                "sha256": "15b91f9fe6141986cac39ecb6625950e206e9289e731b24c04cf1c7aee0ad21a"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1503677.0,
-                "instructions:u": 2817905.0,
-                "branches:u": 545902.0,
-                "branch-misses:u": 5534.0
+                "cycles:u": 1437011.0,
+                "instructions:u": 2652379.0,
+                "branches:u": 525239.5,
+                "branch-misses:u": 5439.5
               }
             },
             {
               "repetition": 2,
               "receipt": {
-                "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/receipt.json",
-                "sha256": "e739a33b72bb142cda452f7d4e2fd96d410410a027b0f11ed56bae8a722fd9cd"
+                "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/receipt.json",
+                "sha256": "856e4095cf96e74fdfe41447c196a7caac6378570ae22f9e170ad9058b0aa8da"
               },
               "median_raw_counts_per_request": {
-                "cycles:u": 1427883.5,
-                "instructions:u": 2648227.5,
-                "branches:u": 524744.5,
-                "branch-misses:u": 5406.5
+                "cycles:u": 1574307.5,
+                "instructions:u": 2679408.0,
+                "branches:u": 528518.5,
+                "branch-misses:u": 5589.0
               }
             }
           ],
           "median_raw_counts_per_request": {
-            "cycles:u": 1445820.5,
-            "instructions:u": 2669739.5,
-            "branches:u": 528488.5,
-            "branch-misses:u": 5534.0
+            "cycles:u": 1445997.5,
+            "instructions:u": 2658970.5,
+            "branches:u": 526222.5,
+            "branch-misses:u": 5578.5
           }
         }
       }
@@ -460,413 +454,632 @@
     "policy": "Median of three process medians of raw user-only kernel counts. No multiplex scaling. Caller/main TID only; control edges included; setup, warmups, encoding and exact checks excluded. Speed changes optimization and register allocation together."
   },
   "helper_entry_counts": {
-    "processes": 2,
-    "baseline_processes": 2,
+    "targets": [
+      "builtin::Object.prototype.hasOwnProperty",
+      "helper::ordinary_own_descriptor",
+      "helper::value_to_property_key",
+      "helper::dynamic_property_read"
+    ],
+    "baseline_source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+    "candidate_source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+    "processes": 4,
+    "processes_per_compiler_mode": 1,
     "windows_per_process": 7,
     "warmups": 3,
     "known_entry_control_windows": 16,
     "modes": {
       "sync": [
         {
-          "name": "js::vn#f133",
-          "prior_per_request": 276,
-          "current_per_request": 276,
+          "name": "builtin::Object.prototype.hasOwnProperty",
+          "baseline_2255_per_request": 163,
+          "candidate_per_request": 163,
           "delta": 0,
-          "prior_windows": [
-            276,
-            276,
-            276,
-            276,
-            276,
-            276,
-            276
+          "baseline_windows": [
+            163,
+            163,
+            163,
+            163,
+            163,
+            163,
+            163
           ],
-          "current_windows": [
-            276,
-            276,
-            276,
-            276,
-            276,
-            276,
-            276
+          "candidate_windows": [
+            163,
+            163,
+            163,
+            163,
+            163,
+            163,
+            163
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/receipt.json",
-            "sha256": "897f59017b82ba631068e08e0da0fb9ecc2e4dbdb27fd14448e6c01841ffa76a"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/receipt.json",
+            "sha256": "7ef46e505e2686717aae80491ad067c7bec7591be7c51afa0d3921ae62fc5b08"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/receipt.json",
-            "sha256": "455b8afd89d07d99e7a8bf71b860ef72459f6482ec353f9cef8bb4ca1fad9da2"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/receipt.json",
+            "sha256": "a76c83b040acdf5c25c6f2fcc0b424e62924dd622d97cfab860b978db051c38a"
           }
         },
         {
-          "name": "js::ft#f123",
-          "prior_per_request": 242,
-          "current_per_request": 242,
-          "delta": 0,
-          "prior_windows": [
-            242,
-            242,
-            242,
-            242,
-            242,
-            242,
-            242
+          "name": "helper::ordinary_own_descriptor",
+          "baseline_2255_per_request": 4304,
+          "candidate_per_request": 4074,
+          "delta": -230,
+          "baseline_windows": [
+            4304,
+            4304,
+            4304,
+            4304,
+            4304,
+            4304,
+            4304
           ],
-          "current_windows": [
-            242,
-            242,
-            242,
-            242,
-            242,
-            242,
-            242
+          "candidate_windows": [
+            4074,
+            4074,
+            4074,
+            4074,
+            4074,
+            4074,
+            4074
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/receipt.json",
-            "sha256": "897f59017b82ba631068e08e0da0fb9ecc2e4dbdb27fd14448e6c01841ffa76a"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/receipt.json",
+            "sha256": "7ef46e505e2686717aae80491ad067c7bec7591be7c51afa0d3921ae62fc5b08"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/receipt.json",
-            "sha256": "455b8afd89d07d99e7a8bf71b860ef72459f6482ec353f9cef8bb4ca1fad9da2"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/receipt.json",
+            "sha256": "a76c83b040acdf5c25c6f2fcc0b424e62924dd622d97cfab860b978db051c38a"
           }
         },
         {
-          "name": "helper::function_call",
-          "prior_per_request": 2538,
-          "current_per_request": 1879,
-          "delta": -659,
-          "prior_windows": [
-            2538,
-            2538,
-            2538,
-            2538,
-            2538,
-            2538,
-            2538
+          "name": "helper::value_to_property_key",
+          "baseline_2255_per_request": 7458,
+          "candidate_per_request": 7357,
+          "delta": -101,
+          "baseline_windows": [
+            7458,
+            7458,
+            7458,
+            7458,
+            7458,
+            7458,
+            7458
           ],
-          "current_windows": [
-            1879,
-            1879,
-            1879,
-            1879,
-            1879,
-            1879,
-            1879
+          "candidate_windows": [
+            7357,
+            7357,
+            7357,
+            7357,
+            7357,
+            7357,
+            7357
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/receipt.json",
-            "sha256": "897f59017b82ba631068e08e0da0fb9ecc2e4dbdb27fd14448e6c01841ffa76a"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/receipt.json",
+            "sha256": "7ef46e505e2686717aae80491ad067c7bec7591be7c51afa0d3921ae62fc5b08"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/receipt.json",
-            "sha256": "455b8afd89d07d99e7a8bf71b860ef72459f6482ec353f9cef8bb4ca1fad9da2"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/receipt.json",
+            "sha256": "a76c83b040acdf5c25c6f2fcc0b424e62924dd622d97cfab860b978db051c38a"
           }
         },
         {
-          "name": "helper::cached_property_read",
-          "prior_per_request": 2548,
-          "current_per_request": 2548,
+          "name": "helper::dynamic_property_read",
+          "baseline_2255_per_request": 136,
+          "candidate_per_request": 136,
           "delta": 0,
-          "prior_windows": [
-            2548,
-            2548,
-            2548,
-            2548,
-            2548,
-            2548,
-            2548
+          "baseline_windows": [
+            136,
+            136,
+            136,
+            136,
+            136,
+            136,
+            136
           ],
-          "current_windows": [
-            2548,
-            2548,
-            2548,
-            2548,
-            2548,
-            2548,
-            2548
+          "candidate_windows": [
+            136,
+            136,
+            136,
+            136,
+            136,
+            136,
+            136
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/receipt.json",
-            "sha256": "897f59017b82ba631068e08e0da0fb9ecc2e4dbdb27fd14448e6c01841ffa76a"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/receipt.json",
+            "sha256": "7ef46e505e2686717aae80491ad067c7bec7591be7c51afa0d3921ae62fc5b08"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/receipt.json",
-            "sha256": "455b8afd89d07d99e7a8bf71b860ef72459f6482ec353f9cef8bb4ca1fad9da2"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/receipt.json",
+            "sha256": "a76c83b040acdf5c25c6f2fcc0b424e62924dd622d97cfab860b978db051c38a"
           }
         }
       ],
       "async": [
         {
-          "name": "js::vn#f133",
-          "prior_per_request": 291,
-          "current_per_request": 291,
+          "name": "builtin::Object.prototype.hasOwnProperty",
+          "baseline_2255_per_request": 165,
+          "candidate_per_request": 165,
           "delta": 0,
-          "prior_windows": [
-            291,
-            291,
-            291,
-            291,
-            291,
-            291,
-            291
+          "baseline_windows": [
+            165,
+            165,
+            165,
+            165,
+            165,
+            165,
+            165
           ],
-          "current_windows": [
-            291,
-            291,
-            291,
-            291,
-            291,
-            291,
-            291
+          "candidate_windows": [
+            165,
+            165,
+            165,
+            165,
+            165,
+            165,
+            165
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/receipt.json",
-            "sha256": "a14e5c26e60c4f71682368c5973051398212890591fff7c93ded1fe287b34ab9"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/receipt.json",
+            "sha256": "745e1bcaf50162c555b4049eea1d19bea11333207f02a41be2e24cc5d0770065"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/receipt.json",
-            "sha256": "8bfc3cdd9807bf6b1cb283550eff1ce972f9de5400cdc58ce6ea34056fc59cef"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/receipt.json",
+            "sha256": "f1ed00352b10e0ef87d07a418724666416d0aaf437b60dcf41a202381d723791"
           }
         },
         {
-          "name": "js::ft#f123",
-          "prior_per_request": 254,
-          "current_per_request": 254,
-          "delta": 0,
-          "prior_windows": [
-            254,
-            254,
-            254,
-            254,
-            254,
-            254,
-            254
+          "name": "helper::ordinary_own_descriptor",
+          "baseline_2255_per_request": 4594,
+          "candidate_per_request": 4360,
+          "delta": -234,
+          "baseline_windows": [
+            4594,
+            4594,
+            4594,
+            4594,
+            4594,
+            4594,
+            4594
           ],
-          "current_windows": [
-            254,
-            254,
-            254,
-            254,
-            254,
-            254,
-            254
+          "candidate_windows": [
+            4360,
+            4360,
+            4360,
+            4360,
+            4360,
+            4360,
+            4360
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/receipt.json",
-            "sha256": "a14e5c26e60c4f71682368c5973051398212890591fff7c93ded1fe287b34ab9"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/receipt.json",
+            "sha256": "745e1bcaf50162c555b4049eea1d19bea11333207f02a41be2e24cc5d0770065"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/receipt.json",
-            "sha256": "8bfc3cdd9807bf6b1cb283550eff1ce972f9de5400cdc58ce6ea34056fc59cef"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/receipt.json",
+            "sha256": "f1ed00352b10e0ef87d07a418724666416d0aaf437b60dcf41a202381d723791"
           }
         },
         {
-          "name": "helper::function_call",
-          "prior_per_request": 2691,
-          "current_per_request": 1998,
-          "delta": -693,
-          "prior_windows": [
-            2691,
-            2691,
-            2691,
-            2691,
-            2691,
-            2691,
-            2691
+          "name": "helper::value_to_property_key",
+          "baseline_2255_per_request": 7656,
+          "candidate_per_request": 7552,
+          "delta": -104,
+          "baseline_windows": [
+            7656,
+            7656,
+            7656,
+            7656,
+            7656,
+            7656,
+            7656
           ],
-          "current_windows": [
-            1998,
-            1998,
-            1998,
-            1998,
-            1998,
-            1998,
-            1998
+          "candidate_windows": [
+            7552,
+            7552,
+            7552,
+            7552,
+            7552,
+            7552,
+            7552
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/receipt.json",
-            "sha256": "a14e5c26e60c4f71682368c5973051398212890591fff7c93ded1fe287b34ab9"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/receipt.json",
+            "sha256": "745e1bcaf50162c555b4049eea1d19bea11333207f02a41be2e24cc5d0770065"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/receipt.json",
-            "sha256": "8bfc3cdd9807bf6b1cb283550eff1ce972f9de5400cdc58ce6ea34056fc59cef"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/receipt.json",
+            "sha256": "f1ed00352b10e0ef87d07a418724666416d0aaf437b60dcf41a202381d723791"
           }
         },
         {
-          "name": "helper::cached_property_read",
-          "prior_per_request": 2698,
-          "current_per_request": 2698,
+          "name": "helper::dynamic_property_read",
+          "baseline_2255_per_request": 141,
+          "candidate_per_request": 141,
           "delta": 0,
-          "prior_windows": [
-            2698,
-            2698,
-            2698,
-            2698,
-            2698,
-            2698,
-            2698
+          "baseline_windows": [
+            141,
+            141,
+            141,
+            141,
+            141,
+            141,
+            141
           ],
-          "current_windows": [
-            2698,
-            2698,
-            2698,
-            2698,
-            2698,
-            2698,
-            2698
+          "candidate_windows": [
+            141,
+            141,
+            141,
+            141,
+            141,
+            141,
+            141
           ],
-          "prior_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/receipt.json",
-            "sha256": "a14e5c26e60c4f71682368c5973051398212890591fff7c93ded1fe287b34ab9"
+          "baseline_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/receipt.json",
+            "sha256": "745e1bcaf50162c555b4049eea1d19bea11333207f02a41be2e24cc5d0770065"
           },
-          "current_receipt": {
-            "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/receipt.json",
-            "sha256": "8bfc3cdd9807bf6b1cb283550eff1ce972f9de5400cdc58ce6ea34056fc59cef"
+          "candidate_receipt": {
+            "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/receipt.json",
+            "sha256": "f1ed00352b10e0ef87d07a418724666416d0aaf437b60dcf41a202381d723791"
           }
         }
       ]
     },
-    "source_entry_totals": {
-      "sync": {
-        "prior_native_source_entries": 518,
-        "current_native_source_entries": 518
-      },
-      "async": {
-        "prior_native_source_entries": 545,
-        "current_native_source_entries": 545
-      }
-    },
-    "policy": "Same-driver authenticated hardware entry counters with fresh eight-case controls for each compiler. Counts overlap and cannot be summed across source/helper populations. Source entry totals are not vector or allocation counts; no multiplication by five arguments."
-  },
-  "native_function_extents": {
-    "modes": {
-      "sync": [
-        {
-          "name": "js::vn#f133",
-          "prior": {
-            "symbol_extent_bytes": 1506048,
-            "executable_mapping_extent_bytes": 31842304,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/perf-before.map",
-              "sha256": "a104d9411107433c8bc3f3588a9744432748d0c13be211101d6a41d42968ad05"
-            }
-          },
-          "current": {
-            "symbol_extent_bytes": 1572240,
-            "executable_mapping_extent_bytes": 31776768,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/perf-before.map",
-              "sha256": "07424d6245f0b8450176725774eca1e27595a645208f86a9cd09d1369f195c76"
-            }
-          }
-        },
-        {
-          "name": "js::ft#f123",
-          "prior": {
-            "symbol_extent_bytes": 556048,
-            "executable_mapping_extent_bytes": 31842304,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/perf-before.map",
-              "sha256": "a104d9411107433c8bc3f3588a9744432748d0c13be211101d6a41d42968ad05"
-            }
-          },
-          "current": {
-            "symbol_extent_bytes": 574512,
-            "executable_mapping_extent_bytes": 31776768,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/perf-before.map",
-              "sha256": "07424d6245f0b8450176725774eca1e27595a645208f86a9cd09d1369f195c76"
-            }
-          }
-        }
-      ],
-      "async": [
-        {
-          "name": "js::vn#f133",
-          "prior": {
-            "symbol_extent_bytes": 1506048,
-            "executable_mapping_extent_bytes": 31842304,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/perf-before.map",
-              "sha256": "84bec61c28151889d608f1f37e17590dd1782515c9ec6831fced5426a0f10928"
-            }
-          },
-          "current": {
-            "symbol_extent_bytes": 1572240,
-            "executable_mapping_extent_bytes": 31776768,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/perf-before.map",
-              "sha256": "675d93294000dd8f630ab372c2b29c7ad284103d5f73e175b39daf3b4e5fa747"
-            }
-          }
-        },
-        {
-          "name": "js::ft#f123",
-          "prior": {
-            "symbol_extent_bytes": 556048,
-            "executable_mapping_extent_bytes": 31842304,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/perf-before.map",
-              "sha256": "84bec61c28151889d608f1f37e17590dd1782515c9ec6831fced5426a0f10928"
-            }
-          },
-          "current": {
-            "symbol_extent_bytes": 574512,
-            "executable_mapping_extent_bytes": 31776768,
-            "perf_map": {
-              "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/perf-before.map",
-              "sha256": "675d93294000dd8f630ab372c2b29c7ad284103d5f73e175b39daf3b4e5fa747"
-            }
-          }
-        }
-      ]
-    },
-    "scope": "Perf-map named symbol extents and containing executable mapping extents; neither is a stack-frame size or live memory measurement."
+    "policy": "Same-driver authenticated hardware entry counters with fresh controls for the 2255 baseline and current candidate. Target populations overlap; report each target separately and do not sum them into source entries, calls, allocations or extents."
   },
   "sampling": {
-    "fresh": false,
+    "fresh": true,
     "historical": {
       "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
       "report": {
-        "path": "/home/jacobt/src/scriptw/docs/rust-rewrite/react-attribution-current.json",
-        "sha256": "b5f7d1d4ce5d35b00e6a087662ee5efb2c19b19e266024c3bfebe6cd603b50e7"
+        "archive": {
+          "path": "/home/jacobt/src/scriptw/docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz",
+          "sha256": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c"
+        },
+        "member": "reports/react-attribution-current.json",
+        "sha256": "43d70f5a5293767d9233b174db672f622b338b0d2a9ad22cc76f08ac16ea563a",
+        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044"
       },
       "archive": {
         "path": "/home/jacobt/src/scriptw/docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz",
         "sha256": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c"
       },
       "scope": "Archived 5aa compiler leaf sampling only; not refreshed or relabelled for the current compiler."
+    },
+    "current": {
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "summary": {
+        "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/fresh-profiles/summary.json",
+        "sha256": "c311d485dda8de3fb6b7a7c10e6eeea766785227ea5daebfd1f42c36f1574508",
+        "archive_member": "verification/06-fresh-profiles/summary.json"
+      },
+      "processes": 12,
+      "windows_per_process": 100,
+      "warmups": 3,
+      "event": "cycles:u",
+      "period": 250000,
+      "call_graph": "fp",
+      "cohorts": [
+        {
+          "native_mode": "fast",
+          "request_mode": "sync",
+          "processes": 3,
+          "samples": 22058,
+          "own_period_sum": 5514500000,
+          "unavailable_ip_or_callchain_samples": 1,
+          "unavailable_ip_or_callchain_period_sum": 250000,
+          "top_own_leaf_period_weights": [
+            {
+              "owner": "wasm:js::vn#f133",
+              "period_sum": 641250000,
+              "sample_share": 0.11628434128207453
+            },
+            {
+              "owner": "wasm:helper::object_read",
+              "period_sum": 422500000,
+              "sample_share": 0.07661619367123039
+            },
+            {
+              "owner": "wasm:js::ft#f123",
+              "period_sum": 322000000,
+              "sample_share": 0.05839151328316257
+            },
+            {
+              "owner": "wasm:helper::ordinary_property_find",
+              "period_sum": 218000000,
+              "sample_share": 0.03953214253332124
+            },
+            {
+              "owner": "wasm:helper::for_in_advance",
+              "period_sum": 198750000,
+              "sample_share": 0.03604134554356696
+            },
+            {
+              "owner": "wasm:helper::intrinsic_property_find",
+              "period_sum": 180250000,
+              "sample_share": 0.03268655363133557
+            },
+            {
+              "owner": "wasm:js::f42",
+              "period_sum": 161250000,
+              "sample_share": 0.02924109166742225
+            },
+            {
+              "owner": "wasm:helper::object_own_keys",
+              "period_sum": 153000000,
+              "sample_share": 0.027745035814670416
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 133000000,
+              "sample_share": 0.024118233747393237
+            },
+            {
+              "owner": "wasm:helper::cached_property_read",
+              "period_sum": 126500000,
+              "sample_share": 0.022939523075528153
+            },
+            {
+              "owner": "wasm:helper::ordinary_set",
+              "period_sum": 122000000,
+              "sample_share": 0.022123492610390788
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 116750000,
+              "sample_share": 0.021171457067730527
+            }
+          ]
+        },
+        {
+          "native_mode": "fast",
+          "request_mode": "async",
+          "processes": 3,
+          "samples": 24144,
+          "own_period_sum": 6036000000,
+          "unavailable_ip_or_callchain_samples": 3,
+          "unavailable_ip_or_callchain_period_sum": 750000,
+          "top_own_leaf_period_weights": [
+            {
+              "owner": "wasm:js::vn#f133",
+              "period_sum": 706000000,
+              "sample_share": 0.11696487740225314
+            },
+            {
+              "owner": "wasm:helper::object_read",
+              "period_sum": 428000000,
+              "sample_share": 0.07090788601722996
+            },
+            {
+              "owner": "wasm:js::ft#f123",
+              "period_sum": 337750000,
+              "sample_share": 0.05595593108018555
+            },
+            {
+              "owner": "wasm:helper::ordinary_property_find",
+              "period_sum": 237000000,
+              "sample_share": 0.03926441351888668
+            },
+            {
+              "owner": "wasm:helper::for_in_advance",
+              "period_sum": 198000000,
+              "sample_share": 0.032803180914512925
+            },
+            {
+              "owner": "wasm:helper::intrinsic_property_find",
+              "period_sum": 193250000,
+              "sample_share": 0.032016235917826374
+            },
+            {
+              "owner": "wasm:helper::object_own_keys",
+              "period_sum": 170250000,
+              "sample_share": 0.02820576540755467
+            },
+            {
+              "owner": "wasm:js::f42",
+              "period_sum": 164750000,
+              "sample_share": 0.027294565937707092
+            },
+            {
+              "owner": "wasm:helper::ordinary_set",
+              "period_sum": 139500000,
+              "sample_share": 0.023111332007952286
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 132750000,
+              "sample_share": 0.021993041749502982
+            },
+            {
+              "owner": "wasm:helper::json_stringify_value",
+              "period_sum": 130750000,
+              "sample_share": 0.021661696487740224
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 123750000,
+              "sample_share": 0.020501988071570578
+            }
+          ]
+        },
+        {
+          "native_mode": "speed",
+          "request_mode": "sync",
+          "processes": 3,
+          "samples": 17462,
+          "own_period_sum": 4365500000,
+          "unavailable_ip_or_callchain_samples": 1,
+          "unavailable_ip_or_callchain_period_sum": 250000,
+          "top_own_leaf_period_weights": [
+            {
+              "owner": "wasm:helper::object_read",
+              "period_sum": 397250000,
+              "sample_share": 0.09099759477723056
+            },
+            {
+              "owner": "wasm:helper::ordinary_property_find",
+              "period_sum": 203500000,
+              "sample_share": 0.04661550796014202
+            },
+            {
+              "owner": "wasm:helper::for_in_advance",
+              "period_sum": 199750000,
+              "sample_share": 0.04575649982819838
+            },
+            {
+              "owner": "wasm:js::vn#f133",
+              "period_sum": 194250000,
+              "sample_share": 0.044496621234681025
+            },
+            {
+              "owner": "wasm:helper::intrinsic_property_find",
+              "period_sum": 179000000,
+              "sample_share": 0.04100332149811018
+            },
+            {
+              "owner": "wasm:helper::object_own_keys",
+              "period_sum": 154750000,
+              "sample_share": 0.03544840224487458
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 126250000,
+              "sample_share": 0.028919940442102852
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 122000000,
+              "sample_share": 0.027946397892566716
+            },
+            {
+              "owner": "wasm:js::ft#f123",
+              "period_sum": 118750000,
+              "sample_share": 0.027201924178215552
+            },
+            {
+              "owner": "wasm:helper::json_stringify_value",
+              "period_sum": 116000000,
+              "sample_share": 0.026571984881456876
+            },
+            {
+              "owner": "wasm:helper::cached_property_read",
+              "period_sum": 112000000,
+              "sample_share": 0.025655709540716984
+            },
+            {
+              "owner": "wasm:helper::ordinary_set",
+              "period_sum": 105500000,
+              "sample_share": 0.02416676211201466
+            }
+          ]
+        },
+        {
+          "native_mode": "speed",
+          "request_mode": "async",
+          "processes": 3,
+          "samples": 19065,
+          "own_period_sum": 4766250000,
+          "unavailable_ip_or_callchain_samples": 3,
+          "unavailable_ip_or_callchain_period_sum": 750000,
+          "top_own_leaf_period_weights": [
+            {
+              "owner": "wasm:helper::object_read",
+              "period_sum": 414250000,
+              "sample_share": 0.08691319171256229
+            },
+            {
+              "owner": "wasm:helper::ordinary_property_find",
+              "period_sum": 213000000,
+              "sample_share": 0.04468922108575925
+            },
+            {
+              "owner": "wasm:js::vn#f133",
+              "period_sum": 199000000,
+              "sample_share": 0.041751901389981645
+            },
+            {
+              "owner": "wasm:helper::intrinsic_property_find",
+              "period_sum": 195500000,
+              "sample_share": 0.04101757146603724
+            },
+            {
+              "owner": "wasm:helper::for_in_advance",
+              "period_sum": 192750000,
+              "sample_share": 0.04044059795436664
+            },
+            {
+              "owner": "wasm:helper::object_own_keys",
+              "period_sum": 150500000,
+              "sample_share": 0.03157618672960923
+            },
+            {
+              "owner": "wasm:helper::json_stringify_value",
+              "period_sum": 137250000,
+              "sample_share": 0.02879622344610543
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::store::StoreOpaque>::is_subtype_cached (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 133500000,
+              "sample_share": 0.02800944138473643
+            },
+            {
+              "owner": "host-or-unresolved:<wasmtime::runtime::vm::gc::enabled::copying::CopyingHeap>::forward (/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline)",
+              "period_sum": 133500000,
+              "sample_share": 0.02800944138473643
+            },
+            {
+              "owner": "wasm:js::ft#f123",
+              "period_sum": 129000000,
+              "sample_share": 0.027065302911093627
+            },
+            {
+              "owner": "wasm:helper::ordinary_set",
+              "period_sum": 115500000,
+              "sample_share": 0.024232887490165226
+            },
+            {
+              "owner": "host-or-unresolved:[unknown] (/usr/lib/libc.so.6)",
+              "period_sum": 114500000,
+              "sample_share": 0.024023078940466826
+            }
+          ]
+        }
+      ],
+      "limits": "Period-weighted user cycle samples, not exact calls, wall time, allocations, or speedup. Own leaf owners are disjoint; inclusive owners and helper caller rows overlap. Unresolved host symbols and unavailable callchains remain explicit and in the own-period denominator."
     }
   },
   "physical_allocation_census": {
     "fresh": false
   },
   "limits": [
-    "No fresh leaf sampling or physical allocation census.",
     "Counters and entry instrumentation perturb execution; profiled timings are not scored.",
-    "Per-request source/helper entries overlap and do not identify allocation origins or causal removable time.",
-    "No fresh old-compiler PMU cohort is claimed; Fast/Speed/V8 PMU data all come from the final diagnostic campaign."
+    "Per-target instrumentation overlaps; these counts do not identify allocation origins or causal removable time.",
+    "No fresh old-compiler PMU cohort is claimed; Fast/Speed/V8 PMU data all come from the final diagnostic campaign.",
+    "Fresh FP locations are period-weighted cycle samples, not exact calls, allocations, wall-time shares or speedup evidence. Physical allocation has not been recounted."
   ],
   "verification": {
     "inputs": {
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/manifest.json": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/manifest.json": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/aggregate.json": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
       "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-      "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate-speed/report.json": "73e7febeb356d00fa9a935c4b5f88596db4af621a9c0e9761737fb80a78f5b8c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-baseline/report.json": "c98291c4e4e9e881cee57433f9b5d9a77de84e78c5dc99e268235ccf975d7f0d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "d9f12c372442ec7fbcef4f0b2f43177cd13ec41ef4b4f0f7e17da7ecaccd87f9",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate-speed/report.json": "27609c27647da06960b039b474491ea31fc8063c3d9086b3e3c3e07d85781441",
       "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
       "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/campaign.json": "42ebfc77de9873b1ff035fa9ca4eb410c6a7233010b3bd4e76d75e45e789ca34",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/candidate_diagnostics.py": "561e08af71f485fa6785120e862e776a737aaca9950dd3dae5fe742578f1ed86",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-census.json": "c8482910cf5a8e84ee7b8e96f395c90fa30bffc097e163fe6f7fa0ddc3ed3c22",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/common.py": "14eede0d86d6dbf4aacab9daf13e4f89df651340fa6a2ec062a7a6ec8804a254",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/measure_rsc.py": "af41ab9aebcf5c9c394c23f233aec9d32e1eed60716952181d344184473b6b16",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/campaign.json": "19ce4f95f6bd93a5420b08b823b3d8c37fd029545511273f09195486296dda8e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/diagnostics.py": "687aaa5a8f7a32ceb9780decf527074f76df2c73cf9e69e0b90da148ed577137",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/common.py": "f0f142dd5f88781b90eb9882f955fcfbd27fc5e6cb46a541c2887e9d0f757a10",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/measure_rsc.py": "02aa3fe57c75690e4dd4b16a87cccd976ceb66d50955131b273cb36a674517fd",
       "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
+      "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
       "/home/jacobt/src/scriptw/target/rsc-attribution-20261107/tools/count_source_entries.py": "84213d00426a4af5f8ac6c104d8d0da6b13d4ed43ddf903de041ced91b33a7ca",
       "/home/jacobt/src/scriptw/target/rsc-attribution-20261107/tools/count_source_entries.adaptation.json": "266b5d3cf91e11f141e2b2ed850859953b4816a5578b13f4778981324edaf74d",
       "/home/jacobt/src/scriptw/target/rsc-attribution-20261107/tools/count_request_pmu.py": "448c55a0803a316a356378cf76d938ac7d59a43ab8bb8fbd78e0fdc8309a3a00",
@@ -879,210 +1092,204 @@
       "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/entry-breakpoints-staged/controls.rs": "93f646e8fd6e5b3175ed4fd8eb9cdff7375cdbc09cc18c1e31a4b9f5fc2ffd8f",
       "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/entry-breakpoints-staged/build_controls.py": "d16f08eb4d6e8f0608731239dc542a94859387b99a3b086d3a782869cc37b256",
       "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/entry-breakpoints-staged/count_entries.py": "e04991fa5f808a58cf2eafd2100f1add2a78d234c9dbb1e5d55a99ddf202fd64",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/receipt.json": "5ef0a25fc1f96869a99f9b37dfe449f9dbe89ce353526ffd75b8ed5a62aa6f85",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/observations.json": "e98db0cca50830f0c01a91c2a767abce903db9a0da92f8babaf979b36e221b3e",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control.stdout": "7ceea5fdcf445db02bc515c0d4117b547d7ba76e64ffe6835d57a4ba2dd973ec",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/receipt.json": "455b8afd89d07d99e7a8bf71b860ef72459f6482ec353f9cef8bb4ca1fad9da2",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/observations.json": "a3660be40a7367424d6bdc39a1e4dedfd97a15bd163865f964effeb4c97eb57f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync.stdout": "5a45e5131d81ca016577f6e3973970d3a33d96573e77e44cebcd8e69b45f45b5",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/receipt.json": "8bfc3cdd9807bf6b1cb283550eff1ce972f9de5400cdc58ce6ea34056fc59cef",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/observations.json": "531e3042fcc461506d4b13b103d2997ba146dfaa5e7bffdd11b99e286f62a433",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async.stdout": "484425ee0ecc6b8ef40e828de28d07655bb9565a7d9653032d6eb3c2827e7008",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/receipt.json": "41f2877d7dc1e1d7db6cfbfb50272e1bb5a3d38a18d1d6bf2367bc908f157294",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/observations.json": "f84728e69aaa67dc1a8288b365c1b37876d34d2c81aea457e3010a1c938c17f4",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0.stdout": "be1c190c7849cabc18002251ba895fd7b8f9331c6b1a04dd958002e029f75739",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/receipt.json": "b8cf65c8274410b15bb1682d70f4c2ba8bcdc48be65375b0574b381504036903",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/observations.json": "369b409823f9d8ebf05617d6d2a8963acc37bcffc4489039766abecf479af745",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0.stdout": "3ec2b475b120358da475bfe791c089fda1f1fa709fdbaf06e1bb8fe5ae1dabd4",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/receipt.json": "cdee4f2440ab81f16b38bd14e18bbf29310e621b74f81733399463a258124eef",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/observations.json": "ffbf92d96c94f473b9b662051d0dd40c9541445cd6670dca062bdf7f89163fa0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0.stdout": "2512e8df12875ade9b435d2a7a98791d590106ffdf60c8291ee023c6ff3ac8db",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/receipt.json": "dfe2a72a9fbc58e0ac61b3598ff2f437a91e1d24cd21afa712866cbf783a3524",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/observations.json": "734d221ebb0f427a213069797bb2d9f9c7ab11329559abe7b041171a37388d38",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0.stdout": "2db468ef86556563fcd32e280ea1a5a318cd8af6ce4ad35be7073a2e6a6d505f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/receipt.json": "2e0899fd49727f65015f711a0a7dcccbf732539a9439c36e99756f69f9b266ce",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/observations.json": "d7bd39b9bb548998173eb003c8a85e657134c95c9a1160206c75ed84d6e1098c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0.stdout": "1d5eb51ae3d64ad163dd2b28979cf340637524aac1f5ab5b963a3946a9de353c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/receipt.json": "9653f0ae421091539b47fc3caca46a3e981cdbc8366349d5ec43598ffcc7ecd0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/observations.json": "668159e9f2b82063848fca593c58286964c8decb491901b195827dba2f924941",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0.stdout": "f62dacdd532c937ebbd93a3cc06489bbb01363a7de6d18cce130acdcea373482",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/receipt.json": "fd909e68da763de3f265e5608e442c4b9ec400c68359c21d5ea5662d3d90ec0f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/observations.json": "b4d4bbfa77a6e76e0a049a3acef9a011a005ba8c79e3f61fbfcbd9d4bfbb4c53",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1.stdout": "436ade0350eb9d5613fd6ebf94802ee2d4a746a06d7f63c13a50553008faddbb",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/receipt.json": "25c96769f65f0824b4d9996012b29ae712dddd3738e23b8f861e802de0b123b6",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/observations.json": "f249666eb058c341b3eeb6a4d95ece43de18ea9690a6662e0e7dc50f25403611",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1.stdout": "9a461754eab9d0e5826301d321eefa4fbd5c02ffcedcbffcc9ea9ee33daaac2a",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/receipt.json": "d3b363c7e9bde6ed444b0c680b3094305603e68b52a147b467818bf6a9afbeb1",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/observations.json": "4135190ef58547e03e587d0d992a975f62b1ea5530bbafb2be24479923152c9b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1.stdout": "e70239d6df4ce00525c783a42a317e956cd4e1816e4c35ac396790c5d7f0caf4",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/receipt.json": "13c7bc49981a58620ad0a9f386e9c372ae486d4ca8a98a80b04b283bb43292c7",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/observations.json": "fed0156e3d9f08331ed0af522c6cfeebc7d9ba16ada43fe4fcbc173db681b030",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1.stdout": "b3e1cc7055286d323628013c8b688232a7181067fb8ecef605b3b334532b050d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/receipt.json": "a58cba5efb423f7dcdd657206973c55861291d07bacb92c5ef4d7f38ea9ce03d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/observations.json": "c2908671d4e3461bc10714e1037a93d74bcc160ffef260f3866e0ab7206ca291",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1.stdout": "7d70d76ef7f4cba2e4179a8894f71dbec10efe7e132e8e2d33b6c803c9b44180",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/receipt.json": "fb3eedabd92b05c822161a79a0c53b0499df1171bdf311dbd7683bccb286480c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/observations.json": "bb72e270ec22ff2c2ad6811187372afe2e9b25a6c5a09e50b3fba187ca528d69",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1.stdout": "f5300699410ec68588ec84e90dc5dea48053bd13d2d4df734cd35ac9d6d1ce31",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/receipt.json": "f290d2e886215167b868279b1d925469b1894749eccfeb63b68263e16f0723d8",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/observations.json": "a5b30425ab4a67eb3da48689577cc447d78ee12176209c9201afb29881374c71",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2.stdout": "ca21a1e81ab8213d1a728499f6929f33968c472c10e2bbe7ce2d31274e40c0d1",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/receipt.json": "bbfacf09d64026255d9411d4126bd9bc4384ae547d23da8e7bf0ec34fda33390",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/observations.json": "b6a78f5e53acbd7fcbe0edec94212e3f3110a553bed01125f80ef3a72b602c51",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2.stdout": "b6299c5c9efeb6925877c6e96d0392d73d8a622ed54736e6f8045967645670b7",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/receipt.json": "2774309858d1ea2861002b6ac92ed41fc57307ae937fb253fc68e3d0be0f0180",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/observations.json": "a05f99f4c3545c1db822e1bf8cbe0142b9f8cb55a22f2d5e10c616164adf257b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2.stdout": "059333a61e2386e36bcb9a5a24a416ad6a452a6442d616741d77e2f2bbdd0fb5",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/receipt.json": "e739a33b72bb142cda452f7d4e2fd96d410410a027b0f11ed56bae8a722fd9cd",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/observations.json": "92934e54a01f64c7c616c29c5a99aabb51c9b502e3a83d06e290b0d848786853",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2.stdout": "e298761c30dde9acd0bcab07191b0069cb18050dab9e2802361b8489b28cd06c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/receipt.json": "727e48e50e8b4835e2b8466acc19c2544b9579992b963590a84d1fe0e47052ec",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/observations.json": "04a9668152b39e85740f91cb638fc434cad593ac64a987eabdb938a4cb2ea06f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2.stdout": "13e2265fef41056177e2a4c20fc1271f312d8fa954f6662bfa75464086141cc5",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/receipt.json": "0b083c9dcafe92c3b51620c45dff08a1bf860e2a1e51a8f1c99e38bed2f9d4f6",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/observations.json": "eff7e1925348df16635064dbc3f39ea0fb88cf4f96d76f7d6b40b1e6047e0717",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2.stdout": "c3fcbed238d33df23ddd5933cd3212de0c867da2f5f76500ce122090cab05efd",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/plan.json": "cc9d1f862a164854eff3deaa5217be79e08538c229881f854bbcd5547263e78d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/host.stdout": "d3f316741f407e141303519780f79a14b6b6a83d626dae270ff7005e34ab711b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/plan.json": "d4a47f1e6216874a22fcea6f2202a669ba2644447230ba44cdf24146568b264a",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/host.stdout": "b41ea35ccb85739a10a8983283eec4830afc05df03b407895895d82b53957b41",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/plan.json": "46f855f9799abb80e473b521dfccf07099bb2a1b331a7576d88d7e60cef43ed7",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-0/host.stderr": "0562a2857ce113d89e349f9448b29e3763a534735d23ce733447f9a4595b4c1c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/plan.json": "07f44ef13836367d821ef9041618446eca8d1f031e85180b3e88b6f709ba6e6c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/host.stdout": "97c7fbb8edc7ab6ec38acaaf3b3f466cbc777855cfaaa9431f233bb50dedadf9",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/plan.json": "576c0da7d3b78c45cb9023b12351181f6c3424e07b56a96c991db88a2b99ad2f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/host.stdout": "f9a7cb9f237deea4bec38d7c451c7c79f8abdc3d3f40ce7a8cba53a3b986398e",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/plan.json": "b1fe292ac76376c576f4865ef392f47e90114c82a97d095b53bf20a0ad495b0d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-0/host.stderr": "913f34b644c5a86941c80b452cdd62dd3346fbf6e6d23af84601c4d10dd46a0a",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/plan.json": "135331584f4e75c63089def5d38db1d245db8a4188b66dd834ea3f8e4217e9e1",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/host.stdout": "35503013fb6380022648148234f27723b3e28814b8af3a85edbac0c214089cfd",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/plan.json": "0f961bd92d74d99cd94b1ed23e4a867ada464364ec491d120bbf83f8e4abff4c",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-1/host.stderr": "d0f7a70b24a2a2a638a4ea6fe641bc951694002be4539423ecce7c2d5040f272",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/plan.json": "c4f424a980d9e60f5624e477cec536b6e24976548c7ba7ae6796f8d53f94b8f3",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/host.stdout": "754299e8f72b5de68bb92bba21e41de5a1353454476f6e2f368944d43aa25ff5",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/plan.json": "efa29804605de44608112826385c1b523f2b7b7dc7f99024e40b902aa53ae4a4",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/host.stdout": "1412f4752c4a5f3c6ce2f148905d161023e423d82e3e04e9dfea0ad1bce73630",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/plan.json": "c9595930db3a623c77a8ce168b5b0d0688993e8455cfcdc113e54268931b2231",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-1/host.stderr": "436ddebc2b35afaad45dfd43243f4afd7890fbe5e17bba742049ad2b33340321",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/plan.json": "7d27429c16be62db932ead00c238ceb5f6a5652875885d52fccf09d94a78f1ea",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/host.stdout": "b3db2f7dc3cf86cd43e5fb7a72c9edf153cf4fcd47640b63f96358aa6b071883",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/plan.json": "b993809536493722512dc244127f0bcf2f371bcab4217449be4b902a658f26ff",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-sync-2/host.stderr": "49b8431ab83c82b78b40d69b34d0173d47db1bd326997a96465cd5ff40874c0d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/plan.json": "72c32e4d3beb79e80f1f86bc23f4d6922bb2abf21f8cf4f7e19aeb37a604b6e6",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/host.stdout": "afb9189221c2b98209869a46c9917e28ba5f4c7d7060c5f689c527c36f82a840",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-sync-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/plan.json": "cd7493b8f4ac387c7aaa3c43017ab95cb4b1ae4e03f3ca70dc799966c75c33c5",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/host.stdout": "8d8b887ffc9e90c3a50588cbd837c69477695777c783af7f65689d83e704bfe4",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-sync-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/plan.json": "ed53ae4f7f0cf0571ee0f70c228f5b4be3d66516649dbf4557f35e6afadd002f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-v8-async-2/host.stderr": "7e3e8929a504631290cb7526b58ffa67308329c61d876ed89c907bd8b04321d0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/plan.json": "9ba94445af2e789c3a67ae31edc4fd6b67487e747a5f17891b03a0583ded660a",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/host.stdout": "25c63173282b801918733811df9ea75b276523f106695ea7e9072c73abec7cba",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-fast-async-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/plan.json": "f1069db9b6173e47aed9132217d7e11c691bcf14a2fb811d6c1855857faf191d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/host.stdout": "e491d4e119aeac1a753b05e63e17d73ee086e28027a19a330087380ba5b44546",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/pmu-speed-async-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/receipt.json": "49694827c57ea148793517d99c8b9c028d41a2b9b49a1071594a3c9dfcb097c9",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/maps-before.txt": "1c664cca755952a002289c111bdb6f96ad93b9785bc2ad0611dbae707c5271b0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/maps-after.txt": "1c664cca755952a002289c111bdb6f96ad93b9785bc2ad0611dbae707c5271b0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-control/observations.json": "e98db0cca50830f0c01a91c2a767abce903db9a0da92f8babaf979b36e221b3e",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/maps-before.txt": "20227113811f3bbc1b8b17228357a1941e326d704bb01f41a6f698daa49740d1",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-control/maps-after.txt": "20227113811f3bbc1b8b17228357a1941e326d704bb01f41a6f698daa49740d1",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/host.stdout": "b382c2ff62b98e11fce6021a3eef85ee69c3852cb9c96a25507aa931da08dd4b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/maps-before.txt": "2fbd705f9da034d22a1555830ef458399c4b446a21db425bae447563389c6145",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/perf-before.map": "07424d6245f0b8450176725774eca1e27595a645208f86a9cd09d1369f195c76",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/maps-after.txt": "e05c69c2c9a24ded79986cc5aabffb40af60c252ecab4dc37ed1cd85e300ff74",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-sync/perf-after.map": "07424d6245f0b8450176725774eca1e27595a645208f86a9cd09d1369f195c76",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/receipt.json": "897f59017b82ba631068e08e0da0fb9ecc2e4dbdb27fd14448e6c01841ffa76a",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/host.stdout": "6453c86805c774e94c3f393df595c832f8d3b364d0a585ba00d899640aa5c64b",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/maps-before.txt": "2d0445a5311cb626b76d8f8b961a38f11cff0024d5296edd67b27551b3ea23d2",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/perf-before.map": "a104d9411107433c8bc3f3588a9744432748d0c13be211101d6a41d42968ad05",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/maps-after.txt": "3117712d24ee3f360d66cdf4de5ada95c1056ae8a97040c0f026310691d1bc77",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/perf-after.map": "a104d9411107433c8bc3f3588a9744432748d0c13be211101d6a41d42968ad05",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-sync/observations.json": "137796177772a9c299a63c28c1a97800f62fb7477316dbbfafa1758bdc14cc8f",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/host.stdout": "8f1bfa45471a9042642c718a306d6f47c20360760a6b7c7450aea5b3ca79139d",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/maps-before.txt": "05b031406bee91e334834c3b7faa066415a5e0b5f88ab1ff999ef7b59803d6de",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/perf-before.map": "675d93294000dd8f630ab372c2b29c7ad284103d5f73e175b39daf3b4e5fa747",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/maps-after.txt": "ea3c29663f6e66cbcc9d07d3afb3f31f2a0b0894125269be5130c38e66753be3",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/final-diagnostics/entries-async/perf-after.map": "675d93294000dd8f630ab372c2b29c7ad284103d5f73e175b39daf3b4e5fa747",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/receipt.json": "a14e5c26e60c4f71682368c5973051398212890591fff7c93ded1fe287b34ab9",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/host.stdout": "22e84772e05e9fd8c10dd17f7f95d400760a0e7cdf16aa404d13bf1a6318f8f0",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/maps-before.txt": "77a9544c1c949f5b55e9bf1c889b2a6443e005f0d74f1a9cee24ae590a020028",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/perf-before.map": "84bec61c28151889d608f1f37e17590dd1782515c9ec6831fced5426a0f10928",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/maps-after.txt": "c568b210ec4586a66d855e0c9eddab3691f3459131cb2fc9a55451d70a67c3b2",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/perf-after.map": "84bec61c28151889d608f1f37e17590dd1782515c9ec6831fced5426a0f10928",
-      "/home/jacobt/src/scriptw/target/performance-levers-20261108/baseline-entries-async/observations.json": "f4d4e997bee0a0331f40e8294ce488cc8eba2fdd695bec48e96179a274dca0b1",
-      "/home/jacobt/src/scriptw/docs/rust-rewrite/react-attribution-current.json": "b5f7d1d4ce5d35b00e6a087662ee5efb2c19b19e266024c3bfebe6cd603b50e7",
-      "/home/jacobt/src/scriptw/docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c"
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/receipt.json": "3bdd5e79efe103ace1de4857454821a67b0a5ab500bd0a385bf236178bcf2a10",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/observations.json": "e98db0cca50830f0c01a91c2a767abce903db9a0da92f8babaf979b36e221b3e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control.stdout": "27404fca5129d0f3159c7447f20f6bde9692a59b3c64b2c3934afb72defa1e92",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/receipt.json": "7ef46e505e2686717aae80491ad067c7bec7591be7c51afa0d3921ae62fc5b08",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/observations.json": "0bf4cd97af978c01edf041bbab8868ab149c00e07805f195f42b6e9e2ed3c64c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync.stdout": "8c7dc4ac6f40ef51d1445c86bf7f56a67bbe53e1fbe6730fdd6471814e292f0f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/receipt.json": "745e1bcaf50162c555b4049eea1d19bea11333207f02a41be2e24cc5d0770065",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/observations.json": "dfc85b7b7a622c3ed553f404b6bb787d1502ebe98d83ba11e34415e1f0615e14",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async.stdout": "2412a2939483194aeb9434c8eccffbbe9573c5dc098775b2e032b125916e923f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/receipt.json": "c75183f6542e1daa9a423c06354304fb94dcc565be14112ebfb0916c7a60a3f3",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/observations.json": "e98db0cca50830f0c01a91c2a767abce903db9a0da92f8babaf979b36e221b3e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control.stdout": "9fc05e782e76149fe4bbf7a33462aa1e03c7d90d69758b3bca16e89cbfa36fa6",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/receipt.json": "a76c83b040acdf5c25c6f2fcc0b424e62924dd622d97cfab860b978db051c38a",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/observations.json": "8158372c3ddf3db3c47c4fa853d8302f4f514eb479900a5dfb1f0385f4365cba",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync.stdout": "3ff35fa0f8f22ecc3c9b74334659971997596ee5d0e800af6ea90ca128c385b1",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/receipt.json": "f1ed00352b10e0ef87d07a418724666416d0aaf437b60dcf41a202381d723791",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/observations.json": "f82e8800f41bb5e9ac65e9d9e660d6424d0fb28567ed8892dc9035a49e3b8300",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async.stdout": "c549b8738d05e2859f882510b29e08aba8fa5962c2b572632613aff586e30cc4",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/receipt.json": "762d0e3604bb79072efd93ef877022b91dcafc581c6157bbf1b0f0ef7edddb9c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/observations.json": "c92e320d19063c54f852953d09374b25960b6d93783a69a52bb55490aec9ff8c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0.stdout": "11738c1ea49805db02109dcd11aebee9a4563702a78fcf35689096394630170d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/receipt.json": "2dc850b2a6c1f14726cfd35ff050fbe1ec37f65219d3854667180691c0fb9bbc",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/observations.json": "14a57e3322d887725ecd356593ab7e9a5e78af3a5238559c40e0a8d24e3e8df5",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0.stdout": "277572f22033d971bbb4ed3ff2f169abee8d0f9004a84d6f677b47a2ad19e3d8",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/receipt.json": "cccbd5a1052bdf47347bfce2e47cd98491d1506cb316529a067e880419068672",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/observations.json": "645e67cb6a1c4ea1e140610869fcaac90bf7be1d971f6e22cdc7d020432f1ad4",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0.stdout": "b26215efbc84696a7b59f598b6017b3755cae11d6a8d8e70757a06430a46cc13",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/receipt.json": "84fd0f5caafcb1a5d79bb9e673cd6d4abe2590976b07814f0632f75cc53bd26e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/observations.json": "be2aec6e573c7ce77831545b6de8ab83abf748f1d86bb6d56d750be8a91cefad",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0.stdout": "a39cf13f66f52525c0a1b24832770c605df4128889cde60d6814966e8223058e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/receipt.json": "312bbe21b916adfc806fe3e9680575796fa6214728bef045b51eda958ae8ebba",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/observations.json": "c08d00820e6c476ecd1702ff3300bacb5f97aeae4fcb7bcbc937182ebdeb29a6",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0.stdout": "0658c4bb7ed95e7c32f7bf32000a8e05f569920a92fcc4fc977b1981c42ba53d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/receipt.json": "f521a941f4982807c4d888af61039c4e2fa0bc6f9bbba6bdeb7c25bbfd332431",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/observations.json": "74653d2a481606b2b5c8c462241cf828e46ef4a97db293442c55ddb51d6f4d65",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0.stdout": "8ac08812d16ca799788eaacbeba35d5c0a230295c13c50badbbb6dec3f44ff66",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/receipt.json": "38553383537773b7ff0d16a37e69c089be68c4fc482b1036ac755cfa09f07b65",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/observations.json": "ff8dd78fdea946464ea023dc223799a6a4bd7fc72c13eb203401daf8d146f7ad",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1.stdout": "8fd2944ded1241ed2703e98ac1dbad7f45984297fef13af9e89422c7f995774b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/receipt.json": "8ec8043c5a357077a2a8def5207260efb8a45d95b04d5e0620a1be46b9033682",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/observations.json": "ca24ea314dae39f654e42a9e71d908f094b26126a0a226ce737efa0394bffa45",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1.stdout": "7260db653c5c7239f09f3b4023409dfa72fc85b7bcd73fbc9c3d9aeeec81a635",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/receipt.json": "47be6fec47d21ba3c258301d33d1a229a62771c419841aaa2ed25a137412142f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/observations.json": "e878688c4b1504b6c9fa736ecd367d91a6dbb31550858a484f6a6bc1e9387b26",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1.stdout": "9d84d1831eb814485ddecb6d8bb865ab45a9bfc85a46cd054b861783cfd477c0",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/receipt.json": "aa77522b92fdc985c0b0e4119b0910c526de78483a16c2c3caa32f79b2370f0f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/observations.json": "961fc53410a915624cb2197b93c09181ea133db2dfa0beb7f2c853a0fd806e3e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1.stdout": "dfd0cfcdadd798dcae2dbbb1d362d657c8c2652a1784cd8c1e5e1baaa4cd17cf",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/receipt.json": "15b91f9fe6141986cac39ecb6625950e206e9289e731b24c04cf1c7aee0ad21a",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/observations.json": "41d199720195149f4bbc98b8f3fce174d0f939cec5690e17134bd04a61e65943",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1.stdout": "47d9d41ebd993e346c4773759ef83f77d9a24795f4904328183a10032e69ac2d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/receipt.json": "ce4e6556169dd17a1b0ba46fc98180f794aae250fdfb0e6101083987290cd19b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/observations.json": "9e1ef0c01163b033976804ea6beea927522af37cac864a084d22dbdf51e133f3",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1.stdout": "394098a83fb989f9d43b7e416ee253107e70fab0aad53b031e848195b6b191cf",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/receipt.json": "a734ab3a2ce22ffaa132b2c3d82158f4d3cbb92af7438d54f307f69c02cf6363",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/observations.json": "dcc868813dc5e6ab208858d0f180ae82aeadf18b0233e0362f0620ec40167656",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2.stdout": "1a53ed835402c72de8acd41a9c83489ad52dc80199625322a685e20e10fc2376",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/receipt.json": "d088a0b8d62115365a3ff46113388c923c9e85b6cb2d78baa80485f42811c28c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/observations.json": "ea39ad36a042d7e2576c318d979ef1a68ccfcb0eabdfc4848700d117cd72fa49",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2.stdout": "e4a89f03d10f16cf04834d94454bb59a9264c83760aca96c6986efadc6e9b64b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/receipt.json": "169a3b86068ee623a7f7ba7fb3d044c9160e78424ae8187dc8a8376a4a81bc8f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/observations.json": "bf516dda58d7d9c7fba76895a4cf70d0e6fc40d31b4e848cd68b3d1d07d666e0",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2.stdout": "d6de8799bbdf8fc27b7cd6a0618b97817bf010d3e957ea6bb43dd563704b15df",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/receipt.json": "856e4095cf96e74fdfe41447c196a7caac6378570ae22f9e170ad9058b0aa8da",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/observations.json": "3bb351c3d236f3430da747f28c6e9bc27fb699c97bcad4a5737ae39c26543a10",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2.stdout": "2c37484712d0bd2b259bc5804fc74e625a5100057adc64efa6edd18941148bc5",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/receipt.json": "b38d8ac2c4b5ae45b8b277da909d9eecf238f0023a3b0ba36434029a1caf903d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/observations.json": "e5ee2ce9bc09b10bf9d12b8ce0e6ac5933f4c49f0783363c22596f194fb574be",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2.stdout": "a8a8a77a03f6d3891c214d00863c9464d61e72842b63500f42635d3846b9b308",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/receipt.json": "52e9200936f350b81f6b1de68d953f0c58e0bf2b547f4edefc317eb7f0b5ff50",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/observations.json": "4fdd061b3f9f8665c24077314a38dfe80da1f86b59a8a53464cd8f9f8af6b4f1",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2.stdout": "11eaeaddf8e286cc902799a595168735a9ff2322fbee3ea0f2cc072158603c9b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/plan.json": "5e4843fb082d19cbfaeaf24c71c83a6e71c5b91d2e72e568b0034aaa1cca9d8f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/host.stdout": "28bb57855d1eb66854a25b13165957903a2155a351db04579147dea19dd65bc9",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/plan.json": "96308ef937ea4fe0669a6ec550dc16a87a79d1b3b03f1672d7c014a14d1b7c57",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/host.stdout": "185be72254f7a55875d7427f59048211d68d70bc70776281bc569789c1e7fc3b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/plan.json": "1d8c822574f5e8a094e5407e68dddc3240963701898811d75373d9b9130f5442",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-0/host.stderr": "27c344b7d92fe34572cde49d5ca755f8204e95eb8eb62ec67ddf09289bdd4105",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/plan.json": "a20656a8126a1a38ffa2c8d7ae8cc87d9af07a59a52333e7645c4bac10741d23",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/host.stdout": "3c513e512cdd999f1ccdf35a3dcfa659818dd3c006b860d9fb948baa57d8844e",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/plan.json": "abeaf456c516d7db9cbbc1539d3dae8fbc0b157c9440b73ec6b3bfa42702d069",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/host.stdout": "e884eb129effaf82ba214cc40513484ae0ecbdadabee0a9a793fe6ad62007220",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-0/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/plan.json": "f4cd53b2709510c5b60a39d46df3bddcefe8bd2fbf341e9c4d10a76e7d204c46",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-0/host.stderr": "72aa8b00af799e7fae11eb203ed4708562eb5e609c28701b16df5a2c04b02b24",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/plan.json": "c84e2be59873f0bdf67e23e6f63c24bbb9133b18cd0dccb07577e89721f5c327",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/host.stdout": "8caced97916678907dfbc86bdf4070bd761bb570a3a1d9865a36b077c8541f8c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/plan.json": "03c9e48b621e3292243452cdf93ab16e175b1b72cf6a2976c9565cb2f0eefb93",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-1/host.stderr": "565adbdda6dac9deb0f01fe4c51583b226473917a32f0e97318c3ecbbe9c82f8",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/plan.json": "2cbbdd3b72d9154205028dc69a1e73ed6b8708aa94fbfc870da386bc1beb539b",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/host.stdout": "c59e9c9292fb4bdeca4e261c80292112962d597b81a383dbc22cbda8669042f8",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/plan.json": "1350aa3b91a37431af4e472b256ee0f744a801890a5abe2dd4f59faa7b3ff411",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/host.stdout": "48f55252ccf0efd07d1e20fd94c518c3fbd86ceef98555bab2fe87b34f5897ee",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/plan.json": "ba0acdc0efb0603a5f289fc3faeb106dac7866a1602470681e1666a2250c7109",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-1/host.stderr": "678d1f1a00bc9d90048b4130cbd50538898d82704a897d6488497691a0f4b0ae",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/plan.json": "1266eca3d1426644b5470810fe2ac3fa2cf81e3b21d0eeabe70d5a87cd1b3881",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/host.stdout": "ebc7be762d47c2e26e4fe9f68f2272bfb78b940eddbdc33c524d050c787bbf85",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-1/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/plan.json": "29b0b3fea97656e8438e31fd778caaec53395430d7cd204ccf8e698dff171054",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-sync-2/host.stderr": "5501416a9dd3a10546ce79408a98476b89a899d8ea3edf23f457da8d9c7569f2",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/plan.json": "a5e242793e14a474de4ea91831af60f024a96fa3295679e308930dccb39f4479",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/host.stdout": "f21b9c6b0c65afe1e1599f0cd3db984a2567597ebed29618cb3ccd0d45e1ebd8",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-sync-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/plan.json": "2eb42d113510a2560dd492d4b1e9f76083c858f44b4131e3a17eda6d8b430392",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/host.stdout": "ad39e8766b850e58ee3ca8144fdc96557688664913843aa6f80155aeb5b3fc0f",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-sync-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/plan.json": "a0a186c1847c440f15a1e90911002fcaa69e978e078cb2068c9257f8aed9dbd5",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-v8-async-2/host.stderr": "5d5844a350e698c2edd1841419a3554abd60ee412b0fd3402222670e527581fc",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/plan.json": "6cb2ff8081150e9e9ad554140ca1a053a9aa2922410109006a4f4456a8c30859",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/host.stdout": "61b8bc4d73509d81402d1deb4d3dff9ba2acd29b45095f8a4cd3de30badd48c5",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-fast-async-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/plan.json": "c5a285f0b4410635656f88fd3e4b5a8ca105da021c4a8e221ba19c32079c0d12",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/host.stdout": "74413dd4aedeb96a5ad7f3798ec1e9b6d75366c0919a1de410dc3070841729eb",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/pmu-speed-async-2/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/maps-before.txt": "e0a5bd428cdb75ad633e3f51cf8d1c554d10df7056f6cbfdaed62e45cf188025",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-control/maps-after.txt": "e0a5bd428cdb75ad633e3f51cf8d1c554d10df7056f6cbfdaed62e45cf188025",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/host.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/maps-before.txt": "9cdecbc31bf0940b2cf8733cc197a8d0c3210e967c7e26ae80d00034ae840c2d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-control/maps-after.txt": "9cdecbc31bf0940b2cf8733cc197a8d0c3210e967c7e26ae80d00034ae840c2d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/host.stdout": "461aca8759654c27f2888503005c920183a5ea61550b60f676ce0f487b953196",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/maps-before.txt": "f4c887e53c868057d463b939cc51f8a08e588b508377404da9b2c083ed8e4183",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/perf-before.map": "ef81ebc0f051e716c40ab11f16c7dd12849b9cd6f8f95a0e68261f293a2d4ac1",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/maps-after.txt": "3bab4e5a8698a96cbbe12cc10cc945a84ade885da7d0707f68490cb228b8c91d",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-sync/perf-after.map": "ef81ebc0f051e716c40ab11f16c7dd12849b9cd6f8f95a0e68261f293a2d4ac1",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/host.stdout": "2355d8317f7bc44f297617dd4a51c74de64c6975d0d7f2dbf59e8de7fe09c9dc",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/maps-before.txt": "6433896173679ee7c945a4034ee5b7a20c3590d1fe44d749f96bbeabeab77c52",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/perf-before.map": "9ece8bdcd2e128273b2a89f5d9bbc93199b32b704bf07d48ff4b3dc79c71891a",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/maps-after.txt": "0e2ab96e1603845950732e7986338c659031641b7ad62acb056e4fd7f4eb563a",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-sync/perf-after.map": "9ece8bdcd2e128273b2a89f5d9bbc93199b32b704bf07d48ff4b3dc79c71891a",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/host.stdout": "d13241f6ea932d14ffc9133817c2049fc1bdb833eaa2dc2f1280e1a7a03f025c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/maps-before.txt": "880d9fb08815685e16ecfd2458968ea799504f9f0779594f1ba0b117dad250c8",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/perf-before.map": "257b5a6e8c34039df28e984732c1b353eb20d8ee16d99555046fae3946fef683",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/maps-after.txt": "2de2e15baad35a41f568a6ab34f2fa9644c8f91947a322c4a1734196d6e815a9",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-baseline-async/perf-after.map": "257b5a6e8c34039df28e984732c1b353eb20d8ee16d99555046fae3946fef683",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/host.stdout": "5dbe01acfebdebd52d6e19a849fb3489e58cb20edcbe51a7e4db3bbe10f9e801",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/host.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/maps-before.txt": "c1ccfbe669db27e6d6b68c25c99272f7800d510a9128ea716241fa83d9cb5c53",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/perf-before.map": "1b6f6c547904fb3c2a5c7bacd70c9bb50081fdc088c44c26e5415dc3f54bb493",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/maps-after.txt": "47b1f3ae83851ac3278e30f6485a3bd3f0d0ed549b9caee88ff350b42bca37d9",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/final-diagnostics/entries-candidate-async/perf-after.map": "1b6f6c547904fb3c2a5c7bacd70c9bb50081fdc088c44c26e5415dc3f54bb493",
+      "/home/jacobt/src/scriptw/docs/rust-rewrite/react-attribution-current.json": "1315138cd2ef9f7264e447b7d5d6c4d192e1ef8a186430558d5ed08849f78929",
+      "/home/jacobt/src/scriptw/docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c",
+      "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/fresh-profiles/summary.json": "c311d485dda8de3fb6b7a7c10e6eeea766785227ea5daebfd1f42c36f1574508"
     },
-    "created_at": "2026-11-08T01:31:15.830714+00:00"
+    "created_at": "2026-11-08T11:42:57.060160+00:00"
   },
   "evidence_archive": {
-    "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
-    "bytes": 3103888,
-    "regular_utf8_members": 3659,
-    "expanded_utf8_bytes": 106603957,
-    "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
-    "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
-  },
-  "publication": {
-    "status": "published",
-    "evidence_archive": {
-      "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
-      "bytes": 3103888,
-      "regular_utf8_members": 3659,
-      "expanded_utf8_bytes": 106603957,
-      "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
-      "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
-    },
-    "canonical_files_written": true
+    "sha256": "6385d0ae7627e6e34ec1a2b2618cec149d468967d9961578d5c92872eb1252ef",
+    "bytes": 4475432,
+    "regular_utf8_members": 1027,
+    "expanded_utf8_bytes": 301175728,
+    "file": "scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz",
+    "canonical_file": "docs/rust-rewrite/scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz"
   },
   "complete_archived_report": {
-    "archive_member": "reports/react-attribution-current-prearchive.json",
-    "sha256": "fb3e913ff090aaef9e5d99339449dbc02193d5b26069608e2680f159fdb531d1"
-  },
-  "source_manifest_member": "source/current/manifest.json"
+    "archive_member": "verification/08-attribution-stage/react-attribution-current.json",
+    "sha256": "6e8867b6f1ff7f86dbd10cbf268631cf654060343c24056bc853055793e6607b"
+  }
 }

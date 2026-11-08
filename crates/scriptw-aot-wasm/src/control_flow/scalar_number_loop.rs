@@ -83,10 +83,10 @@ enum NumberExpression {
     Compound(usize, NumberArithmetic, Box<Self>),
     Update(usize, NumericUpdateOp, UpdateReturnMode),
     Comma(Box<Self>, Box<Self>),
-    Call(usize),
-    CallSlot(usize),
+    Call(usize, NumberDomain),
+    CallSlot(usize, NumberDomain),
     AssignCallSlot(usize, Box<Self>),
-    SelectCall(Box<Self>, Vec<usize>),
+    SelectCall(Box<Self>, Vec<usize>, NumberDomain),
 }
 
 /// These expression facts establish exact conversion ranges, independently of
@@ -98,6 +98,18 @@ enum NumberDomain {
     Signed32,
     Unsigned32,
     SafeInteger,
+}
+
+impl NumberDomain {
+    fn join(self, other: Self) -> Self {
+        if self == other {
+            return self;
+        }
+        if self == Self::Number || other == Self::Number {
+            return Self::Number;
+        }
+        Self::SafeInteger
+    }
 }
 
 enum NumberPredicate {
@@ -901,10 +913,10 @@ impl NumberExpression {
                 rhs,
                 rhs.intrinsic_domain(),
             ),
+            Self::Call(_, domain) | Self::CallSlot(_, domain) | Self::SelectCall(_, _, domain) => {
+                *domain
+            }
             Self::Binding(_)
-            | Self::Call(_)
-            | Self::CallSlot(_)
-            | Self::SelectCall(_, _)
             | Self::ArrayElement
             | Self::CompactPath(_)
             | Self::JoinedLength
@@ -922,7 +934,9 @@ impl NumberExpression {
     fn binding_domain(&self, bindings: &[NumberBinding]) -> NumberDomain {
         match self {
             Self::Binding(index) => bindings[*index].domain,
-            Self::Assign(_, value) | Self::Comma(_, value) => value.binding_domain(bindings),
+            Self::Assign(_, value) | Self::AssignCallSlot(_, value) | Self::Comma(_, value) => {
+                value.binding_domain(bindings)
+            }
             Self::Arithmetic(op, lhs, rhs) => Self::arithmetic_domain(
                 *op,
                 lhs,
@@ -1006,7 +1020,7 @@ impl NumberExpression {
             }
             Self::Update(index, _, _) => record(writes, *index, NumberDomain::Number),
             Self::Negate(value) | Self::Complement(value) => value.collect_writes(writes),
-            Self::AssignCallSlot(_, value) | Self::SelectCall(value, _) => {
+            Self::AssignCallSlot(_, value) | Self::SelectCall(value, _, _) => {
                 value.collect_writes(writes)
             }
             Self::Arithmetic(_, lhs, rhs)
@@ -1017,8 +1031,8 @@ impl NumberExpression {
                 rhs.collect_writes(writes);
             }
             Self::Constant(_)
-            | Self::Call(_)
-            | Self::CallSlot(_)
+            | Self::Call(_, _)
+            | Self::CallSlot(_, _)
             | Self::Binding(_)
             | Self::ArrayLength
             | Self::ArrayElement
@@ -1182,11 +1196,11 @@ impl NumberExpression {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
             Self::Binding(index) => locals.values[*index].load_number(function),
-            Self::Call(index) => {
+            Self::Call(index, _) => {
                 let (plan, roots) = locals.calls.expect("sealed captured call owner");
                 plan.emit_call(*index, roots, builder, locals, function);
             }
-            Self::CallSlot(index) => locals
+            Self::CallSlot(index, _) => locals
                 .calls
                 .expect("sealed call slot")
                 .1
@@ -1197,7 +1211,7 @@ impl NumberExpression {
                 roots.store(*index, plan, builder, function);
                 roots.load(*index, function);
             }
-            Self::SelectCall(index, sites) => {
+            Self::SelectCall(index, sites, _) => {
                 index.emit_uint32(builder, locals, function);
                 let (plan, roots) = locals.calls.expect("sealed call selection");
                 plan.emit_selection(sites, roots, builder, locals, function);

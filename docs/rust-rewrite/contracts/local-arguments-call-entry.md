@@ -46,3 +46,11 @@ by itself evidence that a native compiler inlined it.
 Runtime layout ABI 53 adds the wide typed entry and its shared function type.
 Older portable pairs and native images must be rebuilt together; they cannot
 share this layout. The narrow parameter layout and its calling work stay intact.
+
+Native argument-list slicing retains a fresh ValueArray whose entries refer to
+the original immutable StoredValue snapshots. Its fill seed is the existing
+shared Undefined snapshot, initialized by the runtime's immutable nonnull global
+constant expression before any function runs. Filling and then replacing array
+entries cannot mutate that snapshot or expose its identity. Function.call/bind
+and Promise argument tails retain their original extent, order and tail-call
+lifecycle; this removes only the otherwise unused seed allocation.

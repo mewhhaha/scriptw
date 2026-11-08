@@ -72,6 +72,7 @@ struct SourceCompiler<'a, 'b, 'c> {
     call: usize,
     bindings: BTreeMap<String, Binding>,
     captures: Vec<usize>,
+    domains: BTreeMap<usize, NumberDomain>,
     depth: usize,
     in_branch: bool,
 }
@@ -193,7 +194,10 @@ pub(super) fn compile(
     }
     let candidates = candidates(proof.builder, values.len(), hints.known_targets())?;
     let call = compile_site(proof, Target::Input(target), &values, candidates, 1, depth)?;
-    Some(NumberExpression::Call(call))
+    Some(NumberExpression::Call(
+        call,
+        proof.calls.result_domain(call),
+    ))
 }
 
 fn candidates(
@@ -259,6 +263,7 @@ fn compile_site(
             call,
             bindings: BTreeMap::new(),
             captures: Vec::new(),
+            domains: BTreeMap::new(),
             depth,
             in_branch: false,
         };
@@ -268,6 +273,7 @@ fn compile_site(
                 Argument::Row => Binding::Row,
                 Argument::Number(value) => {
                     let slot = compiler.temporary()?;
+                    compiler.domains.insert(slot, value.intrinsic_domain());
                     body.push(NumberStatement::Initialize(
                         NumberExpression::AssignCallSlot(slot, Box::new(value.clone())),
                     ));
@@ -296,6 +302,24 @@ fn compile_site(
 }
 
 impl SourceCompiler<'_, '_, '_> {
+    fn read_slot(&self, slot: usize) -> NumberExpression {
+        NumberExpression::CallSlot(
+            slot,
+            self.domains
+                .get(&slot)
+                .copied()
+                .unwrap_or(NumberDomain::Number),
+        )
+    }
+
+    fn forget_captures(&mut self) {
+        // Different source bindings and callable instances may reach the same
+        // physical cell. Only a write's own result establishes its new range.
+        for slot in &self.captures {
+            self.domains.remove(slot);
+        }
+    }
+
     fn visit(&mut self) -> Option<()> {
         self.proof.remaining = self.proof.remaining.checked_sub(1)?;
         Some(())
@@ -380,6 +404,7 @@ impl SourceCompiler<'_, '_, '_> {
             }
             _ => return None,
         };
+        self.domains.insert(slot, expression.intrinsic_domain());
         Some(NumberExpression::AssignCallSlot(slot, Box::new(expression)))
     }
     fn statement(
@@ -422,12 +447,25 @@ impl SourceCompiler<'_, '_, '_> {
                 let test = self.predicate(condition)?;
                 let mut consequent = Vec::new();
                 let mut alternate = Vec::new();
+                let before = self.domains.clone();
                 let previous = self.in_branch;
                 self.in_branch = true;
                 self.statement(then_branch, &mut consequent, false)?;
+                let then_domains = std::mem::replace(&mut self.domains, before);
                 if let Some(branch) = else_branch {
                     self.statement(branch, &mut alternate, false)?;
                 }
+                self.domains = then_domains
+                    .into_iter()
+                    .map(|(slot, domain)| {
+                        let other = self
+                            .domains
+                            .get(&slot)
+                            .copied()
+                            .unwrap_or(NumberDomain::Number);
+                        (slot, domain.join(other))
+                    })
+                    .collect();
                 self.in_branch = previous;
                 out.push(NumberStatement::If {
                     test,
@@ -479,14 +517,20 @@ impl SourceCompiler<'_, '_, '_> {
                 let Binding::Number(index) = self.bindings.get(name)? else {
                     return None;
                 };
-                NumberExpression::CallSlot(*index)
+                self.read_slot(*index)
             }
             ExprIr::EnvironmentIdentifier(reference) => match &reference.operation {
-                EnvOp::Read => NumberExpression::CallSlot(self.capture(reference, false)?),
-                EnvOp::Assign { value } => NumberExpression::AssignCallSlot(
-                    self.capture(reference, true)?,
-                    Box::new(self.expression(value)?),
-                ),
+                EnvOp::Read => {
+                    let slot = self.capture(reference, false)?;
+                    self.read_slot(slot)
+                }
+                EnvOp::Assign { value } => {
+                    let slot = self.capture(reference, true)?;
+                    let value = self.expression(value)?;
+                    self.forget_captures();
+                    self.domains.insert(slot, value.intrinsic_domain());
+                    NumberExpression::AssignCallSlot(slot, Box::new(value))
+                }
                 _ => return None,
             },
             ExprIr::AssignIdentifier { name, value } => return self.assign(name, value, false),
@@ -601,11 +645,38 @@ impl SourceCompiler<'_, '_, '_> {
                 self.depth,
             )?);
         }
-        Some(NumberExpression::SelectCall(Box::new(index), sites))
+        self.forget_captures();
+        let domain = sites
+            .iter()
+            .map(|site| self.proof.calls.result_domain(*site))
+            .reduce(NumberDomain::join)?;
+        Some(NumberExpression::SelectCall(Box::new(index), sites, domain))
     }
 }
 
 impl CapturedCalls {
+    fn may_alias(&self, left: usize, right: usize) -> bool {
+        // Only one source alternative at a call site is authenticated. Its
+        // other alternatives retain null roots and cannot observe this write.
+        !self.calls.iter().any(|call| {
+            let owner = |slot| {
+                call.cases
+                    .iter()
+                    .position(|case| case.captures.contains(&slot))
+            };
+            matches!((owner(left), owner(right)), (Some(left), Some(right)) if left != right)
+        })
+    }
+
+    fn result_domain(&self, index: usize) -> NumberDomain {
+        self.calls[index]
+            .cases
+            .iter()
+            .map(|case| case.result.intrinsic_domain())
+            .reduce(NumberDomain::join)
+            .expect("a captured call has at least one authenticated source")
+    }
+
     pub(super) fn is_empty(&self) -> bool {
         self.calls.is_empty()
     }
@@ -617,6 +688,13 @@ impl CapturedCalls {
         locals: &LoopLocals<'_>,
         function: &mut Function,
     ) {
+        if let [case] = self.calls[index].cases.as_slice() {
+            // Entry has already authenticated this sole source. Its selected
+            // index cannot change inside the closed region.
+            NumberStatement::emit_list(&case.body, builder, locals, None, function);
+            case.result.emit(builder, locals, function);
+            return;
+        }
         let result = builder.runtime_schema().reserve_f64_local(function);
         for (case_index, case) in self.calls[index].cases.iter().enumerate() {
             roots.selected(index, function);

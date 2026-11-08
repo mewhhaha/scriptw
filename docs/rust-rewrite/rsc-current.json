@@ -1,18 +1,18 @@
 {
   "schema": "scriptw-rsc-current-v2",
   "date": "2026-11-08",
-  "source_manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+  "source_manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
   "baseline": {
-    "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-    "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-    "producer": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json",
-    "producer_sha256": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a",
-    "report": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
-    "report_sha256": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
+    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
+    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json",
+    "producer_sha256": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0",
+    "report": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json",
+    "report_sha256": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
     "identity": {
-      "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-      "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-      "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
       "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
       "toolchain": {
         "opt_level": "3",
@@ -40,11 +40,12 @@
         "wasmtime": "47.0.0",
         "wasmtime_async_stack_bytes": 67108864
       },
-      "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
+      "program_wasm_bytes": 4327610,
+      "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
       "runtime": {
-        "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
-        "wasm_bytes": 38738181,
-        "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
+        "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
+        "wasm_bytes": 38768915,
+        "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
       },
       "inputs": {
         "adapted_source_bytes": 64946,
@@ -62,17 +63,19 @@
           "react-server-dom-webpack": "19.3.1"
         },
         "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-      }
+      },
+      "native_mode": "fast",
+      "native_mode_scope": "matched Fast cohort"
     },
-    "reference_campaign": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json",
-    "reference_campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
-    "reference_aggregate": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json",
-    "reference_aggregate_sha256": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd",
-    "published_report_sha256": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350"
+    "reference_campaign": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json",
+    "reference_campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
+    "reference_aggregate": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json",
+    "reference_aggregate_sha256": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b",
+    "published_report_sha256": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4"
   },
   "candidate": {
-    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
-    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
+    "sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
     "build_argv": [
       "cargo",
       "--config",
@@ -110,11 +113,14 @@
       "aot_async",
       "--test",
       "aot_realm_modules",
+      "--test",
+      "aot_gc_entries",
       "--example",
       "rsc_baseline",
       "--example",
       "compiler_precompiled_baseline",
-      "--message-format=json-render-diagnostics"
+      "--message-format=json-render-diagnostics",
+      "--timings"
     ],
     "build_wrapper": [
       "python3",
@@ -122,8 +128,8 @@
       "scripts/limited_verification.py",
       "--"
     ],
-    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
-    "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
+    "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
     "artifact": {
       "reason": "compiler-artifact",
       "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
@@ -156,15 +162,14 @@
       "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
       "fresh": false
     },
-    "qualified_reuse": null,
     "compiler_source_identity": {
-      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-      "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "source_revision": "git:dfefb3222737b067e1c98777161d95d42491df8f"
     }
   },
   "measurement": {
-    "campaign": "target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json",
-    "campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
+    "campaign": "target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json",
+    "campaign_sha256": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
     "blocks": 2,
     "processes_per_engine": 8,
     "samples": 7,
@@ -199,183 +204,10 @@
     "execution_processes": 32,
     "exact_output": "Both RSC cases were checked against the shared Node-generated JSON golden."
   },
-  "caveat": "Descriptive same-host cohort, not causal attribution to one source change, conformance, statistical confidence or universal application performance. The 5aa baseline is retained under its original source/runtime identity. Fast and Speed are separately scored; candidate reports must share source, host, P, R and request inputs, with only native compilation policy differing.",
+  "caveat": "Descriptive same-host cohort, not causal attribution to one source change, conformance, statistical confidence or universal application performance. The 2255 baseline is retained under its original source/runtime identity. Fast and Speed are separately scored; candidate reports must share source, host, P, R and request inputs, with only native compilation policy differing.",
   "engines": {
     "baseline": {
       "label": "published Scriptw baseline Fast",
-      "identity": {
-        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-        "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-        "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-        "toolchain": {
-          "opt_level": "3",
-          "profile": "release",
-          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-          "target": "x86_64-unknown-linux-gnu"
-        },
-        "configuration": {
-          "collector": "Copying",
-          "compilation_jobs": 1,
-          "cranelift_opt_level": "None",
-          "driver_worker_stack_bytes": 67108864,
-          "epoch_deadline_ticks": 6000,
-          "epoch_interruption": true,
-          "epoch_tick_ms": 5,
-          "gc_initial_bytes": 16777216,
-          "max_wasm_stack_bytes": 33554432,
-          "native_parallel_compilation": false,
-          "pending_deadline_ms": 30000,
-          "register_allocation": "SinglePass",
-          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-          "target": "x86_64-unknown-linux-gnu",
-          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-          "wasmtime": "47.0.0",
-          "wasmtime_async_stack_bytes": 67108864
-        },
-        "program_wasm_bytes": 4232136,
-        "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
-        "runtime": {
-          "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
-          "wasm_bytes": 38738181,
-          "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
-        },
-        "inputs": {
-          "adapted_source_bytes": 64946,
-          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-          "source_bytes": 64835,
-          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-          "versions": {
-            "esbuild": "0.28.2",
-            "playwright": "1.64.1",
-            "react": "19.3.1",
-            "react-dom": "19.3.1",
-            "react-server-dom-webpack": "19.3.1"
-          },
-          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        },
-        "native_mode": "fast",
-        "native_mode_scope": "matched Fast cohort"
-      },
-      "cases": {
-        "rsc-sync": [
-          4730732,
-          4802348,
-          4840821,
-          4905014,
-          4774858,
-          4798263,
-          4934062,
-          4974409
-        ],
-        "rsc-async": [
-          5175044,
-          5195354,
-          5271479,
-          5222467,
-          5208250,
-          5206017,
-          5586921,
-          5427058
-        ]
-      },
-      "block_medians": [
-        {
-          "block": 0,
-          "cases": {
-            "rsc-sync": 4821584.5,
-            "rsc-async": 5208910.5
-          }
-        },
-        {
-          "block": 1,
-          "cases": {
-            "rsc-sync": 4866162.5,
-            "rsc-async": 5317654.0
-          }
-        }
-      ],
-      "phase_processes": [
-        {
-          "engine_setup": 102504,
-          "front_and_lower": 2762112158,
-          "module_initialization": 2012451,
-          "native_preparation": 5748274868,
-          "realm_and_instantiation": 594829,
-          "source_to_wasm": 3200100057,
-          "wasm_emission": 437987899
-        },
-        {
-          "engine_setup": 92084,
-          "front_and_lower": 2685350445,
-          "module_initialization": 2118993,
-          "native_preparation": 5581836986,
-          "realm_and_instantiation": 593296,
-          "source_to_wasm": 3114907698,
-          "wasm_emission": 429557253
-        },
-        {
-          "engine_setup": 98527,
-          "front_and_lower": 2679105317,
-          "module_initialization": 2070542,
-          "native_preparation": 5535494557,
-          "realm_and_instantiation": 578949,
-          "source_to_wasm": 3108320957,
-          "wasm_emission": 429215640
-        },
-        {
-          "engine_setup": 94169,
-          "front_and_lower": 2694377516,
-          "module_initialization": 2024434,
-          "native_preparation": 5559508896,
-          "realm_and_instantiation": 568139,
-          "source_to_wasm": 3125334172,
-          "wasm_emission": 430956656
-        },
-        {
-          "engine_setup": 92435,
-          "front_and_lower": 2667975113,
-          "module_initialization": 2038621,
-          "native_preparation": 5528409405,
-          "realm_and_instantiation": 589610,
-          "source_to_wasm": 3097738616,
-          "wasm_emission": 429763503
-        },
-        {
-          "engine_setup": 94850,
-          "front_and_lower": 2683984365,
-          "module_initialization": 2026509,
-          "native_preparation": 5566850762,
-          "realm_and_instantiation": 557719,
-          "source_to_wasm": 3113234722,
-          "wasm_emission": 429250357
-        },
-        {
-          "engine_setup": 90031,
-          "front_and_lower": 2676542622,
-          "module_initialization": 2106901,
-          "native_preparation": 5733307459,
-          "realm_and_instantiation": 600912,
-          "source_to_wasm": 3116002013,
-          "wasm_emission": 439459391
-        },
-        {
-          "engine_setup": 98858,
-          "front_and_lower": 2802480321,
-          "module_initialization": 2062177,
-          "native_preparation": 5710937749,
-          "realm_and_instantiation": 573168,
-          "source_to_wasm": 3242060976,
-          "wasm_emission": 439580655
-        }
-      ]
-    },
-    "candidate": {
-      "label": "new Scriptw source Fast",
       "identity": {
         "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
         "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
@@ -436,123 +268,296 @@
       },
       "cases": {
         "rsc-sync": [
-          4644127,
-          4687580,
-          4732486,
-          4678514,
-          4714122,
-          4714524,
-          4776633,
-          5043881
+          4604819,
+          4651157,
+          4647250,
+          4722583,
+          4624617,
+          4672669,
+          4640327,
+          4668480
         ],
         "rsc-async": [
-          5062792,
-          5105613,
-          5055659,
-          5141904,
-          5095256,
-          5109143,
-          5166443,
-          5518432
+          5013736,
+          5079171,
+          5059454,
+          5141569,
+          5110962,
+          5101844,
+          5040378,
+          5084281
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 4683047.0,
-            "rsc-async": 5084202.5
+            "rsc-sync": 4649203.5,
+            "rsc-async": 5069312.5
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 4745578.5,
-            "rsc-async": 5137793.0
+            "rsc-sync": 4654403.5,
+            "rsc-async": 5093062.5
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 82146,
-          "front_and_lower": 2668403086,
-          "module_initialization": 2085540,
-          "native_preparation": 5599166444,
-          "realm_and_instantiation": 606832,
-          "source_to_wasm": 3099687040,
-          "wasm_emission": 431283954
+          "engine_setup": 74141,
+          "front_and_lower": 2678333242,
+          "module_initialization": 2012394,
+          "native_preparation": 5581789284,
+          "realm_and_instantiation": 582997,
+          "source_to_wasm": 3108884217,
+          "wasm_emission": 430550975
         },
         {
-          "engine_setup": 86163,
-          "front_and_lower": 2704049750,
-          "module_initialization": 2045394,
-          "native_preparation": 5566081023,
-          "realm_and_instantiation": 555825,
-          "source_to_wasm": 3143885597,
-          "wasm_emission": 439835847
+          "engine_setup": 77236,
+          "front_and_lower": 2681100225,
+          "module_initialization": 2031149,
+          "native_preparation": 5577168033,
+          "realm_and_instantiation": 594871,
+          "source_to_wasm": 3111675294,
+          "wasm_emission": 430575069
         },
         {
-          "engine_setup": 79490,
-          "front_and_lower": 2662419624,
-          "module_initialization": 2047327,
-          "native_preparation": 5504905949,
-          "realm_and_instantiation": 547430,
-          "source_to_wasm": 3091610275,
-          "wasm_emission": 429190651
+          "engine_setup": 76746,
+          "front_and_lower": 2681451785,
+          "module_initialization": 2021701,
+          "native_preparation": 5532754668,
+          "realm_and_instantiation": 582546,
+          "source_to_wasm": 3112463801,
+          "wasm_emission": 431012016
         },
         {
-          "engine_setup": 78809,
-          "front_and_lower": 2666026186,
-          "module_initialization": 2004015,
-          "native_preparation": 5524597789,
-          "realm_and_instantiation": 575473,
-          "source_to_wasm": 3099240987,
-          "wasm_emission": 433214801
+          "engine_setup": 74501,
+          "front_and_lower": 2708454824,
+          "module_initialization": 2035558,
+          "native_preparation": 5543985483,
+          "realm_and_instantiation": 589961,
+          "source_to_wasm": 3140652959,
+          "wasm_emission": 432198135
         },
         {
-          "engine_setup": 76436,
-          "front_and_lower": 2666760553,
-          "module_initialization": 2094568,
-          "native_preparation": 5603937370,
-          "realm_and_instantiation": 560965,
-          "source_to_wasm": 3096555851,
-          "wasm_emission": 429795298
+          "engine_setup": 73981,
+          "front_and_lower": 2683108023,
+          "module_initialization": 2024296,
+          "native_preparation": 5546592765,
+          "realm_and_instantiation": 593808,
+          "source_to_wasm": 3115281736,
+          "wasm_emission": 432173713
         },
         {
-          "engine_setup": 76455,
-          "front_and_lower": 2666550359,
-          "module_initialization": 2073418,
-          "native_preparation": 5552181773,
-          "realm_and_instantiation": 583298,
-          "source_to_wasm": 3097119045,
-          "wasm_emission": 430568686
+          "engine_setup": 70064,
+          "front_and_lower": 2713271067,
+          "module_initialization": 2033885,
+          "native_preparation": 5557953967,
+          "realm_and_instantiation": 597987,
+          "source_to_wasm": 3147142349,
+          "wasm_emission": 433871282
         },
         {
-          "engine_setup": 86154,
-          "front_and_lower": 2661521102,
-          "module_initialization": 2105880,
-          "native_preparation": 5511483506,
-          "realm_and_instantiation": 571044,
-          "source_to_wasm": 3090367654,
-          "wasm_emission": 428846552
+          "engine_setup": 76966,
+          "front_and_lower": 2691879353,
+          "module_initialization": 2066457,
+          "native_preparation": 5543561990,
+          "realm_and_instantiation": 583949,
+          "source_to_wasm": 3123811352,
+          "wasm_emission": 431931999
         },
         {
-          "engine_setup": 88889,
-          "front_and_lower": 2760976840,
-          "module_initialization": 2049272,
-          "native_preparation": 5713972879,
-          "realm_and_instantiation": 594519,
-          "source_to_wasm": 3199347695,
-          "wasm_emission": 438370855
+          "engine_setup": 75283,
+          "front_and_lower": 2685389904,
+          "module_initialization": 1983600,
+          "native_preparation": 5548022751,
+          "realm_and_instantiation": 547961,
+          "source_to_wasm": 3117218748,
+          "wasm_emission": 431828844
+        }
+      ]
+    },
+    "candidate": {
+      "label": "new Scriptw source Fast",
+      "identity": {
+        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+        "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+        "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
+        },
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_bytes": 4327610,
+        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+        "runtime": {
+          "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+          "wasm_bytes": 38769947,
+          "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
+      },
+      "cases": {
+        "rsc-sync": [
+          4614588,
+          4586765,
+          4744925,
+          4704619,
+          4620480,
+          4716893,
+          4585704,
+          4730870
+        ],
+        "rsc-async": [
+          5033643,
+          4984210,
+          5158161,
+          5094180,
+          5049665,
+          5251298,
+          4974553,
+          5087287
+        ]
+      },
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 4659603.5,
+            "rsc-async": 5063911.5
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 4668686.5,
+            "rsc-async": 5068476.0
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "engine_setup": 47340,
+          "front_and_lower": 2671481117,
+          "module_initialization": 2023264,
+          "native_preparation": 5588140612,
+          "realm_and_instantiation": 548202,
+          "source_to_wasm": 3103049821,
+          "wasm_emission": 431568704
+        },
+        {
+          "engine_setup": 49714,
+          "front_and_lower": 2662382964,
+          "module_initialization": 2000281,
+          "native_preparation": 5473355434,
+          "realm_and_instantiation": 579641,
+          "source_to_wasm": 3091729254,
+          "wasm_emission": 429346290
+        },
+        {
+          "engine_setup": 47290,
+          "front_and_lower": 2683260152,
+          "module_initialization": 2085893,
+          "native_preparation": 5692726595,
+          "realm_and_instantiation": 604990,
+          "source_to_wasm": 3131606258,
+          "wasm_emission": 448346106
+        },
+        {
+          "engine_setup": 46949,
+          "front_and_lower": 2701305266,
+          "module_initialization": 2086484,
+          "native_preparation": 5621440049,
+          "realm_and_instantiation": 553201,
+          "source_to_wasm": 3137940216,
+          "wasm_emission": 436634950
+        },
+        {
+          "engine_setup": 46879,
+          "front_and_lower": 2717524392,
+          "module_initialization": 2040487,
+          "native_preparation": 5550055192,
+          "realm_and_instantiation": 592827,
+          "source_to_wasm": 3157496920,
+          "wasm_emission": 439972528
+        },
+        {
+          "engine_setup": 47300,
+          "front_and_lower": 2676114972,
+          "module_initialization": 2326781,
+          "native_preparation": 5587237673,
+          "realm_and_instantiation": 471847,
+          "source_to_wasm": 3108747807,
+          "wasm_emission": 432632835
+        },
+        {
+          "engine_setup": 45136,
+          "front_and_lower": 2682630727,
+          "module_initialization": 2033244,
+          "native_preparation": 5521358355,
+          "realm_and_instantiation": 564112,
+          "source_to_wasm": 3114321935,
+          "wasm_emission": 431691208
+        },
+        {
+          "engine_setup": 48312,
+          "front_and_lower": 2673211131,
+          "module_initialization": 2062830,
+          "native_preparation": 5624063412,
+          "realm_and_instantiation": 579692,
+          "source_to_wasm": 3104163175,
+          "wasm_emission": 430952044
         }
       ]
     },
     "candidate-speed": {
       "label": "new Scriptw source Speed/Backtracking",
       "identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+        "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+        "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -583,9 +588,9 @@
         "program_wasm_bytes": 4327610,
         "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
         "runtime": {
-          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
-          "wasm_bytes": 38768915,
-          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+          "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+          "wasm_bytes": 38769947,
+          "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -609,114 +614,114 @@
       },
       "cases": {
         "rsc-sync": [
-          3677883,
-          3736555,
-          3732618,
-          3693995,
-          3645282,
-          3741626,
-          3718642,
-          3801630
+          3601453,
+          3679902,
+          3678419,
+          3709809,
+          3821191,
+          3673480,
+          3774543,
+          3767148
         ],
         "rsc-async": [
-          4034068,
-          4062944,
-          4050792,
-          4018352,
-          4004113,
-          4105607,
-          4060722,
-          4182013
+          3957098,
+          3979481,
+          4020640,
+          4045177,
+          4158822,
+          4007895,
+          4075744,
+          4122243
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 3713306.5,
-            "rsc-async": 4042430.0
+            "rsc-sync": 3679160.5,
+            "rsc-async": 4000060.5
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 3730134.0,
-            "rsc-async": 4083164.5
+            "rsc-sync": 3770845.5,
+            "rsc-async": 4098993.5
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 79671,
-          "front_and_lower": 2665954144,
-          "module_initialization": 1704586,
-          "native_preparation": 7514639723,
-          "realm_and_instantiation": 606672,
-          "source_to_wasm": 3099831211,
-          "wasm_emission": 433877067
+          "engine_setup": 53913,
+          "front_and_lower": 2670870982,
+          "module_initialization": 1690582,
+          "native_preparation": 7526943436,
+          "realm_and_instantiation": 620509,
+          "source_to_wasm": 3103485839,
+          "wasm_emission": 432614857
         },
         {
-          "engine_setup": 80583,
-          "front_and_lower": 2664098062,
-          "module_initialization": 1776873,
-          "native_preparation": 7454987824,
-          "realm_and_instantiation": 609657,
-          "source_to_wasm": 3093304849,
-          "wasm_emission": 429206787
+          "engine_setup": 63871,
+          "front_and_lower": 2694752115,
+          "module_initialization": 1739896,
+          "native_preparation": 7529944941,
+          "realm_and_instantiation": 638033,
+          "source_to_wasm": 3126163142,
+          "wasm_emission": 431411027
         },
         {
-          "engine_setup": 80894,
-          "front_and_lower": 2658207232,
-          "module_initialization": 1748881,
-          "native_preparation": 7453947592,
-          "realm_and_instantiation": 597014,
-          "source_to_wasm": 3087918381,
-          "wasm_emission": 429711149
+          "engine_setup": 46969,
+          "front_and_lower": 2676754049,
+          "module_initialization": 1717514,
+          "native_preparation": 7486327605,
+          "realm_and_instantiation": 663881,
+          "source_to_wasm": 3108499327,
+          "wasm_emission": 431745278
         },
         {
-          "engine_setup": 76946,
-          "front_and_lower": 2666433960,
-          "module_initialization": 1709096,
-          "native_preparation": 7510988967,
-          "realm_and_instantiation": 598246,
-          "source_to_wasm": 3097485450,
-          "wasm_emission": 431051490
+          "engine_setup": 50476,
+          "front_and_lower": 2727532507,
+          "module_initialization": 1658081,
+          "native_preparation": 7574665487,
+          "realm_and_instantiation": 616762,
+          "source_to_wasm": 3168294753,
+          "wasm_emission": 440762246
         },
         {
-          "engine_setup": 80704,
-          "front_and_lower": 2677483001,
-          "module_initialization": 1665814,
-          "native_preparation": 7510069079,
-          "realm_and_instantiation": 590612,
-          "source_to_wasm": 3109400130,
-          "wasm_emission": 431917129
+          "engine_setup": 52951,
+          "front_and_lower": 2749442560,
+          "module_initialization": 1701322,
+          "native_preparation": 7679855511,
+          "realm_and_instantiation": 628495,
+          "source_to_wasm": 3207523230,
+          "wasm_emission": 458080670
         },
         {
-          "engine_setup": 81545,
-          "front_and_lower": 2668820139,
-          "module_initialization": 1759872,
-          "native_preparation": 7417709513,
-          "realm_and_instantiation": 617954,
-          "source_to_wasm": 3098673921,
-          "wasm_emission": 429853782
+          "engine_setup": 47691,
+          "front_and_lower": 2676793002,
+          "module_initialization": 1694410,
+          "native_preparation": 7537513442,
+          "realm_and_instantiation": 638413,
+          "source_to_wasm": 3106414582,
+          "wasm_emission": 429621580
         },
         {
-          "engine_setup": 81124,
-          "front_and_lower": 2703581384,
-          "module_initialization": 1734564,
-          "native_preparation": 7603227328,
-          "realm_and_instantiation": 607514,
-          "source_to_wasm": 3138894701,
-          "wasm_emission": 435313317
+          "engine_setup": 50276,
+          "front_and_lower": 2679513328,
+          "module_initialization": 1776034,
+          "native_preparation": 7478812564,
+          "realm_and_instantiation": 625369,
+          "source_to_wasm": 3112613208,
+          "wasm_emission": 433099880
         },
         {
-          "engine_setup": 83689,
-          "front_and_lower": 2760824424,
-          "module_initialization": 1786404,
-          "native_preparation": 7840834775,
-          "realm_and_instantiation": 612223,
-          "source_to_wasm": 3201128907,
-          "wasm_emission": 440304483
+          "engine_setup": 48161,
+          "front_and_lower": 2672007389,
+          "module_initialization": 1682998,
+          "native_preparation": 7548760222,
+          "realm_and_instantiation": 621180,
+          "source_to_wasm": 3103871553,
+          "wasm_emission": 431864164
         }
       ]
     },
@@ -755,82 +760,82 @@
       },
       "cases": {
         "rsc-sync": [
-          498797,
-          489790,
-          498527,
-          545556,
-          481734,
-          479421,
-          495211,
-          469752
+          487045,
+          494529,
+          504889,
+          491003,
+          489951,
+          477207,
+          489440,
+          481756
         ],
         "rsc-async": [
-          388498,
-          399128,
-          397555,
-          322222,
-          542029,
-          405631,
-          391794,
-          525518
+          509989,
+          399068,
+          401092,
+          382627,
+          389610,
+          453331,
+          406533,
+          396814
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 498662.0,
-            "rsc-async": 393026.5
+            "rsc-sync": 492766.0,
+            "rsc-async": 400080.0
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 480577.5,
-            "rsc-async": 465574.5
+            "rsc-sync": 485598.0,
+            "rsc-async": 401673.5
           }
         }
       ],
       "phase_processes": [
         {
-          "realm_creation_ns": 17046102,
-          "source_module_parse_ns": 1544642,
-          "module_link_and_initialization_ns": 2424844
+          "realm_creation_ns": 16377777,
+          "source_module_parse_ns": 1475674,
+          "module_link_and_initialization_ns": 2459372
         },
         {
-          "realm_creation_ns": 16272827,
-          "source_module_parse_ns": 1519304,
-          "module_link_and_initialization_ns": 2358749
+          "realm_creation_ns": 17397937,
+          "source_module_parse_ns": 1529626,
+          "module_link_and_initialization_ns": 2427863
         },
         {
-          "realm_creation_ns": 16347431,
-          "source_module_parse_ns": 1513615,
-          "module_link_and_initialization_ns": 2380851
+          "realm_creation_ns": 17068782,
+          "source_module_parse_ns": 1529096,
+          "module_link_and_initialization_ns": 2418545
         },
         {
-          "realm_creation_ns": 16903369,
-          "source_module_parse_ns": 1484148,
-          "module_link_and_initialization_ns": 2348770
+          "realm_creation_ns": 16575856,
+          "source_module_parse_ns": 1495873,
+          "module_link_and_initialization_ns": 2399819
         },
         {
-          "realm_creation_ns": 16545269,
-          "source_module_parse_ns": 1504286,
-          "module_link_and_initialization_ns": 2377444
+          "realm_creation_ns": 16849085,
+          "source_module_parse_ns": 1494740,
+          "module_link_and_initialization_ns": 2458682
         },
         {
-          "realm_creation_ns": 16813520,
-          "source_module_parse_ns": 1490140,
-          "module_link_and_initialization_ns": 2361605
+          "realm_creation_ns": 16918788,
+          "source_module_parse_ns": 1471796,
+          "module_link_and_initialization_ns": 2520740
         },
         {
-          "realm_creation_ns": 16244842,
-          "source_module_parse_ns": 1502674,
-          "module_link_and_initialization_ns": 2387705
+          "realm_creation_ns": 16560477,
+          "source_module_parse_ns": 1504309,
+          "module_link_and_initialization_ns": 2388930
         },
         {
-          "realm_creation_ns": 17597322,
-          "source_module_parse_ns": 1537059,
-          "module_link_and_initialization_ns": 2462046
+          "realm_creation_ns": 16811676,
+          "source_module_parse_ns": 1487206,
+          "module_link_and_initialization_ns": 2398537
         }
       ]
     }
@@ -838,75 +843,37 @@
   "inputs": {
     "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
     "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1",
-    "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350",
+    "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4",
     "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f",
     "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
     "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/focused-outlined-1/receipt.json": "d859db8cdb7dac9305d942e6427b19e35f1a835a169bb4ced9e7c6aa32178f2c",
     "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0",
     "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/common.py": "14eede0d86d6dbf4aacab9daf13e4f89df651340fa6a2ec062a7a6ec8804a254",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/freeze_source.py": "e66e6dc41756b182e9fca5ddbbc964f7b6e392e5e383ce90a3039127ffa2ebfe",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/measure_rsc.py": "af41ab9aebcf5c9c394c23f233aec9d32e1eed60716952181d344184473b6b16",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/baseline/rsc-current.json": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/manifest.json": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/tracked.patch": "a50f830332597052b0a48b655f0f885d818d9149efec0ae482ebdaf6309d5f32",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/focused/receipt.json": "dce75cc4b637dfc9031fdb764bb62e9096e44870432fb128b3f4b12663f7f28d",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/common.py": "f0f142dd5f88781b90eb9882f955fcfbd27fc5e6cb46a541c2887e9d0f757a10",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/freeze_source.py": "477514f433204b1d21aa68edb7aeb455ec0f0a3eb37a8f8d5aa0d3387a34adfd",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/measure_rsc.py": "02aa3fe57c75690e4dd4b16a87cccd976ceb66d50955131b273cb36a674517fd",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/baseline/rsc-current.json": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/manifest.json": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/tracked.patch": "f9ed24d3ea2cb519566d20547481444b169da3281e86038ad63716070f200578",
     "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63",
-    "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/common.py": "0c9f0c949b02cb80bff8563a6af723080d1922db157c4b0d738de236f7a527e1",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/compact_data.rs": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/define_property.rs": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects.rs": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/main.rs": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": "7d0a9d7de9d5fe4b546ece86612e251de7baf18cbf7abe5e9c32c55e64260289",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/main.rs": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/for-in-enumeration.md": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/compact_data.rs": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/define_property.rs": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects.rs": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/main.rs": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": "dc7180a1b6eb6344a3832abbb7fbba9a4e688dad54287ee07429a7f8a90f5123",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/main.rs": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/for-in-enumeration.md": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad"
+    "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3"
   },
   "source_identity": {
-    "git_revision_role": "base Git revision with a frozen dirty source batch",
+    "git_revision_role": "new HEAD with one frozen dirty source batch",
     "baseline_source": {
       "identity": {
-        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-        "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-        "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -934,11 +901,12 @@
           "wasmtime": "47.0.0",
           "wasmtime_async_stack_bytes": 67108864
         },
-        "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
+        "program_wasm_bytes": 4327610,
+        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
         "runtime": {
-          "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
-          "wasm_bytes": 38738181,
-          "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
+          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
+          "wasm_bytes": 38768915,
+          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -956,32 +924,34 @@
             "react-server-dom-webpack": "19.3.1"
           },
           "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        }
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
       },
-      "executable": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-      "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-      "report": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
-      "report_sha256": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
-      "published_report_sha256": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350"
+      "executable": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
+      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "report": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json",
+      "report_sha256": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
+      "published_report_sha256": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4"
     },
     "candidate_measured_source": {
-      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-      "manifest_path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
-      "manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "manifest_path": "target/performance-predicate-transport-20261108/tools/source-current/manifest.json",
+      "manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
       "runtime_abi": 53,
       "archive_prefix": "source/current/",
       "manifest_member": "source/current/manifest.json"
     },
     "candidate_build": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
-      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
-      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
-      "qualified_reuse": null,
+      "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
+      "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
+      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "build_producer_is_direct": true,
       "compiler_source_identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+        "source_revision": "git:dfefb3222737b067e1c98777161d95d42491df8f"
       }
     },
     "candidate_speed_policy": {
@@ -1003,274 +973,21 @@
       "wasmtime": "47.0.0",
       "wasmtime_async_stack_bytes": 67108864
     },
-    "runtime_abi": 53,
-    "verification_source": {
-      "schema": "scriptw-performance-levers-test-only-reuse-v2",
-      "measured_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
-        "sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4"
-      },
-      "verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
-        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
-        "archive_prefix": "verification/source-current/",
-        "manifest_member": "verification/source-current/manifest.json"
-      },
-      "reuse_receipt": {
-        "path": "target/performance-levers-20261108/test-only-reuse-outlined-5.json",
-        "sha256": "7dfee0d0cf6a11ee4cb30070a369759f093cad30e79ac343f3e8542aa91b8838",
-        "archive_member": "verification/test-only-reuse-receipt.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-5.json",
-        "sha256": "38f6d41470f3260425c4ec833414757b98315f1ed13dfe9e0c1ec856da6f6134",
-        "archive_member": "verification/test-only-qualification.json"
-      },
-      "prior_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-4/manifest.json",
-        "sha256": "1b114db1657b70ab6f3b7d18b9dc5eacfd646c092a6cef0a9b4edd349a7ac574",
-        "archive_prefix": "verification/source-previous/",
-        "manifest_member": "verification/source-previous/manifest.json"
-      },
-      "binary_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-      "changed_external_test_files": [
-        "crates/scriptw-aot-wasm/tests/emission/row_loop_operators.rs",
-        "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/array_iterator_runtime_ownership.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_classic_loop_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_switch_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_with_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_with_environment_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_with_environment_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/host_schema.rs"
-      ],
-      "changed_cfg_test_file": [
-        "crates/scriptw-aot-wasm/src/tests/local_argument_calls.rs"
-      ],
-      "test_only_gate_files": [
-        {
-          "path": "crates/scriptw-engine/compiler_fingerprint.rs",
-          "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
-          "archive_member": "verification/test-only-gate/crates/scriptw-engine/compiler_fingerprint.rs"
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/src/lib.rs",
-          "sha256": "3be3b762ebaf64f2720987dd1429cd283e8758d85523e57708e79728479fd914",
-          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/lib.rs"
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/src/tests.rs",
-          "sha256": "b5b95f8e9c7f53b002ccba575ffa7ad9a35e26fcbbe69d85e98dc46b23d59466",
-          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/tests.rs"
-        }
-      ],
-      "compiler_source_identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "qualification": "Changed inputs are limited to listed external tests and at most the single explicitly excluded cfg(test) module. Compiler source identity and Cargo inputs match; the frozen production executable SHA is unchanged."
-    },
-    "mixed_cfg_verification": {
-      "schema": "scriptw-performance-levers-mixed-cfg-test-change-v1",
-      "previous_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
-        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
-        "archive_prefix": "verification/mixed-cfg/source-previous/",
-        "manifest_member": "verification/mixed-cfg/source-previous/manifest.json"
-      },
-      "current_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
-        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
-        "archive_prefix": "verification/mixed-cfg/source-current/",
-        "manifest_member": "verification/mixed-cfg/source-current/manifest.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
-        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4",
-        "archive_member": "verification/mixed-cfg-test-qualification.json"
-      },
-      "previous_producer": {
-        "path": "target/performance-levers-20261108/build-outlined-5.stdout",
-        "sha256": "60d140eed11ab6127d7935adf4e0655486882bc8887213164f01d9c6eb34e0c8",
-        "archive_member": "verification/mixed-cfg/previous-cargo-producer.stdout"
-      },
-      "current_producer": {
-        "path": "target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
-        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424",
-        "archive_member": "verification/mixed-cfg/current-cargo-producer.stdout"
-      },
-      "change": {
-        "path": "crates/scriptw-aot-wasm/src/functions/numeric_body.rs",
-        "previous_file_sha256": "ba572e47a3bcf697cac990bd616f0b681f90a9919a021081c7afff738b0d3e9f",
-        "current_file_sha256": "8582d38f500db00bd4c5a8fce4ff1cb4e61a36dedfda8000d4fa2e75b08f2102",
-        "production_prefix_sha256": "2cb9dff6a8f4ec202c4b8cf0ebe5cec9b6028409ec92ecf43149f8d9c6060a0e",
-        "previous_test_suffix_sha256": "c2feb326b3407c253c1e0e89475fcdaa44c82581b94dc493ced58140abc83cdf",
-        "current_test_suffix_sha256": "d68b331b2ddd4d0b71a6c7479fc87f68b0657b498d53a3119d726d197476b9e6",
-        "previous_test_literal": "export function step(row,i,extra){tick=tick+1;return row.x+i;}",
-        "current_test_literal": "export function step(row,i,a,b,c,extra){tick=tick+1;return row.x+i;}"
-      },
-      "previous_compiler_source_identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "current_compiler_source_identity": {
-        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "product_binary_identity": "separate verification build; no binary-equality claim",
-      "qualification": "Only the cfg(test) suffix changed in this fingerprinted mixed source file; the production prefix is byte-identical. The verification build has a separately recorded compiler identity and is not treated as the measured binary."
-    },
-    "format_only_test_verification": {
-      "schema": "scriptw-performance-levers-format-only-test-proof-v1",
-      "previous_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
-        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
-        "archive_prefix": "verification/import-format/source-previous/",
-        "manifest_member": "verification/import-format/source-previous/manifest.json"
-      },
-      "current_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-7/manifest.json",
-        "sha256": "af601c7297d03a20e5bff67a6e6c9fc1fd150105c7b28edebc052ae453359052",
-        "archive_prefix": "verification/import-format/source-current/",
-        "manifest_member": "verification/import-format/source-current/manifest.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-7.json",
-        "sha256": "382eae9e7bb88147d05702fff21527100efaf99d89070b50b7289ddd4d35e484",
-        "archive_member": "verification/import-format-qualification.json"
-      },
-      "mixed_cfg_qualification": {
-        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
-        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4"
-      },
-      "format_only_files": [
-        {
-          "path": "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
-          "previous_file_sha256": "79251e1e44eea5ce49fefaca5421adb8f8c2c41f4aea0b89832f31db06a40751",
-          "current_file_sha256": "4881d3e92914bf2897da0c48a23b0cb4051b83df1a8550cd7fcd684c50e65c44",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};",
-              "current_import": "use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};"
-            },
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
-          "previous_file_sha256": "a56d0129495274c11dcf643f61a27dfac9fbaebd540615ff460dc609e1444076",
-          "current_file_sha256": "63375d48af6068a739bae3b37d6f62c3af96b85771725a8ee2d03e58e46e2f9f",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
-          "previous_file_sha256": "aa2fde8f36550c27f3dbef126be10564b964578e8e0024955fbba443172c57d5",
-          "current_file_sha256": "7d22a3370598327ccf586d4f87ca8a3bc0fea3297862b669a9a266422fea1ca8",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
-          "previous_file_sha256": "1a39f65f950c86781935a7e790291402e50b8b9ddcf77f37daff8b4d0a1371b9",
-          "current_file_sha256": "8e24d31301843effb5c80f46eedcf2233112078d78f9b4edaaf9bb12e1ebd803",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
-          "previous_file_sha256": "d4554ca0193daf8c42da97c648751f51a37d5e8e0b7b2f1a0e90f74559104479",
-          "current_file_sha256": "3089cc19c93116f78f069ef55f1f0e53036246fe56a560758f4f94f9b7dbc6e3",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
-          "previous_file_sha256": "3d64fa77b90de00a3fd58ed3c707682717c70c853234ccae683f9d557c55de42",
-          "current_file_sha256": "446f1029df9d9d708ee7488c55a87cbd12eab6dbf69ef85ef7cdfa87f711c098",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        }
-      ],
-      "compiler_source_identity": {
-        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "current_product_producer": {
-        "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
-        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424"
-      },
-      "compiler_fingerprint_exclusion": {
-        "path": "crates/scriptw-engine/compiler_fingerprint.rs",
-        "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
-        "archive_member": "verification/import-format/compiler_fingerprint.rs"
-      },
-      "binary_identity_comparison": "not-claimed; no source7 product build was run",
-      "qualification": "Source6 to source7 changes only import ordering in six external test files. The measured source1 cohort and source6 CLI identity remain separately pinned; no product binary identity is inferred and no tests are claimed as rerun by this receipt."
-    }
+    "runtime_abi": 53
   },
   "producer_receipts": {
     "baseline": {
-      "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json",
-      "sha256": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a"
+      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json",
+      "sha256": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0"
     },
     "candidate": {
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
-      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
-      "qualified_reuse": null
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
+      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "build_producer_is_direct": true
     },
     "candidate_speed": {
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
-      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
+      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
       "native_configuration": {
         "collector": "Copying",
         "compilation_jobs": 1,
@@ -1294,21 +1011,21 @@
   },
   "publication": {
     "date": "2026-11-08",
-    "status": "published",
+    "status": "published-recorded-source",
     "measured_source": {
-      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-      "manifest_path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
-      "manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "manifest_path": "target/performance-predicate-transport-20261108/tools/source-current/manifest.json",
+      "manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
       "runtime_abi": 53,
       "archive_prefix": "source/current/",
       "manifest_member": "source/current/manifest.json"
     },
     "baseline": {
       "identity": {
-        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-        "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-        "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -1336,11 +1053,12 @@
           "wasmtime": "47.0.0",
           "wasmtime_async_stack_bytes": 67108864
         },
-        "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
+        "program_wasm_bytes": 4327610,
+        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
         "runtime": {
-          "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
-          "wasm_bytes": 38738181,
-          "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
+          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
+          "wasm_bytes": 38768915,
+          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -1358,281 +1076,30 @@
             "react-server-dom-webpack": "19.3.1"
           },
           "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        }
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
       },
-      "reference_campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
-      "reference_aggregate_sha256": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd"
+      "reference_campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
+      "reference_aggregate_sha256": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b"
     },
     "speed_policy": "candidate-speed is a separately scored native-policy actor using the existing host's explicit Speed/Backtracking mode",
     "archive_prefix": "source/current/",
-    "verification_source": {
-      "schema": "scriptw-performance-levers-test-only-reuse-v2",
-      "measured_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
-        "sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4"
-      },
-      "verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
-        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
-        "archive_prefix": "verification/source-current/",
-        "manifest_member": "verification/source-current/manifest.json"
-      },
-      "reuse_receipt": {
-        "path": "target/performance-levers-20261108/test-only-reuse-outlined-5.json",
-        "sha256": "7dfee0d0cf6a11ee4cb30070a369759f093cad30e79ac343f3e8542aa91b8838",
-        "archive_member": "verification/test-only-reuse-receipt.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-5.json",
-        "sha256": "38f6d41470f3260425c4ec833414757b98315f1ed13dfe9e0c1ec856da6f6134",
-        "archive_member": "verification/test-only-qualification.json"
-      },
-      "prior_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-4/manifest.json",
-        "sha256": "1b114db1657b70ab6f3b7d18b9dc5eacfd646c092a6cef0a9b4edd349a7ac574",
-        "archive_prefix": "verification/source-previous/",
-        "manifest_member": "verification/source-previous/manifest.json"
-      },
-      "binary_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-      "changed_external_test_files": [
-        "crates/scriptw-aot-wasm/tests/emission/row_loop_operators.rs",
-        "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/array_iterator_runtime_ownership.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_classic_loop_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_switch_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_with_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/async_with_environment_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/generator_with_environment_structure.rs",
-        "crates/scriptw-aot-wasm/tests/structure_async/host_schema.rs"
-      ],
-      "changed_cfg_test_file": [
-        "crates/scriptw-aot-wasm/src/tests/local_argument_calls.rs"
-      ],
-      "test_only_gate_files": [
-        {
-          "path": "crates/scriptw-engine/compiler_fingerprint.rs",
-          "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
-          "archive_member": "verification/test-only-gate/crates/scriptw-engine/compiler_fingerprint.rs"
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/src/lib.rs",
-          "sha256": "3be3b762ebaf64f2720987dd1429cd283e8758d85523e57708e79728479fd914",
-          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/lib.rs"
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/src/tests.rs",
-          "sha256": "b5b95f8e9c7f53b002ccba575ffa7ad9a35e26fcbbe69d85e98dc46b23d59466",
-          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/tests.rs"
-        }
-      ],
-      "compiler_source_identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "qualification": "Changed inputs are limited to listed external tests and at most the single explicitly excluded cfg(test) module. Compiler source identity and Cargo inputs match; the frozen production executable SHA is unchanged."
-    },
-    "mixed_cfg_verification": {
-      "schema": "scriptw-performance-levers-mixed-cfg-test-change-v1",
-      "previous_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
-        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
-        "archive_prefix": "verification/mixed-cfg/source-previous/",
-        "manifest_member": "verification/mixed-cfg/source-previous/manifest.json"
-      },
-      "current_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
-        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
-        "archive_prefix": "verification/mixed-cfg/source-current/",
-        "manifest_member": "verification/mixed-cfg/source-current/manifest.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
-        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4",
-        "archive_member": "verification/mixed-cfg-test-qualification.json"
-      },
-      "previous_producer": {
-        "path": "target/performance-levers-20261108/build-outlined-5.stdout",
-        "sha256": "60d140eed11ab6127d7935adf4e0655486882bc8887213164f01d9c6eb34e0c8",
-        "archive_member": "verification/mixed-cfg/previous-cargo-producer.stdout"
-      },
-      "current_producer": {
-        "path": "target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
-        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424",
-        "archive_member": "verification/mixed-cfg/current-cargo-producer.stdout"
-      },
-      "change": {
-        "path": "crates/scriptw-aot-wasm/src/functions/numeric_body.rs",
-        "previous_file_sha256": "ba572e47a3bcf697cac990bd616f0b681f90a9919a021081c7afff738b0d3e9f",
-        "current_file_sha256": "8582d38f500db00bd4c5a8fce4ff1cb4e61a36dedfda8000d4fa2e75b08f2102",
-        "production_prefix_sha256": "2cb9dff6a8f4ec202c4b8cf0ebe5cec9b6028409ec92ecf43149f8d9c6060a0e",
-        "previous_test_suffix_sha256": "c2feb326b3407c253c1e0e89475fcdaa44c82581b94dc493ced58140abc83cdf",
-        "current_test_suffix_sha256": "d68b331b2ddd4d0b71a6c7479fc87f68b0657b498d53a3119d726d197476b9e6",
-        "previous_test_literal": "export function step(row,i,extra){tick=tick+1;return row.x+i;}",
-        "current_test_literal": "export function step(row,i,a,b,c,extra){tick=tick+1;return row.x+i;}"
-      },
-      "previous_compiler_source_identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "current_compiler_source_identity": {
-        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "product_binary_identity": "separate verification build; no binary-equality claim",
-      "qualification": "Only the cfg(test) suffix changed in this fingerprinted mixed source file; the production prefix is byte-identical. The verification build has a separately recorded compiler identity and is not treated as the measured binary."
-    },
-    "format_only_test_verification": {
-      "schema": "scriptw-performance-levers-format-only-test-proof-v1",
-      "previous_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
-        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
-        "archive_prefix": "verification/import-format/source-previous/",
-        "manifest_member": "verification/import-format/source-previous/manifest.json"
-      },
-      "current_verification_source": {
-        "path": "target/performance-levers-20261108/tools/source-outlined-7/manifest.json",
-        "sha256": "af601c7297d03a20e5bff67a6e6c9fc1fd150105c7b28edebc052ae453359052",
-        "archive_prefix": "verification/import-format/source-current/",
-        "manifest_member": "verification/import-format/source-current/manifest.json"
-      },
-      "qualification_receipt": {
-        "path": "target/performance-levers-20261108/qualification-outlined-7.json",
-        "sha256": "382eae9e7bb88147d05702fff21527100efaf99d89070b50b7289ddd4d35e484",
-        "archive_member": "verification/import-format-qualification.json"
-      },
-      "mixed_cfg_qualification": {
-        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
-        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4"
-      },
-      "format_only_files": [
-        {
-          "path": "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
-          "previous_file_sha256": "79251e1e44eea5ce49fefaca5421adb8f8c2c41f4aea0b89832f31db06a40751",
-          "current_file_sha256": "4881d3e92914bf2897da0c48a23b0cb4051b83df1a8550cd7fcd684c50e65c44",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};",
-              "current_import": "use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};"
-            },
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
-          "previous_file_sha256": "a56d0129495274c11dcf643f61a27dfac9fbaebd540615ff460dc609e1444076",
-          "current_file_sha256": "63375d48af6068a739bae3b37d6f62c3af96b85771725a8ee2d03e58e46e2f9f",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
-          "previous_file_sha256": "aa2fde8f36550c27f3dbef126be10564b964578e8e0024955fbba443172c57d5",
-          "current_file_sha256": "7d22a3370598327ccf586d4f87ca8a3bc0fea3297862b669a9a266422fea1ca8",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
-          "previous_file_sha256": "1a39f65f950c86781935a7e790291402e50b8b9ddcf77f37daff8b4d0a1371b9",
-          "current_file_sha256": "8e24d31301843effb5c80f46eedcf2233112078d78f9b4edaaf9bb12e1ebd803",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
-          "previous_file_sha256": "d4554ca0193daf8c42da97c648751f51a37d5e8e0b7b2f1a0e90f74559104479",
-          "current_file_sha256": "3089cc19c93116f78f069ef55f1f0e53036246fe56a560758f4f94f9b7dbc6e3",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        },
-        {
-          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
-          "previous_file_sha256": "3d64fa77b90de00a3fd58ed3c707682717c70c853234ccae683f9d557c55de42",
-          "current_file_sha256": "446f1029df9d9d708ee7488c55a87cbd12eab6dbf69ef85ef7cdfa87f711c098",
-          "replacements": [
-            {
-              "previous_import": "use scriptw_front::{ParseOptions, parse};",
-              "current_import": "use scriptw_front::{parse, ParseOptions};"
-            },
-            {
-              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
-              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
-            }
-          ]
-        }
-      ],
-      "compiler_source_identity": {
-        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
-        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
-      },
-      "current_product_producer": {
-        "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
-        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424"
-      },
-      "compiler_fingerprint_exclusion": {
-        "path": "crates/scriptw-engine/compiler_fingerprint.rs",
-        "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
-        "archive_member": "verification/import-format/compiler_fingerprint.rs"
-      },
-      "binary_identity_comparison": "not-claimed; no source7 product build was run",
-      "qualification": "Source6 to source7 changes only import ordering in six external test files. The measured source1 cohort and source6 CLI identity remain separately pinned; no product binary identity is inferred and no tests are claimed as rerun by this receipt."
-    },
     "evidence_archive": {
-      "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
-      "bytes": 3103888,
-      "regular_utf8_members": 3659,
-      "expanded_utf8_bytes": 106603957,
-      "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
-      "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
+      "sha256": "6385d0ae7627e6e34ec1a2b2618cec149d468967d9961578d5c92872eb1252ef",
+      "bytes": 4475432,
+      "regular_utf8_members": 1027,
+      "expanded_utf8_bytes": 301175728,
+      "file": "scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz",
+      "canonical_file": "docs/rust-rewrite/scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz"
     },
     "canonical_files_written": true
   },
   "candidate_speed": {
-    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
-    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
-    "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
+    "sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
+    "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
     "configuration": {
       "collector": "Copying",
       "compilation_jobs": 1,
@@ -1656,15 +1123,15 @@
     "scope": "separately scored native compilation policy"
   },
   "evidence_archive": {
-    "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
-    "bytes": 3103888,
-    "regular_utf8_members": 3659,
-    "expanded_utf8_bytes": 106603957,
-    "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
-    "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
+    "sha256": "6385d0ae7627e6e34ec1a2b2618cec149d468967d9961578d5c92872eb1252ef",
+    "bytes": 4475432,
+    "regular_utf8_members": 1027,
+    "expanded_utf8_bytes": 301175728,
+    "file": "scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz",
+    "canonical_file": "docs/rust-rewrite/scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz"
   },
   "complete_archived_report": {
     "archive_member": "reports/rsc-current-prearchive.json",
-    "sha256": "defa972ecf1a3338f81da0fa650ed2a49b3ba0ee5e0c1f4a68c69c07e0bc0b5c"
+    "sha256": "21a4591d65d442545e0f22634a09ce00d36340b71ea2729a6b9542b1318b3c87"
   }
 }

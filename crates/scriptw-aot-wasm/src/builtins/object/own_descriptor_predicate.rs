@@ -18,6 +18,7 @@ impl FunctionBuilder<'_> {
         let object = schema.reserve_value_local(function);
         let output = schema.reserve_completion(function);
         let boolean = schema.reserve_i32_local(function);
+        let enumerable = schema.reserve_i32_local(function);
         let key = match &builtin {
             OwnDescriptorPredicateBuiltin::ObjectHasOwn => {
                 self.emit_builtin_arg_to_value(0, &receiver, function);
@@ -41,23 +42,21 @@ impl FunctionBuilder<'_> {
                 key
             }
         };
-        let descriptor = self.emit_proxy_target_own_descriptor(&object, &key, function)?;
+        self.emit_own_property_enumerability(&object, &key, boolean, enumerable, function)?;
         match &builtin {
             OwnDescriptorPredicateBuiltin::ObjectHasOwn
-            | OwnDescriptorPredicateBuiltin::PrototypeHasOwnProperty => {
-                descriptor.emit_found_i32(schema, function)
-            }
+            | OwnDescriptorPredicateBuiltin::PrototypeHasOwnProperty => {}
             OwnDescriptorPredicateBuiltin::PrototypePropertyIsEnumerable => {
-                descriptor.emit_found_i32(schema, function);
-                descriptor.emit_enumerable_i32(schema, function);
+                boolean.load(function);
+                enumerable.load(function);
                 function.instruction(&Instruction::I32And);
+                boolean.store(function);
             }
         }
-        boolean.store(function);
         receiver.set_boolean(boolean, function);
         output.set_normal(&receiver, function);
         self.completion().copy_from(&output, function);
-        descriptor.clear(function);
+        schema.release_i32_local(enumerable, function);
         key.clear(function);
         schema.release_i32_local(boolean, function);
         output.clear(function);

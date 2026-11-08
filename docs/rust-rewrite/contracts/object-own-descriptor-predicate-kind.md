@@ -1,21 +1,27 @@
-# Object own-descriptor predicate kind
+# Object own-descriptor predicates
 
-The GC source draft keeps one private owner,
-`builtins/object/own_descriptor_predicate.rs`, and a closed three-case policy:
-ObjectHasOwn, PrototypeHasOwnProperty and PrototypePropertyIsEnumerable. Each
-actual dispatcher entry constructs its matching policy. Exhaustive borrowed
-matches select acquisition/coercion order and descriptor projection together.
-The policy has no incidental Copy/Clone capability.
+`builtins/object/own_descriptor_predicate.rs` owns the closed ObjectHasOwn,
+PrototypeHasOwnProperty and PrototypePropertyIsEnumerable policies. Object.hasOwn
+completes ToObject before ToPropertyKey; both prototype forms complete the key
+first, including when ToObject(this) throws. The executing builtin retains its
+Realm and whole abrupt completion.
 
-Object.hasOwn completes ToObject on its first argument before coercing the
-second to a property key. Both prototype forms coerce their key before
-ToObject(this), including the nullish receiver failure. All forms consume the
-same completed typed own-descriptor acquisition. The first two project
-presence; propertyIsEnumerable projects presence and the stored enumerable
-flag. Original throws, Symbol keys and reference identities remain whole.
+All three consume the existing scalar own-property observation immediately.
+Actual OrdinaryObject references read compact attributes, intrinsic rows or
+stored dictionary descriptor flags without materializing property values or
+copying descriptors. Presence remains independent of enumerability. Accessors
+are never invoked; own Undefined remains present. Concrete Arrays retain their
+indexed, named, Symbol and virtual-length lookup. Other exotics, including
+Proxies, retain the complete ObjectGetOwnProperty helper and its original traps,
+validation and throws.
 
-Historical Batch X/AK checks covered the preceding source. They do not establish
-acceptance for this GC rewrite. The existing semantic predicate fixture remains
-required. The obsolete source-spelling guard is retired. No compilation or
-runtime control has run during dry authoring; final verification requires the
-complete source pass and the confirmed 4096 MiB process tree cap.
+No user code can run between obtaining the scalar facts and consuming them.
+Consumers that retain a descriptor across effects, including Proxy invariant
+checks, still require the independent completed snapshot described in
+[Proxy target descriptor completion](proxy-target-descriptor-completion.md).
+
+The emitted-module witness checks all three predicate bodies, ordinary storage
+without descriptor/value construction, canonical Array/exotic fallbacks, and a
+snapshot-taking control. The CLI predicate fixture covers storage transitions,
+key-coercion mutations, symbols, accessors, Arrays, typed arrays, boxed strings,
+Proxy trap counts, original throws, conversion order and foreign error realms.

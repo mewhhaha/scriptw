@@ -38,5 +38,17 @@ sources are pending execution. Compilation, emitted-Wasm validation,
 focused regressions and broad JSON acceptance remain pending; no suite
 counts or task acceptance are changed by this source packet.
 
+Stringify and the canonical parse-reviver walk share the same enumerable-key
+snapshot owner. It snapshots own keys first, skips Symbols, then reads live
+presence/enumerability in order through `emit_own_property_enumerability`.
+Ordinary compact, intrinsic and dictionary storage supply these scalars without
+materializing a descriptor or reading its value/getter/setter fields. Exotic
+objects retain their descriptor traps, invariant checks and original thrown
+values. The complete enumerable String-key list exists before any descendant
+getter or reviver runs; descendant reads still observe current property values.
+Emission regressions cover both JSON owners, and exact execution traces cover
+Proxy descriptor mutations, vanished keys, Symbol omission, callback mutation,
+fresh reviver descendants and abrupt descriptor traps.
+
 Primary specifications: [JSON.stringify](https://tc39.es/ecma262/2026/multipage/structured-data.html#sec-json.stringify)
 and [SerializeJSONProperty](https://tc39.es/ecma262/2026/multipage/structured-data.html#sec-serializejsonproperty).

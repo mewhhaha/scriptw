@@ -46,13 +46,14 @@ fn property_read_dispatch_has_one_whole_value_route() {
     let helper = &READ_HELPER_SOURCE[helper_start..helper_end];
     let coercible = helper.find("self.compile_nullish_tagged_i32(").unwrap();
     let convert = helper
-        .find("self.emit_value_to_property_key_completion(")
+        .find("self.emit_value_to_property_key_locals_or_branch(")
         .unwrap();
     let lookup = helper
         .find("self.emit_dynamic_property_read_with_key_locals(")
         .unwrap();
     assert!(coercible < convert && convert < lookup);
-    assert!(helper[convert..lookup].contains("self.emit_branch_to_target(exit,"));
+    assert!(!helper.contains("self.emit_value_to_property_key_locals("));
+    assert!(!helper.contains("self.emit_value_to_property_key_completion("));
 }
 
 #[test]

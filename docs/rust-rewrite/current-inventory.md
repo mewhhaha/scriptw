@@ -12,15 +12,10 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Close the remaining Fast gaps on `args-unused.js` (34× V8) and `frame-compact.js` (36×). Measure projection, preflight and scalar GC loads separately; their time shares remain unknown. Keep exact outputs and RSC request time as controls. Owner: scalar-call planning and runtime code layout.
-
-- Propagate existing `NumberDomain` facts through captured `CallSlot`, `CompactPath` and `Call` results. These paths currently fall back to general Number and emit the full `ToUint32` sequence for proven integer ranges. Add only guards justified by entry inputs; preserve arithmetic order and complete fallback.
-
-- Test amortizing `frame-compact.js` projection across its closed outer loop. Source structure has 3,120 own-data field probes and 16 projection allocations there; `args-unused.js` has 130 probes and one projection. These are source-derived counts, not measured time shares. Keep projection local across any intervening source effects unless a complete loop-region proof admits it.
-
-- Measure source/alias selection still emitted per iteration after captured-call admission. Elide single-case dispatch first; bound variants with a code-size budget.
-
-- Remove the second property-key conversion after `DynamicPropertyRead` has completed `ToPropertyKey`. This is a structural opportunity from the current call chain, not a measured hot share; preserve the first conversion’s effects, throw and evaluation order.
+- Reduce the current Fast gaps on `args-unused.js` (33× V8) and `frame-compact.js` (34×). The exact emitted programs still have 4 full conversions in the arguments loop and 21 across four frame source alternatives; a selected frame iteration executes 4 or 6. Classify rows during existing projection writes, preserve original Number payloads, and branch once to integer or existing Number loops. Carry conditional domains through call slots and exact Add/Sub bounds. The integer proposal is unmeasured; preserve fractions, negative zero, nonfinite values, overflow and fallback. Owner: scalar-call planning.
+- Test amortizing `frame-compact.js` projection across its closed outer loop. Source structure has 3,120 own-data field probes and 16 projection allocations; `args-unused.js` has 130 probes and one projection. These are source-derived counts, not time shares. Prove that intervening effects cannot invalidate the projected rows before hoisting.
+- Measure the default `@@hasInstance` handler path before changing the call ABI. Fresh source `0c2c10dac9c0` profiles place 7.3–10.0% of sample periods in the overlapping `has_instance` subtree. Test the existing native-code/same-Realm guard after observable handler lookup, preserving custom/proxy/foreign handlers, activation, caller reflection, bound targets and whole abrupt completion. The proposed shortcut has not been implemented or timed. Owner: runtime instance checks.
+- Resolve the Fast `vn` entry hotspot before attributing it to arguments or Value/Completion transport. Native symbol extents are code sizes, not frame sizes. Use the existing native image/disassembly and the fresh [caller profiles](react-attribution-current.json) to distinguish stack probing, local homes and body operations; retain Speed as a control.
 
 - Measure type classification and singleton dispatch after strict-pair period
   projection. Prefer private binding facts and existing semantic kernels before

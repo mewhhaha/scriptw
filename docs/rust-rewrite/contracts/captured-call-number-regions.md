@@ -9,6 +9,8 @@ about the live callee: entry checks its actual FunctionObject, executable kind,
 source ID and defining ProgramInstance. A single forwarding body may select a
 bounded packed-array callable; each selected slot receives the same checks.
 Source depth is checked for the complete call chain after positive-trip admission.
+Single-source sites execute their authenticated body directly inside the loop;
+multi-source sites retain their selected-source dispatch.
 
 The complete test, body, update and substituted callees must be callback-free
 and nonthrowing after admission. Only private Number operands, actual own-data
@@ -30,6 +32,18 @@ each dirty representative once and clears every retained root. Distinct closure
 instances with identical code therefore retain distinct state, while closures
 sharing a binding observe one scalar history. No callback, throw or suspension
 can observe a deferred write between entry and publication.
+Captures from different source alternatives of the same call site cannot be
+active together, so their entry and per-write alias comparisons are omitted.
+Cross-site comparisons remain, including identical code with distinct cells.
+
+Call-local reads retain the Number domain established by their latest assignment.
+Branches join both possible domains, including the unchanged path. A captured
+write establishes only its own result's domain and invalidates other captured
+facts because physical aliases are decided at entry; nested calls also invalidate
+those facts. Each call result joins every admitted source result. These facts
+remove redundant ToUint32 modulo work without adding row or cell range guards.
+Stored values and full Number consumers retain binary64 semantics, including
+negative zero, NaN and values outside the exact integer range.
 
 The unchanged captured-state fixtures must contain a projected loop with no
 source calls, allocations or heap writes, alongside a real generic fallback.

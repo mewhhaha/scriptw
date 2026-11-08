@@ -291,10 +291,13 @@ impl CapturedCalls {
             cell.load(s, function).is_null(function);
             function.instruction(&Instruction::I32Eqz);
             builder.open_frame(ControlFrameKind::If, function);
-            for previous in &roots.slots[..index] {
+            for (previous_index, previous) in roots.slots[..index].iter().enumerate() {
                 let Some(previous_cell) = &previous.cell else {
                     continue;
                 };
+                if !self.may_alias(index, previous_index) {
+                    continue;
+                }
                 cell.load(s, function);
                 previous_cell.load(s, function);
                 function.instruction(&Instruction::RefEq);
@@ -344,7 +347,7 @@ impl CapturedCallRoots {
         }
         slot.dirty.set_constant(1, function);
         for (other_index, other) in self.slots.iter().enumerate() {
-            if other_index == index || other.cell.is_none() {
+            if other_index == index || other.cell.is_none() || !plan.may_alias(index, other_index) {
                 continue;
             }
             slot.alias.load(function);

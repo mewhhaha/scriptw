@@ -76,7 +76,7 @@ try { a[1]; throw 1; } catch (error) { assert(error === token && reads === 2, 'o
 
 #[test]
 fn property_reads_evaluate_keys_once_before_receiver_errors() {
-    assert_reads(
+    assert_reads_with_options(
         r#"
 var token = {}, a = [token], evaluations = 0, coercions = 0;
 function numeric() { evaluations++; return 0; }
@@ -85,7 +85,49 @@ var key = {}; key[Symbol.toPrimitive] = function(hint) { coercions++; assert(hin
 assert(a[key] === 7 && coercions === 1, 'effectful key conversion before lookup');
 try { null[numeric()]; throw 1; } catch (error) { assert(error instanceof TypeError && evaluations === 2, 'key evaluated before nullish check'); }
 try { undefined[key]; throw 1; } catch (error) { assert(error instanceof TypeError && coercions === 1, 'nullish check precedes key conversion'); }
+var symbol = Symbol('0'), otherSymbol = Symbol('0');
+a[symbol] = token; a['-0'] = 11; a[-1] = 13; a[1.5] = 17; a[NaN] = 19; a[Infinity] = 23;
+assert(a[symbol] === token && a[otherSymbol] === undefined && a[-0] === 7 && a['-0'] === 11,
+  'completed keys retain Symbol identity and numeric negative zero');
+assert(a[-1] === 13 && a[1.5] === 17 && a[NaN] === 19 && a[Infinity] === 23,
+  'nonindex Number conversion retains the complete property name');
+var events = '', getterReads = 0;
+Object.defineProperty(a, symbol, {get: function() {
+  getterReads++; events += 'get;'; assert(this === a, 'Symbol getter receiver'); return token;
+}, configurable: true});
+key[Symbol.toPrimitive] = function(hint) {
+  coercions++; events += hint + ';'; return symbol;
+};
+assert(a[key] === token && coercions === 2 && getterReads === 1 && events === 'string;get;',
+  'one conversion precedes the Symbol getter');
+var foreign = __scriptwCreateRealm().global;
+Object.defineProperty(a, 'foreign', {
+  get: Object.getOwnPropertyDescriptor(foreign.Map.prototype, 'size').get,
+  configurable: true
+});
+key[Symbol.toPrimitive] = function() { coercions++; return 'foreign'; };
+try { a[key]; throw 1; } catch (error) {
+  assert(error instanceof foreign.TypeError && !(error instanceof TypeError) && coercions === 3,
+    'foreign getter keeps its native-error Realm after key conversion');
+}
+delete a[symbol];
+var traps = 0, prototype = new Proxy({}, {get: function(target, name, receiver) {
+  traps++; assert(name === symbol && receiver === a, 'prototype Proxy key and original receiver'); return token;
+}});
+Object.setPrototypeOf(a, prototype);
+key[Symbol.toPrimitive] = function() { coercions++; return symbol; };
+assert(a[key] === token && coercions === 4 && traps === 1,
+  'converted Symbol reaches inherited Proxy lookup once');
+key[Symbol.toPrimitive] = function() { coercions++; throw token; };
+try { a[key]; throw 1; } catch (error) {
+  assert(error === token && coercions === 5 && traps === 1,
+    'abrupt conversion preserves identity and skips lookup');
+}
 "#,
+        CompileOptions {
+            host_surface_policy: HostSurfacePolicy::Test262,
+            ..CompileOptions::default()
+        },
     );
 }
 

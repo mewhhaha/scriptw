@@ -741,15 +741,9 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::End);
         count.store(function);
-        let initial_value = schema.reserve_value_local(function);
-        initial_value.set_undefined(function);
-        let initial = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&initial_value, function),
-            function,
-        );
-        initial_value.clear(function);
+        let initial = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
         let destination = schema.reserve_gc_local(function).initialize(
             array.filled(GcOperand::reference(&initial, schema), count, function),
             function,

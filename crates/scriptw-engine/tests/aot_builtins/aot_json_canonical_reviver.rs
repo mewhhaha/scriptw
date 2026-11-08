@@ -177,6 +177,58 @@ fn private_parse_records_do_not_observe_inherited_hooks_for_new_current_keys() {
     );
 }
 
+#[test]
+fn injected_proxy_key_snapshot_precedes_reviver_effects_and_reads_fresh_descendants() {
+    assert_trace(
+        r#"
+var events = [], symbol = Symbol('skip'), target = {first: 1, hidden: 2, gone: 3}, proxy;
+Object.defineProperty(target, 'hidden', {enumerable: false});
+target[symbol] = 9;
+proxy = new Proxy(target, {
+  ownKeys: function() { events.push('keys'); return ['first', 'hidden', 'gone', symbol]; },
+  getOwnPropertyDescriptor: function(object, key) {
+    events.push('desc:' + String(key));
+    if (key === 'first') { Object.defineProperty(object, 'hidden', {enumerable: true}); delete object.gone; }
+    return Reflect.getOwnPropertyDescriptor(object, key);
+  },
+  get: function(object, key, receiver) { events.push('get:' + String(key)); return Reflect.get(object, key, receiver); }
+});
+var result = JSON.parse('{"kick":0,"later":null}', function(key, value) {
+  events.push('visit:' + key);
+  if (key === 'kick') this.later = proxy;
+  if (key === 'first' && this === proxy) {
+    target.hidden = {fresh: 7}; target.added = 9;
+    Object.defineProperty(target, 'hidden', {enumerable: false});
+    return value + 1;
+  }
+  return value;
+});
+print(result.later === proxy, target.first, target.hidden.fresh, target.added);
+print(events.join('|'));
+var marker = {}, checks = [];
+var abrupt = new Proxy({first: 1, stop: 2, tail: 3}, {
+  ownKeys: function() { checks.push('keys'); return ['first', 'stop', 'tail']; },
+  getOwnPropertyDescriptor: function(object, key) {
+    checks.push('desc:' + key);
+    if (key === 'stop') throw marker;
+    return Reflect.getOwnPropertyDescriptor(object, key);
+  }
+});
+try {
+  JSON.parse('{"kick":0,"later":null}', function(key, value) {
+    checks.push('visit:' + key); if (key === 'kick') this.later = abrupt; return value;
+  });
+  throw 'missing descriptor failure';
+} catch (error) { print(error === marker, checks.join('|')); }
+"#,
+        &[
+            "true 2 7 9",
+            "visit:kick|keys|desc:first|desc:hidden|desc:gone|get:first|visit:first|get:hidden|visit:fresh|visit:hidden|visit:later|visit:",
+            "true visit:kick|keys|desc:first|desc:stop",
+        ],
+    );
+}
+
 // The GC cohort is independent of the preserved canonical trace cohorts above.
 fn assert_json_gc_source(source: &str, marker: &str) {
     scriptw_engine::configure_compilation_jobs(1).expect("one bounded compilation worker");

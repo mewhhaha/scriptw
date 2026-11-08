@@ -24,6 +24,18 @@ have or manufacture a callable FunctionContext. User hooks still execute
 through their actual callable records and defining Realms. Caller-owned abrupt
 routes remain outside the shared boundary.
 
+The raw-key `DynamicPropertyRead` kernel converts once through
+`emit_value_to_property_key_locals_or_branch`. That checked producer preserves
+the complete thrown result at its caller-owned exit and roots the normal
+String/Symbol result as `PropertyKeyLocals` before lookup overwrites the
+completion. It never sends the completed key through `ToPropertyKey` again.
+The raw numeric Array own-data probe and nullish-receiver check retain their
+original ordering. Emission coverage requires exactly one conversion call in
+this kernel; execution coverage checks key hooks, Symbol identity, nonindex
+Numbers, getter receivers, inherited Proxies and foreign getter error Realms.
+The removed second call already took the primitive fast path, so this removes
+redundant helper/completion transport without changing observable hook counts.
+
 ValueToString, ValueToNumber and ValueToNumeric already use their registered
 helpers. Their existing inline flags start enabled and are disabled only while
 compiling that helper's own original body; those bodies now call shared

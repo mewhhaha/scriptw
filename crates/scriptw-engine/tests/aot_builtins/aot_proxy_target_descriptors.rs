@@ -66,3 +66,14 @@ fn exotic_descriptors_preserve_snapshots_and_materialize_independent_public_resu
         "exotic-descriptor-snapshot-mutation:ok",
     );
 }
+
+#[test]
+fn own_descriptor_predicates_observe_scalar_flags_across_storage_and_coercion() {
+    let source = format!(
+        "{}\nprint('own-descriptor-predicates:ok');262;",
+        include_str!(
+            "../../../scriptw-cli/tests/fixtures/wasm_object_own_descriptor_predicates.js"
+        )
+    );
+    assert_modes(&source, "own-descriptor-predicates:ok");
+}

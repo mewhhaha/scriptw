@@ -68,3 +68,42 @@ print('captured call boundaries ok');
         "captured call boundaries ok",
     );
 }
+
+#[test]
+fn captured_call_domains_preserve_branches_snapshots_and_arbitrary_numbers() {
+    for step in [
+        "tick=row.x|0;var value=tick;value=(value+3)|0;return (value+tick)|0;",
+        "var value=row.x|0;if(row.y<0)value=row.y>>>0;else value=row.y|0;tick=value;return (value+2147483648)|0;",
+        "tick=row.x|0;if(row.y<0)tick=row.y;return (tick+1)|0;",
+        "tick=row.x|0;var value=tick;tick=row.y;return (value+tick)|0;",
+        "tick=row.x|0;var value=tick;if(row.y<0)value=row.y;tick=value;return value;",
+    ] {
+        run(
+            &format!(
+                r#"
+var rows,step,readTick;
+function prepare(x,y) {{
+  rows=[{{x:x,y:y}},{{x:x,y:y}},{{x:x,y:y}},{{x:x,y:y}}];
+  var tick=x;
+  step=function(row) {{{step}}};
+  readTick=function(){{return tick;}};
+}}
+function run() {{var sum=0;for(var i=0;i<32;i++)sum+=step(rows[i&3]);return sum;}}
+var values=[-0,0,1.5,-1.5,2147483647,2147483648,4294967295,4294967296,9007199254740991,9007199254740992,NaN,Infinity,-Infinity];
+for(var x of values) {{
+  for(var y of values) {{
+    prepare(x,y);
+    var actual=run(),actualTick=readTick();
+    prepare(x,y);
+    step=new Proxy(step,{{}});
+    var expected=run(),expectedTick=readTick();
+    if(!Object.is(actual,expected)||!Object.is(actualTick,expectedTick))throw new Error('numeric call domain');
+  }}
+}}
+print('captured call domains ok');
+"#
+            ),
+            "captured call domains ok",
+        );
+    }
+}

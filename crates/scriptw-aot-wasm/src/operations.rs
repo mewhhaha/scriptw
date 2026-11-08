@@ -2479,8 +2479,7 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    /// Sole semantic PropertyKey mint. Captured already-converted String or
-    /// Symbol values take the same checked fast path without invoking hooks.
+    /// Convert once and route errors to the active handler before minting the key.
     pub(crate) fn emit_value_to_property_key_locals(
         &mut self,
         input: &ValueLocals,
@@ -2497,6 +2496,22 @@ impl<'a> FunctionBuilder<'a> {
         let key = schema.reserve_value_local(function);
         key.copy_from(result.value(), function);
         result.clear(function);
+        Ok(PropertyKeyLocals::from_converted_value(key))
+    }
+
+    /// Keep the complete conversion result for a caller-owned exit. Only the
+    /// normal String/Symbol path can mint a key; no second conversion is needed.
+    pub(crate) fn emit_value_to_property_key_locals_or_branch(
+        &mut self,
+        input: &ValueLocals,
+        result: &CompletionLocals,
+        exit: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) -> Result<PropertyKeyLocals, EmitError> {
+        self.emit_value_to_property_key_completion(input, result, function)?;
+        self.emit_spec_operation_abrupt_exit(result, exit, function);
+        let key = self.runtime_schema().reserve_value_local(function);
+        key.copy_from(result.value(), function);
         Ok(PropertyKeyLocals::from_converted_value(key))
     }
 

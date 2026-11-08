@@ -268,8 +268,8 @@ fn counter_test(value: &NumberExpression, counter: usize) -> bool {
 fn node_count(value: &NumberExpression) -> usize {
     1 + match value {
         NumberExpression::Constant(_)
-        | NumberExpression::Call(_)
-        | NumberExpression::CallSlot(_)
+        | NumberExpression::Call(_, _)
+        | NumberExpression::CallSlot(_, _)
         | NumberExpression::Binding(_)
         | NumberExpression::ArrayLength
         | NumberExpression::ArrayElement
@@ -279,7 +279,7 @@ fn node_count(value: &NumberExpression) -> usize {
         | NumberExpression::Update(_, _, _) => 0,
         NumberExpression::Negate(value)
         | NumberExpression::AssignCallSlot(_, value)
-        | NumberExpression::SelectCall(value, _)
+        | NumberExpression::SelectCall(value, _, _)
         | NumberExpression::Complement(value)
         | NumberExpression::Assign(_, value)
         | NumberExpression::Compound(_, _, value) => node_count(value),

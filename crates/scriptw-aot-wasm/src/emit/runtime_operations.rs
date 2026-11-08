@@ -54,16 +54,12 @@ impl<'a> FunctionBuilder<'a> {
         self.runtime_schema()
             .release_i32_local(found, &mut function);
         self.emit_branch_if_to_target(exit, &mut function);
-        self.emit_value_to_property_key_completion(&parameters.key, &result, &mut function)?;
-        result.kind().load(&mut function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, &mut function);
-        self.emit_branch_to_target(exit, &mut function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        // Only a normal String/Symbol conversion reaches the sole checked mint.
-        let key = self.emit_value_to_property_key_locals(result.value(), &mut function)?;
+        let key = self.emit_value_to_property_key_locals_or_branch(
+            &parameters.key,
+            &result,
+            exit,
+            &mut function,
+        )?;
         self.emit_dynamic_property_read_with_key_locals(
             &parameters.target,
             &parameters.receiver,

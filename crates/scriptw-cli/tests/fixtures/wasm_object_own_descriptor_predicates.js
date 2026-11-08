@@ -19,6 +19,67 @@ function assertPredicates(value, key, present, enumerable, label) {
   );
 }
 
+var compact = { first: undefined, second: null };
+assertPredicates(compact, "first", true, true, "inline own undefined");
+assertPredicates(compact, "missing", false, false, "inline absent");
+var wider = { first: undefined, second: 2, third: 3 };
+assertPredicates(wider, "third", true, true, "wider compact property");
+Object.freeze(wider);
+assertPredicates(wider, "first", true, true, "frozen own undefined");
+Object.defineProperty(compact, "first", { enumerable: false });
+assertPredicates(compact, "first", true, false, "changed enumerability");
+delete compact.second;
+assertPredicates(compact, "second", false, false, "deleted property");
+compact.second = undefined;
+assertPredicates(compact, "second", true, true, "recreated own undefined");
+assertPredicates(Object.create(compact), "first", false, false, "inherited hidden property");
+assertPredicates(Object.prototype, "toString", true, false, "intrinsic ordinary flags");
+
+var coercionTarget = { changing: 1 };
+var coercionEffects = 0;
+var coercionGetterCalls = 0;
+var changingKey = {
+  [Symbol.toPrimitive]: function () {
+    coercionEffects += 1;
+    Object.defineProperty(coercionTarget, "changing", {
+      get: function () { coercionGetterCalls += 1; return 9; },
+      enumerable: false,
+      configurable: true,
+    });
+    return "changing";
+  },
+};
+assertPredicates(coercionTarget, changingKey, true, false, "coercion changes descriptor");
+assertSame(coercionEffects, 3, "one coercion per predicate");
+assertSame(coercionGetterCalls, 0, "coercion-installed getter stays unobserved");
+var deletingKey = {
+  [Symbol.toPrimitive]: function () {
+    delete coercionTarget.changing;
+    return "changing";
+  },
+};
+assertPredicates(coercionTarget, deletingKey, false, false, "coercion deletes property");
+
+var packed = [1, 2, 3];
+assertPredicates(packed, "1", true, true, "packed Array element");
+assertPredicates(packed, "length", true, false, "Array virtual length");
+delete packed[1];
+assertPredicates(packed, "1", false, false, "Array hole");
+packed[1] = undefined;
+assertPredicates(packed, "1", true, true, "Array own undefined");
+packed.named = 4;
+assertPredicates(packed, "named", true, true, "Array ordinary header");
+
+function argumentTail() { return arguments; }
+var emptyTail = argumentTail.call(null);
+var firstTail = argumentTail.call(null, undefined, 7);
+var secondTail = argumentTail.call(null, undefined);
+firstTail[0] = 19;
+assertSame(emptyTail.length, 0, "empty native argument tail");
+assertSame(firstTail[1], 7, "argument tail retains order");
+assertSame(secondTail[0], undefined, "argument tails retain independent entries");
+assertSame(Object.hasOwn(secondTail, "0"), true, "tail own undefined remains present");
+
 var numeric = new Uint8Array([7]);
 assertPredicates(numeric, "0", true, true, "typed array element");
 assertPredicates(numeric, "-0", false, false, "typed array negative zero");

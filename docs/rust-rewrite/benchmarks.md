@@ -7,13 +7,13 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-08**, React **19.3.1**, source fingerprint `2255a0080df2`. The manifest-bound dirty source snapshot is based on Git `7b9841501050`; that base commit alone does not identify the measured implementation. Both Flight outputs match Node exactly. The 32-row catalog async form adds a resolved Promise and extra markup; neither request performs I/O.
+Measured **2026-11-08**, React **19.3.1**, source fingerprint `0c2c10dac9c0`. The manifest-bound dirty source snapshot is based on Git `dfefb3222737`; that base commit alone does not identify the measured implementation. Both Flight outputs match Node exactly. The 32-row catalog async form adds a resolved Promise and extra markup; neither request performs I/O.
 
 | Current policy | Sync · ms (median; min–max) | Async · ms (median; min–max) |
 | --- | ---: | ---: |
-| Scriptw Fast | 4.714 (4.644–5.044) | 5.107 (5.056–5.518) |
-| Scriptw Speed | 3.726 (3.645–3.802) | 4.056 (4.004–4.182) |
-| Node 24 / V8 | 0.493 (0.470–0.546) | 0.398 (0.322–0.542) |
+| Scriptw Fast | 4.663 (4.586–4.745) | 5.068 (4.975–5.251) |
+| Scriptw Speed | 3.695 (3.601–3.821) | 4.033 (3.957–4.159) |
+| Node 24 / V8 | 0.490 (0.477–0.505) | 0.400 (0.383–0.510) |
 
 ![Current RSC request timings](assets/rsc-current/runtime.svg)
 
@@ -21,86 +21,99 @@ The campaign uses 8 fresh processes per policy in 2 balanced blocks, with 3 warm
 
 Fast and Speed are separately scored native compilation policies. Their source, executable, P, R and request inputs match; Cranelift optimization and register allocation differ together.
 
-Against the matched prior Fast control, request medians improve 2.2% sync and 2.1% async. The selected implementation keeps property caches in shared R, transports up to five arguments in locals, fuses admitted captured calls into Number loops and writes mutable binding values directly. Broad P cache inlining was rejected: it grew P 33% and regressed Fast requests by 6–7%. A thinner P path gained only 1–2% in an unscored screen while growing P 21%. Source snapshots and raw results are in the [evidence archive](scriptw-performance-levers-evidence-2026-11-08.tar.xz).
-
 | Cold phase · median | Fast | Speed |
 | --- | ---: | ---: |
-| Front end and lowering · s | 2.667 | 2.668 |
-| Wasm emission · s | 0.431 | 0.431 |
-| Native preparation · s | 5.559 | 7.511 |
-| Source to Wasm · s | 3.098 | 3.099 |
-| Realm and instantiation · ms | 0.573 | 0.607 |
-| Module initialization · ms | 2.061 | 1.742 |
+| Front end and lowering · s | 2.679 | 2.678 |
+| Wasm emission · s | 0.432 | 0.432 |
+| Native preparation · s | 5.588 | 7.534 |
+| Source to Wasm · s | 3.112 | 3.111 |
+| Realm and instantiation · ms | 0.572 | 0.627 |
+| Module initialization · ms | 2.052 | 1.698 |
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
-The emitted program P is 4,327,610 bytes (SHA-256 `8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e`). Packaged runtime R is 38,768,915 bytes (SHA-256 `95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec`). These are artifact sizes, not allocation or resident-memory measurements. Exact executable and producer identities are in [the current report](rsc-current.json).
+The emitted program P is 4,327,610 bytes (SHA-256 `8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e`). Packaged runtime R is 38,769,947 bytes (SHA-256 `4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64`). These are artifact sizes, not allocation or resident-memory measurements. Exact executable and producer identities are in [the current report](rsc-current.json).
 
 ### RSC profiling evidence
 
-Fresh request counters for compiler `2255a0080df2`. Values are unscored diagnostics.
+Fresh request counters for compiler `0c2c10dac9c0`. Values are unscored diagnostics: medians of three process medians, 100 measured requests and 3 warmups per process. Only the authenticated caller/main thread is counted, including control edges; normal JIT and GC remain enabled.
 
 | Mode | Actor | Cycles/request | Instructions/request | Branches/request | Branch misses/request |
 | --- | --- | ---: | ---: | ---: | ---: |
-| sync | fast | 17,589,548.5 | 39,944,688.0 | 5,593,143.0 | 22,645.5 |
-| sync | speed | 13,563,641.5 | 36,827,263.0 | 5,460,766.0 | 15,901.5 |
-| sync | v8 | 1,356,714.5 | 2,541,786.5 | 500,716.5 | 5,037.5 |
-| async | fast | 19,146,436.5 | 43,486,086.5 | 6,174,704.0 | 25,239.5 |
-| async | speed | 14,914,027.5 | 40,200,914.0 | 6,035,331.5 | 18,316.5 |
-| async | v8 | 1,445,820.5 | 2,669,739.5 | 528,488.5 | 5,534.0 |
+| sync | fast | 18,489,146.0 | 39,879,202.5 | 5,586,053.5 | 22,926.5 |
+| sync | speed | 13,774,270.0 | 36,761,818.0 | 5,453,693.0 | 17,228.0 |
+| sync | v8 | 1,366,392.5 | 2,512,669.5 | 496,588.5 | 5,108.5 |
+| async | fast | 21,126,330.5 | 43,419,419.0 | 6,167,511.0 | 25,579.5 |
+| async | speed | 14,832,464.5 | 40,134,144.0 | 6,028,109.0 | 19,001.5 |
+| async | v8 | 1,445,997.5 | 2,658,970.5 | 526,222.5 | 5,578.5 |
 
-| Mode | Native entry | Prior/request | Current/request |
+| Mode | Instrumented target | Baseline 2255/request | Candidate/request |
 | --- | --- | ---: | ---: |
-| sync | `js::vn#f133` | 276 | 276 |
-| sync | `js::ft#f123` | 242 | 242 |
-| sync | `helper::function_call` | 2,538 | 1,879 |
-| sync | `helper::cached_property_read` | 2,548 | 2,548 |
-| async | `js::vn#f133` | 291 | 291 |
-| async | `js::ft#f123` | 254 | 254 |
-| async | `helper::function_call` | 2,691 | 1,998 |
-| async | `helper::cached_property_read` | 2,698 | 2,698 |
+| sync | `builtin::Object.prototype.hasOwnProperty` | 163 | 163 |
+| sync | `helper::ordinary_own_descriptor` | 4,304 | 4,074 |
+| sync | `helper::value_to_property_key` | 7,458 | 7,357 |
+| sync | `helper::dynamic_property_read` | 136 | 136 |
+| async | `builtin::Object.prototype.hasOwnProperty` | 165 | 165 |
+| async | `helper::ordinary_own_descriptor` | 4,594 | 4,360 |
+| async | `helper::value_to_property_key` | 7,656 | 7,552 |
+| async | `helper::dynamic_property_read` | 141 | 141 |
 
-| Mode | Native body | Prior symbol bytes | Current symbol bytes | Prior mapping bytes | Current mapping bytes |
-| --- | --- | ---: | ---: | ---: | ---: |
-| sync | `js::vn#f133` | 1,506,048 | 1,572,240 | 31,842,304 | 31,776,768 |
-| sync | `js::ft#f123` | 556,048 | 574,512 | 31,842,304 | 31,776,768 |
-| async | `js::vn#f133` | 1,506,048 | 1,572,240 | 31,842,304 | 31,776,768 |
-| async | `js::ft#f123` | 556,048 | 574,512 | 31,842,304 | 31,776,768 |
+Per-target builtin/helper populations overlap. Do not add them into a total source-entry, call, allocation, or extent count.
 
-The two source bodies total 518/545 baseline native entries per sync/async request. These counts overlap helper entries and do not count vectors or physical allocations.
+The older leaf samples remain historical source `5aa48ad8a545` evidence in archived member `reports/react-attribution-current.json` from `scriptw-property-kernels-evidence-2026-11-07.tar.xz`. They do not describe the current candidate or 2255 baseline.
 
-No fresh leaf sampling or physical allocation census. [Archived leaf sampling for compiler `5aa48ad8a545`](scriptw-property-kernels-evidence-2026-11-07.tar.xz) retains its old compiler identity.
+Fast/Speed/V8 PMU windows use raw nonmultiplexed caller/main-thread counters. Speed combines optimization and register allocation changes. Physical allocation has not been recounted.
 
-Fast/Speed/V8 PMU windows use raw nonmultiplexed caller/main-thread counters. Speed combines optimization and register allocation changes. Native symbol extents are code sizes; containing executable mappings are broader regions, and neither measures stack frames.
+Fresh caller profiles use 12 independent processes: Fast/Speed × sync/async × three repetitions, each with 3 warmups and 100 request windows. The table shows the largest disjoint leaf period weights; inclusive caller tables, host/unresolved symbols and unavailable callchains remain in the archived raw summary. These are cycle-sample locations, not wall-time shares or exact call counts.
 
+| Native policy / mode | Leaf owner | Sample-period weight |
+| --- | --- | ---: |
+| fast / sync | `wasm:js::vn#f133` | 11.6% |
+| fast / sync | `wasm:helper::object_read` | 7.7% |
+| fast / sync | `wasm:js::ft#f123` | 5.8% |
+| fast / sync | `wasm:helper::ordinary_property_find` | 4.0% |
+| fast / async | `wasm:js::vn#f133` | 11.7% |
+| fast / async | `wasm:helper::object_read` | 7.1% |
+| fast / async | `wasm:js::ft#f123` | 5.6% |
+| fast / async | `wasm:helper::ordinary_property_find` | 3.9% |
+| speed / sync | `wasm:helper::object_read` | 9.1% |
+| speed / sync | `wasm:helper::ordinary_property_find` | 4.7% |
+| speed / sync | `wasm:helper::for_in_advance` | 4.6% |
+| speed / sync | `wasm:js::vn#f133` | 4.4% |
+| speed / async | `wasm:helper::object_read` | 8.7% |
+| speed / async | `wasm:helper::ordinary_property_find` | 4.5% |
+| speed / async | `wasm:js::vn#f133` | 4.2% |
+| speed / async | `wasm:helper::intrinsic_property_find` | 4.1% |
+
+The matched Fast comparison measured no meaningful RSC speedup despite the lower helper-entry counts. [Attribution data](react-attribution-current.json) and the [raw UTF-8 evidence archive](scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz) retain identities, counts, caller profiles and replay tools.
 
 ## Focused performance situations
 
-Measured **2026-11-08** on source `2255a0080df2`. All 21 programs use two balanced blocks and eight fresh processes per actor. Fast, Speed and V8 are current policies; this is not a before/after series.
+Measured **2026-11-08** on source `0c2c10dac9c0`. All 21 programs use two balanced blocks and eight fresh processes per actor. Each program compares Fast, Speed and V8.
 
 | Program · retained call | Fast · ms (median; min–max) | Speed · ms (median; min–max) | V8 · ms (median; min–max) |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.005255 (0.005139–0.00531) | 0.0052 (0.005069–0.00544) | 0.000361 (0.0003–0.000381) |
-| `global-shallow.js` | 2.24274 (2.21636–2.3037) | 1.82358 (1.78822–1.87597) | 0.984215 (0.925338–1.00343) |
-| `global-deep8.js` | 2.74447 (2.71951–2.79397) | 2.06074 (2.03936–2.07554) | 0.996508 (0.947129–1.06036) |
-| `global-bound-deep.js` | 0.650165 (0.644765–0.654413) | 0.216902 (0.214107–0.244004) | 0.004308 (0.002345–0.004579) |
-| `global-getter-deep.js` | 2.97213 (2.92984–2.99675) | 2.19718 (2.16867–2.27933) | 0.985147 (0.938443–1.02057) |
-| `frame-compact.js` | 2.05863 (2.04008–2.15498) | 0.975989 (0.963751–0.982236) | 0.057765 (0.057349–0.058772) |
-| `frame-branches32.js` | 8.26369 (8.11337–8.30669) | 5.89935 (5.85895–6.21956) | 0.082802 (0.081575–0.086334) |
-| `frame-branches128.js` | 8.66395 (8.57749–8.84299) | 5.98293 (5.85009–6.43743) | 0.113651 (0.112935–0.116281) |
-| `frame-branches512.js` | 10.7892 (10.3446–12.4362) | 6.11094 (6.05184–6.18282) | 0.181585 (0.17898–0.190362) |
-| `args-unused.js` | 0.106662 (0.105761–0.109588) | 0.0566475 (0.055916–0.088809) | 0.003156 (0.003046–0.02647) |
-| `args-observed.js` | 1.09131 (1.05632–1.12091) | 0.770353 (0.754343–0.817573) | 0.003141 (0.003066–0.007735) |
-| `property-stable.js` | 0.151273 (0.149374–0.15244) | 0.07098 (0.069843–0.071596) | 0.0717865 (0.071556–0.072427) |
-| `property-mutated.js` | 0.151027 (0.149634–0.152299) | 0.0729285 (0.072688–0.073259) | 0.0621835 (0.061998–0.062439) |
-| `metadata-ordinary.js` | 0.200371 (0.199169–0.207965) | 0.0822365 (0.080783–0.086524) | 0.012278 (0.012193–0.015429) |
-| `metadata-function.js` | 0.194444 (0.191474–0.197415) | 0.0812745 (0.080223–0.083298) | 0.204293 (0.202845–0.208767) |
-| `metadata-intrinsic.js` | 0.199028 (0.196683–0.201232) | 0.083664 (0.081956–0.087266) | 0.224967 (0.215299–0.227723) |
-| `typeof-dispatch.js` | 0.922192 (0.914487–0.982176) | 0.375543 (0.36839–0.418986) | 0.013912 (0.013746–0.025348) |
-| `singleton-dispatch.js` | 0.894254 (0.877456–1.12056) | 0.397335 (0.393137–0.42091) | 0.010585 (0.006332–0.012744) |
-| `strict-equality-numbers.js` | 0.0815095 (0.079421–0.082928) | 0.033934 (0.032472–0.033975) | 0.012339 (0.011352–0.014908) |
-| `strict-equality-mixed.js` | 0.0894245 (0.087847–0.090322) | 0.0348715 (0.034054–0.035598) | 0.034415 (0.033594–0.035628) |
-| `for-in-wide.js` | 0.635617 (0.631931–0.680623) | 0.562704 (0.557199–0.576255) | 0.037942 (0.036509–0.060385) |
+| `control-empty.js` | 0.005205 (0.00511–0.00528) | 0.0051195 (0.00508–0.005179) | 0.000371 (0.000351–0.000381) |
+| `global-shallow.js` | 2.15091 (2.13457–2.47145) | 1.80062 (1.79018–1.95783) | 0.972221 (0.939644–1.00079) |
+| `global-deep8.js` | 2.72953 (2.69883–2.94225) | 1.96657 (1.94707–2.16408) | 0.945736 (0.931108–1.04589) |
+| `global-bound-deep.js` | 0.641253 (0.638393–0.645846) | 0.214242 (0.212894–0.215489) | 0.004248 (0.003788–0.004288) |
+| `global-getter-deep.js` | 2.95835 (2.88347–3.03896) | 2.17241 (2.15927–2.41108) | 0.972397 (0.962918–0.999088) |
+| `frame-compact.js` | 1.93303 (1.92307–2.02891) | 0.973859 (0.969121–0.987565) | 0.057569 (0.056668–0.077147) |
+| `frame-branches32.js` | 8.13099 (8.0468–8.59473) | 5.8768 (5.84858–6.00526) | 0.0825565 (0.079331–0.088568) |
+| `frame-branches128.js` | 8.45608 (8.41308–8.71366) | 5.98491 (5.94302–6.22377) | 0.113025 (0.111662–0.114798) |
+| `frame-branches512.js` | 11.3498 (10.6404–11.9646) | 6.00733 (5.92427–6.25072) | 0.178554 (0.176395–0.181375) |
+| `args-unused.js` | 0.102355 (0.100131–0.104889) | 0.0554 (0.054904–0.059693) | 0.003136 (0.003066–0.003306) |
+| `args-observed.js` | 1.04961 (1.03896–1.19029) | 0.736148 (0.73173–0.747149) | 0.0030405 (0.002996–0.003096) |
+| `property-stable.js` | 0.150642 (0.149835–0.151518) | 0.0708595 (0.070274–0.142842) | 0.071571 (0.06868–0.072007) |
+| `property-mutated.js` | 0.149985 (0.149144–0.153893) | 0.072813 (0.072397–0.073009) | 0.0622535 (0.061667–0.06338) |
+| `metadata-ordinary.js` | 0.197961 (0.196253–0.199288) | 0.08143 (0.081295–0.082477) | 0.0122035 (0.012123–0.012263) |
+| `metadata-function.js` | 0.193849 (0.191154–0.196223) | 0.080984 (0.079742–0.082496) | 0.203922 (0.202715–0.20544) |
+| `metadata-intrinsic.js` | 0.195567 (0.193748–0.206071) | 0.082642 (0.082426–0.162679) | 0.22587 (0.218616–0.245426) |
+| `typeof-dispatch.js` | 0.931439 (0.92668–0.954012) | 0.370939 (0.363239–0.387375) | 0.013806 (0.013665–0.025579) |
+| `singleton-dispatch.js` | 0.886544 (0.883688–0.896413) | 0.365474 (0.360455–0.381705) | 0.0106655 (0.006292–0.012584) |
+| `strict-equality-numbers.js` | 0.0803275 (0.079501–0.156547) | 0.033208 (0.03163–0.034155) | 0.0124985 (0.011001–0.02103) |
+| `strict-equality-mixed.js` | 0.088293 (0.087757–0.08958) | 0.0343355 (0.033854–0.034585) | 0.034721 (0.034134–0.035227) |
+| `for-in-wide.js` | 0.643732 (0.636078–0.755054) | 0.562733 (0.5582–0.57922) | 0.038633 (0.03683–0.055555) |
 
 All scores time the public retained call after preparation; each program keeps its own workload and exact-output checks. No workload ratio or blended score is reported. [Full identities and observations](situations-current.json).
 
@@ -108,7 +121,7 @@ All scores time the public retained call after preparation; each program keeps i
 
 | Retained program | Fast native P · KiB | Speed native P · KiB | Portable Wasm P · KiB |
 | --- | ---: | ---: | ---: |
-| `frame-compact.js` | 2260.2 | 972.1 | 193.2 |
+| `frame-compact.js` | 2252.2 | 968.1 | 193.1 |
 | `frame-branches32.js` | 2195.2 | 967.2 | 210.3 |
 | `frame-branches128.js` | 2854.1 | 1233.4 | 312.5 |
 | `frame-branches512.js` | 5486.8 | 2330.2 | 727.7 |
@@ -242,13 +255,11 @@ part of the result.
 
 ### Public-call control and verification
 
-The current situation cohort passes 504 processes and 60,984 exact calls. The current RSC cohort passes 32 processes and 640 exact Flight calls. The fixed-yield for-in width control remains historical on source `0ca455c47636` and its earlier archive.
+The current situation cohort has 504 process observations and 60,984 exact calls. The current RSC cohort has 32 processes and 640 exact Flight calls. The fixed-yield for-in width control remains historical on source `0ca455c47636` and its earlier archive.
 
-Latest scoped verification (**2026-11-08**): 2,550 broad checks across 12 scopes; AOT unit checks pass 671 with 4 known failures; Engine unit checks pass 1,093 with 0 failures. Source guards pass 380; production CLI smoke checks pass 8. Full workspace CI and Test262 were not rerun. Eleven pre-existing formatting failures, fourteen stale Intl recipes and the existing host guard's historical-selector inventory failure remain [owned](current-inventory.md).
+Scoped verification (**2026-11-08**, source `0c2c10dac9c0`): 2,828 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun; existing format, Intl, and four AOT failures remain owned.
 
-Benchmarks retain compiler `2255a0080df2`; the separately built CLI records `cd9a276f1c38`. The intervening fingerprinted change corrects one inline `cfg(test)` arity fixture, with its production prefix byte-identical. Six subsequent external-test edits only sort imports. Exact source snapshots, retained passing scopes, failures and both producer identities are qualified in [the current report](rsc-current.json) and its archive; binary equality is not inferred.
-
-The situation runner’s wrapper retained its original terminal status: failed at stale 5aa orchestration assertion; underlying campaign complete and all pins/resources retained. The pinned successful native campaign was qualified without rerunning measurements.
+**Broad native scopes:** emission, structure_builtins, structure_language, structure_async, runtime_link, modules_realms, intl_temporal, structure, aot_builtins, aot_language, aot_async, aot_realm_modules, aot_gc_entries.
 
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison

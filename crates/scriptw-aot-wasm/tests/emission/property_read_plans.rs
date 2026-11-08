@@ -214,16 +214,10 @@ fn assert_numeric_probe_before_conversion(
             .collect::<Vec<_>>()
     };
     let conversion_calls = calls_to(conversion);
-    if complete_get_v.is_some() {
-        assert_eq!(
-            conversion_calls.len(),
-            1,
-            "one computed GetV property-key conversion on a miss"
-        );
-    }
-    assert!(
-        !conversion_calls.is_empty(),
-        "the complete key-conversion fallback remains available"
+    assert_eq!(
+        conversion_calls.len(),
+        1,
+        "one property-key conversion on a miss retains its completed String/Symbol key"
     );
     let conversion = conversion_calls[0];
     let cast = body[..conversion]
