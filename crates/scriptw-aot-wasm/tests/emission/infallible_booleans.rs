@@ -1,8 +1,11 @@
-//! Infallible queries retain their kernels and full Normal result without pending5.
+//! Catalog expressions retain their kernels while publishing only their value output.
 use crate::property_read_plans::Module;
 use scriptw_aot_wasm::emit;
 use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr};
+use scriptw_ir::{
+    lower, AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr, TypedExpr,
+    ValueInfo, ValueKind,
+};
 use wasmparser::{Operator, Validator, WasmFeatures};
 
 const QUERIES: [(&str, SpecOperationIr); 7] = [
@@ -47,8 +50,17 @@ fn guarded_value_copies(body: &[Operator<'_>]) -> usize {
 }
 
 fn direct_normal_publications(body: &[Operator<'_>]) -> usize {
-    // Value3 copied from distinct output storage, then Normal kind + empty
-    // target. A pending.set_normal(pending.value()) self-copy cannot pass.
+    let completion_tag = body.windows(10).find_map(|ops| match ops {
+        [Operator::I32Const { value: 0 }, Operator::LocalSet { local_index },
+         Operator::I64Const { value: 0 }, Operator::LocalSet { .. },
+         Operator::RefNull { .. }, Operator::LocalSet { .. },
+         Operator::I32Const { value: 0 }, Operator::LocalSet { .. },
+         Operator::I32Const { value: 0 }, Operator::LocalSet { .. }] => Some(*local_index),
+        _ => None,
+    }).expect("source body initializes its enclosing Completion");
+    // Count publication into the enclosing Completion specifically. The
+    // expression's output copy followed by kind/target normalization has the
+    // same opcode shape but writes a different Value3 destination.
     body.windows(10)
         .filter(|ops| {
             matches!(ops, [
@@ -58,13 +70,13 @@ fn direct_normal_publications(body: &[Operator<'_>]) -> usize {
         Operator::LocalGet { .. }, Operator::LocalSet { .. },
         Operator::I32Const { value: 0 }, Operator::LocalSet { .. },
         Operator::I32Const { value: 0 }, Operator::LocalSet { .. }
-    ] if source_tag != result_tag)
+    ] if source_tag != result_tag && *result_tag == completion_tag)
         })
         .count()
 }
 
 #[test]
-fn infallible_boolean_catalog_rows_omit_pending_completion_and_keep_whole_normal() {
+fn infallible_boolean_catalog_rows_omit_pending_completion_and_normal_payload_copies() {
     let catalog = SpecOperationIr::ALL
         .iter()
         .copied()
@@ -85,7 +97,7 @@ fn infallible_boolean_catalog_rows_omit_pending_completion_and_keep_whole_normal
                     "export function {name}(left, right, unused) {{ return left === right; }}\n"
                 ));
             }
-            source.push_str("export function loose(left, right, unused) { return left == right; }");
+            source.push_str("export function loose(left, right, unused) { return left == right; } export function nullish(value) { return value === null; } export function kind(value) { return typeof value === 'number'; }");
             let parsed = parse(&source, ParseOptions::module()).unwrap();
             let mut program = lower(&parsed);
             assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
@@ -165,8 +177,8 @@ fn infallible_boolean_catalog_rows_omit_pending_completion_and_keep_whole_normal
         if name == "loose" {
             assert_eq!(
                 guarded_value_copies(body),
-                1,
-                "loose equality retains pending Completion"
+                0,
+                "loose equality projects its normal value without a second Normal gate"
             );
             assert_eq!(
                 calls(body, loose),
@@ -181,8 +193,8 @@ fn infallible_boolean_catalog_rows_omit_pending_completion_and_keep_whole_normal
             );
             assert_eq!(
                 direct_normal_publications(body),
-                1,
-                "{name} still publishes full Normal"
+                0,
+                "{name} leaves normal payload publication to its statement/return owner"
             );
             assert_eq!(calls(body, loose), 0);
             if matches!(name.as_str(), "sameValue" | "sameValueZero" | "strict") {
@@ -191,4 +203,83 @@ fn infallible_boolean_catalog_rows_omit_pending_completion_and_keep_whole_normal
             }
         }
     }
+    for name in ["js::nullish#", "js::kind#"] {
+        let (_, body) = program.named(name);
+        assert_eq!(
+            guarded_value_copies(body),
+            0,
+            "{name} retains a direct scalar comparison"
+        );
+        assert_eq!(
+            direct_normal_publications(body),
+            0,
+            "{name} uses the same output-only normal result contract"
+        );
+    }
+}
+
+#[test]
+fn catalog_expression_results_publish_whole_throw_only_on_the_cold_edge() {
+    std::thread::Builder::new()
+        .name("catalog-expression-result".into())
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let parsed = parse(
+                "export function numeric(value, unused) { return value === unused; } export function call(value, receiver) { return value === receiver; }",
+                ParseOptions::module(),
+            ).unwrap();
+            let mut ir = lower(&parsed);
+            for function in &mut ir.script.as_mut().unwrap().functions {
+                let operation = match function.name.as_str() {
+                    "numeric" => SpecOperationIr::ToNumber,
+                    "call" => SpecOperationIr::Call,
+                    _ => continue,
+                };
+                let [StatementIr::Return(result)] = function.body.statements.as_mut_slice() else {
+                    panic!("one source return");
+                };
+                let ExprIr::SpecOperation { operation: selected, operands } = &mut result.expr else {
+                    panic!("source reaches the catalog owner");
+                };
+                *selected = operation;
+                if operation == SpecOperationIr::ToNumber { operands.truncate(1); }
+                let kind = match operation {
+                    SpecOperationIr::ToNumber => ValueKind::Number,
+                    SpecOperationIr::Call => ValueKind::Dynamic,
+                    _ => unreachable!("the witness selects a numeric operation or source Call"),
+                };
+                let expression = result.expr.clone();
+                *result = TypedExpr::from_info(ValueInfo::new(kind), expression);
+                function.return_kind = kind;
+                function.body.result_kind = kind;
+                function.return_shape = None;
+                function.return_targets = result.function_targets.clone();
+            }
+            let artifact = emit(&ir).unwrap();
+            for bytes in [artifact.bytes.as_slice(), artifact.runtime().unwrap().bytes()] {
+                Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+            }
+            let program = Module::read(&artifact.bytes, true);
+            let runtime = Module::read(artifact.runtime().unwrap().bytes(), false);
+            let (conversion, _) = runtime.named("helper::value_to_number");
+            let conversion = program.imported_runtime_function(&runtime, conversion);
+            let (_, numeric) = program.named("js::numeric#");
+            assert_eq!(calls(numeric, conversion), 1);
+            assert_eq!(guarded_value_copies(numeric), 0,
+                "the catalog result has no Normal-gated value transport");
+            assert_eq!(direct_normal_publications(numeric), 0,
+                "a normal expression payload is published only to its output and source return");
+            let call = numeric.iter().position(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == conversion)).unwrap();
+            let [Operator::LocalSet { .. }, Operator::LocalSet { local_index: kind },
+                Operator::LocalSet { .. }, Operator::LocalSet { .. }, Operator::LocalSet { .. },
+                Operator::End, Operator::LocalGet { local_index: tested },
+                Operator::I32Const { value: 1 }, Operator::I32Eq, Operator::If { .. }, ..] = &numeric[call+1..] else {
+                panic!("the complete helper result goes directly to one cold Throw edge");
+            };
+            assert_eq!(kind, tested, "the result's own kind controls its projection");
+            let (_, call) = program.named("js::call#");
+            assert_eq!(guarded_value_copies(call), 1,
+                "source Call retains its existing complete returned-kind protocol");
+        }).unwrap().join().unwrap();
 }

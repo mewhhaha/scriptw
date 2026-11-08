@@ -12,7 +12,7 @@ observation into a current acceptance result.
 Keep current invariants with their owning domain. Git retains superseded
 designs; dated checkpoints retain their own source and verification scope.
 
-846 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
+849 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
 
 ## A
 
@@ -142,6 +142,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [callable-function-prototype](<callable-function-prototype.md>)
 - [callable-non-simple-parameters-contain-use-strict-early-errors](<callable-non-simple-parameters-contain-use-strict-early-errors.md>)
 - [canonicalize-locale-list-observation](<canonicalize-locale-list-observation.md>)
+- [captured-call-number-regions](<captured-call-number-regions.md>)
 - [captured-generator-identifier-reference-backend](<captured-generator-identifier-reference-backend.md>)
 - [catch-binding-expression-ownership](<catch-binding-expression-ownership.md>)
 - [catch-body-declaration-conflict-early-errors](<catch-body-declaration-conflict-early-errors.md>)
@@ -375,6 +376,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [import-meta-outside-module-early-errors](<import-meta-outside-module-early-errors.md>)
 - [independent-global-script-preludes](<independent-global-script-preludes.md>)
 - [indexed-collection-invocation-reference](<indexed-collection-invocation-reference.md>)
+- [initialized-parameter-locals](<initialized-parameter-locals.md>)
 - [inline-compact-storage](<inline-compact-storage.md>)
 - [intl-bundle-export](<intl-bundle-export.md>)
 - [intl-calendar-projection](<intl-calendar-projection.md>)
@@ -759,6 +761,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [source-activation-exits](<source-activation-exits.md>)
 - [source-text-module-source-phase-rejection](<source-text-module-source-phase-rejection.md>)
 - [span-stable-replacement-error](<span-stable-replacement-error.md>)
+- [spec-operation-expression-results](<spec-operation-expression-results.md>)
 - [spec-operation-object-target-kind](<spec-operation-object-target-kind.md>)
 - [spec-operations](<spec-operations.md>)
 - [stable-implicit-arguments-value-info](<stable-implicit-arguments-value-info.md>)

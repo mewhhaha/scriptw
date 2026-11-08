@@ -1,18 +1,18 @@
 {
   "schema": "scriptw-rsc-current-v2",
   "date": "2026-11-08",
-  "source_manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
+  "source_manifest_sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
   "baseline": {
-    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
-    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-    "producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json",
-    "producer_sha256": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0",
-    "report": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json",
-    "report_sha256": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
+    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
+    "sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline-producer.json",
+    "producer_sha256": "c73115061da82a5440f02448b65a7dcb8a26465c33e3173de255deefd7b2f04c",
+    "report": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
+    "report_sha256": "d9f12c372442ec7fbcef4f0b2f43177cd13ec41ef4b4f0f7e17da7ecaccd87f9",
     "identity": {
-      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+      "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
       "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
       "toolchain": {
         "opt_level": "3",
@@ -43,9 +43,9 @@
       "program_wasm_bytes": 4327610,
       "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
       "runtime": {
-        "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
-        "wasm_bytes": 38768915,
-        "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+        "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+        "wasm_bytes": 38769947,
+        "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
       },
       "inputs": {
         "adapted_source_bytes": 64946,
@@ -67,15 +67,15 @@
       "native_mode": "fast",
       "native_mode_scope": "matched Fast cohort"
     },
-    "reference_campaign": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json",
-    "reference_campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
-    "reference_aggregate": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json",
-    "reference_aggregate_sha256": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b",
-    "published_report_sha256": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4"
+    "reference_campaign": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json",
+    "reference_campaign_sha256": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
+    "reference_aggregate": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/aggregate.json",
+    "reference_aggregate_sha256": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6",
+    "published_report_sha256": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e"
   },
   "candidate": {
-    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
-    "sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "path": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline",
+    "sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
     "build_argv": [
       "cargo",
       "--config",
@@ -122,14 +122,16 @@
       "--message-format=json-render-diagnostics",
       "--timings"
     ],
+    "build_argv_file": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build-argv.json",
+    "build_argv_file_sha256": "fe97ce5597b074a6057d1510b6265a382848f8d61492a41eeaa3aa17537cd33d",
     "build_wrapper": [
       "python3",
       "-B",
       "scripts/limited_verification.py",
       "--"
     ],
-    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
-    "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout",
+    "cargo_producer_sha256": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
     "artifact": {
       "reason": "compiler-artifact",
       "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
@@ -162,25 +164,44 @@
       "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
       "fresh": false
     },
+    "qualified_reuse": {
+      "path": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/external-test-reuse-finished.json",
+      "sha256": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6",
+      "schema": "scriptw-external-test-correction-qualified-reuse-v1",
+      "previous_source": {
+        "manifest": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-final/manifest.json",
+        "sha256": "8abc0ddb26877f9724e90e59b207f31ea52de0602152aa482eb6b95635d490d5"
+      },
+      "current_source": {
+        "manifest": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/manifest.json",
+        "sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1"
+      },
+      "changed_source_files": [
+        "crates/scriptw-aot-wasm/tests/emission/infallible_booleans.rs",
+        "crates/scriptw-aot-wasm/tests/emission/parameter_initialization.rs"
+      ],
+      "qualification": "Two external integration tests changed. All non-test product/compiler source inputs are byte-identical. The compiler identity is pinned by the original engine-linked RSC producer; the corrected emission-only test crate does not emit an engine build-script identity. The corrected emission test artifact is pinned to the corrected source manifest."
+    },
     "compiler_source_identity": {
-      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
-      "source_revision": "git:dfefb3222737b067e1c98777161d95d42491df8f"
+      "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+      "source_revision": "git:b8c7325438c48028866fc85a74f2115acd465731"
     }
   },
   "measurement": {
-    "campaign": "target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json",
-    "campaign_sha256": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
+    "campaign": "target/performance-architecture-20261108/tools/rsc-campaign-1/campaign.json",
+    "campaign_sha256": "0b36a76f2340fcdce9b2eafe7855b787ffb867bf1182295e93e72e7202b81e8a",
     "blocks": 2,
     "processes_per_engine": 8,
     "samples": 7,
     "warmups": 3,
-    "checked_flight_calls": 640,
+    "checked_flight_calls": 800,
     "case_order": [
       "rsc-sync",
       "rsc-async"
     ],
     "actors": [
       "baseline",
+      "baseline-speed",
       "candidate",
       "candidate-speed",
       "v8"
@@ -190,6 +211,7 @@
     "process_order": [
       [
         "baseline",
+        "baseline-speed",
         "candidate",
         "candidate-speed",
         "v8"
@@ -198,189 +220,17 @@
         "v8",
         "candidate-speed",
         "candidate",
+        "baseline-speed",
         "baseline"
       ]
     ],
-    "execution_processes": 32,
+    "execution_processes": 40,
     "exact_output": "Both RSC cases were checked against the shared Node-generated JSON golden."
   },
-  "caveat": "Descriptive same-host cohort, not causal attribution to one source change, conformance, statistical confidence or universal application performance. The 2255 baseline is retained under its original source/runtime identity. Fast and Speed are separately scored; candidate reports must share source, host, P, R and request inputs, with only native compilation policy differing.",
+  "caveat": "Descriptive same-host cohort, not causal attribution to one source change, conformance, statistical confidence or universal application performance. The 0c2c baseline is retained under its original source/runtime identity. Fast and Speed are separately scored; candidate reports must share source, host, P, R and request inputs, with only native compilation policy differing.",
   "engines": {
     "baseline": {
-      "label": "published Scriptw baseline Fast",
-      "identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
-        "toolchain": {
-          "opt_level": "3",
-          "profile": "release",
-          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
-          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
-          "target": "x86_64-unknown-linux-gnu"
-        },
-        "configuration": {
-          "collector": "Copying",
-          "compilation_jobs": 1,
-          "cranelift_opt_level": "None",
-          "driver_worker_stack_bytes": 67108864,
-          "epoch_deadline_ticks": 6000,
-          "epoch_interruption": true,
-          "epoch_tick_ms": 5,
-          "gc_initial_bytes": 16777216,
-          "max_wasm_stack_bytes": 33554432,
-          "native_parallel_compilation": false,
-          "pending_deadline_ms": 30000,
-          "register_allocation": "SinglePass",
-          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
-          "target": "x86_64-unknown-linux-gnu",
-          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
-          "wasmtime": "47.0.0",
-          "wasmtime_async_stack_bytes": 67108864
-        },
-        "program_wasm_bytes": 4327610,
-        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
-        "runtime": {
-          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
-          "wasm_bytes": 38768915,
-          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
-        },
-        "inputs": {
-          "adapted_source_bytes": 64946,
-          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
-          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
-          "source_bytes": 64835,
-          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
-          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-          "versions": {
-            "esbuild": "0.28.2",
-            "playwright": "1.64.1",
-            "react": "19.3.1",
-            "react-dom": "19.3.1",
-            "react-server-dom-webpack": "19.3.1"
-          },
-          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        },
-        "native_mode": "fast",
-        "native_mode_scope": "matched Fast cohort"
-      },
-      "cases": {
-        "rsc-sync": [
-          4604819,
-          4651157,
-          4647250,
-          4722583,
-          4624617,
-          4672669,
-          4640327,
-          4668480
-        ],
-        "rsc-async": [
-          5013736,
-          5079171,
-          5059454,
-          5141569,
-          5110962,
-          5101844,
-          5040378,
-          5084281
-        ]
-      },
-      "block_medians": [
-        {
-          "block": 0,
-          "cases": {
-            "rsc-sync": 4649203.5,
-            "rsc-async": 5069312.5
-          }
-        },
-        {
-          "block": 1,
-          "cases": {
-            "rsc-sync": 4654403.5,
-            "rsc-async": 5093062.5
-          }
-        }
-      ],
-      "phase_processes": [
-        {
-          "engine_setup": 74141,
-          "front_and_lower": 2678333242,
-          "module_initialization": 2012394,
-          "native_preparation": 5581789284,
-          "realm_and_instantiation": 582997,
-          "source_to_wasm": 3108884217,
-          "wasm_emission": 430550975
-        },
-        {
-          "engine_setup": 77236,
-          "front_and_lower": 2681100225,
-          "module_initialization": 2031149,
-          "native_preparation": 5577168033,
-          "realm_and_instantiation": 594871,
-          "source_to_wasm": 3111675294,
-          "wasm_emission": 430575069
-        },
-        {
-          "engine_setup": 76746,
-          "front_and_lower": 2681451785,
-          "module_initialization": 2021701,
-          "native_preparation": 5532754668,
-          "realm_and_instantiation": 582546,
-          "source_to_wasm": 3112463801,
-          "wasm_emission": 431012016
-        },
-        {
-          "engine_setup": 74501,
-          "front_and_lower": 2708454824,
-          "module_initialization": 2035558,
-          "native_preparation": 5543985483,
-          "realm_and_instantiation": 589961,
-          "source_to_wasm": 3140652959,
-          "wasm_emission": 432198135
-        },
-        {
-          "engine_setup": 73981,
-          "front_and_lower": 2683108023,
-          "module_initialization": 2024296,
-          "native_preparation": 5546592765,
-          "realm_and_instantiation": 593808,
-          "source_to_wasm": 3115281736,
-          "wasm_emission": 432173713
-        },
-        {
-          "engine_setup": 70064,
-          "front_and_lower": 2713271067,
-          "module_initialization": 2033885,
-          "native_preparation": 5557953967,
-          "realm_and_instantiation": 597987,
-          "source_to_wasm": 3147142349,
-          "wasm_emission": 433871282
-        },
-        {
-          "engine_setup": 76966,
-          "front_and_lower": 2691879353,
-          "module_initialization": 2066457,
-          "native_preparation": 5543561990,
-          "realm_and_instantiation": 583949,
-          "source_to_wasm": 3123811352,
-          "wasm_emission": 431931999
-        },
-        {
-          "engine_setup": 75283,
-          "front_and_lower": 2685389904,
-          "module_initialization": 1983600,
-          "native_preparation": 5548022751,
-          "realm_and_instantiation": 547961,
-          "source_to_wasm": 3117218748,
-          "wasm_emission": 431828844
-        }
-      ]
-    },
-    "candidate": {
-      "label": "new Scriptw source Fast",
+      "label": "prior-source Scriptw Fast",
       "identity": {
         "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
         "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
@@ -441,123 +291,296 @@
       },
       "cases": {
         "rsc-sync": [
-          4614588,
-          4586765,
-          4744925,
-          4704619,
-          4620480,
-          4716893,
-          4585704,
-          4730870
+          4657106,
+          4812622,
+          4821650,
+          4769762,
+          4647109,
+          4738634,
+          4654404,
+          4617475
         ],
         "rsc-async": [
-          5033643,
-          4984210,
-          5158161,
-          5094180,
-          5049665,
-          5251298,
-          4974553,
-          5087287
+          5010589,
+          5248441,
+          5297636,
+          5187657,
+          5033193,
+          5175325,
+          5082819,
+          5027985
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 4659603.5,
-            "rsc-async": 5063911.5
+            "rsc-sync": 4791192.0,
+            "rsc-async": 5218049.0
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 4668686.5,
-            "rsc-async": 5068476.0
+            "rsc-sync": 4650756.5,
+            "rsc-async": 5058006.0
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 47340,
-          "front_and_lower": 2671481117,
-          "module_initialization": 2023264,
-          "native_preparation": 5588140612,
-          "realm_and_instantiation": 548202,
-          "source_to_wasm": 3103049821,
-          "wasm_emission": 431568704
+          "engine_setup": 51929,
+          "front_and_lower": 2667741234,
+          "module_initialization": 2074295,
+          "native_preparation": 5680824700,
+          "realm_and_instantiation": 580524,
+          "source_to_wasm": 3098277731,
+          "wasm_emission": 430536497
         },
         {
-          "engine_setup": 49714,
-          "front_and_lower": 2662382964,
-          "module_initialization": 2000281,
-          "native_preparation": 5473355434,
-          "realm_and_instantiation": 579641,
-          "source_to_wasm": 3091729254,
-          "wasm_emission": 429346290
+          "engine_setup": 48502,
+          "front_and_lower": 2667201641,
+          "module_initialization": 2093311,
+          "native_preparation": 5860007182,
+          "realm_and_instantiation": 603287,
+          "source_to_wasm": 3099252188,
+          "wasm_emission": 432050547
         },
         {
-          "engine_setup": 47290,
-          "front_and_lower": 2683260152,
-          "module_initialization": 2085893,
-          "native_preparation": 5692726595,
-          "realm_and_instantiation": 604990,
-          "source_to_wasm": 3131606258,
-          "wasm_emission": 448346106
+          "engine_setup": 56437,
+          "front_and_lower": 2765896584,
+          "module_initialization": 2085816,
+          "native_preparation": 5771176725,
+          "realm_and_instantiation": 571668,
+          "source_to_wasm": 3208086844,
+          "wasm_emission": 442190260
         },
         {
-          "engine_setup": 46949,
-          "front_and_lower": 2701305266,
-          "module_initialization": 2086484,
-          "native_preparation": 5621440049,
-          "realm_and_instantiation": 553201,
-          "source_to_wasm": 3137940216,
-          "wasm_emission": 436634950
+          "engine_setup": 51347,
+          "front_and_lower": 2766297466,
+          "module_initialization": 2108039,
+          "native_preparation": 5896758477,
+          "realm_and_instantiation": 577538,
+          "source_to_wasm": 3206778553,
+          "wasm_emission": 440481087
         },
         {
-          "engine_setup": 46879,
-          "front_and_lower": 2717524392,
-          "module_initialization": 2040487,
-          "native_preparation": 5550055192,
-          "realm_and_instantiation": 592827,
-          "source_to_wasm": 3157496920,
-          "wasm_emission": 439972528
+          "engine_setup": 47440,
+          "front_and_lower": 2665356817,
+          "module_initialization": 2055620,
+          "native_preparation": 5487759729,
+          "realm_and_instantiation": 584733,
+          "source_to_wasm": 3095383484,
+          "wasm_emission": 430026667
         },
         {
-          "engine_setup": 47300,
-          "front_and_lower": 2676114972,
-          "module_initialization": 2326781,
-          "native_preparation": 5587237673,
-          "realm_and_instantiation": 471847,
-          "source_to_wasm": 3108747807,
-          "wasm_emission": 432632835
+          "engine_setup": 53241,
+          "front_and_lower": 2701541312,
+          "module_initialization": 2125222,
+          "native_preparation": 5655435570,
+          "realm_and_instantiation": 610111,
+          "source_to_wasm": 3137035450,
+          "wasm_emission": 435494138
         },
         {
-          "engine_setup": 45136,
-          "front_and_lower": 2682630727,
-          "module_initialization": 2033244,
-          "native_preparation": 5521358355,
-          "realm_and_instantiation": 564112,
-          "source_to_wasm": 3114321935,
-          "wasm_emission": 431691208
+          "engine_setup": 48382,
+          "front_and_lower": 2691261619,
+          "module_initialization": 2055420,
+          "native_preparation": 5548669941,
+          "realm_and_instantiation": 567961,
+          "source_to_wasm": 3138365640,
+          "wasm_emission": 447104021
         },
         {
-          "engine_setup": 48312,
-          "front_and_lower": 2673211131,
-          "module_initialization": 2062830,
-          "native_preparation": 5624063412,
-          "realm_and_instantiation": 579692,
-          "source_to_wasm": 3104163175,
-          "wasm_emission": 430952044
+          "engine_setup": 53502,
+          "front_and_lower": 2712552121,
+          "module_initialization": 2068104,
+          "native_preparation": 5541617505,
+          "realm_and_instantiation": 579862,
+          "source_to_wasm": 3146045729,
+          "wasm_emission": 433493608
+        }
+      ]
+    },
+    "candidate": {
+      "label": "new Scriptw source Fast",
+      "identity": {
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+        "executable_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
+        },
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_bytes": 4169697,
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+        "runtime": {
+          "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+          "wasm_bytes": 38769947,
+          "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
+      },
+      "cases": {
+        "rsc-sync": [
+          4441887,
+          4768599,
+          4589539,
+          4504838,
+          4480092,
+          4559263,
+          4549103,
+          4600692
+        ],
+        "rsc-async": [
+          4847518,
+          5271044,
+          5019707,
+          4936109,
+          4845737,
+          4935458,
+          4968862,
+          4940177
+        ]
+      },
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 4547188.5,
+            "rsc-async": 4977908.0
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 4554183.0,
+            "rsc-async": 4937817.5
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "engine_setup": 81074,
+          "front_and_lower": 2670880050,
+          "module_initialization": 2074225,
+          "native_preparation": 5057793799,
+          "realm_and_instantiation": 572198,
+          "source_to_wasm": 3091363075,
+          "wasm_emission": 420483025
+        },
+        {
+          "engine_setup": 85483,
+          "front_and_lower": 2766934548,
+          "module_initialization": 2093872,
+          "native_preparation": 5296066076,
+          "realm_and_instantiation": 594211,
+          "source_to_wasm": 3199592434,
+          "wasm_emission": 432657886
+        },
+        {
+          "engine_setup": 85232,
+          "front_and_lower": 2742858559,
+          "module_initialization": 2070569,
+          "native_preparation": 5565762165,
+          "realm_and_instantiation": 582357,
+          "source_to_wasm": 3177430845,
+          "wasm_emission": 434572286
+        },
+        {
+          "engine_setup": 79651,
+          "front_and_lower": 2671269484,
+          "module_initialization": 2110494,
+          "native_preparation": 5080491583,
+          "realm_and_instantiation": 566056,
+          "source_to_wasm": 3089875454,
+          "wasm_emission": 418605970
+        },
+        {
+          "engine_setup": 93688,
+          "front_and_lower": 2657488163,
+          "module_initialization": 2058535,
+          "native_preparation": 5094326909,
+          "realm_and_instantiation": 562330,
+          "source_to_wasm": 3078515627,
+          "wasm_emission": 421027464
+        },
+        {
+          "engine_setup": 80554,
+          "front_and_lower": 2677514073,
+          "module_initialization": 2119100,
+          "native_preparation": 5236259584,
+          "realm_and_instantiation": 557821,
+          "source_to_wasm": 3097774870,
+          "wasm_emission": 420260797
+        },
+        {
+          "engine_setup": 89110,
+          "front_and_lower": 2729509913,
+          "module_initialization": 2049058,
+          "native_preparation": 5214716068,
+          "realm_and_instantiation": 572288,
+          "source_to_wasm": 3152432684,
+          "wasm_emission": 422922771
+        },
+        {
+          "engine_setup": 79211,
+          "front_and_lower": 2686986723,
+          "module_initialization": 2083894,
+          "native_preparation": 5213823364,
+          "realm_and_instantiation": 576867,
+          "source_to_wasm": 3108357778,
+          "wasm_emission": 421371055
         }
       ]
     },
     "candidate-speed": {
       "label": "new Scriptw source Speed/Backtracking",
       "identity": {
-        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
-        "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
-        "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+        "executable_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -585,8 +608,8 @@
           "wasmtime": "47.0.0",
           "wasmtime_async_stack_bytes": 67108864
         },
-        "program_wasm_bytes": 4327610,
-        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+        "program_wasm_bytes": 4169697,
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
         "runtime": {
           "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
           "wasm_bytes": 38769947,
@@ -614,114 +637,114 @@
       },
       "cases": {
         "rsc-sync": [
-          3601453,
-          3679902,
-          3678419,
-          3709809,
-          3821191,
-          3673480,
-          3774543,
-          3767148
+          3663577,
+          3728291,
+          3790840,
+          3670241,
+          3784559,
+          3630015,
+          3795680,
+          3737059
         ],
         "rsc-async": [
-          3957098,
-          3979481,
-          4020640,
-          4045177,
-          4158822,
-          4007895,
-          4075744,
-          4122243
+          3993485,
+          4072806,
+          4095530,
+          3975462,
+          4174379,
+          3964842,
+          4139695,
+          4061116
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 3679160.5,
-            "rsc-async": 4000060.5
+            "rsc-sync": 3699266.0,
+            "rsc-async": 4033145.5
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 3770845.5,
-            "rsc-async": 4098993.5
+            "rsc-sync": 3760809.0,
+            "rsc-async": 4100405.5
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 53913,
-          "front_and_lower": 2670870982,
-          "module_initialization": 1690582,
-          "native_preparation": 7526943436,
-          "realm_and_instantiation": 620509,
-          "source_to_wasm": 3103485839,
-          "wasm_emission": 432614857
+          "engine_setup": 81655,
+          "front_and_lower": 2695779438,
+          "module_initialization": 1712867,
+          "native_preparation": 7114600833,
+          "realm_and_instantiation": 597837,
+          "source_to_wasm": 3118024774,
+          "wasm_emission": 422245336
         },
         {
-          "engine_setup": 63871,
-          "front_and_lower": 2694752115,
-          "module_initialization": 1739896,
-          "native_preparation": 7529944941,
-          "realm_and_instantiation": 638033,
-          "source_to_wasm": 3126163142,
-          "wasm_emission": 431411027
+          "engine_setup": 89190,
+          "front_and_lower": 2776301637,
+          "module_initialization": 1709882,
+          "native_preparation": 8555823629,
+          "realm_and_instantiation": 616232,
+          "source_to_wasm": 3208217282,
+          "wasm_emission": 431915645
         },
         {
-          "engine_setup": 46969,
-          "front_and_lower": 2676754049,
-          "module_initialization": 1717514,
-          "native_preparation": 7486327605,
-          "realm_and_instantiation": 663881,
-          "source_to_wasm": 3108499327,
-          "wasm_emission": 431745278
+          "engine_setup": 100782,
+          "front_and_lower": 2715589955,
+          "module_initialization": 1721474,
+          "native_preparation": 9878232297,
+          "realm_and_instantiation": 611743,
+          "source_to_wasm": 3178672544,
+          "wasm_emission": 463082589
         },
         {
-          "engine_setup": 50476,
-          "front_and_lower": 2727532507,
-          "module_initialization": 1658081,
-          "native_preparation": 7574665487,
-          "realm_and_instantiation": 616762,
-          "source_to_wasm": 3168294753,
-          "wasm_emission": 440762246
+          "engine_setup": 81105,
+          "front_and_lower": 2678943959,
+          "module_initialization": 1776669,
+          "native_preparation": 7181082192,
+          "realm_and_instantiation": 583900,
+          "source_to_wasm": 3101452839,
+          "wasm_emission": 422508880
         },
         {
-          "engine_setup": 52951,
-          "front_and_lower": 2749442560,
-          "module_initialization": 1701322,
-          "native_preparation": 7679855511,
-          "realm_and_instantiation": 628495,
-          "source_to_wasm": 3207523230,
-          "wasm_emission": 458080670
+          "engine_setup": 82888,
+          "front_and_lower": 2678027371,
+          "module_initialization": 1709722,
+          "native_preparation": 7069266691,
+          "realm_and_instantiation": 592146,
+          "source_to_wasm": 3100036393,
+          "wasm_emission": 422009022
         },
         {
-          "engine_setup": 47691,
-          "front_and_lower": 2676793002,
-          "module_initialization": 1694410,
-          "native_preparation": 7537513442,
-          "realm_and_instantiation": 638413,
-          "source_to_wasm": 3106414582,
-          "wasm_emission": 429621580
+          "engine_setup": 86184,
+          "front_and_lower": 2660726642,
+          "module_initialization": 1648556,
+          "native_preparation": 7030460480,
+          "realm_and_instantiation": 595302,
+          "source_to_wasm": 3082235756,
+          "wasm_emission": 421509114
         },
         {
-          "engine_setup": 50276,
-          "front_and_lower": 2679513328,
-          "module_initialization": 1776034,
-          "native_preparation": 7478812564,
-          "realm_and_instantiation": 625369,
-          "source_to_wasm": 3112613208,
-          "wasm_emission": 433099880
+          "engine_setup": 83740,
+          "front_and_lower": 2738175576,
+          "module_initialization": 1736583,
+          "native_preparation": 8460193763,
+          "realm_and_instantiation": 595553,
+          "source_to_wasm": 3170292157,
+          "wasm_emission": 432116581
         },
         {
-          "engine_setup": 48161,
-          "front_and_lower": 2672007389,
-          "module_initialization": 1682998,
-          "native_preparation": 7548760222,
-          "realm_and_instantiation": 621180,
-          "source_to_wasm": 3103871553,
-          "wasm_emission": 431864164
+          "engine_setup": 80634,
+          "front_and_lower": 2675703208,
+          "module_initialization": 1726464,
+          "native_preparation": 7143619723,
+          "realm_and_instantiation": 596805,
+          "source_to_wasm": 3097562906,
+          "wasm_emission": 421859698
         }
       ]
     },
@@ -760,82 +783,82 @@
       },
       "cases": {
         "rsc-sync": [
-          487045,
-          494529,
-          504889,
-          491003,
-          489951,
-          477207,
-          489440,
-          481756
+          715952,
+          492667,
+          544085,
+          476817,
+          482949,
+          496815,
+          548623,
+          492607
         ],
         "rsc-async": [
-          509989,
-          399068,
-          401092,
-          382627,
-          389610,
-          453331,
-          406533,
-          396814
+          397466,
+          401543,
+          394991,
+          393087,
+          410982,
+          394811,
+          398017,
+          398157
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 492766.0,
-            "rsc-async": 400080.0
+            "rsc-sync": 518376.0,
+            "rsc-async": 396228.5
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 485598.0,
-            "rsc-async": 401673.5
+            "rsc-sync": 494711.0,
+            "rsc-async": 398087.0
           }
         }
       ],
       "phase_processes": [
         {
-          "realm_creation_ns": 16377777,
-          "source_module_parse_ns": 1475674,
-          "module_link_and_initialization_ns": 2459372
+          "realm_creation_ns": 16636177,
+          "source_module_parse_ns": 1487389,
+          "module_link_and_initialization_ns": 2388983
         },
         {
-          "realm_creation_ns": 17397937,
-          "source_module_parse_ns": 1529626,
-          "module_link_and_initialization_ns": 2427863
+          "realm_creation_ns": 17660327,
+          "source_module_parse_ns": 1501906,
+          "module_link_and_initialization_ns": 2453747
         },
         {
-          "realm_creation_ns": 17068782,
-          "source_module_parse_ns": 1529096,
-          "module_link_and_initialization_ns": 2418545
+          "realm_creation_ns": 17244338,
+          "source_module_parse_ns": 1552894,
+          "module_link_and_initialization_ns": 2459328
         },
         {
-          "realm_creation_ns": 16575856,
-          "source_module_parse_ns": 1495873,
-          "module_link_and_initialization_ns": 2399819
+          "realm_creation_ns": 16566319,
+          "source_module_parse_ns": 1497328,
+          "module_link_and_initialization_ns": 2391529
         },
         {
-          "realm_creation_ns": 16849085,
-          "source_module_parse_ns": 1494740,
-          "module_link_and_initialization_ns": 2458682
+          "realm_creation_ns": 16617678,
+          "source_module_parse_ns": 1484033,
+          "module_link_and_initialization_ns": 2360500
         },
         {
-          "realm_creation_ns": 16918788,
-          "source_module_parse_ns": 1471796,
-          "module_link_and_initialization_ns": 2520740
+          "realm_creation_ns": 16486248,
+          "source_module_parse_ns": 1494132,
+          "module_link_and_initialization_ns": 2400055
         },
         {
-          "realm_creation_ns": 16560477,
-          "source_module_parse_ns": 1504309,
-          "module_link_and_initialization_ns": 2388930
+          "realm_creation_ns": 16697472,
+          "source_module_parse_ns": 1575638,
+          "module_link_and_initialization_ns": 2433078
         },
         {
-          "realm_creation_ns": 16811676,
-          "source_module_parse_ns": 1487206,
-          "module_link_and_initialization_ns": 2398537
+          "realm_creation_ns": 16581804,
+          "source_module_parse_ns": 1523918,
+          "module_link_and_initialization_ns": 2410796
         }
       ]
     }
@@ -843,37 +866,43 @@
   "inputs": {
     "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
     "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1",
-    "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4",
+    "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e",
     "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f",
     "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
     "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/common.py": "14eede0d86d6dbf4aacab9daf13e4f89df651340fa6a2ec062a7a6ec8804a254",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/aggregate.json": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
-    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build-argv.json": "fe97ce5597b074a6057d1510b6265a382848f8d61492a41eeaa3aa17537cd33d",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/emission-finished-build.stdout": "811dc0cd4bc1841173647138ac0c62b2d7cdc4e662f8b7b873891cf7f27bdfb7",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/focused-complete/receipt.json": "40126cbc1a08dfd47922550a189278019091a5fa12b2faef601ee04eb23b7e5e",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline-producer.json": "99ed01a2365f34eb6e39b06be1bafa3a8ae986cebe688e8eb549acb98f2eb654",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen-finished/emission": "e6dc08651646219b9d3ff2bd0438cd7430b895bc56eb78ec7345d615d69eb266",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen-finished/emission-producer.json": "39f833fe16ffd608f8f0f86698d942bc03d32ed59da4d918214c2950d1de87dd",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/common.py": "27d6727ba848a941a6b1081f5bbb3abfe69c87194d23525d2aba50fc44caad07",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/external-test-reuse-finished.json": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/freeze_source.py": "51057e0b4fc43ae22b8eab5438f1e1a2072ad10be87b5203dd5df3cf7234f05d",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/measure_rsc.py": "0840e56dfb509dffe43bf677b32f0cde3bcc0bda75c639798bb9b24914e0ac13",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/baseline/rsc-current.json": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/manifest.json": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
+    "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/tracked.patch": "7d4b9ea955703f85e5c1bad92f3320cb28e8b079a3fc35949efca0adf91870dd",
     "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/focused/receipt.json": "dce75cc4b637dfc9031fdb764bb62e9096e44870432fb128b3f4b12663f7f28d",
     "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline-producer.json": "c73115061da82a5440f02448b65a7dcb8a26465c33e3173de255deefd7b2f04c",
     "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/common.py": "f0f142dd5f88781b90eb9882f955fcfbd27fc5e6cb46a541c2887e9d0f757a10",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/freeze_source.py": "477514f433204b1d21aa68edb7aeb455ec0f0a3eb37a8f8d5aa0d3387a34adfd",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/measure_rsc.py": "02aa3fe57c75690e4dd4b16a87cccd976ceb66d50955131b273cb36a674517fd",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/baseline/rsc-current.json": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/manifest.json": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
-    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/source-current/tracked.patch": "f9ed24d3ea2cb519566d20547481444b169da3281e86038ad63716070f200578",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/aggregate.json": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "d9f12c372442ec7fbcef4f0b2f43177cd13ec41ef4b4f0f7e17da7ecaccd87f9",
+    "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
     "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63",
-    "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3"
+    "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082"
   },
   "source_identity": {
-    "git_revision_role": "new HEAD with one frozen dirty source batch",
+    "git_revision_role": "b8c parent with one frozen architecture source batch and separately qualified test-only witness correction",
     "baseline_source": {
       "identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+        "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+        "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -904,9 +933,9 @@
         "program_wasm_bytes": 4327610,
         "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
         "runtime": {
-          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
-          "wasm_bytes": 38768915,
-          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+          "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+          "wasm_bytes": 38769947,
+          "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -928,31 +957,50 @@
         "native_mode": "fast",
         "native_mode_scope": "matched Fast cohort"
       },
-      "executable": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
-      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
-      "report": "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/rsc-campaign-2/block-0-rep-0-candidate/report.json",
-      "report_sha256": "a1d34f7ab2627851f2ed3f6859cc7131ac889cf79dfdffc02b4baf1e8cdce258",
-      "published_report_sha256": "88dd6b004df67159b6c2b9801d46f9ced82769b6ce40042864663b8bc1f53cc4"
+      "executable": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
+      "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+      "report": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
+      "report_sha256": "d9f12c372442ec7fbcef4f0b2f43177cd13ec41ef4b4f0f7e17da7ecaccd87f9",
+      "published_report_sha256": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e"
     },
     "candidate_measured_source": {
-      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
-      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
-      "manifest_path": "target/performance-predicate-transport-20261108/tools/source-current/manifest.json",
-      "manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
+      "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+      "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+      "manifest_path": "target/performance-architecture-20261108/tools/source-finished/manifest.json",
+      "manifest_sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
       "runtime_abi": 53,
       "archive_prefix": "source/current/",
       "manifest_member": "source/current/manifest.json"
     },
     "candidate_build": {
-      "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
-      "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
-      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "path": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline",
+      "executable_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout",
+      "cargo_producer_sha256": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
       "build_producer_is_direct": true,
       "compiler_source_identity": {
-        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
-        "source_revision": "git:dfefb3222737b067e1c98777161d95d42491df8f"
-      }
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "source_revision": "git:b8c7325438c48028866fc85a74f2115acd465731"
+      },
+      "qualified_reuse": {
+        "path": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/external-test-reuse-finished.json",
+        "sha256": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6",
+        "schema": "scriptw-external-test-correction-qualified-reuse-v1",
+        "previous_source": {
+          "manifest": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-final/manifest.json",
+          "sha256": "8abc0ddb26877f9724e90e59b207f31ea52de0602152aa482eb6b95635d490d5"
+        },
+        "current_source": {
+          "manifest": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/manifest.json",
+          "sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1"
+        },
+        "changed_source_files": [
+          "crates/scriptw-aot-wasm/tests/emission/infallible_booleans.rs",
+          "crates/scriptw-aot-wasm/tests/emission/parameter_initialization.rs"
+        ],
+        "qualification": "Two external integration tests changed. All non-test product/compiler source inputs are byte-identical. The compiler identity is pinned by the original engine-linked RSC producer; the corrected emission-only test crate does not emit an engine build-script identity. The corrected emission test artifact is pinned to the corrected source manifest."
+      },
+      "producer_role": "direct original build, with separately qualified external-test correction"
     },
     "candidate_speed_policy": {
       "collector": "Copying",
@@ -977,17 +1025,17 @@
   },
   "producer_receipts": {
     "baseline": {
-      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline-producer.json",
-      "sha256": "b4b9616fa9b8eed76da984649ee866182ceacddc9f5016937f558b212fef04b0"
+      "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline-producer.json",
+      "sha256": "c73115061da82a5440f02448b65a7dcb8a26465c33e3173de255deefd7b2f04c"
     },
     "candidate": {
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
-      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout",
+      "cargo_producer_sha256": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
       "build_producer_is_direct": true
     },
     "candidate_speed": {
-      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
-      "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout",
+      "cargo_producer_sha256": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
       "native_configuration": {
         "collector": "Copying",
         "compilation_jobs": 1,
@@ -1011,21 +1059,21 @@
   },
   "publication": {
     "date": "2026-11-08",
-    "status": "published-recorded-source",
+    "status": "published",
     "measured_source": {
-      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
-      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
-      "manifest_path": "target/performance-predicate-transport-20261108/tools/source-current/manifest.json",
-      "manifest_sha256": "ad0bacadc4a679c7c3bb4e214f85542edefe288bfe6b9e86807667e51ba28946",
+      "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+      "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+      "manifest_path": "target/performance-architecture-20261108/tools/source-finished/manifest.json",
+      "manifest_sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
       "runtime_abi": 53,
       "archive_prefix": "source/current/",
       "manifest_member": "source/current/manifest.json"
     },
     "baseline": {
       "identity": {
-        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
-        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
-        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+        "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+        "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+        "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -1056,9 +1104,9 @@
         "program_wasm_bytes": 4327610,
         "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
         "runtime": {
-          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
-          "wasm_bytes": 38768915,
-          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+          "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+          "wasm_bytes": 38769947,
+          "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -1080,26 +1128,28 @@
         "native_mode": "fast",
         "native_mode_scope": "matched Fast cohort"
       },
-      "reference_campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
-      "reference_aggregate_sha256": "d747dc39e451b60b9a5e25e1b755cc7cd357258c9702e0eef1bf015ee7f45f8b"
+      "reference_campaign_sha256": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c",
+      "reference_aggregate_sha256": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6"
     },
-    "speed_policy": "candidate-speed is a separately scored native-policy actor using the existing host's explicit Speed/Backtracking mode",
+    "speed_policy": "candidate-speed is a separately scored native-policy actor using the current host's explicit Speed/Backtracking mode; optional baseline-speed uses the prior source and same baseline host as a control",
     "archive_prefix": "source/current/",
     "evidence_archive": {
-      "sha256": "6385d0ae7627e6e34ec1a2b2618cec149d468967d9961578d5c92872eb1252ef",
-      "bytes": 4475432,
-      "regular_utf8_members": 1027,
-      "expanded_utf8_bytes": 301175728,
-      "file": "scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz",
-      "canonical_file": "docs/rust-rewrite/scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz"
+      "sha256": "8ea2b76bd32ace847cd3bdaadf923a6a231829fcbaf527c7be3208cbf7e0afa0",
+      "bytes": 1530076,
+      "regular_utf8_members": 973,
+      "expanded_utf8_bytes": 49742573,
+      "file": "scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+      "canonical_file": "docs/rust-rewrite/scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+      "staged_file": "target/performance-architecture-20261108/publication-stage-2/scriptw-performance-architecture-evidence-2026-11-08.tar.xz"
     },
-    "canonical_files_written": true
+    "canonical_files_written": true,
+    "charts_rendered": true
   },
   "candidate_speed": {
-    "path": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline",
-    "sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
-    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout",
-    "cargo_producer_sha256": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375",
+    "path": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline",
+    "sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout",
+    "cargo_producer_sha256": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc",
     "configuration": {
       "collector": "Copying",
       "compilation_jobs": 1,
@@ -1122,16 +1172,249 @@
     "native_mode": "speed",
     "scope": "separately scored native compilation policy"
   },
+  "baseline_speed_control": {
+    "label": "prior-source Scriptw Speed/Backtracking control",
+    "identity": {
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+      "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+      "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+      "toolchain": {
+        "opt_level": "3",
+        "profile": "release",
+        "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+        "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+        "target": "x86_64-unknown-linux-gnu"
+      },
+      "configuration": {
+        "collector": "Copying",
+        "compilation_jobs": 1,
+        "cranelift_opt_level": "Speed",
+        "driver_worker_stack_bytes": 67108864,
+        "epoch_deadline_ticks": 6000,
+        "epoch_interruption": true,
+        "epoch_tick_ms": 5,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_parallel_compilation": false,
+        "pending_deadline_ms": 30000,
+        "register_allocation": "Backtracking",
+        "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+        "target": "x86_64-unknown-linux-gnu",
+        "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+        "wasmtime": "47.0.0",
+        "wasmtime_async_stack_bytes": 67108864
+      },
+      "program_wasm_bytes": 4327610,
+      "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+      "runtime": {
+        "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+        "wasm_bytes": 38769947,
+        "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+      },
+      "inputs": {
+        "adapted_source_bytes": 64946,
+        "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+        "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+        "source_bytes": 64835,
+        "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+        "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+        "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+        "versions": {
+          "esbuild": "0.28.2",
+          "playwright": "1.64.1",
+          "react": "19.3.1",
+          "react-dom": "19.3.1",
+          "react-server-dom-webpack": "19.3.1"
+        },
+        "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+      },
+      "native_mode": "speed",
+      "native_mode_scope": "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+    },
+    "cases": {
+      "rsc-sync": [
+        3776382,
+        3743389,
+        3744062,
+        3708544,
+        3650935,
+        3671123,
+        3744664,
+        3772837
+      ],
+      "rsc-async": [
+        4001329,
+        4133010,
+        4042628,
+        4038251,
+        3977716,
+        4030998,
+        4088127,
+        4136899
+      ]
+    },
+    "block_medians": [
+      {
+        "block": 0,
+        "cases": {
+          "rsc-sync": 3743725.5,
+          "rsc-async": 4040439.5
+        }
+      },
+      {
+        "block": 1,
+        "cases": {
+          "rsc-sync": 3707893.5,
+          "rsc-async": 4059562.5
+        }
+      }
+    ],
+    "phase_processes": [
+      {
+        "engine_setup": 48192,
+        "front_and_lower": 2680560866,
+        "module_initialization": 1674725,
+        "native_preparation": 7431665318,
+        "realm_and_instantiation": 592156,
+        "source_to_wasm": 3112508108,
+        "wasm_emission": 431947242
+      },
+      {
+        "engine_setup": 54894,
+        "front_and_lower": 2745799502,
+        "module_initialization": 1719339,
+        "native_preparation": 7975116581,
+        "realm_and_instantiation": 619078,
+        "source_to_wasm": 3182877000,
+        "wasm_emission": 437077498
+      },
+      {
+        "engine_setup": 70685,
+        "front_and_lower": 2783012491,
+        "module_initialization": 1734168,
+        "native_preparation": 10306854511,
+        "realm_and_instantiation": 610732,
+        "source_to_wasm": 3419432782,
+        "wasm_emission": 636420291
+      },
+      {
+        "engine_setup": 50817,
+        "front_and_lower": 2768251530,
+        "module_initialization": 1674676,
+        "native_preparation": 7531297217,
+        "realm_and_instantiation": 586876,
+        "source_to_wasm": 3203827617,
+        "wasm_emission": 435576087
+      },
+      {
+        "engine_setup": 49514,
+        "front_and_lower": 2669870569,
+        "module_initialization": 1657523,
+        "native_preparation": 7450064634,
+        "realm_and_instantiation": 604670,
+        "source_to_wasm": 3101805827,
+        "wasm_emission": 431935258
+      },
+      {
+        "engine_setup": 56328,
+        "front_and_lower": 2683353653,
+        "module_initialization": 1700765,
+        "native_preparation": 8776082720,
+        "realm_and_instantiation": 610742,
+        "source_to_wasm": 3116115064,
+        "wasm_emission": 432761411
+      },
+      {
+        "engine_setup": 48763,
+        "front_and_lower": 2772376132,
+        "module_initialization": 1695034,
+        "native_preparation": 7581683688,
+        "realm_and_instantiation": 588279,
+        "source_to_wasm": 3219129109,
+        "wasm_emission": 446752977
+      },
+      {
+        "engine_setup": 51978,
+        "front_and_lower": 2681608606,
+        "module_initialization": 1707639,
+        "native_preparation": 7489134903,
+        "realm_and_instantiation": 652531,
+        "source_to_wasm": 3122867740,
+        "wasm_emission": 441259134
+      }
+    ],
+    "actor": "baseline-speed",
+    "scored_in_current_chart": false,
+    "scope": "separately measured prior-source Speed control; included in total process/call counts"
+  },
+  "source_witnesses": {
+    "measured": {
+      "path": "target/performance-architecture-20261108/tools/source-finished/manifest.json",
+      "sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
+      "archive_prefix": "source/current/"
+    },
+    "original_producer_pretest": {
+      "path": "target/performance-architecture-20261108/tools/source-final/manifest.json",
+      "sha256": "8abc0ddb26877f9724e90e59b207f31ea52de0602152aa482eb6b95635d490d5",
+      "archive_prefix": "source/original-producer-pretest/"
+    },
+    "intermediate_test_verification": [
+      {
+        "path": "target/performance-architecture-20261108/tools/source-verified/manifest.json",
+        "sha256": "8f1066352adb34a58f63f50237c79d2d4e0ce1c59f170043b26212604b22d987",
+        "archive_prefix": "source/intermediate-00-source-verified/"
+      },
+      {
+        "path": "target/performance-architecture-20261108/tools/source-qualified/manifest.json",
+        "sha256": "39780d307c10ac92cb770fe219ae0848b583510f2c2dcb1adc5e3bc2b1d8fd86",
+        "archive_prefix": "source/intermediate-01-source-qualified/"
+      },
+      {
+        "path": "target/performance-architecture-20261108/tools/source-correct/manifest.json",
+        "sha256": "d77235b2526e14ea40cd56ea980cf3022a5f623082c41620f8ca08ef128f1faf",
+        "archive_prefix": "source/intermediate-02-source-correct/"
+      },
+      {
+        "path": "target/performance-architecture-20261108/tools/source-accepted/manifest.json",
+        "sha256": "4b8dfde1627d86f6f8fa607f1658199e11b070815829f31062164e7c8b305958",
+        "archive_prefix": "source/intermediate-03-source-accepted/"
+      }
+    ],
+    "corrected_test_verification": {
+      "path": "target/performance-architecture-20261108/tools/source-finished/manifest.json",
+      "sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1",
+      "archive_prefix": "source/corrected-test-verification/"
+    },
+    "postmeasurement_verification": {
+      "path": "target/performance-architecture-20261108/tools/source-complete/manifest.json",
+      "sha256": "ff1f2dc58c02bdb5efdac00127635fd795ec50740e42427c53ca238ef22b2a48",
+      "archive_prefix": "source/postmeasurement-verification/"
+    }
+  },
+  "test_only_qualifications": [
+    {
+      "path": "target/performance-architecture-20261108/tools/external-test-reuse-finished.json",
+      "sha256": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6",
+      "archive_member": "verification/test-only-qualification-00-external-test-reuse-finished.json"
+    }
+  ],
+  "postmeasurement_test_qualification": {
+    "path": "target/performance-architecture-20261108/tools/postmeasurement-test-reuse.json",
+    "sha256": "ba6f7b46a3ada5529cbc5f1a6a07709201270d83f9ac8f31128215a3fec3ca15",
+    "archive_member": "verification/postmeasurement-test-qualification.json"
+  },
   "evidence_archive": {
-    "sha256": "6385d0ae7627e6e34ec1a2b2618cec149d468967d9961578d5c92872eb1252ef",
-    "bytes": 4475432,
-    "regular_utf8_members": 1027,
-    "expanded_utf8_bytes": 301175728,
-    "file": "scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz",
-    "canonical_file": "docs/rust-rewrite/scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz"
+    "sha256": "8ea2b76bd32ace847cd3bdaadf923a6a231829fcbaf527c7be3208cbf7e0afa0",
+    "bytes": 1530076,
+    "regular_utf8_members": 973,
+    "expanded_utf8_bytes": 49742573,
+    "file": "scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+    "canonical_file": "docs/rust-rewrite/scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+    "staged_file": "target/performance-architecture-20261108/publication-stage-2/scriptw-performance-architecture-evidence-2026-11-08.tar.xz"
   },
   "complete_archived_report": {
     "archive_member": "reports/rsc-current-prearchive.json",
-    "sha256": "21a4591d65d442545e0f22634a09ce00d36340b71ea2729a6b9542b1318b3c87"
+    "sha256": "43b527705c0e623a3c5a6f5ca0214b2b392e85d10292367d06f78d2298bbc3e7"
   }
 }

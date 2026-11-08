@@ -80,17 +80,24 @@ fn get_v_owner_propagates_the_whole_abrupt_completion_before_publication() {
     ));
     assert!(get_v.contains("SpecOperationIr::GetV|SpecOperationIr::GetMethod=>"));
     assert!(get_v.contains("self.emit_value_to_object_locals(&inputs[0],&pending,function)?"));
-    let copy = get_v
-        .rfind("self.completion().copy_from(&pending,function)")
+    assert!(get_v.contains("result.project(self,output,inputs,function)"));
+    let projection = normalized(bounded(
+        OPERATIONS_SOURCE,
+        "            Self::Expression(pending) => {",
+        "            Self::Call(pending) => {",
+    ));
+    let throw = projection.find("CompletionKind::Throw.code()").unwrap();
+    let copy = projection
+        .find("builder.completion().copy_from(&pending,function)")
         .unwrap();
-    let normal = get_v[copy..].find("CompletionKind::Normal.code()").unwrap() + copy;
-    let publish = get_v
+    let propagate = projection
+        .find("builder.emit_propagate_current_throw(function)")
+        .unwrap();
+    let publish = projection
         .find("output.copy_from(pending.value(),function)")
         .unwrap();
-    let propagate = get_v
-        .rfind("self.emit_propagate_current_throw_if_needed(function)")
-        .unwrap();
-    assert!(copy < normal && normal < publish && publish < propagate);
+    assert!(throw < copy && copy < propagate && propagate < publish);
+    assert!(!projection.contains("CompletionKind::Normal.code()"));
     assert!(!get_v.contains("ReturnCurrentFunction"));
 }
 

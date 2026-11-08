@@ -28,6 +28,8 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 enum NativeMode {
     Fast,
     Speed,
+    FastBacktracking,
+    SpeedSinglePass,
 }
 
 impl NativeMode {
@@ -35,8 +37,10 @@ impl NativeMode {
         match value.as_deref() {
             None | Some("fast") => Ok(Self::Fast),
             Some("speed") => Ok(Self::Speed),
+            Some("fast-backtracking") => Ok(Self::FastBacktracking),
+            Some("speed-single-pass") => Ok(Self::SpeedSinglePass),
             Some(value) => {
-                Err(format!("unknown native mode {value:?}; expected fast or speed").into())
+                Err(format!("unknown native mode {value:?}; expected fast, speed, fast-backtracking or speed-single-pass").into())
             }
         }
     }
@@ -45,7 +49,32 @@ impl NativeMode {
         match self {
             Self::Fast => "fast",
             Self::Speed => "speed",
+            Self::FastBacktracking => "fast-backtracking",
+            Self::SpeedSinglePass => "speed-single-pass",
         }
+    }
+
+    fn configure(self, config: &mut wasmtime::Config) {
+        let (optimization, allocation) = match self {
+            Self::Fast => (
+                wasmtime::OptLevel::None,
+                wasmtime::RegallocAlgorithm::SinglePass,
+            ),
+            Self::Speed => (
+                wasmtime::OptLevel::Speed,
+                wasmtime::RegallocAlgorithm::Backtracking,
+            ),
+            Self::FastBacktracking => (
+                wasmtime::OptLevel::None,
+                wasmtime::RegallocAlgorithm::Backtracking,
+            ),
+            Self::SpeedSinglePass => (
+                wasmtime::OptLevel::Speed,
+                wasmtime::RegallocAlgorithm::SinglePass,
+            ),
+        };
+        config.cranelift_opt_level(optimization);
+        config.cranelift_regalloc_algorithm(allocation);
     }
 }
 
@@ -235,7 +264,7 @@ fn run() -> Result<Value> {
     let mut profile = ProfileBarrier::from_environment()?;
     let mut args = std::env::args().skip(1);
     let source_path = PathBuf::from(args.next().ok_or(
-        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3] [native-mode=fast|speed]",
+        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3] [native-mode=fast|speed|fast-backtracking|speed-single-pass]",
     )?);
     let support_path = PathBuf::from(args.next().ok_or("missing support.json")?);
     let output = PathBuf::from(args.next().ok_or("missing output.json")?);
@@ -275,10 +304,7 @@ fn run() -> Result<Value> {
     let started = Instant::now();
     let mut config = wasmtime::Config::new();
     configure_wasm_runtime(&mut config);
-    if let NativeMode::Speed = native_mode {
-        config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-        config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
-    }
+    native_mode.configure(&mut config);
     config.target(env!("SCRIPTW_PERF_TARGET"))?;
     if profile.is_some() {
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);
@@ -307,6 +333,9 @@ fn run() -> Result<Value> {
         NativeMode::Fast => "matched Fast cohort",
         NativeMode::Speed => {
             "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+        }
+        NativeMode::FastBacktracking | NativeMode::SpeedSinglePass => {
+            "excluded crossed compiler-policy diagnostic; keep separate from scored Fast/Speed cohorts"
         }
     };
     let started = Instant::now();

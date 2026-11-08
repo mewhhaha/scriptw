@@ -27,6 +27,16 @@ mod retained_for_in_enumerator;
 mod with_has_binding;
 use global_environment::GlobalBindingFailure;
 
+/// Minted only after all ordinary parameter initializers have completed.
+/// Environment cells and resumable frame bindings cannot acquire this proof.
+pub(crate) struct InitializedParameterLocal(crate::emit::LocalBindingId);
+
+impl InitializedParameterLocal {
+    pub(crate) fn binding(self) -> crate::emit::LocalBindingId {
+        self.0
+    }
+}
+
 impl<'a> FunctionBuilder<'a> {
     /// Environment References already own an object base and canonical key.
     /// Retain the complete internal-method completion until the caller releases
@@ -834,6 +844,26 @@ impl<'a> FunctionBuilder<'a> {
             {
                 for statement in statements {
                     self.compile_statement(statement, function)?;
+                }
+            }
+        }
+        // Only normal fallthrough reaches the body after every parameter and
+        // destructuring/default initializer completed. Local bindings cannot
+        // become uninitialized again. Captured cells and resumable entries
+        // retain their existing initialization/lifetime protocol.
+        if self.current_function_meta().is_some_and(|meta| {
+            meta.protocol().execution_kind() == scriptw_ir::FunctionExecutionKind::Ordinary
+        }) {
+            for param in self.params {
+                match self.lookup_binding(&param.name) {
+                    Some(BindingStorage::Local(id)) => {
+                        self.seal_initialized_parameter_local(
+                            InitializedParameterLocal(id),
+                            function,
+                        );
+                    }
+                    Some(BindingStorage::EnvSlot { .. }) => {}
+                    None => unreachable!("completed parameter retains its binding"),
                 }
             }
         }

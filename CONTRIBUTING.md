@@ -362,6 +362,11 @@ Speed/Backtracking diagnostic; keep it outside the matched Fast cohort. A single
 probe is not a complete comparison; freeze binaries before repeating the balanced
 process campaign. The published evidence archive retains that campaign's driver.
 
+For excluded compiler-policy diagnostics, `fast-backtracking` and
+`speed-single-pass` cross optimization and register allocation independently.
+Record their actual configuration and separate process cohorts alongside the
+ordinary Fast/Speed controls.
+
 [RSC attribution](docs/rust-rewrite/react-attribution-current.json) separates
 request-window hardware counters, frame-pointer samples and exact native entry
 counts. Its [inert evidence archive](docs/rust-rewrite/rsc-attribution-evidence-2026-11-07.tar.xz)

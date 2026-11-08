@@ -48,18 +48,18 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-08**, source `0c2c10dac9c0`; exact Flight output.
+**React 19.3.1 RSC · 2026-11-08**, source `453a9074fcac`; exact Flight output.
 
 | Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
 | --- | ---: | ---: | ---: |
-| Sync | 4.663 ms | 3.695 ms | 0.490 ms |
-| Async | 5.068 ms | 4.033 ms | 0.400 ms |
+| Sync | 4.554 ms | 3.733 ms | 0.495 ms |
+| Async | 4.938 ms | 4.067 ms | 0.398 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Eight fresh processes per policy in two balanced blocks; 3 warmups and 7 timed requests per mode. Full Flight serialization and consumption are timed; setup precedes the window, and JSON encoding and final output validation follow it. Fast and Speed are separately scored native policies; their optimization and register-allocation settings differ together. The async catalog adds a resolved Promise and markup and performs no I/O. [Phases, workload bounds and limits](docs/rust-rewrite/benchmarks.md#react-server-components) · [RSC identities](docs/rust-rewrite/rsc-current.json).
 
-**Focused performance situations · 2026-11-08**, source `0c2c10dac9c0`: 21 standalone programs compare Fast, Speed and V8.
+**Focused performance situations · 2026-11-08**, source `453a9074fcac`: 21 standalone programs compare Fast, Speed and V8.
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json) · [RSC data](docs/rust-rewrite/rsc-current.json).
 
 ## Current Status
@@ -84,7 +84,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Scoped verification (**2026-11-08**, source `0c2c10dac9c0`): 2,828 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun; existing formatting/Intl issues and four historical AOT unit failures remain [owned](docs/rust-rewrite/current-inventory.md).
+Scoped verification (**2026-11-08**, source `453a9074fcac`): 2,832 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun. Existing formatting and Intl issues remain owned; four AOT unit failures remain a historical owned gate.
 
 ## Caveats
 

@@ -15,21 +15,23 @@ never authorize this path; a shadowed `undefined` remains dynamic.
 Other strict comparisons retain tagged equality: binary64 Number equality,
 String code-unit equality, BigInt value equality and object/reference identity.
 SameValue and SameValueZero keep their distinct Number rules. Loose equality
-retains its conversion and HTMLDDA semantics. Callers retain inequality inversion
-and whole Normal completion publication; no runtime layout or ABI changes.
+retains its conversion and HTMLDDA semantics. Callers retain inequality inversion;
+statement/return owners publish their explicit expression output. No runtime
+layout or ABI changes.
 
 The encoded test checks both emitter routes and omitted all-kind operations
 against dynamic, shadowed, numeric and loose controls. Engine fixtures exercise
 both operand orders, every value category, GC/reentry, whole Throws, TDZ and
 HTMLDDA under strict and sloppy source modes.
 
-The spec dispatcher directly publishes the catalog's seven infallible Boolean
+The spec dispatcher directly computes the catalog's seven infallible Boolean
 operations: IsCallable, IsConstructor, IsPropertyKey, ToBoolean, SameValue,
 SameValueZero and StrictEqualityComparison. A compile-time catalog check pins
 that complete set and its operand domains. Operands still evaluate in order and
 can throw; only the selected kernel is infallible. It writes the Boolean output
-and the complete current Normal completion without a temporary Completion,
-Normal test or second value copy. Loose equality keeps its coercion/Throw path.
+and normalizes the current kind/target without a temporary Completion, Normal
+test or copy into the StatementList payload. Loose equality keeps its
+coercion/Throw path and the same normal output-only contract.
 
 ```sh
 cargo test -p scriptw-aot-wasm --test emission -- singleton_comparisons::

@@ -1,0 +1,1962 @@
+{
+  "schema": "scriptw-react-architecture-current-v1",
+  "status": "complete",
+  "published": true,
+  "date": "2026-11-08",
+  "source": {
+    "base_git": "b8c7325438c48028866fc85a74f2115acd465731",
+    "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+    "runtime_abi": 53,
+    "manifest": {
+      "path": "target/performance-architecture-20261108/tools/source-finished/manifest.json",
+      "sha256": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1"
+    },
+    "qualified_external_test_correction": {
+      "path": "target/performance-architecture-20261108/tools/external-test-reuse-finished.json",
+      "sha256": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6"
+    },
+    "host_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+    "host_producer": {
+      "path": "target/performance-architecture-20261108/frozen/rsc_baseline-producer.json",
+      "sha256": "99ed01a2365f34eb6e39b06be1bafa3a8ae986cebe688e8eb549acb98f2eb654"
+    },
+    "compiler_source_identity": "Product host built from the preceding source snapshot; two external-test-only corrections are qualified separately."
+  },
+  "scored_rsc": {
+    "campaign": {
+      "path": "target/performance-architecture-20261108/tools/rsc-campaign-1/campaign.json",
+      "sha256": "0b36a76f2340fcdce9b2eafe7855b787ffb867bf1182295e93e72e7202b81e8a"
+    },
+    "aggregate": {
+      "path": "target/performance-architecture-20261108/tools/rsc-campaign-1/aggregate.json",
+      "sha256": "d0a204c3e7cc9a80d7c047215f529d9781b8f44e2e49efa25fccbdb48d485339"
+    },
+    "measurement": {
+      "campaign": "target/performance-architecture-20261108/tools/rsc-campaign-1/campaign.json",
+      "campaign_sha256": "0b36a76f2340fcdce9b2eafe7855b787ffb867bf1182295e93e72e7202b81e8a",
+      "blocks": 2,
+      "processes_per_engine": 8,
+      "samples": 7,
+      "warmups": 3,
+      "checked_flight_calls": 800,
+      "case_order": [
+        "rsc-sync",
+        "rsc-async"
+      ],
+      "actors": [
+        "baseline",
+        "baseline-speed",
+        "candidate",
+        "candidate-speed",
+        "v8"
+      ]
+    },
+    "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+    "baseline_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+    "process_count": 40,
+    "checked_request_calls": 800,
+    "samples_per_request": 7,
+    "warmups_per_process": 3,
+    "raw_process_reports": [
+      {
+        "label": "block-0-rep-0-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-0-baseline/report.json",
+        "sha256": "6c78b191e57aa8772ae35c6a61699e32dde1d7a3b42a630037dc5c2cd086554d"
+      },
+      {
+        "label": "block-0-rep-0-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-0-baseline-speed/report.json",
+        "sha256": "2cf90388cd62464d6657af0f8f89d7499ccb8fa2a75a23c54752b99015218b9d"
+      },
+      {
+        "label": "block-0-rep-0-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
+        "sha256": "82ff7735ab4ac1f4f159a50b063e239a84fd51ec48d7ea68eee0aa56e58c4981"
+      },
+      {
+        "label": "block-0-rep-0-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate-speed/report.json",
+        "sha256": "0d783b2dd5cce544bbd595be9bb58815d6b8b3c764d8be0f03ed3f682735b1e7"
+      },
+      {
+        "label": "block-0-rep-0-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-0-v8/report.json",
+        "sha256": "35bb44b673f41df42a573d531d93e60bb719f0ed5bf6272d1627a460675d389f"
+      },
+      {
+        "label": "block-0-rep-1-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-1-baseline/report.json",
+        "sha256": "a58a7f2be864698b97f44d7812cd70e1644b3233ce629b2ede5e498dc7892b5a"
+      },
+      {
+        "label": "block-0-rep-1-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-1-baseline-speed/report.json",
+        "sha256": "f6036a755e9bd60586957e752e71cd59084c7f2c009110528251bd60f387c588"
+      },
+      {
+        "label": "block-0-rep-1-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-1-candidate/report.json",
+        "sha256": "60699a395ee267b6dd719b49347042e4d247420d10b6e747ff9efee3a967c586"
+      },
+      {
+        "label": "block-0-rep-1-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-1-candidate-speed/report.json",
+        "sha256": "6ad5e4efb38dc97e209763bc68521328ec486b01b6935392002428b20cb034bb"
+      },
+      {
+        "label": "block-0-rep-1-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-1-v8/report.json",
+        "sha256": "77c49e29e6ddea762dc14c132df34a13c3414ac4ab1a80fc3c124768de70d307"
+      },
+      {
+        "label": "block-0-rep-2-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-2-baseline/report.json",
+        "sha256": "129ff1a695dbe5b5e6dbc1bc1d18dfac153432503b978700fa54bc4e611b967e"
+      },
+      {
+        "label": "block-0-rep-2-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-2-baseline-speed/report.json",
+        "sha256": "e8efc8687ec44ae64980005d7f8d3198aa4ccf1491ffbfad889ae6efec920894"
+      },
+      {
+        "label": "block-0-rep-2-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-2-candidate/report.json",
+        "sha256": "86c3503b2cb6b74fcdfbbd2c11250f29a57aeeb1376c4f6d0e50c70264cbb906"
+      },
+      {
+        "label": "block-0-rep-2-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-2-candidate-speed/report.json",
+        "sha256": "b39e91f2b96c6a550fe32c4da98513b88c6b251c06bb2f5f475b02ce3f34bffe"
+      },
+      {
+        "label": "block-0-rep-2-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-2-v8/report.json",
+        "sha256": "fd2900f199a14f7cea75c6a02ee20e381f5c18712f67f00cadd5d0509d0bdb92"
+      },
+      {
+        "label": "block-0-rep-3-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-3-baseline/report.json",
+        "sha256": "6cccade0dc3331c19b01fa3341490e58276929d95602e103d64e25629d1c9480"
+      },
+      {
+        "label": "block-0-rep-3-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-3-baseline-speed/report.json",
+        "sha256": "931bbfcb5bf7bc3cb1482e81d73b48541d9c5b5e960a84e27e71f114aec444a4"
+      },
+      {
+        "label": "block-0-rep-3-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-3-candidate/report.json",
+        "sha256": "647a5839843254f2139fc26efff463f0c2892f58d864740faa48bbc693065ec8"
+      },
+      {
+        "label": "block-0-rep-3-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-3-candidate-speed/report.json",
+        "sha256": "b8f6a42eb05e0bf54ff3c6c966536e92aeda165ed6cc2baa7b1d17c6473695a1"
+      },
+      {
+        "label": "block-0-rep-3-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-0-rep-3-v8/report.json",
+        "sha256": "bbab7440634654adcc6c130793f611ecb8eb5fb57653a97d4b7ad4580e29eba0"
+      },
+      {
+        "label": "block-1-rep-0-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-0-v8/report.json",
+        "sha256": "e06eba1a135e3e5036683425b305a283467781a2c0041b9c0d76a7d8edb34067"
+      },
+      {
+        "label": "block-1-rep-0-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-0-candidate-speed/report.json",
+        "sha256": "b614771425b14c02373f75e996dda9893ae9cdb2a6c468d8ef91304930c70194"
+      },
+      {
+        "label": "block-1-rep-0-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-0-candidate/report.json",
+        "sha256": "01d0b570434f95d1ef61a9bb9dd9fddac3288e6a1ba4f73de5e89cdc8788d8bc"
+      },
+      {
+        "label": "block-1-rep-0-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-0-baseline-speed/report.json",
+        "sha256": "9aeb94b90874897ba803453ba6ace76978b94cb2ef251ddc03b089b6c1c4dfa1"
+      },
+      {
+        "label": "block-1-rep-0-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-0-baseline/report.json",
+        "sha256": "60a9d9bec90b6f951b1913c3b43158a0fe6bc4f797bc46e4e7d497972cca80e8"
+      },
+      {
+        "label": "block-1-rep-1-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-1-v8/report.json",
+        "sha256": "43d43eb2dc48350a591ea222b5ce5b219340f35bbdfd5595210065320d95ead5"
+      },
+      {
+        "label": "block-1-rep-1-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-1-candidate-speed/report.json",
+        "sha256": "9f00fc0351ff33896ff6d54f8a18b8b9325093b260823e207662096f6fe39200"
+      },
+      {
+        "label": "block-1-rep-1-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-1-candidate/report.json",
+        "sha256": "55e5277c660c4ce096333e1b2185ca9d31dab609d60ab5e6076a28d8225d24ad"
+      },
+      {
+        "label": "block-1-rep-1-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-1-baseline-speed/report.json",
+        "sha256": "293852e442e3aeaa0436a5cfa53275f3677a85af38a4f62d893dfa3b2812a492"
+      },
+      {
+        "label": "block-1-rep-1-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-1-baseline/report.json",
+        "sha256": "36a9c79d9e9b270647498dd245648f53403bee94e01726624dc1d83a2e8d213d"
+      },
+      {
+        "label": "block-1-rep-2-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-2-v8/report.json",
+        "sha256": "7eb0bc4f6b4ffb7f9af56173f7c463ff893650f2dfb858fcae107af0e9d351f8"
+      },
+      {
+        "label": "block-1-rep-2-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-2-candidate-speed/report.json",
+        "sha256": "a53d0c73fe5639c2386e4119a00cc62a0e32789399e76b8ff0b38a45dfa02b0a"
+      },
+      {
+        "label": "block-1-rep-2-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-2-candidate/report.json",
+        "sha256": "50b428f6c8bfaefd2ae739f650ccd3b7b7103ae5c5246c3c281841d725ec5c5b"
+      },
+      {
+        "label": "block-1-rep-2-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-2-baseline-speed/report.json",
+        "sha256": "aa0d20353f5b234fed71dc17e1c9c287e0bdc0edb604aebe6fc8ddc793ca32f2"
+      },
+      {
+        "label": "block-1-rep-2-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-2-baseline/report.json",
+        "sha256": "ed2aec3e29e61b0f8c6ed19f629ad4f59a41ee7e5603b8d60c97d21b96f2c327"
+      },
+      {
+        "label": "block-1-rep-3-v8",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-3-v8/report.json",
+        "sha256": "6eb09c2eadd5dac7b8fdc11b6ca7e734ba6ccef0e221dfe33ccf570fe09fdb5e"
+      },
+      {
+        "label": "block-1-rep-3-candidate-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-3-candidate-speed/report.json",
+        "sha256": "be4174b9f3fb8b0784db8b2987ef4d48e46de032c0d1f2c34b58d5c73ff8c3d0"
+      },
+      {
+        "label": "block-1-rep-3-candidate",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-3-candidate/report.json",
+        "sha256": "253de4a6294694aaf16a7cf34f38a64e34974582a1605954637165bfc4ecdbad"
+      },
+      {
+        "label": "block-1-rep-3-baseline-speed",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-3-baseline-speed/report.json",
+        "sha256": "a5cec398674803bcb9030f6b70b1548e7f3ddafc1f72595969274537e7bb126c"
+      },
+      {
+        "label": "block-1-rep-3-baseline",
+        "report": "target/performance-architecture-20261108/tools/rsc-campaign-1/block-1-rep-3-baseline/report.json",
+        "sha256": "4963a329db0b2dfa2386dfcdaacb5090502ba3359cf150cfc075a4b6c7e76af3"
+      }
+    ],
+    "engines": {
+      "baseline": {
+        "identity": {
+          "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+          "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+          "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+          "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+          "toolchain": {
+            "opt_level": "3",
+            "profile": "release",
+            "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+            "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+            "target": "x86_64-unknown-linux-gnu"
+          },
+          "configuration": {
+            "collector": "Copying",
+            "compilation_jobs": 1,
+            "cranelift_opt_level": "None",
+            "driver_worker_stack_bytes": 67108864,
+            "epoch_deadline_ticks": 6000,
+            "epoch_interruption": true,
+            "epoch_tick_ms": 5,
+            "gc_initial_bytes": 16777216,
+            "max_wasm_stack_bytes": 33554432,
+            "native_parallel_compilation": false,
+            "pending_deadline_ms": 30000,
+            "register_allocation": "SinglePass",
+            "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+            "target": "x86_64-unknown-linux-gnu",
+            "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+            "wasmtime": "47.0.0",
+            "wasmtime_async_stack_bytes": 67108864
+          },
+          "program_wasm_bytes": 4327610,
+          "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+          "runtime": {
+            "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+            "wasm_bytes": 38769947,
+            "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+          },
+          "inputs": {
+            "adapted_source_bytes": 64946,
+            "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+            "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "source_bytes": 64835,
+            "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+            "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+            "versions": {
+              "esbuild": "0.28.2",
+              "playwright": "1.64.1",
+              "react": "19.3.1",
+              "react-dom": "19.3.1",
+              "react-server-dom-webpack": "19.3.1"
+            },
+            "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+          },
+          "native_mode": "fast",
+          "native_mode_scope": "matched Fast cohort"
+        },
+        "block_medians_ns": [
+          {
+            "block": 0,
+            "cases": {
+              "rsc-sync": 4791192.0,
+              "rsc-async": 5218049.0
+            }
+          },
+          {
+            "block": 1,
+            "cases": {
+              "rsc-sync": 4650756.5,
+              "rsc-async": 5058006.0
+            }
+          }
+        ],
+        "process_medians_ns": {
+          "rsc-sync": [
+            4657106,
+            4812622,
+            4821650,
+            4769762,
+            4647109,
+            4738634,
+            4654404,
+            4617475
+          ],
+          "rsc-async": [
+            5010589,
+            5248441,
+            5297636,
+            5187657,
+            5033193,
+            5175325,
+            5082819,
+            5027985
+          ]
+        }
+      },
+      "baseline-speed": {
+        "identity": {
+          "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+          "source_commit": "dfefb3222737b067e1c98777161d95d42491df8f",
+          "executable_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+          "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+          "toolchain": {
+            "opt_level": "3",
+            "profile": "release",
+            "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+            "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+            "target": "x86_64-unknown-linux-gnu"
+          },
+          "configuration": {
+            "collector": "Copying",
+            "compilation_jobs": 1,
+            "cranelift_opt_level": "Speed",
+            "driver_worker_stack_bytes": 67108864,
+            "epoch_deadline_ticks": 6000,
+            "epoch_interruption": true,
+            "epoch_tick_ms": 5,
+            "gc_initial_bytes": 16777216,
+            "max_wasm_stack_bytes": 33554432,
+            "native_parallel_compilation": false,
+            "pending_deadline_ms": 30000,
+            "register_allocation": "Backtracking",
+            "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+            "target": "x86_64-unknown-linux-gnu",
+            "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+            "wasmtime": "47.0.0",
+            "wasmtime_async_stack_bytes": 67108864
+          },
+          "program_wasm_bytes": 4327610,
+          "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+          "runtime": {
+            "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+            "wasm_bytes": 38769947,
+            "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+          },
+          "inputs": {
+            "adapted_source_bytes": 64946,
+            "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+            "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "source_bytes": 64835,
+            "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+            "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+            "versions": {
+              "esbuild": "0.28.2",
+              "playwright": "1.64.1",
+              "react": "19.3.1",
+              "react-dom": "19.3.1",
+              "react-server-dom-webpack": "19.3.1"
+            },
+            "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+          },
+          "native_mode": "speed",
+          "native_mode_scope": "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+        },
+        "block_medians_ns": [
+          {
+            "block": 0,
+            "cases": {
+              "rsc-sync": 3743725.5,
+              "rsc-async": 4040439.5
+            }
+          },
+          {
+            "block": 1,
+            "cases": {
+              "rsc-sync": 3707893.5,
+              "rsc-async": 4059562.5
+            }
+          }
+        ],
+        "process_medians_ns": {
+          "rsc-sync": [
+            3776382,
+            3743389,
+            3744062,
+            3708544,
+            3650935,
+            3671123,
+            3744664,
+            3772837
+          ],
+          "rsc-async": [
+            4001329,
+            4133010,
+            4042628,
+            4038251,
+            3977716,
+            4030998,
+            4088127,
+            4136899
+          ]
+        }
+      },
+      "candidate": {
+        "identity": {
+          "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+          "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+          "executable_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+          "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+          "toolchain": {
+            "opt_level": "3",
+            "profile": "release",
+            "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+            "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+            "target": "x86_64-unknown-linux-gnu"
+          },
+          "configuration": {
+            "collector": "Copying",
+            "compilation_jobs": 1,
+            "cranelift_opt_level": "None",
+            "driver_worker_stack_bytes": 67108864,
+            "epoch_deadline_ticks": 6000,
+            "epoch_interruption": true,
+            "epoch_tick_ms": 5,
+            "gc_initial_bytes": 16777216,
+            "max_wasm_stack_bytes": 33554432,
+            "native_parallel_compilation": false,
+            "pending_deadline_ms": 30000,
+            "register_allocation": "SinglePass",
+            "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+            "target": "x86_64-unknown-linux-gnu",
+            "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+            "wasmtime": "47.0.0",
+            "wasmtime_async_stack_bytes": 67108864
+          },
+          "program_wasm_bytes": 4169697,
+          "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+          "runtime": {
+            "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+            "wasm_bytes": 38769947,
+            "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+          },
+          "inputs": {
+            "adapted_source_bytes": 64946,
+            "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+            "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "source_bytes": 64835,
+            "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+            "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+            "versions": {
+              "esbuild": "0.28.2",
+              "playwright": "1.64.1",
+              "react": "19.3.1",
+              "react-dom": "19.3.1",
+              "react-server-dom-webpack": "19.3.1"
+            },
+            "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+          },
+          "native_mode": "fast",
+          "native_mode_scope": "matched Fast cohort"
+        },
+        "block_medians_ns": [
+          {
+            "block": 0,
+            "cases": {
+              "rsc-sync": 4547188.5,
+              "rsc-async": 4977908.0
+            }
+          },
+          {
+            "block": 1,
+            "cases": {
+              "rsc-sync": 4554183.0,
+              "rsc-async": 4937817.5
+            }
+          }
+        ],
+        "process_medians_ns": {
+          "rsc-sync": [
+            4441887,
+            4768599,
+            4589539,
+            4504838,
+            4480092,
+            4559263,
+            4549103,
+            4600692
+          ],
+          "rsc-async": [
+            4847518,
+            5271044,
+            5019707,
+            4936109,
+            4845737,
+            4935458,
+            4968862,
+            4940177
+          ]
+        }
+      },
+      "candidate-speed": {
+        "identity": {
+          "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+          "source_commit": "b8c7325438c48028866fc85a74f2115acd465731",
+          "executable_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+          "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+          "toolchain": {
+            "opt_level": "3",
+            "profile": "release",
+            "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+            "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+            "target": "x86_64-unknown-linux-gnu"
+          },
+          "configuration": {
+            "collector": "Copying",
+            "compilation_jobs": 1,
+            "cranelift_opt_level": "Speed",
+            "driver_worker_stack_bytes": 67108864,
+            "epoch_deadline_ticks": 6000,
+            "epoch_interruption": true,
+            "epoch_tick_ms": 5,
+            "gc_initial_bytes": 16777216,
+            "max_wasm_stack_bytes": 33554432,
+            "native_parallel_compilation": false,
+            "pending_deadline_ms": 30000,
+            "register_allocation": "Backtracking",
+            "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+            "target": "x86_64-unknown-linux-gnu",
+            "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+            "wasmtime": "47.0.0",
+            "wasmtime_async_stack_bytes": 67108864
+          },
+          "program_wasm_bytes": 4169697,
+          "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+          "runtime": {
+            "key": "02fd98fc153c0fb317f91d3ef4e852b625dbb409a41e51893506a0c488d5d0d6",
+            "wasm_bytes": 38769947,
+            "wasm_sha256": "4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64"
+          },
+          "inputs": {
+            "adapted_source_bytes": 64946,
+            "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+            "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+            "source_bytes": 64835,
+            "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+            "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+            "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+            "versions": {
+              "esbuild": "0.28.2",
+              "playwright": "1.64.1",
+              "react": "19.3.1",
+              "react-dom": "19.3.1",
+              "react-server-dom-webpack": "19.3.1"
+            },
+            "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+          },
+          "native_mode": "speed",
+          "native_mode_scope": "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+        },
+        "block_medians_ns": [
+          {
+            "block": 0,
+            "cases": {
+              "rsc-sync": 3699266.0,
+              "rsc-async": 4033145.5
+            }
+          },
+          {
+            "block": 1,
+            "cases": {
+              "rsc-sync": 3760809.0,
+              "rsc-async": 4100405.5
+            }
+          }
+        ],
+        "process_medians_ns": {
+          "rsc-sync": [
+            3663577,
+            3728291,
+            3790840,
+            3670241,
+            3784559,
+            3630015,
+            3795680,
+            3737059
+          ],
+          "rsc-async": [
+            3993485,
+            4072806,
+            4095530,
+            3975462,
+            4174379,
+            3964842,
+            4139695,
+            4061116
+          ]
+        }
+      },
+      "v8": {
+        "identity": {
+          "node": {
+            "node": "24.12.0",
+            "acorn": "8.15.0",
+            "ada": "3.3.0",
+            "amaro": "1.1.5",
+            "ares": "1.34.5",
+            "brotli": "1.1.0",
+            "cjs_module_lexer": "2.1.0",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.3.0",
+            "modules": "137",
+            "napi": "10",
+            "nbytes": "0.1.1",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.67.1",
+            "openssl": "3.5.4",
+            "simdjson": "4.1.0",
+            "simdutf": "6.4.0",
+            "sqlite": "3.50.4",
+            "tz": "2025b",
+            "undici": "7.16.0",
+            "unicode": "16.0",
+            "uv": "1.51.0",
+            "uvwasi": "0.0.23",
+            "v8": "13.6.233.17-node.37",
+            "zlib": "1.3.1-470d3a2",
+            "zstd": "1.5.7"
+          }
+        },
+        "block_medians_ns": [
+          {
+            "block": 0,
+            "cases": {
+              "rsc-sync": 518376.0,
+              "rsc-async": 396228.5
+            }
+          },
+          {
+            "block": 1,
+            "cases": {
+              "rsc-sync": 494711.0,
+              "rsc-async": 398087.0
+            }
+          }
+        ],
+        "process_medians_ns": {
+          "rsc-sync": [
+            715952,
+            492667,
+            544085,
+            476817,
+            482949,
+            496815,
+            548623,
+            492607
+          ],
+          "rsc-async": [
+            397466,
+            401543,
+            394991,
+            393087,
+            410982,
+            394811,
+            398017,
+            398157
+          ]
+        }
+      }
+    },
+    "scope": "Scored retained RSC request latency; source/host/Wasmtime policy pair is explicit per engine."
+  },
+  "native_policy_diagnostics": {
+    "campaign": {
+      "path": "target/performance-architecture-20261108/tools/native-policy-2x2/campaign.json",
+      "sha256": "780ef2641b409e67b112c4dba8e34f022281607a13a4a20b8510b07025135c53"
+    },
+    "process_count": 24,
+    "checked_request_calls": 480,
+    "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+    "mode_medians_ns": {
+      "fast": [
+        {
+          "block": 0,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 4509488,
+            "rsc-async": 4893400
+          },
+          "report_sha256": "255984b0a6ed968bfc84028be592649576fb5f9b9b63955556cef5db4afcf99e"
+        },
+        {
+          "block": 0,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 4431921,
+            "rsc-async": 4832914
+          },
+          "report_sha256": "b813c49897378d442bbd20c86542867fb40ccf7695170633f6d22ca839ad1651"
+        },
+        {
+          "block": 0,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 4476296,
+            "rsc-async": 4900152
+          },
+          "report_sha256": "18f437ca6756e6547172ccc2a8f8bdd516a85095efffac9307d2eea73bce65b1"
+        },
+        {
+          "block": 1,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 4486356,
+            "rsc-async": 4877890
+          },
+          "report_sha256": "c31060cbf26a03464f9024c7d7811676b72f89fbafd4f8d92e683b3568507459"
+        },
+        {
+          "block": 1,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 4459414,
+            "rsc-async": 4828898
+          },
+          "report_sha256": "1d6c7d39d4df506ce79600da1783dcc2023670763c9468dbb1a699de3fc83a88"
+        },
+        {
+          "block": 1,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 4412665,
+            "rsc-async": 4806184
+          },
+          "report_sha256": "c91e1e4804c2940f306dba349c5204e89ac59d754e02df7c3ff23f77afea3a12"
+        }
+      ],
+      "fast-backtracking": [
+        {
+          "block": 0,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 3719596,
+            "rsc-async": 4085142
+          },
+          "report_sha256": "1b6954b001bb9f7e842417161f3e04387032463cd79776d90c92aaa382cb1ee1"
+        },
+        {
+          "block": 0,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 3772036,
+            "rsc-async": 4146208
+          },
+          "report_sha256": "0669710af6449bc201282bc4c2de8c5b951e4e825bcbf18373c1a0a22cde2e3b"
+        },
+        {
+          "block": 0,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 3821962,
+            "rsc-async": 4170384
+          },
+          "report_sha256": "9acf49b26f2dcedf789cd694460234d1341451e4c04aef84de8f8bc04f9a3592"
+        },
+        {
+          "block": 1,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 3795741,
+            "rsc-async": 4132602
+          },
+          "report_sha256": "5375b3007937244c2489bd169f2098cba1bc5ff621215212fca8aac51375a2ab"
+        },
+        {
+          "block": 1,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 3826610,
+            "rsc-async": 4153542
+          },
+          "report_sha256": "fb313346b240a2c86d2ce1e24296c6af31b0396e7378938230ee91d55ceb5fdc"
+        },
+        {
+          "block": 1,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 3791303,
+            "rsc-async": 4182638
+          },
+          "report_sha256": "f0b581bd5ed1bc2f074bb77cdb84d2abca5cfcb046672da0bdbd42f177658538"
+        }
+      ],
+      "speed": [
+        {
+          "block": 0,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 3619606,
+            "rsc-async": 3960865
+          },
+          "report_sha256": "465f7d7b33339385c157c5eb4e46f4a5b40b2d9b8bd4dc5d055104e37ea0418c"
+        },
+        {
+          "block": 0,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 3651697,
+            "rsc-async": 3972577
+          },
+          "report_sha256": "8193685812a301b8fb20c8fbb1a7e34aa3098ce919223d32028994f3fb3daedd"
+        },
+        {
+          "block": 0,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 3669651,
+            "rsc-async": 3960966
+          },
+          "report_sha256": "cbd2a193a99bcb255fab8f46a8ed85f7b5c587eced89a8c102bdac5cf4cb9f0a"
+        },
+        {
+          "block": 1,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 3621641,
+            "rsc-async": 3948943
+          },
+          "report_sha256": "cc76be77f0da371f5336c479a83b5254ed87cf9378b2601380d4e3ac10c304f9"
+        },
+        {
+          "block": 1,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 3650415,
+            "rsc-async": 3957460
+          },
+          "report_sha256": "702db2a890689e045d6796a9593556e1520699b2e0bf7ee2f6a96712505e9128"
+        },
+        {
+          "block": 1,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 3614216,
+            "rsc-async": 3969052
+          },
+          "report_sha256": "90387c42bf07037cd4d95493cc3d91f5f37c555c5412c2e2f540279d288599c7"
+        }
+      ],
+      "speed-single-pass": [
+        {
+          "block": 0,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 4214347,
+            "rsc-async": 4539436
+          },
+          "report_sha256": "1810c5c408bf2b8b7ef42e5dfc4b2ae0cdb8214f2df44b68e8a0351d484afaf8"
+        },
+        {
+          "block": 0,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 4174862,
+            "rsc-async": 4535408
+          },
+          "report_sha256": "acbcf05b1a88e5c05aa6745f8bd174199244ef3d8fce285f8956df637467034e"
+        },
+        {
+          "block": 0,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 4231270,
+            "rsc-async": 4564033
+          },
+          "report_sha256": "38474c1d45252dea8ccb24cf4afc62c4cf3919e88d6d09afe9c4e13e336fdf17"
+        },
+        {
+          "block": 1,
+          "repetition": 0,
+          "cases": {
+            "rsc-sync": 4230268,
+            "rsc-async": 4599851
+          },
+          "report_sha256": "fd2e293eb6fd989fc54589bb785dfdb348fe0cc4639f7879f99744c2f9aafd3f"
+        },
+        {
+          "block": 1,
+          "repetition": 1,
+          "cases": {
+            "rsc-sync": 4152591,
+            "rsc-async": 4544095
+          },
+          "report_sha256": "348a10d9f1aa96cb955babe8622eb53421ca9171efeb332985471782c7b20279"
+        },
+        {
+          "block": 1,
+          "repetition": 2,
+          "cases": {
+            "rsc-sync": 4189030,
+            "rsc-async": 4564534
+          },
+          "report_sha256": "886c60437ce011aa800d303f723b73e9b02acf199cf5135ea82fcbe1e8c2062b"
+        }
+      ]
+    },
+    "raw_process_reports": [
+      {
+        "label": "block-0-rep-0-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-0-fast/report.json",
+        "sha256": "255984b0a6ed968bfc84028be592649576fb5f9b9b63955556cef5db4afcf99e"
+      },
+      {
+        "label": "block-0-rep-0-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-0-fast-backtracking/report.json",
+        "sha256": "1b6954b001bb9f7e842417161f3e04387032463cd79776d90c92aaa382cb1ee1"
+      },
+      {
+        "label": "block-0-rep-0-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-0-speed/report.json",
+        "sha256": "465f7d7b33339385c157c5eb4e46f4a5b40b2d9b8bd4dc5d055104e37ea0418c"
+      },
+      {
+        "label": "block-0-rep-0-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-0-speed-single-pass/report.json",
+        "sha256": "1810c5c408bf2b8b7ef42e5dfc4b2ae0cdb8214f2df44b68e8a0351d484afaf8"
+      },
+      {
+        "label": "block-0-rep-1-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-1-fast/report.json",
+        "sha256": "b813c49897378d442bbd20c86542867fb40ccf7695170633f6d22ca839ad1651"
+      },
+      {
+        "label": "block-0-rep-1-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-1-fast-backtracking/report.json",
+        "sha256": "0669710af6449bc201282bc4c2de8c5b951e4e825bcbf18373c1a0a22cde2e3b"
+      },
+      {
+        "label": "block-0-rep-1-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-1-speed/report.json",
+        "sha256": "8193685812a301b8fb20c8fbb1a7e34aa3098ce919223d32028994f3fb3daedd"
+      },
+      {
+        "label": "block-0-rep-1-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-1-speed-single-pass/report.json",
+        "sha256": "acbcf05b1a88e5c05aa6745f8bd174199244ef3d8fce285f8956df637467034e"
+      },
+      {
+        "label": "block-0-rep-2-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-2-fast/report.json",
+        "sha256": "18f437ca6756e6547172ccc2a8f8bdd516a85095efffac9307d2eea73bce65b1"
+      },
+      {
+        "label": "block-0-rep-2-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-2-fast-backtracking/report.json",
+        "sha256": "9acf49b26f2dcedf789cd694460234d1341451e4c04aef84de8f8bc04f9a3592"
+      },
+      {
+        "label": "block-0-rep-2-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-2-speed/report.json",
+        "sha256": "cbd2a193a99bcb255fab8f46a8ed85f7b5c587eced89a8c102bdac5cf4cb9f0a"
+      },
+      {
+        "label": "block-0-rep-2-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-0-rep-2-speed-single-pass/report.json",
+        "sha256": "38474c1d45252dea8ccb24cf4afc62c4cf3919e88d6d09afe9c4e13e336fdf17"
+      },
+      {
+        "label": "block-1-rep-0-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-0-speed-single-pass/report.json",
+        "sha256": "fd2e293eb6fd989fc54589bb785dfdb348fe0cc4639f7879f99744c2f9aafd3f"
+      },
+      {
+        "label": "block-1-rep-0-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-0-speed/report.json",
+        "sha256": "cc76be77f0da371f5336c479a83b5254ed87cf9378b2601380d4e3ac10c304f9"
+      },
+      {
+        "label": "block-1-rep-0-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-0-fast-backtracking/report.json",
+        "sha256": "5375b3007937244c2489bd169f2098cba1bc5ff621215212fca8aac51375a2ab"
+      },
+      {
+        "label": "block-1-rep-0-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-0-fast/report.json",
+        "sha256": "c31060cbf26a03464f9024c7d7811676b72f89fbafd4f8d92e683b3568507459"
+      },
+      {
+        "label": "block-1-rep-1-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-1-speed-single-pass/report.json",
+        "sha256": "348a10d9f1aa96cb955babe8622eb53421ca9171efeb332985471782c7b20279"
+      },
+      {
+        "label": "block-1-rep-1-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-1-speed/report.json",
+        "sha256": "702db2a890689e045d6796a9593556e1520699b2e0bf7ee2f6a96712505e9128"
+      },
+      {
+        "label": "block-1-rep-1-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-1-fast-backtracking/report.json",
+        "sha256": "fb313346b240a2c86d2ce1e24296c6af31b0396e7378938230ee91d55ceb5fdc"
+      },
+      {
+        "label": "block-1-rep-1-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-1-fast/report.json",
+        "sha256": "1d6c7d39d4df506ce79600da1783dcc2023670763c9468dbb1a699de3fc83a88"
+      },
+      {
+        "label": "block-1-rep-2-speed-single-pass",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-2-speed-single-pass/report.json",
+        "sha256": "886c60437ce011aa800d303f723b73e9b02acf199cf5135ea82fcbe1e8c2062b"
+      },
+      {
+        "label": "block-1-rep-2-speed",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-2-speed/report.json",
+        "sha256": "90387c42bf07037cd4d95493cc3d91f5f37c555c5412c2e2f540279d288599c7"
+      },
+      {
+        "label": "block-1-rep-2-fast-backtracking",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-2-fast-backtracking/report.json",
+        "sha256": "f0b581bd5ed1bc2f074bb77cdb84d2abca5cfcb046672da0bdbd42f177658538"
+      },
+      {
+        "label": "block-1-rep-2-fast",
+        "report": "target/performance-architecture-20261108/tools/native-policy-2x2/block-1-rep-2-fast/report.json",
+        "sha256": "c91e1e4804c2940f306dba349c5204e89ac59d754e02df7c3ff23f77afea3a12"
+      }
+    ],
+    "captures": {
+      "fast": {
+        "receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/receipt.json",
+          "sha256": "defe08e893a01e6cd3ea5fcd8ca74224a67f681632c246f90b48c88de9122300"
+        },
+        "report": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/report.json",
+          "sha256": "f3d187521e38c288218e43eb961daf93eb372f022dc9d1012a3a739f6ca138ea"
+        },
+        "mode": "fast",
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "host_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+        "program_wasm_bytes": 4169697,
+        "program_wasm": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/program.wasm",
+          "sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f"
+        },
+        "functions": {
+          "js::vn#f133": {
+            "perfmap_extent_bytes": 1398560,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-fast-retry/vn.native",
+              "sha256": "ba119e93251710768b68d8e0037cb3e41500be29536e59a77e5b0be8797b6f1d"
+            }
+          },
+          "js::ft#f123": {
+            "perfmap_extent_bytes": 521904,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-fast-retry/ft.native",
+              "sha256": "2382cca574cecbbea48832522a1f0a70c170d5c530a353017591a4120bbc9468"
+            }
+          }
+        },
+        "maps_before_sha256": "cc3f80c39863eb9fffc395f7719b368893f89b01270c272e889bb89851bd2c31",
+        "maps_after_sha256": "cc3f80c39863eb9fffc395f7719b368893f89b01270c272e889bb89851bd2c31",
+        "maps_file": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/maps.txt",
+          "sha256": "cc3f80c39863eb9fffc395f7719b368893f89b01270c272e889bb89851bd2c31"
+        },
+        "perf_map_sha256": "91c45276d11ae1e2bf30c10d1fe92d40bddfb33d686e3b63daa86f00d21cd226",
+        "perf_map": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/perf.map",
+          "sha256": "91c45276d11ae1e2bf30c10d1fe92d40bddfb33d686e3b63daa86f00d21cd226"
+        },
+        "native_stack_frame_analysis": {
+          "vn": {
+            "frame_bytes": 213856,
+            "probe_kind": "page-probe",
+            "probe_count": 53
+          },
+          "ft": {
+            "frame_bytes": 85664,
+            "probe_kind": "page-probe",
+            "probe_count": 21
+          }
+        },
+        "native_stack_frame_analysis_source": "Manual disassembly of the exact captured native bytes; distinct from perf-map function extents."
+      },
+      "fast-backtracking": {
+        "receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/receipt.json",
+          "sha256": "0d57ba8047fe4eed22616f8fec60ca980ee0a4131953591a11c9eba4980643fb"
+        },
+        "report": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/report.json",
+          "sha256": "951f9fd04798e2e9fefa25ef8217c759c7311964283295c1d526de8de19c4d1e"
+        },
+        "mode": "fast-backtracking",
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "host_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+        "program_wasm_bytes": 4169697,
+        "program_wasm": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/program.wasm",
+          "sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f"
+        },
+        "functions": {
+          "js::vn#f133": {
+            "perfmap_extent_bytes": 761904,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/vn.native",
+              "sha256": "e3b93b6fce54a64108169257c1399f35701096bd2fab2eca702b2c01a0ab27be"
+            }
+          },
+          "js::ft#f123": {
+            "perfmap_extent_bytes": 291664,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/ft.native",
+              "sha256": "4e888cc0fcfd97b75af57e61a21c77531cabd68e60f5d86cb8ae87fae9b358f4"
+            }
+          }
+        },
+        "maps_before_sha256": "7cb08f53e1488269af08fbcbca1b51870149f2721c509095eb72217929eb8cce",
+        "maps_after_sha256": "7cb08f53e1488269af08fbcbca1b51870149f2721c509095eb72217929eb8cce",
+        "maps_file": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/maps.txt",
+          "sha256": "7cb08f53e1488269af08fbcbca1b51870149f2721c509095eb72217929eb8cce"
+        },
+        "perf_map_sha256": "a2a7a7045c4024095cc85ba931290dee882ec34f7d3c602b52606b42712568b3",
+        "perf_map": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/perf.map",
+          "sha256": "a2a7a7045c4024095cc85ba931290dee882ec34f7d3c602b52606b42712568b3"
+        },
+        "native_stack_frame_analysis": {
+          "vn": {
+            "frame_bytes": 8736,
+            "probe_kind": "unrolled-probe-store",
+            "probe_count": 2
+          },
+          "ft": {
+            "frame_bytes": 2736,
+            "probe_kind": "unrolled-probe-store",
+            "probe_count": 0
+          }
+        },
+        "native_stack_frame_analysis_source": "Manual disassembly of the exact captured native bytes; distinct from perf-map function extents."
+      },
+      "speed": {
+        "receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/receipt.json",
+          "sha256": "5babd6a90ef56431179cc5ada3254f9fc515dc54bf9ed9410505604ee22cbb12"
+        },
+        "report": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/report.json",
+          "sha256": "1da0cf6f29b3ec4dd531f9006c4df4dec5873ee0e4614bba4a8b21accf8dd2bc"
+        },
+        "mode": "speed",
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "host_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+        "program_wasm_bytes": 4169697,
+        "program_wasm": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/program.wasm",
+          "sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f"
+        },
+        "functions": {
+          "js::vn#f133": {
+            "perfmap_extent_bytes": 531472,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-speed/vn.native",
+              "sha256": "fe64b35734d9e0feaa8de2ace80fc80583ead08a0318d0385a60d8843ada1844"
+            }
+          },
+          "js::ft#f123": {
+            "perfmap_extent_bytes": 195184,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-speed/ft.native",
+              "sha256": "d1b82ad29854a9432f1457e6292598ca84b5aea6c86899c6447e347c1dad743c"
+            }
+          }
+        },
+        "maps_before_sha256": "50f827edf5d0bff599fe981d81a77c5b3a0b1591fd9ec0e0e0cb6ee3a71679b6",
+        "maps_after_sha256": "50f827edf5d0bff599fe981d81a77c5b3a0b1591fd9ec0e0e0cb6ee3a71679b6",
+        "maps_file": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/maps.txt",
+          "sha256": "50f827edf5d0bff599fe981d81a77c5b3a0b1591fd9ec0e0e0cb6ee3a71679b6"
+        },
+        "perf_map_sha256": "9438ff918f6ca08c707d2635af21a7eef8a1954632cecff8c44e1aa406382ca8",
+        "perf_map": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/perf.map",
+          "sha256": "9438ff918f6ca08c707d2635af21a7eef8a1954632cecff8c44e1aa406382ca8"
+        },
+        "native_stack_frame_analysis": {
+          "vn": {
+            "frame_bytes": 6656,
+            "probe_kind": "unrolled-probe-store",
+            "probe_count": 1
+          },
+          "ft": {
+            "frame_bytes": 2480,
+            "probe_kind": "unrolled-probe-store",
+            "probe_count": 0
+          }
+        },
+        "native_stack_frame_analysis_source": "Manual disassembly of the exact captured native bytes; distinct from perf-map function extents."
+      },
+      "speed-single-pass": {
+        "receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/receipt.json",
+          "sha256": "131ff83c796ca088aa0f4452b655078f364a525481bda701187c036594b01eb9"
+        },
+        "report": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/report.json",
+          "sha256": "ba2345680e46d97fec092ed925139c801d0d5994d421fe163d69a89856419bf2"
+        },
+        "mode": "speed-single-pass",
+        "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+        "host_sha256": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082",
+        "program_wasm_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+        "program_wasm_bytes": 4169697,
+        "program_wasm": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/program.wasm",
+          "sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f"
+        },
+        "functions": {
+          "js::vn#f133": {
+            "perfmap_extent_bytes": 1044736,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/vn.native",
+              "sha256": "dd8e8f57ce748c48d844ec12f9cfd66fc07109b9872b12e83aaa8fd24812bdab"
+            }
+          },
+          "js::ft#f123": {
+            "perfmap_extent_bytes": 388384,
+            "native_bytes": {
+              "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/ft.native",
+              "sha256": "5d4937ad6d97a2c863aae1eab9912970cc1f858aa8d90244da533d6046e1c01a"
+            }
+          }
+        },
+        "maps_before_sha256": "0ac3885cb36dc1c9e63dbace279adfdc405260621d94c3c7a9838a7a85d8bdaf",
+        "maps_after_sha256": "0ac3885cb36dc1c9e63dbace279adfdc405260621d94c3c7a9838a7a85d8bdaf",
+        "maps_file": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/maps.txt",
+          "sha256": "0ac3885cb36dc1c9e63dbace279adfdc405260621d94c3c7a9838a7a85d8bdaf"
+        },
+        "perf_map_sha256": "0492bde3330875ac346a1a9eec8455b53bb5771f9372c87e83ff6bea471372f7",
+        "perf_map": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/perf.map",
+          "sha256": "0492bde3330875ac346a1a9eec8455b53bb5771f9372c87e83ff6bea471372f7"
+        },
+        "native_stack_frame_analysis": {
+          "vn": {
+            "frame_bytes": 171712,
+            "probe_kind": "loop-probe",
+            "probe_count": 42
+          },
+          "ft": {
+            "frame_bytes": 68976,
+            "probe_kind": "loop-probe",
+            "probe_count": 17
+          }
+        },
+        "native_stack_frame_analysis_source": "Manual disassembly of the exact captured native bytes; distinct from perf-map function extents."
+      }
+    },
+    "register_allocation_configuration": {
+      "source": {
+        "path": "crates/scriptw-cli/examples/rsc_baseline.rs",
+        "sha256": "62e731a883cddcf2f61f2cbce41531e8d7a78489cfe7bdd106ecd4e2daa62298"
+      },
+      "modes": {
+        "fast": {
+          "cranelift_opt_level": "None",
+          "register_allocation": "SinglePass"
+        },
+        "fast-backtracking": {
+          "cranelift_opt_level": "None",
+          "register_allocation": "Backtracking"
+        },
+        "speed": {
+          "cranelift_opt_level": "Speed",
+          "register_allocation": "Backtracking"
+        },
+        "speed-single-pass": {
+          "cranelift_opt_level": "Speed",
+          "register_allocation": "SinglePass"
+        }
+      },
+      "interpretation": "Fast vs FastBacktracking and Speed vs SpeedSinglePass hold optimization level fixed and vary register allocation. The measured stack-frame changes align with the allocator choice; they do not establish that frame size caused RSC timing changes."
+    },
+    "scope": "Excluded program-P native compilation policies; every mode loads the same precompiled R image.",
+    "native_preparation_medians_ns": {
+      "fast": 5093144326.5,
+      "fast-backtracking": 7224916716.0,
+      "speed": 7070287220.0,
+      "speed-single-pass": 5642561025.0
+    }
+  },
+  "native_stack_frames": {
+    "current": {
+      "fast": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-retry/receipt.json",
+          "sha256": "defe08e893a01e6cd3ea5fcd8ca74224a67f681632c246f90b48c88de9122300"
+        },
+        "analysis_source": "Manual disassembly of exact current capture bytes.",
+        "vn": {
+          "frame_bytes": 213856,
+          "probe_kind": "page-probe",
+          "probe_count": 53
+        },
+        "ft": {
+          "frame_bytes": 85664,
+          "probe_kind": "page-probe",
+          "probe_count": 21
+        }
+      },
+      "fast-backtracking": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-fast-backtracking/receipt.json",
+          "sha256": "0d57ba8047fe4eed22616f8fec60ca980ee0a4131953591a11c9eba4980643fb"
+        },
+        "analysis_source": "Manual disassembly of exact current capture bytes.",
+        "vn": {
+          "frame_bytes": 8736,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 2
+        },
+        "ft": {
+          "frame_bytes": 2736,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 0
+        }
+      },
+      "speed": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-speed/receipt.json",
+          "sha256": "5babd6a90ef56431179cc5ada3254f9fc515dc54bf9ed9410505604ee22cbb12"
+        },
+        "analysis_source": "Manual disassembly of exact current capture bytes.",
+        "vn": {
+          "frame_bytes": 6656,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 1
+        },
+        "ft": {
+          "frame_bytes": 2480,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 0
+        }
+      },
+      "speed-single-pass": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-final-speed-single-pass/receipt.json",
+          "sha256": "131ff83c796ca088aa0f4452b655078f364a525481bda701187c036594b01eb9"
+        },
+        "analysis_source": "Manual disassembly of exact current capture bytes.",
+        "vn": {
+          "frame_bytes": 171712,
+          "probe_kind": "loop-probe",
+          "probe_count": 42
+        },
+        "ft": {
+          "frame_bytes": 68976,
+          "probe_kind": "loop-probe",
+          "probe_count": 17
+        }
+      }
+    },
+    "historical_baseline_0c2c": {
+      "fast": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-fast/receipt.json",
+          "sha256": "606f21429a36c24de379160980ed1b5efb63da56c0351a4ffbb05b0807ccd4ea"
+        },
+        "analysis_source": "Manual disassembly of exact historical 0c2c capture bytes.",
+        "vn": {
+          "frame_bytes": 244848,
+          "probe_kind": "page-probe",
+          "probe_count": 60
+        },
+        "ft": {
+          "frame_bytes": 94032,
+          "probe_kind": "page-probe",
+          "probe_count": 23
+        }
+      },
+      "speed": {
+        "capture_receipt": {
+          "path": "target/performance-architecture-20261108/capture-speed/receipt.json",
+          "sha256": "e4c77a66a6798ad7278ac8172bba8cf3991c08620d138d5a969a5c85b44cb5b0"
+        },
+        "analysis_source": "Manual disassembly of exact historical 0c2c capture bytes.",
+        "vn": {
+          "frame_bytes": 3744,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 0
+        },
+        "ft": {
+          "frame_bytes": 2320,
+          "probe_kind": "unrolled-probe-store",
+          "probe_count": 0
+        }
+      }
+    },
+    "native_perfmap_extents_are_separate_from_stack_frame_bytes": true
+  },
+  "static_wasm": {
+    "current_fast": {
+      "report": {
+        "path": "target/performance-architecture-20261108/astra/source-expansion-counts-final-fast.json",
+        "sha256": "fc6f2d550b662d5cae5ea5fb16f6b8fe1c50a7d11c2bf723285b0ee6bedbae9b"
+      },
+      "source_fingerprint": "453a9074fcacb06fb5fc010a47eb443e4c1aa804e32afbd23e6e4e43d985610c",
+      "program_sha256": "fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f",
+      "program_bytes": 4169697,
+      "functions": [
+        {
+          "name": "js::f42",
+          "wasm_body_bytes": 28065,
+          "opcodes": 12897,
+          "locals": 198,
+          "local_get": 3243,
+          "local_set": 3513,
+          "ref_null": 964,
+          "ref_as_non_null": 835,
+          "if": 449,
+          "call": 145,
+          "struct_get": 341
+        },
+        {
+          "name": "js::ft#f123",
+          "wasm_body_bytes": 60096,
+          "opcodes": 26247,
+          "locals": 241,
+          "local_get": 7038,
+          "local_set": 7586,
+          "ref_null": 2088,
+          "ref_as_non_null": 1560,
+          "if": 772,
+          "call": 272,
+          "struct_get": 782
+        },
+        {
+          "name": "js::vn#f133",
+          "wasm_body_bytes": 175869,
+          "opcodes": 78416,
+          "locals": 223,
+          "local_get": 20952,
+          "local_set": 22650,
+          "ref_null": 6673,
+          "ref_as_non_null": 5061,
+          "if": 2379,
+          "call": 764,
+          "struct_get": 1767
+        }
+      ]
+    },
+    "historical_baseline_0c2c": {
+      "report": {
+        "path": "target/performance-architecture-20261108/astra/source-expansion-counts.json",
+        "sha256": "0c212426b28a13744d6f9b3be793f54587bc3bb6f48d08d2a2cc8f119da0eb8c"
+      },
+      "program_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+      "program_bytes": 4327610,
+      "functions": [
+        {
+          "name": "js::f42",
+          "wasm_body_bytes": 29341,
+          "opcodes": 13315,
+          "locals": 201,
+          "local_get": 3354,
+          "local_set": 3652,
+          "ref_null": 964,
+          "ref_as_non_null": 857,
+          "if": 476,
+          "call": 156,
+          "struct_get": 352,
+          "tdz_guard_local_counts": {
+            "50": 6,
+            "113": 1,
+            "146": 1,
+            "48": 1,
+            "56": 4,
+            "164": 1
+          },
+          "five_parameter_flag_cold_blocks": {
+            "count": 0,
+            "bytes": 0,
+            "opcodes": 0
+          },
+          "limit": "The five flag identities match the parameter groups but require producer proof; cold block counts are static code, not dynamic instructions."
+        },
+        {
+          "name": "js::ft#f123",
+          "wasm_body_bytes": 66631,
+          "opcodes": 29184,
+          "locals": 246,
+          "local_get": 7772,
+          "local_set": 8511,
+          "ref_null": 2184,
+          "ref_as_non_null": 1708,
+          "if": 961,
+          "call": 346,
+          "struct_get": 909,
+          "tdz_guard_local_counts": {
+            "87": 26,
+            "83": 8,
+            "65": 16,
+            "61": 13,
+            "79": 11,
+            "103": 1,
+            "106": 1,
+            "174": 1,
+            "138": 1,
+            "153": 1,
+            "115": 1,
+            "109": 1
+          },
+          "five_parameter_flag_cold_blocks": {
+            "count": 74,
+            "bytes": 5128,
+            "opcodes": 2426
+          },
+          "limit": "The five flag identities match the parameter groups but require producer proof; cold block counts are static code, not dynamic instructions."
+        },
+        {
+          "name": "js::vn#f133",
+          "wasm_body_bytes": 196226,
+          "opcodes": 87901,
+          "locals": 228,
+          "local_get": 23276,
+          "local_set": 25631,
+          "ref_null": 7043,
+          "ref_as_non_null": 5569,
+          "if": 3020,
+          "call": 1018,
+          "struct_get": 2021,
+          "tdz_guard_local_counts": {
+            "65": 26,
+            "87": 116,
+            "121": 1,
+            "109": 3,
+            "61": 65,
+            "147": 1,
+            "83": 29,
+            "79": 18,
+            "116": 1,
+            "142": 2,
+            "141": 1,
+            "155": 2,
+            "118": 2,
+            "97": 1,
+            "139": 1,
+            "201": 1,
+            "221": 1,
+            "154": 1,
+            "117": 1
+          },
+          "five_parameter_flag_cold_blocks": {
+            "count": 254,
+            "bytes": 16307,
+            "opcodes": 7874
+          },
+          "limit": "The five flag identities match the parameter groups but require producer proof; cold block counts are static code, not dynamic instructions."
+        }
+      ]
+    }
+  },
+  "historical_cache_diagnostics_0c2c": {
+    "sync": {
+      "receipt": {
+        "path": "target/performance-architecture-20261108/cache-census/sync-6/receipt.json",
+        "sha256": "7dd0e5ca65d30aaa4e49901ccf19acaeeb6fd4604f1c551a090bed4d149c790e"
+      },
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "baseline_host_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+      "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+      "warmups": 3,
+      "sample_windows": 7,
+      "exact_flight_checks": 10,
+      "counts_per_window": {
+        "helperentry:cached": [
+          2548,
+          2548,
+          2548,
+          2548,
+          2548,
+          2548,
+          2548
+        ],
+        "callsite:cached-fallback": [
+          1275,
+          1275,
+          1275,
+          1275,
+          1275,
+          1275,
+          1275
+        ],
+        "callsite:object-self-0": [
+          2521,
+          2521,
+          2521,
+          2521,
+          2521,
+          2521,
+          2521
+        ],
+        "callsite:object-self-1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "native_self_sites": [
+        {
+          "offset_hex": "0x74fe",
+          "counted": true,
+          "semantic_role": "unclassified"
+        },
+        {
+          "offset_hex": "0x77e9",
+          "counted": true,
+          "semantic_role": "unclassified"
+        },
+        {
+          "offset_hex": "0xaa69",
+          "counted": false,
+          "semantic_role": "unclassified"
+        }
+      ],
+      "control_receipt": {
+        "path": "target/performance-architecture-20261108/cache-census/control-6/receipt.json",
+        "sha256": "7c5a18630a8b516967b0f907e0dd5f817946bcdf2699515cc65b5277083d2d4c"
+      },
+      "adaptation_sha256": "c65b8b102650ce942c1dcfd158778285339b9c9d02d134e4e57c884b04fc3928",
+      "raw_files": [
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/host.stdout",
+          "sha256": "a6bddb356ecd946271f594543077c2a466c15213130d0015683f794c56b7e1a7",
+          "bytes": 3975
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/host.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/maps-before.txt",
+          "sha256": "0110d2f46fdf280d953e2911155d6b0fb45aa4598c384e32958d4fdb0509e3b6",
+          "bytes": 5377
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/perf-cache-before.map",
+          "sha256": "c2abcf9386277e2b3fc61e47710c488615883e49ad8f9e58b5484db4b8207276",
+          "bytes": 201126
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-cached_property_read.before.native",
+          "sha256": "49b69cc18335d903b65e98d9b4df6fd7d57f3134ff50af26615144bf4686f640",
+          "bytes": 13418
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-cached_property_read.before.disasm",
+          "sha256": "bf6ba22cdf92f05a4663ed894905c4f9ef7fd5f89b4235bbf15961a0fbe1ef3b",
+          "bytes": 257370
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-object_read.before.native",
+          "sha256": "0432687e2cfc2076d5ffabd54f4be75a2dd03a9f948c9e1d92872180796159e3",
+          "bytes": 48128
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-object_read.before.disasm",
+          "sha256": "e0a7f024d77d6f82816df8b7cfbdfea3dc9f2879f40e466820ff961dd904e252",
+          "bytes": 923272
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/maps-after.txt",
+          "sha256": "752db5b81b208231a8f44a8154df74a0eae8dcba9a002d8c47474d79e628884c",
+          "bytes": 5377
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/perf-cache-after.map",
+          "sha256": "c2abcf9386277e2b3fc61e47710c488615883e49ad8f9e58b5484db4b8207276",
+          "bytes": 201126
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-cached_property_read.after.native",
+          "sha256": "49b69cc18335d903b65e98d9b4df6fd7d57f3134ff50af26615144bf4686f640",
+          "bytes": 13418
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-cached_property_read.after.disasm",
+          "sha256": "97806bdff949e2a13b95ff8cae178f8955155951549c2814519745d0563cf104",
+          "bytes": 257369
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-object_read.after.native",
+          "sha256": "0432687e2cfc2076d5ffabd54f4be75a2dd03a9f948c9e1d92872180796159e3",
+          "bytes": 48128
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/helper-object_read.after.disasm",
+          "sha256": "7be5c54056610b394b215d3dfa9cd39ce38956d7872aab88d71bdfc49ebc78c1",
+          "bytes": 923271
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/sync-6/observations.json",
+          "sha256": "53564203c6a83473cf5192011ed5e8975a0573f21f1d6da2de83ef148069507e",
+          "bytes": 5033
+        }
+      ],
+      "limits": "Excluded breakpoint census. Entry/fallback counts do not prove cache hits; self-call sites have no prototype/proxy role or coverage claim."
+    },
+    "async": {
+      "receipt": {
+        "path": "target/performance-architecture-20261108/cache-census/async-6/receipt.json",
+        "sha256": "f74a3ed80879c6e64f609d58ca95096cbee47e6ed2b22b77270886f10dd10e6e"
+      },
+      "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+      "baseline_host_sha256": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3",
+      "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+      "warmups": 3,
+      "sample_windows": 7,
+      "exact_flight_checks": 10,
+      "counts_per_window": {
+        "helperentry:cached": [
+          2698,
+          2698,
+          2698,
+          2698,
+          2698,
+          2698,
+          2698
+        ],
+        "callsite:cached-fallback": [
+          1362,
+          1362,
+          1362,
+          1362,
+          1362,
+          1362,
+          1362
+        ],
+        "callsite:object-self-0": [
+          2674,
+          2674,
+          2674,
+          2674,
+          2674,
+          2674,
+          2674
+        ],
+        "callsite:object-self-1": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "native_self_sites": [
+        {
+          "offset_hex": "0x74fe",
+          "counted": true,
+          "semantic_role": "unclassified"
+        },
+        {
+          "offset_hex": "0x77e9",
+          "counted": true,
+          "semantic_role": "unclassified"
+        },
+        {
+          "offset_hex": "0xaa69",
+          "counted": false,
+          "semantic_role": "unclassified"
+        }
+      ],
+      "control_receipt": {
+        "path": "target/performance-architecture-20261108/cache-census/control-6/receipt.json",
+        "sha256": "7c5a18630a8b516967b0f907e0dd5f817946bcdf2699515cc65b5277083d2d4c"
+      },
+      "adaptation_sha256": "c65b8b102650ce942c1dcfd158778285339b9c9d02d134e4e57c884b04fc3928",
+      "raw_files": [
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/host.stdout",
+          "sha256": "9c37e68a17fe40bbf002b21d682f03186121e69dbb89696dfc18f71223317074",
+          "bytes": 3979
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/host.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/maps-before.txt",
+          "sha256": "b809379eded26622982012457c0cf9f0d352f0b56b2006f49ab8f0df820d4a6a",
+          "bytes": 5377
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/perf-cache-before.map",
+          "sha256": "bd81f506ab25e91a1a88e3c68839af70bfbcd8f4c0d07334559620c96b74a30d",
+          "bytes": 201126
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-cached_property_read.before.native",
+          "sha256": "49b69cc18335d903b65e98d9b4df6fd7d57f3134ff50af26615144bf4686f640",
+          "bytes": 13418
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-cached_property_read.before.disasm",
+          "sha256": "9c569d1780eae583ea3f9ce7eafa105ae52b795ef415217ff304a29d065fb026",
+          "bytes": 257371
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-object_read.before.native",
+          "sha256": "0432687e2cfc2076d5ffabd54f4be75a2dd03a9f948c9e1d92872180796159e3",
+          "bytes": 48128
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-object_read.before.disasm",
+          "sha256": "1a8049e31baff75fea9a07d1e4a0cbb366faed10d18b8a3ac52fedf3ea2eb0e9",
+          "bytes": 923273
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/maps-after.txt",
+          "sha256": "d43a8ea89396bb2aa517ae341fe301637e368ce2842a5c4b7e63c7b5374c9f32",
+          "bytes": 5377
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/perf-cache-after.map",
+          "sha256": "bd81f506ab25e91a1a88e3c68839af70bfbcd8f4c0d07334559620c96b74a30d",
+          "bytes": 201126
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-cached_property_read.after.native",
+          "sha256": "49b69cc18335d903b65e98d9b4df6fd7d57f3134ff50af26615144bf4686f640",
+          "bytes": 13418
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-cached_property_read.after.disasm",
+          "sha256": "13fd6b01f6e7d1bca5cb701fefdd24a12058d2aca10e758752501b46413110fb",
+          "bytes": 257370
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-object_read.after.native",
+          "sha256": "0432687e2cfc2076d5ffabd54f4be75a2dd03a9f948c9e1d92872180796159e3",
+          "bytes": 48128
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/helper-object_read.after.disasm",
+          "sha256": "4fbb46595a2bf8bf9c67a6290df6ae988dacbfc464fff3342abf3c7494f263ad",
+          "bytes": 923272
+        },
+        {
+          "path": "target/performance-architecture-20261108/cache-census/async-6/observations.json",
+          "sha256": "93d715b613cb1a33741b0f2f3dd5f640699f032f4dc262231df3408a77a7e8cc",
+          "bytes": 5037
+        }
+      ],
+      "limits": "Excluded breakpoint census. Entry/fallback counts do not prove cache hits; self-call sites have no prototype/proxy role or coverage claim."
+    }
+  },
+  "historical_pmu_references_0c2c": {
+    "source_fingerprint": "0c2c10dac9c03a8c8b22c500f175ee190e97131e7d591f33760f1bafa602596b",
+    "optional_historical_only": true,
+    "profile_summary": {
+      "path": "target/performance-predicate-transport-20261108/fresh-profiles/summary.json",
+      "sha256": "c311d485dda8de3fb6b7a7c10e6eeea766785227ea5daebfd1f42c36f1574508"
+    },
+    "diagnostic_campaign": {
+      "path": "target/performance-predicate-transport-20261108/final-diagnostics/campaign.json",
+      "sha256": "19ce4f95f6bd93a5420b08b823b3d8c37fd029545511273f09195486296dda8e"
+    },
+    "not_current_source_evidence": true
+  },
+  "limits": [
+    "No full unit suite, Test262, full CI, or four known AOT failure retest is claimed by this proposal.",
+    "Cache census is from 0c2c and does not measure the current 453a source.",
+    "Native stack-frame and perf-map extents are separate dimensions.",
+    "PMU profiles are historical 0c2c-only references."
+  ],
+  "evidence_archive": {
+    "sha256": "8ea2b76bd32ace847cd3bdaadf923a6a231829fcbaf527c7be3208cbf7e0afa0",
+    "bytes": 1530076,
+    "regular_utf8_members": 973,
+    "expanded_utf8_bytes": 49742573,
+    "file": "scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+    "canonical_file": "docs/rust-rewrite/scriptw-performance-architecture-evidence-2026-11-08.tar.xz",
+    "staged_file": "target/performance-architecture-20261108/publication-stage-2/scriptw-performance-architecture-evidence-2026-11-08.tar.xz"
+  },
+  "verification_source": {
+    "manifest_sha256": "ff1f2dc58c02bdb5efdac00127635fd795ec50740e42427c53ca238ef22b2a48",
+    "postmeasurement_test_qualification_sha256": "ba6f7b46a3ada5529cbc5f1a6a07709201270d83f9ac8f31128215a3fec3ca15",
+    "scope": "Only retained_operands.rs changed after measurement; compiler/product inputs are identical."
+  }
+}

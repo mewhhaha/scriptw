@@ -38,6 +38,7 @@ mod own_keys_helper;
 mod own_property_helper;
 mod packed_array_descriptors;
 mod packed_array_storage;
+mod parameter_initialization;
 mod product_artifact;
 mod program_utf16_sharing;
 mod proper_tail_call_emission;

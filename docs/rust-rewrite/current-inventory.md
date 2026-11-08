@@ -12,10 +12,11 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Reduce the current Fast gaps on `args-unused.js` (33× V8) and `frame-compact.js` (34×). The exact emitted programs still have 4 full conversions in the arguments loop and 21 across four frame source alternatives; a selected frame iteration executes 4 or 6. Classify rows during existing projection writes, preserve original Number payloads, and branch once to integer or existing Number loops. Carry conditional domains through call slots and exact Add/Sub bounds. The integer proposal is unmeasured; preserve fractions, negative zero, nonfinite values, overflow and fallback. Owner: scalar-call planning.
-- Test amortizing `frame-compact.js` projection across its closed outer loop. Source structure has 3,120 own-data field probes and 16 projection allocations; `args-unused.js` has 130 probes and one projection. These are source-derived counts, not time shares. Prove that intervening effects cannot invalidate the projected rows before hoisting.
-- Measure the default `@@hasInstance` handler path before changing the call ABI. Fresh source `0c2c10dac9c0` profiles place 7.3–10.0% of sample periods in the overlapping `has_instance` subtree. Test the existing native-code/same-Realm guard after observable handler lookup, preserving custom/proxy/foreign handlers, activation, caller reflection, bound targets and whole abrupt completion. The proposed shortcut has not been implemented or timed. Owner: runtime instance checks.
-- Resolve the Fast `vn` entry hotspot before attributing it to arguments or Value/Completion transport. Native symbol extents are code sizes, not frame sizes. Use the existing native image/disassembly and the fresh [caller profiles](react-attribution-current.json) to distinguish stack probing, local homes and body operations; retain Speed as a control.
+- Reduce the current Fast gaps on `args-unused.js` and `frame-compact.js`. Measure remaining full Number conversions, classify rows during projection, preserve original payloads, and branch once to integer or existing Number loops. Carry conditional domains through call slots and exact Add/Sub bounds; retain fractions, negative zero, nonfinite values, overflow and fallback. Owner: scalar-call planning.
+- Test amortizing `frame-compact.js` projection across its closed outer loop. Recount projection allocations and own-data probes on the current source, then prove intervening effects cannot invalidate rows before hoisting. Owner: scalar-call planning.
+- Measure the default `@@hasInstance` handler path before changing the call ABI. Source `0c2c10dac9c0` profiles place 7.3–10.0% of sample periods in the overlapping `has_instance` subtree. Test the existing native-code/same-Realm guard after observable handler lookup, preserving custom/proxy/foreign handlers, activation, caller reflection, bound targets and whole abrupt completion. The proposed shortcut has not been implemented or timed. Owner: runtime instance checks.
+- Reuse nonoverlapping SinglePass spill homes or reduce cross-block value transport. The current RSC `vn` uses a 208.8-KiB fixed stack allocation and 53 page probes with SinglePass; unchanged optimization with Backtracking uses 8.5 KiB and two probes. The excluded crossed-policy cohort lowers request time about 15% with Backtracking but adds about 2.1 seconds of native preparation. Count block-local versus cross-block/block-parameter homes before choosing a bounded compactor; preserve CFG lifetimes, GC/debug locations, argument slots, alignment and move order. Branch scratch slots do not explain these functions. [Evidence](react-architecture-current.json). Owner: compiler backend/spill homes.
+- Replace descriptor backing for ordinary dictionary data rows with direct Value fields, preserving PropertyEntry identity, hash/index and insertion order. One changed existing-data Set path performs three lookups and reserves six GC records; these are source-path counts, not measured frequency. Measure dictionary read/write/create traffic and allocation by owner first. Let PreparedOrdinaryDefinition own the entry and a borrowed property view; materialize immutable descriptors for genuine GetOwnProperty/Proxy snapshots. Keep deferred writeback and legacy-reflection descriptor/value identity owners intact. Add isolated write/create controls, then measure Get/Set/Define, enumeration, GC and complete RSC requests. Owner: ordinary object storage.
 
 - Measure type classification and singleton dispatch after strict-pair period
   projection. Prefer private binding facts and existing semantic kernels before
@@ -30,7 +31,7 @@ accepts `--case <file.js>`.
   and measured gains. Missing own indices can expose the real object through a
   prototype getter; preserve actual count, rooted snapshots and complete fallback.
   Owner: arguments binding and source-call planning.
-- Measure actual property-cache outcomes before changing dictionary shape or expanding cache coverage: static versus computed key × compact versus dictionary receiver × own, inherited or absent result. Count eligibility separately from repeat hits and misses. Existing helper-entry totals do not identify cache hits or misses by family. Keep the complete object-model fallback for exotics and preserve live prototype/storage guards.
+- Classify property-cache fallback families before widening coverage. Source `0c2c10dac9c0` request windows count 2,548/2,698 cached-helper entries and 1,275/1,362 generic fallbacks (sync/async); other exits are not a hit count. Separate eligibility, cold/evicted sites, compact/dictionary receivers, computed/static keys, inherited and absent results. Preserve live guards and the complete exotic fallback. [Counters](react-architecture-current.json). Owner: ordinary object storage.
 - Attribute StoredValue decoding and binding writes before another list-storage
   rewrite. The physical census does not identify allocation origins or prove a
   representation change wins. Preserve deferred recipes, descriptor ownership
@@ -54,24 +55,16 @@ accepts `--case <file.js>`.
   [sampled callers](react-attribution-current.json); preserve Proxy ordering,
   namespace TDZ, mapped arguments, typed arrays and execution Realm.
   Owner: AOT object operations.
-- Attribute cross-block/edge homes to actual result families before changing the
-  Value/Completion ABI. General Completion has five lanes, including kind and
-  target. Measure a typed Normal-or-Throw property-read result before narrowing
-  the source-call family; ordinary Return normalization, resumable outcomes and
-  proper tail-call signatures have distinct requirements. Compare native EH only
-  with Realm/activation/invocation cleanup and whole thrown values preserved.
-  The allocator census does not identify semantic origins or prove a global
-  representation rewrite will win. Owner: AOT call/completion lowering.
+- Test a connected NormalValue/Throw operation region across Get, conversion and callbacks before changing the global Completion ABI. A single boundary adapter can preserve StatementList/finally/resumable completions while removing repeated normal kind/target transport. Measure native traffic first: Wasmtime Tail ABI can return the five integer-class lanes in registers; they do not automatically imply sret. Native EH must preserve Realm, activation, invocation-depth cleanup and arbitrary thrown values. Owner: AOT operation/call lowering.
+
 - Move embedding-only benchmark hosts to Engine examples so emitter iterations
   do not rebuild the Test262-linked CLI library. Reuse native producer/consumer
   runs for retained RSC requests while measuring cold setup separately. Prefer
   the existing external emission target for public artifact acceptance checks;
   keep private unit checks at frozen qualification. Measure identical edits
   before claiming build savings. Owner: benchmark tools/runtime-image build.
-- Reduce [raw RSC Wasm expansion](rsc-wasm-size-current.json) and cold setup.
-  Keep exact P/R identities and code/data accounting separate from native image
-  size and request time. The older [SSR checkpoint](react-codegen-20261102.json)
-  retains a 1,110,482-byte body. Owner: AOT codegen/native compilation.
+- Reduce [current RSC Wasm and native expansion](react-architecture-current.json) and cold setup. Measure code, data and reachable-helper contribution to P and R separately; the [older encoded-byte breakdown](rsc-wasm-size-current.json) retains its recorded source. Keep raw Wasm, native image size, resident memory and request time separate. Owner: AOT codegen/native compilation.
+
 - Requalify affected operators before a new full conformance publication.
   The [shared-kernel checkpoint](react-codegen-20261102.json) passes all 79 pinned
   modulus variants; the complete pinned Test262 matrix remains a separate gate.

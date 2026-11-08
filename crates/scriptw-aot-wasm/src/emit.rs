@@ -106,12 +106,13 @@ pub(crate) struct LocalBindingLocals {
     initialization: LocalBindingInitialization,
     role: LocalBindingRole,
 }
-/// Only the constructors that publish an initialized value can omit a TDZ
-/// flag. Declaration spelling alone cannot prove a captured snapshot ready.
+/// Only initialized-value constructors or the completed parameter producer can
+/// omit a TDZ flag. Declaration spelling cannot prove a captured snapshot ready.
 #[derive(Clone, Copy)]
 enum LocalBindingInitialization {
     Checked(I32Local),
     HoistedVar,
+    InitializedParameter,
     CompilerTemporary,
 }
 enum LocalBindingRole {
@@ -128,6 +129,7 @@ impl LocalBindingLocals {
         match self.initialization {
             LocalBindingInitialization::Checked(initialized) => Some(initialized),
             LocalBindingInitialization::HoistedVar
+            | LocalBindingInitialization::InitializedParameter
             | LocalBindingInitialization::CompilerTemporary => None,
         }
     }
@@ -989,6 +991,30 @@ pub(crate) fn async_generator_for_await_is_transparent_yield(
 }
 
 impl<'a> FunctionBuilder<'a> {
+    /// Only the completed ordinary-parameter producer can retire this check.
+    /// Default initializers have already been emitted with the original flags.
+    pub(crate) fn seal_initialized_parameter_local(
+        &mut self,
+        parameter: crate::environments::InitializedParameterLocal,
+        function: &mut Function,
+    ) {
+        let binding = self.local_bindings[parameter.binding().ordinal]
+            .as_mut()
+            .expect("completed parameter retains its local binding");
+        match binding.initialization {
+            LocalBindingInitialization::Checked(initialized) => {
+                binding.initialization = LocalBindingInitialization::InitializedParameter;
+                self.schema.release_i32_local(initialized, function);
+            }
+            // Sloppy duplicate parameters resolve to the same binding.
+            LocalBindingInitialization::InitializedParameter => {}
+            LocalBindingInitialization::HoistedVar
+            | LocalBindingInitialization::CompilerTemporary => {
+                unreachable!("parameter allocation owns checked source storage")
+            }
+        }
+    }
+
     pub(crate) fn allocate_local_binding(
         &mut self,
         _mode: scriptw_ir::BindingMode,

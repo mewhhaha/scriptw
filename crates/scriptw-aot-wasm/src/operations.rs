@@ -217,6 +217,91 @@ enum UnaryNumericKind {
     BigInt,
 }
 
+/// Catalog expressions produce a normal value or throw. Source calls keep
+/// their complete returned-kind protocol until their call owner normalizes it.
+/// Owning this choice prevents projecting a source Return as a catalog Normal.
+#[must_use = "an operation result must be projected and its roots released"]
+enum SpecOperationResultLocals {
+    Expression(CompletionLocals),
+    Call(CompletionLocals),
+}
+
+impl SpecOperationResultLocals {
+    fn new(operation: SpecOperationIr, schema: &RuntimeSchema, function: &mut Function) -> Self {
+        let completion = schema.reserve_completion(function);
+        match operation {
+            SpecOperationIr::Call | SpecOperationIr::Construct => {
+                completion.initialize(function);
+                Self::Call(completion)
+            }
+            _ => {
+                // Each non-call arm below writes its whole result before its
+                // exit. The catalog excludes statement-shaped abrupt kinds.
+                match operation.descriptor().abrupt() {
+                    AbruptCapability::Infallible | AbruptCapability::MayThrow => {}
+                }
+                Self::Expression(completion)
+            }
+        }
+    }
+
+    fn completion(&self) -> &CompletionLocals {
+        match self {
+            Self::Expression(completion) | Self::Call(completion) => completion,
+        }
+    }
+
+    fn project(
+        self,
+        builder: &mut FunctionBuilder<'_>,
+        output: &ValueLocals,
+        inputs: Vec<ValueLocals>,
+        function: &mut Function,
+    ) {
+        match self {
+            Self::Expression(pending) => {
+                pending.kind().load(function);
+                function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
+                function.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, function);
+                builder.completion().copy_from(&pending, function);
+                // An in-function catch can continue allocating after this
+                // branch. Retire temporary roots before leaving their scope.
+                pending.value().reference().clear(function);
+                for input in inputs.iter().rev() {
+                    input.reference().clear(function);
+                }
+                builder.emit_propagate_current_throw(function);
+                builder.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                // Falling through proves the catalog's normal result. Its
+                // payload belongs to output, not the enclosing StatementList.
+                output.copy_from(pending.value(), function);
+                builder.set_completion_kind(CompletionKind::Normal, function);
+                pending.clear(function);
+                for input in inputs.into_iter().rev() {
+                    input.clear(function);
+                }
+            }
+            Self::Call(pending) => {
+                builder.completion().copy_from(&pending, function);
+                pending.kind().load(function);
+                function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
+                function.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, function);
+                output.copy_from(pending.value(), function);
+                builder.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                pending.clear(function);
+                for input in inputs.into_iter().rev() {
+                    input.clear(function);
+                }
+                builder.emit_propagate_current_throw_if_needed(function);
+            }
+        }
+    }
+}
+
 impl<'a> FunctionBuilder<'a> {
     pub(crate) fn compile_object_destructuring_operation_keys<'operation>(
         &mut self,
@@ -451,7 +536,7 @@ impl<'a> FunctionBuilder<'a> {
             let boolean = schema.reserve_i32_local(function);
             boolean.store(function);
             output.set_boolean(boolean, function);
-            self.completion().set_normal(output, function);
+            self.set_completion_kind(CompletionKind::Normal, function);
             schema.release_i32_local(boolean, function);
             return Ok(());
         }
@@ -499,17 +584,17 @@ impl<'a> FunctionBuilder<'a> {
             let boolean = schema.reserve_i32_local(function);
             boolean.store(function);
             output.set_boolean(boolean, function);
-            self.completion().set_normal(output, function);
+            self.set_completion_kind(CompletionKind::Normal, function);
             schema.release_i32_local(boolean, function);
             for input in inputs.into_iter().rev() {
                 input.clear(function);
             }
             return Ok(());
         }
-        let pending = schema.reserve_completion(function);
+        let result = SpecOperationResultLocals::new(operation, schema, function);
+        let pending = result.completion();
         let boolean = schema.reserve_i32_local(function);
         let scalar = schema.reserve_i64_local(function);
-        pending.initialize(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
         match operation {
             SpecOperationIr::IsCallable
@@ -907,21 +992,9 @@ impl<'a> FunctionBuilder<'a> {
         }
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        self.completion().copy_from(&pending, function);
-        pending.kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        output.copy_from(pending.value(), function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
         schema.release_i64_local(scalar, function);
         schema.release_i32_local(boolean, function);
-        pending.clear(function);
-        for input in inputs.into_iter().rev() {
-            input.clear(function);
-        }
-        self.emit_propagate_current_throw_if_needed(function);
+        result.project(self, output, inputs, function);
         Ok(())
     }
 

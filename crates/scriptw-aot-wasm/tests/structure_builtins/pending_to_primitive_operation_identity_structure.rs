@@ -66,9 +66,16 @@ fn named_operation_boundaries_replace_the_ignored_generic_marker() {
     assert!(operations.contains("SpecOperationIr::ToNumber=>{self.emit_value_to_number_payload(&inputs[0],&pending,function)?"));
     assert!(operations.contains("SpecOperationIr::GetV|SpecOperationIr::GetMethod=>{self.emit_value_to_object_locals(&inputs[0],&pending,function)?;"));
     assert!(operations.contains("self.emit_dynamic_property_read_with_key_locals(&lookup,&inputs[0],&key,&pending,function,"));
-    assert!(operations.contains("self.completion().copy_from(&pending,function)"));
-    assert!(operations.contains("output.copy_from(pending.value(),function)"));
-    assert!(operations.contains("self.emit_propagate_current_throw_if_needed(function)"));
+    assert!(operations.contains("SpecOperationResultLocals::new(operation,schema,function)"));
+    assert!(operations.contains("result.project(self,output,inputs,function)"));
+    let projection = normalized(bounded(
+        OPERATIONS_SOURCE,
+        "            Self::Expression(pending) => {",
+        "            Self::Call(pending) => {",
+    ));
+    assert!(projection.contains("builder.completion().copy_from(&pending,function)"));
+    assert!(projection.contains("output.copy_from(pending.value(),function)"));
+    assert!(projection.contains("builder.emit_propagate_current_throw(function)"));
 }
 
 #[test]

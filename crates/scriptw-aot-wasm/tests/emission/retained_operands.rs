@@ -77,8 +77,8 @@ function lexical(receiver,argument,extra) { 'use strict'; let saved=receiver; re
             let (_, invoke) = program.named("js::invoke#");
             assert_eq!(
                 calls(reference, tdz),
-                2,
-                "both actual source parameters keep their checked reads"
+                0,
+                "completed ordinary parameters are initialized before the body"
             );
             assert_eq!(
                 calls(invoke, tdz),
@@ -87,10 +87,10 @@ function lexical(receiver,argument,extra) { 'use strict'; let saved=receiver; re
             );
             let (_, identity) = program.named("js::identity#");
             let (_, lexical) = program.named("js::lexical#");
-            assert_eq!(calls(identity, tdz), 1);
+            assert_eq!(calls(identity, tdz), 0);
             assert_eq!(
                 calls(lexical, tdz),
-                2,
+                1,
                 "the initialized source let still owns its TDZ protocol"
             );
         })
