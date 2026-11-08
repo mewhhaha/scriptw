@@ -354,27 +354,15 @@ impl FunctionBuilder<'_> {
     ) {
         let schema = self.runtime_schema();
         let cell = self.generator_statement_list_cell(binding, function);
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(value, function),
-                function,
-            );
-        schema.field(BindingCellSchema::VALUE).write(
-            &cell,
-            GcOperand::reference(&stored, schema),
-            schema,
-            function,
-        );
+        schema
+            .struct_type::<BindingCell>()
+            .write_value(&cell, value, schema, function);
         schema.field(BindingCellSchema::INITIALIZED).write(
             &cell,
             GcOperand::boolean(true),
             schema,
             function,
         );
-        stored.clear(function);
         cell.clear(function);
     }
 
@@ -386,19 +374,9 @@ impl FunctionBuilder<'_> {
     ) {
         let schema = self.runtime_schema();
         let cell = self.generator_statement_list_cell(binding, function);
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .field(BindingCellSchema::VALUE)
-                    .read(&cell, schema, function)
-                    .reference(),
-                function,
-            );
         schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, value, schema, function);
-        stored.clear(function);
+            .struct_type::<BindingCell>()
+            .read_value(&cell, value, schema, function);
         cell.clear(function);
     }
 

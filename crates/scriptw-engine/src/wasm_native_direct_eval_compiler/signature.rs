@@ -147,15 +147,13 @@ impl NativeDirectEvalSignature {
                 &binding_cell,
             )?;
         }
-        schema::peer(
-            &schema::field_structure(
-                &binding_cell,
-                Field::BindingCellValue,
-                false,
-                Layout::StoredValue,
-            )?,
-            &stored,
-        )?;
+        for name in [
+            Field::BindingCellTag,
+            Field::BindingCellScalar,
+            Field::BindingCellReference,
+        ] {
+            schema::field(&binding_cell, name)?;
+        }
         Ok(Self {
             function,
             arguments,

@@ -23,6 +23,14 @@ closures retain the original named-self binding even when a body declaration
 shadows its spelling; real parameter names retain their mutable policy.
 Await/yield and per-iteration environments preserve the selected binding cell.
 
+The cell owns mutable scalar, tag and GC-reference fields. A write replaces all
+three without allocating an immutable `StoredValue`; primitive writes also clear
+the old reference edge. Immutable argument/completion snapshots remain separate
+records. Mapped arguments and suspended closures retain the same cell identity.
+Module reads resolve the exporting target before checking TDZ and reading its
+payload; the importing cell retains its own initialization and mutability policy.
+Native direct-eval readers validate these fields from the canonical host schema.
+
 Object binding initialization retains the original InitializeBinding/var-write
 policy, one acquired property value and the original primitive receiver.
 See [object binding](object-binding-single-get.md),

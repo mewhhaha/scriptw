@@ -382,8 +382,11 @@ impl ArrayReadLoop {
             }) => {
                 // Find only the direct row read of this accumulation. The
                 // complete body/test/update still pass the scalar proof.
-                let property = PropertyReadView::of(value)?;
-                (None, PropertyReadView::of(property.target)?)
+                let row = super::captured_calls::row_argument(value).or_else(|| {
+                    PropertyReadView::of(value)
+                        .and_then(|property| PropertyReadView::of(property.target))
+                })?;
+                (None, row)
             }
             StatementIr::Expression(TypedExpr {
                 expr: ExprIr::AssignIdentifier { name, value },
@@ -399,8 +402,11 @@ impl ArrayReadLoop {
                 // Lowered += can retain its left read as an explicit Add.
                 // Authenticate that read before discovering the RHS receiver;
                 // the complete scalar proof still owns arithmetic and effects.
-                let property = PropertyReadView::of(rhs)?;
-                (None, PropertyReadView::of(property.target)?)
+                let row = super::captured_calls::row_argument(rhs).or_else(|| {
+                    PropertyReadView::of(rhs)
+                        .and_then(|property| PropertyReadView::of(property.target))
+                })?;
+                (None, row)
             }
             _ => return None,
         };
@@ -475,6 +481,41 @@ impl ArrayReadLoop {
 
     pub(super) fn is_compact(&self) -> bool {
         matches!(self.paths, ReadPaths::Compact(_))
+    }
+
+    pub(super) fn has_complete_projection(&self) -> bool {
+        self.is_compact() && self.iteration.projection_period().is_some()
+    }
+
+    pub(super) fn is_row(&self, builder: &FunctionBuilder<'_>, value: &TypedExpr) -> bool {
+        PropertyReadView::of(value).is_some_and(|read| {
+            RegionInputSource::of(builder, read.target).as_ref() == Some(&self.array)
+                && self.is_counter_key(builder, read.key)
+        })
+    }
+
+    pub(super) fn capture_field(
+        &mut self,
+        builder: &FunctionBuilder<'_>,
+        name: &str,
+    ) -> Option<CompactPathId> {
+        let path =
+            CompactReadPath::Number(super::compact_path::CachedReadName::new(builder, name)?);
+        if matches!(self.paths, ReadPaths::LengthOnly) {
+            self.paths = ReadPaths::Compact(Vec::new());
+        }
+        let ReadPaths::Compact(paths) = &mut self.paths else {
+            return None;
+        };
+        if let Some(index) = paths.iter().position(|old| *old == path) {
+            return Some(CompactPathId::new(index));
+        }
+        if paths.len() >= 4 {
+            return None;
+        }
+        let index = paths.len();
+        paths.push(path);
+        Some(CompactPathId::new(index))
     }
 
     fn is_counter_key(&self, builder: &FunctionBuilder<'_>, key: ReadKey<'_>) -> bool {

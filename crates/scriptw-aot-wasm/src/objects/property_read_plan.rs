@@ -1,7 +1,7 @@
-//! Static reads identify a ProgramInstance cache site and call R's complete
-//! cached Get kernel. R owns live storage guards, slot loads and Get fallback.
+//! Static reads identify a ProgramInstance site and call the typed R cache kernel.
+//! R owns registration, live storage guards, value loads and complete Get fallback.
 use super::*;
-use scriptw_ir::{HeapShape, HeapShapeProvenance, ObjectShapeProperty};
+use scriptw_ir::{HeapShape, HeapShapeProvenance};
 
 enum PropertyReadPlan {
     General,
@@ -10,18 +10,13 @@ enum PropertyReadPlan {
 impl PropertyReadPlan {
     fn for_read(target: &TypedExpr, key: &PropertyKeyIr) -> Self {
         match key {
-            PropertyKeyIr::StaticString(name) => {
+            PropertyKeyIr::StaticString(_) => {
                 if !target.possible_kinds.contains(ValueKind::Object) {
                     return Self::General;
                 }
                 match target.heap_shape.as_deref() {
                     Some(HeapShape::Object(shape)) => {
-                        if shape.provenance == HeapShapeProvenance::Program
-                            && matches!(
-                                shape.properties.get(name),
-                                Some(ObjectShapeProperty::Data(_))
-                            )
-                        {
+                        if shape.provenance == HeapShapeProvenance::Program {
                             Self::CachedStaticString
                         } else {
                             Self::General

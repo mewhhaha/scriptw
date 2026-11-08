@@ -142,7 +142,7 @@ fn called_operations(
                         | Operator::ReturnCall { function_index } => calls.push(function_index),
                         Operator::StructGet {
                             struct_type_index,
-                            field_index: 11,
+                            field_index: super::host_schema::BindingCellLayout::ITERATOR_RECORD,
                         } if retained.is_some_and(|(cell, _)| struct_type_index == cell) => {
                             reloads_iterator = true;
                         }

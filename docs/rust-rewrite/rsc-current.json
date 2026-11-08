@@ -1,16 +1,18 @@
 {
-  "schema": "scriptw-rsc-current-v1",
-  "date": "2026-11-07",
-  "source_manifest_sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
+  "schema": "scriptw-rsc-current-v2",
+  "date": "2026-11-08",
+  "source_manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
   "baseline": {
-    "path": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline",
-    "sha256": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
-    "producer": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json",
-    "report": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/block-0-0-candidate/report.json",
+    "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
+    "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+    "producer": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json",
+    "producer_sha256": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a",
+    "report": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
+    "report_sha256": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
     "identity": {
-      "source_fingerprint": "0ca455c47636f9f52e402bee01ccf3f4e796ef65dba2e4ac1733af9469b422db",
-      "source_commit": "e9687a06ed89933d0210bcb897b0387be00f9925",
-      "executable_sha256": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
+      "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
+      "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
+      "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
       "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
       "toolchain": {
         "opt_level": "3",
@@ -40,9 +42,9 @@
       },
       "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
       "runtime": {
-        "key": "50ad6b6c7424c2af5619cc0913f4287f4cf58dcfcdadc55e401af9a83471cdd1",
-        "wasm_bytes": 38732607,
-        "wasm_sha256": "a6f571ce32bb44471d7d5b5990233d7d06174a5c4f625ef7e9beb2cb1e8ab187"
+        "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
+        "wasm_bytes": 38738181,
+        "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
       },
       "inputs": {
         "adapted_source_bytes": 64946,
@@ -62,14 +64,15 @@
         "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
       }
     },
-    "reference_campaign": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/campaign.json",
-    "reference_campaign_sha256": "6dad11244c6a43413ff934a72c2f3e839e8366407fe532dea7b1f91c319e7685",
-    "reference_aggregate": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/aggregate.json",
-    "reference_aggregate_sha256": "d34e901738b2e4b0bee91f91a82fb81d779f88d73aef02fdcf26771a4271c538"
+    "reference_campaign": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json",
+    "reference_campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
+    "reference_aggregate": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json",
+    "reference_aggregate_sha256": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd",
+    "published_report_sha256": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350"
   },
   "candidate": {
-    "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-    "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
+    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
     "build_argv": [
       "cargo",
       "--config",
@@ -119,7 +122,8 @@
       "scripts/limited_verification.py",
       "--"
     ],
-    "cargo_producer": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
+    "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
     "artifact": {
       "reason": "compiler-artifact",
       "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
@@ -150,137 +154,59 @@
         "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
       ],
       "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-      "fresh": true
+      "fresh": false
     },
-    "qualified_reuse": {
-      "receipt_path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json",
-      "receipt_sha256": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-      "allowed_changed_files": [
-        "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs"
-      ],
-      "previous_source_manifest": {
-        "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json",
-        "sha256": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d"
-      },
-      "current_source_manifest": {
-        "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json",
-        "sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2"
-      },
-      "previous_producer": {
-        "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout",
-        "sha256": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db"
-      },
-      "current_producer": {
-        "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
-        "sha256": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0"
-      },
-      "binary": {
-        "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-        "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283"
-      },
-      "previous_artifact": {
-        "reason": "compiler-artifact",
-        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-        "target": {
-          "kind": [
-            "example"
-          ],
-          "crate_types": [
-            "bin"
-          ],
-          "name": "rsc_baseline",
-          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-          "edition": "2021",
-          "doc": false,
-          "doctest": false,
-          "test": false
-        },
-        "profile": {
-          "opt_level": "3",
-          "debuginfo": "line-tables-only",
-          "debug_assertions": false,
-          "overflow_checks": false,
-          "test": false
-        },
-        "features": [],
-        "filenames": [
-          "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-        ],
-        "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-        "fresh": false
-      },
-      "current_artifact": {
-        "reason": "compiler-artifact",
-        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-        "target": {
-          "kind": [
-            "example"
-          ],
-          "crate_types": [
-            "bin"
-          ],
-          "name": "rsc_baseline",
-          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-          "edition": "2021",
-          "doc": false,
-          "doctest": false,
-          "test": false
-        },
-        "profile": {
-          "opt_level": "3",
-          "debuginfo": "line-tables-only",
-          "debug_assertions": false,
-          "overflow_checks": false,
-          "test": false
-        },
-        "features": [],
-        "filenames": [
-          "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-        ],
-        "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-        "fresh": true
-      }
+    "qualified_reuse": null,
+    "compiler_source_identity": {
+      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+      "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
     }
   },
   "measurement": {
+    "campaign": "target/performance-levers-20261108/tools/rsc-campaign-2/campaign.json",
+    "campaign_sha256": "157ddfd8bfddbd4dad92471f50574a6031fd6e107418fc3c976a7fe3e83f9aeb",
     "blocks": 2,
     "processes_per_engine": 8,
-    "processes_per_engine_per_block": 4,
-    "warmups": 3,
     "samples": 7,
-    "clock": "retained applicationRun through complete Flight; JSON encoding and exact output validation outside the timer",
+    "warmups": 3,
+    "checked_flight_calls": 640,
     "case_order": [
       "rsc-sync",
       "rsc-async"
     ],
+    "actors": [
+      "baseline",
+      "candidate",
+      "candidate-speed",
+      "v8"
+    ],
+    "processes_per_engine_per_block": 4,
+    "clock": "retained applicationRun through complete Flight serialization and consumption; JSON encoding and exact validation outside request timing",
     "process_order": [
       [
         "baseline",
         "candidate",
+        "candidate-speed",
         "v8"
       ],
       [
         "v8",
+        "candidate-speed",
         "candidate",
         "baseline"
       ]
     ],
-    "campaign": "target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json",
-    "campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
-    "execution_processes": 24,
-    "checked_invocations": 480,
-    "exact_output": "All sync/async Flight output checked against Node; serialization and consumption are timed; JSON encoding and exact-output validation follow timing."
+    "execution_processes": 32,
+    "exact_output": "Both RSC cases were checked against the shared Node-generated JSON golden."
   },
-  "caveat": "Descriptive same-host pilot, not causal attribution to one source change, conformance, statistical confidence or universal application performance. RSC is exact-output checked; baseline is the published current candidate from the 6ae49d87 cohort. Node/V8 is the pinned local v24 runtime.",
+  "caveat": "Descriptive same-host cohort, not causal attribution to one source change, conformance, statistical confidence or universal application performance. The 5aa baseline is retained under its original source/runtime identity. Fast and Speed are separately scored; candidate reports must share source, host, P, R and request inputs, with only native compilation policy differing.",
   "engines": {
     "baseline": {
       "label": "published Scriptw baseline Fast",
       "identity": {
-        "source_fingerprint": "0ca455c47636f9f52e402bee01ccf3f4e796ef65dba2e4ac1733af9469b422db",
-        "source_commit": "e9687a06ed89933d0210bcb897b0387be00f9925",
-        "executable_sha256": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
+        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
+        "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
+        "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
         "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
         "toolchain": {
           "opt_level": "3",
@@ -308,11 +234,12 @@
           "wasmtime": "47.0.0",
           "wasmtime_async_stack_bytes": 67108864
         },
+        "program_wasm_bytes": 4232136,
         "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
         "runtime": {
-          "key": "50ad6b6c7424c2af5619cc0913f4287f4cf58dcfcdadc55e401af9a83471cdd1",
-          "wasm_bytes": 38732607,
-          "wasm_sha256": "a6f571ce32bb44471d7d5b5990233d7d06174a5c4f625ef7e9beb2cb1e8ab187"
+          "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
+          "wasm_bytes": 38738181,
+          "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
         },
         "inputs": {
           "adapted_source_bytes": 64946,
@@ -330,123 +257,652 @@
             "react-server-dom-webpack": "19.3.1"
           },
           "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
-        }
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
       },
       "cases": {
         "rsc-sync": [
-          5630904,
-          5766962,
-          5812770,
-          5782612,
-          5900696,
-          5691308,
-          5619692,
-          5613721
+          4730732,
+          4802348,
+          4840821,
+          4905014,
+          4774858,
+          4798263,
+          4934062,
+          4974409
         ],
         "rsc-async": [
-          6094645,
-          6240452,
-          6159107,
-          6125955,
-          6205636,
-          6149790,
-          6101048,
-          6054188
+          5175044,
+          5195354,
+          5271479,
+          5222467,
+          5208250,
+          5206017,
+          5586921,
+          5427058
         ]
       },
       "block_medians": [
         {
           "block": 0,
           "cases": {
-            "rsc-sync": 5774787.0,
-            "rsc-async": 6142531.0
+            "rsc-sync": 4821584.5,
+            "rsc-async": 5208910.5
           }
         },
         {
           "block": 1,
           "cases": {
-            "rsc-sync": 5655500.0,
-            "rsc-async": 6125419.0
+            "rsc-sync": 4866162.5,
+            "rsc-async": 5317654.0
           }
         }
       ],
       "phase_processes": [
         {
-          "engine_setup": 86354,
-          "front_and_lower": 2701386308,
-          "module_initialization": 2173502,
-          "native_preparation": 5649147526,
-          "realm_and_instantiation": 586465,
-          "source_to_wasm": 3134736282,
-          "wasm_emission": 433349974
+          "engine_setup": 102504,
+          "front_and_lower": 2762112158,
+          "module_initialization": 2012451,
+          "native_preparation": 5748274868,
+          "realm_and_instantiation": 594829,
+          "source_to_wasm": 3200100057,
+          "wasm_emission": 437987899
         },
         {
-          "engine_setup": 90071,
-          "front_and_lower": 2710557443,
-          "module_initialization": 2193860,
-          "native_preparation": 5709791986,
-          "realm_and_instantiation": 574492,
-          "source_to_wasm": 3145985668,
-          "wasm_emission": 435428225
+          "engine_setup": 92084,
+          "front_and_lower": 2685350445,
+          "module_initialization": 2118993,
+          "native_preparation": 5581836986,
+          "realm_and_instantiation": 593296,
+          "source_to_wasm": 3114907698,
+          "wasm_emission": 429557253
         },
         {
-          "engine_setup": 90041,
-          "front_and_lower": 2737231589,
-          "module_initialization": 2158403,
-          "native_preparation": 5758256685,
-          "realm_and_instantiation": 568972,
-          "source_to_wasm": 3179774739,
-          "wasm_emission": 442543150
+          "engine_setup": 98527,
+          "front_and_lower": 2679105317,
+          "module_initialization": 2070542,
+          "native_preparation": 5535494557,
+          "realm_and_instantiation": 578949,
+          "source_to_wasm": 3108320957,
+          "wasm_emission": 429215640
         },
         {
-          "engine_setup": 92636,
-          "front_and_lower": 2874749285,
-          "module_initialization": 2126441,
-          "native_preparation": 5779679530,
-          "realm_and_instantiation": 587006,
-          "source_to_wasm": 3320389882,
-          "wasm_emission": 445640597
+          "engine_setup": 94169,
+          "front_and_lower": 2694377516,
+          "module_initialization": 2024434,
+          "native_preparation": 5559508896,
+          "realm_and_instantiation": 568139,
+          "source_to_wasm": 3125334172,
+          "wasm_emission": 430956656
         },
         {
-          "engine_setup": 96223,
-          "front_and_lower": 2812312632,
-          "module_initialization": 2236111,
-          "native_preparation": 6623770127,
-          "realm_and_instantiation": 590522,
-          "source_to_wasm": 3263641492,
-          "wasm_emission": 451328860
+          "engine_setup": 92435,
+          "front_and_lower": 2667975113,
+          "module_initialization": 2038621,
+          "native_preparation": 5528409405,
+          "realm_and_instantiation": 589610,
+          "source_to_wasm": 3097738616,
+          "wasm_emission": 429763503
         },
         {
-          "engine_setup": 92155,
-          "front_and_lower": 2818487792,
-          "module_initialization": 2222835,
-          "native_preparation": 5714574991,
-          "realm_and_instantiation": 591114,
-          "source_to_wasm": 3266145825,
-          "wasm_emission": 447658033
+          "engine_setup": 94850,
+          "front_and_lower": 2683984365,
+          "module_initialization": 2026509,
+          "native_preparation": 5566850762,
+          "realm_and_instantiation": 557719,
+          "source_to_wasm": 3113234722,
+          "wasm_emission": 429250357
         },
         {
-          "engine_setup": 102245,
-          "front_and_lower": 2705265141,
-          "module_initialization": 2153764,
-          "native_preparation": 5610411332,
-          "realm_and_instantiation": 581596,
-          "source_to_wasm": 3139799027,
-          "wasm_emission": 434533886
+          "engine_setup": 90031,
+          "front_and_lower": 2676542622,
+          "module_initialization": 2106901,
+          "native_preparation": 5733307459,
+          "realm_and_instantiation": 600912,
+          "source_to_wasm": 3116002013,
+          "wasm_emission": 439459391
         },
         {
-          "engine_setup": 92135,
-          "front_and_lower": 2695227472,
-          "module_initialization": 2212046,
-          "native_preparation": 5615030153,
-          "realm_and_instantiation": 598026,
-          "source_to_wasm": 3128599320,
-          "wasm_emission": 433371848
+          "engine_setup": 98858,
+          "front_and_lower": 2802480321,
+          "module_initialization": 2062177,
+          "native_preparation": 5710937749,
+          "realm_and_instantiation": 573168,
+          "source_to_wasm": 3242060976,
+          "wasm_emission": 439580655
         }
       ]
     },
     "candidate": {
       "label": "new Scriptw source Fast",
+      "identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
+        },
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_bytes": 4327610,
+        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+        "runtime": {
+          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
+          "wasm_bytes": 38768915,
+          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        },
+        "native_mode": "fast",
+        "native_mode_scope": "matched Fast cohort"
+      },
+      "cases": {
+        "rsc-sync": [
+          4644127,
+          4687580,
+          4732486,
+          4678514,
+          4714122,
+          4714524,
+          4776633,
+          5043881
+        ],
+        "rsc-async": [
+          5062792,
+          5105613,
+          5055659,
+          5141904,
+          5095256,
+          5109143,
+          5166443,
+          5518432
+        ]
+      },
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 4683047.0,
+            "rsc-async": 5084202.5
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 4745578.5,
+            "rsc-async": 5137793.0
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "engine_setup": 82146,
+          "front_and_lower": 2668403086,
+          "module_initialization": 2085540,
+          "native_preparation": 5599166444,
+          "realm_and_instantiation": 606832,
+          "source_to_wasm": 3099687040,
+          "wasm_emission": 431283954
+        },
+        {
+          "engine_setup": 86163,
+          "front_and_lower": 2704049750,
+          "module_initialization": 2045394,
+          "native_preparation": 5566081023,
+          "realm_and_instantiation": 555825,
+          "source_to_wasm": 3143885597,
+          "wasm_emission": 439835847
+        },
+        {
+          "engine_setup": 79490,
+          "front_and_lower": 2662419624,
+          "module_initialization": 2047327,
+          "native_preparation": 5504905949,
+          "realm_and_instantiation": 547430,
+          "source_to_wasm": 3091610275,
+          "wasm_emission": 429190651
+        },
+        {
+          "engine_setup": 78809,
+          "front_and_lower": 2666026186,
+          "module_initialization": 2004015,
+          "native_preparation": 5524597789,
+          "realm_and_instantiation": 575473,
+          "source_to_wasm": 3099240987,
+          "wasm_emission": 433214801
+        },
+        {
+          "engine_setup": 76436,
+          "front_and_lower": 2666760553,
+          "module_initialization": 2094568,
+          "native_preparation": 5603937370,
+          "realm_and_instantiation": 560965,
+          "source_to_wasm": 3096555851,
+          "wasm_emission": 429795298
+        },
+        {
+          "engine_setup": 76455,
+          "front_and_lower": 2666550359,
+          "module_initialization": 2073418,
+          "native_preparation": 5552181773,
+          "realm_and_instantiation": 583298,
+          "source_to_wasm": 3097119045,
+          "wasm_emission": 430568686
+        },
+        {
+          "engine_setup": 86154,
+          "front_and_lower": 2661521102,
+          "module_initialization": 2105880,
+          "native_preparation": 5511483506,
+          "realm_and_instantiation": 571044,
+          "source_to_wasm": 3090367654,
+          "wasm_emission": 428846552
+        },
+        {
+          "engine_setup": 88889,
+          "front_and_lower": 2760976840,
+          "module_initialization": 2049272,
+          "native_preparation": 5713972879,
+          "realm_and_instantiation": 594519,
+          "source_to_wasm": 3199347695,
+          "wasm_emission": 438370855
+        }
+      ]
+    },
+    "candidate-speed": {
+      "label": "new Scriptw source Speed/Backtracking",
+      "identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+        "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
+        },
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "Speed",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "Backtracking",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_bytes": 4327610,
+        "program_wasm_sha256": "8d69007a874b606b13d1e840b72c7f75b56fa8875c853e86d7efa47f422e637e",
+        "runtime": {
+          "key": "1a4942c30fb46f39ebe053fc0924db09a4cc01a76c06c531aff64c8627d6b06a",
+          "wasm_bytes": 38768915,
+          "wasm_sha256": "95ad9e205549dab9a64cb841319bf866e0da37afdfef7507ff00eb10908bb4ec"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        },
+        "native_mode": "speed",
+        "native_mode_scope": "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
+      },
+      "cases": {
+        "rsc-sync": [
+          3677883,
+          3736555,
+          3732618,
+          3693995,
+          3645282,
+          3741626,
+          3718642,
+          3801630
+        ],
+        "rsc-async": [
+          4034068,
+          4062944,
+          4050792,
+          4018352,
+          4004113,
+          4105607,
+          4060722,
+          4182013
+        ]
+      },
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 3713306.5,
+            "rsc-async": 4042430.0
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 3730134.0,
+            "rsc-async": 4083164.5
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "engine_setup": 79671,
+          "front_and_lower": 2665954144,
+          "module_initialization": 1704586,
+          "native_preparation": 7514639723,
+          "realm_and_instantiation": 606672,
+          "source_to_wasm": 3099831211,
+          "wasm_emission": 433877067
+        },
+        {
+          "engine_setup": 80583,
+          "front_and_lower": 2664098062,
+          "module_initialization": 1776873,
+          "native_preparation": 7454987824,
+          "realm_and_instantiation": 609657,
+          "source_to_wasm": 3093304849,
+          "wasm_emission": 429206787
+        },
+        {
+          "engine_setup": 80894,
+          "front_and_lower": 2658207232,
+          "module_initialization": 1748881,
+          "native_preparation": 7453947592,
+          "realm_and_instantiation": 597014,
+          "source_to_wasm": 3087918381,
+          "wasm_emission": 429711149
+        },
+        {
+          "engine_setup": 76946,
+          "front_and_lower": 2666433960,
+          "module_initialization": 1709096,
+          "native_preparation": 7510988967,
+          "realm_and_instantiation": 598246,
+          "source_to_wasm": 3097485450,
+          "wasm_emission": 431051490
+        },
+        {
+          "engine_setup": 80704,
+          "front_and_lower": 2677483001,
+          "module_initialization": 1665814,
+          "native_preparation": 7510069079,
+          "realm_and_instantiation": 590612,
+          "source_to_wasm": 3109400130,
+          "wasm_emission": 431917129
+        },
+        {
+          "engine_setup": 81545,
+          "front_and_lower": 2668820139,
+          "module_initialization": 1759872,
+          "native_preparation": 7417709513,
+          "realm_and_instantiation": 617954,
+          "source_to_wasm": 3098673921,
+          "wasm_emission": 429853782
+        },
+        {
+          "engine_setup": 81124,
+          "front_and_lower": 2703581384,
+          "module_initialization": 1734564,
+          "native_preparation": 7603227328,
+          "realm_and_instantiation": 607514,
+          "source_to_wasm": 3138894701,
+          "wasm_emission": 435313317
+        },
+        {
+          "engine_setup": 83689,
+          "front_and_lower": 2760824424,
+          "module_initialization": 1786404,
+          "native_preparation": 7840834775,
+          "realm_and_instantiation": 612223,
+          "source_to_wasm": 3201128907,
+          "wasm_emission": 440304483
+        }
+      ]
+    },
+    "v8": {
+      "label": "Node 24 / V8",
+      "identity": {
+        "node": {
+          "node": "24.12.0",
+          "acorn": "8.15.0",
+          "ada": "3.3.0",
+          "amaro": "1.1.5",
+          "ares": "1.34.5",
+          "brotli": "1.1.0",
+          "cjs_module_lexer": "2.1.0",
+          "cldr": "47.0",
+          "icu": "77.1",
+          "llhttp": "9.3.0",
+          "modules": "137",
+          "napi": "10",
+          "nbytes": "0.1.1",
+          "ncrypto": "0.0.1",
+          "nghttp2": "1.67.1",
+          "openssl": "3.5.4",
+          "simdjson": "4.1.0",
+          "simdutf": "6.4.0",
+          "sqlite": "3.50.4",
+          "tz": "2025b",
+          "undici": "7.16.0",
+          "unicode": "16.0",
+          "uv": "1.51.0",
+          "uvwasi": "0.0.23",
+          "v8": "13.6.233.17-node.37",
+          "zlib": "1.3.1-470d3a2",
+          "zstd": "1.5.7"
+        }
+      },
+      "cases": {
+        "rsc-sync": [
+          498797,
+          489790,
+          498527,
+          545556,
+          481734,
+          479421,
+          495211,
+          469752
+        ],
+        "rsc-async": [
+          388498,
+          399128,
+          397555,
+          322222,
+          542029,
+          405631,
+          391794,
+          525518
+        ]
+      },
+      "block_medians": [
+        {
+          "block": 0,
+          "cases": {
+            "rsc-sync": 498662.0,
+            "rsc-async": 393026.5
+          }
+        },
+        {
+          "block": 1,
+          "cases": {
+            "rsc-sync": 480577.5,
+            "rsc-async": 465574.5
+          }
+        }
+      ],
+      "phase_processes": [
+        {
+          "realm_creation_ns": 17046102,
+          "source_module_parse_ns": 1544642,
+          "module_link_and_initialization_ns": 2424844
+        },
+        {
+          "realm_creation_ns": 16272827,
+          "source_module_parse_ns": 1519304,
+          "module_link_and_initialization_ns": 2358749
+        },
+        {
+          "realm_creation_ns": 16347431,
+          "source_module_parse_ns": 1513615,
+          "module_link_and_initialization_ns": 2380851
+        },
+        {
+          "realm_creation_ns": 16903369,
+          "source_module_parse_ns": 1484148,
+          "module_link_and_initialization_ns": 2348770
+        },
+        {
+          "realm_creation_ns": 16545269,
+          "source_module_parse_ns": 1504286,
+          "module_link_and_initialization_ns": 2377444
+        },
+        {
+          "realm_creation_ns": 16813520,
+          "source_module_parse_ns": 1490140,
+          "module_link_and_initialization_ns": 2361605
+        },
+        {
+          "realm_creation_ns": 16244842,
+          "source_module_parse_ns": 1502674,
+          "module_link_and_initialization_ns": 2387705
+        },
+        {
+          "realm_creation_ns": 17597322,
+          "source_module_parse_ns": 1537059,
+          "module_link_and_initialization_ns": 2462046
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+    "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1",
+    "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350",
+    "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f",
+    "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
+    "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+    "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/focused-outlined-1/receipt.json": "d859db8cdb7dac9305d942e6427b19e35f1a835a169bb4ced9e7c6aa32178f2c",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/common.py": "14eede0d86d6dbf4aacab9daf13e4f89df651340fa6a2ec062a7a6ec8804a254",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/freeze_source.py": "e66e6dc41756b182e9fca5ddbbc964f7b6e392e5e383ce90a3039127ffa2ebfe",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/measure_rsc.py": "af41ab9aebcf5c9c394c23f233aec9d32e1eed60716952181d344184473b6b16",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/baseline/rsc-current.json": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/manifest.json": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+    "/home/jacobt/src/scriptw/target/performance-levers-20261108/tools/source-outlined-1/tracked.patch": "a50f830332597052b0a48b655f0f885d818d9149efec0ae482ebdaf6309d5f32",
+    "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63",
+    "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/common.py": "0c9f0c949b02cb80bff8563a6af723080d1922db157c4b0d738de236f7a527e1",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/compact_data.rs": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/define_property.rs": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/src/objects.rs": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/main.rs": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": "7d0a9d7de9d5fe4b546ece86612e251de7baf18cbf7abe5e9c32c55e64260289",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/crates/scriptw-engine/tests/aot_builtins/main.rs": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/for-in-enumeration.md": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/files/docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/compact_data.rs": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/define_property.rs": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/src/objects.rs": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/main.rs": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": "dc7180a1b6eb6344a3832abbb7fbba9a4e688dad54287ee07429a7f8a90f5123",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/crates/scriptw-engine/tests/aot_builtins/main.rs": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/for-in-enumeration.md": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/files/docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d",
+    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad"
+  },
+  "source_identity": {
+    "git_revision_role": "base Git revision with a frozen dirty source batch",
+    "baseline_source": {
       "identity": {
         "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
         "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
@@ -502,882 +958,713 @@
           "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
         }
       },
-      "cases": {
-        "rsc-sync": [
-          4854959,
-          4901066,
-          4945701,
-          5104604,
-          5424131,
-          5048487,
-          5373945,
-          5126455
-        ],
-        "rsc-async": [
-          5327046,
-          5396679,
-          5360630,
-          5559948,
-          6030543,
-          5460780,
-          5509823,
-          5316386
-        ]
-      },
-      "block_medians": [
-        {
-          "block": 0,
-          "cases": {
-            "rsc-sync": 4923383.5,
-            "rsc-async": 5378654.5
-          }
-        },
-        {
-          "block": 1,
-          "cases": {
-            "rsc-sync": 5250200.0,
-            "rsc-async": 5485301.5
-          }
-        }
-      ],
-      "phase_processes": [
-        {
-          "engine_setup": 86705,
-          "front_and_lower": 2746533007,
-          "module_initialization": 2053714,
-          "native_preparation": 5602462475,
-          "realm_and_instantiation": 569523,
-          "source_to_wasm": 3184680842,
-          "wasm_emission": 438147835
-        },
-        {
-          "engine_setup": 76946,
-          "front_and_lower": 2746565361,
-          "module_initialization": 2017785,
-          "native_preparation": 5633959890,
-          "realm_and_instantiation": 544575,
-          "source_to_wasm": 3188173914,
-          "wasm_emission": 441608553
-        },
-        {
-          "engine_setup": 82106,
-          "front_and_lower": 2795846840,
-          "module_initialization": 2085114,
-          "native_preparation": 5740187288,
-          "realm_and_instantiation": 567058,
-          "source_to_wasm": 3238459071,
-          "wasm_emission": 442612231
-        },
-        {
-          "engine_setup": 80062,
-          "front_and_lower": 2757337009,
-          "module_initialization": 2112055,
-          "native_preparation": 5749415854,
-          "realm_and_instantiation": 669132,
-          "source_to_wasm": 3200911159,
-          "wasm_emission": 443574150
-        },
-        {
-          "engine_setup": 85062,
-          "front_and_lower": 2787386801,
-          "module_initialization": 2116382,
-          "native_preparation": 5889743451,
-          "realm_and_instantiation": 616592,
-          "source_to_wasm": 3238388390,
-          "wasm_emission": 451001589
-        },
-        {
-          "engine_setup": 83739,
-          "front_and_lower": 2807746874,
-          "module_initialization": 2163553,
-          "native_preparation": 5826934783,
-          "realm_and_instantiation": 563932,
-          "source_to_wasm": 3251769577,
-          "wasm_emission": 444022703
-        },
-        {
-          "engine_setup": 75914,
-          "front_and_lower": 2711293018,
-          "module_initialization": 2049887,
-          "native_preparation": 5627642164,
-          "realm_and_instantiation": 558572,
-          "source_to_wasm": 3144303999,
-          "wasm_emission": 433010981
-        },
-        {
-          "engine_setup": 75764,
-          "front_and_lower": 2691547736,
-          "module_initialization": 2047032,
-          "native_preparation": 5568916757,
-          "realm_and_instantiation": 574973,
-          "source_to_wasm": 3125538068,
-          "wasm_emission": 433990332
-        }
-      ]
-    },
-    "v8": {
-      "label": "Node 24 / V8",
-      "identity": {
-        "node": {
-          "node": "24.12.0",
-          "acorn": "8.15.0",
-          "ada": "3.3.0",
-          "amaro": "1.1.5",
-          "ares": "1.34.5",
-          "brotli": "1.1.0",
-          "cjs_module_lexer": "2.1.0",
-          "cldr": "47.0",
-          "icu": "77.1",
-          "llhttp": "9.3.0",
-          "modules": "137",
-          "napi": "10",
-          "nbytes": "0.1.1",
-          "ncrypto": "0.0.1",
-          "nghttp2": "1.67.1",
-          "openssl": "3.5.4",
-          "simdjson": "4.1.0",
-          "simdutf": "6.4.0",
-          "sqlite": "3.50.4",
-          "tz": "2025b",
-          "undici": "7.16.0",
-          "unicode": "16.0",
-          "uv": "1.51.0",
-          "uvwasi": "0.0.23",
-          "v8": "13.6.233.17-node.37",
-          "zlib": "1.3.1-470d3a2",
-          "zstd": "1.5.7"
-        }
-      },
-      "cases": {
-        "rsc-sync": [
-          487277,
-          496785,
-          482006,
-          498828,
-          503276,
-          484561,
-          491745,
-          524227
-        ],
-        "rsc-async": [
-          411262,
-          397636,
-          412785,
-          409659,
-          400171,
-          403627,
-          399079,
-          394640
-        ]
-      },
-      "block_medians": [
-        {
-          "block": 0,
-          "cases": {
-            "rsc-sync": 492031.0,
-            "rsc-async": 410460.5
-          }
-        },
-        {
-          "block": 1,
-          "cases": {
-            "rsc-sync": 497510.5,
-            "rsc-async": 399625.0
-          }
-        }
-      ],
-      "phase_processes": [
-        {
-          "realm_creation_ns": 16580698,
-          "source_module_parse_ns": 1529478,
-          "module_link_and_initialization_ns": 2415182
-        },
-        {
-          "realm_creation_ns": 16690226,
-          "source_module_parse_ns": 1559345,
-          "module_link_and_initialization_ns": 2424678
-        },
-        {
-          "realm_creation_ns": 17202730,
-          "source_module_parse_ns": 1575104,
-          "module_link_and_initialization_ns": 2477269
-        },
-        {
-          "realm_creation_ns": 16964978,
-          "source_module_parse_ns": 1519979,
-          "module_link_and_initialization_ns": 2484854
-        },
-        {
-          "realm_creation_ns": 16859519,
-          "source_module_parse_ns": 1571617,
-          "module_link_and_initialization_ns": 2529077
-        },
-        {
-          "realm_creation_ns": 17572483,
-          "source_module_parse_ns": 1513798,
-          "module_link_and_initialization_ns": 2586527
-        },
-        {
-          "realm_creation_ns": 16439249,
-          "source_module_parse_ns": 1527543,
-          "module_link_and_initialization_ns": 2434428
-        },
-        {
-          "realm_creation_ns": 16846944,
-          "source_module_parse_ns": 1538575,
-          "module_link_and_initialization_ns": 2383099
-        }
-      ]
-    }
-  },
-  "inputs": {
-    "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
-    "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1",
-    "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f",
-    "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57",
-    "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
-    "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
-    "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
-    "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json": "307e230e934085e4e312a9675820028f924d08e13e604df546759946635ea133",
-    "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/aggregate.json": "d34e901738b2e4b0bee91f91a82fb81d779f88d73aef02fdcf26771a4271c538",
-    "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/block-0-0-candidate/report.json": "eff46db3d033605155feae5b87eefbb2065cafd84c3c8f110a4674d0d56d0aa8",
-    "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/campaign.json": "6dad11244c6a43413ff934a72c2f3e839e8366407fe532dea7b1f91c319e7685",
-    "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/focused-final-5/receipt.json": "53e4c1a89b553d2587a5c2be44e8d90ac3bf92797188efcd8b819eabc2a030c0",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/common.py": "0c9f0c949b02cb80bff8563a6af723080d1922db157c4b0d738de236f7a527e1",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/measure_rsc.py": "8eba660abd8f191bffc36f52ada85f0c7a94d890dea35e9282f331e52fc42e05",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/baseline/rsc-current.json": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/tracked.patch": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/aggregate.json": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd",
-    "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/campaign.json": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430"
-  },
-  "source_identity": {
-    "git_revision_role": "Base commit only; candidate fingerprint, executable, program P and runtime R hashes identify measured build.",
-    "baseline_source": {
-      "source_commit": "e9687a06ed89933d0210bcb897b0387be00f9925",
-      "source_fingerprint": "0ca455c47636f9f52e402bee01ccf3f4e796ef65dba2e4ac1733af9469b422db",
-      "executable_sha256": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
-      "producer": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json",
-      "producer_sha256": "307e230e934085e4e312a9675820028f924d08e13e604df546759946635ea133",
-      "baseline_report": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/rsc-final-3/block-0-0-candidate/report.json",
-      "baseline_report_sha256": "eff46db3d033605155feae5b87eefbb2065cafd84c3c8f110a4674d0d56d0aa8"
+      "executable": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
+      "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+      "report": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json",
+      "report_sha256": "3755975d08bb9bb74fb6739092c4f5900d1d8ffe9fba84f40ac3833b8918fb63",
+      "published_report_sha256": "a389b39938c5e6601232b4df74971718f990e52f2037e733215a203ae9385350"
     },
     "candidate_measured_source": {
-      "path": "target/rsc-property-kernels-20261107/tools/source-corrected-5",
-      "manifest_sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
-      "manifest": {
-        "schema": "scriptw-rsc-property-source-v1",
-        "created_at": "2026-11-07T20:52:58.300787+00:00",
-        "base_git": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-        "runtime_abi": 52,
-        "tracked_patch_sha256": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad",
-        "tracked_files": [
-          "crates/scriptw-aot-wasm/src/objects.rs",
-          "crates/scriptw-aot-wasm/src/objects/compact_data.rs",
-          "crates/scriptw-aot-wasm/src/objects/define_property.rs",
-          "crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs",
-          "crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs",
-          "crates/scriptw-aot-wasm/tests/emission/main.rs",
-          "crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs",
-          "crates/scriptw-engine/tests/aot_builtins/main.rs",
-          "docs/rust-rewrite/contracts/for-in-enumeration.md",
-          "docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md",
-          "docs/rust-rewrite/contracts/object-operation-runtime-helpers.md"
-        ],
-        "untracked_files": [
-          "crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs",
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs",
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs",
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs"
-        ],
-        "deleted_files": [],
-        "files": {
-          "crates/scriptw-aot-wasm/src/objects.rs": {
-            "origin": "tracked",
-            "sha256": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
-            "bytes": 176892
-          },
-          "crates/scriptw-aot-wasm/src/objects/compact_data.rs": {
-            "origin": "tracked",
-            "sha256": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
-            "bytes": 43405
-          },
-          "crates/scriptw-aot-wasm/src/objects/define_property.rs": {
-            "origin": "tracked",
-            "sha256": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
-            "bytes": 94222
-          },
-          "crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": {
-            "origin": "tracked",
-            "sha256": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
-            "bytes": 17269
-          },
-          "crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": {
-            "origin": "tracked",
-            "sha256": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
-            "bytes": 6915
-          },
-          "crates/scriptw-aot-wasm/tests/emission/main.rs": {
-            "origin": "tracked",
-            "sha256": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
-            "bytes": 1684
-          },
-          "crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": {
-            "origin": "tracked",
-            "sha256": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
-            "bytes": 4660
-          },
-          "crates/scriptw-engine/tests/aot_builtins/main.rs": {
-            "origin": "tracked",
-            "sha256": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
-            "bytes": 3177
-          },
-          "docs/rust-rewrite/contracts/for-in-enumeration.md": {
-            "origin": "tracked",
-            "sha256": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
-            "bytes": 5966
-          },
-          "docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": {
-            "origin": "tracked",
-            "sha256": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
-            "bytes": 1863
-          },
-          "docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": {
-            "origin": "tracked",
-            "sha256": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
-            "bytes": 4191
-          },
-          "crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": {
-            "origin": "untracked",
-            "sha256": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
-            "bytes": 10647
-          },
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": {
-            "origin": "untracked",
-            "sha256": "7d0a9d7de9d5fe4b546ece86612e251de7baf18cbf7abe5e9c32c55e64260289",
-            "bytes": 7081
-          },
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": {
-            "origin": "untracked",
-            "sha256": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
-            "bytes": 9695
-          },
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": {
-            "origin": "untracked",
-            "sha256": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
-            "bytes": 11681
-          }
-        },
-        "published_rsc_current_sha256": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8"
-      },
-      "qualification": {
-        "candidate_source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-        "cargo_reuse_receipt": "target/rsc-property-kernels-20261107/candidate-reuse.json",
-        "cargo_reuse_receipt_sha256": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-        "reused_executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-        "only_source_correction": "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs",
-        "production_sources_unchanged": true,
-        "runtime_abi": 52
-      }
+      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+      "manifest_path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
+      "manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+      "runtime_abi": 53,
+      "archive_prefix": "source/current/",
+      "manifest_member": "source/current/manifest.json"
     },
     "candidate_build": {
-      "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-      "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-      "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-      "producer": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
-      "producer_sha256": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0",
-      "qualified_reuse": {
-        "receipt_path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json",
-        "receipt_sha256": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-        "allowed_changed_files": [
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs"
-        ],
-        "previous_source_manifest": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json",
-          "sha256": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d"
-        },
-        "current_source_manifest": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json",
-          "sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2"
-        },
-        "previous_producer": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout",
-          "sha256": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db"
-        },
-        "current_producer": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
-          "sha256": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0"
-        },
-        "binary": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-          "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283"
-        },
-        "previous_artifact": {
-          "reason": "compiler-artifact",
-          "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-          "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-          "target": {
-            "kind": [
-              "example"
-            ],
-            "crate_types": [
-              "bin"
-            ],
-            "name": "rsc_baseline",
-            "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-            "edition": "2021",
-            "doc": false,
-            "doctest": false,
-            "test": false
-          },
-          "profile": {
-            "opt_level": "3",
-            "debuginfo": "line-tables-only",
-            "debug_assertions": false,
-            "overflow_checks": false,
-            "test": false
-          },
-          "features": [],
-          "filenames": [
-            "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-          ],
-          "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-          "fresh": false
-        },
-        "current_artifact": {
-          "reason": "compiler-artifact",
-          "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-          "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-          "target": {
-            "kind": [
-              "example"
-            ],
-            "crate_types": [
-              "bin"
-            ],
-            "name": "rsc_baseline",
-            "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-            "edition": "2021",
-            "doc": false,
-            "doctest": false,
-            "test": false
-          },
-          "profile": {
-            "opt_level": "3",
-            "debuginfo": "line-tables-only",
-            "debug_assertions": false,
-            "overflow_checks": false,
-            "test": false
-          },
-          "features": [],
-          "filenames": [
-            "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-          ],
-          "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-          "fresh": true
-        }
-      },
-      "build_argv": [
-        "cargo",
-        "--config",
-        "build.jobs=1",
-        "build",
-        "--release",
-        "--locked",
-        "-p",
-        "scriptw-cli",
-        "-p",
-        "scriptw-aot-wasm",
-        "-p",
-        "scriptw-engine",
-        "--test",
-        "emission",
-        "--test",
-        "structure_builtins",
-        "--test",
-        "structure_language",
-        "--test",
-        "structure_async",
-        "--test",
-        "runtime_link",
-        "--test",
-        "modules_realms",
-        "--test",
-        "intl_temporal",
-        "--test",
-        "structure",
-        "--test",
-        "aot_builtins",
-        "--test",
-        "aot_language",
-        "--test",
-        "aot_async",
-        "--test",
-        "aot_realm_modules",
-        "--example",
-        "rsc_baseline",
-        "--example",
-        "compiler_precompiled_baseline",
-        "--message-format=json-render-diagnostics"
-      ],
-      "build_wrapper": [
-        "python3",
-        "-B",
-        "scripts/limited_verification.py",
-        "--"
-      ]
+      "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
+      "executable_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
+      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+      "qualified_reuse": null,
+      "compiler_source_identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      }
     },
-    "runtime_abi": 52
+    "candidate_speed_policy": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "Speed",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "Backtracking",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "runtime_abi": 53,
+    "verification_source": {
+      "schema": "scriptw-performance-levers-test-only-reuse-v2",
+      "measured_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
+        "sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4"
+      },
+      "verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
+        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
+        "archive_prefix": "verification/source-current/",
+        "manifest_member": "verification/source-current/manifest.json"
+      },
+      "reuse_receipt": {
+        "path": "target/performance-levers-20261108/test-only-reuse-outlined-5.json",
+        "sha256": "7dfee0d0cf6a11ee4cb30070a369759f093cad30e79ac343f3e8542aa91b8838",
+        "archive_member": "verification/test-only-reuse-receipt.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-5.json",
+        "sha256": "38f6d41470f3260425c4ec833414757b98315f1ed13dfe9e0c1ec856da6f6134",
+        "archive_member": "verification/test-only-qualification.json"
+      },
+      "prior_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-4/manifest.json",
+        "sha256": "1b114db1657b70ab6f3b7d18b9dc5eacfd646c092a6cef0a9b4edd349a7ac574",
+        "archive_prefix": "verification/source-previous/",
+        "manifest_member": "verification/source-previous/manifest.json"
+      },
+      "binary_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "changed_external_test_files": [
+        "crates/scriptw-aot-wasm/tests/emission/row_loop_operators.rs",
+        "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/array_iterator_runtime_ownership.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_classic_loop_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_switch_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_with_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_with_environment_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_with_environment_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/host_schema.rs"
+      ],
+      "changed_cfg_test_file": [
+        "crates/scriptw-aot-wasm/src/tests/local_argument_calls.rs"
+      ],
+      "test_only_gate_files": [
+        {
+          "path": "crates/scriptw-engine/compiler_fingerprint.rs",
+          "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
+          "archive_member": "verification/test-only-gate/crates/scriptw-engine/compiler_fingerprint.rs"
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/src/lib.rs",
+          "sha256": "3be3b762ebaf64f2720987dd1429cd283e8758d85523e57708e79728479fd914",
+          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/lib.rs"
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/src/tests.rs",
+          "sha256": "b5b95f8e9c7f53b002ccba575ffa7ad9a35e26fcbbe69d85e98dc46b23d59466",
+          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/tests.rs"
+        }
+      ],
+      "compiler_source_identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "qualification": "Changed inputs are limited to listed external tests and at most the single explicitly excluded cfg(test) module. Compiler source identity and Cargo inputs match; the frozen production executable SHA is unchanged."
+    },
+    "mixed_cfg_verification": {
+      "schema": "scriptw-performance-levers-mixed-cfg-test-change-v1",
+      "previous_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
+        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
+        "archive_prefix": "verification/mixed-cfg/source-previous/",
+        "manifest_member": "verification/mixed-cfg/source-previous/manifest.json"
+      },
+      "current_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
+        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
+        "archive_prefix": "verification/mixed-cfg/source-current/",
+        "manifest_member": "verification/mixed-cfg/source-current/manifest.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
+        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4",
+        "archive_member": "verification/mixed-cfg-test-qualification.json"
+      },
+      "previous_producer": {
+        "path": "target/performance-levers-20261108/build-outlined-5.stdout",
+        "sha256": "60d140eed11ab6127d7935adf4e0655486882bc8887213164f01d9c6eb34e0c8",
+        "archive_member": "verification/mixed-cfg/previous-cargo-producer.stdout"
+      },
+      "current_producer": {
+        "path": "target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
+        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424",
+        "archive_member": "verification/mixed-cfg/current-cargo-producer.stdout"
+      },
+      "change": {
+        "path": "crates/scriptw-aot-wasm/src/functions/numeric_body.rs",
+        "previous_file_sha256": "ba572e47a3bcf697cac990bd616f0b681f90a9919a021081c7afff738b0d3e9f",
+        "current_file_sha256": "8582d38f500db00bd4c5a8fce4ff1cb4e61a36dedfda8000d4fa2e75b08f2102",
+        "production_prefix_sha256": "2cb9dff6a8f4ec202c4b8cf0ebe5cec9b6028409ec92ecf43149f8d9c6060a0e",
+        "previous_test_suffix_sha256": "c2feb326b3407c253c1e0e89475fcdaa44c82581b94dc493ced58140abc83cdf",
+        "current_test_suffix_sha256": "d68b331b2ddd4d0b71a6c7479fc87f68b0657b498d53a3119d726d197476b9e6",
+        "previous_test_literal": "export function step(row,i,extra){tick=tick+1;return row.x+i;}",
+        "current_test_literal": "export function step(row,i,a,b,c,extra){tick=tick+1;return row.x+i;}"
+      },
+      "previous_compiler_source_identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "current_compiler_source_identity": {
+        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "product_binary_identity": "separate verification build; no binary-equality claim",
+      "qualification": "Only the cfg(test) suffix changed in this fingerprinted mixed source file; the production prefix is byte-identical. The verification build has a separately recorded compiler identity and is not treated as the measured binary."
+    },
+    "format_only_test_verification": {
+      "schema": "scriptw-performance-levers-format-only-test-proof-v1",
+      "previous_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
+        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
+        "archive_prefix": "verification/import-format/source-previous/",
+        "manifest_member": "verification/import-format/source-previous/manifest.json"
+      },
+      "current_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-7/manifest.json",
+        "sha256": "af601c7297d03a20e5bff67a6e6c9fc1fd150105c7b28edebc052ae453359052",
+        "archive_prefix": "verification/import-format/source-current/",
+        "manifest_member": "verification/import-format/source-current/manifest.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-7.json",
+        "sha256": "382eae9e7bb88147d05702fff21527100efaf99d89070b50b7289ddd4d35e484",
+        "archive_member": "verification/import-format-qualification.json"
+      },
+      "mixed_cfg_qualification": {
+        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
+        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4"
+      },
+      "format_only_files": [
+        {
+          "path": "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
+          "previous_file_sha256": "79251e1e44eea5ce49fefaca5421adb8f8c2c41f4aea0b89832f31db06a40751",
+          "current_file_sha256": "4881d3e92914bf2897da0c48a23b0cb4051b83df1a8550cd7fcd684c50e65c44",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};",
+              "current_import": "use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};"
+            },
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
+          "previous_file_sha256": "a56d0129495274c11dcf643f61a27dfac9fbaebd540615ff460dc609e1444076",
+          "current_file_sha256": "63375d48af6068a739bae3b37d6f62c3af96b85771725a8ee2d03e58e46e2f9f",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
+          "previous_file_sha256": "aa2fde8f36550c27f3dbef126be10564b964578e8e0024955fbba443172c57d5",
+          "current_file_sha256": "7d22a3370598327ccf586d4f87ca8a3bc0fea3297862b669a9a266422fea1ca8",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
+          "previous_file_sha256": "1a39f65f950c86781935a7e790291402e50b8b9ddcf77f37daff8b4d0a1371b9",
+          "current_file_sha256": "8e24d31301843effb5c80f46eedcf2233112078d78f9b4edaaf9bb12e1ebd803",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
+          "previous_file_sha256": "d4554ca0193daf8c42da97c648751f51a37d5e8e0b7b2f1a0e90f74559104479",
+          "current_file_sha256": "3089cc19c93116f78f069ef55f1f0e53036246fe56a560758f4f94f9b7dbc6e3",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
+          "previous_file_sha256": "3d64fa77b90de00a3fd58ed3c707682717c70c853234ccae683f9d557c55de42",
+          "current_file_sha256": "446f1029df9d9d708ee7488c55a87cbd12eab6dbf69ef85ef7cdfa87f711c098",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        }
+      ],
+      "compiler_source_identity": {
+        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "current_product_producer": {
+        "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
+        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424"
+      },
+      "compiler_fingerprint_exclusion": {
+        "path": "crates/scriptw-engine/compiler_fingerprint.rs",
+        "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
+        "archive_member": "verification/import-format/compiler_fingerprint.rs"
+      },
+      "binary_identity_comparison": "not-claimed; no source7 product build was run",
+      "qualification": "Source6 to source7 changes only import ordering in six external test files. The measured source1 cohort and source6 CLI identity remain separately pinned; no product binary identity is inferred and no tests are claimed as rerun by this receipt."
+    }
   },
   "producer_receipts": {
     "baseline": {
-      "host": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline",
-      "host_sha256": "bea0ab58d272ba73e17f3fcc1e5a1c9fd5bc74659b2f9d2a1042d3e0e0316788",
-      "producer": "/home/jacobt/src/scriptw/target/performance-v8-climb-20261104/for-in-set-execution/build-final-3/frozen/rsc_baseline-producer.json",
-      "producer_sha256": "307e230e934085e4e312a9675820028f924d08e13e604df546759946635ea133"
+      "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline-producer.json",
+      "sha256": "e1edbe71155395acce9460111d8faecc00cb1d7617b28ee1eef814d4fbc6c00a"
     },
     "candidate": {
-      "host": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-      "host_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-      "producer": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
-      "producer_sha256": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0",
-      "cargo_artifact": {
-        "reason": "compiler-artifact",
-        "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-        "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-        "target": {
-          "kind": [
-            "example"
-          ],
-          "crate_types": [
-            "bin"
-          ],
-          "name": "rsc_baseline",
-          "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-          "edition": "2021",
-          "doc": false,
-          "doctest": false,
-          "test": false
-        },
-        "profile": {
-          "opt_level": "3",
-          "debuginfo": "line-tables-only",
-          "debug_assertions": false,
-          "overflow_checks": false,
-          "test": false
-        },
-        "features": [],
-        "filenames": [
-          "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-        ],
-        "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-        "fresh": true
-      },
-      "qualified_reuse": {
-        "receipt_path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/candidate-reuse.json",
-        "receipt_sha256": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-        "allowed_changed_files": [
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs"
-        ],
-        "previous_source_manifest": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-initial/manifest.json",
-          "sha256": "9beb89b370e9f30eedcad4d04be84e9157979d137e157e955580fc269fa8061d"
-        },
-        "current_source_manifest": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/tools/source-corrected-5/manifest.json",
-          "sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2"
-        },
-        "previous_producer": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-initial.stdout",
-          "sha256": "43b6d11172c7fce6e8658d748812ea6410eee99ce31f0299308ccaf6c20365db"
-        },
-        "current_producer": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/build-corrected-5.stdout",
-          "sha256": "01a0de615d50a65233345eed77ce242d3703fbf8dc8ce15a926b7ccae92612c0"
-        },
-        "binary": {
-          "path": "/home/jacobt/src/scriptw/target/rsc-property-kernels-20261107/frozen-initial/rsc_baseline",
-          "sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283"
-        },
-        "previous_artifact": {
-          "reason": "compiler-artifact",
-          "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-          "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-          "target": {
-            "kind": [
-              "example"
-            ],
-            "crate_types": [
-              "bin"
-            ],
-            "name": "rsc_baseline",
-            "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-            "edition": "2021",
-            "doc": false,
-            "doctest": false,
-            "test": false
-          },
-          "profile": {
-            "opt_level": "3",
-            "debuginfo": "line-tables-only",
-            "debug_assertions": false,
-            "overflow_checks": false,
-            "test": false
-          },
-          "features": [],
-          "filenames": [
-            "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-          ],
-          "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-          "fresh": false
-        },
-        "current_artifact": {
-          "reason": "compiler-artifact",
-          "package_id": "path+file:///home/jacobt/src/scriptw/crates/scriptw-cli#0.1.0",
-          "manifest_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/Cargo.toml",
-          "target": {
-            "kind": [
-              "example"
-            ],
-            "crate_types": [
-              "bin"
-            ],
-            "name": "rsc_baseline",
-            "src_path": "/home/jacobt/src/scriptw/crates/scriptw-cli/examples/rsc_baseline.rs",
-            "edition": "2021",
-            "doc": false,
-            "doctest": false,
-            "test": false
-          },
-          "profile": {
-            "opt_level": "3",
-            "debuginfo": "line-tables-only",
-            "debug_assertions": false,
-            "overflow_checks": false,
-            "test": false
-          },
-          "features": [],
-          "filenames": [
-            "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline"
-          ],
-          "executable": "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline",
-          "fresh": true
-        }
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
+      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+      "qualified_reuse": null
+    },
+    "candidate_speed": {
+      "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
+      "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+      "native_configuration": {
+        "collector": "Copying",
+        "compilation_jobs": 1,
+        "cranelift_opt_level": "Speed",
+        "driver_worker_stack_bytes": 67108864,
+        "epoch_deadline_ticks": 6000,
+        "epoch_interruption": true,
+        "epoch_tick_ms": 5,
+        "gc_initial_bytes": 16777216,
+        "max_wasm_stack_bytes": 33554432,
+        "native_parallel_compilation": false,
+        "pending_deadline_ms": 30000,
+        "register_allocation": "Backtracking",
+        "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+        "target": "x86_64-unknown-linux-gnu",
+        "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+        "wasmtime": "47.0.0",
+        "wasmtime_async_stack_bytes": 67108864
       }
     }
   },
   "publication": {
-    "date": "2026-11-07",
+    "date": "2026-11-08",
+    "status": "published",
     "measured_source": {
-      "path": "target/rsc-property-kernels-20261107/tools/source-corrected-5",
-      "manifest_sha256": "ce74eaca2d892120c31acb930521f7897e432d69bf6f11581d6babee131371a2",
-      "manifest": {
-        "schema": "scriptw-rsc-property-source-v1",
-        "created_at": "2026-11-07T20:52:58.300787+00:00",
-        "base_git": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
-        "runtime_abi": 52,
-        "tracked_patch_sha256": "5c5327f24892318d1e5c17a1b7b1c1495de2a9b5fdf9969010477f42e31265ad",
-        "tracked_files": [
-          "crates/scriptw-aot-wasm/src/objects.rs",
-          "crates/scriptw-aot-wasm/src/objects/compact_data.rs",
-          "crates/scriptw-aot-wasm/src/objects/define_property.rs",
-          "crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs",
-          "crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs",
-          "crates/scriptw-aot-wasm/tests/emission/main.rs",
-          "crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs",
-          "crates/scriptw-engine/tests/aot_builtins/main.rs",
-          "docs/rust-rewrite/contracts/for-in-enumeration.md",
-          "docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md",
-          "docs/rust-rewrite/contracts/object-operation-runtime-helpers.md"
-        ],
-        "untracked_files": [
-          "crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs",
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs",
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs",
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs"
-        ],
-        "deleted_files": [],
-        "files": {
-          "crates/scriptw-aot-wasm/src/objects.rs": {
-            "origin": "tracked",
-            "sha256": "40073753497a999cdac953e765d7d96e57e884ba6384caf6d3f942bc9346a1cc",
-            "bytes": 176892
-          },
-          "crates/scriptw-aot-wasm/src/objects/compact_data.rs": {
-            "origin": "tracked",
-            "sha256": "25b21c31ddb05e7d7f7a95e2d26ae795e63936963f71087c5d1767ebb6921453",
-            "bytes": 43405
-          },
-          "crates/scriptw-aot-wasm/src/objects/define_property.rs": {
-            "origin": "tracked",
-            "sha256": "231e9509cc3d35cb17fb72d503725518b4e6eb2693a27c23f42eb36e0529dd50",
-            "bytes": 94222
-          },
-          "crates/scriptw-aot-wasm/src/objects/proxy_target_descriptor.rs": {
-            "origin": "tracked",
-            "sha256": "eafe0d24e6506ca430734e7dab305f99ab4b97931b45c940497bf652a1b62541",
-            "bytes": 17269
-          },
-          "crates/scriptw-aot-wasm/tests/emission/for_in_descriptor_observation.rs": {
-            "origin": "tracked",
-            "sha256": "c70126748d409ae54f45ca537288ae40a9babac2c05d828130089c6062ee2bb5",
-            "bytes": 6915
-          },
-          "crates/scriptw-aot-wasm/tests/emission/main.rs": {
-            "origin": "tracked",
-            "sha256": "e4c85d8428b9b2fb98b3557de560640d50202d345e74a9f48accf196e302ec8d",
-            "bytes": 1684
-          },
-          "crates/scriptw-aot-wasm/tests/structure_builtins/string_exotic_property_key_structure.rs": {
-            "origin": "tracked",
-            "sha256": "0acbe76410ea74de4c932a65a65a1307ff5929542ddbcd7e98d6038f0c58a122",
-            "bytes": 4660
-          },
-          "crates/scriptw-engine/tests/aot_builtins/main.rs": {
-            "origin": "tracked",
-            "sha256": "ff4091bf282c4c35fa1085b963b14ae0ef4df9731c127c8ba2d2ac3733558da5",
-            "bytes": 3177
-          },
-          "docs/rust-rewrite/contracts/for-in-enumeration.md": {
-            "origin": "tracked",
-            "sha256": "f4fe0daca48cf79d23f0229254fd678d24abda0cc5b0856225578fbc0df0ed12",
-            "bytes": 5966
-          },
-          "docs/rust-rewrite/contracts/object-define-property-descriptor-roles.md": {
-            "origin": "tracked",
-            "sha256": "fbb93f8b04aee6d80e173c2bc3237aa86e3abbe593ec2ec7197818222cd7a0f4",
-            "bytes": 1863
-          },
-          "docs/rust-rewrite/contracts/object-operation-runtime-helpers.md": {
-            "origin": "tracked",
-            "sha256": "e6e38207e0e3dc766b66affd39d480e66107a5a2666483e1477e7dc996eb2038",
-            "bytes": 4191
-          },
-          "crates/scriptw-aot-wasm/src/objects/ordinary_get_probe.rs": {
-            "origin": "untracked",
-            "sha256": "b49ec83dfdc6c0ce798c9b502970452c619be7c81a302431bd2136ab0402b639",
-            "bytes": 10647
-          },
-          "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs": {
-            "origin": "untracked",
-            "sha256": "7d0a9d7de9d5fe4b546ece86612e251de7baf18cbf7abe5e9c32c55e64260289",
-            "bytes": 7081
-          },
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_get_probe.rs": {
-            "origin": "untracked",
-            "sha256": "03dba0b169e9b8bdffa03fa9ed634dc304bdb5e52a3459eb61474d51b9dccee2",
-            "bytes": 9695
-          },
-          "crates/scriptw-engine/tests/aot_builtins/aot_ordinary_set_normalized_descriptor.rs": {
-            "origin": "untracked",
-            "sha256": "5615459ea11187032f2cafe5825688e2a20040358eb27772c73847ff746f50ef",
-            "bytes": 11681
-          }
+      "source_commit": "7b98415010501ab7c8f78dbf81661c06a9cb20bf",
+      "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+      "manifest_path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
+      "manifest_sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+      "runtime_abi": 53,
+      "archive_prefix": "source/current/",
+      "manifest_member": "source/current/manifest.json"
+    },
+    "baseline": {
+      "identity": {
+        "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
+        "source_commit": "6ae49d87bd9ee79c1e540fe58d3ab287d54fe832",
+        "executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
+        "compiler_identity_scheme": "scriptw-program-cache-compiler-v3",
+        "toolchain": {
+          "opt_level": "3",
+          "profile": "release",
+          "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\\nbinary: rustc\\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\\ncommit-date: 2026-07-14\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.97.1\\nLLVM version: 22.1.6\\n",
+          "rustflags": "-C\\u{1f}link-arg=-fuse-ld=lld",
+          "target": "x86_64-unknown-linux-gnu"
         },
-        "published_rsc_current_sha256": "77be6e741bf45ad5024a30e68b3ec7e019b1dcaab91b8dbad3507fc0aa8f46b8"
+        "configuration": {
+          "collector": "Copying",
+          "compilation_jobs": 1,
+          "cranelift_opt_level": "None",
+          "driver_worker_stack_bytes": 67108864,
+          "epoch_deadline_ticks": 6000,
+          "epoch_interruption": true,
+          "epoch_tick_ms": 5,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_parallel_compilation": false,
+          "pending_deadline_ms": 30000,
+          "register_allocation": "SinglePass",
+          "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+          "target": "x86_64-unknown-linux-gnu",
+          "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+          "wasmtime": "47.0.0",
+          "wasmtime_async_stack_bytes": 67108864
+        },
+        "program_wasm_sha256": "581dd619e4fc7c13921a46b8970687ab7422c9ee3e6bc681e3769b999e6c2637",
+        "runtime": {
+          "key": "9343011ab4758751b573199c4df0a088941fed60e8fc92d4802e96e9649defab",
+          "wasm_bytes": 38738181,
+          "wasm_sha256": "5a5309394e2c910846aa7adc84d5c426728960abf42db3b6d8e765a4ac608774"
+        },
+        "inputs": {
+          "adapted_source_bytes": 64946,
+          "adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf",
+          "source": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js",
+          "source_bytes": 64835,
+          "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334",
+          "support": "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json",
+          "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6",
+          "versions": {
+            "esbuild": "0.28.2",
+            "playwright": "1.64.1",
+            "react": "19.3.1",
+            "react-dom": "19.3.1",
+            "react-server-dom-webpack": "19.3.1"
+          },
+          "wrapper": "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n"
+        }
       },
-      "qualification": {
-        "candidate_source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044",
-        "cargo_reuse_receipt": "target/rsc-property-kernels-20261107/candidate-reuse.json",
-        "cargo_reuse_receipt_sha256": "ed5f7893437ae262dcc467efc80ec7559de32a7759f237f138063bb4b04233f1",
-        "reused_executable_sha256": "280319af6b7db82536fcb57a58eb4c7a33621e90ae5c24f419dc20922e984283",
-        "only_source_correction": "crates/scriptw-aot-wasm/tests/emission/ordinary_receiver_definition.rs",
-        "production_sources_unchanged": true,
-        "runtime_abi": 52
-      }
+      "reference_campaign_sha256": "90e7e98d35a6d52f5681bd5256bdf54932817dd4b8b5f81c95f8fd3c3b69c430",
+      "reference_aggregate_sha256": "6ddcb604824558ca3190904ca5839406a6277e3d09b25583f99b120e23ef91cd"
     },
-    "baseline_diagnostics": {
-      "react-allocation-current.json": {
-        "path": "baseline/diagnostics/react-allocation-current.json",
-        "sha256": "76ffefad68d0eeabdb1c1e35a2bb92e30773edb6b4469b90376db82b25a40462"
+    "speed_policy": "candidate-speed is a separately scored native-policy actor using the existing host's explicit Speed/Backtracking mode",
+    "archive_prefix": "source/current/",
+    "verification_source": {
+      "schema": "scriptw-performance-levers-test-only-reuse-v2",
+      "measured_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-1/manifest.json",
+        "sha256": "396ab7f7215f53286e1979432cd3c76d77d7fb3d2ba1e6ddf342c97fcadeef25",
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4"
       },
-      "react-attribution-current.json": {
-        "path": "baseline/diagnostics/react-attribution-current.json",
-        "sha256": "b6a51574b6585cbc32c78c8dd5111557132af3ee2fde5f10d1e243570ddb83d8"
+      "verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
+        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
+        "archive_prefix": "verification/source-current/",
+        "manifest_member": "verification/source-current/manifest.json"
       },
-      "rsc-wasm-size-current.json": {
-        "path": "baseline/diagnostics/rsc-wasm-size-current.json",
-        "sha256": "d46b0ef2a911dd940913f6e4da3b61c554698730a2be43b586a5c6b18cbeef4f"
-      }
+      "reuse_receipt": {
+        "path": "target/performance-levers-20261108/test-only-reuse-outlined-5.json",
+        "sha256": "7dfee0d0cf6a11ee4cb30070a369759f093cad30e79ac343f3e8542aa91b8838",
+        "archive_member": "verification/test-only-reuse-receipt.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-5.json",
+        "sha256": "38f6d41470f3260425c4ec833414757b98315f1ed13dfe9e0c1ec856da6f6134",
+        "archive_member": "verification/test-only-qualification.json"
+      },
+      "prior_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-4/manifest.json",
+        "sha256": "1b114db1657b70ab6f3b7d18b9dc5eacfd646c092a6cef0a9b4edd349a7ac574",
+        "archive_prefix": "verification/source-previous/",
+        "manifest_member": "verification/source-previous/manifest.json"
+      },
+      "binary_sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+      "changed_external_test_files": [
+        "crates/scriptw-aot-wasm/tests/emission/row_loop_operators.rs",
+        "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/array_iterator_runtime_ownership.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_classic_loop_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_switch_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_generator_with_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/async_with_environment_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/generator_with_environment_structure.rs",
+        "crates/scriptw-aot-wasm/tests/structure_async/host_schema.rs"
+      ],
+      "changed_cfg_test_file": [
+        "crates/scriptw-aot-wasm/src/tests/local_argument_calls.rs"
+      ],
+      "test_only_gate_files": [
+        {
+          "path": "crates/scriptw-engine/compiler_fingerprint.rs",
+          "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
+          "archive_member": "verification/test-only-gate/crates/scriptw-engine/compiler_fingerprint.rs"
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/src/lib.rs",
+          "sha256": "3be3b762ebaf64f2720987dd1429cd283e8758d85523e57708e79728479fd914",
+          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/lib.rs"
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/src/tests.rs",
+          "sha256": "b5b95f8e9c7f53b002ccba575ffa7ad9a35e26fcbbe69d85e98dc46b23d59466",
+          "archive_member": "verification/test-only-gate/crates/scriptw-aot-wasm/src/tests.rs"
+        }
+      ],
+      "compiler_source_identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "qualification": "Changed inputs are limited to listed external tests and at most the single explicitly excluded cfg(test) module. Compiler source identity and Cargo inputs match; the frozen production executable SHA is unchanged."
     },
-    "status": "published-measurements",
+    "mixed_cfg_verification": {
+      "schema": "scriptw-performance-levers-mixed-cfg-test-change-v1",
+      "previous_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-5/manifest.json",
+        "sha256": "e90db675a4635e7a41ee9971a99f2df557345757a6a5a863def835222a423d20",
+        "archive_prefix": "verification/mixed-cfg/source-previous/",
+        "manifest_member": "verification/mixed-cfg/source-previous/manifest.json"
+      },
+      "current_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
+        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
+        "archive_prefix": "verification/mixed-cfg/source-current/",
+        "manifest_member": "verification/mixed-cfg/source-current/manifest.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
+        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4",
+        "archive_member": "verification/mixed-cfg-test-qualification.json"
+      },
+      "previous_producer": {
+        "path": "target/performance-levers-20261108/build-outlined-5.stdout",
+        "sha256": "60d140eed11ab6127d7935adf4e0655486882bc8887213164f01d9c6eb34e0c8",
+        "archive_member": "verification/mixed-cfg/previous-cargo-producer.stdout"
+      },
+      "current_producer": {
+        "path": "target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
+        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424",
+        "archive_member": "verification/mixed-cfg/current-cargo-producer.stdout"
+      },
+      "change": {
+        "path": "crates/scriptw-aot-wasm/src/functions/numeric_body.rs",
+        "previous_file_sha256": "ba572e47a3bcf697cac990bd616f0b681f90a9919a021081c7afff738b0d3e9f",
+        "current_file_sha256": "8582d38f500db00bd4c5a8fce4ff1cb4e61a36dedfda8000d4fa2e75b08f2102",
+        "production_prefix_sha256": "2cb9dff6a8f4ec202c4b8cf0ebe5cec9b6028409ec92ecf43149f8d9c6060a0e",
+        "previous_test_suffix_sha256": "c2feb326b3407c253c1e0e89475fcdaa44c82581b94dc493ced58140abc83cdf",
+        "current_test_suffix_sha256": "d68b331b2ddd4d0b71a6c7479fc87f68b0657b498d53a3119d726d197476b9e6",
+        "previous_test_literal": "export function step(row,i,extra){tick=tick+1;return row.x+i;}",
+        "current_test_literal": "export function step(row,i,a,b,c,extra){tick=tick+1;return row.x+i;}"
+      },
+      "previous_compiler_source_identity": {
+        "source_fingerprint": "2255a0080df2d4f1c503ebc3dcd44fa1431c135a97c3412adc641b17ccac52c4",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "current_compiler_source_identity": {
+        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "product_binary_identity": "separate verification build; no binary-equality claim",
+      "qualification": "Only the cfg(test) suffix changed in this fingerprinted mixed source file; the production prefix is byte-identical. The verification build has a separately recorded compiler identity and is not treated as the measured binary."
+    },
+    "format_only_test_verification": {
+      "schema": "scriptw-performance-levers-format-only-test-proof-v1",
+      "previous_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-6/manifest.json",
+        "sha256": "d7f51f2809287a4a279f80c347f042d313f39e1064fdb0d7f175394f7dc6b6b9",
+        "archive_prefix": "verification/import-format/source-previous/",
+        "manifest_member": "verification/import-format/source-previous/manifest.json"
+      },
+      "current_verification_source": {
+        "path": "target/performance-levers-20261108/tools/source-outlined-7/manifest.json",
+        "sha256": "af601c7297d03a20e5bff67a6e6c9fc1fd150105c7b28edebc052ae453359052",
+        "archive_prefix": "verification/import-format/source-current/",
+        "manifest_member": "verification/import-format/source-current/manifest.json"
+      },
+      "qualification_receipt": {
+        "path": "target/performance-levers-20261108/qualification-outlined-7.json",
+        "sha256": "382eae9e7bb88147d05702fff21527100efaf99d89070b50b7289ddd4d35e484",
+        "archive_member": "verification/import-format-qualification.json"
+      },
+      "mixed_cfg_qualification": {
+        "path": "target/performance-levers-20261108/qualification-outlined-6.json",
+        "sha256": "d410d8d8667f4cd522b5bac2b3e84882737c9ce320069e1adda18b99293350f4"
+      },
+      "format_only_files": [
+        {
+          "path": "crates/scriptw-aot-wasm/tests/emission/scalar_row_modes.rs",
+          "previous_file_sha256": "79251e1e44eea5ce49fefaca5421adb8f8c2c41f4aea0b89832f31db06a40751",
+          "current_file_sha256": "4881d3e92914bf2897da0c48a23b0cb4051b83df1a8550cd7fcd684c50e65c44",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};",
+              "current_import": "use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};"
+            },
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_array_destructuring_structure.rs",
+          "previous_file_sha256": "a56d0129495274c11dcf643f61a27dfac9fbaebd540615ff460dc609e1444076",
+          "current_file_sha256": "63375d48af6068a739bae3b37d6f62c3af96b85771725a8ee2d03e58e46e2f9f",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_for_in_enumeration_structure.rs",
+          "previous_file_sha256": "aa2fde8f36550c27f3dbef126be10564b964578e8e0024955fbba443172c57d5",
+          "current_file_sha256": "7d22a3370598327ccf586d4f87ca8a3bc0fea3297862b669a9a266422fea1ca8",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/async_generator_for_in_structure.rs",
+          "previous_file_sha256": "1a39f65f950c86781935a7e790291402e50b8b9ddcf77f37daff8b4d0a1371b9",
+          "current_file_sha256": "8e24d31301843effb5c80f46eedcf2233112078d78f9b4edaaf9bb12e1ebd803",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_array_destructuring_structure.rs",
+          "previous_file_sha256": "d4554ca0193daf8c42da97c648751f51a37d5e8e0b7b2f1a0e90f74559104479",
+          "current_file_sha256": "3089cc19c93116f78f069ef55f1f0e53036246fe56a560758f4f94f9b7dbc6e3",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        },
+        {
+          "path": "crates/scriptw-aot-wasm/tests/structure_async/generator_for_in_enumeration_structure.rs",
+          "previous_file_sha256": "3d64fa77b90de00a3fd58ed3c707682717c70c853234ccae683f9d557c55de42",
+          "current_file_sha256": "446f1029df9d9d708ee7488c55a87cbd12eab6dbf69ef85ef7cdfa87f711c098",
+          "replacements": [
+            {
+              "previous_import": "use scriptw_front::{ParseOptions, parse};",
+              "current_import": "use scriptw_front::{parse, ParseOptions};"
+            },
+            {
+              "previous_import": "use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};",
+              "current_import": "use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};"
+            }
+          ]
+        }
+      ],
+      "compiler_source_identity": {
+        "source_fingerprint": "cd9a276f1c3881b8c70d13231bf8ed0791e205b2d95ff7359e3271a4076e6450",
+        "source_revision": "git:7b98415010501ab7c8f78dbf81661c06a9cb20bf"
+      },
+      "current_product_producer": {
+        "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/units-cli-complete/production-cli-build.stdout",
+        "sha256": "077b1a4bb7359c8377d8ce7d29224adbcd99565bf2f9a63978068b30b2f1f424"
+      },
+      "compiler_fingerprint_exclusion": {
+        "path": "crates/scriptw-engine/compiler_fingerprint.rs",
+        "sha256": "f7ffb532d6954c7887e410337126e73208802f6e65f6d7f379c48363a839819a",
+        "archive_member": "verification/import-format/compiler_fingerprint.rs"
+      },
+      "binary_identity_comparison": "not-claimed; no source7 product build was run",
+      "qualification": "Source6 to source7 changes only import ordering in six external test files. The measured source1 cohort and source6 CLI identity remain separately pinned; no product binary identity is inferred and no tests are claimed as rerun by this receipt."
+    },
     "evidence_archive": {
-      "file": "docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz",
-      "sha256": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c",
-      "bytes": 3857924,
-      "regular_utf8_members": 1921,
-      "expanded_utf8_bytes": 227197994
+      "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
+      "bytes": 3103888,
+      "regular_utf8_members": 3659,
+      "expanded_utf8_bytes": 106603957,
+      "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
+      "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
     },
-    "current_diagnostics": {
-      "archive_member": "reports/react-attribution-current.json",
-      "sha256": "43d70f5a5293767d9233b174db672f622b338b0d2a9ad22cc76f08ac16ea563a",
-      "source_fingerprint": "5aa48ad8a545934f090cc46c13e18d6e56ac76098bbfe8e0a56eb345b9677044"
-    },
-    "verification": {
-      "broad": {
-        "passed": 2535,
-        "scopes": 12,
-        "archive_member": "verification/broad/receipt.json",
-        "sha256": "95bf3a6e838b55e9a5d795700102da6b20d1d8a6e94b0e6935d2648222ee3032"
-      },
-      "units": {
-        "passed": 1757,
-        "failed": 4,
-        "archive_member": "verification/units-cli-0/receipt.json",
-        "sha256": "34e755395b98b51ade7ae92f20de60e319ce97efeef7b4075ba7c040102e7046"
-      },
-      "source_guards": {
-        "passed": 380,
-        "archive_member": "verification/extra-5/receipt.json",
-        "sha256": "f8cb1ff1cd7627bdad24fba6107c3b63cc06a745937549edf1dfebb01b543359"
-      },
-      "production_cli_smokes": 8,
-      "dependency_features": {
-        "archive_member": "verification/extra-files/1/product-feature-comparison.json",
-        "sha256": "662d81562358566a7a64963c6753e13585d84b22795ca2169c900673ca542430"
-      },
-      "formatting_failed_files": 11,
-      "stale_intl_recipes": 14,
-      "cheap_checks": {
-        "archive_member": "verification/extra-6/receipt.json",
-        "sha256": "ba47b0767ab78ebd6a5fe3f579884904cd03153cd6635d600e788885f258e2ac"
-      },
-      "full_workspace_ci_rerun": false,
-      "full_test262_rerun": false
-    }
+    "canonical_files_written": true
   },
-  "baseline_diagnostics": {
-    "scope": "Historical reports retain their own compiler, program/runtime and measurement identities.",
-    "reports": {
-      "react-allocation-current.json": {
-        "path": "baseline/diagnostics/react-allocation-current.json",
-        "sha256": "76ffefad68d0eeabdb1c1e35a2bb92e30773edb6b4469b90376db82b25a40462"
-      },
-      "react-attribution-current.json": {
-        "path": "baseline/diagnostics/react-attribution-current.json",
-        "sha256": "b6a51574b6585cbc32c78c8dd5111557132af3ee2fde5f10d1e243570ddb83d8"
-      },
-      "rsc-wasm-size-current.json": {
-        "path": "baseline/diagnostics/rsc-wasm-size-current.json",
-        "sha256": "d46b0ef2a911dd940913f6e4da3b61c554698730a2be43b586a5c6b18cbeef4f"
-      }
-    }
+  "candidate_speed": {
+    "path": "/home/jacobt/src/scriptw/target/performance-levers-20261108/frozen-outlined-1/rsc_baseline",
+    "sha256": "c48fdc61c3dc4d990fb8e03097e8f850962f4e4b99d69f78185e7acbe6abbea4",
+    "cargo_producer": "/home/jacobt/src/scriptw/target/performance-levers-20261108/build-outlined-1.stdout",
+    "cargo_producer_sha256": "75e6623dab4c3b9ffde3fe0706ab424b8c78792296fb931612871e0dbe5949be",
+    "configuration": {
+      "collector": "Copying",
+      "compilation_jobs": 1,
+      "cranelift_opt_level": "Speed",
+      "driver_worker_stack_bytes": 67108864,
+      "epoch_deadline_ticks": 6000,
+      "epoch_interruption": true,
+      "epoch_tick_ms": 5,
+      "gc_initial_bytes": 16777216,
+      "max_wasm_stack_bytes": 33554432,
+      "native_parallel_compilation": false,
+      "pending_deadline_ms": 30000,
+      "register_allocation": "Backtracking",
+      "store_limiter": "EmbeddedRuntime::new_state limits_mut",
+      "target": "x86_64-unknown-linux-gnu",
+      "target_features_policy": "explicit Config::target disables host-inferred feature flags",
+      "wasmtime": "47.0.0",
+      "wasmtime_async_stack_bytes": 67108864
+    },
+    "native_mode": "speed",
+    "scope": "separately scored native compilation policy"
   },
   "evidence_archive": {
-    "file": "docs/rust-rewrite/scriptw-property-kernels-evidence-2026-11-07.tar.xz",
-    "sha256": "178f809a17eccae7cd7092a4e7bb15c1444ef5a1f2af5516ad6e770d2f9d780c",
-    "bytes": 3857924,
-    "regular_utf8_members": 1921,
-    "expanded_utf8_bytes": 227197994
+    "sha256": "a52117a6ec7b3d83040fe6ec10a87159ba970d1ffb5673cba4414d8efc5bca0c",
+    "bytes": 3103888,
+    "regular_utf8_members": 3659,
+    "expanded_utf8_bytes": 106603957,
+    "file": "scriptw-performance-levers-evidence-2026-11-08.tar.xz",
+    "canonical_file": "docs/rust-rewrite/scriptw-performance-levers-evidence-2026-11-08.tar.xz"
   },
   "complete_archived_report": {
-    "archive_member": "reports/rsc-current.json",
-    "sha256": "451e8d036037beb2b37774882e7a05c25e3668885ccacd3fd87669ab2c5c3320"
+    "archive_member": "reports/rsc-current-prearchive.json",
+    "sha256": "defa972ecf1a3338f81da0fa650ed2a49b3ba0ee5e0c1f4a68c69c07e0bc0b5c"
   }
 }

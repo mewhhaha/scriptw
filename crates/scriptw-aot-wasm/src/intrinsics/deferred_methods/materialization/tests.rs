@@ -4,6 +4,7 @@ use wasmparser::{KnownCustom, Name, Operator, Parser, Payload, TypeRef};
 
 fn ordinary_meta() -> WasmFunctionMeta {
     WasmFunctionMeta {
+        captured_call: None,
         constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,

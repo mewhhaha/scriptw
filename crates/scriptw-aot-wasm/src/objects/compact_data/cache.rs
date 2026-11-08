@@ -1,6 +1,7 @@
 //! A monomorphic cache owns only immutable shape/key metadata and a slot. Every
 //! use reloads the receiver's live storage and SoA values after intervening code.
 use super::*;
+mod hit;
 
 impl FunctionBuilder<'_> {
     pub(in crate::objects) fn emit_own_data_cache_site(
@@ -109,6 +110,29 @@ impl FunctionBuilder<'_> {
         // Native callable shapes have primitive keys/attributes only; cached
         // values are always reloaded from this callable's current own storage.
         let cache = self.emit_own_data_cache_site(p.site, p.key.value(), &mut f);
+        self.emit_cached_compact_read_hit(
+            &p.target, &p.key, &object, &storage, &cache, &result, handled, &mut f,
+        )?;
+        handled.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let slot = schema.reserve_i32_local(&mut f);
+        self.emit_compact_slot_probe(&storage, &p.key, slot, handled, &mut f)?;
+        handled.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let mode = self.emit_negative_cache_mode(&p.target, &object, Some(&p.key), &mut f)?;
+        mode.load(&mut f);
+        slot.store(&mut f);
+        mode.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        handled.store(&mut f);
+        schema.release_i32_local(mode, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        handled.load(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
         let shape = schema.reserve_gc_local(&mut f).initialize(
             schema
                 .field(CompactDataStorageSchema::SHAPE)
@@ -116,39 +140,6 @@ impl FunctionBuilder<'_> {
                 .reference(),
             &mut f,
         );
-        let cached_shape = schema.reserve_gc_local(&mut f).initialize(
-            schema
-                .field(OwnDataReadCacheSchema::SHAPE)
-                .read(&cache, schema, &mut f)
-                .reference(),
-            &mut f,
-        );
-        let cached_key = schema.reserve_gc_local(&mut f).initialize(
-            schema
-                .field(OwnDataReadCacheSchema::KEY)
-                .read(&cache, schema, &mut f)
-                .reference(),
-            &mut f,
-        );
-        let slot = schema.reserve_i32_local(&mut f);
-        cached_key.load(schema, &mut f);
-        p.key.value().reference().load(&mut f);
-        f.instruction(&Instruction::RefEq);
-        shape.load(schema, &mut f);
-        cached_shape.load(schema, &mut f);
-        f.instruction(&Instruction::RefEq);
-        f.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, &mut f);
-        schema
-            .field(OwnDataReadCacheSchema::SLOT)
-            .read(&cache, schema, &mut f)
-            .store(slot, &mut f);
-        f.instruction(&Instruction::I32Const(1));
-        handled.store(&mut f);
-        f.instruction(&Instruction::Else);
-        self.emit_compact_slot_probe(&storage, &p.key, slot, handled, &mut f)?;
-        handled.load(&mut f);
-        self.open_frame(ControlFrameKind::If, &mut f);
         schema.field(OwnDataReadCacheSchema::SHAPE).write(
             &cache,
             GcOperand::nullable_reference(&shape, schema),
@@ -161,22 +152,13 @@ impl FunctionBuilder<'_> {
             schema,
             &mut f,
         );
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        handled.load(&mut f);
-        self.open_frame(ControlFrameKind::If, &mut f);
-        let value = schema.reserve_value_local(&mut f);
-        self.emit_compact_value_at(&storage, slot, &value, &mut f);
-        result.set_normal(&value, &mut f);
-        value.clear(&mut f);
+        shape.clear(&mut f);
+        self.emit_cached_compact_value(&storage, slot, &result, &mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(slot, &mut f);
-        cached_shape.clear(&mut f);
-        cached_key.clear(&mut f);
-        shape.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         storage.clear(&mut f);
         cache.clear(&mut f);
         self.pop_control(ControlFrameKind::If);

@@ -274,13 +274,29 @@ fn canonical_runtime_moves_all_date_rows_and_roots_inside_the_void_demand_owner(
         ]
     );
     let (building, ready) = (writes[0].0, writes[1].0);
-    let guards: Vec<_> = ensure[..building].windows(6).enumerate().filter_map(|(position, ops)| match ops {
-        [Operator::LocalGet { local_index }, Operator::I32Const { value }, Operator::I32Eq,
-            Operator::If { .. }, Operator::Return, Operator::End] => Some((position, *local_index, *value, true)),
-        [Operator::LocalGet { local_index }, Operator::I32Const { value }, Operator::I32Ne,
-            Operator::If { .. }, Operator::Unreachable, Operator::End] => Some((position, *local_index, *value, false)),
-        _ => None,
-    }).collect();
+    let guards: Vec<_> = ensure[..building]
+        .windows(6)
+        .enumerate()
+        .filter_map(|(position, ops)| match ops {
+            [
+                Operator::LocalGet { local_index },
+                Operator::I32Const { value },
+                Operator::I32Eq,
+                Operator::If { .. },
+                Operator::Return,
+                Operator::End,
+            ] => Some((position, *local_index, *value, true)),
+            [
+                Operator::LocalGet { local_index },
+                Operator::I32Const { value },
+                Operator::I32Ne,
+                Operator::If { .. },
+                Operator::Unreachable,
+                Operator::End,
+            ] => Some((position, *local_index, *value, false)),
+            _ => None,
+        })
+        .collect();
     assert_eq!(
         guards.len(),
         2,
@@ -818,6 +834,7 @@ fn date_intrinsic_callable_returns_the_ensured_constructor_without_an_allocation
     // This route needs the planned identity, but must never consume its code
     // entry or native metadata to build a second constructor.
     let meta = WasmFunctionMeta {
+        captured_call: None,
         constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,
@@ -944,10 +961,17 @@ fn date_intrinsic_callable_returns_the_ensured_constructor_without_an_allocation
         1,
         "no constructor, native-code or metadata allocation helper is reachable"
     );
-    assert!(!ops.iter().any(|op| matches!(op,
-        Operator::StructNew { .. } | Operator::ArrayNew { .. } | Operator::ArrayNewFixed { .. }
-        | Operator::ArrayNewDefault { .. } | Operator::RefFunc { .. })),
-        "the callable route allocates neither FunctionObject nor ExecutableCode, even behind an Undefined branch");
+    assert!(
+        !ops.iter().any(|op| matches!(
+            op,
+            Operator::StructNew { .. }
+                | Operator::ArrayNew { .. }
+                | Operator::ArrayNewFixed { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::RefFunc { .. }
+        )),
+        "the callable route allocates neither FunctionObject nor ExecutableCode, even behind an Undefined branch"
+    );
     let table = type_index::<IntrinsicTable>(schema);
     let read = (demand[0] + 1..ops.len())
         .find(|&position| {

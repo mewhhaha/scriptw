@@ -96,7 +96,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // helper. The helper function/type ABI changes; the GC object model does not.
 // Version 52 retains a canonical SetObject in the private ForIn cursor,
 // replacing its visited-key array with an immutable strong Set edge.
-const LAYOUT_VERSION: u32 = 52;
+// Version 53 stores binding values directly in their cells and adds a typed
+// wide local-argument entry to the existing executable-code record.
+const LAYOUT_VERSION: u32 = 53;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

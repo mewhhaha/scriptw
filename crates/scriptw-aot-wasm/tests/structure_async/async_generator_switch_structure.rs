@@ -1,3 +1,4 @@
+use crate::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -71,12 +72,10 @@ fn inspect_switch_artifact(source: &str, requires_abrupt_reference: bool) {
     let cells = structures
         .iter()
         .filter_map(|(&index, structure)| {
-            let fields = &structure.fields;
-            (fields.len() == 13
-                && concrete_reference(fields[4].element_type) == Some((true, index))
-                && fields[10].mutable
-                && concrete_reference(fields[10].element_type)
-                    .is_some_and(|(nullable, _)| nullable))
+            let cell = BindingCellLayout::new(index, structure)?;
+            let selected = cell.identifier_reference();
+            (selected.mutable
+                && concrete_reference(selected.element_type).is_some_and(|(nullable, _)| nullable))
             .then_some(index)
         })
         .collect::<Vec<_>>();
@@ -172,12 +171,20 @@ fn inspect_switch_artifact(source: &str, requires_abrupt_reference: bool) {
                     } if struct_type_index == frames[0] => pending_writes += 1,
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cells[0] => reference_reads += 1,
+                        field_index,
+                    } if struct_type_index == cells[0]
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_reads += 1
+                    }
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cells[0] => reference_writes += 1,
+                        field_index,
+                    } if struct_type_index == cells[0]
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_writes += 1
+                    }
                     _ => {}
                 }
             }

@@ -1,6 +1,6 @@
 //! Integration-test projections of the public emitted host-schema authority.
 use scriptw_aot_wasm::{GcHostField, GcHostLayout, GcHostStorage};
-use wasmparser::{FieldType, RefType, StorageType, StructType, ValType};
+use wasmparser::{FieldType, HeapType, RefType, StorageType, StructType, UnpackedIndex, ValType};
 
 // A new StoredValue field must update this complete named projection rather
 // than silently weakening the test's notion of a real stored JavaScript value.
@@ -39,6 +39,95 @@ pub(super) fn is_stored_value(actual: &StructType) -> bool {
                         && actual.element_type == stored_field_storage(expected.storage())
                 })
         })
+}
+
+/// ABI 53 keeps private record owners on the cell, beside its direct Value3.
+/// Consumers obtain these edges only after the payload and self-target agree.
+pub(super) struct BindingCellLayout<'a> {
+    fields: &'a [FieldType],
+}
+
+impl<'a> BindingCellLayout<'a> {
+    pub(super) const ACCUMULATION_INDEX: u32 = 11;
+    pub(super) const IDENTIFIER_REFERENCE: u32 = 12;
+    pub(super) const ITERATOR_RECORD: u32 = 13;
+    pub(super) const FOR_IN_RECORD: u32 = 14;
+
+    pub(super) fn new(index: u32, actual: &'a StructType) -> Option<Self> {
+        let fields = &actual.fields;
+        if fields.len() != GcHostLayout::BindingCell.field_count()? as usize {
+            return None;
+        }
+        for field in [
+            GcHostField::BindingCellScalar,
+            GcHostField::BindingCellTag,
+            GcHostField::BindingCellReference,
+        ] {
+            let expected = field.definition();
+            let actual = fields.get(expected.index() as usize)?;
+            if actual.mutable != expected.mutable()
+                || actual.element_type != stored_field_storage(expected.storage())
+            {
+                return None;
+            }
+        }
+        for (index, mutable) in [(3, true), (4, false), (5, false)] {
+            if fields[index].mutable != mutable
+                || fields[index].element_type.unpack() != ValType::I32
+            {
+                return None;
+            }
+        }
+        let target = fields[6];
+        let ValType::Ref(reference) = target.element_type.unpack() else {
+            return None;
+        };
+        if !target.mutable
+            || !reference.is_nullable()
+            || reference.heap_type() != HeapType::Concrete(UnpackedIndex::Module(index))
+        {
+            return None;
+        }
+        if fields[6..].iter().any(|field| !field.mutable)
+            || fields[Self::ACCUMULATION_INDEX as usize]
+                .element_type
+                .unpack()
+                != ValType::I64
+        {
+            return None;
+        }
+        Some(Self { fields })
+    }
+
+    pub(super) fn accumulation_index(&self) -> FieldType {
+        self.fields[Self::ACCUMULATION_INDEX as usize]
+    }
+    pub(super) fn identifier_reference(&self) -> FieldType {
+        self.fields[Self::IDENTIFIER_REFERENCE as usize]
+    }
+    pub(super) fn iterator_record(&self) -> FieldType {
+        self.fields[Self::ITERATOR_RECORD as usize]
+    }
+    pub(super) fn for_in_record(&self) -> FieldType {
+        self.fields[Self::FOR_IN_RECORD as usize]
+    }
+
+    pub(super) fn matches_stored_value(&self, stored: &StructType) -> bool {
+        is_stored_value(stored)
+            && [
+                (GcHostField::BindingCellScalar, GcHostField::StoredScalar),
+                (GcHostField::BindingCellTag, GcHostField::StoredTag),
+                (
+                    GcHostField::BindingCellReference,
+                    GcHostField::StoredReference,
+                ),
+            ]
+            .iter()
+            .all(|(cell, snapshot)| {
+                self.fields[cell.definition().index() as usize].element_type
+                    == stored.fields[snapshot.definition().index() as usize].element_type
+            })
+    }
 }
 
 #[test]

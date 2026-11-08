@@ -93,6 +93,20 @@ impl SourceActivationDepth {
 }
 
 impl RuntimeSchema {
+    /// A closed region may represent several source entries without publishing
+    /// intermediate activations. Decline before effects unless all would fit.
+    pub(crate) fn emit_source_activation_admission_test_for_depth(
+        &self,
+        additional: u32,
+        function: &mut Function,
+    ) {
+        assert!(additional > 0 && additional <= MAX_ACTIVE_SOURCE_BODIES as u32);
+        function.instruction(&Instruction::GlobalGet(self.source_activation_depth.index));
+        function.instruction(&Instruction::I32Const(
+            MAX_ACTIVE_SOURCE_BODIES - additional as i32,
+        ));
+        function.instruction(&Instruction::I32LeU);
+    }
     pub(crate) fn emit_source_activation_admission_test(&self, function: &mut Function) {
         self.source_activation_depth.emit_admission_test(function);
     }

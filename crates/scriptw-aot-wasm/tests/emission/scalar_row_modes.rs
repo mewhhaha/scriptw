@@ -3,6 +3,7 @@
 mod row_loop_operators;
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
 use row_loop_operators::{closed_number_loops, normalize};
+use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{
@@ -43,7 +44,8 @@ fn ordinary_inline_operators_match_published_baseline_and_dictionary_has_a_separ
         // The unchanged repeated workload is covered by scalar_row_projection.
         let source = include_str!("fixtures/compact_inline_metadata.mjs").replace("i < 8192", "i < 64");
         let ir = lower(&parse(&source, ParseOptions::module()).unwrap());
-        let artifact = scriptw_aot_wasm::emit(&ir).unwrap();
+        let artifact = emit_with_rooted_snapshot(&ir, PromiseRejectionPolicy::Ignore,
+            &scriptw_intl::IntlCompilationProfile::Minimal).unwrap();
         for bytes in [artifact.bytes.as_slice(), artifact.runtime().unwrap().bytes()] {
             Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
         }
@@ -60,7 +62,17 @@ fn ordinary_inline_operators_match_published_baseline_and_dictionary_has_a_separ
         let expected = include_str!("fixtures/compact_inline_metadata.ops").lines()
             .filter(|line| !line.starts_with('#')).map(str::to_owned).collect::<Vec<_>>();
         assert_eq!(expected.len(), 193, "receipt from the fingerprinted published P");
-        let inline = loops.iter().filter(|region| normalize(body, region.start..region.end) == expected).collect::<Vec<_>>();
+        let stored = runtime.witness_type(GcSnapshotLayout::Stored);
+        let normalized = loops.iter().map(|region| normalize(body, region.clone(), stored, &runtime.types)).collect::<Vec<_>>();
+        let inline = loops.iter().zip(&normalized).filter_map(|(region, actual)| (actual == &expected).then_some(region)).collect::<Vec<_>>();
+        if inline.len() != 1 {
+            for (region, actual) in loops.iter().zip(&normalized) {
+                let first = actual.iter().zip(&expected).position(|(actual, expected)| actual != expected)
+                    .unwrap_or(actual.len().min(expected.len()));
+                eprintln!("loop {region:?}: {} operators; first difference at {first}: expected {:?}, actual {:?}; actual StoredValue type {stored}",
+                    actual.len(), expected.get(first), actual.get(first));
+            }
+        }
         assert_eq!(inline.len(), 1, "exact old inline operators, immediates, roots, aliasing and control destinations");
         let dictionary_loop = loops.iter().find(|region| *region != inline[0]).unwrap();
         let (prepare, _) = runtime.named("helper::ordinary_property_prepare");

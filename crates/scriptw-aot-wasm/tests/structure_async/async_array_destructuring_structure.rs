@@ -1,3 +1,4 @@
+use super::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -56,19 +57,13 @@ fn inspect_async_pattern_artifact(source: &str, requires_reference: bool) {
     let cells = structures
         .iter()
         .filter_map(|(&index, structure)| {
-            let fields = &structure.fields;
-            if fields.len() != 13
-                || concrete_reference(fields[4].element_type) != Some((true, index))
-                || [1, 2, 3]
-                    .iter()
-                    .any(|&i| fields[i].element_type.unpack() != ValType::I32)
-                || fields[9].element_type.unpack() != ValType::I64
+            let layout = BindingCellLayout::new(index, structure)?;
+            let iterator_edge = layout.iterator_record();
+            let reference_edge = layout.identifier_reference();
+            let (nullable, iterator) = concrete_reference(iterator_edge.element_type)?;
+            let (reference_nullable, reference) = concrete_reference(reference_edge.element_type)?;
+            if !nullable || !iterator_edge.mutable || !reference_nullable || !reference_edge.mutable
             {
-                return None;
-            }
-            let (nullable, iterator) = concrete_reference(fields[11].element_type)?;
-            let (reference_nullable, reference) = concrete_reference(fields[10].element_type)?;
-            if !nullable || !fields[11].mutable || !reference_nullable || !fields[10].mutable {
                 return None;
             }
             let iterator_fields = &structures.get(&iterator)?.fields;
@@ -81,6 +76,10 @@ fn inspect_async_pattern_artifact(source: &str, requires_reference: bool) {
                 || concrete_reference(iterator_fields[0].element_type)
                     != concrete_reference(iterator_fields[1].element_type)
             {
+                return None;
+            }
+            let (nullable, value) = concrete_reference(iterator_fields[0].element_type)?;
+            if nullable || !layout.matches_stored_value(structures.get(&value)?) {
                 return None;
             }
             let reference_fields = &structures.get(&reference)?.fields;
@@ -109,14 +108,28 @@ fn inspect_async_pattern_artifact(source: &str, requires_reference: bool) {
                     Operator::StructGet {
                         struct_type_index,
                         field_index,
-                    } if struct_type_index == cell && (10..=11).contains(&field_index) => {
-                        retained_loads[(field_index - 10) as usize] += 1;
+                    } if struct_type_index == cell
+                        && [
+                            BindingCellLayout::IDENTIFIER_REFERENCE,
+                            BindingCellLayout::ITERATOR_RECORD,
+                        ]
+                        .contains(&field_index) =>
+                    {
+                        retained_loads
+                            [(field_index - BindingCellLayout::IDENTIFIER_REFERENCE) as usize] += 1;
                     }
                     Operator::StructSet {
                         struct_type_index,
                         field_index,
-                    } if struct_type_index == cell && (10..=11).contains(&field_index) => {
-                        retained_writes[(field_index - 10) as usize] += 1;
+                    } if struct_type_index == cell
+                        && [
+                            BindingCellLayout::IDENTIFIER_REFERENCE,
+                            BindingCellLayout::ITERATOR_RECORD,
+                        ]
+                        .contains(&field_index) =>
+                    {
+                        retained_writes
+                            [(field_index - BindingCellLayout::IDENTIFIER_REFERENCE) as usize] += 1;
                     }
                     _ => {}
                 }

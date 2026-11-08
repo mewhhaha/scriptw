@@ -37,10 +37,11 @@ reflection cannot reveal the omitted object during reentry.
 Any arguments reference, direct eval, child callable creation, uninspected
 plan, non-simple parameter list or resumable protocol refuses this proof.
 Absence of an owned arguments cell alone grants no authority. The same proof
-feeds the existing local-arguments entry planner, whose independent limit
-remains two simple formals. Five-formal bodies can omit their arguments object
-while retaining the ordinary vector ABI. Neither runtime layout nor helper
-ABI changes.
+feeds the local-arguments entry planner. It retains the two-slot entry for up
+to two simple formals and a distinct five-slot entry for three to five formals.
+Every local body retains its ordinary vector entry as an adapter. The distinct
+wide typed entry is part of shared runtime layout ABI 53; arguments-object
+omission itself adds no runtime helper ABI.
 
 Local-count planning and root-variable reuse need only know whether the
 function has its own arguments object. Their reusable `present()` projection

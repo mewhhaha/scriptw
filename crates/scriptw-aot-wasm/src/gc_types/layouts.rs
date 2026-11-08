@@ -562,7 +562,8 @@ macro_rules! callable_roles {
 }
 callable_roles!(OrdinaryCallable => JavaScriptFunction, GeneratorCallable => GeneratorFunction,
     AsyncCallable => AsyncFunction, AsyncGeneratorCallable => AsyncGeneratorFunction,
-    LocalArgumentsCallable => LocalArgumentsFunction);
+    LocalArgumentsCallable => LocalArgumentsFunction,
+    WideLocalArgumentsCallable => WideLocalArgumentsFunction);
 
 /// A scalar attempt has no Completion ABI and cannot pass through call_entry.
 pub(crate) enum BinaryNumericCallback {}
@@ -1054,6 +1055,7 @@ gc_layout_registry! {
             ASYNC_GENERATOR_ENTRY: GcFunctionRef<AsyncGeneratorCallable>, Immutable, Nullable;
             BINARY_NUMERIC_ENTRY: GcFunctionRef<BinaryNumericCallback>, Immutable, Nullable;
             LOCAL_ARGUMENTS_ENTRY: GcFunctionRef<LocalArgumentsCallable>, Immutable, Nullable;
+            WIDE_LOCAL_ARGUMENTS_ENTRY: GcFunctionRef<WideLocalArgumentsCallable>, Immutable, Nullable;
         }
         struct FunctionObject: JavaScriptObject => FunctionObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
@@ -1294,7 +1296,9 @@ gc_layout_registry! {
             IMPORT_CELLS: GcRef<BindingCellTable>, Immutable, NonNullable;
         }
         struct BindingCell => BindingCellSchema {
-            VALUE: GcRef<StoredValue>, Mutable, NonNullable;
+            VALUE_SCALAR: I64Value, Mutable, NonNullable;
+            VALUE_TAG: I32Value, Mutable, NonNullable;
+            VALUE_REFERENCE: AnyGcRef, Mutable, Nullable;
             INITIALIZED: bool, Mutable, NonNullable;
             MUTABLE: bool, Immutable, NonNullable;
             IMMUTABLE_STRICT: bool, Immutable, NonNullable;

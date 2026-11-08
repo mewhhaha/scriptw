@@ -238,6 +238,7 @@ if (first !== 4 || second !== 103 || tailed !== 4 || proxied !== 1004 || !reject
     log.join('|') !== 'argument|original|argument|replacement|argument|original|argument|proxy|original|argument') {
   throw new Error('held Reference changed while evaluating arguments');
 }
+
 print('held-reference:ok');
 "#;
     let observed = Engine::new(RealmBuilder::new().build())
@@ -269,5 +270,121 @@ print('held-reference:ok');
         vec![scriptw_engine::HostOutputEvent::PrintLine(
             "held-reference:ok".into()
         )]
+    );
+}
+
+#[test]
+fn five_argument_entries_preserve_mixed_values_padding_and_observer_fallbacks() {
+    assert_call_semantics(
+        r#"
+'use strict';
+function collect(a,b,c,d,e) { return [this,a,b,c,d,e]; }
+var token = {}, symbol = Symbol('local'), receiver = {collect};
+var full = receiver.collect(token, undefined, symbol, 19n, 'last');
+var short = collect(token, 2, 3), empty = collect(), effects = 0;
+var extra = collect(token, 2, 3, 4, 5, (effects++, 6));
+var spread = collect(...[token, 2, 3, 4, 5]);
+function observed(a,b,c,d,e) { return [arguments.length, a, e, arguments[5]]; }
+var seen = [], proxy = new Proxy(observed, {apply(target, self, args) {
+  seen.push(self, args.length); return Reflect.apply(target, self, args);
+}});
+var choices = [collect, proxy, Math.max, observed.bind(undefined, token)];
+function invoke(index,a,b,c,d,e) { var value = choices[index](a,b,c,d,e); return value; }
+var direct = invoke(0, token, symbol, 3, 4, 5);
+var proxied = invoke(1, token, 2, 3, 4, 5);
+var native = invoke(2, 1, 2, 3, 4, 5);
+var bound = invoke(3, 1, 2, 3, 4, 5);
+full[0] === receiver && full[1] === token && full[2] === undefined && full[3] === symbol &&
+full[4] === 19n && full[5] === 'last' && short[0] === undefined && short[1] === token &&
+short[3] === 3 && short[4] === undefined && short[5] === undefined && empty[5] === undefined &&
+extra[5] === 5 && effects === 1 && spread[1] === token && spread[5] === 5 && direct[0] === choices && direct[1] === token && direct[2] === symbol &&
+proxied[0] === 5 && proxied[1] === token && proxied[2] === 5 && seen[0] === choices && seen[1] === 5 &&
+native === 5 && bound[0] === 6 && bound[1] === token && bound[2] === 4 && bound[3] === 5;
+"#,
+    );
+}
+
+#[test]
+fn five_argument_calls_hold_callee_receiver_and_roots_across_all_operand_effects() {
+    assert_call_semantics(
+        r#"
+'use strict';
+var log = [], token = {}, calls = 0;
+function original(a,b,c,d,e) { calls++; log.push('body'); return [this,a,b,c,d,e]; }
+var holder = {get method() { log.push('callee'); return original; }};
+function receiver() { log.push('receiver'); return holder; }
+function argument(index) {
+  log.push(index);
+  if (index === 5) { Object.defineProperty(holder, 'method', {value: 17, configurable: true}); gc(); }
+  return {index, token};
+}
+var result = receiver().method(argument(1), argument(2), argument(3), argument(4), argument(5));
+var rooted = result[0] === holder;
+for (var index = 1; index <= 5; index++) rooted = rooted && result[index].index === index && result[index].token === token;
+var ordered = log.join('|') === 'receiver|callee|1|2|3|4|5|body';
+log = [];
+var reason, caught = false;
+function fail() { log.push('throw'); throw reason; }
+try { original(argument(1), argument(2), argument(3), argument(4), fail()); }
+catch (error) { caught = error === undefined; }
+var abruptOrder = log.join('|') === '1|2|3|4|throw';
+log = [];
+var rejected = false;
+try { holder.method(argument(1), argument(2), argument(3), argument(4), argument(5)); }
+catch (error) { rejected = error instanceof TypeError; }
+rooted && ordered && caught && abruptOrder && rejected && calls === 1 && log.join('|') === '1|2|3|4|5';
+"#,
+    );
+}
+
+#[test]
+fn five_argument_replacements_use_actual_closure_program_realm_and_tail_activation() {
+    assert_call_semantics(
+        r#"
+function make(seed) { 'use strict'; return function frame(a,b,c,d,e) { seed += a; return {seed, b, c, d, e}; }; }
+var frame = make(7), original = frame, token = {};
+function run(a,b,c,d,e) { 'use strict'; var result = frame(a,b,c,d,e); return result; }
+var first = run(3, token, 2, 4, 5);
+frame = make(100);
+var second = run(3, token, 2, 4, 5), saved = original(3, token, 2, 4, 5);
+var foreign = __scriptwCreateRealm().global;
+foreign.eval("function frame(a,b,c,d,e) { 'use strict'; return {a,b,c,d,e}; }");
+frame = foreign.frame;
+var foreignResult = run(3, token, 2, 4, 5);
+function local(a,b,c,d,e) { 'use strict'; return {a,b,c,d,e}; }
+var localResult = local(3, token, 2, 4, 5);
+function observer() { return observer.caller === null; }
+function barrier(a,b,c,d,e) { 'use strict'; return a() && b === token && c === 2 && d === 4 && e === 5; }
+var strictBarrier = barrier(observer, token, 2, 4, 5);
+function tail(n,a,b,c,d) { 'use strict'; if (n > 0) return tail(n-1,a,b,c,d); return [a,b,c,d]; }
+function recurse(n,a,b,c,d) { 'use strict'; if (n > 0) { var value = recurse(n-1,a,b,c,d); return value; } return a; }
+var depthChecked = false;
+try { recurse(10000, token, 2, 4, 5); } catch (error) { depthChecked = error instanceof RangeError; }
+var tailResult = tail(10000, token, 2, 4, 5);
+first.seed === 10 && second.seed === 103 && saved.seed === 13 && foreignResult.b === token &&
+Object.getPrototypeOf(foreignResult) === foreign.Object.prototype && Object.getPrototypeOf(localResult) === Object.prototype &&
+strictBarrier && depthChecked && tailResult[0] === token && tailResult[1] === 2 && tailResult[2] === 4 && tailResult[3] === 5;
+"#,
+    );
+}
+
+#[test]
+fn five_formal_constructor_adapters_keep_new_target_and_actual_vector_extent() {
+    assert_call_semantics(
+        r#"
+function Maker(a,b,c,d,e) { 'use strict'; this.values=[a,b,c,d,e]; this.target=new.target; }
+function Alternate() {}
+class Derived extends Maker {}
+var token = {}, effects = 0;
+var missing = new Maker(token), extra = new Maker(token, 2, 3, 4, 5, (effects++, 6));
+var alternate = Reflect.construct(Maker, [token,2,3,4,5], Alternate);
+var derived = new Derived(token,2,3,4,5);
+var Bound = Maker.bind(null, token, 2), bound = new Bound(3,4,5);
+missing.values[0] === token && missing.values[4] === undefined && missing.target === Maker &&
+extra.values[4] === 5 && effects === 1 && alternate.target === Alternate &&
+Object.getPrototypeOf(alternate) === Alternate.prototype && alternate.values[4] === 5 &&
+derived.target === Derived && Object.getPrototypeOf(derived) === Derived.prototype && derived.values[4] === 5 &&
+bound.target === Maker && Object.getPrototypeOf(bound) === Maker.prototype && bound.values[0] === token && bound.values[4] === 5;
+"#,
     );
 }

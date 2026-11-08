@@ -27,6 +27,9 @@ mod chunked;
 use chunked::ChunkedLoop;
 mod whole_trip;
 use whole_trip::WholeTrip;
+mod captured_calls;
+pub(crate) use captured_calls::CapturedCallSource;
+use captured_calls::{CapturedCallRoots, CapturedCalls};
 
 const MAX_NODES: usize = 256;
 const MAX_DEPTH: usize = 64;
@@ -62,6 +65,7 @@ impl NumberArithmetic {
     }
 }
 
+#[derive(Clone)]
 enum NumberExpression {
     Constant(u64),
     Binding(usize),
@@ -79,6 +83,10 @@ enum NumberExpression {
     Compound(usize, NumberArithmetic, Box<Self>),
     Update(usize, NumericUpdateOp, UpdateReturnMode),
     Comma(Box<Self>, Box<Self>),
+    Call(usize),
+    CallSlot(usize),
+    AssignCallSlot(usize, Box<Self>),
+    SelectCall(Box<Self>, Vec<usize>),
 }
 
 /// These expression facts establish exact conversion ranges, independently of
@@ -142,6 +150,7 @@ struct LoopLocals<'a> {
     bindings: &'a [NumberBinding],
     values: Vec<LoopLocal>,
     invariant: Option<&'a RegionFact<'a>>,
+    calls: Option<(&'a CapturedCalls, &'a CapturedCallRoots)>,
 }
 
 impl LoopLocals<'_> {
@@ -210,11 +219,13 @@ pub(super) struct ScalarNumberLoop {
     invariant: Option<RegionInvariant>,
     dense_four_step: bool,
     whole_trip: Option<WholeTrip>,
+    calls: CapturedCalls,
 }
 
 /// Carries the actual guarded roots until either loop path has completed.
 pub(super) struct ScalarNumberLoopEntry<'a> {
     fact: Option<RegionFact<'a>>,
+    calls: Option<CapturedCallRoots>,
 }
 
 impl<'a> ScalarNumberLoopEntry<'a> {
@@ -235,6 +246,9 @@ impl<'a> ScalarNumberLoopEntry<'a> {
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        if let Some(calls) = self.calls {
+            calls.release(builder, function);
+        }
         if let Some(fact) = self.fact {
             fact.release(builder, function);
         }
@@ -270,6 +284,7 @@ struct LoopProof<'a, 'b> {
     invariant: Option<RegionInvariant>,
     row_alias_initialized: bool,
     number_index_initialized: bool,
+    calls: CapturedCalls,
 }
 
 impl ScalarNumberLoop {
@@ -336,6 +351,7 @@ impl ScalarNumberLoop {
                 }),
             row_alias_initialized: false,
             number_index_initialized: false,
+            calls: CapturedCalls::default(),
         };
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
@@ -344,6 +360,16 @@ impl ScalarNumberLoop {
             Some(expression) => Some(proof.expression(expression, MAX_DEPTH)?),
             None => None,
         };
+        // Captured writes are deferred only while every row is preflighted.
+        // Streaming or non-array loops retain the ordinary call boundaries.
+        if !proof.calls.is_empty() {
+            let Some(RegionInvariant::ArrayReads(array)) = &proof.invariant else {
+                return None;
+            };
+            if !array.has_complete_projection() || !proof.imul.is_empty() {
+                return None;
+            }
+        }
         if let Some(RegionInvariant::ArrayReads(array)) = &proof.invariant {
             if !array.body_preserves_counter(&proof.bindings, &expressions) {
                 return None;
@@ -402,9 +428,12 @@ impl ScalarNumberLoop {
             invariant: proof.invariant,
             dense_four_step,
             whole_trip: None,
+            calls: proof.calls,
         };
         // Declining this narrower proof keeps the existing scalar plan intact.
-        plan.whole_trip = WholeTrip::new(builder, init, source_test, &plan);
+        if plan.calls.is_empty() {
+            plan.whole_trip = WholeTrip::new(builder, init, source_test, &plan);
+        }
         Some(plan)
     }
 
@@ -461,6 +490,7 @@ impl ScalarNumberLoop {
             }
         }
         let mut fact = None;
+        let mut calls = None;
         if !self.imul.is_empty() || self.invariant.is_some() {
             let schema = builder.runtime_schema();
             let accepted = schema.reserve_i32_local(function);
@@ -533,10 +563,13 @@ impl ScalarNumberLoop {
                     }
                 });
             }
+            if !self.calls.is_empty() {
+                calls = Some(self.calls.guard(builder, accepted, function)?);
+            }
             accepted.load(function);
             schema.release_i32_local(accepted, function);
         }
-        Ok(ScalarNumberLoopEntry { fact })
+        Ok(ScalarNumberLoopEntry { fact, calls })
     }
 }
 
@@ -581,6 +614,9 @@ impl LoopProof<'_, '_> {
 
     fn expression(&mut self, value: &TypedExpr, depth: usize) -> Option<NumberExpression> {
         let depth = self.visit(depth)?;
+        if captured_calls::is_call(value) {
+            return captured_calls::compile(self, value, depth);
+        }
         if let Some(joined) = JoinedStringArrayLength::of_length(value, self.builder) {
             if self
                 .bindings
@@ -866,12 +902,16 @@ impl NumberExpression {
                 rhs.intrinsic_domain(),
             ),
             Self::Binding(_)
+            | Self::Call(_)
+            | Self::CallSlot(_)
+            | Self::SelectCall(_, _)
             | Self::ArrayElement
             | Self::CompactPath(_)
             | Self::JoinedLength
             | Self::Negate(_)
             | Self::Compound(_, _, _)
             | Self::Update(_, _, _) => NumberDomain::Number,
+            Self::AssignCallSlot(_, value) => value.intrinsic_domain(),
         }
     }
 
@@ -966,6 +1006,9 @@ impl NumberExpression {
             }
             Self::Update(index, _, _) => record(writes, *index, NumberDomain::Number),
             Self::Negate(value) | Self::Complement(value) => value.collect_writes(writes),
+            Self::AssignCallSlot(_, value) | Self::SelectCall(value, _) => {
+                value.collect_writes(writes)
+            }
             Self::Arithmetic(_, lhs, rhs)
             | Self::Bitwise(_, lhs, rhs)
             | Self::Imul(lhs, rhs)
@@ -974,6 +1017,8 @@ impl NumberExpression {
                 rhs.collect_writes(writes);
             }
             Self::Constant(_)
+            | Self::Call(_)
+            | Self::CallSlot(_)
             | Self::Binding(_)
             | Self::ArrayLength
             | Self::ArrayElement
@@ -1137,6 +1182,26 @@ impl NumberExpression {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
             Self::Binding(index) => locals.values[*index].load_number(function),
+            Self::Call(index) => {
+                let (plan, roots) = locals.calls.expect("sealed captured call owner");
+                plan.emit_call(*index, roots, builder, locals, function);
+            }
+            Self::CallSlot(index) => locals
+                .calls
+                .expect("sealed call slot")
+                .1
+                .load(*index, function),
+            Self::AssignCallSlot(index, value) => {
+                value.emit(builder, locals, function);
+                let (plan, roots) = locals.calls.expect("sealed call slot");
+                roots.store(*index, plan, builder, function);
+                roots.load(*index, function);
+            }
+            Self::SelectCall(index, sites) => {
+                index.emit_uint32(builder, locals, function);
+                let (plan, roots) = locals.calls.expect("sealed call selection");
+                plan.emit_selection(sites, roots, builder, locals, function);
+            }
             Self::ArrayLength => locals.array().emit_length(function),
             Self::ArrayElement => locals.array().emit_element(builder, function),
             Self::MaskedInputIndex => {
@@ -1316,6 +1381,7 @@ impl FunctionBuilder<'_> {
             bindings: &plan.bindings,
             values,
             invariant: entry.fact.as_ref(),
+            calls: entry.calls.as_ref().map(|roots| (&plan.calls, roots)),
         };
         // The body's last value is independent of later update/final-test
         // writes. Keep its proven representation until loop exit, too.
@@ -1441,6 +1507,9 @@ impl FunctionBuilder<'_> {
         }
         if let Some(RegionFact::ArrayReads(array)) = locals.invariant {
             array.publish_row_alias(iterated, self, function);
+        }
+        if let Some((plan, roots)) = locals.calls {
+            roots.publish(plan, self, function);
         }
         if let Some(value) = value {
             iterated.load(function);

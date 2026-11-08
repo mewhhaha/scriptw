@@ -6,7 +6,7 @@ use crate::gc_types::{
     DirectEvalDerivedBindingsSchema, DirectEvalExecutionContext, DirectEvalExecutionContextSchema,
     Environment, EnvironmentSchema, FunctionObject, GcFieldNullability, GcLocal, GcOperand,
     I32Local, NamedBindingTable, NonNullable, Nullable, ObjectEnvironment, RealmRecord,
-    ScalarValue, StoredValue, StoredValueSchema, StringValue, ValueArray, ValueLocals,
+    ScalarValue, StoredValue, StringValue, ValueArray, ValueLocals,
 };
 use scriptw_ir::{LexicalEnvironmentIr, NativeErrorKind, DIRECT_EVAL_EXECUTION_CONTEXT_NAME};
 
@@ -388,30 +388,9 @@ impl<'a> FunctionBuilder<'a> {
             .field(BindingCellSchema::INITIALIZED)
             .read(&source, schema, function)
             .store(initialized, function);
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<BindingCell>()
-                    .field(BindingCellSchema::VALUE)
-                    .read(&source, schema, function)
-                    .reference(),
-                function,
-            );
-        let stored_type = schema.struct_type::<StoredValue>();
-        stored_type
-            .field(StoredValueSchema::TAG)
-            .read(&stored, schema, function)
-            .store(value.tag(), function);
-        stored_type
-            .field(StoredValueSchema::SCALAR)
-            .read(&stored, schema, function)
-            .store_i64(value.scalar(), function);
-        stored_type
-            .field(StoredValueSchema::REFERENCE)
-            .read(&stored, schema, function)
-            .store_eq(value.reference(), function);
-        stored.clear(function);
+        schema
+            .struct_type::<BindingCell>()
+            .read_value(&source, value, schema, function);
         target.clear(function);
         source.clear(function);
         initialized
@@ -424,24 +403,9 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(value, function),
-                function,
-            );
         schema
             .struct_type::<BindingCell>()
-            .field(BindingCellSchema::VALUE)
-            .write(
-                cell,
-                GcOperand::reference(&stored, schema),
-                schema,
-                function,
-            );
-        stored.clear(function);
+            .write_value(cell, value, schema, function);
     }
 
     pub(crate) fn emit_allocate_environment_cells(
@@ -536,20 +500,14 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> GcLocal<BindingCell> {
         let schema = self.runtime_schema();
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(initial_value, function),
-                function,
-            );
         let cell = schema
             .reserve_gc_local::<BindingCell, NonNullable>(function)
             .initialize(
                 schema.struct_type::<BindingCell>().construct(
                     (
-                        GcOperand::reference(&stored, schema),
+                        GcOperand::i64_local(initial_value.scalar()),
+                        GcOperand::i32_local(initial_value.tag()),
+                        GcOperand::eq_reference(initial_value.reference()),
                         GcOperand::boolean(initialized),
                         GcOperand::boolean(mutable),
                         GcOperand::boolean(immutable_strict),
@@ -567,7 +525,6 @@ impl<'a> FunctionBuilder<'a> {
                 ),
                 function,
             );
-        stored.clear(function);
         cell
     }
 

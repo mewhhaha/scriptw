@@ -1,3 +1,4 @@
+use super::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -61,14 +62,12 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
     let cursors = structures
         .iter()
         .filter_map(|(&cell, structure)| {
-            let fields = &structure.fields;
-            if fields.len() != 13
-                || concrete_reference(fields[4].element_type) != Some((true, cell))
-                || !fields[12].mutable
-            {
+            let layout = BindingCellLayout::new(cell, structure)?;
+            let cursor_edge = layout.for_in_record();
+            if !cursor_edge.mutable {
                 return None;
             }
-            let (nullable, cursor) = concrete_reference(fields[12].element_type)?;
+            let (nullable, cursor) = concrete_reference(cursor_edge.element_type)?;
             let record = &structures.get(&cursor)?.fields;
             if !nullable
                 || record.len() != 4
@@ -79,7 +78,7 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
                 return None;
             }
             let (nullable, value) = concrete_reference(record[0].element_type)?;
-            if nullable || concrete_reference(fields[0].element_type) != Some((false, value)) {
+            if nullable || !layout.matches_stored_value(structures.get(&value)?) {
                 return None;
             }
             let (nullable, keys) = concrete_reference(record[1].element_type)?;
@@ -209,11 +208,11 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
                     } if struct_type_index == cursor => cursor_writes[field_index as usize] += 1,
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 12,
+                        field_index: BindingCellLayout::FOR_IN_RECORD,
                     } if struct_type_index == cell => edge_reads += 1,
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 12,
+                        field_index: BindingCellLayout::FOR_IN_RECORD,
                     } if struct_type_index == cell => edge_writes += 1,
                     Operator::StructGet {
                         struct_type_index,
@@ -237,11 +236,11 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
                     } if struct_type_index == activations[0] => phase_writes += 1,
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 10,
+                        field_index: BindingCellLayout::IDENTIFIER_REFERENCE,
                     } if struct_type_index == cell => reference_reads += 1,
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 10,
+                        field_index: BindingCellLayout::IDENTIFIER_REFERENCE,
                     } if struct_type_index == cell => reference_writes += 1,
                     _ => {}
                 }
@@ -255,7 +254,7 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
             && cursor_writes[3] == 0
             && edge_reads > 0
             && edge_writes > 0,
-        "actual create/advance/retire accesses the one original field-12 cursor"
+        "actual create/advance/retire accesses the one original retained cursor"
     );
     assert!(
         ancestry_reads > 0
@@ -268,7 +267,7 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
     if requires_reference {
         assert!(
             reference_reads > 0 && reference_writes > 0,
-            "body RHS References retain the original invocation-private field-10 edge"
+            "body RHS References retain the original invocation-private identifier-reference edge"
         );
     }
 }

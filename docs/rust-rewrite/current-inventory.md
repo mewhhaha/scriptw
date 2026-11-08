@@ -12,15 +12,16 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Extend the existing scalar-loop owner with guarded captured-call fusion on
-  `args-unused.js` and `frame-compact.js` (Fast: 0.694 / 8.772 ms; V8: 0.00337 /
-  0.0622 ms). Measure call entries and instructions before implementation;
-  target a measured 2x gain on both kernels without RSC/control regressions.
-  Require code/source/defining-program guards, alias-identity handling,
-  complete preflight before writes and the untouched original loop as fallback.
-  Preserve binding ownership, TDZ, arguments snapshots, Realm, receiver, depth
-  and abrupt completion.
-  Owner: IR/AOT source-call planning and dispatch.
+- Close the remaining Fast gaps on `args-unused.js` (34× V8) and `frame-compact.js` (36×). Measure projection, preflight and scalar GC loads separately; their time shares remain unknown. Keep exact outputs and RSC request time as controls. Owner: scalar-call planning and runtime code layout.
+
+- Propagate existing `NumberDomain` facts through captured `CallSlot`, `CompactPath` and `Call` results. These paths currently fall back to general Number and emit the full `ToUint32` sequence for proven integer ranges. Add only guards justified by entry inputs; preserve arithmetic order and complete fallback.
+
+- Test amortizing `frame-compact.js` projection across its closed outer loop. Source structure has 3,120 own-data field probes and 16 projection allocations there; `args-unused.js` has 130 probes and one projection. These are source-derived counts, not measured time shares. Keep projection local across any intervening source effects unless a complete loop-region proof admits it.
+
+- Measure source/alias selection still emitted per iteration after captured-call admission. Elide single-case dispatch first; bound variants with a code-size budget.
+
+- Remove the second property-key conversion after `DynamicPropertyRead` has completed `ToPropertyKey`. This is a structural opportunity from the current call chain, not a measured hot share; preserve the first conversion’s effects, throw and evaluation order.
+
 - Measure type classification and singleton dispatch after strict-pair period
   projection. Prefer private binding facts and existing semantic kernels before
   adding a general Value region. Preserve arithmetic order, input effects,
@@ -34,20 +35,7 @@ accepts `--case <file.js>`.
   and measured gains. Missing own indices can expose the real object through a
   prototype getter; preserve actual count, rooted snapshots and complete fallback.
   Owner: arguments binding and source-call planning.
-- Measure captured-cell writes separately from call transport. A direct mutable
-  Value3 cell payload is a candidate only after mapping snapshots, target-local
-  metadata, arguments detachment and host-schema effects are covered. Source
-  patterns imply 1,024/8,192 writes in the two kernels; these are not measured
-  allocation origins. Do not make shared StoredValue mutable. Owner: AOT
-  environment storage and embedding schema.
-- Count property-cache hits, misses and negative-cache eligibility on RSC before
-  changing the cache. A narrow absence proof can cover compact ordinary heads
-  with a null prototype or the unchanged canonical ObjectPrototype layout;
-  reload prototype/storage guards and reject dictionary heads and exotics.
-  Separate eligibility from actual repeat hits and measure without counters.
-  The [fresh function samples](react-attribution-current.json) locate code,
-  rather than identifying cache outcomes or allocation origins.
-  Owner: AOT object operations and benchmark tooling.
+- Measure actual property-cache outcomes before changing dictionary shape or expanding cache coverage: static versus computed key × compact versus dictionary receiver × own, inherited or absent result. Count eligibility separately from repeat hits and misses. Existing helper-entry totals do not identify cache hits or misses by family. Keep the complete object-model fallback for exotics and preserve live prototype/storage guards.
 - Attribute StoredValue decoding and binding writes before another list-storage
   rewrite. The physical census does not identify allocation origins or prove a
   representation change wins. Preserve deferred recipes, descriptor ownership

@@ -16,7 +16,7 @@ pub(super) enum CachedReadName {
 }
 
 impl CachedReadName {
-    fn new(builder: &FunctionBuilder<'_>, name: &str) -> Option<Self> {
+    pub(super) fn new(builder: &FunctionBuilder<'_>, name: &str) -> Option<Self> {
         let index = builder.strings.pooled_string_index(name).ok()?;
         Some(match builder.strings.pooled_string_domain(index).ok()? {
             PooledLiteralDomain::Runtime(_) => {

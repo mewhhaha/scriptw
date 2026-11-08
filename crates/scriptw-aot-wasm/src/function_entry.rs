@@ -15,8 +15,10 @@ mod executable_code;
 pub(crate) use binary_numeric::PlannedBinaryNumericEntry;
 mod local_argument_inputs;
 mod local_arguments;
-pub(crate) use local_argument_inputs::LocalArgumentCallInputs;
-pub(crate) use local_arguments::{LocalArgumentsPlan, PlannedLocalArgumentsEntry};
+pub(crate) use local_argument_inputs::{LocalArgumentCallInputs, LocalArgumentsCallableRole};
+pub(crate) use local_arguments::{
+    LocalArgumentsArity, LocalArgumentsPlan, PlannedLocalArgumentsEntry,
+};
 mod runtime_dispatch;
 mod saved_activation_call;
 pub(crate) use body_entry_locals::{BodyEntryLocals, ResumableEntryLocals};

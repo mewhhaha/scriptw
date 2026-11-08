@@ -23,7 +23,7 @@ fn concrete(value: ValType) -> u32 {
     index
 }
 fn writes(body: &[Operator<'_>], cell: u32) -> Vec<usize> {
-    let field = GcHostField::BindingCellValue.definition().index();
+    let field = GcHostField::BindingCellScalar.definition().index();
     body.iter().enumerate().filter_map(|(at,op)| matches!(op,Operator::StructSet {struct_type_index,field_index} if *struct_type_index==cell && *field_index==field).then_some(at)).collect()
 }
 #[test]

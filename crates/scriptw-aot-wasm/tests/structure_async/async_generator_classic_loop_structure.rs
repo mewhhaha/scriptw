@@ -1,3 +1,4 @@
+use crate::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -56,17 +57,15 @@ fn inspect_mixed_artifact(source: &str) {
     let cells = structures
         .iter()
         .filter_map(|(&index, structure)| {
-            let fields = &structure.fields;
-            if fields.len() != 13
-                || concrete_reference(fields[4].element_type) != Some((true, index))
-                || fields[9].element_type.unpack() != ValType::I64
-            {
+            let cell = BindingCellLayout::new(index, structure)?;
+            if cell.accumulation_index().element_type.unpack() != ValType::I64 {
                 return None;
             }
-            let (nullable, record) = concrete_reference(fields[10].element_type)?;
+            let selected = cell.identifier_reference();
+            let (nullable, record) = concrete_reference(selected.element_type)?;
             let reference = &structures.get(&record)?.fields;
             if !nullable
-                || !fields[10].mutable
+                || !selected.mutable
                 || reference.len() != 6
                 || reference.iter().any(|field| field.mutable)
                 || concrete_reference(reference[4].element_type) != Some((true, index))
@@ -133,12 +132,20 @@ fn inspect_mixed_artifact(source: &str) {
                 match instruction.unwrap() {
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cells[0] => reference_reads += 1,
+                        field_index,
+                    } if struct_type_index == cells[0]
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_reads += 1
+                    }
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cells[0] => reference_writes += 1,
+                        field_index,
+                    } if struct_type_index == cells[0]
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_writes += 1
+                    }
                     Operator::StructGet {
                         struct_type_index,
                         field_index: 3,

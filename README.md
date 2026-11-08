@@ -48,20 +48,19 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-07**, source fingerprint `5aa48ad8a545`: exact Flight output.
+**React 19.3.1 RSC · 2026-11-08**, source `2255a0080df2`; exact Flight output.
 
-| Retained request | Scriptw Fast | Node 24 / V8 |
-| --- | ---: | ---: |
-| Sync | 5.077 ms | 0.494 ms |
-| Async | 5.429 ms | 0.402 ms |
+| Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
+| --- | ---: | ---: | ---: |
+| Sync | 4.714 ms | 3.726 ms | 0.493 ms |
+| Async | 5.107 ms | 4.056 ms | 0.398 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
-Eight fresh processes per engine in two balanced blocks, with three warmups and seven timed requests. Full Flight serialization and consumption are timed; compilation, initialization, JSON encoding and final validation are outside the window. Against the matched prior build, Fast is 11.4% faster sync and 11.6% faster async. The 32-row catalog's async form adds a resolved Promise and markup; it performs no I/O. [Fresh attribution and limits](docs/rust-rewrite/benchmarks.md#rsc-request-attribution) · [RSC identities and receipts](docs/rust-rewrite/rsc-current.json).
+Eight fresh processes per policy in two balanced blocks; 3 warmups and 7 timed requests per mode. Full Flight serialization and consumption are timed; setup precedes the window, and JSON encoding and final output validation follow it. Fast and Speed are separately scored native policies; their optimization and register-allocation settings differ together. The async catalog adds a resolved Promise and markup and performs no I/O. [Phases, workload bounds and limits](docs/rust-rewrite/benchmarks.md#react-server-components) · [RSC identities](docs/rust-rewrite/rsc-current.json).
 
-**Focused performance situations · 2026-11-07**, source fingerprint `5aa48ad8a545`: 21 standalone programs compare Fast, Speed and V8. The separate fixed-yield width panel remains historical on source `0ca455c47636` and its prior archive.
-
-[Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [RSC data](docs/rust-rewrite/rsc-current.json) · [Situation data](docs/rust-rewrite/situations-current.json).
+**Focused performance situations · 2026-11-08**, source `2255a0080df2`: 21 standalone programs compare Fast, Speed and V8.
+[Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json) · [RSC data](docs/rust-rewrite/rsc-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->
@@ -85,7 +84,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest scoped verification (**2026-11-07**, compiler `5aa48ad8a545`): 2,535 runtime/emitter checks and 1,757 unit checks pass; four existing AOT unit assertions fail. All 380 source guards, eight production CLI checks, 60,984 situation calls and 480 RSC checks pass. Full Test262 and workspace CI were not rerun; eleven formatting failures and fourteen stale Intl recipes remain [owned](docs/rust-rewrite/current-inventory.md).
+Scoped verification (**2026-11-08**): 2,550 broad checks, 1,764 unit checks, 380 source guards and eight CLI checks pass; four existing AOT unit assertions fail. Benchmarks validate 60,984 situation calls and 640 Flight calls. Full CI and Test262 were not rerun. Eleven existing formatting failures and fourteen stale Intl recipes remain [owned](docs/rust-rewrite/current-inventory.md). [Verification identities and limits](docs/rust-rewrite/benchmarks.md#public-call-control-and-verification).
 
 ## Caveats
 
@@ -100,7 +99,8 @@ Latest scoped verification (**2026-11-07**, compiler `5aa48ad8a545`): 2,535 runt
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 52:** private for-in cursors now retain hashed Set storage.
+- **Runtime ABI 53:** binding cells own mutable value fields; source functions
+  support a typed wide local-argument entry alongside the narrow entry.
   Rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·

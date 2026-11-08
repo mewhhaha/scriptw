@@ -113,7 +113,7 @@ def check(sources: dict[str, str]) -> list[dict[str, str]]:
             "(actual.mutability()==Mutability::Var)!=definition.mutable()" in schema and
             "storage_matches(definition.storage(),actual.element_type())" in schema and
             "!StructType::eq(actual,expected)" in schema and
-            all("Field::" + name in signature for name in ("DirectEvalClassContext", "ContextDefiningProgram", "ContextActiveFunction", "FunctionObjectContext", "DirectEvalHomeObject", "DirectEvalDerivedBindings", "DerivedThisCell", "DerivedThisStatusCell", "DerivedNewTargetCell", "DerivedActiveFunctionCell", "BindingCellValue")),
+            all("Field::" + name in signature for name in ("DirectEvalClassContext", "ContextDefiningProgram", "ContextActiveFunction", "FunctionObjectContext", "DirectEvalHomeObject", "DirectEvalDerivedBindings", "DerivedThisCell", "DerivedThisStatusCell", "DerivedNewTargetCell", "DerivedActiveFunctionCell", "BindingCellTag", "BindingCellScalar", "BindingCellReference")),
             "canonical_fields", "declaration-owned field counts, nullability, storage, mutability and canonical peer edges remain checked")
     decoded = c[HOST + "/sources.rs"]
     require("operands:[Val;14]" in decoded and "_roots:Vec<OwnedRooted<AnyRef>>" in decoded and

@@ -234,18 +234,9 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 function,
             );
-            let stored = schema.reserve_gc_local(function).initialize(
-                schema
-                    .struct_type::<BindingCell>()
-                    .field(BindingCellSchema::VALUE)
-                    .read(&cell, schema, function)
-                    .reference(),
-                function,
-            );
             schema
-                .struct_type::<StoredValue>()
-                .read_into(&stored, output, schema, function);
-            stored.clear(function);
+                .struct_type::<BindingCell>()
+                .read_value(&cell, output, schema, function);
             cell.clear(function);
         }
         self.pop_control(ControlFrameKind::If);

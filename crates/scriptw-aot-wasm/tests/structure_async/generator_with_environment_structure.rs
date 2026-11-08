@@ -1,3 +1,4 @@
+use crate::host_schema::BindingCellLayout;
 #[path = "../fixtures/linked_bodies.rs"]
 mod linked_bodies;
 
@@ -85,12 +86,10 @@ fn inspect_actual_with_artifact(source: &str, check_shared_global_reads: bool) {
             if nullable {
                 return None;
             }
-            let cell_fields = &structures.get(&cell)?.fields;
-            if cell_fields.len() != 13
-                || concrete_reference(cell_fields[4].element_type) != Some((true, cell))
-                || !cell_fields[12].mutable
-                || !concrete_reference(cell_fields[12].element_type)
-                    .is_some_and(|(nullable, _)| nullable)
+            let layout = BindingCellLayout::new(cell, structures.get(&cell)?)?;
+            let retained = layout.for_in_record();
+            if !retained.mutable
+                || !concrete_reference(retained.element_type).is_some_and(|(nullable, _)| nullable)
             {
                 return None;
             }

@@ -1,4 +1,4 @@
-use super::host_schema::is_stored_value;
+use super::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -62,19 +62,15 @@ fn inspect_actual_enumeration_artifact(source: &str) {
     let owners = structures
         .iter()
         .filter_map(|(&cell, structure)| {
-            let fields = &structure.fields;
-            if fields.len() != 13
-                || concrete_reference(fields[4].element_type) != Some((true, cell))
-                || !fields[12].mutable
-            {
+            let layout = BindingCellLayout::new(cell, structure)?;
+            let cursor_edge = layout.for_in_record();
+            if !cursor_edge.mutable {
                 return None;
             }
-            let (nullable, cursor) = concrete_reference(fields[12].element_type)?;
-            if !nullable {
-                return None;
-            }
+            let (nullable, cursor) = concrete_reference(cursor_edge.element_type)?;
             let cursor_fields = &structures.get(&cursor)?.fields;
-            if cursor_fields.len() != 4
+            if !nullable
+                || cursor_fields.len() != 4
                 || cursor_fields[..3].iter().any(|field| !field.mutable)
                 || cursor_fields[3].mutable
                 || cursor_fields[2].element_type.unpack() != ValType::I32
@@ -82,7 +78,7 @@ fn inspect_actual_enumeration_artifact(source: &str) {
                 return None;
             }
             let (nullable, value) = concrete_reference(cursor_fields[0].element_type)?;
-            if nullable || concrete_reference(fields[0].element_type) != Some((false, value)) {
+            if nullable || !layout.matches_stored_value(structures.get(&value)?) {
                 return None;
             }
             let (nullable, keys) = concrete_reference(cursor_fields[1].element_type)?;
@@ -112,9 +108,6 @@ fn inspect_actual_enumeration_artifact(source: &str) {
             if !key_element.mutable
                 || concrete_reference(key_element.element_type) != Some((false, value))
             {
-                return None;
-            }
-            if !is_stored_value(structures.get(&value)?) {
                 return None;
             }
             Some((cell, cursor))
@@ -155,11 +148,11 @@ fn inspect_actual_enumeration_artifact(source: &str) {
                     } if struct_type_index == cursor => cursor_write[field_index as usize] += 1,
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 12,
+                        field_index: BindingCellLayout::FOR_IN_RECORD,
                     } if struct_type_index == cell => edge_loads += 1,
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 12,
+                        field_index: BindingCellLayout::FOR_IN_RECORD,
                     } if struct_type_index == cell => edge_publications_and_retirements += 1,
                     _ => {}
                 }

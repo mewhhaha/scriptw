@@ -1,3 +1,4 @@
+use crate::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -73,13 +74,11 @@ fn inspect_with_artifact(source: &str, requires_reference: bool) {
                 return None;
             }
             let (nullable, cell) = concrete_reference(object_fields[0].element_type)?;
-            let cell_fields = &structures.get(&cell)?.fields;
+            let layout = BindingCellLayout::new(cell, structures.get(&cell)?)?;
+            let retained = layout.identifier_reference();
             if nullable
-                || cell_fields.len() != 13
-                || concrete_reference(cell_fields[4].element_type) != Some((true, cell))
-                || !cell_fields[10].mutable
-                || !concrete_reference(cell_fields[10].element_type)
-                    .is_some_and(|(nullable, _)| nullable)
+                || !retained.mutable
+                || !concrete_reference(retained.element_type).is_some_and(|(nullable, _)| nullable)
             {
                 return None;
             }
@@ -162,12 +161,20 @@ fn inspect_with_artifact(source: &str, requires_reference: bool) {
                     } if struct_type_index == frames[0] => invocation_reads += 1,
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cell => reference_reads += 1,
+                        field_index,
+                    } if struct_type_index == cell
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_reads += 1
+                    }
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 10,
-                    } if struct_type_index == cell => reference_writes += 1,
+                        field_index,
+                    } if struct_type_index == cell
+                        && field_index == BindingCellLayout::IDENTIFIER_REFERENCE =>
+                    {
+                        reference_writes += 1
+                    }
                     Operator::StructSet {
                         struct_type_index,
                         field_index: 7,

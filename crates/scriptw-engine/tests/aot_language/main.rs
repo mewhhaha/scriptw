@@ -7,6 +7,7 @@ mod aot_arguments_concat;
 mod aot_arguments_index_descriptors;
 mod aot_arguments_iteration;
 mod aot_arguments_iterator_mutation;
+mod aot_binding_cell_payload;
 mod aot_boxed_string_environment_writes;
 mod aot_callable_capture_lifecycle;
 mod aot_callable_entry_roles;
@@ -95,4 +96,5 @@ mod aot_typed_number_inputs;
 
 mod aot_strict_arguments_projection;
 
+mod aot_captured_call_regions;
 mod aot_numeric_body;

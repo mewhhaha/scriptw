@@ -157,22 +157,37 @@ the actual String tag before cache registration; computed keys, super reads,
 Get and GetMethod retain their existing paths. Nullish errors and getter
 receivers keep their existing execution context and whole-Throw behavior.
 
-P calls the typed `CachedPropertyRead` helper for every admitted read. R owns
-cache registration, live storage guards, value loads and complete Get fallback.
-P retains neither an invocation-long metadata root nor a duplicate storage-read
-path. Each helper call reloads the ProgramInstance's indexed cache table, with
-the same source-site identity and execution context. The full five-slot
-Completion result, general helper/source/resumable signatures and ABI 51 remain
-unchanged. Runtime/compiler source identity still invalidates stale artifacts.
+Each P read calls the typed `CachedPropertyRead` helper with its ProgramInstance
+site and evaluated operands. R owns cache registration, live-storage guards,
+current-value loads, closed negative tails and complete Get. P retains no cache
+metadata root or duplicate storage-read path. The shared GC type prefix and full
+Completion/helper/source/resumable contracts remain unchanged. All temporary
+roots clear before the read continues, including guard misses.
 
-The optimized runtime checks the live concrete lookup, live compact storage and
-actual immutable shape before loading the current slot value through the common
-read path. Every later read repeats those checks, including reads after calls.
-Value-only Set keeps the shape and the cache reads the new value from either
-compact representation. Structural mutation falls back to complete Get and does
-not let a cache bypass accessors, prototypes or proxies. Cache records retain
-only primitive string/shape metadata and a slot; they cannot retain a user
-object, prototype, Symbol, value or Realm.
+Each read proves the concrete lookup, current compact storage, primitive key
+identity and immutable shape identity before loading the live slot value. Calls
+and value-only Set cannot make an old value authoritative: the value reloads
+from the current inline or array compact storage. Structural mutation replaces
+storage and forces complete Get when these guards fail.
+
+The existing signed slot has a closed encoding: nonnegative means own data,
+`-1` means absence through a null prototype, and `-2` means absence through the
+sealed Object.prototype layout. A null cached shape means uninitialized. Negative
+registration first proves compact-own absence and an actual OrdinaryObject
+lookup. The second mode additionally proves an actual OrdinaryObject prototype,
+its immutable-prototype flag, null parent, and the exact intrinsic storage ADDRESS
+and COUNT, then checks that the key is absent from those sealed rows. Each
+negative hit in R reloads and checks that live prototype tail; prototype replacement
+or intrinsic-storage promotion therefore misses. No prototype object, value,
+Symbol or Realm is retained in a cache record. Function and primitive-box own
+data hits remain supported, but their misses cannot register negative modes;
+virtual String properties, accessors, Proxies and other exotics keep full Get.
+
+The external `property_read_plans` emission check validates P and R, witnesses
+their shared compact/cache types, the actual typed R call, absence of P cache
+metadata access, R positive/negative guards and complete Get fallback. `aot_cached_read_inputs` exercises current values and attributes,
+callback/GC boundaries, both negative modes, prototype promotion/replacement,
+boxed Strings, callable/proxy misses and foreign-Realm mutation.
 
 Concrete FunctionObjects join the effect-free own-data probe through their
 canonical ordinary header, including dictionary storage. Each read resolves its

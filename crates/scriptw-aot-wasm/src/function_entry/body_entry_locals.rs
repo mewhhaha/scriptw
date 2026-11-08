@@ -57,7 +57,7 @@ enum BodyArguments {
         values: GcLocal<ValueArray>,
         count: I64Local,
     },
-    Locals([ValueLocals; 2]),
+    Locals(Vec<ValueLocals>),
 }
 
 #[derive(Clone, Copy)]
@@ -199,7 +199,7 @@ impl PlannedBodyEntry<'_> {
                 caller_realm: schema.parameter_gc::<RealmRecord, NonNullable>(
                     match arguments_layout {
                         ArgumentLayout::Vector => 9,
-                        ArgumentLayout::Locals(_) => 13,
+                        ArgumentLayout::Locals(entry) => 7 + 3 * entry.slot_count() as u32,
                     },
                     function,
                 ),
@@ -291,7 +291,7 @@ impl PlannedBodyEntry<'_> {
         };
         let program_index = match arguments_layout {
             ArgumentLayout::Vector => self.program_parameter_index(),
-            ArgumentLayout::Locals(_) => 14,
+            ArgumentLayout::Locals(entry) => 8 + 3 * entry.slot_count() as u32,
         };
         let program_parameter =
             schema.parameter_gc::<ProgramInstance, NonNullable>(program_index, function);
@@ -329,10 +329,11 @@ impl PlannedBodyEntry<'_> {
                 };
                 BodyArguments::Vector { values, count }
             }
-            ArgumentLayout::Locals(_entry) => BodyArguments::Locals([
-                schema.parameter_value(7, function),
-                schema.parameter_value(10, function),
-            ]),
+            ArgumentLayout::Locals(entry) => BodyArguments::Locals(
+                (0..entry.slot_count())
+                    .map(|index| schema.parameter_value(7 + 3 * index as u32, function))
+                    .collect(),
+            ),
         };
         let new_target = match &role {
             EntryRoleLocals::Ordinary { .. } | EntryRoleLocals::PreparedScript { .. } => {
@@ -446,7 +447,7 @@ impl BodyEntryLocals {
         };
         let value = values
             .get(index)
-            .expect("validated local-argument formal is one of the two declared slots");
+            .expect("validated local-argument formal has a declared slot");
         destination.copy_from(value, function);
         true
     }

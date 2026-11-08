@@ -3,6 +3,7 @@
 use super::*;
 use crate::WasmRuntimeValueTag;
 
+mod binding_cell;
 mod compact_array_recipes;
 mod instance_elements;
 mod native_direct_eval_compiler;
@@ -782,6 +783,7 @@ impl GcStructType<ExecutableCode> {
         entry: ExecutableCodeEntry<'_>,
         binary_numeric: Option<&FunctionLocal<BinaryNumericCallback>>,
         local_arguments: Option<&FunctionLocal<LocalArgumentsCallable>>,
+        wide_local_arguments: Option<&FunctionLocal<WideLocalArgumentsCallable>>,
         metadata: ExecutableCodeMetadata,
         function: &mut Function,
     ) -> Result<GcStackReference<ExecutableCode>, crate::EmitError> {
@@ -809,7 +811,8 @@ impl GcStructType<ExecutableCode> {
             || (binary_numeric.is_some()
                 && (metadata.kind != ExecutableCodeKind::JavaScript
                     || entry_execution != scriptw_ir::FunctionExecutionKind::Ordinary))
-            || (local_arguments.is_some()
+            || (local_arguments.is_some() && wide_local_arguments.is_some())
+            || ((local_arguments.is_some() || wide_local_arguments.is_some())
                 && (metadata.kind != ExecutableCodeKind::JavaScript
                     || metadata.protocol
                         != scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
@@ -863,6 +866,10 @@ impl GcStructType<ExecutableCode> {
                     None => GcOperand::null_function(),
                 },
                 match local_arguments {
+                    Some(entry) => GcOperand::function_reference(entry),
+                    None => GcOperand::null_function(),
+                },
+                match wide_local_arguments {
                     Some(entry) => GcOperand::function_reference(entry),
                     None => GcOperand::null_function(),
                 },
@@ -2113,11 +2120,16 @@ impl RuntimeSchema {
         FunctionStackReference { shape: PhantomData }
     }
 
-    pub(crate) fn reference_local_arguments_entry(
+    pub(crate) fn reference_local_arguments_entry<R: GcEntryFunctionRole>(
         &self,
         entry: &crate::function_entry::PlannedLocalArgumentsEntry,
         function: &mut Function,
-    ) -> FunctionStackReference<LocalArgumentsCallable> {
+    ) -> FunctionStackReference<R> {
+        assert_eq!(
+            GcFunctionSignature::Entry(entry.signature()),
+            R::SIGNATURE,
+            "local argument callable role matches the source-bound signature"
+        );
         entry.emit_ref_func(function);
         FunctionStackReference { shape: PhantomData }
     }

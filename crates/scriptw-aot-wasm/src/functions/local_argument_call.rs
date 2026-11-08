@@ -1,10 +1,10 @@
 //! The actual callable's published source entry is the guard, including across P.
 use super::*;
-use crate::function_entry::LocalArgumentCallInputs;
+use crate::function_entry::{LocalArgumentCallInputs, LocalArgumentsCallableRole};
 use crate::gc_types::{
     ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema, FunctionObject,
-    FunctionObjectSchema, GcI32Constant, GcNullability, LocalArgumentsCallable, Nullable,
-    ValueLocals,
+    FunctionObjectSchema, GcI32Constant, GcNullability, LocalArgumentsCallable, ValueLocals,
+    WideLocalArgumentsCallable,
 };
 
 impl FunctionBuilder<'_> {
@@ -23,16 +23,47 @@ impl FunctionBuilder<'_> {
         if known_target.is_some_and(|meta| meta.entry.local_arguments().is_none()) {
             return Ok(false);
         }
-        if arguments.len() > 2
-            || arguments.iter().any(|argument| {
-                matches!(
-                    argument.expr,
-                    ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
-                )
-            })
-        {
+        if arguments.iter().any(|argument| {
+            matches!(
+                argument.expr,
+                ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
+            )
+        }) {
             return Ok(false);
         }
+        match arguments.len() {
+            0..=2 => self.emit_local_argument_call::<LocalArgumentsCallable>(
+                callee,
+                receiver,
+                arguments,
+                known_target,
+                continuation,
+                output,
+                function,
+            ),
+            3..=5 => self.emit_local_argument_call::<WideLocalArgumentsCallable>(
+                callee,
+                receiver,
+                arguments,
+                known_target,
+                continuation,
+                output,
+                function,
+            ),
+            _ => Ok(false),
+        }
+    }
+
+    fn emit_local_argument_call<R: LocalArgumentsCallableRole>(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[TypedExpr],
+        known_target: Option<&WasmFunctionMeta>,
+        continuation: &CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
         let schema = self.runtime_schema();
         let mut values = Vec::with_capacity(arguments.len());
         for argument in arguments {
@@ -68,20 +99,12 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let optional = schema
-            .reserve_function_local::<LocalArgumentsCallable, Nullable>(function)
-            .initialize(
-                schema
-                    .field(ExecutableCodeSchema::LOCAL_ARGUMENTS_ENTRY)
-                    .read(&code, schema, function)
-                    .callable(),
-                function,
-            );
+        let optional = R::load_optional_entry(&code, schema, function);
         optional.load(function).is_null(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         let entry = schema
-            .reserve_function_local::<LocalArgumentsCallable, _>(function)
+            .reserve_function_local::<R, _>(function)
             .initialize(optional.load(function).require_non_null(function), function);
         let context = schema.reserve_gc_local(function).initialize(
             schema
@@ -100,9 +123,11 @@ impl FunctionBuilder<'_> {
         let caller_realm = self.load_current_realm(function);
         // Cross-P source IDs can collide. The actual code and its defining
         // program must both agree before a source hint becomes a direct call.
-        let direct = if let Some(meta) =
-            known_target.filter(|meta| meta.entry.local_arguments().is_some())
-        {
+        let direct = if let Some(meta) = known_target.filter(|meta| {
+            meta.entry
+                .local_arguments()
+                .is_some_and(|entry| entry.arity() == R::ARITY)
+        }) {
             let owner = schema.reserve_gc_local(function).initialize(
                 schema
                     .field(FunctionContextSchema::DEFINING_PROGRAM)
@@ -149,10 +174,6 @@ impl FunctionBuilder<'_> {
         };
         let undefined = schema.reserve_value_local(function);
         undefined.set_undefined(function);
-        let operands = [
-            values.first().unwrap_or(&undefined),
-            values.get(1).unwrap_or(&undefined),
-        ];
         match continuation {
             CallContinuation::Continue => {
                 self.replace_current_realm(&realm, function);
@@ -161,9 +182,10 @@ impl FunctionBuilder<'_> {
                         guard.load(function);
                         self.open_frame(ControlFrameKind::If, function);
                         result.store_call(
-                            LocalArgumentCallInputs::call(
+                            LocalArgumentCallInputs::<R>::call(
                                 receiver,
-                                operands,
+                                &values,
+                                &undefined,
                                 &caller_realm,
                                 self.current_program(),
                             )
@@ -172,9 +194,10 @@ impl FunctionBuilder<'_> {
                         );
                         function.instruction(&Instruction::Else);
                         result.store_call(
-                            LocalArgumentCallInputs::call(
+                            LocalArgumentCallInputs::<R>::call(
                                 receiver,
-                                operands,
+                                &values,
+                                &undefined,
                                 &caller_realm,
                                 self.current_program(),
                             )
@@ -185,9 +208,10 @@ impl FunctionBuilder<'_> {
                         function.instruction(&Instruction::End);
                     }
                     None => result.store_call(
-                        LocalArgumentCallInputs::call(
+                        LocalArgumentCallInputs::<R>::call(
                             receiver,
-                            operands,
+                            &values,
+                            &undefined,
                             &caller_realm,
                             self.current_program(),
                         )
@@ -203,9 +227,10 @@ impl FunctionBuilder<'_> {
                 let calling_program = self.capture_current_program(function);
                 self.emit_retire_tail_call_activation(function);
                 self.replace_current_realm(&realm, function);
-                let inputs = LocalArgumentCallInputs::call(
+                let inputs = LocalArgumentCallInputs::<R>::call(
                     receiver,
-                    operands,
+                    &values,
+                    &undefined,
                     &caller_realm,
                     &calling_program,
                 );

@@ -50,6 +50,7 @@ mod resumed_identifier_assignment;
 mod return_position;
 mod scalar_number_loop;
 pub(crate) use bounded_induction::{BoundedInduction, BoundedInductionRead};
+pub(crate) use scalar_number_loop::CapturedCallSource;
 mod statement_completion;
 use for_await_iterator_plan::ForAwaitIteratorPlan;
 use for_await_iterator_symbol::ForAwaitIteratorSymbol;

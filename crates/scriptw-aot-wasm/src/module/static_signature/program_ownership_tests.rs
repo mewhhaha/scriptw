@@ -2,6 +2,14 @@ use super::*;
 
 #[test]
 fn callable_entry_program_operands_are_nonnull_and_follow_existing_semantic_slots() {
+    assert_eq!(
+        StaticSignature::LocalArgumentsFunction.parameter_count(),
+        15
+    );
+    assert_eq!(
+        StaticSignature::WideLocalArgumentsFunction.parameter_count(),
+        24
+    );
     for (signature, program_position, context_position, context_layout) in [
         (
             StaticSignature::JavaScriptFunction,
@@ -13,6 +21,12 @@ fn callable_entry_program_operands_are_nonnull_and_follow_existing_semantic_slot
             StaticSignature::LocalArgumentsFunction,
             14,
             13,
+            GcLayout::RealmRecord,
+        ),
+        (
+            StaticSignature::WideLocalArgumentsFunction,
+            23,
+            22,
             GcLayout::RealmRecord,
         ),
         (

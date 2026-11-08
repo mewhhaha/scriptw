@@ -48,10 +48,9 @@ pub(super) fn compile(
     values.clear(&mut function);
     function.instruction(&Instruction::End);
 
-    let arguments = [
-        schema.reserve_value_local(&mut function),
-        schema.reserve_value_local(&mut function),
-    ];
+    let arguments: Vec<_> = (0..entry.slot_count())
+        .map(|_| schema.reserve_value_local(&mut function))
+        .collect();
     for (index, argument) in arguments.iter().enumerate() {
         argument.set_undefined(&mut function);
         count.load(&mut function);

@@ -4,12 +4,35 @@ use super::*;
 use crate::arguments_protocol::UnobservedStrictArguments;
 use crate::function_layout::LocalArgumentsFunctionIndex;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LocalArgumentsArity {
+    Narrow,
+    Wide,
+}
+
+impl LocalArgumentsArity {
+    pub(crate) fn slot_count(self) -> usize {
+        match self {
+            Self::Narrow => 2,
+            Self::Wide => 5,
+        }
+    }
+
+    fn signature(self) -> StaticSignature {
+        match self {
+            Self::Narrow => StaticSignature::LocalArgumentsFunction,
+            Self::Wide => StaticSignature::WideLocalArgumentsFunction,
+        }
+    }
+}
+
 /// The existing arguments-observer proof also justifies dropping the actual
 /// argument count and all values beyond the bounded simple formal list.
 #[derive(Debug, Clone)]
 pub(crate) struct LocalArgumentsPlan {
     source: FunctionId,
     parameter_count: usize,
+    arity: LocalArgumentsArity,
 }
 
 #[cfg(test)]
@@ -25,7 +48,18 @@ mod tests {
                 true,
             ),
             ("export function make() { return this; }", true),
-            ("export function make(a,b,c) { return a+b+c; }", false),
+            ("export function make(a,b,c) { return a+b+c; }", true),
+            ("export function make(a,b,c,d,e) { return a+e; }", true),
+            ("export function make(a,b,c,d,e,f) { return a+f; }", false),
+            (
+                "export function make(a,b,c,d,e) { return arguments[4]; }",
+                false,
+            ),
+            (
+                "export function make(a,b,c,d,e) { return () => arguments[4]; }",
+                false,
+            ),
+            ("export function make(a,b,c,d,e=1) { return e; }", false),
             (
                 "export function make(a) { return arguments.length; }",
                 false,
@@ -61,13 +95,16 @@ mod tests {
 
 impl LocalArgumentsPlan {
     pub(crate) fn for_function(source: &FunctionIr) -> Option<Self> {
-        if source.params.len() > 2 {
-            return None;
-        }
+        let arity = match source.params.len() {
+            0..=2 => LocalArgumentsArity::Narrow,
+            3..=5 => LocalArgumentsArity::Wide,
+            _ => return None,
+        };
         UnobservedStrictArguments::admit(source)?;
         Some(Self {
             source: source.id.clone(),
             parameter_count: source.params.len(),
+            arity,
         })
     }
 }
@@ -106,8 +143,16 @@ impl PlannedLocalArgumentsEntry {
         );
     }
 
+    pub(crate) fn arity(&self) -> LocalArgumentsArity {
+        self.proof.arity
+    }
+
+    pub(crate) fn slot_count(&self) -> usize {
+        self.arity().slot_count()
+    }
+
     pub(crate) fn signature(&self) -> StaticSignature {
-        StaticSignature::LocalArgumentsFunction
+        self.arity().signature()
     }
 
     pub(crate) fn identity(&self) -> FunctionIdentity {

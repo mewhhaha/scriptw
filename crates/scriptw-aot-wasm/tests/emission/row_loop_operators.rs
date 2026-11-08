@@ -1,7 +1,64 @@
 //! Exact operator comparison independent of local ordinals and outer labels.
 use std::collections::BTreeMap;
 use std::ops::Range;
-use wasmparser::Operator;
+use wasmparser::{CompositeInnerType, HeapType, Operator, SubType, UnpackedIndex};
+
+// The published receipt identifies StoredValue at canonical GC type 63.
+// Static function signatures may move the entire group; relative GC ordinals,
+// field indices and all other operands must still match the original receipt.
+const PUBLISHED_STORED: u32 = 63;
+
+fn gc_ordinal(index: &mut u32, stored: u32, runtime_types: &[SubType]) {
+    let ty = runtime_types
+        .get(*index as usize)
+        .expect("closed-loop GC operand belongs to the authenticated R prefix");
+    assert!(
+        matches!(
+            ty.composite_type.inner,
+            CompositeInnerType::Struct(_) | CompositeInnerType::Array(_)
+        ),
+        "closed-loop operand names an actual canonical GC type"
+    );
+    *index = index
+        .checked_add(PUBLISHED_STORED)
+        .and_then(|rebased| rebased.checked_sub(stored))
+        .expect("closed-loop GC type rebases relative to the actual StoredValue witness");
+}
+
+fn gc_operator(op: &Operator<'_>, stored: u32, runtime_types: &[SubType]) -> String {
+    let mut op = op.clone();
+    match &mut op {
+        Operator::RefNull { hty }
+        | Operator::RefTestNonNull { hty }
+        | Operator::RefCastNonNull { hty } => {
+            if let HeapType::Concrete(UnpackedIndex::Module(index)) = hty {
+                gc_ordinal(index, stored, runtime_types);
+            }
+        }
+        Operator::StructGet {
+            struct_type_index, ..
+        } => {
+            assert!(matches!(
+                runtime_types[*struct_type_index as usize]
+                    .composite_type
+                    .inner,
+                CompositeInnerType::Struct(_)
+            ));
+            gc_ordinal(struct_type_index, stored, runtime_types);
+        }
+        Operator::ArrayGet { array_type_index } => {
+            assert!(matches!(
+                runtime_types[*array_type_index as usize]
+                    .composite_type
+                    .inner,
+                CompositeInnerType::Array(_)
+            ));
+            gc_ordinal(array_type_index, stored, runtime_types);
+        }
+        _ => {}
+    }
+    format!("{op:?}")
+}
 
 pub fn closed_number_loops(body: &[Operator<'_>]) -> Vec<Range<usize>> {
     let mut stack = Vec::new();
@@ -50,7 +107,12 @@ pub fn closed_number_loops(body: &[Operator<'_>]) -> Vec<Range<usize>> {
     regions
 }
 
-pub fn normalize(body: &[Operator<'_>], region: Range<usize>) -> Vec<String> {
+pub fn normalize(
+    body: &[Operator<'_>],
+    region: Range<usize>,
+    stored: u32,
+    runtime_types: &[SubType],
+) -> Vec<String> {
     let mut frames = Vec::new();
     let mut ends = BTreeMap::new();
     let mut branches = BTreeMap::new();
@@ -116,7 +178,7 @@ pub fn normalize(body: &[Operator<'_>], region: Range<usize>) -> Vec<String> {
                 Operator::BrTable { .. } | Operator::Return => {
                     panic!("untracked closed-loop escape")
                 }
-                _ => format!("{op:?}"),
+                _ => gc_operator(op, stored, runtime_types),
             }
         })
         .collect()

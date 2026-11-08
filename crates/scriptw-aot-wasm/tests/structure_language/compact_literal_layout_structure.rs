@@ -5,6 +5,7 @@ const SHAPE: &str = include_str!("../../src/objects/compact_data/shape.rs");
 const LITERAL: &str = include_str!("../../src/objects/plain_data_literal.rs");
 const READ: &str = include_str!("../../src/objects/property_read_plan.rs");
 const CACHE: &str = include_str!("../../src/objects/compact_data/cache.rs");
+const HIT: &str = include_str!("../../src/objects/compact_data/cache/hit.rs");
 
 fn between<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -68,7 +69,9 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     assert!(READ.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
     assert!(!READ.contains("OwnDataReadCacheSchema"));
     assert!(CACHE.contains(".field(OrdinaryObjectSchema::PROPERTIES)"));
-    assert!(CACHE.contains(".field(CompactDataStorageSchema::SHAPE)"));
-    assert!(CACHE.contains(".field(OwnDataReadCacheSchema::KEY)"));
-    assert!(CACHE.contains("self.emit_compact_value_at(&storage, slot, &value, &mut f)"));
+    assert!(HIT.contains(".field(CompactDataStorageSchema::SHAPE)"));
+    assert!(HIT.contains(".field(OwnDataReadCacheSchema::KEY)"));
+    assert!(HIT.contains("self.emit_compact_value_at(storage, slot, &value, f)"));
+    assert!(CACHE.contains("self.emit_cached_compact_read_hit("));
+    assert!(HIT.contains("self.emit_cached_compact_identity(key, storage, cache, f)"));
 }

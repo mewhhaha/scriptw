@@ -10,6 +10,7 @@ use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone)]
 pub(crate) struct WasmFunctionMeta {
+    pub(crate) captured_call: Option<Arc<crate::control_flow::CapturedCallSource>>,
     pub(crate) constant_leaf: Option<crate::functions::ConstantLeafPlan>,
     pub(crate) numeric_leaf: Option<crate::functions::NumericLeafPlan>,
     pub(crate) async_generator_resume_environment_plan:
@@ -5737,6 +5738,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             function.id.clone(),
             WasmFunctionMeta {
+                captured_call: crate::control_flow::CapturedCallSource::new(function).map(Arc::new),
                 constant_leaf: crate::functions::ConstantLeafPlan::for_function(function),
                 numeric_leaf: source.numeric_leaf(function).cloned(),
                 async_generator_resume_environment_plan: function
@@ -5779,6 +5781,7 @@ pub(crate) fn build_function_metas<'a>(
         insert_meta(
             unit.id.function_id(),
             WasmFunctionMeta {
+                captured_call: None,
                 constant_leaf: None,
                 numeric_leaf: None,
                 // Prepared Script thunks receive a lexical environment directly;
@@ -5812,6 +5815,7 @@ pub(crate) fn build_function_metas<'a>(
     }
 
     let standard_builtin_meta = |builtin: StandardBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        captured_call: None,
         constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,
@@ -5843,6 +5847,7 @@ pub(crate) fn build_function_metas<'a>(
         needs_active_function_identity: false,
     };
     let host_builtin_meta = |builtin: HostBuiltinId, wasm_index: u32| WasmFunctionMeta {
+        captured_call: None,
         constant_leaf: None,
         numeric_leaf: None,
         async_generator_resume_environment_plan: None,

@@ -116,6 +116,7 @@ mod tests {
     fn ordinary_meta() -> WasmFunctionMeta {
         let builtin = StandardBuiltinId::ArrayBufferPrototypeByteLengthGetter;
         WasmFunctionMeta {
+            captured_call: None,
             constant_leaf: None,
             numeric_leaf: None,
             async_generator_resume_environment_plan: None,

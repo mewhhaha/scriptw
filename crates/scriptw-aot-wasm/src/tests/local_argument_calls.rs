@@ -1,8 +1,8 @@
 //! Inspect real dynamic callsites, canonical source bodies, and argv adapters.
 use super::*;
 use crate::gc_types::{
-    GcFunctionRole, GcNullability, GlobalLedger, LocalArgumentsCallable, RuntimeModuleTypes,
-    StoredValue, ValueArray,
+    ExecutableCode, GcFunctionRole, GcNullability, GlobalLedger, LocalArgumentsCallable,
+    RuntimeModuleTypes, StoredValue, ValueArray, WideLocalArgumentsCallable,
 };
 
 fn declarations(artifact: &WasmArtifact) -> Vec<u32> {
@@ -28,12 +28,19 @@ fn declarations(artifact: &WasmArtifact) -> Vec<u32> {
 }
 
 fn canonical_index(artifact: &WasmArtifact, name: &str) -> u32 {
+    canonical_index_for(
+        artifact,
+        name,
+        LocalArgumentsCallable::SIGNATURE.type_index(),
+    )
+}
+
+fn canonical_index_for(artifact: &WasmArtifact, name: &str, signature: u32) -> u32 {
     let signatures = declarations(artifact);
     let matching: Vec<_> = function_names(artifact)
         .into_iter()
         .filter(|(index, actual)| {
-            actual.contains(&format!("::{name}#"))
-                && signatures[*index as usize] == LocalArgumentsCallable::SIGNATURE.type_index()
+            actual.contains(&format!("::{name}#")) && signatures[*index as usize] == signature
         })
         .collect();
     assert_eq!(
@@ -44,14 +51,29 @@ fn canonical_index(artifact: &WasmArtifact, name: &str) -> u32 {
     matching[0].0
 }
 
-fn inspect_dynamic_call(tail: bool) {
-    let ending = if tail {
-        "return steps[index & 1](row);"
+fn inspect_dynamic_call(tail: bool, wide: bool) {
+    let (actuals, formals, snapshot_count, signature) = if wide {
+        (
+            "row,1,2,3,4",
+            "row,a,b,c,d",
+            5,
+            WideLocalArgumentsCallable::SIGNATURE.type_index(),
+        )
     } else {
-        "var value = steps[index & 1](row); return value;"
+        (
+            "row",
+            "row",
+            1,
+            LocalArgumentsCallable::SIGNATURE.type_index(),
+        )
+    };
+    let ending = if tail {
+        format!("return steps[index & 1]({actuals});")
+    } else {
+        format!("var value = steps[index & 1]({actuals}); return value;")
     };
     let artifact = emit_script(&format!(
-        "'use strict'; var steps; function prepare(seed) {{ var tick=seed; steps=[function(row){{tick++;return row.x+tick;}},function(row){{tick+=3;return row.y+tick;}}]; }} function frame(index,row) {{ {ending} }} prepare(7); frame(globalThis.index,globalThis.row);"
+        "'use strict'; var steps; function prepare(seed) {{ var tick=seed; steps=[function({formals}){{tick++;return row.x+tick;}},function({formals}){{tick+=3;return row.y+tick;}}]; }} function frame(index,row) {{ {ending} }} prepare(7); frame(globalThis.index,globalThis.row);"
     ))
     .expect("capturing dynamic calls emit");
     expect_valid_module(&artifact, 4);
@@ -91,12 +113,8 @@ fn inspect_dynamic_call(tail: bool) {
             let call = operators
                 .iter()
                 .position(|op| match op {
-                    Operator::CallRef { type_index } if !tail => {
-                        *type_index == LocalArgumentsCallable::SIGNATURE.type_index()
-                    }
-                    Operator::ReturnCallRef { type_index } if tail => {
-                        *type_index == LocalArgumentsCallable::SIGNATURE.type_index()
-                    }
+                    Operator::CallRef { type_index } if !tail => *type_index == signature,
+                    Operator::ReturnCallRef { type_index } if tail => *type_index == signature,
                     _ => false,
                 })
                 .expect("actual dynamic call reaches the typed source body");
@@ -172,8 +190,8 @@ fn inspect_dynamic_call(tail: bool) {
                 }
             }
             assert_eq!(
-                snapshots, 1,
-                "only the original row actual needs a fallback snapshot"
+                snapshots, snapshot_count,
+                "each original actual needs exactly one fallback snapshot"
             );
             assert_eq!(vectors, 1, "the guard-miss branch owns one argv");
             inspected = true;
@@ -185,18 +203,28 @@ fn inspect_dynamic_call(tail: bool) {
 
 #[test]
 fn dynamic_capturing_calls_allocate_argument_vectors_only_on_guard_miss() {
-    inspect_dynamic_call(false);
+    inspect_dynamic_call(false, false);
 }
 
 #[test]
 fn dynamic_capturing_tail_calls_reach_the_typed_entry_without_an_argument_vector() {
-    inspect_dynamic_call(true);
+    inspect_dynamic_call(true, false);
+}
+
+#[test]
+fn five_actual_dynamic_calls_allocate_five_snapshots_and_an_argv_only_on_guard_miss() {
+    inspect_dynamic_call(false, true);
+}
+
+#[test]
+fn five_actual_dynamic_tail_calls_use_the_wide_typed_entry_before_any_argv() {
+    inspect_dynamic_call(true, true);
 }
 
 #[test]
 fn arguments_observers_and_complex_parameters_retain_the_vector_body() {
     let artifact = emit_script(
-        "'use strict'; function observed(a){return arguments[0];} function defaults(a=7){return a;} function rest(...a){return a[0];} observed(1); defaults(); rest(1);"
+        "'use strict'; function observed(a,b,c,d,e){return arguments.length;} function defaults(a,b,c,d,e=7){return e;} function rest(...a){return a[0];} observed(1); defaults(); rest(1);"
     ).expect("vector-only source functions emit");
     expect_valid_module(&artifact, 3);
     let signatures = declarations(&artifact);
@@ -205,22 +233,35 @@ fn arguments_observers_and_complex_parameters_retain_the_vector_body() {
             .iter()
             .any(|source| name.contains(&format!("::{source}#")))
         {
-            assert_ne!(
-                signatures[index as usize],
+            for signature in [
                 LocalArgumentsCallable::SIGNATURE.type_index(),
-                "{name} needs the actual incoming argument list"
-            );
+                WideLocalArgumentsCallable::SIGNATURE.type_index(),
+            ] {
+                assert_ne!(
+                    signatures[index as usize], signature,
+                    "{name} needs the actual incoming argument list"
+                );
+            }
         }
     }
 }
 
-#[test]
-fn vector_entry_is_a_thin_tail_adapter_to_the_single_canonical_body() {
+fn inspect_vector_adapter(wide: bool) {
+    let (source, signature) = if wide {
+        (
+            "'use strict'; function make(a,b,c,d,e){return {a,b,c,d,e};} globalThis.saved=make;",
+            WideLocalArgumentsCallable::SIGNATURE.type_index(),
+        )
+    } else {
+        (
+            "'use strict'; function make(value){return {value};} globalThis.saved=make;",
+            LocalArgumentsCallable::SIGNATURE.type_index(),
+        )
+    };
     let artifact =
-        emit_script("'use strict'; function make(value){return {value};} globalThis.saved=make;")
-            .expect("escaping source callable emits both invocation entries");
+        emit_script(source).expect("escaping source callable emits both invocation entries");
     expect_valid_module(&artifact, 1);
-    let canonical = canonical_index(&artifact, "make");
+    let canonical = canonical_index_for(&artifact, "make", signature);
     let mut adapters = 0;
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         let Payload::CodeSectionEntry(body) = payload.expect("P decodes") else {
@@ -249,15 +290,36 @@ fn vector_entry_is_a_thin_tail_adapter_to_the_single_canonical_body() {
     );
 }
 
-fn inspect_known_source_call(tail: bool) {
-    let ending = if tail {
-        "return frame(row);"
+#[test]
+fn vector_entry_is_a_thin_tail_adapter_to_the_single_canonical_body() {
+    inspect_vector_adapter(false);
+}
+
+#[test]
+fn five_formal_vector_entry_only_unpacks_and_tail_enters_one_wide_canonical_body() {
+    inspect_vector_adapter(true);
+}
+
+fn inspect_known_source_call(tail: bool, wide: bool) {
+    let (actuals, formals, target_signature) = if wide {
+        (
+            "row,1,2,3,4",
+            "row,a,b,c,d",
+            WideLocalArgumentsCallable::SIGNATURE.type_index(),
+        )
     } else {
-        "var value=frame(row); return value;"
+        ("row", "row", LocalArgumentsCallable::SIGNATURE.type_index())
+    };
+    let ending = if tail {
+        format!("return frame({actuals});")
+    } else {
+        format!("var value=frame({actuals}); return value;")
     };
     let program = lower(
         &parse(
-            &format!("function frame(row){{return row.x;}} export function run(row){{{ending}}}"),
+            &format!(
+                "function frame({formals}){{return row.x;}} export function run(row){{{ending}}}"
+            ),
             ParseOptions::module(),
         )
         .unwrap(),
@@ -282,13 +344,15 @@ fn inspect_known_source_call(tail: bool) {
             _ => continue,
         };
         let expected = format!("js::{}#{}", source.name, source.id);
+        let signature = if source.name == "frame" {
+            target_signature
+        } else {
+            LocalArgumentsCallable::SIGNATURE.type_index()
+        };
         let matching: Vec<_> = names
             .iter()
             .filter_map(|(index, actual)| {
-                (*actual == expected
-                    && signatures[*index as usize]
-                        == LocalArgumentsCallable::SIGNATURE.type_index())
-                .then_some(*index)
+                (*actual == expected && signatures[*index as usize] == signature).then_some(*index)
             })
             .collect();
         assert_eq!(
@@ -299,6 +363,16 @@ fn inspect_known_source_call(tail: bool) {
         destination.insert(matching[0]);
     }
     assert!(!targets.is_empty() && !callers.is_empty());
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
+        .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(code_type) = registered
+        .globals()
+        .schema()
+        .reference_type::<ExecutableCode>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("ExecutableCode has its registered concrete type");
+    };
     let mut index = imported_function_count(&artifact);
     let mut inspected = false;
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
@@ -328,6 +402,32 @@ fn inspect_known_source_call(tail: bool) {
                     .any(|op| matches!(op, Operator::I64Eq)),
                 "actual source identity guards the direct arm"
             );
+            // The encoded ExecutableCode ABI starts with immutable SOURCE_ID
+            // and KIND. Inspect that prefix without exposing private field ordinals.
+            let mut types = Vec::new();
+            for payload in Parser::new(0).parse_all(&artifact.bytes) {
+                if let Payload::TypeSection(groups) = payload.expect("P types decode") {
+                    for group in groups {
+                        types.extend(group.unwrap().types().cloned());
+                    }
+                }
+            }
+            let wasmparser::CompositeInnerType::Struct(code) =
+                &types[code_type as usize].composite_type.inner
+            else {
+                panic!("actual ExecutableCode struct");
+            };
+            for (field, storage) in [(0, wasmparser::ValType::I64), (1, wasmparser::ValType::I32)] {
+                assert!(!code.fields[field].mutable);
+                assert_eq!(code.fields[field].element_type.unpack(), storage);
+                let field = field as u32;
+                assert!(
+                    operators[..direct].iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == code_type && *field_index == field)),
+                    "actual code metadata is read before a direct source call"
+                );
+            }
             assert!(
                 operators[..direct]
                     .iter()
@@ -336,10 +436,9 @@ fn inspect_known_source_call(tail: bool) {
             );
             assert!(
                 operators[direct + 1..].iter().any(|op| match op {
-                    Operator::CallRef { type_index } if !tail =>
-                        *type_index == LocalArgumentsCallable::SIGNATURE.type_index(),
+                    Operator::CallRef { type_index } if !tail => *type_index == target_signature,
                     Operator::ReturnCallRef { type_index } if tail =>
-                        *type_index == LocalArgumentsCallable::SIGNATURE.type_index(),
+                        *type_index == target_signature,
                     _ => false,
                 }),
                 "an identity miss still calls the actual typed source entry"
@@ -353,12 +452,22 @@ fn inspect_known_source_call(tail: bool) {
 
 #[test]
 fn known_source_calls_guard_direct_wasm_calls_to_the_canonical_body() {
-    inspect_known_source_call(false);
+    inspect_known_source_call(false, false);
 }
 
 #[test]
 fn known_source_tail_calls_guard_direct_wasm_tail_calls_to_the_canonical_body() {
-    inspect_known_source_call(true);
+    inspect_known_source_call(true, false);
+}
+
+#[test]
+fn known_five_argument_calls_guard_source_kind_and_defining_program_before_the_wide_body() {
+    inspect_known_source_call(false, true);
+}
+
+#[test]
+fn known_five_argument_tail_calls_retain_the_actual_wide_entry_on_identity_miss() {
+    inspect_known_source_call(true, true);
 }
 
 #[test]

@@ -129,11 +129,13 @@ def check(sources):
         ('DerivedThisStatusCell','DirectEvalDerivedBindingsSchema::THIS_STATUS_CELL'),
         ('DerivedNewTargetCell','DirectEvalDerivedBindingsSchema::NEW_TARGET_CELL'),
         ('DerivedActiveFunctionCell','DirectEvalDerivedBindingsSchema::ACTIVE_FUNCTION_CELL'),
-        ('BindingCellValue','BindingCellSchema::VALUE'),
+        ('BindingCellTag','BindingCellSchema::VALUE_TAG'),
+        ('BindingCellScalar','BindingCellSchema::VALUE_SCALAR'),
+        ('BindingCellReference','BindingCellSchema::VALUE_REFERENCE'),
         ('ContextActiveFunction','FunctionContextSchema::ACTIVE_FUNCTION'),
         ('FunctionObjectContext','FunctionObjectSchema::CONTEXT'),
         ('FunctionObjectDerivedConstructor','FunctionObjectSchema::DERIVED_CONSTRUCTOR')):
-        kind = 'scalar' if field in ('PrivateEnvironmentClassScope','FunctionObjectDerivedConstructor') else 'reference'
+        kind = 'scalar' if field in ('PrivateEnvironmentClassScope','FunctionObjectDerivedConstructor','BindingCellTag','BindingCellScalar','BindingCellReference') else 'reference'
         require(re.search(r'Self::'+field+r'=>\{?'+kind+r'_field\(&'+schema+r'\)\}?', host),
                 'host declaration-owned projection: '+field)
     require('Self::PrivateNameTable=>Some(reference_array_element::<PrivateNameTable,PrivateName>())' in host and

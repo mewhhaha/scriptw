@@ -2,10 +2,7 @@
 //! A failed preflight reaches unchanged FDI; successful writes use real cells.
 use super::numeric_leaf_call::NumericLeafExpression;
 use super::*;
-use crate::gc_types::{
-    BindingCell, BindingCellSchema, GcNullability, NonNullable, Nullable, OrdinaryObject,
-    StoredValue,
-};
+use crate::gc_types::{BindingCell, BindingCellSchema, GcNullability, Nullable, OrdinaryObject};
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{
     EnvironmentIdentifierOperationIr as EnvOp, EnvironmentIdentifierResolutionStart, PropertyKeyIr,
@@ -351,19 +348,12 @@ impl FunctionBuilder<'_> {
                         .iter()
                         .position(|capture| capture.slot == *slot && capture.hops == *hops)
                         .expect("validated capture");
-                    let stored = schema
-                        .reserve_gc_local::<StoredValue, NonNullable>(function)
-                        .initialize(
-                            schema
-                                .field(BindingCellSchema::VALUE)
-                                .read(&cells[index], schema, function)
-                                .reference(),
-                            function,
-                        );
-                    schema
-                        .struct_type::<StoredValue>()
-                        .read_into(&stored, &pending, schema, function);
-                    stored.clear(function);
+                    schema.struct_type::<BindingCell>().read_value(
+                        &cells[index],
+                        &pending,
+                        schema,
+                        function,
+                    );
                 }
                 Input::OwnField { argument, name } => {
                     let target = &arguments[*argument];
@@ -587,7 +577,7 @@ mod tests {
                 .is_empty()
         );
         assert!(plans(
-            "var tick=0; export function step(row,i,extra){tick=tick+1;return row.x+i;}"
+            "var tick=0; export function step(row,i,a,b,c,extra){tick=tick+1;return row.x+i;}"
         )
         .is_empty());
         assert!(
@@ -596,7 +586,9 @@ mod tests {
     }
     #[test]
     fn aliases_snapshot_entry_values_and_numeric_copies_keep_source_order() {
-        let plans=plans("var tick=0; export function step(row,i){var old=row; row=i+tick; var before=tick; tick=(tick+1)&255; var after=tick; return old.x+row+before+after;}");
+        let plans = plans(
+            "var tick=0; export function step(row,i){var old=row; row=i+tick; var before=tick; tick=(tick+1)&255; var after=tick; return old.x+row+before+after;}",
+        );
         assert_eq!(plans.len(), 1);
         let plan = &plans[0];
         assert_eq!(plan.assignments.len(), 4);

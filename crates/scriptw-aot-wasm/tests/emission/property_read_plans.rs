@@ -1,4 +1,4 @@
-//! Source read plans call one runtime owner for guarded hits and complete Get.
+//! Source reads call the typed runtime owner for live cache hits and complete Get.
 use scriptw_aot_wasm::{
     emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
     RUNTIME_IMPORT_NAMESPACE,
@@ -416,46 +416,6 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
     cache_types[0]
 }
 
-fn assert_runtime_owned_cache_read(module: &Module<'_>, source: &str, cache: u32, storage: u32) {
-    let (index, body) = module.named(source);
-    assert_eq!(
-        count(body, |op| matches!(op,
-        Operator::Call { function_index } if *function_index == cache)),
-        1,
-        "each admitted source read calls the actual runtime kernel once"
-    );
-    let cache_type = own_data_cache_type(module, storage);
-    assert!(
-        !module.locals[&index].iter().any(|ty| matches!(ty,
-        ValType::Ref(reference) if reference.heap_type()
-            == HeapType::Concrete(UnpackedIndex::Module(cache_type)))),
-        "P retains no invocation-long cache metadata root"
-    );
-    assert!(
-        !body.iter().any(|op| matches!(op,
-        Operator::StructGet { struct_type_index, .. }
-        | Operator::StructSet { struct_type_index, .. }
-        | Operator::StructNew { struct_type_index }
-            if *struct_type_index == cache_type)),
-        "cache registration and proof fields belong to R"
-    );
-    let mut storage_types = vec![storage];
-    storage_types.extend(module.types.iter().enumerate().filter_map(|(index, ty)| {
-        (ty.supertype_idx.map(|parent| parent.unpack()) == Some(UnpackedIndex::Module(storage)))
-            .then_some(index as u32)
-    }));
-    assert_eq!(
-        storage_types.len(),
-        3,
-        "the compact base has its two concrete representations"
-    );
-    assert!(
-        !body.iter().any(|op| matches!(op,
-        Operator::StructGet { struct_type_index, .. } if storage_types.contains(struct_type_index))),
-        "P does not duplicate the compact-storage shape or current-value read"
-    );
-}
-
 #[test]
 fn own_data_cache_reads_use_runtime_guards_and_numeric_reads_keep_get_fallbacks() {
     std::thread::Builder::new()
@@ -466,7 +426,9 @@ fn own_data_cache_reads_use_runtime_guards_and_numeric_reads_keep_get_fallbacks(
             // constant. Publishing the functions retains one unspecialized
             // body each; controls isolate ordinary function/literal plumbing.
             let source = r#"
+Object.prototype;
 function ownCandidate(value) { var record = {x: value}; return record.x; }
+function absentCandidate(value) { var record = {x: value}; return record.then; }
 function ownControl(value) { var record = {x: value}; return record; }
 function indexRead(value) { var array = [value]; return array[0]; }
 function arrayControl(value) { var array = [value]; return array; }
@@ -478,7 +440,7 @@ function repeatedRead(record, count, callback) {
   for (var i = 0; i < count; i++) { callback(record, i); sum += record.x; }
   return sum;
 }
-[ownCandidate, ownControl, indexRead, arrayControl, lengthRead, unresolvedRead, computedRead, repeatedRead];
+[absentCandidate, ownCandidate, ownControl, indexRead, arrayControl, lengthRead, unresolvedRead, computedRead, repeatedRead];
 "#;
             let parsed = parse(source, ParseOptions::script()).expect("property fixtures parse");
             let lowered = lower(&parsed);
@@ -578,8 +540,20 @@ function repeatedRead(record, count, callback) {
             let (store, _) = runtime.named("helper::compact_data_store");
             let program_store = program.imported_runtime_function(&runtime, store);
             let program_storage = concrete_reference_type(program.function_type(program_store).params()[0]);
-            for source in ["js::ownCandidate#", "js::unresolvedRead#", "js::repeatedRead#"] {
-                assert_runtime_owned_cache_read(&program, source, cache, program_storage);
+            let program_cache_type = own_data_cache_type(&program, program_storage);
+            assert_eq!(program.function_type(cache), runtime.function_type(cached_definition),
+                "P calls the actual typed R cache signature with the shared GC prefix");
+            for source in ["js::ownCandidate#", "js::absentCandidate#", "js::unresolvedRead#", "js::repeatedRead#"] {
+                let (_, body) = program.named(source);
+                assert_eq!(count(body, |op| matches!(op,
+                    Operator::Call { function_index } if *function_index == cache)), 1,
+                    "each source read calls the actual typed R cache kernel once");
+                assert!(!body.iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, .. }
+                    | Operator::StructSet { struct_type_index, .. }
+                    | Operator::StructNew { struct_type_index }
+                        if *struct_type_index == program_cache_type)),
+                    "P reads and writes no cache metadata; R owns registration and proof");
             }
             let (boxing, _) = runtime.named("helper::value_to_object");
             assert!(!calls(unresolved, program.imported_runtime_function(&runtime, boxing)),
@@ -626,6 +600,31 @@ function repeatedRead(record, count, callback) {
             );
             let storage = concrete_reference_type(runtime.function_type(store).params()[0]);
             let cache_type = own_data_cache_type(&runtime, storage);
+            assert_eq!(own_data_cache_type(&program, program_storage), cache_type,
+                "P and R use the same canonical cache type in the shared GC prefix");
+            let storage_definition = &runtime.types[storage as usize];
+            assert_eq!(&program.types[program_storage as usize], storage_definition,
+                "the compact store boundary retains R's exact shared type");
+            for mode in [-1, -2] {
+                assert!(cached_body.iter().any(|op| matches!(op, Operator::I32Const { value } if *value == mode)),
+                    "R registers the same closed negative mode {mode}");
+            }
+            let (find, _) = runtime.named("helper::intrinsic_property_find");
+            let intrinsic_storage = concrete_reference_type(runtime.function_type(find).params()[0]);
+            let intrinsic_count = GcSnapshotField::IntrinsicCount.index();
+            for field in [intrinsic_count - 1, intrinsic_count] {
+                assert!(cached_body.iter().any(|op| matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == intrinsic_storage && *field_index == field)),
+                    "R negative hits guard both sealed intrinsic ADDRESS and COUNT");
+            }
+            assert!(count(cached_body, |op| matches!(op,
+                Operator::StructGet { struct_type_index, field_index }
+                    if *struct_type_index == runtime.witness_type(GcSnapshotLayout::Object)
+                        && *field_index == GcSnapshotField::ObjectPrototype.index())) >= 2,
+                "R negative hits reload the lookup prototype and live null parent");
+            assert!(calls(cached_body, find),
+                "negative registration proves absence in sealed Object.prototype rows");
             assert_eq!(count(cached_body, |op| matches!(op,
                 Operator::StructNew { struct_type_index } if *struct_type_index == cache_type)), 1,
                 "R alone lazily registers the canonical cache metadata record");
@@ -651,7 +650,7 @@ function repeatedRead(record, count, callback) {
             let (call, _) = runtime.named("helper::proxy_call");
             let call = program.imported_runtime_function(&runtime, call);
             assert!(calls(&repeated[loop_start..cache_call], call),
-                "the runtime-owned live-storage proof runs after the observable callback");
+                "the guarded read remains after the observable callback");
             for (name, read) in [("numeric index", indexed), ("array length", length)] {
                 assert!(
                     !read.iter().any(|operator| matches!(

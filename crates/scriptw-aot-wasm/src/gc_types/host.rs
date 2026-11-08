@@ -238,7 +238,9 @@ pub enum GcHostField {
     DerivedThisStatusCell,
     DerivedNewTargetCell,
     DerivedActiveFunctionCell,
-    BindingCellValue,
+    BindingCellTag,
+    BindingCellScalar,
+    BindingCellReference,
     ContextActiveFunction,
     FunctionObjectContext,
     FunctionObjectDerivedConstructor,
@@ -370,7 +372,9 @@ impl GcHostField {
             Self::DerivedActiveFunctionCell => {
                 reference_field(&DirectEvalDerivedBindingsSchema::ACTIVE_FUNCTION_CELL)
             }
-            Self::BindingCellValue => reference_field(&BindingCellSchema::VALUE),
+            Self::BindingCellTag => scalar_field(&BindingCellSchema::VALUE_TAG),
+            Self::BindingCellScalar => scalar_field(&BindingCellSchema::VALUE_SCALAR),
+            Self::BindingCellReference => scalar_field(&BindingCellSchema::VALUE_REFERENCE),
             Self::ContextActiveFunction => reference_field(&FunctionContextSchema::ACTIVE_FUNCTION),
             Self::FunctionObjectContext => reference_field(&FunctionObjectSchema::CONTEXT),
             Self::FunctionObjectDerivedConstructor => {

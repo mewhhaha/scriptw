@@ -39,22 +39,33 @@ fn arguments_type(body: &[Operator<'_>], locals: &[ValType]) -> u32 {
     // The real observed control publishes an Arguments Value from its typed
     // allocation root. Derive P's type there; no snapshot exports or R/P type
     // index equality is assumed.
-    let types = body.windows(7).filter_map(|ops| {
-        let [Operator::I32Const { value }, Operator::LocalSet { .. },
-            Operator::I64Const { value: 0 }, Operator::LocalSet { .. },
-            Operator::LocalGet { local_index }, Operator::RefAsNonNull,
-            Operator::LocalSet { .. }] = ops else { return None; };
-        if *value != WasmRuntimeValueTag::Arguments as i32 {
-            return None;
-        }
-        let ValType::Ref(reference) = locals[*local_index as usize] else {
-            panic!("Arguments publication reads a GC root");
-        };
-        let HeapType::Concrete(UnpackedIndex::Module(index)) = reference.heap_type() else {
-            panic!("Arguments publication retains a concrete allocation type");
-        };
-        Some(index)
-    }).collect::<Vec<_>>();
+    let types = body
+        .windows(7)
+        .filter_map(|ops| {
+            let [
+                Operator::I32Const { value },
+                Operator::LocalSet { .. },
+                Operator::I64Const { value: 0 },
+                Operator::LocalSet { .. },
+                Operator::LocalGet { local_index },
+                Operator::RefAsNonNull,
+                Operator::LocalSet { .. },
+            ] = ops
+            else {
+                return None;
+            };
+            if *value != WasmRuntimeValueTag::Arguments as i32 {
+                return None;
+            }
+            let ValType::Ref(reference) = locals[*local_index as usize] else {
+                panic!("Arguments publication reads a GC root");
+            };
+            let HeapType::Concrete(UnpackedIndex::Module(index)) = reference.heap_type() else {
+                panic!("Arguments publication retains a concrete allocation type");
+            };
+            Some(index)
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
         types.len(),
         1,
@@ -183,11 +194,12 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
                 "{name} arguments materialization"
             );
             let signature = program.function_type(index);
-            if name == "small" {
+            if matches!(name, "small" | "scan" | "classify") {
+                let expected_parameters = if name == "small" { 15 } else { 24 };
                 assert_eq!(
                     signature.params().len(),
-                    15,
-                    "the same observer proof also admits the existing two-formal local entry"
+                    expected_parameters,
+                    "the observer proof selects the matching narrow or wide local entry"
                 );
                 assert_eq!(signature.results(), vector_signature.results());
                 let adapter_name = format!("js-arguments-adapter::{name}#{id}");

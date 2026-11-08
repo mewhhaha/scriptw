@@ -280,6 +280,7 @@ mod tests {
     fn constructor_meta() -> WasmFunctionMeta {
         let builtin = StandardBuiltinId::ArrayConstructor;
         WasmFunctionMeta {
+            captured_call: None,
             constant_leaf: None,
             numeric_leaf: None,
             async_generator_resume_environment_plan: None,

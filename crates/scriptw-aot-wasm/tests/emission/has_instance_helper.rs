@@ -11,13 +11,13 @@ fn artifact() -> WasmArtifact {
         .name("has-instance-emission".into())
         .stack_size(64 * 1024 * 1024)
         .spawn(|| {
-            // Three formals keep these bodies independent of the local-argument
+            // Six formals keep these bodies independent of the local-argument
             // entry optimization. Every operator retains unknown runtime inputs.
             let source = format!(
-                "function single(object, constructor, unused) {{
+                "function single(object, constructor, unused1, unused2, unused3, unused4) {{
                     return object instanceof constructor;
                  }}
-                 function repeated(object, constructor, unused) {{
+                 function repeated(object, constructor, unused1, unused2, unused3, unused4) {{
                     {}
                     return object instanceof constructor;
                  }}
@@ -227,6 +227,8 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
     let growth = sizes[1]
         .checked_sub(sizes[0])
         .expect("seven more dynamic operations");
-    assert!(growth < 7 * 1024,
-        "seven operator sites must add bounded argument/result transport, not seven kernels: {sizes:?}");
+    assert!(
+        growth < 7 * 1024,
+        "seven operator sites must add bounded argument/result transport, not seven kernels: {sizes:?}"
+    );
 }

@@ -14,6 +14,8 @@ mod aot_guarded_number_update;
 mod arguments_elision;
 mod async_generator_scheduling_size;
 mod async_labelled_region_emission;
+mod binding_cell_payload;
+mod captured_call_regions;
 mod class_initializer_function_identity;
 mod compact_birth_layouts;
 mod constant_number_condition_emission;

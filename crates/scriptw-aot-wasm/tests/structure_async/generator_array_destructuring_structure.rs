@@ -1,3 +1,4 @@
+use super::host_schema::BindingCellLayout;
 use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use std::collections::BTreeMap;
@@ -58,23 +59,16 @@ fn inspect_native_pattern_artifact(source: &str) {
     let cells = structures
         .iter()
         .filter_map(|(&index, structure)| {
-            let fields = &structure.fields;
-            if fields.len() != 13
-                || !fields[0].mutable
-                || !fields[1].mutable
-                || fields[2].mutable
-                || fields[3].mutable
-                || [1, 2, 3]
-                    .iter()
-                    .any(|&i| fields[i].element_type.unpack() != ValType::I32)
-                || fields[9].element_type.unpack() != ValType::I64
-                || concrete_reference(fields[4].element_type) != Some((true, index))
+            let layout = BindingCellLayout::new(index, structure)?;
+            let iterator_edge = layout.iterator_record();
+            let enumerator_edge = layout.for_in_record();
+            let (nullable, record) = concrete_reference(iterator_edge.element_type)?;
+            let (enumerator_nullable, _) = concrete_reference(enumerator_edge.element_type)?;
+            if !nullable
+                || !iterator_edge.mutable
+                || !enumerator_nullable
+                || !enumerator_edge.mutable
             {
-                return None;
-            }
-            let (nullable, record) = concrete_reference(fields[11].element_type)?;
-            let (enumerator_nullable, _) = concrete_reference(fields[12].element_type)?;
-            if !nullable || !fields[11].mutable || !enumerator_nullable || !fields[12].mutable {
                 return None;
             }
             let record_fields = &structures.get(&record)?.fields;
@@ -87,6 +81,10 @@ fn inspect_native_pattern_artifact(source: &str) {
                 || concrete_reference(record_fields[0].element_type)
                     != concrete_reference(record_fields[1].element_type)
             {
+                return None;
+            }
+            let (nullable, value) = concrete_reference(record_fields[0].element_type)?;
+            if nullable || !layout.matches_stored_value(structures.get(&value)?) {
                 return None;
             }
             Some((index, record))
@@ -106,11 +104,11 @@ fn inspect_native_pattern_artifact(source: &str) {
                 match instruction.unwrap() {
                     Operator::StructGet {
                         struct_type_index,
-                        field_index: 11,
+                        field_index: BindingCellLayout::ITERATOR_RECORD,
                     } if struct_type_index == cell => record_loads += 1,
                     Operator::StructSet {
                         struct_type_index,
-                        field_index: 11,
+                        field_index: BindingCellLayout::ITERATOR_RECORD,
                     } if struct_type_index == cell => record_publications_and_retirements += 1,
                     _ => {}
                 }

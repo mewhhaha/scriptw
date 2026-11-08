@@ -19,7 +19,7 @@ ARCHIVED_ROOT = ROOT
 AUTHORITY = ROOT / 'docs/rust-rewrite/applications-current.json'
 ASSETS = AUTHORITY.parent / 'assets/applications-current'
 RSC_ASSETS = AUTHORITY.parent / 'assets/rsc-current'
-RSC_ENGINE_LABELS = {'candidate': 'Scriptw', 'v8': 'Node / V8'}
+RSC_ENGINE_LABELS = {'candidate': 'Scriptw', 'candidate-speed': 'Scriptw Speed', 'v8': 'Node / V8'}
 SERVER = ('rsc-sync', 'rsc-async', 'web-url', 'web-json')
 BROWSER = ('mount', 'update', 'hydrate')
 LABELS = {'rsc-sync': 'RSC Flight · sync', 'rsc-async': 'RSC Flight · async',
@@ -33,7 +33,8 @@ def sha(value):
 
 def rsc_report(path):
     report = json.loads(path.read_text())
-    require(report['schema'] == 'scriptw-rsc-current-v1', 'foreign current RSC report')
+    require(report['schema'] in ('scriptw-rsc-current-v1', 'scriptw-rsc-current-v2'),
+            'foreign current RSC report')
     require(re.fullmatch(r'\d{4}-\d{2}-\d{2}', report['date']) is not None,
             'current RSC date must be YYYY-MM-DD')
     measurement = report['measurement']
@@ -47,7 +48,10 @@ def rsc_report(path):
         require(isinstance(name, str) and name and re.fullmatch(r'[0-9a-f]{64}', value) is not None,
                 'invalid current RSC input fingerprint')
     engines = report['engines']
-    require(set(engines) == {'baseline', 'candidate', 'v8'}, 'current RSC engine inventory differs')
+    expected = {'baseline', 'candidate', 'v8'}
+    if report['schema'] == 'scriptw-rsc-current-v2':
+        expected.add('candidate-speed')
+    require(set(engines) == expected, 'current RSC engine inventory differs')
     for engine_name, engine in engines.items():
         require(isinstance(engine['label'], str) and engine['label'],
                 'current RSC engine label missing: ' + engine_name)
@@ -57,7 +61,7 @@ def rsc_report(path):
             require(isinstance(values, list) and len(values) == 8
                     and all(type(value) is int and value > 0 for value in values),
                     'current RSC case needs eight positive process medians: ' + engine_name + '/' + case_name)
-    for engine_name in ('baseline', 'candidate'):
+    for engine_name in sorted(expected - {'v8'}):
         phases = engines[engine_name]['phase_processes']
         require(isinstance(phases, list) and len(phases) == 8,
                 'current RSC phase inventory needs eight processes: ' + engine_name)
@@ -65,7 +69,21 @@ def rsc_report(path):
             require(all(type(process.get(name)) is int and process[name] > 0
                         for name in ('front_and_lower', 'wasm_emission', 'native_preparation')),
                     'current RSC phase timings missing or nonpositive: ' + engine_name)
+    if report['schema'] == 'scriptw-rsc-current-v2':
+        fast, speed = (engines[name]['identity'] for name in ('candidate', 'candidate-speed'))
+        for name in ('source_fingerprint', 'executable_sha256', 'program_wasm_sha256', 'runtime', 'inputs'):
+            require(fast[name] == speed[name], 'RSC native policies must use the same ' + name)
+        for identity, optimization, allocation in ((fast, 'None', 'SinglePass'), (speed, 'Speed', 'Backtracking')):
+            require(identity['configuration']['cranelift_opt_level'] == optimization
+                    and identity['configuration']['register_allocation'] == allocation,
+                    'RSC native policy identity differs')
     return report
+
+
+def rsc_engine_label(report, name):
+    if name == 'candidate' and report['schema'] == 'scriptw-rsc-current-v2':
+        return 'Scriptw Fast'
+    return RSC_ENGINE_LABELS[name]
 
 
 def rsc_runtime_chart(report, preview=None):
@@ -76,6 +94,10 @@ def rsc_runtime_chart(report, preview=None):
     engines = ('candidate', 'v8')
     colors = ('#3478a8', '#d17b36')
     width = .34
+    if report['schema'] == 'scriptw-rsc-current-v2':
+        engines = ('candidate', 'candidate-speed', 'v8')
+        colors = ('#3478a8', '#4a9a79', '#d17b36')
+        width = .25
     centers = (0, 1)
     with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
                          'svg.hashsalt': 'scriptw-rsc-current-runtime-v1', 'text.usetex': False}):
@@ -86,8 +108,8 @@ def rsc_runtime_chart(report, preview=None):
                 values = [statistics.median(engine['cases'][name]) / 1e6 for name in names]
                 minimum = [min(engine['cases'][name]) / 1e6 for name in names]
                 maximum = [max(engine['cases'][name]) / 1e6 for name in names]
-                positions = [center + (engine_index - .5) * width for center in centers]
-                ax.bar(positions, values, width, color=color, label=RSC_ENGINE_LABELS[engine_name],
+                positions = [center + (engine_index - (len(engines) - 1) / 2) * width for center in centers]
+                ax.bar(positions, values, width, color=color, label=rsc_engine_label(report, engine_name),
                        yerr=[[value - low for value, low in zip(values, minimum, strict=True)],
                              [high - value for value, high in zip(values, maximum, strict=True)]],
                        capsize=3, error_kw={'elinewidth': 1, 'ecolor': '#555b61'})
@@ -99,7 +121,7 @@ def rsc_runtime_chart(report, preview=None):
             ax.set_title('React 19.3.1 · retained RSC module', loc='left', fontweight='bold', pad=14)
             ax.set_axisbelow(True)
             ax.grid(axis='y', color='#eaeef2')
-            ax.legend(frameon=False, ncol=2, loc='upper left')
+            ax.legend(frameon=False, ncol=len(engines), loc='upper left')
             ax.set_ylim(bottom=0, top=max(max(report['engines'][name]['cases'][case]) / 1e6
                                          for name in engines for case in names) * 1.28)
             for side in ('top', 'right'):
@@ -115,38 +137,46 @@ def rsc_compile_chart(report, preview=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    engine_name = 'candidate'
+    engines = ('candidate',)
+    if report['schema'] == 'scriptw-rsc-current-v2':
+        engines = ('candidate', 'candidate-speed')
     phases = ('front_and_lower', 'wasm_emission', 'native_preparation')
     labels = ('Front end + lower', 'Wasm emission', 'Native preparation')
     colors = ('#6687a3', '#e5a23d', '#4a9a79')
-    medians = [statistics.median(
-        process[phase] for process in report['engines'][engine_name]['phase_processes']) / 1e9
-        for phase in phases]
+    medians = {name: [statistics.median(
+        process[phase] for process in report['engines'][name]['phase_processes']) / 1e9
+        for phase in phases] for name in engines}
     with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 11, 'svg.fonttype': 'none',
                          'svg.hashsalt': 'scriptw-rsc-current-compilation-v1', 'text.usetex': False}):
         fig, ax = plt.subplots(figsize=(8, 4.1))
         try:
-            position = 0
-            bottom = 0.0
-            for phase_index, (label, color) in enumerate(zip(labels, colors, strict=True)):
-                value = medians[phase_index]
-                ax.bar(position, value, bottom=bottom, color=color, width=.55, label=label)
-                label_color = 'white'
-                if phase_index == 1:
-                    label_color = '#32220b'
-                ax.text(position, bottom + value / 2, f'{value:.2f}', ha='center', va='center',
-                        fontsize=9, color=label_color, fontweight='bold')
-                bottom += value
-            ax.set_xticks([position], [RSC_ENGINE_LABELS[engine_name]])
-            ax.set_xlim(-.75, .75)
+            totals = []
+            for position, engine_name in enumerate(engines):
+                bottom = 0.0
+                for phase_index, (label, color) in enumerate(zip(labels, colors, strict=True)):
+                    value = medians[engine_name][phase_index]
+                    legend = None
+                    if position == 0:
+                        legend = label
+                    ax.bar(position, value, bottom=bottom, color=color, width=.55, label=legend)
+                    label_color = 'white'
+                    if phase_index == 1:
+                        label_color = '#32220b'
+                    ax.text(position, bottom + value / 2, f'{value:.2f}', ha='center', va='center',
+                            fontsize=9, color=label_color, fontweight='bold')
+                    bottom += value
+                totals.append(bottom)
+            ax.set_xticks(range(len(engines)), [rsc_engine_label(report, name) for name in engines])
+            ax.set_xlim(-.75, len(engines) - .25)
             ax.set_ylabel('Cold compile + native preparation · s')
             ax.set_title('React 19.3.1 · cold compilation phases', loc='left', fontweight='bold', pad=14)
             ax.set_axisbelow(True)
             ax.grid(axis='y', color='#eaeef2')
             ax.legend(frameon=False, ncol=3, loc='upper left')
-            ax.annotate(f'{bottom:.2f} s', (position, bottom), xytext=(0, 5), textcoords='offset points',
-                        ha='center', va='bottom', fontweight='bold')
-            ax.set_ylim(bottom=0, top=bottom * 1.24)
+            for position, bottom in enumerate(totals):
+                ax.annotate(f'{bottom:.2f} s', (position, bottom), xytext=(0, 5), textcoords='offset points',
+                            ha='center', va='bottom', fontweight='bold')
+            ax.set_ylim(bottom=0, top=max(totals) * 1.24)
             for side in ('top', 'right'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(length=0, pad=7)

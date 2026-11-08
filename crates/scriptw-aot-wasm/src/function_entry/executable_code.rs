@@ -5,6 +5,7 @@ use crate::gc_types::{
     AsyncCallable, AsyncGeneratorCallable, BinaryNumericCallback, ExecutableCode,
     ExecutableCodeEntry, ExecutableCodeKind, ExecutableCodeMetadata, GcStackReference,
     GeneratorCallable, LocalArgumentsCallable, OrdinaryCallable, RuntimeSchema,
+    WideLocalArgumentsCallable,
 };
 
 impl PlannedFunctionEntry {
@@ -56,14 +57,28 @@ impl PlannedFunctionEntry {
                     function,
                 )
         });
-        let local_arguments = self.local_arguments().map(|entry| {
-            schema
-                .reserve_function_local::<LocalArgumentsCallable, _>(function)
-                .initialize(
-                    schema.reference_local_arguments_entry(entry, function),
-                    function,
-                )
-        });
+        let local_arguments = self
+            .local_arguments()
+            .filter(|entry| entry.arity() == LocalArgumentsArity::Narrow)
+            .map(|entry| {
+                schema
+                    .reserve_function_local::<LocalArgumentsCallable, _>(function)
+                    .initialize(
+                        schema.reference_local_arguments_entry(entry, function),
+                        function,
+                    )
+            });
+        let wide_local_arguments = self
+            .local_arguments()
+            .filter(|entry| entry.arity() == LocalArgumentsArity::Wide)
+            .map(|entry| {
+                schema
+                    .reserve_function_local::<WideLocalArgumentsCallable, _>(function)
+                    .initialize(
+                        schema.reference_local_arguments_entry(entry, function),
+                        function,
+                    )
+            });
         macro_rules! publish {
             ($role:ident, $variant:ident) => {{
                 let entry = schema
@@ -73,6 +88,7 @@ impl PlannedFunctionEntry {
                     ExecutableCodeEntry::$variant(&entry),
                     binary_numeric.as_ref(),
                     local_arguments.as_ref(),
+                    wide_local_arguments.as_ref(),
                     metadata,
                     function,
                 )?;
@@ -93,6 +109,9 @@ impl PlannedFunctionEntry {
             entry.clear(function);
         }
         if let Some(entry) = local_arguments {
+            entry.clear(function);
+        }
+        if let Some(entry) = wide_local_arguments {
             entry.clear(function);
         }
         Ok(published)
