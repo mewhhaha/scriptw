@@ -43,6 +43,8 @@ impl RuntimeSchema {
     }
 
     /// All tags derive from the same closed schema as object header projection.
+    /// A caller that only examines the object's layout uses `has_layout` and
+    /// `cast_layout` on the reference instead and skips this classification.
     pub(crate) fn prototype_reference_into(
         &self,
         reference: &GcLocal<JavaScriptObject, Nullable>,
@@ -92,5 +94,37 @@ impl RuntimeSchema {
             f.instruction(&Instruction::End);
         }
         f.instruction(&Instruction::End);
+    }
+}
+
+impl GcLocal<JavaScriptObject, Nullable> {
+    /// Whether the referenced object has exactly `T`'s sealed layout. Null
+    /// has none.
+    pub(crate) fn has_layout<T: JavaScriptReference>(
+        &self,
+        schema: &RuntimeSchema,
+        f: &mut Function,
+    ) {
+        self.load(schema, f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<T>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+    }
+
+    /// Traps unless the referenced object has `T`'s layout.
+    pub(crate) fn cast_layout<T: JavaScriptReference>(
+        &self,
+        schema: &RuntimeSchema,
+        f: &mut Function,
+    ) -> GcStackReference<T> {
+        self.load(schema, f);
+        f.instruction(&Instruction::RefCastNonNull(
+            schema
+                .reference_type::<T>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        GcStackReference::new()
     }
 }

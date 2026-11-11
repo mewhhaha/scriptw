@@ -104,7 +104,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 57 compiles without epoch checks. Source functions and loops store
 // to the deadline poll byte; P from an older compiler has no such stores.
 // The uncalled indexed element-write helper leaves R.
-const LAYOUT_VERSION: u32 = 57;
+// Version 58 widens the per-site read record: a dictionary entry position and
+// a prototype holder with its receiver rule, storage, shape, value and slot.
+const LAYOUT_VERSION: u32 = 58;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

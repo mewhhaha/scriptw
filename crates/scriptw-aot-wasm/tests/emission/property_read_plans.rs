@@ -391,7 +391,7 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
             let CompositeInnerType::Struct(fields) = &ty.composite_type.inner else {
                 return None;
             };
-            if fields.fields.len() != 3 {
+            if fields.fields.len() < 3 {
                 return None;
             }
             let reference = |field: usize, target, nullable| {
@@ -399,16 +399,22 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
             StorageType::Val(ValType::Ref(r)) if r.is_nullable() == nullable
                 && r.heap_type() == HeapType::Concrete(UnpackedIndex::Module(target)))
             };
+            // After the key, shape and slot the record adds only further
+            // nullable shapes and integers: no object, value or callable.
             (reference(0, string, false)
                 && reference(1, shape, true)
-                && fields.fields[2].element_type == StorageType::Val(ValType::I32))
+                && fields.fields[2].element_type == StorageType::Val(ValType::I32)
+                && (3..fields.fields.len()).all(|field| {
+                    reference(field, shape, true)
+                        || fields.fields[field].element_type == StorageType::Val(ValType::I32)
+                }))
             .then_some(index as u32)
         })
         .collect::<Vec<_>>();
     assert_eq!(
         cache_types.len(),
         1,
-        "one canonical primitive key/shape/slot cache layout"
+        "one canonical read record: a primitive key, then shapes and integers only"
     );
     cache_types[0]
 }

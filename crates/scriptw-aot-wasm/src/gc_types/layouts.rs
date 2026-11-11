@@ -999,6 +999,23 @@ gc_layout_registry! {
             KEY: GcRef<StringValue>, Immutable, NonNullable;
             SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
             SLOT: I32Value, Mutable, NonNullable;
+            // An own data property of a dictionary receiver: its entry
+            // position, checked against the key at every use.
+            DICTIONARY_POSITION: I32Value, Mutable, NonNullable;
+            // An own data property of a receiver on intrinsic storage: the
+            // immutable layout's address and the row's value group.
+            LAYOUT: I32Value, Mutable, NonNullable;
+            GROUP: I32Value, Mutable, NonNullable;
+            // A data property on the receiver's direct prototype. The record
+            // retains no object or value, only where the property lives: an
+            // intrinsic layout address, a compact shape or a dictionary
+            // position. A use re-proves the receiver's absence rule and
+            // that place on the live prototype; see `cache/holder.rs`.
+            RECEIVER_KIND: I32Value, Mutable, NonNullable;
+            RECEIVER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
+            HOLDER_LAYOUT: I32Value, Mutable, NonNullable;
+            HOLDER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
+            HOLDER_SLOT: I32Value, Mutable, NonNullable;
         }
         array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }
         array OwnDataReadCachePageTable => OwnDataReadCachePageTableSchema { ELEMENT: GcRef<OwnDataReadCacheTable>, Mutable, Nullable; }

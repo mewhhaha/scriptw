@@ -17,6 +17,17 @@ impl NegativeCacheMode {
 }
 
 impl FunctionBuilder<'_> {
+    /// Leaves on the stack whether `mode` is the unmodified-%Object.prototype%
+    /// tail: a prototype with that immutable layout, an immutable null
+    /// [[Prototype]] of its own and, when registered with a key, no such row.
+    pub(crate) fn emit_is_object_prototype_tail_i32(&self, mode: I32Local, f: &mut Function) {
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(
+            NegativeCacheMode::ObjectPrototype.word(),
+        ));
+        f.instruction(&Instruction::I32Eq);
+    }
+
     pub(super) fn emit_cached_compact_read_hit(
         &mut self,
         target: &ValueLocals,

@@ -352,6 +352,60 @@ default eight processes per case, actor and policy. Fast/Speed medians move
 A scalar loop now pays one store per iteration where it paid an epoch load,
 compare and branch. This run does not replace the published situation panel.
 
+### Read records and per-operation costs (2026-11-11)
+
+Source `7c6998ed91b4`, ABI 58. These are diagnostics from one retained Speed
+process per case on a machine running other builds, counted in user
+instructions per request (deterministic) and cycles per request (not). They do
+not refresh the published panel.
+
+| State | Sync instructions / cycles | Async instructions |
+| --- | ---: | ---: |
+| Fault-driven deadlines, `89a934d06891` | 20.12M / — | 21.65M |
+| Direct `instanceof`, global reads and own data | 17.13M / — | 18.50M |
+| Read records and the closed-chain Set, `7c6998ed91b4` | 15.53M / 6.98M | 16.79M |
+| Node 24 `--jitless` | 4.38M / 2.68M | — |
+| Node 24 with its JIT | 2.62M / — | — |
+
+A static read site keeps one record that holds only its key, shapes and
+integers. It answers an own compact slot, an own dictionary entry (a position
+confirmed by the entry's key), an own row of an intrinsic layout (the layout
+address and value group), and a data property or proven absence on the
+receiver's direct prototype. Every use re-proves the record against live
+storage; nothing invalidates it from outside. A Set on an ordinary object
+whose chain is closed skips the prototype walk.
+
+Single operations, each in a loop inside a strict function with captured
+state, at the `2c3f6db29` commit (before the read records). Values are user
+instructions per operation above each engine's cheapest loop. Scriptw's
+cheapest loop is its scalar loop, so its column also carries about 100
+instructions of ordinary loop overhead that the V8 column does not.
+
+| Operation | Scriptw | Node 24 `--jitless` |
+| --- | ---: | ---: |
+| Read own property | 1,082 | 145 |
+| Read a prototype method | 1,985 | 116 |
+| Write own property | 1,164 | 101 |
+| Call a function / a method | 741 / 2,844 | 364 / 449 |
+| `text.indexOf(":")` | 7,724 | 447 |
+| `Map.prototype.get` | 5,479 | 356 |
+| `o instanceof Int8Array` | 2,792 | 356 |
+| Read a global constructor | 925 | 41 |
+| `{}` then two property adds | 7,012 | 416 |
+| `new P()` with two fields | 10,301 | 596 |
+| Create a closure | 8,831 | 249 |
+| `JSON.stringify` of a three-key object | 20,107 | 2,290 |
+
+The gap is spread over basic operations rather than one hot spot. Profiles of
+the same loops attribute a property add to the dictionary definition path
+(about 1,000 cycles each), a builtin call to the argument-vector call, the
+funcref and subtype host calls and receiver coercion, a closure to eager
+`length`/`name`/`prototype` definition, and a write to a captured variable to a
+runtime helper even when the binding cell is proven. A traced retained Realm
+keeps 1.67 MB live in a 16 MB heap, allocates about 1.0 MB per request and
+collects every sixth request, so the collector's growth rule is not the cost;
+allocation volume is.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

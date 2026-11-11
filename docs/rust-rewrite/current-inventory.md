@@ -12,7 +12,16 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Bring retained RSC sync and async below 1 ms. Source `89a934d06891`
+- Bring retained RSC sync and async below 1 ms, and at least to V8 without its
+  JIT. Source `7c6998ed91b4` runs a Speed sync request in 15.53M user
+  instructions against 4.38M for Node 24 `--jitless`
+  ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11)).
+  Next, in measured order: transition shapes so property adds stop defining
+  dictionary entries; the builtin and method call path (argument vector,
+  funcref and subtype host calls, receiver coercion); inline stores for proven
+  captured cells; site records for `instanceof` and global reads, which need a
+  local absence proof for dictionary constructors; lazy function `prototype`,
+  `length` and `name`. Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
   V8 with the eight-process campaign before refreshing the published panel.
@@ -40,7 +49,7 @@ accepts `--case <file.js>`.
   Wasmtime; it changes the `ExecutableCode` layout, publication, host-created
   code and the runtime ABI. Owner: AOT call lowering.
 - Reduce copying-collection cost per request. A retained RSC Realm allocates
-  about 1.5 MB per request and collects every sixth request for about 1.85 ms;
+  about 1.0 MB per request with 1.67 MB live and collects every sixth request;
   the existing larger-capacity profiles trade resident memory for fewer
   collections. Measure the collector's per-object cost and the retained graph
   size before changing capacity policy. Owner: runtime value/storage

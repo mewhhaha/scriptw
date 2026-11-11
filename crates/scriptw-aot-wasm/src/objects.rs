@@ -2309,6 +2309,134 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
+    /// True when no object above `target` can hold `key`, so that OrdinarySet
+    /// reaches the receiver's own definition without asking the chain. The
+    /// caller has already found no own property on `target`.
+    ///
+    /// A plain object qualifies when its prototype is an unmodified
+    /// %Object.prototype% that lacks the key. An Array with an array-index
+    /// key qualifies when its prototype is an Array without any indexed
+    /// element whose own prototype is that same closed tail; the unmodified
+    /// %Object.prototype% layout has no index key. Arrays answer [[Set]]
+    /// ordinarily, and neither parent can be a Proxy.
+    fn emit_set_chain_lacks_key_i32(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let closed = schema.reserve_i32_local(function);
+        closed.set_constant(0, function);
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let object = schema.reserve_gc_local(function).initialize(
+            target.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let mode = self.emit_negative_cache_mode(target, &object, Some(key), function)?;
+        self.emit_is_object_prototype_tail_i32(mode, function);
+        closed.store(function);
+        schema.release_i32_local(mode, function);
+        object.clear(function);
+        function.instruction(&Instruction::Else);
+        target.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<crate::gc_types::ArrayObject>(
+                    crate::gc_types::GcNullability::NonNullable,
+                )
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let index = schema.reserve_i32_local(function);
+        let indexed = schema.reserve_i32_local(function);
+        self.emit_property_key_array_index(key, index, indexed, function)?;
+        indexed.load(function);
+        schema.release_i32_local(indexed, function);
+        schema.release_i32_local(index, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let array = schema.reserve_gc_local(function).initialize(
+            target.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
+            function,
+        );
+        let header = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(crate::gc_types::ArrayObjectSchema::OBJECT)
+                .read(&array, schema, function)
+                .reference(),
+            function,
+        );
+        array.clear(function);
+        let parent = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        header.clear(function);
+        let parent_value = schema.reserve_value_local(function);
+        schema.prototype_reference_into(&parent, &parent_value, function);
+        parent.clear(function);
+        parent_value.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<crate::gc_types::ArrayObject>(
+                    crate::gc_types::GcNullability::NonNullable,
+                )
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let parent_array = schema.reserve_gc_local(function).initialize(
+            parent_value.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
+            function,
+        );
+        let count = schema.reserve_i64_local(function);
+        schema
+            .field(crate::gc_types::ArrayObjectSchema::COUNT)
+            .read(&parent_array, schema, function)
+            .store_i64(count, function);
+        count.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        schema.release_i64_local(count, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let parent_header = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(crate::gc_types::ArrayObjectSchema::OBJECT)
+                .read(&parent_array, schema, function)
+                .reference(),
+            function,
+        );
+        let parent_header_value = schema.reserve_value_local(function);
+        parent_header_value.set_reference(&parent_header, schema, function);
+        let mode =
+            self.emit_negative_cache_mode(&parent_header_value, &parent_header, None, function)?;
+        self.emit_is_object_prototype_tail_i32(mode, function);
+        closed.store(function);
+        schema.release_i32_local(mode, function);
+        parent_header_value.clear(function);
+        parent_header.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        parent_array.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        parent_value.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(closed)
+    }
+
     fn emit_non_proxy_set(
         &mut self,
         target: &ValueLocals,
@@ -2380,9 +2508,16 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         let prototype = schema.reserve_value_local(function);
         self.emit_ordinary_get_prototype_of(target, &prototype, function);
+        // A chain that provably lacks the key ends like a null prototype:
+        // the receiver gets the data property without asking each parent.
+        let closed = self.emit_set_chain_lacks_key_i32(target, key, function)?;
         prototype.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
         function.instruction(&Instruction::I32Ne);
+        closed.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        schema.release_i32_local(closed, function);
         self.open_frame(ControlFrameKind::If, function);
         schema
             .call_helper(

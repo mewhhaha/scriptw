@@ -430,8 +430,20 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
     };
     assert!(!keys.0.mutable);
     assert_eq!(keys.0.element_type, reference(GcLayout::StringValue, false));
+    // Key; own compact shape and slot; own dictionary position; own
+    // intrinsic layout address and value group; then the prototype record:
+    // receiver rule and shape, and the place as an intrinsic layout address,
+    // a compact shape and a slot. Shapes are the only references.
     let cache = fields(GcLayout::OwnDataReadCache);
-    assert_eq!(cache.len(), 3);
+    assert_eq!(cache.len(), 11);
+    for (index, field) in cache.iter().enumerate() {
+        let expected = match index {
+            0 => reference(GcLayout::StringValue, false),
+            1 | 7 | 9 => reference(GcLayout::CompactDataShape, true),
+            _ => wasmparser::StorageType::Val(wasmparser::ValType::I32),
+        };
+        assert_eq!(field.element_type, expected, "read record field {index}");
+    }
     assert_eq!(
         cache[0].element_type,
         reference(GcLayout::StringValue, false)
