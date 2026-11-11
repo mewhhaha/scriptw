@@ -1,10 +1,10 @@
 //! Source reads call the typed runtime owner for live cache hits and complete Get.
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
-    RUNTIME_IMPORT_NAMESPACE,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
+    emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind, lower};
 use std::collections::BTreeMap;
 use wasmparser::{
     CompositeInnerType, ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload,
@@ -106,10 +106,9 @@ impl<'a> Module<'a> {
                             {
                                 for name in map {
                                     let name = name.expect("property-read function name decodes");
-                                    assert!(module
-                                        .names
-                                        .insert(name.index, name.name.into())
-                                        .is_none());
+                                    assert!(
+                                        module.names.insert(name.index, name.name.into()).is_none()
+                                    );
                                 }
                             }
                         }
@@ -250,7 +249,11 @@ fn assert_numeric_probe_before_conversion(
             && guard.iter().any(|op| matches!(op, Operator::F64Eq)),
         "finite integral index guards precede the trapping cast"
     );
-    let [Operator::LocalGet { .. }, Operator::BrIf { relative_depth }, ..] = &body[end + 1..]
+    let [
+        Operator::LocalGet { .. },
+        Operator::BrIf { relative_depth },
+        ..,
+    ] = &body[end + 1..]
     else {
         panic!("the completed probe's handled flag controls the property exit");
     };
@@ -370,11 +373,11 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
     else {
         panic!("the live storage shape is a GC record");
     };
-    assert_eq!(
-        shape_fields.fields.len(),
-        2,
+    assert!(
+        shape_fields.fields.len() >= 2,
         "shape owns primitive keys and attributes"
     );
+    assert!(shape_fields.fields[..2].iter().all(|field| !field.mutable));
     let keys = concrete_reference_type(shape_fields.fields[0].element_type.unpack());
     let CompositeInnerType::Array(keys) = &module.types[keys as usize].composite_type.inner else {
         panic!("the shape owns its key array");
@@ -632,9 +635,15 @@ function repeatedRead(record, count, callback) {
                 [Operator::RefEq, Operator::I32And, Operator::If { .. }]))
                 .expect("actual key and shape identity admit the cached slot");
             assert!(live_storage < admission);
-            assert!(cached_body[live_storage..admission].iter().any(|op| matches!(op,
+            for sealed in [GcSnapshotLayout::InlineCompactStorage, GcSnapshotLayout::ArrayCompactStorage] {
+                let sealed = runtime.witness_type(sealed);
+                assert!(cached_body[live_storage..admission].iter().any(|op| matches!(op,
+                    Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                        if *index == sealed)), "current compact storage is proven before using cache metadata");
+            }
+            assert!(!cached_body.iter().any(|op| matches!(op,
                 Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
-                    if *index == storage)), "current compact storage is proven before using cache metadata");
+                    if *index == storage)), "a test against the open compact base would call the host subtype query");
             let cache_call = repeated.iter().position(|op| matches!(op,
                 Operator::Call { function_index } if *function_index == cache)).unwrap();
             let loop_start = repeated.iter().enumerate().find_map(|(start, op)| {

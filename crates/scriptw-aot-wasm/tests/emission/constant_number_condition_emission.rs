@@ -1,6 +1,6 @@
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, StatementIr};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{StatementIr, lower};
 
 fn guarded_body_bytes(condition: &str, repetitions: usize) -> u32 {
     let condition = condition.to_string();

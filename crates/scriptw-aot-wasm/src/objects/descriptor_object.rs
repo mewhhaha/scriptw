@@ -2,7 +2,6 @@
 //! Each selected field is a writable, enumerable, configurable data property.
 
 use super::*;
-use scriptw_ir::property_descriptor::CompleteDescriptor;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum DescriptorFlag {
@@ -121,120 +120,6 @@ impl FunctionBuilder<'_> {
         let result = object.load(schema, function);
         object.clear(function);
         Ok(result)
-    }
-
-    pub(crate) fn emit_from_complete_property_descriptor(
-        &mut self,
-        prototype: DescriptorObjectPrototype<'_>,
-        descriptor: CompleteDescriptor<DescriptorObjectLocals<'_>>,
-        function: &mut Function,
-    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        let fields = match descriptor {
-            CompleteDescriptor::Data {
-                value,
-                writable,
-                enumerable,
-                configurable,
-            } => DescriptorObjectFields {
-                value: Presence::Present(value),
-                writable: Presence::Present(writable),
-                get: Presence::Absent,
-                set: Presence::Absent,
-                enumerable: Presence::Present(enumerable),
-                configurable: Presence::Present(configurable),
-            },
-            CompleteDescriptor::Accessor {
-                get,
-                set,
-                enumerable,
-                configurable,
-            } => DescriptorObjectFields {
-                value: Presence::Absent,
-                writable: Presence::Absent,
-                get: Presence::Present(get),
-                set: Presence::Present(set),
-                enumerable: Presence::Present(enumerable),
-                configurable: Presence::Present(configurable),
-            },
-        };
-        self.emit_from_property_descriptor(prototype, &fields, function)
-    }
-
-    pub(crate) fn emit_create_data_property_descriptor_carrier(
-        &mut self,
-        value: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        self.emit_from_complete_property_descriptor(
-            DescriptorObjectPrototype::PrivateCarrier,
-            CompleteDescriptor::Data {
-                value,
-                writable: DescriptorFlag::Known(true),
-                enumerable: DescriptorFlag::Known(true),
-                configurable: DescriptorFlag::Known(true),
-            },
-            function,
-        )
-    }
-
-    pub(crate) fn emit_alloc_data_descriptor_from_locals(
-        &mut self,
-        value: &ValueLocals,
-        writable: bool,
-        enumerable: bool,
-        configurable: bool,
-        function: &mut Function,
-    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        self.emit_from_complete_property_descriptor(
-            DescriptorObjectPrototype::CurrentExecutionRealmObjectPrototype,
-            CompleteDescriptor::Data {
-                value,
-                writable: DescriptorFlag::Known(writable),
-                enumerable: DescriptorFlag::Known(enumerable),
-                configurable: DescriptorFlag::Known(configurable),
-            },
-            function,
-        )
-    }
-
-    pub(crate) fn emit_alloc_data_descriptor_from_locals_with_flag_locals(
-        &mut self,
-        value: &ValueLocals,
-        writable: I32Local,
-        enumerable: I32Local,
-        configurable: I32Local,
-        function: &mut Function,
-    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        self.emit_from_complete_property_descriptor(
-            DescriptorObjectPrototype::CurrentExecutionRealmObjectPrototype,
-            CompleteDescriptor::Data {
-                value,
-                writable: DescriptorFlag::BooleanPayload(writable),
-                enumerable: DescriptorFlag::BooleanPayload(enumerable),
-                configurable: DescriptorFlag::BooleanPayload(configurable),
-            },
-            function,
-        )
-    }
-
-    pub(crate) fn emit_alloc_accessor_descriptor_from_locals_with_flag_local(
-        &mut self,
-        get: &ValueLocals,
-        set: &ValueLocals,
-        enumerable: I32Local,
-        configurable: I32Local,
-        function: &mut Function,
-    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
-        self.emit_from_complete_property_descriptor(
-            DescriptorObjectPrototype::CurrentExecutionRealmObjectPrototype,
-            CompleteDescriptor::Accessor {
-                get,
-                set,
-                enumerable: DescriptorFlag::BooleanPayload(enumerable),
-                configurable: DescriptorFlag::BooleanPayload(configurable),
-            },
-            function,
-        )
     }
 
     fn emit_descriptor_object_field(

@@ -1,8 +1,8 @@
 //! Actual comparison routes omit intermediate Strings and retain generic typeof.
 use crate::property_read_plans::Module;
-use scriptw_aot_wasm::{emit, WasmRuntimeValueTag};
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, EqualityBinaryOp, ExprIr, SpecOperationIr, StatementIr};
+use scriptw_aot_wasm::{WasmRuntimeValueTag, emit};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{EqualityBinaryOp, ExprIr, SpecOperationIr, StatementIr, lower};
 use wasmparser::{Operator, Validator, WasmFeatures};
 
 const SOURCE_FUNCTIONS: [&str; 8] = [

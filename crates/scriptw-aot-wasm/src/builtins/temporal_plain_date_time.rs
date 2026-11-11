@@ -19,7 +19,6 @@ use crate::gc_types::*;
 
 use super::super::*;
 use super::temporal_options::TemporalTimeUnit;
-use super::temporal_plain_date::TemporalEraField;
 use super::temporal_zone_provider::TemporalCalendarSlotLocals;
 use crate::intrinsics::temporal::{TemporalIntrinsicFamily, TemporalPrototypeSource};
 
@@ -264,21 +263,6 @@ impl<'a> FunctionBuilder<'a> {
             schema.release_i32_local(scalar, function);
         }
         Ok(())
-    }
-
-    /// Leaves an `i32` on the stack: 1 when the value carries
-    /// `[[InitializedTemporalDateTime]]`.
-    pub(crate) fn emit_temporal_plain_date_time_brand_check_i32(
-        &self,
-        input: &ValueLocals,
-        function: &mut Function,
-    ) {
-        input.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            self.runtime_schema()
-                .reference_type::<TemporalPlainDateTimeObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
     }
 
     pub(crate) fn emit_temporal_plain_date_time_load_record(

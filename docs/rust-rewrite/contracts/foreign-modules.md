@@ -152,7 +152,7 @@ their persisted foreign requirements.
 
 `EmbeddedRuntime::new_state(realm, user_data)` creates opaque Scriptw state with
 typed embedder data. The caller owns the `Store`, `Linker`, resource limiter,
-fuel policy and epoch deadlines. `register` installs the checked Scriptw host
+fuel policy and any [execution deadline](execution-deadlines.md). `register` installs the checked Scriptw host
 functions/resources and any explicitly declared error tag. The embedder adds
 its own ordinary `linker.func_wrap("dd", "add", ...)` implementation.
 `instantiate` checks required native function types before R/P initialization.

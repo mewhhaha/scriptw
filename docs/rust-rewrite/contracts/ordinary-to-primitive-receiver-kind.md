@@ -44,8 +44,6 @@ cargo test -p scriptw-ir --test scriptw_ir_integration -- ir_cases::array_argume
 cargo test -p scriptw-engine --test aot_builtins -- aot_array_arguments_primitive::
 cargo test -p scriptw-engine --test aot_language -- aot_compound_assignment_saved_value::
 cargo test -p scriptw-engine --test aot_builtins -- aot_function_coercion::
-cargo test -p scriptw-aot-wasm --test structure_builtins -- ordinary_to_primitive_receiver_kind_structure::
 cargo test -p scriptw-aot-wasm --test structure_builtins -- pending_to_primitive_operation_identity_structure::
-cargo test -p scriptw-aot-wasm --test modules_realms -- conversion_error_realm_source_structure::
 cargo test -p scriptw-aot-wasm --test structure_builtins -- regexp_exec_result_mode_structure::
 ```

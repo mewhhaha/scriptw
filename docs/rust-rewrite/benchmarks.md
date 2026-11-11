@@ -7,76 +7,418 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-08**, React **19.3.1**, source fingerprint `453a9074fcac`. The manifest-bound dirty source snapshot is based on Git `b8c7325438c4`; that base commit alone does not identify the measured implementation. Both Flight outputs match Node exactly. The 32-row catalog async form adds a resolved Promise and extra markup; neither request performs I/O.
+Measured **2026-11-09**, React **19.3.1**, source fingerprint `9f2788b4af9f51a77dcd3d62e3a8c717367af9c9a0eee65170af66cc8823016b`. Scriptw Fast takes about **16.9× V8 request time**; Speed takes about **13.9×**. The measured descriptor optimization reduces request medians by **2.7–2.9%**. Current CPU counters and profiles place the remaining gap in instruction volume, object operations and generated JavaScript code; the experiments below do not assign an exclusive cause to the whole gap.
 
-| Current policy | Sync · ms (median; min–max) | Async · ms (median; min–max) |
+### Requests and measurement boundaries
+
+The campaign checked **16,080 exact outputs across 80 fresh processes**: eight processes per engine and case, 100 warmups and 101 timed calls per process, in two mirrored blocks with rotating engine/case order. Sync and async use separate processes. Timed calls within a process are dependent; the independent summaries are process medians. Baseline and candidate Cargo feature sets match across 248 shared packages. Exact executable, source, P/R, toolchain and input identities are in the [current report](rsc-current.json).
+
+| Policy / source | Sync median / typical mean / typical p95 · ms | Async median / typical mean / typical p95 · ms |
 | --- | ---: | ---: |
-| Scriptw Fast | 4.554 (4.442–4.769) | 4.938 (4.846–5.271) |
-| Scriptw Speed | 3.733 (3.630–3.796) | 4.067 (3.965–4.174) |
-| Node 24 / V8 | 0.495 (0.477–0.716) | 0.398 (0.393–0.411) |
+| Fast baseline · `453a9074` | 4.425 / 4.777 / 6.106 | 4.858 / 5.248 / 6.548 |
+| Fast candidate · `9f2788b4` | 4.304 / 4.677 / 6.010 | 4.719 / 5.131 / 6.374 |
+| Speed baseline · `453a9074` | 3.640 / 3.991 / 5.318 | 3.989 / 4.367 / 5.649 |
+| Speed candidate · `9f2788b4` | 3.537 / 3.887 / 5.195 | 3.876 / 4.291 / 5.551 |
+| Node 24 / V8 | 0.255 / 0.329 / 0.445 | 0.280 / 0.357 / 0.603 |
 
-![Current RSC request timings](assets/rsc-current/runtime.svg)
+Median is the median of eight process medians. Typical mean and p95 are the medians of eight within-process means and nearest-rank p95s; they are descriptive statistics, without confidence intervals. Candidate Fast improves 2.72% sync / 2.86% async; Speed improves 2.81% / 2.82%. Both blocks improve in all four comparisons. Chart whiskers show the minimum and maximum process medians.
 
-The campaign uses 8 fresh processes per policy in 2 balanced blocks, with 3 warmups and 7 timed requests per mode. It records 800 exact-checked Flight calls. Each process retains one Module/Realm; setup precedes the request window, while JSON encoding and exact-output validation follow it. Rows show medians of process medians, with process-median bounds. The chart shows current Fast, Speed and V8. The two prior-source Fast/Speed controls remain separately identified in the raw report.
+![RSC request timings](assets/rsc-current/runtime.svg)
 
-Fast and Speed are separately scored native compilation policies. Their source, executable, P, R and request inputs match; Cranelift optimization and register allocation differ together.
+The 32-row catalog produces 2,059-byte sync and 2,140-byte async Flight streams, each with one root record, ID `0`. The async form adds a resolved Promise and markup; neither performs I/O. The timed `applicationRun` includes React Flight rendering, UTF-8 encoding, complete stream consumption/decoding and the fixture's `trimEnd`/split/map/search sanity scan. Render, consume and scan do not have separate clocks. Outer JSON encoding, host copying and exact-output comparison follow the clock, but their allocations can affect subsequent GC/JIT state. The bounded Web API fixture does not establish full WHATWG or engine parity.
 
-| Cold phase · median | Fast | Speed |
+### Warmup and case-order control
+
+The old shared-process, three-warmup method made Node async appear faster. A separate control holds seven measured calls fixed and uses eight fresh processes per cell, in two balanced blocks:
+
+| Warmups | Process shape | Sync median · ms | Async median · ms |
+| ---: | --- | ---: | ---: |
+| 3 | Shared, sync then async | 0.501 | 0.401 |
+| 3 | Isolated case | 0.486 | 0.521 |
+| 100 | Shared, sync then async | 0.279 | 0.271 |
+| 100 | Isolated case | 0.273 | 0.274 |
+
+Case isolation and longer warmup remove that reversal in this control. These seven-call cells are separate from the primary 101-call campaign. The primary campaign retains every warmup and timed observation; curves show the pointwise median across eight processes, with a logarithmic time axis. One hundred warmups do not prove fully optimized steady state.
+
+![RSC warmup curves](assets/rsc-current/warmup.svg)
+
+### Current-source instruction and caller attribution
+
+Thirty unscored PMU processes use three fresh repetitions per engine/case, 100 warmups and 100 request windows. The table gives the median of three within-process instruction medians, in millions of retired user instructions:
+
+| Policy | Sync · million instructions | Async · million instructions |
 | --- | ---: | ---: |
-| Front end and lowering · s | 2.682 | 2.687 |
-| Wasm emission · s | 0.421 | 0.422 |
-| Native preparation · s | 5.214 | 7.162 |
-| Source to Wasm · s | 3.103 | 3.110 |
-| Realm and instantiation · ms | 0.572 | 0.596 |
-| Module initialization · ms | 2.079 | 1.717 |
+| Fast baseline | 39.480 | 42.999 |
+| Fast candidate | 38.771 | 42.290 |
+| Speed baseline | 36.571 | 39.933 |
+| Speed candidate | 35.862 | 39.224 |
+| V8 | 2.477 | 2.616 |
+
+Fast therefore retires about 15.7× / 16.2× V8's caller-window instructions; Speed about 14.5× / 15.0×. Counters do not multiplex. They cover the actual calling thread and include the ready/done and Promise-return edges; background JIT/GC threads and kernel work are excluded. Six additional Node controls perform 100 checked Flight warmups followed by 100 checked literal-null windows. Pooling 300 windows per case, that control is 13.62% / 13.20% of the full Node instruction window, and 16.06% / 15.54% of cycles. Counts remain raw; no control subtraction or workload-only claim is made.
+
+Twelve frame-pointer profiles cover current Fast/Speed, three repetitions per case. Sample periods are pooled per policy/case. Disjoint own samples place **51.44% / 50.70%** of Fast periods in runtime helpers and **26.45% / 25.55%** in generated JavaScript functions; Speed has **61.73% / 60.35%** helper periods and **12.13% / 12.00%** JavaScript periods. Host/unresolved leaves retain **16.57% / 18.63%** Fast and **19.67% / 21.79%** Speed; these are not silently assigned to Wasm. These are sampled caller-thread periods, not exclusive wall-clock shares or fractions of the V8 gap.
+
+For Fast sync, `object_read` owns 7.73% of periods and appears in 16.91% of call chains; its sampled callers include cached reads, recursive reads and `has_instance`. `function_call` appears in 23.21%, `has_instance` in 7.82%, and the descriptor-query union in 4.85%. These inclusive families overlap: `has_instance`/`object_read` alone overlap in 5.27% of periods. They must not be added or treated as removable dispatch overhead. Source paths preserve observable `@@hasInstance` lookup, calls and prototype traversal. The generated `vn` and `ft` functions own 10.18% and 5.58% of Fast sync periods. Speed reduces the JavaScript share while leaving R's native policy fixed; higher helper percentages do not show that helpers became slower.
+
+StoredValue loads are emitted inline by `StoredValue.read_into`; there is no separately named `StoredValueDecode` owner in these profiles. Its exclusive cost remains unmeasured. [Full own lists, overlapping caller families and raw identities](react-attribution-current.json).
+
+An excluded **2026-11-10** diagnostic on later source `16418b790879`
+counts original P/R function entries and successful `StoredValue` constructions.
+Two fresh processes check 484 exact outputs, with 100 warmups and 21 samples per
+case. Both processes produce identical request vectors: **84,271 / 89,842**
+function entries and **8,181 / 8,947** logical constructions, sync/async.
+`value_to_object` accounts for 9,521 / 10,105 entries, header projection
+6,563 / 6,978, string equality 5,076 / 5,349, and property-key conversion
+2,186 / 2,285. These counts motivated a caller-identity experiment; they do not
+measure time saved. The hot `ft` and `vn` bodies already receive local arguments;
+their argv
+adapters have zero observed entries. Counters preserve original types, indices,
+locals and opcode bytes, with independently verified stack-neutral increments
+and zero-reset readbacks. Instrumentation can inhibit native elimination;
+logical constructions exclude host and constant-initializer allocations and
+are not comparable to the older physical census below. This diagnostic does
+not refresh the published timing panel or establish the sub-1-ms target.
+
+A separate 20-process screen checks 2,420 exact outputs with two processes per
+actor/case, 100 warmups and 21 measurements. Source `2525cdc5d252` adds caller
+identity guards for conversions, string equality, ordinary headers and actual
+functions. Fast moves **3.610/3.931 → 3.605/3.948 ms** and Speed
+**2.860/3.187 → 2.784/3.164 ms**, sync/async. This is effectively flat for Fast
+and a small Speed change, without final eight-process qualification. The
+experiment is retired. A separate 484-output counter campaign confirms entries
+fall **84,271/89,842 → 65,415/69,864** (about 22%), while logical StoredValue
+constructions remain **8,181/8,947**. Removing these dispatches leaves almost
+the same request time; entry counts are a poor proxy for the remaining cost.
+Its 123 focused checks pass after two fixture/structural test
+corrections; full CI and Test262 were not rerun.
+
+Source `ce4bc97f96f0` separately reuses immutable descriptor getter/setter
+edges and directly reads authenticated cells for strict identifier calls.
+Another 20-process, 2,420-output screen moves Fast
+**3.477/3.851 → 3.470/3.849 ms** and Speed
+**2.848/3.151 → 2.739/3.058 ms**. Its separate 484-output census records
+**83,132/88,640** entries and **7,345/8,063** logical StoredValue
+constructions, about 10% fewer constructions than source `16418b790879`.
+Fast remains effectively flat; these are screens rather than final
+eight-process qualification. The batch passes 207 focused checks and all 380
+source guards, with full CI and Test262 unverified.
+
+An excluded four-slot census on that same source checks another 484 exact
+outputs. Both process medians agree: sync/async construct **2,859/3,396
+StringValues** and **2,946/3,494 CodeUnitArrays**. All these request constructions
+are in R. `json_stringify_value` owns 1,424/1,900 strings and 1,510/1,997 arrays;
+`integer_decimal_string` owns 663/690 of each. These are logical constructors,
+not byte/copy counts or physical reservations. Reaggregating the twelve pinned
+older `9f2788b4` profiles puts the exact JSON helper's deduplicated inclusive
+share at 4.23%/4.63% Fast and 5.16%/5.65% Speed. Those older cycle samples do not
+measure current-source savings; the high construction share alone does not
+justify assigning the request gap to JSON.
+
+An excluded function-body optimization screen on the same `ce4bc97f96f0`
+artifacts checks 2,420 exact outputs across 20 fresh processes, including V8
+controls. Binaryen 133 local simplification, propagation and common-expression
+passes preserve every original non-Code section byte, including types, globals,
+imports and exports. Custom descriptors and exact references remain disabled.
+Both actors use one frozen diagnostic host and identical explicit R
+`SpeedAndSize`/`Backtracking` compilation. Fast moves
+**3.435/3.821 → 3.298/3.673 ms**; Speed moves
+**2.733/3.105 → 2.714/3.014 ms**. These median-of-process-medians use only two
+processes per actor/case, 100 warmups and 21 measurements; the transform is not
+adopted or qualified beyond RSC. Smaller Wasm does not establish a large request
+gain: P shrinks 4.12→2.49 MB, while Fast improves about 4%.
+
+A separate current-source Fast sync FP process checks 200 exact outputs and
+samples 100 request windows. Its 6,114 samples total 1,528,500,000 cycle periods:
+helper labels own 45.58%, JavaScript labels 30.50%, and host/unresolved labels
+18.14%. `object_read` owns 8.98% and appears in 18.89% of sampled call chains;
+its cached-read, recursive-read and `has_instance` callers overlap. This single
+process refreshes attribution only, not the published timing panel or a savings
+estimate.
+
+A further excluded 16-process screen checks 1,936 exact outputs with the same
+warmup/sample counts. It compares linked P/R, raw Binaryen fusion, optimized
+fusion and V8. All Wasm code uses `Speed`/`Backtracking`, including the linked R
+control; this differs from canonical R's `SpeedAndSize` policy. Sync/async
+medians are **2.728/3.053 ms** linked, **2.720/3.020 ms** fused, and
+**2.846/3.134 ms** after local cleanup and bounded inlining. Raw fusion is nearly
+flat; that optimized recipe regresses and is rejected. Each fused process has
+one module and one actual private-memory provider for both memory imports.
+All exports required by the embedding host and complete Flight outputs pass;
+general conformance remains unverified. Raw Wasm size falls mainly through
+custom-section removal, while fusion initially grows executable Code about 9%.
+The optimized `ft`/`vn` bodies retain their key conversion, cached-read and call
+edges; their size is consistent with exclusion by the 32 KiB combined inlining
+cap, though exact pre-inlining AST sizes were not captured.
+
+A selective fusion experiment then removes all six chosen conversion,
+lookup and cached-read edges from `ft`/`vn`, but native compilation exhausts
+4 GiB before producing a request. Coalescing locals down to 175/194 still
+exhausts that limit. Neither attempt has a candidate timing; both are rejected.
+
+An eight-process V8 control checks 968 exact outputs with the same 100 warmups
+and 21 measurements. JIT/JITless sync medians are **0.251/0.503 ms** and async
+medians **0.288/0.539 ms**. Disabling V8's JIT accounts for only part of this
+comparison; this does not isolate a cause inside Scriptw.
+
+Source `3d5416134359` gives only the default `@@hasInstance` builtin one
+canonical typed local-argument body, retaining its ordinary argv adapter and
+observable method lookup, native caller boundary and Realm. Another 20-process,
+2,420-output matched screen moves Fast **3.536/3.952 → 3.435/3.786 ms** and
+Speed **2.776/3.078 → 2.710/3.036 ms**, sync/async. Both blocks improve, with
+only two fresh processes per actor/case; this is not final qualification and
+neither case reaches 1 ms. Runtime ABI is 55; natural GC and the complete
+request clock remain unchanged. All 2,673 adjacent native checks and 16 selected
+private call-entry checks pass, alongside 380 source guards. Full CI, Test262
+and the remaining private units were not rerun. Aggregate p95 improves slightly,
+but Speed async p95 rises 0.99% in the first block; this screen does not establish
+a tail-latency win.
+
+A separate value-kind census on `3d5416134359` checks 484 exact outputs
+across two fresh retained processes, each running both cases with 100 warmups
+and 21 measured requests. Only measured calls retain counter vectors; request
+and outer validation windows remain separate. Every measured vector agrees
+within and across processes.
+
+| Repeated payload reads per request | Sync | Async |
+| --- | ---: | ---: |
+| StoredValue | 13,703 | 14,996 |
+| BindingCell | 3,449 | 3,637 |
+| Existing GC references | 15,807 | 17,193 |
+| Undefined, null or booleans | 492 | 542 |
+| Numbers eligible for the proposed immediate encoding | 853 | 898 |
+| Other Numbers | 0 | 0 |
+
+This makes a single-reference value ABI a candidate for a complete prototype:
+the observed values fit existing GC references or immediates. It does not
+establish a timing or allocation gain. The census covers successful SCALAR
+field reads from those two types, excluding compact SoA storage, host reads
+and unboxed temporaries; reads are not unique values. Dynamic floating-point
+results elsewhere may require boxes. The proposed signed-i31 interval is
+−1,073,741,824 through 1,073,741,819, reserving four codes for other primitives
+and excluding negative zero. The same emitted classifier and independent
+edit verifier pass 19 boundary/NaN/infinity cases on each actual GC type,
+with all 38 original-bit round trips and exact counter windows checked.
+Original instructions, local indices and unrelated sections are preserved;
+four scratch locals are appended only where needed. The transform is diagnostic
+and remains outside the product and scored cohorts.
+
+### Single-reference value experiment (2026-11-10)
+
+A complete isolated prototype replaces StoredValue wrappers and BindingCell
+payload triples with direct GC references, i31 immediates and immutable boxes
+for other Number bits. Generic JavaScript values cross calls in one eqref;
+Completions have three results. This is experimental ABI 56, not the product ABI.
+The first source, `3677c166d0d8`, packs local copies into that representation;
+a second, `86536fe46f9b`, instead copies the available decoded/encoded cache
+state without conversion. Both regress retained RSC requests.
+
+Each version has its own matched 20-process, 2,420-output screen against frozen
+source `3d5416134359` and V8: 100 warmups, 21 measurements, two reversed blocks,
+two fresh processes per actor/case, natural GC and the unchanged complete request
+clock. The first version moves Fast sync/async **3.456/3.970 → 6.217/6.868 ms**
+and Speed **2.831/3.118 → 4.321/4.810 ms**. The local-copy refinement gives:
+
+| Policy and case | Current compiler | Single-reference prototype |
+| --- | ---: | ---: |
+| Fast sync | 3.409 ms | 5.639 ms |
+| Fast async | 3.804 ms | 6.053 ms |
+| Speed sync | 2.689 ms | 4.197 ms |
+| Speed async | 3.016 ms | 4.576 ms |
+
+These are medians of fresh-process request medians, not final qualification.
+All outputs match exactly. The refinement still regresses every case in both
+blocks. Removing wrappers does not establish lower total allocation or faster
+execution: this implementation adds reference classification and local cache
+bookkeeping. One exact scalar-loop fixture grows from 193 to 383 Wasm operators,
+including 13 pure decoder calls. The first inline-codec build also saturates
+4 GiB and is terminated without an OOM kill; shared codecs allow the subsequent
+builds to complete under the same cap. Native preparation remains outside the
+request clock and also regresses in the matched screens.
+
+The final prototype passes 83 distinct compiler emission checks and an embedding
+regression for numeric boundaries, signed zero, NaN payloads, heap storage,
+closures, throws and explicit GC. Test-only corrections retain unchanged passing
+scopes and rerun affected checks. Full CI, private units and Test262 were not
+rerun. The prototype is rejected and remains outside the product; canonical
+compiler inputs stay at `3d5416134359`, ABI 55. Raw campaigns and source/binary
+witnesses are retained under `target/rsc-single-value-proposal/`, with the
+consolidated result in `summary.json`. Neither attempt approaches 1 ms.
+
+### Host-boundary screen (2026-11-11)
+
+The earlier profiles left 16–22% of sampled request cycles in host or
+unresolved leaves. On source `3d5416134359` those leaves divide into four
+families: Wasmtime's subtype query, per-element initialization of host-allocated
+byte arrays, copying collection, and typed funcref reads from GC structs.
+Source `a97d0d600965` removes the first two without changing ABI 55:
+
+- Wasmtime compiles a test or cast against a sealed GC type to an inline header
+  comparison, and calls the host subtype query whenever the reference's type is
+  not the tested type itself. The open `CompactDataStorage` base is never
+  allocated, so every test and cast against it made that call; object reads,
+  sets, for-in and own-key helpers did both per operation. Compiled code now
+  reaches an open layout with at most four sealed descendants through those
+  descendants.
+- ArrayBuffer backing allocation keeps its host import, which preserves the
+  collector's out-of-memory result, but Wasmtime's `ArrayRef::new` now fills a
+  packed `i8` body at once instead of checking and writing one `Val` per byte.
+
+A 16-process screen checks 3,216 exact outputs: two fresh processes per actor
+and case in reversed order, 100 warmups and 101 measured requests each. Values
+are medians of process medians, in milliseconds:
+
+| Policy and case | `3d5416134359` | `a97d0d600965` | Change |
+| --- | ---: | ---: | ---: |
+| Fast sync | 3.668 | 3.353 | −8.6% |
+| Fast async | 3.982 | 3.623 | −9.0% |
+| Speed sync | 2.887 | 2.629 | −9.0% |
+| Speed async | 3.214 | 2.853 | −11.2% |
+
+Process means move −7.9% to −10.4%. A repeat screen on later source
+`aebbfdab3f38`, whose P and R are byte-identical to these, measures −6.5%/−6.1%
+Fast and −10.7%/−11.1% Speed, so two-process screens place the Fast change
+only within about 2.5 points. These are screens without V8 controls or
+eight-process qualification, and they do not refresh the published panel. P
+grows 4,216,405→4,222,594 B and R 38,866,927→38,867,541 B. One Fast sync
+frame-pointer process (100 warmups, 100 windows) samples 13.80M cycles per
+window against 15.29M before; host-or-unresolved own share falls 18.1%→11.5%,
+with host GC-API leaves 2.96%→0.14% and subtype-query leaves 3.79%→about 0.2%.
+
+The scalar-row loop made the same open-base cast once per iteration, before
+its sealed inline cast; it now casts to the sealed layout directly. A matched
+run of the 21 [focused situations](#focused-performance-situations) uses two
+hosts that differ only in this emission, with the default eight processes per
+case, actor and policy. Fast/Speed medians move −11.3%/−12.2% on
+`for-in-wide.js`, −7.2 to −10.3% / −8.4 to −10.1% on the three
+`frame-branches` cases, −4.5%/−11.4% on `frame-compact.js`, −3.3 to −5.8% /
+−3.3 to −7.6% on the three walked global lookups, −3.5%/−5.9% and −3.7%/−6.7%
+on `args-unused.js` and `args-observed.js`, and −2.3%/−3.5% on
+`property-stable.js`. The other ten cases move between −2.8% and +1.4%. This
+run does not replace the published situation panel.
+
+The same profiles place 4.3% Fast / 5.9% Speed of request-window cycles in
+copying collection, about 2.1% / 3.0% in the typed funcref read
+(`get_interned_func_ref`, `FuncRefTable::get_typed`, `engine_type_index`) and
+2.5% / 3.4% in libc copies. Every sixth request on the unchanged 16-MiB heap
+contains one collection of about 1.85 ms; that is roughly 0.3 ms of mean request
+time and is absent from medians.
+
+An excluded diagnostic host, source `2a35735267da`, differs only in disabling
+Wasmtime epoch interruption for P and R. A second 16-process screen of the same
+shape moves Fast sync/async **3.510/3.980 → 2.834/3.092 ms** and Speed
+**2.548/2.862 → 2.189/2.420 ms**: 19–22% and 14–15%. Epoch checks ran at every
+function entry and loop header. The diagnostic has no execution deadlines and
+is not a product configuration; it measured what epoch interruption cost on
+this workload.
+
+### Fault-driven deadlines (2026-11-11)
+
+Source `89a934d06891`, ABI 57, compiles P and R without epoch checks and keeps
+execution deadlines: a deadline removes access to the Store's GC heap and
+private linear memory, and the fault stops compiled code
+([contract](contracts/execution-deadlines.md)). Source functions and loops
+store one byte to linear memory instead of checking an epoch. One 64-process
+screen interleaves four hosts, four fresh processes per host, policy and case,
+101 warmups and 100 timed requests each, with natural collection and exact
+output checks. Values are the median of the four process medians, in ms.
+
+| Policy and case | `3d5416134359` | `a97d0d600965` | No deadlines `2a35735267da` | `89a934d06891` | Change from first |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Fast sync | 3.863 | 3.661 | 2.904 | 2.871 | −25.7% |
+| Fast async | 4.287 | 3.907 | 3.407 | 3.349 | −21.9% |
+| Speed sync | 2.889 | 2.637 | 2.254 | 2.298 | −20.4% |
+| Speed async | 3.390 | 2.994 | 2.571 | 2.486 | −26.7% |
+
+The new host is within −3.3% to +2.0% of the diagnostic without deadlines, so
+the stores have no measured cost on this workload. An earlier screen of the
+same four hosts measured −22.2%, −25.8%, −21.9% and −27.5% from the first
+column, with two baseline processes per case instead of four. These are
+screens without V8 controls or eight-process qualification, and they do not
+refresh the published panel. P grows 4,222,594→4,228,988 B for the stores; R is
+38,867,304 B after one uncalled helper leaves it.
+
+A matched run of the 21 [focused situations](#focused-performance-situations)
+compares `a97d0d600965` with `89a934d06891`, both run back to back with the
+default eight processes per case, actor and policy. Fast/Speed medians move
+−45.0 to −48.0% / −39.8 to −49.4% on `property-stable.js`,
+`property-mutated.js` and the three `metadata` cases; −25.6%/−48.4% and
+−30.5%/−46.5% on the two `strict-equality` cases; −22.4 to −26.5% / −17.0 to
+−21.9% on the four global lookups, except `global-bound-deep.js` Speed at
++0.1%; −25.4%/−19.3% on `frame-compact.js`; −25.8%/−8.9% on `args-unused.js`;
+−20.2%/−17.6% on `for-in-wide.js`; −5.3 to −19.1% / −6.8 to −9.9% on the three
+`frame-branches` cases; and −8.5 to −9.8% / −12.7 to −13.9% on
+`args-observed.js`, `typeof-dispatch.js` and `singleton-dispatch.js`, except
+`singleton-dispatch.js` Speed at +1.2%. `control-empty.js` moves −2.6%/−3.7%.
+A scalar loop now pays one store per iteration where it paid an epoch load,
+compare and branch. This run does not replace the published situation panel.
+
+### Descriptor work and physical allocation
+
+Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
+
+The unscored breakpoint census uses 100 warmups and 21 measured requests per window. Entries count attempts; breakpoint instrumentation perturbs execution.
+
+| Entry | Baseline sync / async | Candidate sync / async |
+| --- | ---: | ---: |
+| `Reflect.defineProperty` | 35 / 38 | 0 / 3 |
+| `ordinary_own_descriptor` | 4,074 / 4,360 | 3,864 / 4,150 |
+| `ordinary_property_find` | 6,799 / 7,231 | 6,449 / 6,881 |
+| `ordinary_set_data_on_receiver` | 390 / 420 | 390 / 420 |
+| Cached read helper | 2,548 / 2,698 | 2,548 / 2,698 |
+| Generic fallback callsite | 1,275 / 1,362 | 1,275 / 1,362 |
+
+The change removes 35 Reflect entries per request in both cases; three remain in async. Cached-entry minus fallback is not a cache-hit count. The first measured `object_read` self-call site counts 2,521 / 2,674 entries, the second zero; a third is unmeasured. There is no prototype-versus-Proxy cause attribution.
+
+Per request, the candidate has one embedding Promise, **zero external checkpoints**, four internal `promise_drain_jobs` entries and two reader reads. Internal drain entries are not a count of jobs or external pumps. Codec/stream counts are one TextEncoder `encode`, zero `encodeInto`, two TextDecoder `decode` and one `getReader`. An external pending-job pump is not explaining these successful requests.
+
+A separate physical allocation census uses exact source-matched P/R, canonical native runtime policy, natural GC and off/on/on/off controls: eight processes, 100 warmups and 21 timed requests per case. All 1,936 outputs pass; 968 enabled allocation epochs are admitted. Counts include dead allocated objects and exclude copied survivors; post-request validation increments are recorded separately.
+
+| Physical request allocations | Baseline | Candidate | Reduction |
+| --- | ---: | ---: | ---: |
+| Sync objects | 36,052 | 34,897 | 1,155 · 3.20% |
+| Sync aligned bytes | 1,546,160 | 1,499,120 | 47,040 · 3.04% |
+| Async objects | 39,087 | 37,932 | 1,155 · 2.96% |
+| Async aligned bytes | 1,723,232 | 1,676,192 | 47,040 · 2.73% |
+
+Candidate sync still allocates 12,625 physical StoredValue records and 3,728 PropertyDescriptor records, down from 4,008 descriptors. Async descriptors fall 4,292→4,012. Physical GC types can alias and do not identify JavaScript object origins or allocating semantic operations. No V8 physical census is available. [Allocation controls, type rows and limitations](react-allocation-current.json).
+
+### Spill-home experiment
+
+An isolated regalloc2 prototype reuses homes only for eligible block-local values. It preserves explicit GC root slots and excludes block parameters, boundary values and other unsupported lifetimes. Checker tests and eight valid fixed fuzz seeds pass for control and prototype; this is not full backend qualification. P and R remain byte-identical to the product.
+
+| Fast function | Product fixed frame / probes | Prototype fixed frame / probes |
+| --- | ---: | ---: |
+| `js::vn#f133` | 213,856 B / 53 | 200,864 B / 50 |
+| `js::ft#f123` | 85,664 B / 21 | 81,696 B / 20 |
+
+Frames exclude saved RBP and return words; stack-limit guards additionally reserve 16 bytes. Native code extents are unchanged. The anonymous static census records 27,840 reuses, but does not attribute them to a named function/module or dynamic execution frequency. Precompiled Backtracking R is outside that census.
+
+The separate 48-process comparison checks 9,648 exact outputs, with 100 warmups, 101 measured calls and eight processes per actor/case. Prototype medians shift **−0.35% sync / −0.97% async**; mean native preparation is 5.171 s product versus 5.178 s prototype. Frame reductions of 6.08% / 4.63% accompany small descriptive request changes; the experiment does not isolate frame or probe costs. **The allocator fork remains outside the product.** [Architecture and isolated experiment](react-architecture-current.json).
+
+### Cold setup and artifact expansion
+
+Fast compiles P with Cranelift `None` / `SinglePass`; Speed uses `Speed` / `Backtracking`. Both load the same precompiled R, whose fixed policy is `SpeedAndSize` / `Backtracking`.
+
+| Candidate cold phase · median | Fast | Speed |
+| --- | ---: | ---: |
+| Front end and lowering · s | 2.668 | 2.670 |
+| Wasm emission · s | 0.419 | 0.419 |
+| Native preparation · s | 5.101 | 7.084 |
+| Source to Wasm · s | 3.086 | 3.089 |
+| Realm and instantiation · ms | 0.564 | 0.597 |
+| Module initialization · ms | 2.021 | 1.683 |
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
-The emitted program P is 4,169,697 bytes (SHA-256 `fef58c9a24bc24e438153a9d0936071e6a6947c86e09ad10dd1db6cc56aeba3f`). Packaged runtime R is 38,769,947 bytes (SHA-256 `4f8d4a6182181d74b527394cd06015a7c723b81b0dabe95964628922516b6f64`). These are artifact sizes, not allocation or resident-memory measurements. Exact executable and producer identities are in [the current report](rsc-current.json).
+Front end, emission and native preparation total about 8.19 s Fast / 10.17 s Speed, before retained calls. R production is prebuilt and excluded. V8's separately measured cold medians are 16.706 ms Realm creation, 1.468 ms module parse and 2.353 ms link/init; later JIT work is not fully accounted for by those phases.
 
-### Current native-policy diagnostic
+P is byte-identical across sources at **4,169,697 B**. R grows **38,769,947→38,872,804 B** (+102,857 B, about 0.27%), all in encoded code bodies. P has 541 defined functions and 3,618,661 code-body bytes; R has 1,149 functions and 14,269,752 code-body bytes. These are encoded artifact measurements; reachability and unused work were not measured. Whole-child peak RSS medians are 251.54 MiB Fast, 296.56 MiB Speed and 75.79 MiB V8, including compilation/setup/warmup. They are neither request-only memory nor live heap sizes.
 
-This excluded 2×2 experiment uses six processes per mode, seven timed requests and three warmups per process. It varies program P compilation; all rows load the same precompiled runtime R. The product default is unchanged. These request timings are diagnostic; the scored Fast/Speed rows above remain the 40-process cohort.
+### Verification and retained evidence
 
-| Mode | Cranelift opt | Register allocation | Sync · ms | Async · ms | Native preparation · s |
-| --- | --- | --- | ---: | ---: | ---: |
-| fast | None | SinglePass | 4.468 | 4.855 | 5.093 |
-| fast-backtracking | None | Backtracking | 3.794 | 4.150 | 7.225 |
-| speed | Speed | Backtracking | 3.636 | 3.961 | 7.070 |
-| speed-single-pass | Speed | SinglePass | 4.202 | 4.554 | 5.643 |
+Seven affected native scopes pass **1,611 tests**; five source-guard groups pass **380 checks**, with owner and product-graph checks also passing. Proxy/Realm/accessor/Array semantics and the unchanged 128-KiB Array.from size guard are covered. Full CI, pinned Test262 and private units were not rerun. Existing unrelated formatting and Intl identity gates remain owned.
 
-#### Captured native stack frames
-
-| Mode | `js::vn#f133` frame / probes | `js::ft#f123` frame / probes |
-| --- | ---: | ---: |
-| fast | 213,856 B / 53 page probes | 85,664 B / 21 page probes |
-| fast-backtracking | 8,736 B / 2 unrolled probe stores | 2,736 B / 0 unrolled probe stores |
-| speed | 6,656 B / 1 unrolled probe store | 2,480 B / 0 unrolled probe stores |
-| speed-single-pass | 171,712 B / 42 looped probes | 68,976 B / 17 looped probes |
-
-Perf-map JIT extents below are separate from native stack-frame sizes:
-
-| Mode | `vn` perf-map extent · B | `ft` perf-map extent · B |
-| --- | ---: | ---: |
-| fast | 1,398,560 | 521,904 |
-| fast-backtracking | 761,904 | 291,664 |
-| speed | 531,472 | 195,184 |
-| speed-single-pass | 1,044,736 | 388,384 |
-
-With optimization fixed, Backtracking reduces request time about 15% and adds about 2.1 seconds of native preparation. The pinned regalloc2 0.15.2 SinglePass allocator assigns permanent homes to spilled SSA values and block parameters; freeing a stack allocation does not recycle its slot. The 223 declared Wasm locals in `vn` therefore do not bound its native frame. Safe spill-home reuse is an unmeasured follow-up; the experiment also changes spill/reload code and does not isolate page-probe time.
-
-The historical cache census below is pinned to source `0c2c10dac9c0`; these entry/fallback counts are not current-source measurements and do not count property-cache hits.
-
-| Historical 0c2c mode | Cached read entries | Generic `object_read` fallback | Fallback share |
-| --- | ---: | ---: | ---: |
-| sync | 2,548 | 1,275 | 50.0% |
-| async | 2,698 | 1,362 | 50.5% |
-
-The baseline runtime Wasm R is byte-identical to current R, but this 0c2c census is not a current cache-hit/miss count. Its third direct self-call site is preserved as unmeasured; the recorded self-call sites have no prototype-versus-proxy attribution.
-
-The earlier [PMU and caller profiles](react-attribution-current.json) retain source `0c2c10dac9c0` and their [own evidence archive](scriptw-performance-predicate-transport-evidence-2026-11-08.tar.xz); their time shares have not been remeasured on this source.
-
-[Architecture measurements and raw-evidence identities](react-architecture-current.json).
+[Raw campaign, controls, profiles, sources, failed attempts and verification receipts](rsc-analysis-evidence-2026-11-09.tar.xz) · [Request report](rsc-current.json) · [Attribution](react-attribution-current.json) · [Architecture](react-architecture-current.json) · [Physical allocations](react-allocation-current.json).
 
 ## Focused performance situations
 
@@ -245,7 +587,7 @@ part of the result.
 
 ### Public-call control and verification
 
-The full 21-situation cohort has 504 process observations and 60,984 exact calls. The RSC cohort has 40 processes and 800 exact Flight calls.
+The 2026-11-08 situation cohort has 504 process observations and 60,984 exact calls. Its earlier RSC companion used 40 processes and 800 exact calls; the separately source-qualified 2026-11-09 RSC campaign above supersedes that RSC panel.
 
 Scoped verification (**2026-11-08**, source `453a9074fcac`): 2,832 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun. Existing formatting and Intl issues remain owned; four AOT unit failures remain a historical owned gate.
 

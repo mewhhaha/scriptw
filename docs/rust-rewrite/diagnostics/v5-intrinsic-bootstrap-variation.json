@@ -1,9 +1,0 @@
-{
-  "schema_version": 5,
-  "id": "t25/object-probe/descriptors-and-realm",
-  "goal": "script",
-  "observation_contract": "selected_object_probe_print_transcript",
-  "filename": "differential/v5/t25-object-graph-descriptors-and-realm.js",
-  "timeout_ms": 30000,
-  "source": "var root = Object.create(null);\nroot[10] = \"ten\";\nroot[2] = \"two\";\nObject.defineProperty(root, \"z\", {value: 3, writable: false, enumerable: false, configurable: true});\nroot.a = root;\nObject.defineProperty(root, \"get\", {get: function () { print(\"getter-called\"); return 7; }, enumerable: true, configurable: false});\nroot[Symbol(\"marker\")] = -0;\nvar caught;\ntry { null.missing; } catch (error) { caught = error; }\nprint(\"object-probe:selected\");\nreturn {\n    roots: [\n        {name: \"root\", value: root},\n        {name: \"alias\", value: root},\n        {name: \"error_prototype\", value: Object.getPrototypeOf(caught)},\n        {name: \"primary_realm\", value: Object.getPrototypeOf(caught) === TypeError.prototype}\n    ],\n    anchors: [{name: \"type_error_prototype\", value: TypeError.prototype}]\n};\n"
-}

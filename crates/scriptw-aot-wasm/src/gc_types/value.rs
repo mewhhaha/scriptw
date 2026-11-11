@@ -732,11 +732,6 @@ impl<R: GcFunctionRole> FunctionStackReference<R, Nullable> {
         FunctionStackReference { shape: PhantomData }
     }
 }
-impl<R: GcFunctionRole> FunctionStackReference<R> {
-    pub(crate) fn nullable(self) -> FunctionStackReference<R, Nullable> {
-        FunctionStackReference { shape: PhantomData }
-    }
-}
 impl<'a, R: GcFunctionRole> GcOperand<'a, GcFunctionRef<R>, Nullable> {
     pub(crate) fn function_reference(value: &'a FunctionLocal<R>) -> Self {
         Self {
@@ -806,18 +801,34 @@ impl GcStructType<ExecutableCode> {
                 metadata.standard_builtin.is_none() && metadata.host_builtin.is_some()
             }
         };
+        let local_arguments_valid = match (
+            local_arguments.is_some(),
+            wide_local_arguments.is_some(),
+        ) {
+            (false, false) => true,
+            (true, true) => false,
+            (narrow, _) => entry_execution == scriptw_ir::FunctionExecutionKind::Ordinary
+                && metadata.class_element_execution == scriptw_ir::ClassElementExecutionKind::None
+                && match metadata.kind {
+                    ExecutableCodeKind::JavaScript => {
+                        metadata.protocol
+                            == scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
+                    }
+                    ExecutableCodeKind::StandardBuiltin => narrow
+                        && metadata.standard_builtin
+                            == Some(
+                                scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
+                            )
+                        && metadata.protocol == scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly,
+                    ExecutableCodeKind::HostBuiltin => false,
+                },
+        };
         if metadata.protocol.execution_kind() != entry_execution
             || !origin_valid
             || (binary_numeric.is_some()
                 && (metadata.kind != ExecutableCodeKind::JavaScript
                     || entry_execution != scriptw_ir::FunctionExecutionKind::Ordinary))
-            || (local_arguments.is_some() && wide_local_arguments.is_some())
-            || ((local_arguments.is_some() || wide_local_arguments.is_some())
-                && (metadata.kind != ExecutableCodeKind::JavaScript
-                    || metadata.protocol
-                        != scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
-                    || metadata.class_element_execution
-                        != scriptw_ir::ClassElementExecutionKind::None))
+            || !local_arguments_valid
         {
             return Err(crate::EmitError::unsupported(
                 "executable metadata disagrees with its registered entry",
@@ -1321,7 +1332,41 @@ impl<T: GcHeapType, N: GcFieldNullability> GcStackReference<T, N> {
         GcStackReference::new()
     }
 
+    /// Traps unless the reference has `Sub`'s layout. An open `Sub` with few
+    /// sealed descendants is reached through them, leaving its own cast as
+    /// the trapping remainder.
     pub(crate) fn cast_subtype<Sub: GcSubtype<T>>(
+        self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<Sub> {
+        let target = schema.reference_type::<Sub>(GcNullability::NonNullable);
+        let Some(alternatives) = schema.sealed_test_alternatives::<Sub>() else {
+            function.instruction(&Instruction::RefCastNonNull(target.heap_type));
+            return GcStackReference::new();
+        };
+        let source = schema
+            .reserve_gc_local::<T, N>(function)
+            .initialize(self, function);
+        let from_ref_type = schema.reference_type::<T>(GcNullability::Nullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(target))));
+        function.instruction(&Instruction::LocalGet(source.index));
+        for to_ref_type in alternatives {
+            function.instruction(&Instruction::BrOnCast {
+                relative_depth: 0,
+                from_ref_type,
+                to_ref_type,
+            });
+        }
+        function.instruction(&Instruction::RefCastNonNull(target.heap_type));
+        function.instruction(&Instruction::End);
+        source.clear(function);
+        GcStackReference::new()
+    }
+
+    /// Traps unless the reference has `Sub`'s layout, two declared levels
+    /// below `T`. One cast to `Sub` already proves `Middle`.
+    pub(crate) fn cast_nested_subtype<Middle: GcSubtype<T>, Sub: GcSubtype<Middle>>(
         self,
         schema: &RuntimeSchema,
         function: &mut Function,
@@ -1340,12 +1385,46 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        self.load(schema, function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<Sub>(GcNullability::NonNullable)
-                .heap_type,
-        ));
+        let Some(alternatives) = schema.sealed_test_alternatives::<Sub>() else {
+            self.load(schema, function);
+            function.instruction(&Instruction::RefTestNonNull(
+                schema
+                    .reference_type::<Sub>(GcNullability::NonNullable)
+                    .heap_type,
+            ));
+            return;
+        };
+        for (position, alternative) in alternatives.into_iter().enumerate() {
+            self.load(schema, function);
+            function.instruction(&Instruction::RefTestNonNull(alternative.heap_type));
+            if position != 0 {
+                function.instruction(&Instruction::I32Or);
+            }
+        }
+    }
+}
+
+/// An open layout with more sealed descendants than this keeps its one host
+/// subtype query instead of a longer inline chain.
+const MAX_SEALED_TEST_ALTERNATIVES: usize = 4;
+
+impl RuntimeSchema {
+    /// The sealed reference types that exactly cover an open layout, when
+    /// testing each of them inline replaces a host subtype query.
+    fn sealed_test_alternatives<T: GcHeapType>(&self) -> Option<Vec<RefType>> {
+        let layouts = T::LAYOUT.sealed_descendants();
+        (1..=MAX_SEALED_TEST_ALTERNATIVES)
+            .contains(&layouts.len())
+            .then(|| {
+                layouts
+                    .into_iter()
+                    .map(|layout| {
+                        self.types
+                            .layouts
+                            .reference(layout, GcNullability::NonNullable)
+                    })
+                    .collect()
+            })
     }
 }
 impl<T: GcHeapType> GcRootGlobal<T> {
@@ -1826,17 +1905,6 @@ impl RuntimeSchema {
         function: &mut Function,
     ) {
         value.load(self, function);
-        emit_root_set(function, self.atomics_async_waiter_queue_root(end));
-    }
-    pub(crate) fn clear_atomics_async_waiter_queue(
-        &self,
-        end: RuntimeQueueEnd,
-        function: &mut Function,
-    ) {
-        function.instruction(&Instruction::RefNull(
-            self.reference_type::<AtomicsAsyncWaiter>(GcNullability::Nullable)
-                .heap_type,
-        ));
         emit_root_set(function, self.atomics_async_waiter_queue_root(end));
     }
     pub(crate) fn load_symbol_registry(
@@ -2604,10 +2672,6 @@ impl<V: GcI64Constant> GcI64DomainLocal<V> {
     }
     pub(crate) fn set_constant(&self, value: V, function: &mut Function) {
         function.instruction(&Instruction::I64Const(value.encode()));
-        self.local.store(function);
-    }
-    pub(crate) fn copy_from(&self, source: &Self, function: &mut Function) {
-        source.load(function);
         self.local.store(function);
     }
     pub(crate) fn load(&self, function: &mut Function) {
@@ -3442,9 +3506,6 @@ impl ImmutableByteArrayConstruction {
         self.bytes.clear(function);
         bytes
     }
-    pub(crate) fn clear(self, function: &mut Function) {
-        self.bytes.clear(function);
-    }
 }
 
 /// RegExp programs use the same private byte construction and add their
@@ -3485,9 +3546,6 @@ impl RegExpProgramConstruction {
             .construct((GcOperand::reference(&bytes, schema),), function);
         bytes.clear(function);
         program
-    }
-    pub(crate) fn clear(self, function: &mut Function) {
-        self.bytes.clear(function);
     }
 }
 
@@ -3718,9 +3776,6 @@ impl PropertyKeyConstruction {
             .from_value(key.value(), function);
         schema.array_type::<PropertyKeyTable>().emit_set(function);
     }
-    pub(crate) fn clear(self, function: &mut Function) {
-        self.keys.clear(function);
-    }
     pub(crate) fn publish(
         self,
         schema: &RuntimeSchema,
@@ -3787,9 +3842,6 @@ impl SegmentBoundaryConstruction {
         self.boundaries.clear(function);
         result
     }
-    pub(crate) fn clear(self, function: &mut Function) {
-        self.boundaries.clear(function);
-    }
 }
 
 pub(crate) struct BigIntConstruction {
@@ -3832,12 +3884,6 @@ impl BigIntConstruction {
         index.load(function);
         limb.load(function);
         schema.array_type::<BigIntLimbArray>().emit_set(function);
-    }
-    pub(crate) fn length(&self, output: I32Local, schema: &RuntimeSchema, function: &mut Function) {
-        schema
-            .array_type::<BigIntLimbArray>()
-            .length(&self.limbs, schema, function);
-        output.store(function);
     }
     pub(crate) fn read(
         &self,

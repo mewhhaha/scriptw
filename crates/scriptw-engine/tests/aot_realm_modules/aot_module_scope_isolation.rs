@@ -62,8 +62,14 @@ fn assert_modules(files: &[(&str, &str)], expected: &[&str], prelude: Option<&st
 fn a_dependency_free_name_cannot_capture_an_entry_module_lexical() {
     assert_modules(
         &[
-            ("entry.js", "import { dependencyRead } from './dependency.js'; const entryOnly = 'entry'; print(dependencyRead());"),
-            ("dependency.js", "export function dependencyRead() { return typeof entryOnly; }"),
+            (
+                "entry.js",
+                "import { dependencyRead } from './dependency.js'; const entryOnly = 'entry'; print(dependencyRead());",
+            ),
+            (
+                "dependency.js",
+                "export function dependencyRead() { return typeof entryOnly; }",
+            ),
         ],
         &["undefined"],
         None,
@@ -74,7 +80,10 @@ fn a_dependency_free_name_cannot_capture_an_entry_module_lexical() {
 fn imported_aliases_do_not_create_global_own_properties() {
     assert_modules(
         &[
-            ("entry.js", "import { value as localAlias } from './dependency.js'; print(Object.getOwnPropertyDescriptor(globalThis, 'localAlias') === undefined); print(localAlias);"),
+            (
+                "entry.js",
+                "import { value as localAlias } from './dependency.js'; print(Object.getOwnPropertyDescriptor(globalThis, 'localAlias') === undefined); print(localAlias);",
+            ),
             ("dependency.js", "export const value = 3;"),
         ],
         &["true", "3"],
@@ -86,8 +95,14 @@ fn imported_aliases_do_not_create_global_own_properties() {
 fn dependency_free_names_resolve_the_independent_script_prelude() {
     assert_modules(
         &[
-            ("entry.js", "import { dependencyRead } from './dependency.js'; const shared = 'entry'; print(dependencyRead(), helperRead(), shared);"),
-            ("dependency.js", "export function dependencyRead() { return shared; }"),
+            (
+                "entry.js",
+                "import { dependencyRead } from './dependency.js'; const shared = 'entry'; print(dependencyRead(), helperRead(), shared);",
+            ),
+            (
+                "dependency.js",
+                "export function dependencyRead() { return shared; }",
+            ),
         ],
         &["global global entry"],
         Some("const shared = 'global'; function helperRead() { return shared; }"),
@@ -125,7 +140,9 @@ print(descriptor.value, descriptor.get === undefined);
 fn same_spelled_declarations_and_aliases_stay_in_their_own_modules() {
     assert_modules(
         &[
-            ("entry.js", r#"
+            (
+                "entry.js",
+                r#"
 import { read as first } from './left.js';
 import { read as second } from './right.js';
 const shared = 'entry';
@@ -133,10 +150,20 @@ var localVar = 'entry';
 function localFunction() { return localVar; }
 print(first(), second(), shared, localFunction());
 print(Object.getOwnPropertyDescriptor(globalThis, 'localVar') === undefined);
-"#),
-            ("left.js", "import { left as alias } from './values.js'; const shared = 'left'; var localVar = 1; function localFunction() { return localVar; } export function read() { return shared + alias + localFunction(); }"),
-            ("right.js", "import { right as alias } from './values.js'; const shared = 'right'; var localVar = 2; function localFunction() { return localVar; } export function read() { return shared + alias + localFunction(); }"),
-            ("values.js", "export const left = 'L'; export const right = 'R';"),
+"#,
+            ),
+            (
+                "left.js",
+                "import { left as alias } from './values.js'; const shared = 'left'; var localVar = 1; function localFunction() { return localVar; } export function read() { return shared + alias + localFunction(); }",
+            ),
+            (
+                "right.js",
+                "import { right as alias } from './values.js'; const shared = 'right'; var localVar = 2; function localFunction() { return localVar; } export function read() { return shared + alias + localFunction(); }",
+            ),
+            (
+                "values.js",
+                "export const left = 'L'; export const right = 'R';",
+            ),
         ],
         &["leftL1 rightR2 entry entry", "true"],
         None,
@@ -197,13 +224,19 @@ export function read() { return value; }
 fn a_completed_cycle_member_remains_evaluating_until_the_component_finishes() {
     assert_modules(
         &[
-            ("entry.js", "import { blocked } from './left.js'; import defer * as right from './right.js'; print(blocked, right.value);"),
-            ("left.js", r#"
+            (
+                "entry.js",
+                "import { blocked } from './left.js'; import defer * as right from './right.js'; print(blocked, right.value);",
+            ),
+            (
+                "left.js",
+                r#"
 import './right.js';
 import defer * as right from './right.js';
 export let blocked = false;
 try { right.value; } catch (error) { blocked = error instanceof TypeError; }
-"#),
+"#,
+            ),
             ("right.js", "import './left.js'; export const value = 3;"),
         ],
         &["true 3"],
@@ -215,7 +248,9 @@ try { right.value; } catch (error) { blocked = error instanceof TypeError; }
 fn a_late_cycle_throw_is_cached_on_members_whose_bodies_already_completed() {
     assert_modules(
         &[
-            ("entry.js", r#"
+            (
+                "entry.js",
+                r#"
 import defer * as left from './left.js';
 import defer * as right from './right.js';
 globalThis.calls = [];
@@ -226,9 +261,16 @@ for (const read of [() => left.value, () => right.value, () => left.value]) {
   if (received !== globalThis.moduleError) throw 'cycle error identity';
 }
 print(globalThis.calls.join(','));
-"#),
-            ("left.js", "import './right.js'; globalThis.calls.push('left'); throw globalThis.moduleError; export const value = 1;"),
-            ("right.js", "import './left.js'; globalThis.calls.push('right'); export const value = 2;"),
+"#,
+            ),
+            (
+                "left.js",
+                "import './right.js'; globalThis.calls.push('left'); throw globalThis.moduleError; export const value = 1;",
+            ),
+            (
+                "right.js",
+                "import './left.js'; globalThis.calls.push('right'); export const value = 2;",
+            ),
         ],
         &["right,left"],
         None,
@@ -239,7 +281,9 @@ print(globalThis.calls.join(','));
 fn an_unvisited_cycle_member_still_visits_its_dependencies_after_an_earlier_failure() {
     assert_modules(
         &[
-            ("entry.js", r#"
+            (
+                "entry.js",
+                r#"
 import defer * as left from './left.js';
 import defer * as unvisited from './unvisited.js';
 globalThis.calls = [];
@@ -251,10 +295,20 @@ received = undefined;
 try { unvisited.value; } catch (error) { received = error; }
 if (received !== globalThis.moduleError) throw 'unvisited error identity';
 print(globalThis.calls.join(','));
-"#),
-            ("left.js", "import './failing.js'; import './unvisited.js'; globalThis.calls.push('left'); export const value = 1;"),
-            ("failing.js", "import './left.js'; globalThis.calls.push('failing'); throw globalThis.moduleError;"),
-            ("unvisited.js", "import './side.js'; import './left.js'; globalThis.calls.push('unvisited'); export const value = 2;"),
+"#,
+            ),
+            (
+                "left.js",
+                "import './failing.js'; import './unvisited.js'; globalThis.calls.push('left'); export const value = 1;",
+            ),
+            (
+                "failing.js",
+                "import './left.js'; globalThis.calls.push('failing'); throw globalThis.moduleError;",
+            ),
+            (
+                "unvisited.js",
+                "import './side.js'; import './left.js'; globalThis.calls.push('unvisited'); export const value = 2;",
+            ),
             ("side.js", "globalThis.calls.push('side');"),
         ],
         &["failing,side"],

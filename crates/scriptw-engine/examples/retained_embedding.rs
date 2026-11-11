@@ -93,9 +93,6 @@ export default {
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
     let mut store = wasmtime::Store::new(&engine, state);
     store.limiter(|state| state.limits_mut());
-    // The host owns deadlines and any epoch ticker; this finite example opts
-    // out of epoch interruption. Compilation and host work remain serial.
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = wasmtime::Linker::<WasmStoreState>::new(&engine);
     runtime.register_foreign(&mut linker, "example", "echo", |_, mut arguments| {
         arguments

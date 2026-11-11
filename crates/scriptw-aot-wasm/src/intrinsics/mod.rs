@@ -20,7 +20,7 @@ pub(crate) mod intl_segmenter;
 pub(crate) mod promise;
 pub(crate) mod property_layouts;
 mod property_publication;
-pub(crate) use property_layouts::{IntrinsicPropertyLayoutId, IntrinsicPropertyRecipeKind};
+pub(crate) use property_layouts::IntrinsicPropertyLayoutId;
 mod property_layout_values;
 pub(crate) mod regexp;
 pub(crate) mod shadow_realm;

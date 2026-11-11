@@ -4,8 +4,13 @@ use super::*;
 
 pub(crate) const WASM_PAGE_SIZE: u64 = 65_536;
 pub(crate) const STATIC_DATA_OFFSET: u32 = 4096;
+/// A private linear-memory byte that source code stores to on function entry
+/// and at every loop header. An execution deadline removes access to this
+/// memory, so the store stops code that reaches no heap value and makes no
+/// call. Nothing reads the byte: it lies below the static data.
+pub(crate) const DEADLINE_POLL_ADDRESS: u32 = 8;
+const _: () = assert!(DEADLINE_POLL_ADDRESS < STATIC_DATA_OFFSET);
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
-pub(crate) const PROPERTY_KEY_SYMBOL_MARKER: u64 = 1 << 63;
 
 /// Private linear-memory wire/scratch storage only. Semantic values use GC.
 pub(crate) fn emit_transient_byte_alloc_helper_function() -> Function {
@@ -568,13 +573,6 @@ impl PromiseSettlement {
             Self::Reject => PromiseState::Rejected,
         }
     }
-
-    pub(crate) const fn is_rejected(self) -> bool {
-        match self {
-            Self::Fulfill => false,
-            Self::Reject => true,
-        }
-    }
 }
 
 // The closed domain stored in a Promise reaction record's `type` word.
@@ -785,10 +783,6 @@ impl StoredPropertyAttributes {
             } => DescriptorWord::of_accessor(enumerable, configurable),
         }
     }
-
-    pub(crate) const fn descriptor_kind_bits(self) -> u32 {
-        self.descriptor_word().bits()
-    }
 }
 
 /// A **test** against a descriptor word.
@@ -807,10 +801,6 @@ impl DescriptorMask {
     pub(crate) const WRITABLE: Self = Self(DescriptorBit::Writable.word());
     pub(crate) const ENUMERABLE: Self = Self(DescriptorBit::Enumerable.word());
     pub(crate) const CONFIGURABLE: Self = Self(DescriptorBit::Configurable.word());
-    /// "The existing entry is a data descriptor **and** is not writable", in
-    /// one `I32And`. A legal mask; not a legal word.
-    pub(crate) const ACCESSOR_OR_WRITABLE: Self =
-        Self(DescriptorBit::Accessor.word() | DescriptorBit::Writable.word());
     /// Bits 0..3: the descriptor kind and the three attributes.
     pub(crate) const KIND_AND_ATTRIBUTES: Self = Self(
         DescriptorBit::Accessor.word()
@@ -818,9 +808,6 @@ impl DescriptorMask {
             | DescriptorBit::Writable.word()
             | DescriptorBit::Enumerable.word(),
     );
-    pub(crate) const fn of(bit: DescriptorBit) -> Self {
-        Self(bit.word())
-    }
 
     pub(crate) const fn bits(self) -> u32 {
         self.0
@@ -953,11 +940,6 @@ mod tests {
         assert_eq!(
             [PromiseSettlement::Fulfill, PromiseSettlement::Reject].map(PromiseSettlement::state),
             [PromiseState::Fulfilled, PromiseState::Rejected]
-        );
-        assert_eq!(
-            [PromiseSettlement::Fulfill, PromiseSettlement::Reject]
-                .map(PromiseSettlement::is_rejected),
-            [false, true]
         );
     }
 }

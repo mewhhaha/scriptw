@@ -12,7 +12,7 @@ observation into a current acceptance result.
 Keep current invariants with their owning domain. Git retains superseded
 designs; dated checkpoints retain their own source and verification scope.
 
-849 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
+850 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
 
 ## A
 
@@ -259,6 +259,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [error-stack-accessors](<error-stack-accessors.md>)
 - [exact-execution-list-replay](<exact-execution-list-replay.md>)
 - [execution-backend-routing](<execution-backend-routing.md>)
+- [execution-deadlines](<execution-deadlines.md>)
 - [execution-hotpaths](<execution-hotpaths.md>)
 ## F
 

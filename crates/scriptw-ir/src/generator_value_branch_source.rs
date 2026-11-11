@@ -1,6 +1,4 @@
 use super::*;
-use boa_ast::visitor::{VisitWith, Visitor};
-use std::ops::ControlFlow;
 
 #[path = "generator_value_branch_source/branches.rs"]
 mod branches;
@@ -11,7 +9,7 @@ pub(crate) use branches::{
 mod optional_chain;
 pub(crate) use optional_chain::{
     GeneratorGroupedOptionalInvocationSource, GeneratorGroupedOptionalReferenceSource,
-    GeneratorOptionalArgumentSource, GeneratorOptionalBaseSource, GeneratorOptionalChainLink,
+    GeneratorOptionalArgumentSource, GeneratorOptionalChainLink,
     GeneratorOptionalChainSource, GeneratorOptionalChainStates, GeneratorOptionalDeleteSource,
     GeneratorOptionalDeleteTerminal, GeneratorOptionalKeySource, GeneratorOptionalOperandSource,
 };

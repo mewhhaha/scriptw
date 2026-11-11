@@ -19,11 +19,9 @@ fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
 
 #[test]
 fn contract_and_behavior_witness_cover_both_unary_numeric_kinds() {
-    assert!(CONTRACT.contains("UnaryNumericKind"));
     assert!(CONTRACT.contains(
         "cargo test -p scriptw-aot-wasm --test structure_language -- unary_numeric_ir_structure::"
     ));
-    assert!(CONTRACT.contains("UnaryNumericKind"));
     assert!(CLI_NUMERIC_TESTS.contains("fn run_wasm_backend_succeeds_for_bigint_bitwise_fixture()"));
     for marker in [
         "~0n",

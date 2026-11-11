@@ -165,7 +165,7 @@ def check(sources: dict[str, str]) -> list[dict[str, str]]:
             "store.data_mut().native_source_compiler=Some(Arc::new(context));" in engine,
             "original_execution", "native callbacks share the original execution-control Arc")
     production = "".join(c[name] for name in FILES if name.startswith(HOST) and not any(part in name for part in ("/tests", "/observer.rs"))) + context
-    require(not any(token in production for token in ("Engine::new(", "RealmBuilder", "Realm::new(", "Realm::default(", "Store::new(", "WasmAgentExecutionControl::new(", "Instant::now(", ".arm(", "set_epoch_deadline(")),
+    require(not any(token in production for token in ("Engine::new(", "RealmBuilder", "Realm::new(", "Realm::default(", "Store::new(", "WasmAgentExecutionControl::new(", "Instant::now(", ".arm(", "interrupt_handle(")),
             "no_replacement_execution", "no new Engine, Store, Realm or timeout budget in production host path")
     host = c[HOST + ".rs"]
     require("WasmtimeEngine::same(caller.engine(),context.linker.engine())" in host and

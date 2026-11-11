@@ -1,8 +1,8 @@
 //! Internal [[GetOwnProperty]] transports a private snapshot across actual R/P.
 use crate::{linked_bodies::module_bodies, property_read_plans::Module};
 use scriptw_aot_wasm::WasmArtifact;
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
 use wasmparser::{Operator, ValType, Validator, WasmFeatures};
 
 fn artifact() -> WasmArtifact {

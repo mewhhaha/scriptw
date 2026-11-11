@@ -213,6 +213,21 @@ impl FunctionBuilder<'_> {
                 receiver.set_undefined(function);
             }
             NumericCallReference::Environment(identifier) => {
+                // NumericCallRun::row has already excluded direct eval.
+                if matches!(identifier.strictness, Strictness::Strict) {
+                    if let EnvironmentIdentifierResolutionStart::Cell(proof) =
+                        identifier.resolution_start()
+                    {
+                        self.emit_read_module_cell_identifier(
+                            &proof,
+                            &identifier.name,
+                            callee,
+                            function,
+                        )?;
+                        receiver.set_undefined(function);
+                        return Ok(());
+                    }
+                }
                 let schema = self.runtime_schema();
                 let key = schema.reserve_gc_local(function).initialize(
                     self.emit_interned_string_reference(&identifier.name, function)?,

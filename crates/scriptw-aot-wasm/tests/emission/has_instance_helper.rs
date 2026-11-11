@@ -1,6 +1,6 @@
 //! Operator sites and the native method share one whole-Completion R kernel.
-use scriptw_aot_wasm::{emit, WasmArtifact};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{WasmArtifact, emit};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{FuncType, Operator, Parser, Payload, TypeRef, ValType, Validator, WasmFeatures};
 

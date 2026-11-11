@@ -5,7 +5,6 @@ use super::temporal_zone_provider::TemporalZonedAllocationInput;
 use super::temporal_zoned_arithmetic::{
     TemporalZonedArithmeticOperation, TemporalZonedDifferenceOperation,
 };
-use crate::gc_types::*;
 use crate::intrinsics::temporal::TemporalPrototypeSource;
 
 impl FunctionBuilder<'_> {

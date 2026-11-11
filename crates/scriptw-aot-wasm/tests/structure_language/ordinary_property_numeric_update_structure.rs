@@ -15,10 +15,6 @@ const FIXTURE: &str = include_str!(
 const CLI_SOURCE: &str = include_str!("../../../scriptw-cli/tests/cli/language_numerics.rs");
 const RUNNER_SOURCE: &str = include_str!("../../../scriptw-test262/src/lib.rs");
 const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-failures.tsv");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/ordinary-property-numeric-update-reference.md"
-);
-
 const EXACT_TEST262: &[(&str, &str)] = &[
     (
         "postfix-decrement/S11.3.2_A6_T1",
@@ -385,12 +381,8 @@ fn exhaustive_consumers_and_gc_owners_name_each_fused_phase() {
         "the sole whole-value publisher owns the fused node"
     );
     assert_eq!(DATA_SOURCE.matches(marker).count(), 1);
-    assert_eq!(PLANNING_SOURCE.matches(marker).count(), 3);
-    for owner in [
-        "fn expr_exposes_global_object(",
-        "fn collect_expr_global_property_names(",
-        "fn expr_references_function(",
-    ] {
+    assert_eq!(PLANNING_SOURCE.matches(marker).count(), 1);
+    for owner in ["fn expr_references_function("] {
         assert_eq!(
             bounded(PLANNING_SOURCE, owner, "\n}\n")
                 .matches(marker)
@@ -476,20 +468,5 @@ fn exact_a6_inventory_is_raw_unmasked_and_runs_in_both_modes() {
         assert!(source.contains("base = null"));
         assert!(source.contains("throw new DummyError()"));
         assert!(source.contains("property key evaluated"));
-    }
-}
-
-#[test]
-fn dry_status_records_the_exact_current_baseline_and_nonclaims() {
-    for marker in [
-        "four physical files and eight executions",
-        "NumericUpdateOp::{Increment, Decrement}",
-        "UpdateReturnMode::{Prefix, Postfix}",
-        "ToPropertyKey` exactly once",
-        "apply `ToNumeric` exactly once",
-        "This batch does not change eager or logical compound assignment",
-        "resumable/suspended property",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract lost {marker}");
     }
 }

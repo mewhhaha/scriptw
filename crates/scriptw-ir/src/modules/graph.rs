@@ -189,6 +189,7 @@ impl ModuleGraphIr {
 
 /// Resolves every import entry, records link errors, and computes the
 /// evaluation order and its strongly-connected components.
+#[cfg(test)]
 pub(crate) fn link(graph: &mut ModuleGraphIr) {
     link_with_admission(graph, super::admission::GraphAdmission::LoadedClosure);
 }

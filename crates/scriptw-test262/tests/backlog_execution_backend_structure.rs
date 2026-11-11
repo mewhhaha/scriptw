@@ -1,9 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
 
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-backlog-execution-backend.md");
-
 fn source() -> String {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -104,13 +101,4 @@ fn backlog_backend_is_owned_once_and_projected_by_name() {
         3
     );
     assert!(!output.contains("artifact.execution_backend,"));
-}
-
-#[test]
-fn contract_records_the_closed_backlog_backend_boundary() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("BacklogArtifact.execution_backend"));
-        assert!(evidence.contains("ExecutionBackend"));
-        assert!(evidence.contains("future-backend"));
-    }
 }

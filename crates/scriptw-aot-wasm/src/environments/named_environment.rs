@@ -1,7 +1,6 @@
 use super::*;
 use crate::gc_types::{
-    NamedBinding, NamedBindingSchema, NamedBindingTable, ObjectEnvironment,
-    ObjectEnvironmentSchema, StringValue,
+    NamedBinding, NamedBindingSchema, NamedBindingTable, ObjectEnvironment, StringValue,
 };
 use scriptw_ir::{
     EvalBindingDeclarationIr, EvalDeclarativeEnvironmentKindIr, EvalEnvironmentRoleIr,

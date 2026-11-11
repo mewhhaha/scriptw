@@ -81,14 +81,6 @@ fn function_module_state_is_the_exact_private_no_capability_domain() {
         )
     );
     let declaration = normalized_code(declaration);
-    assert!(declaration.contains("Self::Main(_,_)=>StaticSignature::Main.parameter_count()"));
-    assert!(declaration.contains(
-        "Self::Internal(entry)=>entry.local_arguments().map_or_else(||entry.signature().parameter_count(),|local|local.signature().parameter_count(),)"
-    ));
-    assert!(
-        declaration.contains("Self::PreparedScript(_,entry)=>entry.signature().parameter_count()")
-    );
-    assert!(declaration.contains("Self::RuntimeOperation(helper)=>helper.parameter_types().len()"));
     assert!(declaration
         .contains("Self::Internal(entry)|Self::PreparedScript(_,entry)=>Some(entry.body())"));
     assert!(declaration

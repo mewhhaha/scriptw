@@ -1,7 +1,4 @@
 const SOURCE: &str = include_str!("../src/lib.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-negative-phase-authority.md");
-
 fn compact(source: &str) -> String {
     source
         .chars()
@@ -59,22 +56,4 @@ fn every_phase_decision_consumes_the_enum_exhaustively() {
     assert!(source.contains("letexpected=negative.phase;"));
     assert!(source.contains("negative.phase.failure_kind()"));
     assert!(source.contains("Some(negative.phase.as_str().to_string())"));
-}
-
-#[test]
-fn contract_records_the_negative_phase_invariant() {
-    for required in [
-        "NegativeExpectation.phase: NegativePhase",
-        "unknown\n`negative.phase`",
-        "compile error",
-        "NegativePhase::Runtime",
-    ] {
-        assert!(
-            CONTRACT.contains(required),
-            "missing contract evidence: {required}"
-        );
-    }
-
-    assert!(CONTRACT.contains("NegativePhase::{Parse, Early, Resolution, Runtime}"));
-    assert!(CONTRACT.contains("negative_phase_authority_structure"));
 }

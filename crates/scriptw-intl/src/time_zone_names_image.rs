@@ -107,6 +107,7 @@ impl TimeZoneNamesDataImage {
     pub(crate) fn names(&self) -> Arc<TimeZoneNames> {
         Arc::clone(&self.0.names)
     }
+    #[cfg(test)]
     pub(crate) fn names_ref(&self) -> &TimeZoneNames {
         &self.0.names
     }

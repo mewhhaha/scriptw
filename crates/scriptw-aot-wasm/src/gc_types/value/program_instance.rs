@@ -63,13 +63,6 @@ impl<'pool> ProgramInstanceImage<'pool> {
     pub(crate) fn literal_count_operand(&self) -> ProgramLiteralCount {
         ProgramLiteralCount(self.literal_count)
     }
-
-    pub(crate) fn literal_index(
-        &self,
-        index: PooledStringIndex,
-    ) -> Result<ProgramLiteralIndex, EmitError> {
-        ProgramLiteralIndex::for_pool(self.strings, index)
-    }
 }
 
 /// A table length minted only by the checked P image.

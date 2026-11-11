@@ -98,7 +98,13 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // replacing its visited-key array with an immutable strong Set edge.
 // Version 53 stores binding values directly in their cells and adds a typed
 // wide local-argument entry to the existing executable-code record.
-const LAYOUT_VERSION: u32 = 53;
+// Version 55 appends the native @@hasInstance local-argument body to R.
+// Existing executable-code fields and Narrow signature remain unchanged.
+// Version 56 belonged to an excluded single-reference value experiment.
+// Version 57 compiles without epoch checks. Source functions and loops store
+// to the deadline poll byte; P from an older compiler has no such stores.
+// The uncalled indexed element-write helper leaves R.
+const LAYOUT_VERSION: u32 = 57;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

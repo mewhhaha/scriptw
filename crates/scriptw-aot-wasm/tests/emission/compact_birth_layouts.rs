@@ -1,6 +1,6 @@
 //! Equal ordered data layouts share metadata across source bodies.
 use crate::{linked_bodies::module_bodies, property_read_plans::Module};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures};
 
@@ -8,8 +8,11 @@ fn shape_slot(body: &[Operator<'_>]) -> i32 {
     let mut sites = Vec::new();
     // Trace the real paged-table id operand back to its emitted constant.
     for (index, ops) in body.windows(3).enumerate() {
-        let [Operator::LocalGet { local_index }, Operator::I32Const { value: 6 }, Operator::I32ShrU] =
-            ops
+        let [
+            Operator::LocalGet { local_index },
+            Operator::I32Const { value: 6 },
+            Operator::I32ShrU,
+        ] = ops
         else {
             continue;
         };
@@ -17,9 +20,12 @@ fn shape_slot(body: &[Operator<'_>]) -> i32 {
             .windows(2)
             .rev()
             .find_map(|ops| match ops {
-                [Operator::I32Const { value }, Operator::LocalSet {
-                    local_index: target,
-                }] if target == local_index => Some(*value),
+                [
+                    Operator::I32Const { value },
+                    Operator::LocalSet {
+                        local_index: target,
+                    },
+                ] if target == local_index => Some(*value),
                 _ => None,
             })
             .expect("the real table id has a constant definition");

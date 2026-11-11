@@ -128,7 +128,6 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::ObjectPreventExtensions
             | RuntimeHelperId::ObjectReadProxy
             | RuntimeHelperId::IndexedElementRead
-            | RuntimeHelperId::IndexedElementWrite
             | RuntimeHelperId::ValueToPrimitiveDefault
             | RuntimeHelperId::ValueToPrimitiveNumber
             | RuntimeHelperId::ValueToPrimitiveString
@@ -220,16 +219,13 @@ impl<'a> FunctionBuilder<'a> {
         self.take_owned_body()
     }
 
-    // `compile_indexed_element_read_helper` and
-    // `compile_indexed_element_write_helper` live in `objects.rs`, beside the
-    // composites they outline, and are the only `compile_*_helper` pair that
-    // does. That is not a filing preference: the bodies they emit are the two
-    // largest inline expansions in the crate (72,635 and 174,558 bytes), and
-    // keeping the compiler in the same module as the body is what lets the body
-    // itself stay module-private with exactly two callers — its seam's fallback
-    // arm and its helper compiler. A third caller elsewhere in the crate would
-    // re-inline the composite and quietly undo the outlining; with the body
-    // private, that call does not compile.
+    // `compile_indexed_element_read_helper` lives in `objects.rs`, beside the
+    // composite it outlines, and is the only `compile_*_helper` that does.
+    // That is not a filing preference: keeping the compiler in the same module
+    // as the body is what lets the body itself stay module-private with exactly
+    // two callers — its seam's fallback arm and its helper compiler. A third
+    // caller elsewhere in the crate would re-inline the composite and quietly
+    // undo the outlining; with the body private, that call does not compile.
 
     pub(super) fn init_current_env(&mut self, function: &mut Function) -> Result<(), EmitError> {
         use crate::gc_types::{

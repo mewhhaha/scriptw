@@ -1,8 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const CONTRACT: &str = include_str!("../../../docs/rust-rewrite/contracts/test262-snapshot-use.md");
-
 fn source() -> String {
     fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs"))
         .expect("scriptw-test262 source should read")
@@ -244,13 +242,4 @@ fn all_eight_product_producers_select_the_exact_snapshot_use() {
         1
     );
     assert!(!comparison.contains("SnapshotUse::CurrentState"));
-}
-
-#[test]
-fn contract_and_t03_record_the_snapshot_use_boundary() {
-    assert!(CONTRACT.contains("SnapshotUse::{CurrentState, ReadOnlyEvidence}"));
-    assert!(CONTRACT.contains("snapshot byte, materialized test source"));
-    assert!(CONTRACT
-        .contains("tests::complete_consumers_reject_legacy_aggregates_and_mixed_legacy_nodes"));
-    assert!(CONTRACT.contains("SnapshotUse::{CurrentState, ReadOnlyEvidence}"));
 }

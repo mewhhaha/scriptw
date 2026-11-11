@@ -5,9 +5,6 @@ const DEFINE_PROPERTY_SOURCE: &str = include_str!("../../src/objects/define_prop
 const TARGET_DESCRIPTOR_SOURCE: &str = include_str!("../../src/objects/proxy_target_descriptor.rs");
 const LAYOUT_SOURCE: &str = include_str!("../../src/gc_types/layouts.rs");
 const PROPERTY_VALUE_SOURCE: &str = include_str!("../../src/intrinsics/deferred_methods.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/stored-descriptor-role-relation.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -276,8 +273,8 @@ fn stored_descriptor_read_and_compatibility_owners_have_a_closed_source_census()
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     assert_eq!(
         count_identifier_in_rust_sources(&source_root, "emit_descriptor_value"),
-        7,
-        "one reader, two compatibility sites, two merge accessor fields, Arguments value and Namespace value"
+        5,
+        "one reader, two compatibility sites, Arguments value and Namespace value; merge retains its two immutable accessor edges directly"
     );
     assert_eq!(
         count_identifier_in_rust_sources(&source_root, "emit_validate_stored_descriptor"),
@@ -357,17 +354,118 @@ fn complete_record_readers_bind_every_stored_role_to_its_named_field() {
     );
     assert!(!merge.normalized.contains("emit_property_value_into"));
     assert!(!merge.normalized.contains("DescriptorField::Value"));
-    for (role, local) in [("Get", "getter"), ("Set", "setter")] {
+    assert!(!merge.normalized.contains("emit_descriptor_value"));
+    assert!(!merge.normalized.contains("read_into"));
+    assert!(!merge.normalized.contains("reserve_value_local"));
+    for local in ["getter", "setter"] {
+        assert_eq!(merge.normalized.matches(&format!(
+            "let{local}=schema.reserve_gc_local(function).initialize(schema.stored_undefined(function),function);"
+        )).count(), 1, "each omitted accessor begins with a rooted canonical undefined edge");
         assert_eq!(
             merge
                 .normalized
                 .matches(&format!(
-                    "self.emit_descriptor_value(&record,DescriptorField::{role},&{local},function);"
+                    "{local}.replace(schema.stored_undefined(function),function);"
                 ))
                 .count(),
-            1
+            1,
+            "kind conversion resets each accessor edge"
+        );
+        assert_eq!(
+            merge
+                .normalized
+                .matches(&format!("GcOperand::reference(&{local},schema)"))
+                .count(),
+            2,
+            "both complete result kinds consume the retained edge"
+        );
+        assert_eq!(
+            merge
+                .normalized
+                .matches(&format!("{local}.clear(function);"))
+                .count(),
+            1,
+            "each retained edge is released once after result construction"
         );
     }
+    assert!(merge.normalized.contains(concat!(
+        "for(field,output)in[",
+        "(PropertyDescriptorSchema::GETTER,&getter),",
+        "(PropertyDescriptorSchema::SETTER,&setter),]{",
+        "output.replace(schema.field(field).read(&record,schema,function).reference(),function,);}",
+        "record.clear(function);"
+    )), "getter and setter retain exactly their named original fields before the record root clears");
+    assert!(
+        merge.normalized.contains(concat!(
+        "for(presence,output)in[(&descriptor.get,&getter),(&descriptor.set,&setter)]{",
+        "ifletSome(input)=presence.value(){",
+        "emit_presence(presence,function);self.open_frame(ControlFrameKind::If,function);",
+        "output.replace(schema.struct_type::<StoredValue>().from_value(input,function),function,);",
+        "self.pop_control(ControlFrameKind::If);function.instruction(&Instruction::End);}}"
+    )),
+        "only a supplied accessor field boxes its incoming Value inside its runtime presence guard"
+    );
+    assert_eq!(
+        merge
+            .normalized
+            .matches("struct_type::<StoredValue>().from_value(")
+            .count(),
+        2,
+        "the closed merge boxing sites are supplied VALUE and supplied get/set; no final reboxing"
+    );
+    assert_eq!(
+        merge
+            .normalized
+            .matches("struct_type::<PropertyDescriptor>().construct(")
+            .count(),
+        2,
+        "both result kinds still construct fresh mutable complete records"
+    );
+
+    let stored = rust_code(bounded(
+        LAYOUT_SOURCE,
+        "struct StoredValue: PropertyValue => StoredValueSchema {",
+        "\n        }",
+    ));
+    assert_eq!(
+        stored.normalized,
+        concat!(
+            "SCALAR:I64Value,Immutable,NonNullable;",
+            "TAG:I32Value,Immutable,NonNullable;",
+            "REFERENCE:AnyGcRef,Immutable,Nullable;"
+        ),
+        "shared accessor wrappers are immutable in every field"
+    );
+    let snapshot = rust_code(bounded(
+        TARGET_DESCRIPTOR_SOURCE,
+        "pub(super) fn emit_completed_descriptor_snapshot(",
+        "pub(crate) fn emit_proxy_target_own_descriptor(",
+    ));
+    for (field, local) in [
+        ("VALUE", "stored_value"),
+        ("GETTER", "stored_getter"),
+        ("SETTER", "stored_setter"),
+    ] {
+        assert!(snapshot.normalized.contains(&format!(
+            "let{local}=schema.reserve_gc_local(function).initialize(schema.struct_type::<PropertyDescriptor>().field(PropertyDescriptorSchema::{field}).read(&source.descriptor,schema,function).reference(),function,);"
+        )), "snapshots retain the exact named immutable edge");
+        assert_eq!(
+            snapshot
+                .normalized
+                .matches(&format!("GcOperand::reference(&{local},schema)"))
+                .count(),
+            2
+        );
+    }
+    assert_eq!(
+        snapshot
+            .normalized
+            .matches("descriptor.replace(schema.struct_type::<PropertyDescriptor>().construct(")
+            .count(),
+        2,
+        "each snapshot kind receives a fresh mutable record, never the live source record"
+    );
+    assert!(!snapshot.normalized.contains("from_value"));
     let value_reader = rust_code(bounded(
         TARGET_DESCRIPTOR_SOURCE,
         "fn read_value(",
@@ -418,17 +516,5 @@ fn complete_record_readers_bind_every_stored_role_to_its_named_field() {
                 .count(),
             1
         );
-    }
-}
-
-#[test]
-fn contract_records_the_role_relation() {
-    for marker in [
-        "stored descriptor role relation",
-        "cannot transpose data, getter, and setter locals",
-        "stored_descriptor_role_relation_structure",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract marker `{marker}`");
-        assert!(CONTRACT.contains(marker), "task marker `{marker}`");
     }
 }

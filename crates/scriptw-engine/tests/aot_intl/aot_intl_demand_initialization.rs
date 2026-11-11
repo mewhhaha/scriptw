@@ -389,7 +389,6 @@ fn portable_retained_host_get_keeps_unread_foreign_intl_separate_from_mutated_en
     let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();
     let mut store = wasmtime::Store::new(&engine, state);
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = wasmtime::Linker::new(&engine);
     runtime.register(&mut store, &mut linker).unwrap();
     let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();

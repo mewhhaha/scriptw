@@ -1010,7 +1010,7 @@ impl ValidatedIntrinsicPropertyLayout {
 }
 
 // Classify the semantic UTF-16 key, just as the runtime indexed-key owner does.
-fn is_array_index(units: &[u16]) -> bool {
+pub(crate) fn is_array_index(units: &[u16]) -> bool {
     if units.is_empty() || units.len() > 10 || (units.len() > 1 && units[0] == 48) {
         return false;
     }

@@ -15,7 +15,6 @@ fn fresh_store(runtime: &EmbeddedRuntime, realm: Realm) -> WasmtimeStore<WasmSto
     let state = runtime.new_state(realm, ()).unwrap();
     let mut store = WasmtimeStore::new(&runtime.engine, state);
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     store
 }
 

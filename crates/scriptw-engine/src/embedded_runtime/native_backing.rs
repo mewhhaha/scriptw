@@ -128,7 +128,6 @@ mod tests {
         drop(original);
         drop(native);
         let mut store = wasmtime::Store::new(&engine, ());
-        store.set_epoch_deadline(1);
         let instance = wasmtime::Instance::new(&mut store, &loaded, &[]).unwrap();
         let answer = instance
             .get_typed_func::<(), i32>(&mut store, "answer")

@@ -196,7 +196,6 @@ mod tests {
         )
         .unwrap();
         let mut store = wasmtime::Store::new(&engine, ());
-        store.set_epoch_deadline(u64::MAX / 2);
         let instance = wasmtime::Instance::new(&mut store, &module, &[]).unwrap();
         let overflow = instance
             .get_typed_func::<(), i32>(&mut store, "overflow")

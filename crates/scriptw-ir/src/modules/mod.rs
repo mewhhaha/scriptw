@@ -86,6 +86,7 @@ pub use resolved_binding::{ModuleBindingNameIr, ResolvedBindingIr};
 
 pub(crate) use admission::{GraphAdmission, link_complete_catalog, link_loaded_graph};
 pub(crate) use dynamic::lower_import_call;
+#[cfg(test)]
 pub(crate) use graph::link;
 pub(crate) use graph_build::build_graph;
 pub(crate) use link::linked_script_source;

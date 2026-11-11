@@ -3,7 +3,7 @@ use super::super::*;
 use crate::gc_types::{
     BufferOwnerKind, BufferOwnerSchema, BufferViewSchema, ByteArray, CompletionLocals,
     GcHostImport, GcI32Constant, GcLocal, GcOperand, HostResourceSchema, I32Local, I64Local,
-    SharedArrayBufferSchema, TypedArrayObject, TypedArrayObjectSchema, ValueLocals,
+    SharedArrayBufferSchema, TypedArrayObject, TypedArrayObjectSchema,
 };
 
 impl FunctionBuilder<'_> {

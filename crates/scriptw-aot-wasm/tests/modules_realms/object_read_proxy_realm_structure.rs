@@ -310,9 +310,6 @@ fn ordinary_allocation_and_to_object_keep_one_private_kernel_and_explicit_operan
     for authority in [
         "self.load_current_realm(function)",
         "self.emit_current_function_realm(function)",
-        "self.emit_get_function_realm(callee, function)",
-        "FunctionRealmRevokedRoute::UseCurrentRealm",
-        "realm.realm()",
     ] {
         assert!(
             routes.contains(authority),

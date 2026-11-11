@@ -1,10 +1,10 @@
 //! Fixed push entries retain real code/Realm proofs and allocate argv only on
 //! the saved-operand fallback, with canonical packed publication in R.
-use super::property_read_plans::{calls, Module};
+use super::property_read_plans::{Module, calls};
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, StorageType, UnpackedIndex, ValType, Validator,
@@ -80,8 +80,11 @@ fn incoming_empty_argv_allocation(
             .then_some(start + 11)
         })
         .collect::<Vec<_>>();
-    assert_eq!(allocations.len(), 1,
-        "only a null incoming vector with zero declared arguments constructs the entry's empty List");
+    assert_eq!(
+        allocations.len(),
+        1,
+        "only a null incoming vector with zero declared arguments constructs the entry's empty List"
+    );
     allocations[0]
 }
 

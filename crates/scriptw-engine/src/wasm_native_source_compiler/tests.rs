@@ -65,7 +65,6 @@ fn owner(
             limits: WasmtimeStoreLimitsBuilder::new().build(),
         },
     );
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = WasmtimeLinker::new(engine);
     host_imports::register(&mut linker, &module).unwrap();
     for import in module.imports() {

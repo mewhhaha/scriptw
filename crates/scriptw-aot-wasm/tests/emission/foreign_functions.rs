@@ -1,13 +1,13 @@
 //! Real module lowering, P import indices/wrappers, and the shared R boundary.
 use scriptw_aot_wasm::{
-    emit, foreign_registry_from_module, WasmArtifact, RUNTIME_IMPORT_NAMESPACE,
+    RUNTIME_IMPORT_NAMESPACE, WasmArtifact, emit, foreign_registry_from_module,
 };
 use scriptw_ir::foreign::{
     ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
     ForeignValueType,
 };
 use scriptw_ir::{
-    lower_module_graph, ModuleGraphSources, ModuleKey, ModuleRequestKeyIr, ModuleSourceIr,
+    ModuleGraphSources, ModuleKey, ModuleRequestKeyIr, ModuleSourceIr, lower_module_graph,
 };
 use wasmparser::{
     CompositeInnerType, Operator, Parser, Payload, SubType, TypeRef, Validator, WasmFeatures,
@@ -197,9 +197,11 @@ fn assert_foreign_wrappers() {
                 for export in exports {
                     let export = export.unwrap();
                     if export.kind == wasmparser::ExternalKind::Func {
-                        assert!(runtime_exports
-                            .insert(export.name.to_owned(), export.index)
-                            .is_none());
+                        assert!(
+                            runtime_exports
+                                .insert(export.name.to_owned(), export.index)
+                                .is_none()
+                        );
                     }
                 }
             }
@@ -312,7 +314,11 @@ fn assert_foreign_wrappers() {
                 if next == wrapper.index {
                     for operator in body.get_operators_reader().unwrap() {
                         if let Operator::TryTable { try_table } = operator.unwrap() {
-                            assert_eq!(try_table.catches, vec![wasmparser::Catch::One { tag: 0, label: 0 }], "wrapper catches only the declared i32-code tag and never catch_all");
+                            assert_eq!(
+                                try_table.catches,
+                                vec![wasmparser::Catch::One { tag: 0, label: 0 }],
+                                "wrapper catches only the declared i32-code tag and never catch_all"
+                            );
                             actual_tag_catch = true;
                         }
                     }

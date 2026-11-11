@@ -38,7 +38,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 
 const OUTPUT_DIR_ENV: &str = "SCRIPTW_GOLDEN_OUT";

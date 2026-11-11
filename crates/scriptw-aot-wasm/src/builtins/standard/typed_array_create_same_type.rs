@@ -1,5 +1,4 @@
 use super::*;
-use crate::gc_types::*;
 
 impl FunctionBuilder<'_> {
     pub(super) fn emit_typed_array_create_same_type(

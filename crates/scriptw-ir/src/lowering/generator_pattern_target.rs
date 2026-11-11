@@ -1,37 +1,9 @@
 //! Generator default ranges adapt the shared original pattern targets.
 
-use super::pattern_target::PatternContinuation;
-pub(super) use super::pattern_target::{owned_pattern_binding, retain_pattern_value};
 use super::*;
 use crate::generator_loop_control::{GeneratorLoopRegionIr, GeneratorLoopSourceRange};
-pub(super) type RetainedGeneratorPatternTarget<'ast> =
-    super::pattern_target::RetainedPatternTarget<'ast>;
 
 impl ScriptLowerer<'_> {
-    pub(super) fn retain_generator_pattern_identifier(
-        &mut self,
-        ident: boa_ast::expression::Identifier,
-        mode: Option<BindingMode>,
-        storage_names: Option<&BTreeMap<String, String>>,
-        statements: &mut Vec<StatementIr>,
-    ) -> RetainedGeneratorPatternTarget<'static> {
-        self.retain_pattern_identifier(ident, mode, storage_names, statements)
-    }
-    pub(super) fn retain_generator_pattern_member(
-        &mut self,
-        access: &PropertyAccess,
-        statements: &mut Vec<StatementIr>,
-    ) -> Option<RetainedGeneratorPatternTarget<'static>> {
-        self.retain_pattern_member(PatternContinuation::Generator, access, statements)
-    }
-    pub(super) fn put_generator_pattern_target(
-        &mut self,
-        target: RetainedGeneratorPatternTarget<'_>,
-        value: TypedExpr,
-        statements: &mut Vec<StatementIr>,
-    ) -> Option<()> {
-        self.put_pattern_target(PatternContinuation::Generator, target, value, statements)
-    }
     pub(super) fn apply_generator_pattern_default(
         &mut self,
         value: &TypedExpr,

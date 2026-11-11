@@ -49,6 +49,11 @@ impl FunctionBuilder<'_> {
                 (
                     GcOperand::reference(&key_table, schema),
                     GcOperand::descriptor_word(attributes),
+                    GcOperand::boolean(names.iter().all(|name| {
+                        !crate::intrinsics::property_layouts::is_array_index(
+                            &scriptw_ir::decode_js_string_utf16(name),
+                        )
+                    })),
                 ),
                 f,
             ),

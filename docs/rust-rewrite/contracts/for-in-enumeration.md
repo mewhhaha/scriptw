@@ -8,8 +8,9 @@ The shared native cursor owns the same primitive boxing and internal-method
 observations for eager, generator, async and async-generator consumers.
 
 The emitter implements a lazy EnumerateObjectProperties traversal. Each object
-level obtains its own property keys once through the typed internal OwnKeys
-helper. Symbols and already visited names are skipped. Immediately before
+level obtains its own property keys once. An actual ordinary compact data
+object may borrow its immutable shape keys when their order already matches
+OwnKeys; other cases use the typed internal OwnKeys helper. Symbols and already visited names are skipped. Immediately before
 considering an unvisited string key, typed internal GetOwnProperty checks
 that the property still exists and whether it is enumerable. Existing
 non-enumerable properties mark names visited and shadow inherited properties;
@@ -69,24 +70,35 @@ prototypes, iterators, species or public methods. Content hashing and
 SameValueZero preserve String equality, including distinct references and lone
 UTF-16 surrogates. Symbols are excluded before membership lookup.
 
-The cursor's immutable non-null `VISITED_SET` edge keeps the same Set identity.
-Membership is checked before the live descriptor; insertion follows descriptor
-existence and precedes its enumerable test. Each operation reacquires current
-collection storage, so no bucket, slot or table crosses a descriptor callback.
-The selected key and cursor remain rooted across traps, nested enumeration,
-GC and suspension. NEXT_KEY still advances before callback-capable work.
+The cursor retains the current object, key snapshot and next index. A compact
+phase also roots its original storage. Each advance checks that the object's
+live storage still matches; structural mutation resumes the original snapshot
+through the general descriptor path, with the already processed prefix marked.
+Mutable values are never cached by enumeration.
 
-This replaces the visited list's linear scan and exact prefix copying. It adds
-fixed header/collection/ordinal storage per cursor and a SetEntry per new key;
-contains and insert perform separate hashed lookups. Small-width cost and wider
-lookup/copy savings require matched measurements; no timing follows from this
-representation alone. OwnKeys, descriptors, binding publication and GC still
-contribute to loop cost.
+On the first general level, snapshots of at most 64 keys use a scalar bitmap
+for keys whose live descriptor existed. OwnKeys uniqueness makes a duplicate
+membership lookup unnecessary on this level. Missing descriptors leave their
+bits clear; existing non-enumerable properties set their bits before the
+enumerable test. Larger snapshots use the canonical Set immediately.
 
-Layout ABI 52 changes only cursor field 3 from mutable PropertyKeyTable to
-immutable SetObject. There are no new GC types, helper IDs or value/completion
-lanes; the complete recursive R/P type graph nevertheless changes. ABI 51
-runtime caches and build packages must be rejected before admission, and all
-Portable bundles and native images must be rebuilt together. The layout,
-emission, resumable topology and Engine tests cover this boundary; historical
-benchmark and Test262 publications retain their original build identities.
+The nullable mutable `VISITED_SET` edge becomes non-null only when needed.
+Before traversing a prototype, the cursor seeds that same canonical Set from
+its processed compact prefix or its first-level found bitmap. Later levels
+check membership before observing the live descriptor and insert only after
+existence is established. No bucket, slot or table crosses a descriptor callback.
+Keys and the cursor remain rooted across traps, nested enumeration, GC and
+suspension; NEXT_KEY still advances before callback-capable work.
+
+After exhausting own keys, the current prototype is observed. A guarded null
+or sealed, wholly non-enumerable Object.prototype tail can finish immediately.
+The guard authenticates the actual ordinary layout, intrinsic rows and null
+ancestor; mutating the prototype or its properties restores general traversal.
+It never suppresses Proxy observations or assumes a pristine prototype across
+body execution.
+
+The cursor retains compact key-order evidence, captured storage and the found
+bitmap, with a lazy visited Set. The current layout stores these cursor and immutable
+shape fields. All older Portable bundles and native images must be rebuilt together. Layout, emission, mutation, resumable
+and Engine tests cover this boundary; historical benchmark and Test262
+publications retain their original build identities.

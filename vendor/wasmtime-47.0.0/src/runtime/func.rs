@@ -1466,6 +1466,12 @@ pub(crate) fn invoke_wasm_and_catch_traps<T>(
     // restored upon exiting Wasm. Note that the `CallThreadState` that is
     // created by the `catch_traps` call below will store a pointer to this
     // stack-allocated `previous_runtime_state`.
+    // A request made while no compiled code could fault is delivered here.
+    #[cfg(feature = "std")]
+    if store.0.take_pending_interrupt() {
+        return Err(crate::Trap::Interrupt.into());
+    }
+
     let mut previous_runtime_state = EntryStoreContext::enter_wasm(store, &mut initial_stack_csi);
 
     if let Err(trap) = store.0.call_hook(CallHook::CallingWasm) {

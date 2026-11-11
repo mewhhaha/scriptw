@@ -481,8 +481,6 @@ pub(super) fn execute(
         .map_err(|e| e.to_string())?;
     let mut store = wasmtime::Store::new(&engine, state);
     store.limiter(|state| state.limits_mut());
-    // The outer bounded driver owns the wall deadline, as for canonical runs.
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = wasmtime::Linker::new(&engine);
     runtime
         .register(&mut store, &mut linker)

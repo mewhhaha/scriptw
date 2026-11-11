@@ -5,14 +5,6 @@ use crate::gc_types::I32Local;
 pub(super) struct CompletedExactChild<'pair> {
     pair: &'pair CountedLoopLocals,
 }
-impl CompletedExactChild<'_> {
-    pub(super) fn guard(&self) -> I64Local {
-        self.pair.guard
-    }
-    pub(super) fn end(&self) -> I64Local {
-        self.pair.end
-    }
-}
 
 fn intersect(eligible: I32Local, f: &mut Function) {
     eligible.load(f);

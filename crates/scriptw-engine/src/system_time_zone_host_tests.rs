@@ -108,7 +108,6 @@ impl SystemZoneProbe {
                     .build(),
             },
         );
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker = WasmtimeLinker::new(&wasm_engine);
         wasm_gc_intl_host::link(&mut linker, &module).unwrap();
         let instance = linker.instantiate(&mut store, &module).unwrap();

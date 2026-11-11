@@ -9,10 +9,6 @@ const FIXTURE: &str = include_str!(
 const CLI_SOURCE: &str = include_str!("../../../scriptw-cli/tests/cli/language_numerics.rs");
 const RUNNER_SOURCE: &str = include_str!("../../../scriptw-test262/src/lib.rs");
 const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-failures.tsv");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/ordinary-property-plain-assignment-reference.md"
-);
-
 const EXACT_TEST262: &[(&str, &str)] = &[
     (
         "target-member-computed-reference-null.js",
@@ -215,21 +211,5 @@ fn exact_inventory_is_raw_unmasked_and_controls_remain_separate() {
     for (_, source) in &EXACT_TEST262[1..] {
         assert!(source.contains("count += 1"));
         assert!(source.contains("assert.sameValue(count, 1)"));
-    }
-}
-
-#[test]
-fn verified_status_records_the_exact_baseline_results_and_nonclaims() {
-    for marker in [
-        "three physical files produce six",
-        "evaluate `rhs`",
-        "apply `ToObject`",
-        "apply `ToPropertyKey` exactly once",
-        "perform `[[Set]]`",
-        "publish `rhs` only after PutValue completes normally",
-        "This batch does not change compound or logical assignment",
-        "resumable property",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract lost {marker}");
     }
 }

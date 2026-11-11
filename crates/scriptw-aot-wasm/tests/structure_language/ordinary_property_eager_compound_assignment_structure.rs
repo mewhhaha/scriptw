@@ -17,10 +17,6 @@ const FIXTURE: &str = include_str!(
 const CLI_SOURCE: &str = include_str!("../../../scriptw-cli/tests/cli/language_numerics.rs");
 const RUNNER_SOURCE: &str = include_str!("../../../scriptw-test262/src/lib.rs");
 const KNOWN_FAILURES: &str = include_str!("../../../scriptw-cli/tests/known-failures.tsv");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/ordinary-property-eager-compound-assignment-reference.md"
-);
-
 macro_rules! exact_test262 {
     ($name:literal) => {
         (
@@ -405,12 +401,8 @@ fn exhaustive_consumers_and_gc_owners_name_each_fused_phase() {
         "the sole whole-value publisher owns the fused node"
     );
     assert_eq!(DATA_SOURCE.matches(marker).count(), 1);
-    assert_eq!(PLANNING_SOURCE.matches(marker).count(), 3);
-    for owner in [
-        "fn expr_exposes_global_object(",
-        "fn collect_expr_global_property_names(",
-        "fn expr_references_function(",
-    ] {
+    assert_eq!(PLANNING_SOURCE.matches(marker).count(), 1);
+    for owner in ["fn expr_references_function("] {
         assert_eq!(
             bounded(PLANNING_SOURCE, owner, "\n}\n")
                 .matches(marker)
@@ -508,19 +500,5 @@ fn exact_a7_inventory_is_raw_unmasked_and_keeps_all_t3_controls() {
             !KNOWN_FAILURES.contains(name),
             "known-failure inventory masks exact witness {name}"
         );
-    }
-}
-
-#[test]
-fn status_records_the_exact_baseline_and_keeps_the_batch_bounded() {
-    for marker in [
-        "44 physical files",
-        "for 88 matrix\nexecutions",
-        "Exponentiation has no file in this legacy matrix",
-        "This batch does not change logical assignment",
-        "prefix/postfix numeric update",
-        "resumable/suspended property Reference",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract lost boundary {marker}");
     }
 }

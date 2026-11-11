@@ -7,7 +7,6 @@ use boa_ast::StatementList;
 use core::ops::ControlFlow;
 
 mod statement;
-pub(crate) use statement::append as append_async_statement_states;
 pub(crate) use statement::append_protocol as append_async_statement_protocol_states;
 pub(crate) use statement::expression_states as append_async_expression_protocol_states;
 pub(crate) use statement::items as append_async_statement_protocol_items;
@@ -100,12 +99,6 @@ impl<'ast> AsyncWithSource<'ast> {
                 .map(|point| (point.suspend_state, point.resume_state))
                 .collect(),
         })
-    }
-    pub(crate) fn append(&self, cursor: &mut u32, awaits: &mut Vec<(u32, u32)>) -> Option<()> {
-        let states = self.states(*cursor)?;
-        *cursor = states.exit;
-        awaits.extend(states.awaits);
-        Some(())
     }
     pub(crate) fn append_protocol(
         &self,

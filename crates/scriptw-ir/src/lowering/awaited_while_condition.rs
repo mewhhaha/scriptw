@@ -38,12 +38,6 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    pub(super) fn has_async_pattern_value_branch_owner(&self) -> bool {
-        self.plain_async_entry_state().is_some()
-            && matches!(self.async_value_branch_context,
-                AsyncValueBranchContext::Pattern { loop_depth } if self.loop_depth == loop_depth)
-    }
-
     pub(super) fn has_checked_async_source_value_branch_owner(&self) -> bool {
         self.plain_async_entry_state().is_some()
             && match self.async_value_branch_context {

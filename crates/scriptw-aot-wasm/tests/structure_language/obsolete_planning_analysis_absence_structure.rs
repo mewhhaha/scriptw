@@ -1,9 +1,6 @@
 const PLANNING_SOURCE: &str = include_str!("../../src/planning.rs");
 const DATA_SOURCE: &str = include_str!("../../src/data.rs");
 const MODULE_SOURCE: &str = include_str!("../../src/module.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/obsolete-planning-analysis-removal.md");
-
 #[test]
 fn unreachable_planning_analysis_is_absent() {
     for name in [
@@ -54,20 +51,4 @@ fn live_planning_and_ir_authorities_remain() {
     assert!(DATA_SOURCE.contains(
         "function.super_constructor_target.as_deref() == Some(BUILTIN_REGEXP_FUNCTION_ID)"
     ));
-}
-
-#[test]
-fn removal_has_frozen_source_evidence() {
-    for evidence in [CONTRACT] {
-        for hash in [
-            "be7c5a1e0e9fe6fefc2c8a5db187f192c1e5f55764eeee29d940dc26ad94a177",
-            "17b31c1feb5348b2f1e2dc0cdf24a618519ddebf55d39105288c6b898d8fb88f",
-            "4050159124cc94d7b65ee22e7bd566c9b600bf5bbb55b5815ca6f4ef537e3ea8",
-            "34679124b57a9e0716f4a604d29f5383ffd4c91ce3d1fdb8aa509c65951df238",
-            "c99ecf4f2aca412f218f8e5a6be29cacb0fe51d34635533114bc0d74e698bba5",
-        ] {
-            assert!(evidence.contains(hash));
-        }
-        assert!(evidence.contains("no new JavaScript behavior"));
-    }
 }

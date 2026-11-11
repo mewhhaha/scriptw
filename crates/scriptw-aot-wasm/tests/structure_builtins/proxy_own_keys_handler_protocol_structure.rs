@@ -3,9 +3,6 @@ const OWN_KEYS_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_proxy_own_keys.js");
 const HANDLER_PROTOCOL_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_proxy_own_keys_handler_protocol.js");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/proxy-own-keys-result-ownership.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -185,19 +182,6 @@ fn assert_live_wasm_cli_test(source: &str, name: &str, fixture: &str) {
         1,
         "`{name}` must run its exact fixture"
     );
-}
-
-#[test]
-fn contract_and_t11_own_the_result_authority() {
-    for marker in [
-        "ProxyOwnKeysTrapLocals",
-        "ProxyOwnKeysTrapResultLocals",
-        "proxy_own_keys_handler_protocol_structure",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract marker `{marker}`");
-        assert!(CONTRACT.contains(marker), "task marker `{marker}`");
-    }
-    assert!(CONTRACT.contains("transposing them compiled"));
 }
 
 #[test]

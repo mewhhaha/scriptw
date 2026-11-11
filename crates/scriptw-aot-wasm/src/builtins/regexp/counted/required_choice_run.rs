@@ -28,9 +28,6 @@ impl ProvenRequiredChoiceRun<'_, '_> {
     pub(in crate::builtins::regexp) fn workspace(&self) -> &MatcherWorkspace {
         self.workspace
     }
-    pub(in crate::builtins::regexp) fn template_newest(&self) -> I64Local {
-        self.template_newest
-    }
     pub(in crate::builtins::regexp) fn template_oldest(&self) -> I64Local {
         self.template_oldest
     }

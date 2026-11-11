@@ -3,7 +3,6 @@ use crate::control_flow::SyncIteratorConsumer;
 use crate::functions::{ErrorMessageConstructorKind, OrdinaryDefaultPrototype};
 use crate::gc_types::*;
 use crate::operations::PropertyKeyLocals;
-pub(crate) use runtime_error::ActiveBuiltinRealmPrototype;
 use scriptw_ir::NativeErrorKind;
 
 mod aggregate_error_preparation;

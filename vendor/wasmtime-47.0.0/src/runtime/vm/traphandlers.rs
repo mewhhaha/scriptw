@@ -959,6 +959,25 @@ impl CallThreadState {
             }
         }
 
+        // An interrupt request made this address inaccessible. Compiled code
+        // stops here whether or not the instruction is a registered trap
+        // site. Host code, and compiled code whose request is already
+        // delivered or withdrawn, retries the access.
+        #[cfg(all(feature = "std", unix, has_native_signals, not(miri)))]
+        if let Some(addr) = faulting_addr {
+            if let Some(interrupt) = unsafe { crate::runtime::vm::restore_access(addr) } {
+                if lookup_code(regs.pc).is_some() && interrupt.take_pending() {
+                    self.set_jit_trap(
+                        regs,
+                        None,
+                        wasmtime_environ::CompiledTrap::Normal(wasmtime_environ::Trap::Interrupt),
+                    );
+                    return TrapTest::Trap(self.entry_trap_handler());
+                }
+                return TrapTest::HandledByEmbedder;
+            }
+        }
+
         // If this fault wasn't in wasm code, then it's not our problem
         let Some((code, text_offset)) = lookup_code(regs.pc) else {
             return TrapTest::NotWasm;

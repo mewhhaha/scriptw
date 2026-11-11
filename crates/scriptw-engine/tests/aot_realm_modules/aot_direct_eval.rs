@@ -134,5 +134,7 @@ fn eval_assignment_to_named_function_self_respects_binding_strictness() {
 
 #[test]
 fn top_level_arrow_grammar_does_not_make_its_eval_vars_global() {
-    assert_direct_eval("let f = () => { eval('var localOnly = 7'); return localOnly === 7; }; f() && typeof localOnly === 'undefined';");
+    assert_direct_eval(
+        "let f = () => { eval('var localOnly = 7'); return localOnly === 7; }; f() && typeof localOnly === 'undefined';",
+    );
 }

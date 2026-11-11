@@ -70,10 +70,11 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
             let (nullable, cursor) = concrete_reference(cursor_edge.element_type)?;
             let record = &structures.get(&cursor)?.fields;
             if !nullable
-                || record.len() != 4
-                || record[..3].iter().any(|field| !field.mutable)
-                || record[3].mutable
+                || record.len() != 6
+                || record.iter().any(|field| !field.mutable)
                 || record[2].element_type.unpack() != ValType::I32
+                || record[5].element_type.unpack() != ValType::I64
+                || !concrete_reference(record[4].element_type).is_some_and(|(nullable, _)| nullable)
             {
                 return None;
             }
@@ -87,7 +88,7 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
             }
             let (nullable, visited) = concrete_reference(record[3].element_type)?;
             let set = &structures.get(&visited)?.fields;
-            if nullable || set.len() != 8 || set[0].mutable {
+            if !nullable || set.len() != 8 || set[0].mutable {
                 return None;
             }
             let (nullable, entries) = concrete_reference(set[1].element_type)?;
@@ -173,8 +174,8 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
         "mixed enumeration uses the original request queue activation"
     );
     let mut cursor_new = 0;
-    let mut cursor_reads = [0; 4];
-    let mut cursor_writes = [0; 4];
+    let mut cursor_reads = [0; 6];
+    let mut cursor_writes = [0; 6];
     let mut edge_reads = 0;
     let mut edge_writes = 0;
     let mut ancestry_reads = 0;
@@ -250,8 +251,7 @@ fn inspect_mixed_for_in_artifact(source: &str, requires_reference: bool) {
     assert!(
         cursor_new > 0
             && cursor_reads.iter().all(|n| *n > 0)
-            && cursor_writes[..3].iter().all(|n| *n > 0)
-            && cursor_writes[3] == 0
+            && cursor_writes.iter().all(|n| *n > 0)
             && edge_reads > 0
             && edge_writes > 0,
         "actual create/advance/retire accesses the one original retained cursor"

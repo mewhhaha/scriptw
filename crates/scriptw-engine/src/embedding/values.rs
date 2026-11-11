@@ -213,7 +213,7 @@ pub(super) fn embedded_error(error: wasmtime::Error) -> EngineError {
         retained.message = format!("embedded Wasm/host execution failed: {error:#}");
         return retained;
     }
-    let kind = if is_wasm_epoch_interrupt(&error) {
+    let kind = if is_wasm_deadline_interrupt(&error) {
         EngineExecutionFailure::Timeout
     } else {
         EngineExecutionFailure::Trap

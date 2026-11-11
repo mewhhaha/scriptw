@@ -143,8 +143,14 @@ fn earlier_unrelated_rejection_never_replaces_the_entry_rejection() {
             let failure = engine()
                 .run_module(source, options(policy), execution())
                 .expect_err("entry rejection is primary");
-            assert_eq!(failure.wasm_execution_failure_kind(), Some(WasmExecutionFailureKind::JavaScriptException));
-            assert_eq!(failure.wasm_javascript_exception_constructor_name(), Some("TypeError"));
+            assert_eq!(
+                failure.wasm_execution_failure_kind(),
+                Some(WasmExecutionFailureKind::JavaScriptException)
+            );
+            assert_eq!(
+                failure.wasm_javascript_exception_constructor_name(),
+                Some("TypeError")
+            );
             assert!(failure.message().contains("entry marker"), "{failure}");
         }
     }

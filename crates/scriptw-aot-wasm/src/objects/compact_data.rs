@@ -200,7 +200,7 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(f))
     }
 
-    pub(super) fn emit_compact_shape_keys(
+    pub(crate) fn emit_compact_shape_keys(
         &self,
         storage: &GcLocal<CompactDataStorage>,
         f: &mut Function,

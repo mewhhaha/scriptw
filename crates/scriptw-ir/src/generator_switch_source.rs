@@ -175,9 +175,7 @@ impl<'ast> CheckedGeneratorSwitchSource<'ast> {
             },
         })
     }
-    pub(crate) fn source(&self) -> &'ast AstSwitch {
-        self.source
-    }
+    #[cfg(test)]
     pub(crate) fn states(&self) -> &GeneratorSwitchSourceStates {
         &self.states
     }

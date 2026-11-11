@@ -97,14 +97,6 @@ impl<'a> WasmProgramRef<'a> {
         self.compilation_policy = Some(policy);
         self
     }
-
-    /// The module that owns the host imports, memory imports and Intl images.
-    pub(super) fn host_bytes(&self) -> &'a [u8] {
-        match self.runtime {
-            Some(runtime) => runtime.bytes(),
-            None => self.bytes,
-        }
-    }
 }
 
 /// The runtime reference an [`Artifact`] carries. Equality is by key: the key

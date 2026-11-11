@@ -2,6 +2,8 @@
 //! Build this package separately so workspace feature unification cannot enable
 //! native source compilation. Compiler dependency crates still exist; this
 //! experiment removes producer commands and the native-source callback roots.
+#[path = "../../scriptw-cli/examples/benchmark_common/thread_cpu.rs"]
+mod benchmark_thread_cpu;
 #[path = "../../scriptw-cli/examples/runtime_precompiled/consume.rs"]
 #[allow(dead_code)]
 mod consume;

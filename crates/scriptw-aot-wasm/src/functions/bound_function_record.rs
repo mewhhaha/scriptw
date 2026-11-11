@@ -23,9 +23,6 @@ impl BoundFunctionRecordLocals {
     pub(crate) fn arguments(&self) -> &GcLocal<ValueArray> {
         &self.arguments
     }
-    pub(crate) fn constructable(&self) -> I32Local {
-        self.constructable
-    }
     pub(crate) fn clear(self, schema: &RuntimeSchema, function: &mut Function) {
         schema.release_i32_local(self.constructable, function);
         self.arguments.clear(function);

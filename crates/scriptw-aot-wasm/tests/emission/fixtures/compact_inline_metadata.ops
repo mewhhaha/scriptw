@@ -1,5 +1,10 @@
 # Published scalar metadata-ordinary P: 487e24a11df0a5ac9145927a11d8072bb2235f05309f2e4fd7523e880e169126
 # Source: 37cd4a8969d8e4baa7f1cd5bea040dd2a2ecac52f573edc07b31f1773cb2cb66
+# The open compact-base cast before the sealed inline cast is no longer emitted.
+# The loop header stores to the deadline poll byte.
+I32Const { value: 8 }
+I32Const { value: 0 }
+I32Store8 { memarg: MemArg { align: 0, max_align: 0, offset: 0, memory: 0 } }
 LocalGet local0
 LocalGet local1
 LocalGet local2
@@ -64,11 +69,11 @@ LocalSet local12
 LocalGet local10
 I32Const { value: 6 }
 I32Ne
-BrIf operator175
+BrIf operator177
 LocalGet local12
 RefTestNonNull { hty: Concrete(Module(71)) }
 I32Eqz
-BrIf operator175
+BrIf operator177
 LocalGet local12
 RefCastNonNull { hty: Concrete(Module(71)) }
 LocalSet local14
@@ -78,9 +83,8 @@ LocalSet local15
 LocalGet local15
 RefTestNonNull { hty: Concrete(Module(83)) }
 I32Eqz
-BrIf operator175
+BrIf operator177
 LocalGet local15
-RefCastNonNull { hty: Concrete(Module(81)) }
 RefCastNonNull { hty: Concrete(Module(83)) }
 LocalSet local16
 LocalGet local16
@@ -88,7 +92,7 @@ StructGet { struct_type_index: 83, field_index: 0 }
 LocalGet local20
 RefEq
 I32Eqz
-BrIf operator175
+BrIf operator177
 LocalGet local16
 StructGet { struct_type_index: 83, field_index: 1 }
 LocalGet local21
@@ -118,7 +122,7 @@ End
 LocalGet local10
 I32Const { value: 3 }
 I32Ne
-BrIf operator175
+BrIf operator177
 LocalGet local11
 F64ReinterpretI64
 LocalSet local1
@@ -151,11 +155,11 @@ End
 LocalGet local10
 I32Const { value: 4 }
 I32Ne
-BrIf operator175
+BrIf operator177
 LocalGet local12
 RefTestNonNull { hty: Concrete(Module(148)) }
 I32Eqz
-BrIf operator175
+BrIf operator177
 LocalGet local12
 RefCastNonNull { hty: Concrete(Module(148)) }
 LocalSet local23

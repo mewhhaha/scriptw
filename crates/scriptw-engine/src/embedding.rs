@@ -96,9 +96,10 @@ pub(super) struct StoreEmbeddingState {
 }
 
 /// Initialize Scriptw's required Wasmtime configuration. Apply any embedder
-/// compilation, fuel or interruption settings after this call. This sets the
-/// normal Fast/copying-GC baseline, including epoch checks; callers own Store
-/// deadlines and any engine epoch ticker. No deadline is changed by evaluation.
+/// compilation or fuel settings after this call. This sets the normal
+/// Fast/copying-GC baseline without epoch checks: compiled code is stopped
+/// through `wasmtime::Store::interrupt_handle`, and callers own that handle
+/// and any deadline. Evaluation neither requests nor cancels an interrupt.
 pub fn configure_wasm_runtime(config: &mut wasmtime::Config) {
     *config = wasmtime_config::base_config(
         WasmNativeCompilationMode::Fast,

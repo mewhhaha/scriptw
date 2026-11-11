@@ -19,7 +19,7 @@ impl PlannedFunctionEntry {
     pub(crate) fn executable_kind(&self) -> Result<ExecutableCodeKind, EmitError> {
         match self.origin {
             EntryOrigin::User { .. } => Ok(ExecutableCodeKind::JavaScript),
-            EntryOrigin::StandardBuiltin(_) => Ok(ExecutableCodeKind::StandardBuiltin),
+            EntryOrigin::StandardBuiltin { .. } => Ok(ExecutableCodeKind::StandardBuiltin),
             EntryOrigin::HostBuiltin(_) => Ok(ExecutableCodeKind::HostBuiltin),
             EntryOrigin::PreparedScript { .. } => Err(entry_error(
                 "a prepared Script cannot publish a callable code record",
@@ -35,7 +35,7 @@ impl PlannedFunctionEntry {
     ) -> Result<GcStackReference<ExecutableCode>, EmitError> {
         let kind = self.executable_kind()?;
         let (standard_builtin, host_builtin) = match self.origin {
-            EntryOrigin::StandardBuiltin(id) => (Some(id), None),
+            EntryOrigin::StandardBuiltin { builtin, .. } => (Some(builtin), None),
             EntryOrigin::HostBuiltin(id) => (None, Some(id)),
             EntryOrigin::User { .. } | EntryOrigin::PreparedScript { .. } => (None, None),
         };

@@ -12,7 +12,7 @@ including `.cargo/config.toml`, generated data, vendor sources and test fixtures
 For an existing cone-mode sparse checkout:
 
 ```sh
-git sparse-checkout add .cargo .github crates scripts vendor test262 docs snapshots
+git sparse-checkout add .cargo .github crates scripts vendor test262 docs
 cargo metadata --locked --offline --no-deps --format-version 1
 ```
 
@@ -217,11 +217,11 @@ For JavaScript-to-portable-Wasm compilation, select a frozen ordinary CLI
 ```sh
 python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-compilation.py run \
   --scriptw target/qualified-cohort/candidate-ordinary/scriptw \
-  --scriptc target/performance-compact-row-entry/tools/scriptc/node_modules/.bin/scriptc \
-  --runtime-pack target/performance-compact-row-entry/tools/scriptc/node_modules/@scriptc/runtime-wasm32-wasi \
-  --zig target/performance-compact-row-entry/tools/zig-x86_64-linux-0.16.0/zig \
-  --time target/performance-worker-cpu/tools/time \
-  --package-lock target/performance-compact-row-entry/tools/scriptc/package-lock.json \
+  --scriptc /path/to/scriptc/node_modules/.bin/scriptc \
+  --runtime-pack /path/to/scriptc/node_modules/@scriptc/runtime-wasm32-wasi \
+  --zig /path/to/zig-0.16.0/zig \
+  --time /path/to/gnu-time \
+  --package-lock /path/to/scriptc/package-lock.json \
   --output target/new-compilation-reference
 python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-compilation.py publish \
   target/new-compilation-reference/report.json --output target/new-compilation-publication
@@ -337,15 +337,14 @@ The [Server Components](https://react.dev/reference/rsc/server-components) and
 [client DOM](https://react.dev/reference/react-dom/client) APIs are separate
 scopes; synchronous HTML SSR is a third workload.
 
-Current-source qualification covers the pinned React 19.3.1 sync and async RSC
-fixtures, each checked against its exact Node Flight output. The matched Node
-reference uses the same generated `rsc.js` and wrapper in one retained
-`vm.SourceTextModule` and Realm, running sync then async with three checked
-warmups and seven samples per mode. Its request clock ends when the full Flight
-Promise resolves; JSON encoding and golden comparison follow the clock. Parse,
-link and module initialization remain separate setup spans. This is a fixture
-qualification and descriptive timing comparison, not full Web API or WHATWG
-Streams conformance or an engine-parity claim.
+RSC qualification uses the pinned React 19.3.1 sync and async fixtures, each
+checked against its exact Node Flight output. Both hosts use the same generated
+`rsc.js` and module wrapper. Timing ends after Flight serialization, complete
+stream consumption, decoding and the fixture's internal sanity checks. The
+outer result's JSON encoding and golden comparison follow the clock. Scriptw
+includes host entry and required Promise pumps; Node includes await completion
+and its Web APIs. Setup is separate. This is a fixture comparison, not full Web
+API or WHATWG Streams conformance or an engine-parity claim.
 
 The retained Scriptw probe uses the same generated inputs:
 
@@ -353,14 +352,39 @@ The retained Scriptw probe uses the same generated inputs:
 python3 -B scripts/limited_verification.py -- cargo build --release --locked -p scriptw-cli --example rsc_baseline
 python3 -B scripts/limited_verification.py -- ./target/release/examples/rsc_baseline \
   target/new-application-fixtures/rsc.js target/new-application-fixtures/support.json \
-  target/new-retained-rsc.json 7 3 fast
+  target/new-retained-rsc.json 21 100 fast rsc-sync
 ```
 
 Build the production CLI separately as described above. This probe reports actual
 native settings and separates setup from requests. `speed` selects the optional
 Speed/Backtracking diagnostic; keep it outside the matched Fast cohort. A single
-probe is not a complete comparison; freeze binaries before repeating the balanced
-process campaign. The published evidence archive retains that campaign's driver.
+probe is not a complete comparison. Freeze each host before changing compiler
+source, retaining its Cargo JSON producer and source diff, then run:
+
+```sh
+python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-rsc.py \
+  --host baseline=target/rsc-baseline/host --host candidate=target/rsc-candidate/host \
+  --producer baseline=target/rsc-baseline/cargo.jsonl \
+  --producer candidate=target/rsc-candidate/cargo.jsonl \
+  --fixtures target/new-application-fixtures --node /path/to/node --time /path/to/gnu-time \
+  --output target/new-rsc-comparison
+```
+
+The maintained campaign gives each case its own process and retained Realm,
+avoiding sync-to-async warmup contamination. Defaults are 100 checked warmups,
+21 samples, and eight fresh processes per actor/case in two reversed blocks.
+`--warmups`, `--samples`, `--processes-per-block` and `--case` select explicit
+scopes; warmup count does not prove optimized steady state. Reports retain all
+warmup and measured times, checked output identities, per-process means,
+medians and nearest-rank p95, process summaries, cold phases and whole-process
+high-water RSS. Request samples in one process are dependent; p95 is descriptive,
+not a confidence bound. Cargo logs are retained, not feature-graph qualified.
+Tracing, profiling and artifact-export runs are rejected as scored inputs.
+The older published seven-sample campaign retains its original runner and Node
+driver in its evidence archive; its fixed sync-then-async order is historical.
+Repeat `--host NAME=PATH` and select `--policy NAME=speed` to include an explicit
+native-policy diagnostic in the same balanced schedule. Each actor retains its
+own policy and source identity; never blend its samples with Fast.
 
 For excluded compiler-policy diagnostics, `fast-backtracking` and
 `speed-single-pass` cross optimization and register allocation independently.
@@ -395,8 +419,8 @@ standalone `EventTarget`/`Event`, `DOMException`, `queueMicrotask`, `setTimeout`
 `clearTimeout`. These use the existing compiled Wasm GC object model. UTF-8 label
 aliases are accepted; other decoder encodings reject explicitly. BYOB readers,
 generic object streams, pipe/tee operations, Fetch/URL and DOM nodes are separate
-capabilities, not implied by this surface. Current artifacts use Runtime ABI 52.
-Current-source sync and async React RSC fixture output passes exact Flight checks;
+capabilities, not implied by this surface. The README records the current
+Runtime ABI. Current-source sync and async React RSC fixture output passes exact Flight checks;
 that does not establish full Web API or WHATWG Streams conformance.
 
 Microtasks drain at checkpoints. Timers use a distinct queue and monotonic
@@ -410,6 +434,15 @@ Reuse requires exact source, features, dependency graph, runtime/program identit
 and resource policy; filenames alone prove nothing. Keep fresh evidence directories
 for new cohorts and preserve failed receipts. Shared immutable runtime images and
 bounded caches reduce rebuilds without sharing mutable JavaScript state.
+
+Give an experimental source copy its own `CARGO_TARGET_DIR`, or keep the copy
+outside `target/`. Cargo identifies workspace packages by their path relative
+to the workspace root and records sources under the target directory relative
+to it. A copy under `target/` built into the shared directory therefore
+replaces the canonical units, and the canonical build then reports them fresh
+and links the copy's code even after canonical sources change. If that
+happened, remove every `target/<profile>/.fingerprint/` directory whose
+`dep-*` files name the copy, then rebuild.
 
 Use a disk-backed `SCRIPTW_CACHE_DIR` for footprint comparisons and record the
 cache filesystem and native backing mode alongside image digests. On Linux, the

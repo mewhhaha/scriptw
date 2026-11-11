@@ -145,13 +145,6 @@ impl ScriptLowerer<'_> {
         }
     }
 
-    fn owned_generated_generator_slot(&self, name: &str) -> Option<u32> {
-        self.generated_owned_env_bindings
-            .iter()
-            .find(|binding| binding.name == name)
-            .map(|binding| binding.slot)
-    }
-
     pub(super) fn lower_generator_value_branch(
         &mut self,
         source: GeneratorValueBranchSource<'_>,

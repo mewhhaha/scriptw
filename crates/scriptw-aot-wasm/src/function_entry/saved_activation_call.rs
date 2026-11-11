@@ -7,7 +7,6 @@ use crate::gc_types::{
     ExecutableCodeSchema, FunctionContext, FunctionContextSchema, FunctionObject,
     FunctionObjectSchema, GcLocal, GeneratorActivation, GeneratorActivationSchema,
     GeneratorCallable, InvocationFrame, InvocationFrameSchema, ProgramInstanceLocals, StoredValue,
-    ValueArray,
 };
 
 macro_rules! saved_activation_call {

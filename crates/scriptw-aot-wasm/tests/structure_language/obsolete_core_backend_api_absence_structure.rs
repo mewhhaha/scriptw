@@ -1,9 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/obsolete-core-backend-api-removal.md");
-
 fn count_identifier_in_rust_sources(dir: &Path, identifier: &str) -> usize {
     fs::read_dir(dir)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", dir.display()))
@@ -65,20 +62,5 @@ fn live_neighboring_apis_remain_reachable() {
             count_identifier_in_rust_sources(&source_root, name) >= 2,
             "`{name}` must retain its definition and a caller"
         );
-    }
-}
-
-#[test]
-fn removal_has_frozen_source_evidence() {
-    for evidence in [CONTRACT] {
-        for hash in [
-            "f3bc9cf6043c6d927bf0d51a9f600cf28f1c2e86291f623c47ba9406b35bc0c7",
-            "6af38235bb977a2b2673f8424ea1bfa1b4fb4b958df5f4a06b9490bb8e270b48",
-            "7860a2a85f440682f332a7be0a6bee8d1a7f92eaa2de78025329ae026dd699fb",
-            "ceac7d89945f7aeaeff7721ff47901b0c9980405f35d05aa33396ec25aab608b",
-        ] {
-            assert!(evidence.contains(hash));
-        }
-        assert!(evidence.contains("no new JavaScript behavior"));
     }
 }

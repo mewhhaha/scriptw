@@ -1,7 +1,7 @@
 //! Completed ordinary parameters omit body TDZ branches; default failures have execution coverage.
 use crate::property_read_plans::Module;
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 

@@ -7,9 +7,6 @@ const MATCHER: &str = concat!(
     include_str!("../../src/builtins/regexp/matcher_workspace.rs"),
     include_str!("../../src/builtins/regexp/transient.rs"),
 );
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/regexp-matcher-result-domain.md");
-
 fn quoted_literal_end(source: &str, quote_start: usize, quote: u8) -> Option<usize> {
     let bytes = source.as_bytes();
     let mut offset = quote_start + 1;
@@ -242,16 +239,4 @@ fn sole_writer_consumes_and_exhaustively_projects_the_result() {
     assert!(!writer.contains("unreachable!"));
     assert_eq!(matcher.matches("result:RegExpMatcherResult").count(), 1);
     assert_eq!(matcher.matches("matchresult{").count(), 1);
-}
-
-#[test]
-fn contract_records_the_exact_abi_boundary_and_nonclaims() {
-    for marker in [
-        "`RegExpMatcherResult::{Match, NoMatch, Failed(RegExpMatcherFailure)}`",
-        "exactly 52 result producers",
-        "The original change was source-equivalent ABI hardening.",
-        "passed `4/4`",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract marker `{marker}`");
-    }
 }

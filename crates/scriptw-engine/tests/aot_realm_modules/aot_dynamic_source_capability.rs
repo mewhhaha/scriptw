@@ -237,8 +237,7 @@ fn agent_script_error(source: &str) -> EngineError {
 const RUNTIME_DIRECT_EVAL: &str = "function caller(){var marker={value:41},seen;var actual=eval('seen=marker;marker.value+=1;marker;/*'+Math.random()+'*/');if(actual!==marker||seen!==marker||marker.value!==42)throw 'native direct caller identity/effects';}caller();";
 const COMPILE_UNSUPPORTED_REALM_SCRIPT: &str =
     "__scriptwRealmEvalScript(\"import(globalThis.moduleSpecifier);\");";
-const RUNTIME_INDIRECT_EVAL: &str =
-    "globalThis.unknownSource = 'globalThis.nativeAgentValue=42;42;/*' + Math.random() + '*/'; \
+const RUNTIME_INDIRECT_EVAL: &str = "globalThis.unknownSource = 'globalThis.nativeAgentValue=42;42;/*' + Math.random() + '*/'; \
      var nativeAgentResult=eval.call(undefined,globalThis.unknownSource);";
 
 const CAPABILITY_WORKER: &str = "new ShadowRealm().evaluate('1/*' + Math.random() + '*/');";

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use scriptw_aot_wasm::{emit, RUNTIME_IMPORT_NAMESPACE};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{RUNTIME_IMPORT_NAMESPACE, emit};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{
     ExternalKind, KnownCustom, Name, Operator, Parser, Payload, TypeRef, Validator, WasmFeatures,
@@ -86,10 +86,12 @@ impl Module {
                             if let Name::Function(map) = subsection.expect("name section decodes") {
                                 for naming in map {
                                     let naming = naming.expect("function name decodes");
-                                    assert!(module
-                                        .names
-                                        .insert(naming.index, naming.name.to_owned())
-                                        .is_none());
+                                    assert!(
+                                        module
+                                            .names
+                                            .insert(naming.index, naming.name.to_owned())
+                                            .is_none()
+                                    );
                                 }
                             }
                         }

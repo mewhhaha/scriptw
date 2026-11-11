@@ -105,7 +105,14 @@ async function server(directory,name) {
   return {schema:'scriptw-react-server-v1',case:name,node:process.versions,parse_ns,initialization_ns,
     samples:7,warmups:3,observations};
 }
-async function retainedModule(directory) {
+async function retainedModule(directory,sampleCount='7',warmupCount='3',selectedCase='all') {
+  const samples=Number(sampleCount);
+  const warmups=Number(warmupCount);
+  assert(Number.isInteger(samples)&&samples>0,'positive integer samples required');
+  assert(Number.isInteger(warmups)&&warmups>=0&&samples+warmups<=1000,'at most 1000 total calls');
+  assert(['all','rsc-sync','rsc-async'].includes(selectedCase),'unknown retained case');
+  let caseOrder=['rsc-sync','rsc-async'];
+  if(selectedCase!=='all') caseOrder=[selectedCase];
   assert.equal(typeof vm.SourceTextModule,'function',
     'run with --experimental-vm-modules on a Node version that exposes vm.SourceTextModule');
   const sourcePath=path.join(directory,'rsc.js');
@@ -130,23 +137,27 @@ async function retainedModule(directory) {
   assert.equal(typeof run,'function');
   assert.equal(typeof encode,'function');
   const observations=[];
-  for(const mode of ['sync','async']) {
-    const name='rsc-'+mode;
+  for(const name of caseOrder) {
+    const mode=name.slice(4);
     const expected=support.expected[name];
     assert.equal(typeof expected,'string','missing Node Flight expectation: '+name);
-    for(let index=0;index<10;index++) {
+    const expectedJson=expected.replace(/\n$/,'');
+    for(let index=0;index<samples+warmups;index++) {
       const start=ns();
       const result=await run(mode);
       const elapsed_ns=elapsed(start);
-      const stdout=encode(result)+'\n';
-      assert.equal(stdout,expected,'retained-module output changed, including warmup: '+name);
-      observations.push({case:name,index,warmup:index<3,elapsed_ns,stdout});
+      const actual=encode(result);
+      assert.equal(actual,expectedJson,'retained-module output changed, including warmup: '+name);
+      observations.push({case:name,index,warmup:index<warmups,elapsed_ns,exact_node_output_checked:true,
+        output_json_sha256:hash(actual),output_json_bytes:Buffer.byteLength(actual)});
     }
   }
   return {schema:'scriptw-react-retained-module-reference-v1',node:process.versions,
-    case_order:['rsc-sync','rsc-async'],realm_policy:'one fresh context and one linked/evaluated SourceTextModule shared by both cases',
+    case_order:caseOrder,case_selection:selectedCase,
+    gc_policy:'normal V8 JIT and natural GC; no forced collection between calls',
+    realm_policy:'one fresh context and one linked/evaluated SourceTextModule per process',
     request_clock:'await applicationRun(mode); excludes JSON encoding, exact golden validation and output checks',
-    samples:7,warmups:3,realm_creation_ns,source_module_parse_ns,module_link_and_initialization_ns,
+    samples,warmups,realm_creation_ns,source_module_parse_ns,module_link_and_initialization_ns,
     inputs:{source:sourcePath,source_sha256:hash(source),wrapper:RSC_WRAPPER,wrapper_sha256:hash(RSC_WRAPPER),
       adapted_source_sha256:hash(adapted),support:supportPath,support_sha256:hash(supportBytes)},observations};
 }
@@ -208,7 +219,7 @@ async function browser(tools,directory,chromium,index,screenshot) {
   let result;
   if(mode==='build') result=await build(...args);
   else if(mode==='server') result=await server(...args);
-  else if(mode==='retained-module') result=await retainedModule(args[0]);
+  else if(mode==='retained-module') result=await retainedModule(...args);
   else if(mode==='browser') result=await browser(args[0],args[1],args[2],Number(args[3]),args[4]);
   else throw new Error('Expected build, server or browser');
   process.stdout.write(JSON.stringify(result)+'\n',()=>process.exit(0));

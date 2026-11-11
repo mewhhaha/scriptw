@@ -3,9 +3,9 @@
 
 use super::*;
 use crate::gc_types::{
-    ArgumentsObject, ArgumentsObjectSchema, ArrayObject, ArrayObjectSchema, CodeUnitArray,
-    I32Local, I64Local, IndexedTable, ModuleExport, ModuleExportSchema, ModuleExportTable,
-    ModuleNamespaceObject, ModuleNamespaceObjectSchema, PrimitiveBox, PrimitiveBoxSchema,
+    ArgumentsObject, ArgumentsObjectSchema, ArrayObject, CodeUnitArray,
+    I32Local, I64Local, IndexedTable,
+    ModuleNamespaceObject, PrimitiveBox, PrimitiveBoxSchema,
     PropertyKeyConstruction, PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
 };
 use crate::runtime_helpers::{

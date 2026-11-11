@@ -1,7 +1,7 @@
 //! Read-only descriptor queries cannot publish a descriptor backing for an Array.
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures,
 };

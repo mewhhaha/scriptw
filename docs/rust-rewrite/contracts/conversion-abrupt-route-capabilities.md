@@ -2,13 +2,13 @@
 
 ## Current GC boundary — 2026-10-08
 
-The current non-Copy `ToPrimitiveAbruptRoute` and `PrimitiveToStringAbruptRoute` each retain ActiveHandler and ReturnCurrentFunction, with exhaustive whole-completion routing. ToLength now fills a borrowed `CompletionLocals` and writes its numeric result only on Normal. Exceptional consumers own their continuation directly: Object.fromEntries passes failed property-key conversion to the rooted IteratorClose owner, and Array.fromAsync rejects its typed PromiseCapability before continuing. The raw iterator/capability tuple route variants described below belong to the earlier representation.
+The current non-Copy `ToPrimitiveAbruptRoute` retains ActiveHandler and ReturnCurrentFunction, with exhaustive whole-completion routing. ToLength now fills a borrowed `CompletionLocals` and writes its numeric result only on Normal. Exceptional consumers own their continuation directly: Object.fromEntries passes failed property-key conversion to the rooted IteratorClose owner, and Array.fromAsync rejects its typed PromiseCapability before continuing. The raw iterator/capability tuple route variants described below belong to the earlier representation.
 
 This source/guard repair does not establish a new runtime or conformance result.
 
 ## Closed ownership domains
 
-The crate-visible `ToPrimitiveAbruptRoute`, `PrimitiveToStringAbruptRoute` and
+The crate-visible `ToPrimitiveAbruptRoute` and
 `ToLengthAbruptRoute` domains derive no cloning, copying, debugging or equality
 capability. Each conversion call constructs one named route and moves it into
 the corresponding emitter. One private finisher consumes that route in an
@@ -39,7 +39,6 @@ to move into one exhaustive private finisher without a wildcard.
 
 ```sh
 cargo test -p scriptw-aot-wasm --test structure_language -- conversion_abrupt_route_capability_structure::
-cargo test -p scriptw-aot-wasm --test modules_realms -- conversion_error_realm_source_structure::
 cargo xc
 git diff --check
 ```

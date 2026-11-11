@@ -206,67 +206,6 @@ impl FunctionBuilder<'_> {
         realm.clear(function);
     }
 
-    pub(crate) fn emit_source_realm_function_context_to_value(
-        &mut self,
-        result: &ValueLocals,
-        function: &mut Function,
-    ) {
-        let realm = self.emit_source_execution_realm_to_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            &realm,
-            NonArrayRealmIntrinsicSlot::FunctionPrototype,
-            result,
-            function,
-        );
-        realm.clear(function);
-    }
-
-    pub(crate) fn emit_function_global_this_to_value(
-        &mut self,
-        callable: &GcLocal<FunctionObject>,
-        result: &ValueLocals,
-        function: &mut Function,
-    ) {
-        let schema = self.runtime_schema();
-        let context = schema
-            .reserve_gc_local::<crate::gc_types::FunctionContext, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<FunctionObject>()
-                    .field(crate::gc_types::FunctionObjectSchema::CONTEXT)
-                    .read(callable, schema, function)
-                    .reference(),
-                function,
-            );
-        let realm = schema
-            .reserve_gc_local::<RealmRecord, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<crate::gc_types::FunctionContext>()
-                    .field(crate::gc_types::FunctionContextSchema::REALM)
-                    .read(&context, schema, function)
-                    .reference(),
-                function,
-            );
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<RealmRecord>()
-                    .field(RealmRecordSchema::GLOBAL_THIS)
-                    .read(&realm, schema, function)
-                    .reference()
-                    .require_non_null(function),
-                function,
-            );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, result, schema, function);
-        stored.clear(function);
-        realm.clear(function);
-        context.clear(function);
-    }
-
     pub(crate) fn emit_initialize_main_global_lexicals(
         &mut self,
         function: &mut Function,

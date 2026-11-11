@@ -7,8 +7,8 @@
 
 use std::collections::BTreeMap;
 
-use scriptw_aot_wasm::{emit, WasmArtifact, RUNTIME_IMPORT_NAMESPACE};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{RUNTIME_IMPORT_NAMESPACE, WasmArtifact, emit};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::types::{EntityType, TypesRef};
 use wasmparser::{Operator, Parser, Payload, Validator, WasmFeatures};

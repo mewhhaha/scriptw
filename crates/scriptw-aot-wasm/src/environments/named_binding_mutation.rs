@@ -1,5 +1,4 @@
 use super::global_environment::GlobalBindingFailure;
-use super::named_environment::*;
 use super::*;
 use crate::gc_types::{NamedBinding, NamedBindingSchema, NamedBindingTable, StringValue};
 

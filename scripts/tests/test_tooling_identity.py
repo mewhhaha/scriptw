@@ -44,17 +44,7 @@ class FrozenProofTests(unittest.TestCase):
                 provenance.readme_history_projection(raw.replace(b'7 passes', b'8 passes'))
 
     def test_current_closed_checkpoints_are_byte_bound(self):
-        for name in ('engine299-runtime-checkpoint-20261020.json',
-                     'native-progress-checkpoint-20261020.json',
-                     'full-af-checkpoint-20261020.json',
-                     'differential-jobs-checkpoint-20261019.json',
-                     'runtime-admission-checkpoint-20261019.json',
-                     'native-default-runtime-type-suffix-doc-cohorts-20261019.json',
-                     'runtime-type-suffix-ordinary-checkpoint-20261019.json',
-                     'complete-af-discovery-cpu-tooling-20261019.json',
-                     'discovery-storage-checkpoint-20261019.json',
-                     'intl-native-budget-candidate-20261019.json',
-                     'matched-native-progress-20261019.json'):
+        for name in ('exact-replay-checkpoint-20261013.json',):
             with self.subTest(name=name):
                 path = Path('docs/rust-rewrite') / name
                 raw = (REPO / path).read_bytes()
@@ -274,26 +264,6 @@ class IdentityTests(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 self.write_proof(self.proof(cwd=prefix + f"/workspace/{RETIRED_NAME}-next"))
                 self.assertNotEqual(self.audit().returncode, 0)
-
-    def test_historical_reader_must_keep_its_exact_captured_source(self):
-        path = self.root / "docs/rust-rewrite/verify-workspace-eb1ca63c9-20261015.py"
-        path.write_text(f"ROOT = '/workspace/{RETIRED_NAME}-next'\n", encoding="utf-8")
-        result = self.audit()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("invalid historical provenance", result.stderr)
-
-    def test_only_the_four_existing_source_fence_field_locators_are_admitted(self):
-        filename = "workspace-source-revalidation-eb1ca63c9-20261015.json"
-        value = {"schema": "portable-default-source-revalidation-eb1ca63c9-v1",
-            "fields": [f".{phase}./workspace/{RETIRED_NAME}-next.real_index.{field}"
-                for phase in ("before", "after") for field in ("bytes", "sha256")]}
-        path = self.write_proof(value, filename)
-        original = path.read_bytes()
-        self.assertEqual(self.audit().returncode, 0)
-        self.assertEqual(path.read_bytes(), original)
-        value["fields"].append(f".before./workspace/{RETIRED_NAME}-next.real_index.product")
-        self.write_proof(value, filename)
-        self.assertNotEqual(self.audit().returncode, 0)
 
     def test_malformed_or_duplicate_registered_schema_is_rejected(self):
         for text in ('{"schema":', '{"schema":"portable-current-workspace-retention-v1","schema":"portable-current-workspace-retention-v1"}'):

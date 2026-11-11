@@ -3,10 +3,6 @@ use std::path::Path;
 
 const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
 const MATH_SOURCE: &str = include_str!("../../src/builtins/math.rs");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/may-throw-operation-abrupt-route-ownership.md"
-);
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -124,14 +120,4 @@ fn builtin_to_number_owner_routes_throw_to_cleanup_before_reading_number_bits() 
     let store = to_number.find("bits.store(function)").unwrap();
     assert!(convert < throw && throw < copy && copy < exit && exit < normal && normal < store);
     assert!(!to_number.contains("emit_propagate_current_throw"));
-}
-
-#[test]
-fn contract_records_named_completion_ownership() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("generic `AbruptRoute` is gone"));
-        assert!(evidence.contains("GetV"));
-        assert!(evidence.contains("ToNumber"));
-        assert!(evidence.contains("unrepresentable"));
-    }
 }

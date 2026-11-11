@@ -103,6 +103,8 @@ pub use store::CallHookHandler;
 pub use store::{
     AsContext, AsContextMut, CallHook, Store, StoreContext, StoreContextMut, UpdateDeadline,
 };
+#[cfg(feature = "std")]
+pub use store::InterruptHandle;
 pub use trap::*;
 pub use types::*;
 pub use v128::V128;

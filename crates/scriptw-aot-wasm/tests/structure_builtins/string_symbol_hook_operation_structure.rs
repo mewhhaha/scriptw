@@ -4,9 +4,6 @@ use std::path::Path;
 const STANDARD: &str = include_str!("../../src/builtins/standard.rs");
 const STRING: &str = include_str!("../../src/builtins/string.rs");
 const SYMBOL_METHOD: &str = include_str!("../../src/builtins/string/symbol_method.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/string-symbol-hook-operation.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -197,14 +194,4 @@ fn standard_dispatch_names_all_six_fixed_entries() {
         count_in_rust_sources(&source_root, "emit_native_string_protocol("),
         7
     );
-}
-
-#[test]
-fn contract_records_the_private_dispatcher_boundary() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("Batch AY"));
-        assert!(evidence.contains("five fixed String symbol-hook entries"));
-        assert!(evidence.contains("source-equivalent"));
-        assert!(evidence.contains("no new String behavior"));
-    }
 }

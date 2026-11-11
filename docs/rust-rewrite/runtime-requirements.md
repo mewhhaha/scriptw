@@ -29,6 +29,22 @@ Rust embedding entry runs synchronously on the caller thread using a guarded
 affinity. Reentrant entry receives an independent 64-MiB scoped-thread stack;
 the Wasm stack limit remains 32 MiB.
 
+The GC heap reserves a fixed 4-GiB virtual address range with a 32-MiB guard.
+Its initial accessible backing is 16 MiB; the Store limiter still caps each
+backing memory at 1 GiB. Reserving addresses does not commit 4 GiB of RAM.
+On the supported 64-bit Wasmtime baseline this permits protected-page checks
+and a stable heap base; Wasm array bounds and null-reference traps remain.
+Native images bind these settings through configuration schema 6. Custom
+pooling allocators require matching GC and linear-memory tunables; ordinary
+Scriptw uses on-demand allocation.
+
+Execution timeouts need Unix signal handling. Compiled code carries no
+deadline checks: a deadline removes access to the Store's GC heap and private
+linear memory, and the fault stops the code. Both stay at a fixed address for
+that reason, and epoch interruption is off. Engine rejects a requested timeout
+on a host without this support. See
+[execution deadlines](contracts/execution-deadlines.md).
+
 An emitted program is linked to Scriptw's runtime module and host imports,
 including the `scriptw_host` namespace. Matching runtime bytes, Intl data and
 host adapters are part of the execution environment.

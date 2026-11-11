@@ -324,6 +324,7 @@ impl DateTimeDataImage {
     pub(crate) fn provider(&self) -> Arc<DateTimeProvider> {
         Arc::clone(&self.0.provider)
     }
+    #[cfg(test)]
     pub(crate) fn provider_ref(&self) -> &DateTimeProvider {
         &self.0.provider
     }

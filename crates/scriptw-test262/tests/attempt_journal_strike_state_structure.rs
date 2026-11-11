@@ -1,7 +1,4 @@
 const SOURCE: &str = include_str!("../src/attempt_journal.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-attempt-journal-strike-state.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -78,19 +75,4 @@ fn typed_strikes_keep_the_existing_numeric_json_shape() {
     assert!(witness.contains("charge_strikes_for_survivors()"));
     assert!(witness.contains("persisted[\"strikes\"][poison.execution_id.wire_key()]"));
     assert!(witness.contains("serde_json::json!(1)"));
-}
-
-#[test]
-fn contract_records_the_strike_state_boundary() {
-    for phrase in [
-        "`AttemptJournalFile.strikes` stores `CaseStrikes`",
-        "wire-only `StrikeEntries` retains raw `u32` counts",
-        "does not change the journal JSON schema",
-    ] {
-        assert!(
-            CONTRACT.contains(phrase),
-            "missing contract phrase `{phrase}`"
-        );
-    }
-    assert!(CONTRACT.contains("Runtime attempt-journal strikes are non-zero by construction"));
 }

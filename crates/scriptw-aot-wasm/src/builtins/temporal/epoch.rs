@@ -1,6 +1,5 @@
 //! Exact Instant admission over the sole immutable GC BigInt representation.
 use super::*;
-use crate::gc_types::*;
 
 /// Publication accepts this completed range proof, never an unchecked BigInt.
 /// The floor pair is exact, including negative fractional epochs.

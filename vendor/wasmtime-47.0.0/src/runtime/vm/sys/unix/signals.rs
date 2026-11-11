@@ -145,6 +145,17 @@ unsafe extern "C" fn trap_handler(
         // trap.
         let info = match info {
             Some(info) => info,
+            // Host code outside any activation reached a GC heap that an
+            // interrupt request made inaccessible: give access back.
+            #[cfg(feature = "std")]
+            None => {
+                return matches!(signum, libc::SIGSEGV | libc::SIGBUS)
+                    && unsafe {
+                        crate::runtime::vm::restore_access((*siginfo).si_addr() as usize)
+                            .is_some()
+                    };
+            }
+            #[cfg(not(feature = "std"))]
             None => return false,
         };
 

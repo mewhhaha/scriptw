@@ -108,7 +108,7 @@ impl FunctionBuilder<'_> {
     /// prototype tails. No object/Realm edge is retained in cache metadata.
     /// Registration additionally proves absence in the sealed intrinsic rows;
     /// hits need only revalidate that exact immutable layout and null parent.
-    pub(super) fn emit_negative_cache_mode(
+    pub(crate) fn emit_negative_cache_mode(
         &mut self,
         target: &ValueLocals,
         object: &GcLocal<OrdinaryObject>,

@@ -332,6 +332,7 @@ fn emit_script_module_with_factory(
             ModuleEntryRole::for_module(kind)
         },
     )
+    .with_standard_builtin_local_arguments(&compiled_standard_builtins)
     .with_foreign_imports(script.foreign_modules.functions().count(), kind)?;
     let (module_types, foreign_types) = ModuleTypeRegistry::new(kind)
         .with_global_prelude(compile_program && script.module_prelude.is_some())
@@ -527,24 +528,34 @@ fn emit_script_module_with_factory(
         }
     }
     program_functions.extend(local_argument_functions);
+    let mut native_local_argument_functions = Vec::new();
     for builtin in compiled_standard_builtins
         .iter()
         .filter(|_| compile_runtime)
     {
+        let entry = &function_metas
+            .get(&builtin.function_id())
+            .expect("standard builtin has its planned entry")
+            .entry;
         let mut builder = FunctionBuilder::new_standard_builtin(
             module_package.schema(),
             *builtin,
-            &function_metas
-                .get(&builtin.function_id())
-                .expect("standard builtin has its planned entry")
-                .entry,
+            entry,
             string_pool,
             &function_metas,
             uses_heap,
             runtime_bootstrap_plan.clone(),
             runtime_helper_base,
         );
-        compiled_functions.push(builder.compile_builtin_callable()?);
+        if entry.local_arguments().is_some() {
+            compiled_functions.push(local_arguments_adapter::compile(
+                entry,
+                module_package.schema(),
+            )?);
+            native_local_argument_functions.push(builder.compile_builtin_callable()?);
+        } else {
+            compiled_functions.push(builder.compile_builtin_callable()?);
+        }
     }
     for builtin in compiled_host_builtins.iter().filter(|_| compile_runtime) {
         let mut builder = FunctionBuilder::new_host_builtin(
@@ -985,20 +996,6 @@ fn emit_script_module_with_factory(
             builder.compile_indexed_element_read_helper()
         })
         .transpose()?;
-    let indexed_element_write_helper_function = compile_runtime
-        .then(|| {
-            let mut builder = FunctionBuilder::new_runtime_operation_helper(
-                module_package.schema(),
-                RuntimeHelperId::IndexedElementWrite,
-                string_pool,
-                &function_metas,
-                uses_heap,
-                runtime_bootstrap_plan.clone(),
-                runtime_helper_base,
-            );
-            builder.compile_indexed_element_write_helper()
-        })
-        .transpose()?;
     // One ToPrimitive body per hint, built from the closed `ToPrimitiveHint`
     // domain rather than from three copied blocks, so a fourth hint is a
     // compile error in `RuntimeHelperId::helper_for` and not a missing body
@@ -1355,11 +1352,6 @@ fn emit_script_module_with_factory(
             indexed_element_read_helper_function
                 .expect("indexed element-read helper must exist when heap is enabled"),
         );
-        helper_bodies.insert(
-            RuntimeHelperId::IndexedElementWrite,
-            indexed_element_write_helper_function
-                .expect("indexed element-write helper must exist when heap is enabled"),
-        );
         for hint in [
             ToPrimitiveHint::Default,
             ToPrimitiveHint::Number,
@@ -1549,8 +1541,8 @@ fn emit_script_module_with_factory(
         &mut exports,
     );
 
-    // Runtime helpers close the runtime half; program helpers follow the
-    // program's callables.
+    // Runtime helpers precede the native local-entry suffix; program helpers
+    // follow the program's callables.
     let mut program_helpers = Vec::new();
     if uses_heap {
         for helper in RuntimeHelperId::ALL {
@@ -1584,6 +1576,9 @@ fn emit_script_module_with_factory(
         "compiled runtime helper bodies were never emitted: {:?}",
         helper_bodies.keys().collect::<Vec<_>>()
     );
+    // The canonical native local body follows R's existing helper prefix.
+    // Its original builtin ordinal remains the vector adapter.
+    compiled_functions.extend(native_local_argument_functions);
     program_functions.extend(program_helpers);
     module_package.append_functions(compiled_functions, program_functions);
     let runtime_global_types = module_package.runtime_global_types();

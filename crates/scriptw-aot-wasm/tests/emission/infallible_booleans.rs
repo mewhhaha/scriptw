@@ -1,10 +1,10 @@
 //! Catalog expressions retain their kernels while publishing only their value output.
 use crate::property_read_plans::Module;
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::{
-    lower, AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr, TypedExpr,
-    ValueInfo, ValueKind,
+    AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr, TypedExpr, ValueInfo,
+    ValueKind, lower,
 };
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -50,14 +50,24 @@ fn guarded_value_copies(body: &[Operator<'_>]) -> usize {
 }
 
 fn direct_normal_publications(body: &[Operator<'_>]) -> usize {
-    let completion_tag = body.windows(10).find_map(|ops| match ops {
-        [Operator::I32Const { value: 0 }, Operator::LocalSet { local_index },
-         Operator::I64Const { value: 0 }, Operator::LocalSet { .. },
-         Operator::RefNull { .. }, Operator::LocalSet { .. },
-         Operator::I32Const { value: 0 }, Operator::LocalSet { .. },
-         Operator::I32Const { value: 0 }, Operator::LocalSet { .. }] => Some(*local_index),
-        _ => None,
-    }).expect("source body initializes its enclosing Completion");
+    let completion_tag = body
+        .windows(10)
+        .find_map(|ops| match ops {
+            [
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { local_index },
+                Operator::I64Const { value: 0 },
+                Operator::LocalSet { .. },
+                Operator::RefNull { .. },
+                Operator::LocalSet { .. },
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { .. },
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { .. },
+            ] => Some(*local_index),
+            _ => None,
+        })
+        .expect("source body initializes its enclosing Completion");
     // Count publication into the enclosing Completion specifically. The
     // expression's output copy followed by kind/target normalization has the
     // same opcode shape but writes a different Value3 destination.

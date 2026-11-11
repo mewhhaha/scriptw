@@ -528,14 +528,6 @@ impl FunctionBuilder<'_> {
         saved.copy_from(self.completion(), function);
     }
 
-    pub(crate) fn restore_saved_completion(
-        &self,
-        saved: &CompletionLocals,
-        function: &mut Function,
-    ) {
-        self.completion().copy_from(saved, function);
-    }
-
     // UpdateEmpty retains the preceding StatementList value separately from
     // operand temporaries and restores it only for the normal empty result.
     pub(crate) fn save_statement_list_value(

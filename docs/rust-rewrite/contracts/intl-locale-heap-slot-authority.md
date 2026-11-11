@@ -49,7 +49,6 @@ execution. All Intl runtime offset consumers remain unchanged.
 
 ```sh
 cargo test -p scriptw-aot-wasm --test intl_locale_heap_slot_structure
-cargo test -p scriptw-aot-wasm --test intl_temporal -- intl_locale_string_slot_domain_structure::
 cargo test -p scriptw-aot-wasm --lib heap::tests::intl_locale_heap_slot_identities_own_layout_metadata -- --exact --test-threads=1
 cargo test -p scriptw-aot-wasm --lib heap::tests::heap_layout_registry_ -- --test-threads=1
 rustfmt --check crates/scriptw-aot-wasm/src/heap_intl_locale_layout.rs crates/scriptw-aot-wasm/src/heap.rs crates/scriptw-aot-wasm/tests/intl_locale_heap_slot_structure.rs

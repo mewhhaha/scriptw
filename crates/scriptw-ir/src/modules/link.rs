@@ -50,7 +50,7 @@ pub(crate) struct LinkedScriptSource {
 ///
 /// Namespace collection runs first and unconditionally. Dynamic components
 /// were already discovered for evaluation-mode classification and filtered to
-/// materialized referrers by `modules::graph::link`; together those steps make
+/// materialized referrers during graph linking; together those steps make
 /// `ProgramIr::modules` describe exactly the runtime objects and call sites the
 /// artifact can observe, including on a failing program.
 pub(crate) fn linked_script_source(

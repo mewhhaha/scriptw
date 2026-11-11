@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import io
 import json
+import math
 from pathlib import Path, PurePosixPath
 import re
 import statistics
@@ -33,15 +34,29 @@ def sha(value):
 
 def rsc_report(path):
     report = json.loads(path.read_text())
-    require(report['schema'] in ('scriptw-rsc-current-v1', 'scriptw-rsc-current-v2'),
+    require(report['schema'] in ('scriptw-rsc-current-v1', 'scriptw-rsc-current-v2', 'scriptw-rsc-current-v3'),
             'foreign current RSC report')
     require(re.fullmatch(r'\d{4}-\d{2}-\d{2}', report['date']) is not None,
             'current RSC date must be YYYY-MM-DD')
     measurement = report['measurement']
-    require(measurement['blocks'] == 2 and measurement['processes_per_engine'] == 8
-            and measurement['warmups'] == 3 and measurement['samples'] == 7
-            and isinstance(measurement['clock'], str) and measurement['clock'],
-            'current RSC measurement cohort differs')
+    isolated = report['schema'] == 'scriptw-rsc-current-v3'
+    if isolated:
+        require(measurement['blocks'] == 2
+                and measurement['processes_per_engine_per_case'] == 8
+                and measurement['processes_per_engine'] == 16
+                and measurement.get('case_isolation') == 'one case per fresh process',
+                'current RSC requires eight isolated processes per case')
+        require(type(measurement['warmups']) is int and measurement['warmups'] > 0
+                and type(measurement['samples']) is int and measurement['samples'] > 0
+                and measurement['warmups'] + measurement['samples'] <= 1000,
+                'current RSC warmups and samples must be positive with at most 1000 calls')
+        require(isinstance(measurement['clock'], str) and measurement['clock'].strip(),
+                'current RSC request clock is missing')
+    else:
+        require(measurement['blocks'] == 2 and measurement['processes_per_engine'] == 8
+                and measurement['warmups'] == 3 and measurement['samples'] == 7
+                and isinstance(measurement['clock'], str) and measurement['clock'],
+                'current RSC measurement cohort differs')
     inputs = report['inputs']
     require(isinstance(inputs, dict) and inputs, 'current RSC input fingerprints are missing')
     for name, value in inputs.items():
@@ -49,7 +64,7 @@ def rsc_report(path):
                 'invalid current RSC input fingerprint')
     engines = report['engines']
     expected = {'baseline', 'candidate', 'v8'}
-    if report['schema'] == 'scriptw-rsc-current-v2':
+    if report['schema'] != 'scriptw-rsc-current-v1':
         expected.add('candidate-speed')
     require(set(engines) == expected, 'current RSC engine inventory differs')
     for engine_name, engine in engines.items():
@@ -58,18 +73,42 @@ def rsc_report(path):
         require(set(engine['cases']) == {'rsc-sync', 'rsc-async'},
                 'current RSC case inventory differs: ' + engine_name)
         for case_name, values in engine['cases'].items():
-            require(isinstance(values, list) and len(values) == 8
-                    and all(type(value) is int and value > 0 for value in values),
-                    'current RSC case needs eight positive process medians: ' + engine_name + '/' + case_name)
-    for engine_name in sorted(expected - {'v8'}):
+            require(isinstance(values, list) and len(values) == 8,
+                    'current RSC case needs eight process medians: ' + engine_name + '/' + case_name)
+            valid_values = all(type(value) is int and value > 0 for value in values)
+            if isolated:
+                valid_values = all(type(value) in (int, float) and math.isfinite(value) and value > 0
+                                   for value in values)
+            require(valid_values, 'current RSC process medians must be positive: '
+                    + engine_name + '/' + case_name)
+        if isolated:
+            curves = engine.get('warmup_curves_ns')
+            require(isinstance(curves, dict) and set(curves) == {'rsc-sync', 'rsc-async'},
+                    'current RSC warmup case inventory differs: ' + engine_name)
+            for case_name, processes in curves.items():
+                require(isinstance(processes, list) and len(processes) == 8
+                        and all(isinstance(curve, list) and len(curve) == measurement['warmups']
+                                and all(type(value) is int and value > 0 for value in curve)
+                                for curve in processes),
+                        'current RSC needs eight complete positive warmup curves: '
+                        + engine_name + '/' + case_name)
+    phase_engines = expected - {'v8'}
+    phase_count = 8
+    if isolated:
+        phase_engines = expected
+        phase_count = 16
+    for engine_name in sorted(phase_engines):
         phases = engines[engine_name]['phase_processes']
-        require(isinstance(phases, list) and len(phases) == 8,
-                'current RSC phase inventory needs eight processes: ' + engine_name)
+        require(isinstance(phases, list) and len(phases) == phase_count,
+                f'current RSC phase inventory needs {phase_count} processes: ' + engine_name)
+        names = ('front_and_lower', 'wasm_emission', 'native_preparation')
+        if engine_name == 'v8':
+            names = ('realm_creation_ns', 'source_module_parse_ns', 'module_link_and_initialization_ns')
         for process in phases:
-            require(all(type(process.get(name)) is int and process[name] > 0
-                        for name in ('front_and_lower', 'wasm_emission', 'native_preparation')),
+            require(isinstance(process, dict)
+                    and all(type(process.get(name)) is int and process[name] > 0 for name in names),
                     'current RSC phase timings missing or nonpositive: ' + engine_name)
-    if report['schema'] == 'scriptw-rsc-current-v2':
+    if report['schema'] != 'scriptw-rsc-current-v1':
         fast, speed = (engines[name]['identity'] for name in ('candidate', 'candidate-speed'))
         for name in ('source_fingerprint', 'executable_sha256', 'program_wasm_sha256', 'runtime', 'inputs'):
             require(fast[name] == speed[name], 'RSC native policies must use the same ' + name)
@@ -77,11 +116,17 @@ def rsc_report(path):
             require(identity['configuration']['cranelift_opt_level'] == optimization
                     and identity['configuration']['register_allocation'] == allocation,
                     'RSC native policy identity differs')
+        if isolated:
+            policy_fields = ('cranelift_opt_level', 'register_allocation')
+            configurations = [{key: value for key, value in identity['configuration'].items()
+                               if key not in policy_fields} for identity in (fast, speed)]
+            require(configurations[0] == configurations[1],
+                    'RSC native policies differ outside optimization and register allocation')
     return report
 
 
 def rsc_engine_label(report, name):
-    if name == 'candidate' and report['schema'] == 'scriptw-rsc-current-v2':
+    if name == 'candidate' and report['schema'] != 'scriptw-rsc-current-v1':
         return 'Scriptw Fast'
     return RSC_ENGINE_LABELS[name]
 
@@ -94,7 +139,7 @@ def rsc_runtime_chart(report, preview=None):
     engines = ('candidate', 'v8')
     colors = ('#3478a8', '#d17b36')
     width = .34
-    if report['schema'] == 'scriptw-rsc-current-v2':
+    if report['schema'] != 'scriptw-rsc-current-v1':
         engines = ('candidate', 'candidate-speed', 'v8')
         colors = ('#3478a8', '#4a9a79', '#d17b36')
         width = .25
@@ -138,7 +183,7 @@ def rsc_compile_chart(report, preview=None):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     engines = ('candidate',)
-    if report['schema'] == 'scriptw-rsc-current-v2':
+    if report['schema'] != 'scriptw-rsc-current-v1':
         engines = ('candidate', 'candidate-speed')
     phases = ('front_and_lower', 'wasm_emission', 'native_preparation')
     labels = ('Front end + lower', 'Wasm emission', 'Native preparation')
@@ -182,6 +227,47 @@ def rsc_compile_chart(report, preview=None):
             ax.tick_params(length=0, pad=7)
             fig.subplots_adjust(left=.11, right=.97, top=.82, bottom=.16)
             return rsc_svg(fig, 'Current React Server Components cold compilation', report, preview)
+        finally:
+            plt.close(fig)
+
+
+def rsc_warmup_chart(report, preview=None):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    require(report['schema'] == 'scriptw-rsc-current-v3',
+            'warmup curves require an isolated current RSC report')
+    engines = ('candidate', 'candidate-speed', 'v8')
+    colors = ('#3478a8', '#4a9a79', '#d17b36')
+    with plt.rc_context({'font.family': 'DejaVu Sans', 'font.size': 10, 'svg.fonttype': 'none',
+                         'svg.hashsalt': 'scriptw-rsc-current-warmup-v1', 'text.usetex': False}):
+        fig, axes = plt.subplots(1, 2, figsize=(9.5, 4.3))
+        try:
+            for ax, case, title in zip(axes, ('rsc-sync', 'rsc-async'),
+                                       ('Sync Flight', 'Async Flight'), strict=True):
+                for engine_name, color in zip(engines, colors, strict=True):
+                    curves = report['engines'][engine_name]['warmup_curves_ns'][case]
+                    medians = [statistics.median(values) / 1e6
+                               for values in zip(*curves, strict=True)]
+                    ax.plot(range(1, len(medians) + 1), medians, color=color, linewidth=1.8,
+                            label=rsc_engine_label(report, engine_name))
+                ax.set_title(title, loc='left', fontweight='bold')
+                ax.set_xlabel('Warmup call')
+                ax.set_ylabel('Request · ms (log scale)')
+                ax.set_yscale('log')
+                ax.set_axisbelow(True)
+                ax.grid(axis='y', color='#eaeef2')
+                ax.tick_params(length=0, pad=7)
+                for side in ('top', 'right'):
+                    ax.spines[side].set_visible(False)
+            fig.suptitle('React 19.3.1 · warmup requests', x=.1, ha='left', fontweight='bold')
+            handles, labels = axes[0].get_legend_handles_labels()
+            fig.legend(handles, labels, frameon=False, ncol=3, loc='upper right',
+                       bbox_to_anchor=(.98, .97))
+            fig.text(.1, .035, 'Median at each call across eight fresh processes; no confidence interval.',
+                     fontsize=9, color='#555b61')
+            fig.subplots_adjust(left=.1, right=.98, top=.78, bottom=.21, wspace=.35)
+            return rsc_svg(fig, 'Current React Server Components warmup curves', report, preview)
         finally:
             plt.close(fig)
 
@@ -571,20 +657,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--preview-dir', type=Path)
-    parser.add_argument('--rsc-json', type=Path,
-                        help='render only current retained-module RSC charts from a scriptw-rsc-current-v1 report')
+    parser.add_argument('--rsc-json', '--rsc-current', type=Path,
+                        help='render only current retained-module RSC charts from a v1, v2 or v3 report')
     args = parser.parse_args()
     if args.rsc_json:
         current = rsc_report(args.rsc_json)
         runtime_preview = None
         compilation_preview = None
+        warmup_preview = None
         if args.preview_dir:
             runtime_preview = args.preview_dir / 'rsc-current-runtime.png'
             compilation_preview = args.preview_dir / 'rsc-current-compilation.png'
+            warmup_preview = args.preview_dir / 'rsc-current-warmup.png'
         outputs = {
             RSC_ASSETS / 'runtime.svg': rsc_runtime_chart(current, runtime_preview),
             RSC_ASSETS / 'compilation.svg': rsc_compile_chart(current, compilation_preview),
         }
+        if current['schema'] == 'scriptw-rsc-current-v3':
+            outputs[RSC_ASSETS / 'warmup.svg'] = rsc_warmup_chart(current, warmup_preview)
         for path, value in outputs.items():
             if args.check:
                 require(path.is_file() and path.read_bytes() == value,
@@ -592,7 +682,7 @@ def main():
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(value)
-        print('Verified two current RSC charts')
+        print(f'Verified {len(outputs)} current RSC charts')
         return
     authority = json.loads(AUTHORITY.read_text())
     require(authority['schema'] == 'scriptw-application-charts-v1', 'foreign application chart authority')

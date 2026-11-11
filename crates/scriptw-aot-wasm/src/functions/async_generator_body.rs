@@ -2,8 +2,7 @@
 
 use super::*;
 use crate::gc_types::{
-    AsyncGeneratorActivation, AsyncGeneratorActivationSchema, AsyncGeneratorReturnStage,
-    CompletionLocals, GcI32Constant, GcLocal, GcOperand, StoredValue,
+    AsyncGeneratorActivation, AsyncGeneratorActivationSchema, AsyncGeneratorReturnStage, GcI32Constant, GcLocal, GcOperand, StoredValue,
 };
 use crate::runtime_helpers::HelperParameters;
 

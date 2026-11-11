@@ -16,23 +16,34 @@ fn for_in_cursor_keeps_the_same_strong_set_edge_in_runtime_and_program_types() {
     assert_eq!(runtime_types[cursor], program_types[cursor]);
     assert_eq!(runtime_types[set as usize], program_types[set as usize]);
     let CompositeInnerType::Struct(record) = &runtime_types[cursor].composite_type.inner else {
-        panic!("ForIn retains its actual four-field GC record");
+        panic!("ForIn retains its actual six-field GC record");
     };
-    assert_eq!(record.fields.len(), 4);
+    assert_eq!(record.fields.len(), 6);
     let ordinal = ForInEnumerationRecordSchema::VISITED_SET.ordinal().raw() as usize;
     assert_eq!(ordinal, 3);
     let field = record.fields[ordinal];
-    assert!(!field.mutable, "the cursor cannot replace its Set identity");
+    assert!(
+        field.mutable,
+        "the generic phase publishes its lazy Set once"
+    );
     assert_eq!(
         field.element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
             wasmparser::RefType::new(
-                false,
+                true,
                 wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(set)),
             )
             .unwrap(),
         )),
         "the root names canonical SetObject, without a second storage layout",
+    );
+    let bits = record.fields[ForInEnumerationRecordSchema::PREFIX_FOUND_BITS
+        .ordinal()
+        .raw() as usize];
+    assert!(bits.mutable);
+    assert_eq!(
+        bits.element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I64)
     );
     assert_eq!(
         &runtime_types[..],

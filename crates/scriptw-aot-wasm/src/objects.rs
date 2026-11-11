@@ -3,7 +3,7 @@ use crate::functions::FunctionNamePrefix;
 use crate::gc_types::{
     CompletionLocals, GcLocal, GcOperand, GcStackReference, I32Local, I64Local, Nullable,
     OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyIndex, OrdinaryPropertyStorage,
-    OrdinaryPropertyStorageSchema, PrivateElementTable, PropertyDescriptor,
+    OrdinaryPropertyStorageSchema, PropertyDescriptor,
     PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema, PropertyTable, ProxyObject,
     ScalarValue, StoredValue, ValueLocals,
 };
@@ -16,7 +16,7 @@ use scriptw_ir::{ComputedPropertyNameInferenceIr, ObjectMethodFunctionIr};
 // The Property Descriptor lattice follows ECMA-262 6.2.6.
 use scriptw_ir::property_descriptor::{
     classify, DescriptorCarrier, DescriptorClassification, DescriptorField, DescriptorSide,
-    KindTerms, KnownPresence, PartialDescriptor, Presence, PropertyDescriptorKind,
+    KindTerms, PartialDescriptor, Presence, PropertyDescriptorKind,
     ValidatedDescriptor, TO_PROPERTY_DESCRIPTOR_ORDER,
 };
 
@@ -62,7 +62,6 @@ mod property_read_plan;
 mod property_storage;
 mod proxy_own_keys_list;
 mod regexp_literal;
-pub(crate) use proxy_own_keys_list::CompletedOwnPropertyKeys;
 mod proxy_target_descriptor;
 pub(crate) use proxy_target_descriptor::CompletedProxyTargetDescriptor;
 mod raw_numeric_array_read;
@@ -273,9 +272,6 @@ impl CompletedPropertyDescriptorLocals {
     }
     pub(crate) fn emit_writable_i32(&self, function: &mut Function) {
         self.fields.writable.load(function);
-    }
-    pub(crate) fn emit_enumerable_i32(&self, function: &mut Function) {
-        self.fields.enumerable.load(function);
     }
     pub(crate) fn emit_configurable_i32(&self, function: &mut Function) {
         self.fields.configurable.load(function);
@@ -1243,58 +1239,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(self.finish_function(function))
     }
 
-    pub(crate) fn emit_typed_array_or_object_index_write_from_locals(
-        &mut self,
-        target: &ValueLocals,
-        index: crate::gc_types::I64Local,
-        key: &PropertyKeyLocals,
-        value: &ValueLocals,
-        strict: I32Local,
-        result: &CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.runtime_schema()
-            .call_helper(
-                crate::runtime_helpers::IndexedElementWriteArguments::new(
-                    target,
-                    index,
-                    key,
-                    value,
-                    strict,
-                    self.current_environment(),
-                    self.current_program(),
-                ),
-                self.runtime_helper_base()?,
-                function,
-            )
-            .store(result, function);
-        Ok(())
-    }
-
-    pub(crate) fn compile_indexed_element_write_helper(&mut self) -> Result<Function, EmitError> {
-        let mut function = self.begin_helper_body(RuntimeHelperId::IndexedElementWrite);
-        let parameters = self
-            .helper_parameters::<crate::runtime_helpers::IndexedElementWriteParameters>(
-                &mut function,
-            );
-        let result = self.runtime_schema().reserve_completion(&mut function);
-        // The retained String/Symbol key is the actual Reference name. The
-        // complete Set owner selects integer-indexed behavior from that key.
-        self.emit_object_write(
-            &parameters.target,
-            &parameters.key,
-            &parameters.value,
-            parameters.strict,
-            &result,
-            &mut function,
-        )?;
-        result.emit(&mut function);
-        result.clear(&mut function);
-        parameters.release(&mut function);
-        function.instruction(&Instruction::End);
-        Ok(self.finish_function(function))
-    }
-
     pub(crate) fn compile_property_write_to_locals(
         &mut self,
         target: &TypedExpr,
@@ -1512,33 +1456,6 @@ impl<'a> FunctionBuilder<'a> {
             .into_descriptor())
     }
 
-    /// Private descriptor-result objects are read through their own data
-    /// entries; this projection neither invokes accessors nor walks prototypes.
-    pub(crate) fn emit_object_own_data_field_read(
-        &mut self,
-        object: &ValueLocals,
-        key: &PropertyKeyLocals,
-        present: crate::gc_types::I32Local,
-        result: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        function.instruction(&Instruction::I32Const(0));
-        present.store(function);
-        result.set_undefined(function);
-        self.emit_is_heap_object_like_tag_i32(object.tag(), function);
-        self.open_frame(ControlFrameKind::If, function);
-        let header = schema.reserve_gc_local(function).initialize(
-            self.emit_object_header_projection(object, function),
-            function,
-        );
-        self.emit_ordinary_own_data_value(&header, key, result, present, function)?;
-        header.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        Ok(())
-    }
-
     /// ToPropertyDescriptor performs HasProperty then Get exactly once per
     /// field, in the normative order, retaining original abrupt completions.
     pub(crate) fn emit_to_property_descriptor(
@@ -1705,35 +1622,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
     }
 
-    pub(crate) fn emit_from_present_property_descriptor(
-        &mut self,
-        descriptor: ReservedPropertyDescriptorLocals,
-        result: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let object = schema.reserve_gc_local(function).initialize(
-            self.emit_from_property_descriptor(
-                DescriptorObjectPrototype::CurrentExecutionRealmObjectPrototype,
-                &descriptor.object_fields(),
-                function,
-            )?,
-            function,
-        );
-        result.set_reference(&object, schema, function);
-        object.clear(function);
-        descriptor.clear(schema, function);
-        Ok(())
-    }
-
-    pub(crate) fn release_reserved_property_descriptor(
-        &mut self,
-        descriptor: ReservedPropertyDescriptorLocals,
-        function: &mut Function,
-    ) {
-        descriptor.clear(self.runtime_schema(), function);
-    }
-
     /// Generic completes to data; the side is derived from the same validated
     /// lattice used by definition and FromPropertyDescriptor.
     pub(crate) fn emit_complete_property_descriptor(
@@ -1771,14 +1659,6 @@ impl<'a> FunctionBuilder<'a> {
             accessor,
             data,
         }
-    }
-
-    pub(crate) fn release_completed_property_descriptor(
-        &mut self,
-        descriptor: CompletedPropertyDescriptorLocals,
-        function: &mut Function,
-    ) {
-        descriptor.clear(self.runtime_schema(), function);
     }
 
     // Only the registered ObjectRead compiler in the private child module
@@ -2608,23 +2488,42 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let incoming = definition.descriptor();
+        self.emit_define_own_property_from_descriptor(receiver, key, &incoming, result, function)
+    }
+
+    /// Internal definitions enter canonical storage directly. Known accessors
+    /// keep Array dispatch in the fallback, avoiding Array code in every source
+    /// literal getter/setter. Other receivers retain their observable protocol.
+    fn emit_define_own_property_from_descriptor(
+        &mut self,
+        receiver: &ValueLocals,
+        key: &PropertyKeyLocals,
+        incoming: &WasmDescriptor<'_>,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        receiver.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<crate::gc_types::ArrayObject>(
-                    crate::gc_types::GcNullability::NonNullable,
-                )
-                .heap_type,
-        ));
-        self.open_frame(ControlFrameKind::If, function);
-        let array = schema.reserve_gc_local(function).initialize(
-            receiver.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
-            function,
-        );
-        self.emit_array_define_own_property(&array, key, &incoming, result, function)?;
-        array.clear(function);
-        function.instruction(&Instruction::Else);
+        let inline_array = !classify(incoming)
+            .terms(DescriptorSide::Accessor)
+            .statically_true;
+        if inline_array {
+            receiver.reference().load(function);
+            function.instruction(&Instruction::RefTestNonNull(
+                schema
+                    .reference_type::<crate::gc_types::ArrayObject>(
+                        crate::gc_types::GcNullability::NonNullable,
+                    )
+                    .heap_type,
+            ));
+            self.open_frame(ControlFrameKind::If, function);
+            let array = schema.reserve_gc_local(function).initialize(
+                receiver.cast_reference::<crate::gc_types::ArrayObject>(schema, function),
+                function,
+            );
+            self.emit_array_define_own_property(&array, key, incoming, result, function)?;
+            array.clear(function);
+            function.instruction(&Instruction::Else);
+        }
         receiver.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             schema
@@ -2636,41 +2535,18 @@ impl<'a> FunctionBuilder<'a> {
             receiver.cast_reference::<OrdinaryObject>(schema, function),
             function,
         );
-        self.emit_ordinary_define_own_property(&object, key, &incoming, result, function)?;
+        self.emit_ordinary_define_own_property(&object, key, incoming, result, function)?;
         object.clear(function);
         function.instruction(&Instruction::Else);
-        self.emit_define_own_property_from_fields(
-            receiver,
-            key,
-            incoming.as_partial(),
-            result,
-            function,
-        )?;
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        Ok(())
-    }
-
-    fn emit_define_own_property_from_fields(
-        &mut self,
-        receiver: &ValueLocals,
-        key: &PropertyKeyLocals,
-        fields: &DescriptorObjectFields<'_>,
-        result: &CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
         let meta = self
             .functions
             .get(&StandardBuiltinId::ReflectDefineProperty.function_id())
             .cloned()
             .expect("Reflect.defineProperty dependency is rooted before emission");
-        let schema = self.runtime_schema();
         let carrier = schema.reserve_gc_local(function).initialize(
             self.emit_from_property_descriptor(
                 DescriptorObjectPrototype::PrivateCarrier,
-                fields,
+                incoming.as_partial(),
                 function,
             )?,
             function,
@@ -2686,6 +2562,12 @@ impl<'a> FunctionBuilder<'a> {
         )?;
         descriptor.clear(function);
         carrier.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        if inline_array {
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
         Ok(())
     }
 

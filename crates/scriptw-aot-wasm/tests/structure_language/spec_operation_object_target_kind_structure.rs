@@ -1,7 +1,4 @@
 const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/spec-operation-object-target-kind.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -135,15 +132,4 @@ fn property_operations_keep_completed_key_and_original_receiver_authorities() {
     assert!(body.contains("&lookup, &inputs[0], &key, &pending, function,"));
     assert!(body.contains("crate::runtime_helpers::OrdinarySetArguments::new("));
     assert!(body.contains("self.emit_create_data_property_or_throw("));
-}
-
-#[test]
-fn contract_records_shared_object_target_ownership() {
-    for source in [CONTRACT] {
-        assert!(source.contains("SpecOperationObjectTargetKind"));
-        assert!(source.contains("StaticallyObjectLike"));
-        assert!(source.contains("RuntimeDynamic"));
-        assert!(source.contains("StaticallyPrimitive"));
-        assert!(source.contains("six") || source.contains("Six"));
-    }
 }

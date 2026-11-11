@@ -12,15 +12,12 @@ use std::{
     fs,
     io::Write,
     path::PathBuf,
-    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
 
 const WRAPPER: &str = "\nexport const run = globalThis.applicationRun;\nexport function encode(value) { return JSON.stringify(value); }\n";
 const DEADLINE: Duration = Duration::from_secs(30);
-const EPOCH_PERIOD: Duration = Duration::from_millis(5);
-const EPOCH_TICKS: u64 = 6_000;
 const WORKER_STACK_BYTES: usize = 64 * 1024 * 1024;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -166,39 +163,6 @@ fn normal(completion: JsCompletion) -> Result<JsValue> {
     }
 }
 
-struct EpochTicker {
-    stop: mpsc::Sender<()>,
-    thread: Option<thread::JoinHandle<()>>,
-}
-
-impl EpochTicker {
-    fn start(engine: &wasmtime::Engine) -> Self {
-        let engine = engine.clone();
-        let (stop, receiver) = mpsc::channel();
-        let thread = thread::spawn(move || {
-            while matches!(
-                receiver.recv_timeout(EPOCH_PERIOD),
-                Err(mpsc::RecvTimeoutError::Timeout)
-            ) {
-                engine.increment_epoch();
-            }
-        });
-        Self {
-            stop,
-            thread: Some(thread),
-        }
-    }
-}
-
-impl Drop for EpochTicker {
-    fn drop(&mut self) {
-        let _ = self.stop.send(());
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
-}
-
 fn initialized(
     instance: &EmbeddedInstance,
     store: &mut wasmtime::Store<WasmStoreState>,
@@ -264,13 +228,22 @@ fn run() -> Result<Value> {
     let mut profile = ProfileBarrier::from_environment()?;
     let mut args = std::env::args().skip(1);
     let source_path = PathBuf::from(args.next().ok_or(
-        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3] [native-mode=fast|speed|fast-backtracking|speed-single-pass]",
+        "usage: rsc_baseline <rsc.js> <support.json> <output.json> [samples=7] [warmups=3] [native-mode=fast|speed|fast-backtracking|speed-single-pass] [case=all|rsc-sync|rsc-async]",
     )?);
     let support_path = PathBuf::from(args.next().ok_or("missing support.json")?);
     let output = PathBuf::from(args.next().ok_or("missing output.json")?);
     let samples = count(args.next(), 7, "samples")?;
     let warmups = count(args.next(), 3, "warmups")?;
     let native_mode = NativeMode::parse(args.next())?;
+    let selected_case = args.next().unwrap_or_else(|| "all".into());
+    if !matches!(selected_case.as_str(), "all" | "rsc-sync" | "rsc-async") {
+        return Err("case must be all, rsc-sync or rsc-async".into());
+    }
+    if let Some(profile) = &profile {
+        if selected_case != "all" && selected_case != format!("rsc-{}", profile.mode) {
+            return Err("selected case differs from profiling mode".into());
+        }
+    }
     let calls = samples
         .checked_add(warmups)
         .ok_or("sample count overflow")?;
@@ -299,6 +272,18 @@ fn run() -> Result<Value> {
     let started = Instant::now();
     let artifact = compiler.emit_wasm(&unit)?;
     let wasm_emission_ns = started.elapsed().as_nanos();
+    let artifact_directory = std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").map(PathBuf::from);
+    if let Some(directory) = &artifact_directory {
+        fs::create_dir(directory)?;
+        fs::write(directory.join("program.wasm"), &artifact.bytes)?;
+        if let Some(runtime) = &artifact.runtime {
+            fs::write(directory.join("runtime.wasm"), runtime.bytes())?;
+        }
+        fs::write(
+            directory.join("portable.bundle"),
+            artifact.encode_portable_bundle(&scriptw_engine::IntlCompilationProfile::Minimal)?,
+        )?;
+    }
     drop(unit);
     drop(compiler);
     let started = Instant::now();
@@ -317,16 +302,22 @@ fn run() -> Result<Value> {
         "cranelift_opt_level":native.get_cranelift_opt_level().map(|value|format!("{value:?}")),
         "native_parallel_compilation":native.get_parallel_compilation(),
         "register_allocation":native.get_cranelift_regalloc_algorithm().map(|value|format!("{value:?}")),
+        "native_inlining":format!("{:?}", native.get_compiler_inlining()),
+        "native_inlining_requested_flags":native.get_cranelift_flags_set()
+            .filter(|(name, _)| name.starts_with("wasmtime_inlining_"))
+            .collect::<std::collections::BTreeMap<_, _>>(),
         "target":native.get_target(),
         "target_features_policy":"explicit Config::target disables host-inferred feature flags",
         "collector":native.get_collector().map(|value|format!("{value:?}")),
         "gc_initial_bytes":native.get_gc_heap_initial_size(),
+        "gc_reservation_bytes":native.get_gc_heap_reservation(),
+        "gc_guard_bytes":native.get_gc_heap_guard_size(),
+        "gc_heap_may_move":native.get_gc_heap_may_move(),
         "max_wasm_stack_bytes":native.get_max_wasm_stack(),
         "wasmtime_async_stack_bytes":native.get_async_stack_size(),
         "driver_worker_stack_bytes":WORKER_STACK_BYTES,
         "store_limiter":"EmbeddedRuntime::new_state limits_mut",
         "epoch_interruption":native.get_epoch_interruption(),
-        "epoch_tick_ms":EPOCH_PERIOD.as_millis(),"epoch_deadline_ticks":EPOCH_TICKS,
         "pending_deadline_ms":DEADLINE.as_millis(),
     });
     let native_mode_scope = match native_mode {
@@ -341,12 +332,10 @@ fn run() -> Result<Value> {
     let started = Instant::now();
     let runtime = EmbeddedRuntime::compile(&native, &artifact)?;
     let native_preparation_ns = started.elapsed().as_nanos();
-    let _ticker = EpochTicker::start(&native);
     let started = Instant::now();
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
     let mut store = wasmtime::Store::new(&native, state);
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(EPOCH_TICKS);
     let mut linker = wasmtime::Linker::<WasmStoreState>::new(&native);
     runtime.register(&mut store, &mut linker)?;
     let mut instance = runtime.instantiate(&mut store, &mut linker)?;
@@ -368,6 +357,9 @@ fn run() -> Result<Value> {
             continue;
         }
         let name = format!("rsc-{mode}");
+        if selected_case != "all" && selected_case != name {
+            continue;
+        }
         let expected = support["expected"][&name]
             .as_str()
             .ok_or("missing Node Flight expectation")?;
@@ -379,7 +371,6 @@ fn run() -> Result<Value> {
         let mut observations = Vec::new();
         let mut measured = Vec::new();
         for index in 0..calls {
-            store.set_epoch_deadline(EPOCH_TICKS);
             if index >= warmups {
                 if let Some(profile) = &mut profile {
                     profile.exchange("ready", index)?;
@@ -408,7 +399,11 @@ fn run() -> Result<Value> {
                 .into());
             }
             let warmup = index < warmups;
-            observations.push(json!({"index":index,"warmup":warmup,"elapsed_ns":elapsed_ns}));
+            observations.push(
+                json!({"index":index,"warmup":warmup,"elapsed_ns":elapsed_ns,
+                "exact_node_output_checked":true,"output_json_sha256":hash(actual.as_bytes()),
+                "output_json_bytes":actual.len()}),
+            );
             if !warmup {
                 measured.push(elapsed_ns);
             }
@@ -418,8 +413,10 @@ fn run() -> Result<Value> {
         if measured.len() % 2 == 0 {
             median_ns = (measured[measured.len() / 2 - 1] + median_ns) / 2;
         }
+        let mean_ns = measured.iter().sum::<u128>() as f64 / samples as f64;
+        let p95_ns = measured[(samples * 95).div_ceil(100) - 1];
         cases.push(json!({"case":name,"samples":samples,"warmups":warmups,
-            "median_ns":median_ns,"observations":observations,
+            "mean_ns":mean_ns,"p95_ns":p95_ns,"median_ns":median_ns,"observations":observations,
             "exact_node_output_checked":true,"expected_json_sha256":hash(expected.as_bytes()),
             "expected_json_bytes":expected.len()}));
     }
@@ -430,6 +427,8 @@ fn run() -> Result<Value> {
     let mut report = json!({
         "schema":"scriptw-react-retained-baseline-v1","status":"complete",
         "scope":"one process and one retained Realm/module; diagnostic, not a statistical comparison",
+        "case_selection":selected_case,
+        "gc_policy":"natural Wasmtime GC; no forced collection between calls",
         "request_clock":"retained call through fulfilled applicationRun Promise after complete Flight consumption; includes bridge and required pumps; excludes setup, JSON validation serialization, host string copying and output checking",
         "source_commit":revision,"source_fingerprint":identity.source_fingerprint().to_string(),
         "native_mode":native_mode.as_str(),
@@ -458,6 +457,11 @@ fn run() -> Result<Value> {
             "protocol":"SWRSC1","mode":profile.mode,"nonce":profile.nonce,
             "windows":samples,"warmups_excluded":warmups,
             "scope":"flight() only; setup, warmups and output validation outside every window",
+        });
+    }
+    if let Some(directory) = artifact_directory {
+        report["artifact_dump"] = json!({
+            "directory":directory,"excluded_from_scored_cohorts":true,
         });
     }
     let bytes = serde_json::to_vec_pretty(&report)?;

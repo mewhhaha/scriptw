@@ -1353,10 +1353,12 @@ fn with_source_artifact_variants(
     assert_eq!(seen, targets.len(), "every named source variant is checked");
 }
 
+/// Loop bodies, each after the deadline poll that a source loop begins with.
+/// The poll is the only linear-memory traffic a scalar loop may carry.
 fn loop_regions<'a>(operators: &'a [Operator<'a>]) -> Vec<&'a [Operator<'a>]> {
     loop_ranges(operators)
         .into_iter()
-        .map(|range| &operators[range])
+        .map(|range| &operators[after_deadline_poll(operators, range.start)..range.end])
         .collect()
 }
 
@@ -1378,6 +1380,20 @@ fn loop_ranges(operators: &[Operator<'_>]) -> Vec<std::ops::Range<usize>> {
         }
     }
     loops
+}
+
+fn after_deadline_poll(operators: &[Operator<'_>], start: usize) -> usize {
+    match operators.get(start..start + 3) {
+        Some(
+            [Operator::I32Const { value: address }, Operator::I32Const { value: 0 }, Operator::I32Store8 { memarg }],
+        ) if *address == crate::heap::DEADLINE_POLL_ADDRESS as i32
+            && memarg.memory == 0
+            && memarg.offset == 0 =>
+        {
+            start + 3
+        }
+        _ => start,
+    }
 }
 
 fn scalar_arithmetic_loop(operators: &[Operator<'_>]) -> bool {

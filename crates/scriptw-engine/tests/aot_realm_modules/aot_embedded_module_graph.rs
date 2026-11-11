@@ -118,10 +118,26 @@ Promise.all([import('caller-a'), import('caller-b')]).then(async function(caller
                 EmbeddedModuleGoal::Script,
                 &source,
                 &[
-                    ("a.js", "export function load(options) { return import('chosen', options); }", "scriptw://a.js"),
-                    ("b.js", "export function load(options) { return import('chosen', options); }", "scriptw://b.js"),
-                    ("value-a.js", "export const value = 41;", "scriptw://value-a.js"),
-                    ("value-b.js", "export const value = 73;", "scriptw://value-b.js"),
+                    (
+                        "a.js",
+                        "export function load(options) { return import('chosen', options); }",
+                        "scriptw://a.js",
+                    ),
+                    (
+                        "b.js",
+                        "export function load(options) { return import('chosen', options); }",
+                        "scriptw://b.js",
+                    ),
+                    (
+                        "value-a.js",
+                        "export const value = 41;",
+                        "scriptw://value-a.js",
+                    ),
+                    (
+                        "value-b.js",
+                        "export const value = 73;",
+                        "scriptw://value-b.js",
+                    ),
                 ],
                 vec![
                     edge("caller-a", &[], "a.js"),
@@ -156,17 +172,53 @@ Promise.all([import(name, options), import(name, options), import('self')]).then
 262;
 "#
         );
-        assert_script(graph(EmbeddedModuleGoal::Script, &source, &[
-            ("dep.js", "globalThis.loads += 1; export const value = 42; export const url = import.meta.url;", "scriptw://independent/dep.js"),
-            ("red.js", "throw 'unselected attribute body'; export const value = 13;", "scriptw://red.js"),
-            ("entry.js", "export const value = 7; export const moduleThis = typeof this;", "scriptw://module/entry.js"),
-            ("unused.js", "throw 'unreferenced body'; export {};", "scriptw://unused.js"),
-            ("unused-invalid.js", "export const =", "scriptw://unused-invalid.js"),
-        ], vec![
-            edge("chosen", &[("flavour", "blue"), ("\u{10000}", "astral"), ("\u{e000}", "bmp")], "dep.js"),
-            edge("chosen", &[("flavour", "red")], "red.js"),
-            edge("self", &[], "entry.js"),
-        ]), "embedded-values:ok");
+        assert_script(
+            graph(
+                EmbeddedModuleGoal::Script,
+                &source,
+                &[
+                    (
+                        "dep.js",
+                        "globalThis.loads += 1; export const value = 42; export const url = import.meta.url;",
+                        "scriptw://independent/dep.js",
+                    ),
+                    (
+                        "red.js",
+                        "throw 'unselected attribute body'; export const value = 13;",
+                        "scriptw://red.js",
+                    ),
+                    (
+                        "entry.js",
+                        "export const value = 7; export const moduleThis = typeof this;",
+                        "scriptw://module/entry.js",
+                    ),
+                    (
+                        "unused.js",
+                        "throw 'unreferenced body'; export {};",
+                        "scriptw://unused.js",
+                    ),
+                    (
+                        "unused-invalid.js",
+                        "export const =",
+                        "scriptw://unused-invalid.js",
+                    ),
+                ],
+                vec![
+                    edge(
+                        "chosen",
+                        &[
+                            ("flavour", "blue"),
+                            ("\u{10000}", "astral"),
+                            ("\u{e000}", "bmp"),
+                        ],
+                        "dep.js",
+                    ),
+                    edge("chosen", &[("flavour", "red")], "red.js"),
+                    edge("self", &[], "entry.js"),
+                ],
+            ),
+            "embedded-values:ok",
+        );
     }
 }
 

@@ -32,7 +32,6 @@ mod current_function_realm_async_disposable_stack;
 mod current_function_realm_disposable_stack;
 mod current_function_realm_typed_array_constructor;
 mod host_output;
-pub(crate) use current_function_realm_typed_array_constructor::CurrentFunctionRealmTypedArrayConstructor;
 mod direct_eval;
 pub(crate) mod direct_eval_invocation;
 mod eval_intrinsic;
@@ -817,30 +816,6 @@ impl FunctionBuilder<'_> {
         Ok(schema.retain_snapshot_realm(realm, function))
     }
 
-    pub(crate) fn emit_store_realm_message_error_prototype(
-        &mut self,
-        realm: &crate::gc_types::GcLocal<crate::gc_types::RealmRecord>,
-        kind: ErrorMessageConstructorKind,
-        prototype: &crate::gc_types::ValueLocals,
-        function: &mut Function,
-    ) {
-        self.emit_store_non_array_realm_intrinsic(
-            realm,
-            kind.prototype_slot(),
-            prototype,
-            function,
-        );
-    }
-
-    pub(crate) fn emit_store_current_realm_message_error_prototype(
-        &mut self,
-        kind: ErrorMessageConstructorKind,
-        prototype: &crate::gc_types::ValueLocals,
-        function: &mut Function,
-    ) {
-        self.emit_store_current_realm_intrinsic(kind.prototype_slot(), prototype, function);
-    }
-
     pub(crate) fn emit_store_non_array_realm_intrinsic(
         &mut self,
         realm: &crate::gc_types::GcLocal<crate::gc_types::RealmRecord>,
@@ -849,17 +824,6 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         self.emit_store_realm_intrinsic_at_index(realm, slot.gc_index(), value, function);
-    }
-
-    pub(crate) fn emit_store_current_realm_intrinsic(
-        &mut self,
-        slot: NonArrayRealmIntrinsicSlot,
-        value: &crate::gc_types::ValueLocals,
-        function: &mut Function,
-    ) {
-        let realm = self.load_current_realm(function);
-        self.emit_store_non_array_realm_intrinsic(&realm, slot, value, function);
-        realm.clear(function);
     }
 
     pub(crate) fn emit_store_realm_array_prototype(

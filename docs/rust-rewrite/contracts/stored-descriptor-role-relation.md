@@ -2,49 +2,46 @@
 
 Status: normative for the AOT descriptor-compatibility boundary.
 
-In the current GC backend, descriptor VALUE has the typed PropertyValue sum;
-GETTER and SETTER accept only immutable StoredValue snapshots. Compatibility
-reads and descriptor exposure resolve internal intrinsic recipes before applying
-SameValue. Merging a partial descriptor preserves its current VALUE edge when
-no new value is supplied, and kind conversion restores the canonical undefined
-snapshot. Attribute changes therefore retain lazy values without manufacturing
-new callables. See [lazy runtime values](lazy-runtime-values.md).
+Descriptor VALUE has the typed PropertyValue sum, including deferred intrinsic
+recipes. GETTER and SETTER are nonnull references to immutable StoredValue
+wrappers. The containing PropertyDescriptor has mutable fields; its identity
+and ownership remain separate from those shared immutable edges.
 
 ## Closed field roles
 
-`StoredDescriptorLocals::new` accepts the distinct
-`StoredDescriptorDataLocals`, `StoredDescriptorGetterLocals`, and
-`StoredDescriptorSetterLocals` roles. This is the
-stored descriptor role relation: the three wrappers have private fields, and only their named
-constructors accept a generic `TaggedLocals` value. A validator producer
-cannot transpose data, getter, and setter locals because the constructor
-rejects the wrong role at compile time.
+The stored descriptor role relation keeps complete records at the boundary.
 
-Array and Arguments indexed storage deliberately project their shared
-data-or-getter carrier into both the data and getter roles. Ordinary named
-storage allocates three independent carriers and labels each before loading its
-heap offsets. The existing validator then consumes the same data, getter, and
-setter values in the same `SameValue` checks and releases the same temporary
-locals in the same order.
+Compatibility receives a complete `GcLocal<PropertyDescriptor>` and a validated
+partial `WasmDescriptor`. Callers cannot transpose data, getter, and setter locals
+at that boundary. The closed `DescriptorField` mapping selects each named field.
+Data reads resolve PropertyValue recipes; accessor reads decode StoredValue.
+Compatibility retains the original SameValue checks and complete abrupt results.
 
-## Durable guard and nonclaims
+A merge preserves the exact current VALUE, GETTER and SETTER edges when their
+fields are omitted. Getter/setter roots start with canonical stored undefined;
+kind conversion resets them before supplied fields are applied. Only a present
+incoming getter/setter is boxed, inside its runtime presence guard. Both result
+kinds construct a complete descriptor using those retained edges. Attribute-only
+changes preserve deferred VALUE recipes without manufacturing new callables.
+See [lazy runtime values](lazy-runtime-values.md).
 
-`stored_descriptor_role_relation_structure` uses a recursive Rust-lexical
-census that excludes comments and normal, raw, byte, C-string and character
-literals. It pins the private one-field roles, the typed aggregate constructor,
-the exact three producers, and each producer's complete role set. Its lexical
-probe prevents comments, nested comments, raw identifiers and literals from
-making the census vacuous.
+A completed Proxy target snapshot constructs a fresh mutable descriptor while
+sharing only its immutable value edges. Later redefinition updates the live
+record's edges independently. Merge publication and complete-record copying
+retain their existing ownership; sharing wrappers cannot alias mutable records.
 
-This is source-equivalent type hardening. It does not change descriptor
-classification, compatibility, heap layout, Array or Arguments exotic
-behavior, Proxy behavior, Realm selection, or conformance counts.
+## Durable guard and scope
 
-At `2026-08-27`, the dedicated structure target passes `4/4`, the neighboring
-Arguments descriptor structure target passes `4/4`, and the exact Array
-descriptor CLI witness passes `1/1`. The older Array descriptor structure target
-passes `2/3`; its pre-existing validator-body assertion still spells a closure
-receiver as `self` where the current source uses `builder`. The mapped-Arguments
-CLI witness is currently blocked outside this boundary because two active
-callers reference the removed `FunctionArgumentsProtocol::present` method.
-Broad Object and Test262 verification remain deferred.
+`stored_descriptor_role_relation_structure` checks exact layouts, field-to-role
+mappings, canonical initialization/reset, presence-guarded boxing, fresh snapshot
+records and complete typed readers. Its recursive Rust-lexical census excludes
+comments and normal, raw, byte, C-string and character literals. The closed
+`emit_descriptor_value` census is five: one reader, two compatibility sites,
+Arguments value and Namespace value. Merge's former two accessor decode calls
+are absent because it retains those immutable edges directly.
+
+Source guards establish these ownership and routing invariants. Actual Wasm
+emission and native semantic tests separately cover partial definitions, kind
+conversion, nonconfigurable properties, reentrant Proxy snapshots, GC and
+deferred intrinsic aliases. Source checks alone establish neither runtime
+conformance nor a performance improvement.

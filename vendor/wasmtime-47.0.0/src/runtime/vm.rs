@@ -57,6 +57,8 @@ mod export;
 mod gc;
 mod imports;
 mod instance;
+#[cfg(feature = "std")]
+mod interrupt;
 mod memory;
 mod mmap_vec;
 #[cfg(has_virtual_memory)]
@@ -100,6 +102,10 @@ pub use crate::runtime::vm::always_mut::*;
 pub use crate::runtime::vm::export::*;
 pub use crate::runtime::vm::gc::*;
 pub use crate::runtime::vm::imports::Imports;
+#[cfg(feature = "std")]
+pub use crate::runtime::vm::interrupt::StoreInterrupt;
+#[cfg(all(feature = "std", unix))]
+pub(crate) use crate::runtime::vm::interrupt::restore_access;
 pub use crate::runtime::vm::instance::{
     GcHeapAllocationIndex, Instance, InstanceAllocationRequest, InstanceAllocator, InstanceHandle,
     MemoryAllocationIndex, OnDemandInstanceAllocator, TableAllocationIndex,

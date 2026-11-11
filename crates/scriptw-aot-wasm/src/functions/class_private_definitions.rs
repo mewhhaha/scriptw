@@ -3,8 +3,8 @@
 use super::*;
 use crate::gc_types::{
     GcLocal, GcOperand, I32Local, NonNullable, Nullable, PrivateElement, PrivateElementKind,
-    PrivateElementSchema, PrivateElementTable, PrivateEnvironment, PrivateEnvironmentSchema,
-    PrivateName, PrivateNameSchema, PrivateNameTable, StoredValue, StringValue, ValueLocals,
+    PrivateElementSchema, PrivateElementTable, PrivateEnvironment,
+    PrivateName, PrivateNameTable, StoredValue, StringValue, ValueLocals,
 };
 
 #[derive(Clone, Copy)]

@@ -174,25 +174,6 @@ fn is_binding_identifier(name: &MergedName) -> bool {
         && chars.all(|ch| scriptw_front::is_identifier_part(u32::from(ch)))
 }
 
-/// Every global the merged script's own preludes spell.
-///
-/// One list, because the four guards that need it used to be three different
-/// literals: `link.rs`'s renamed-import check tested
-/// `OBJECT_NAME | SYMBOL_NAME | GLOBAL_THIS_NAME`, while this module's two alias
-/// checks and its shadowed-globals check tested only `OBJECT_NAME | SYMBOL_NAME`.
-/// So `import * as globalThis from './m.js'` emitted
-/// `const globalThis = $m0$namespace;` into the merged scope ahead of
-/// the former alias prelude's `Object.defineProperty(globalThis, …)`, which then
-/// defined every renamed-import alias on the namespace object — a silent wrong
-/// answer where the other two names give a diagnostic. Three literals could
-/// disagree; one cannot.
-pub(crate) const PRELUDE_GLOBALS: [&str; 3] = [OBJECT_NAME, SYMBOL_NAME, GLOBAL_THIS_NAME];
-
-/// Whether `name` is one of [`PRELUDE_GLOBALS`].
-pub(crate) fn shadows_prelude_global(name: &str) -> bool {
-    PRELUDE_GLOBALS.contains(&name)
-}
-
 /// Expression the merged script evaluates to read a resolved binding.
 ///
 /// The single authority for what a `ResolvedBinding` Record reads as in the

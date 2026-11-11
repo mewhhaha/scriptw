@@ -36,7 +36,6 @@ fn precompiled_runtime_functions_reuse_stencils_without_reusing_stale_code() {
             let native = engine.precompile_module(&wasm).unwrap();
             let module = wasmtime::Module::new(&engine, &wasm).unwrap();
             let mut store = wasmtime::Store::new(&engine, ());
-            store.set_epoch_deadline(1);
             let instance = wasmtime::Instance::new(&mut store, &module, &[]).unwrap();
             let answer = instance
                 .get_typed_func::<(), i32>(&mut store, "answer")
@@ -375,7 +374,7 @@ fn embedded_runtime_matches_target_emission_and_preserves_native_compatibility_c
                     WasmNativeCompilationMode::Fast,
                     WasmBacktraceDetails::Disable,
                 );
-                mismatched.epoch_interruption(false);
+                mismatched.epoch_interruption(true);
                 let incompatible = Engine::new(&mismatched).unwrap();
                 assert!(
                     bundle

@@ -1,0 +1,150 @@
+{
+  "snapshot_version": 8,
+  "compiler_identity": {
+    "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3",
+    "source_fingerprint": "89a934d0689156f94128f206d0eb2b3e1c456fd20baffadf75d148d3f2dae1f7",
+    "source_revision": {
+      "kind": "git-commit",
+      "commit": "a52f555d040c8502c2c0a7821410e40e7462af81"
+    },
+    "executable_sha256": "ad325df2a8e48842f06b1ee1c71be538b1b7a8639854b017cb7f8a793a9c9d01"
+  },
+  "producer": "scriptw",
+  "matrix_strategy_version": 3,
+  "execution_backend": "wasm-aot",
+  "pinned_revisions": {
+    "ecma262": "5345883164f463e87f8b40aca4956157ecba8783",
+    "test262": "6a4268a9354a545d41c3b62efebc478ed8c521f4"
+  },
+  "manifest_hash": 614859141672195111,
+  "run_kind": "full",
+  "total": 44,
+  "passed": 44,
+  "counts_per_kind": {
+    "EarlyError": 0,
+    "HostHarness": 0,
+    "Lowering": 0,
+    "Parser": 0,
+    "Runtime": 0,
+    "Unsupported": 0,
+    "WasmBackend": 0
+  },
+  "counts_per_outcome": {
+    "Bug": 0,
+    "Crash": 0,
+    "NotImplemented": 0,
+    "Success": 44
+  },
+  "slowest_tests": [
+    {
+      "test_id": "strict-script:built-ins/Array/prototype/find/prop-desc.js",
+      "path": "built-ins/Array/prototype/find/prop-desc.js",
+      "duration_ms": 2713
+    },
+    {
+      "test_id": "strict-script:built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+      "path": "built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+      "duration_ms": 2590
+    },
+    {
+      "test_id": "sloppy-script:built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+      "path": "built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+      "duration_ms": 2469
+    },
+    {
+      "test_id": "sloppy-script:built-ins/Array/prototype/find/prop-desc.js",
+      "path": "built-ins/Array/prototype/find/prop-desc.js",
+      "duration_ms": 2360
+    },
+    {
+      "test_id": "sloppy-script:built-ins/Array/prototype/find/name.js",
+      "path": "built-ins/Array/prototype/find/name.js",
+      "duration_ms": 2323
+    },
+    {
+      "test_id": "strict-script:built-ins/Array/prototype/find/name.js",
+      "path": "built-ins/Array/prototype/find/name.js",
+      "duration_ms": 2307
+    },
+    {
+      "test_id": "sloppy-script:built-ins/Array/prototype/find/length.js",
+      "path": "built-ins/Array/prototype/find/length.js",
+      "duration_ms": 2159
+    },
+    {
+      "test_id": "strict-script:built-ins/Array/prototype/find/length.js",
+      "path": "built-ins/Array/prototype/find/length.js",
+      "duration_ms": 2149
+    },
+    {
+      "test_id": "strict-script:built-ins/Array/prototype/find/resizable-buffer.js",
+      "path": "built-ins/Array/prototype/find/resizable-buffer.js",
+      "duration_ms": 2047
+    },
+    {
+      "test_id": "sloppy-script:built-ins/Array/prototype/find/resizable-buffer.js",
+      "path": "built-ins/Array/prototype/find/resizable-buffer.js",
+      "duration_ms": 2036
+    }
+  ],
+  "timeout_test_ids": [],
+  "failures": [],
+  "completed_test_ids": [
+    "sloppy-script:built-ins/Array/prototype/find/array-altered-during-loop.js",
+    "strict-script:built-ins/Array/prototype/find/array-altered-during-loop.js",
+    "sloppy-script:built-ins/Array/prototype/find/call-with-boolean.js",
+    "strict-script:built-ins/Array/prototype/find/call-with-boolean.js",
+    "sloppy-script:built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+    "strict-script:built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js",
+    "sloppy-script:built-ins/Array/prototype/find/length.js",
+    "strict-script:built-ins/Array/prototype/find/length.js",
+    "sloppy-script:built-ins/Array/prototype/find/name.js",
+    "strict-script:built-ins/Array/prototype/find/name.js",
+    "sloppy-script:built-ins/Array/prototype/find/not-a-constructor.js",
+    "strict-script:built-ins/Array/prototype/find/not-a-constructor.js",
+    "sloppy-script:built-ins/Array/prototype/find/predicate-call-parameters.js",
+    "strict-script:built-ins/Array/prototype/find/predicate-call-parameters.js",
+    "sloppy-script:built-ins/Array/prototype/find/predicate-call-this-non-strict.js",
+    "strict-script:built-ins/Array/prototype/find/predicate-call-this-strict.js",
+    "sloppy-script:built-ins/Array/prototype/find/predicate-called-for-each-array-property.js",
+    "strict-script:built-ins/Array/prototype/find/predicate-called-for-each-array-property.js",
+    "sloppy-script:built-ins/Array/prototype/find/predicate-is-not-callable-throws.js",
+    "strict-script:built-ins/Array/prototype/find/predicate-is-not-callable-throws.js",
+    "sloppy-script:built-ins/Array/prototype/find/predicate-not-called-on-empty-array.js",
+    "strict-script:built-ins/Array/prototype/find/predicate-not-called-on-empty-array.js",
+    "sloppy-script:built-ins/Array/prototype/find/prop-desc.js",
+    "strict-script:built-ins/Array/prototype/find/prop-desc.js",
+    "sloppy-script:built-ins/Array/prototype/find/resizable-buffer-grow-mid-iteration.js",
+    "strict-script:built-ins/Array/prototype/find/resizable-buffer-grow-mid-iteration.js",
+    "sloppy-script:built-ins/Array/prototype/find/resizable-buffer-shrink-mid-iteration.js",
+    "strict-script:built-ins/Array/prototype/find/resizable-buffer-shrink-mid-iteration.js",
+    "sloppy-script:built-ins/Array/prototype/find/resizable-buffer.js",
+    "strict-script:built-ins/Array/prototype/find/resizable-buffer.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-abrupt-from-predicate-call.js",
+    "strict-script:built-ins/Array/prototype/find/return-abrupt-from-predicate-call.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-abrupt-from-property.js",
+    "strict-script:built-ins/Array/prototype/find/return-abrupt-from-property.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-abrupt-from-this-length-as-symbol.js",
+    "strict-script:built-ins/Array/prototype/find/return-abrupt-from-this-length-as-symbol.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-abrupt-from-this-length.js",
+    "strict-script:built-ins/Array/prototype/find/return-abrupt-from-this-length.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-abrupt-from-this.js",
+    "strict-script:built-ins/Array/prototype/find/return-abrupt-from-this.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-found-value-predicate-result-is-true.js",
+    "strict-script:built-ins/Array/prototype/find/return-found-value-predicate-result-is-true.js",
+    "sloppy-script:built-ins/Array/prototype/find/return-undefined-if-predicate-returns-false-value.js",
+    "strict-script:built-ins/Array/prototype/find/return-undefined-if-predicate-returns-false-value.js"
+  ],
+  "matrix_path": [],
+  "completed_nodes": [],
+  "aggregate_counts_so_far": {
+    "EarlyError": 0,
+    "HostHarness": 0,
+    "Lowering": 0,
+    "Parser": 0,
+    "Runtime": 0,
+    "Unsupported": 0,
+    "WasmBackend": 0
+  },
+  "aggregate_entries": []
+}

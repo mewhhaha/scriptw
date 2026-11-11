@@ -3,9 +3,6 @@ use std::path::{Path, PathBuf};
 
 const LOWERING_SOURCE: &str = include_str!("../src/lowering.rs");
 const ASSIGNMENT_SOURCE: &str = include_str!("../src/lowering/assignment.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/property-reference-update-operation.md");
-
 fn bounded_inclusive<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     let start_offset = source
         .find(start)
@@ -445,13 +442,4 @@ fn the_single_consumer_couples_reachability_operation_and_write() {
         4,
         "method items and indirect aliases may not create alternate routes"
     );
-}
-
-#[test]
-fn contract_and_t08_record_the_one_shot_property_update_operation() {
-    assert!(CONTRACT.contains("PropertyUpdateOp::{Arithmetic, Bitwise, Logical}"));
-    assert!(CONTRACT.contains("nine to eight"));
-    assert!(CONTRACT.contains("property_update_op_ownership_structure"));
-    assert!(CONTRACT.contains("PropertyUpdateOp::{Arithmetic, Bitwise, Logical}"));
-    assert!(CONTRACT.contains("property_update_op_ownership_structure"));
 }

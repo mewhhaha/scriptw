@@ -65,6 +65,7 @@ pub(crate) struct AsyncGeneratorForInSource<'ast> {
 }
 
 impl<'ast> AsyncGeneratorForInSource<'ast> {
+    #[cfg(test)]
     pub(crate) fn new(source: &'ast ForInLoop) -> Option<Self> {
         Self::for_execution(source, ResumableRegionProtocolIr::AsyncGenerator)
     }

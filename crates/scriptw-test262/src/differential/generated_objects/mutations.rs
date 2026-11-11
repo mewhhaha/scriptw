@@ -1,6 +1,5 @@
 //! One closed mutation algebra owns execution order and all reduction aliases.
 use super::*;
-use std::fmt::Write as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Integrity {

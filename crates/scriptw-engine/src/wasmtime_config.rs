@@ -4,7 +4,7 @@
 use crate::wasmtime_policy::PRODUCT_WASMTIME_POLICY;
 use wasmtime::{Config, ModuleVersionStrategy, OptLevel, RegallocAlgorithm, WasmBacktraceDetails};
 
-pub(crate) const CONFIGURATION_SCHEMA: u32 = 4;
+pub(crate) const CONFIGURATION_SCHEMA: u32 = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum WasmNativeCompilationMode {
@@ -53,18 +53,28 @@ pub(crate) fn base_config(
     });
     config.cranelift_regalloc_algorithm(RegallocAlgorithm::SinglePass);
     config.gc_heap_initial_size(WASM_GC_HEAP_INITIAL_BYTES as u64);
+    // Cover the complete 32-bit reference range with reserved address space.
+    // Wasmtime can use its protected pages instead of per-field heap checks.
+    // Initial accessible memory and the per-memory Store limit stay separate.
+    config.gc_heap_reservation(1_u64 << 32);
+    config.gc_heap_guard_size(WASM_LINEAR_MEMORY_GUARD_BYTES);
+    config.gc_heap_reservation_for_growth(0);
+    config.gc_heap_may_move(false);
     config.max_wasm_stack(WASM_MAX_STACK_SIZE);
     config.async_stack_size(ENGINE_WORKER_STACK_SIZE);
     // Shared memories cannot relocate. Their reservation covers the existing
     // StoreLimits cap; ordinary memories retain the same growth/guard policy.
     config.memory_reservation(WASM_STORE_MEMORY_CAP_BYTES as u64);
     config.memory_reservation_for_growth(0);
-    config.memory_may_move(true);
+    // The reservation is the whole Store limit, so growth never needs to
+    // relocate. Saying so lets a deadline publish a memory's range.
+    config.memory_may_move(false);
     config.memory_guard_size(WASM_LINEAR_MEMORY_GUARD_BYTES);
     config.guard_before_linear_memory(true);
     PRODUCT_WASMTIME_POLICY.configure(&mut config);
-    // Every product profile retains the existing execution-time epoch checks.
-    config.epoch_interruption(true);
+    // Compiled code carries no deadline checks: `execution_deadline` stops a
+    // Store by removing access to its GC heap and private memory.
+    config.epoch_interruption(false);
     // Engine's Cargo build supplies this identity. The runtime-image build
     // script computes and installs the same version explicitly before compiling.
     if let Some(identity) = option_env!("SCRIPTW_NATIVE_COMPILER_FINGERPRINT") {

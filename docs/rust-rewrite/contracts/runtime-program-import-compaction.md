@@ -42,6 +42,14 @@ Store/Engine ownership errors remain errors. R remains the diagnostic and root
 owner, including exports P did not request. No caller manifest replaces actual
 Module imports or Wasmtime’s type checks.
 
+P can carry checked copies of a closed set of hot runtime helpers. Their bodies
+come from the admitted R, with matching type, host, global and memory prefixes.
+Copies append after P's original definitions; only direct calls are redirected.
+Function references, mutable state and root ownership stay with canonical R.
+Actual data operands determine whether copied passive images are needed, and
+ordinary import compaction runs after this rewrite. The same final module
+validation and body-size attribution cover the copies.
+
 Native source compilation retains that same R instance as its export owner.
 A later Function or eval template resolves its actual runtime imports directly
 from that owner; specialized native factories use the same on-demand lookup.

@@ -939,8 +939,6 @@ fn labelled_lexical_selector_stops_at_a_statement_instead_of_unwrapping_labels()
     let items = parsed.statements().statements();
     assert!(lexically_scoped_statement_list_item_function_declaration(&items[0]).is_some());
     assert!(lexically_scoped_statement_list_item_function_declaration(&items[1]).is_none());
-    // Syntax/root traversal is a different operation and still sees the chain.
-    assert!(statement_list_item_function_declaration(&items[1]).is_some());
 }
 
 #[test]

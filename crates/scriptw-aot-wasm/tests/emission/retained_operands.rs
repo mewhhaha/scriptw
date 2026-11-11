@@ -1,8 +1,8 @@
 //! Private evaluated operands have no source TDZ; real lexical reads retain it.
 use crate::property_read_plans::Module;
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, ExprIr, StatementIr};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{ExprIr, StatementIr, lower};
 use wasmparser::{Operator, Validator, WasmFeatures};
 
 fn calls(body: &[Operator<'_>], callee: u32) -> usize {

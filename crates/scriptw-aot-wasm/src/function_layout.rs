@@ -1,7 +1,7 @@
 //! The one Wasm function index space.
 //!
 //! ```text
-//! [common host imports][runtime callables/helpers][P foreign imports][main?][P initializer?][program callables/scalar entries/helpers]
+//! [common host imports][runtime callables/helpers/local entries][P foreign imports][main?][P initializer?][program callables/scalar entries/helpers]
 //!           ^-- runtime half: identical for every program --^
 //!                                                 ^-- program half starts with its actual entry prefix
 //! ```
@@ -224,6 +224,7 @@ pub(crate) struct FunctionIndexLayout {
     standard: u32,
     host: u32,
     runtime_helpers: u32,
+    native_local_arguments: bool,
     foreign_imports: u32,
     entry_role: ModuleEntryRole,
     program_initialize: bool,
@@ -269,6 +270,7 @@ impl FunctionIndexLayout {
             standard: count(standard),
             host: count(host),
             runtime_helpers: count(runtime_helpers),
+            native_local_arguments: false,
             foreign_imports: 0,
             entry_role,
             program_initialize: matches!(kind, ModuleKind::Program(_)),
@@ -349,9 +351,37 @@ impl FunctionIndexLayout {
         )
     }
 
-    /// End of the common H/R prefix, identical regardless of P capabilities.
+    pub(crate) fn with_standard_builtin_local_arguments(
+        mut self,
+        builtins: &[scriptw_ir::StandardBuiltinId],
+    ) -> Self {
+        self.native_local_arguments =
+            builtins.contains(&scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance);
+        self.program_helper_end();
+        self
+    }
+
+    pub(crate) fn native_local_arguments_index(
+        &self,
+        builtin: scriptw_ir::StandardBuiltinId,
+    ) -> Option<LocalArgumentsFunctionIndex> {
+        if !self.native_local_arguments
+            || builtin != scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance
+        {
+            return None;
+        }
+        Some(LocalArgumentsFunctionIndex(Self::add(
+            self.runtime_helper_first(),
+            self.runtime_helpers,
+        )))
+    }
+
+    /// End of the common H/R prefix, including the native local-entry suffix.
     fn foreign_import_first(&self) -> u32 {
-        Self::add(self.runtime_helper_first(), self.runtime_helpers)
+        Self::add(
+            Self::add(self.runtime_helper_first(), self.runtime_helpers),
+            u32::from(self.native_local_arguments),
+        )
     }
 
     pub(crate) fn foreign_import_index(

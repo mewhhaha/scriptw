@@ -81,7 +81,6 @@ fn store(runtime: &EmbeddedRuntime, offset: f64) -> WasmtimeStore<WasmStoreState
         .unwrap();
     let mut store = WasmtimeStore::new(&runtime.engine, state);
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     store
 }
 

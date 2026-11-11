@@ -4,7 +4,7 @@ use super::*;
 
 mod choice_entries;
 pub(super) use choice_entries::{
-    CheckedTemplateRunNode, ChoiceEntry, ChoiceEntryKind, ChoiceSnapshot, ChoiceSnapshotView,
+    CheckedTemplateRunNode, ChoiceEntryKind, ChoiceSnapshotView,
     ChoiceSnapshotWord, ChoiceStack, SnapshotChoice,
 };
 

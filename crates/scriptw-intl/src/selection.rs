@@ -16,13 +16,7 @@ use crate::{
     IntlProvider, InvalidLocaleId, ListDataImage, LocaleDataImage, LocaleId,
     NamedTimeZoneDataImage, NativeLocaleInformationDataImage, NumberProfilesDataImage,
     RelativeTimeDataImage, SegmenterDataImage, SupportedValuesKey, SupportedValuesList,
-    SupportedValuesSetupError, TimeZoneNamesDataImage, INTL_COLLATOR_DATA_CUSTOM_SECTION,
-    INTL_DATETIME_DATA_CUSTOM_SECTION, INTL_DISPLAY_NAMES_DATA_CUSTOM_SECTION,
-    INTL_DURATION_DATA_CUSTOM_SECTION, INTL_LIST_DATA_CUSTOM_SECTION,
-    INTL_LOCALE_DATA_CUSTOM_SECTION, INTL_NAMED_TIME_ZONE_DATA_CUSTOM_SECTION,
-    INTL_NATIVE_LOCALE_INFORMATION_CUSTOM_SECTION, INTL_NUMBER_DATA_CUSTOM_SECTION,
-    INTL_RELATIVE_TIME_DATA_CUSTOM_SECTION, INTL_SEGMENTER_DATA_CUSTOM_SECTION,
-    INTL_TIME_ZONE_NAMES_DATA_CUSTOM_SECTION,
+    SupportedValuesSetupError, TimeZoneNamesDataImage,
 };
 use crate::{CheckedIntlServiceSelection, IntlDataComponent, IntlService, IntlServiceSet};
 use std::sync::{Arc, Mutex, OnceLock};

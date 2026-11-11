@@ -303,15 +303,4 @@ impl FunctionBuilder<'_> {
         receiver.clear(function);
         Ok(())
     }
-
-    pub(super) fn emit_date_clip_number_result(
-        &mut self,
-        clip: &CompletedDateClipLocals,
-        function: &mut Function,
-    ) {
-        let value = self.runtime_schema().reserve_value_local(function);
-        value.set_number(clip.payload(), function);
-        self.completion().set_normal(&value, function);
-        value.clear(function);
-    }
 }

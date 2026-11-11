@@ -64,6 +64,7 @@ mod embedding;
 pub use embedding::{
     BenchmarkModuleImage, BenchmarkModuleImages, BenchmarkModuleSection, BenchmarkModuleSections,
 };
+mod execution_deadline;
 mod execution_failure;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,
@@ -1509,14 +1510,6 @@ fn memory_wasm_module_is_cached(bytes: &[u8]) -> bool {
         .contains_wasm_sha256(&wasm_sha256)
 }
 
-/// Wall-clock tick between `Engine::increment_epoch()` calls made by
-/// `ensure_wasm_epoch_ticker`. This is the granularity of Wasm-AOT execution
-/// timeouts: a requested timeout is rounded up to the nearest multiple of
-/// this duration. 100ms keeps the ticker thread cheap (a handful of wakeups
-/// per second, process-wide, not per test) while staying far tighter than
-/// the tens-of-seconds bounds test262 runs use in practice.
-const WASM_EPOCH_TICK_MS: u64 = 100;
-
 /// Retained, typed context for a product Wasmtime configuration failure.
 #[derive(Debug, Clone)]
 struct WasmtimeEngineSetupError {
@@ -1694,58 +1687,11 @@ fn shared_profile_wasm_engine(
     Ok(engine)
 }
 
-fn registered_wasm_epoch_engines() -> &'static Mutex<Vec<wasmtime::EngineWeak>> {
-    static ENGINES: OnceLock<Mutex<Vec<wasmtime::EngineWeak>>> = OnceLock::new();
-    ENGINES.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-/// Registers an engine with the process-wide ticker that increments every
-/// Wasm-AOT engine's epoch every `WASM_EPOCH_TICK_MS`. Every store created by
-/// `run_with_wasm_aot_inner` sets its epoch deadline in units of this tick, so
-/// both native-compilation engines must remain registered: otherwise a module
-/// compiled by the engine that registered second could never time out.
-fn ensure_wasm_epoch_ticker(engine: &WasmtimeEngine) {
-    {
-        let mut engines = registered_wasm_epoch_engines()
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        engines.retain(|registered| registered.upgrade().is_some());
-        let already_registered = engines.iter().any(|registered| {
-            registered
-                .upgrade()
-                .is_some_and(|registered| WasmtimeEngine::same(&registered, engine))
-        });
-        if !already_registered {
-            engines.push(engine.weak());
-        }
-    }
-
-    static STARTED: OnceLock<()> = OnceLock::new();
-    STARTED.get_or_init(|| {
-        std::thread::Builder::new()
-            .name("scriptw-wasm-epoch-ticker".to_string())
-            .spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_millis(WASM_EPOCH_TICK_MS));
-                let mut engines = registered_wasm_epoch_engines()
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
-                engines.retain(|registered| {
-                    let Some(engine) = registered.upgrade() else {
-                        return false;
-                    };
-                    engine.increment_epoch();
-                    true
-                });
-            })
-            .expect("scriptw wasm epoch ticker thread should spawn");
-    });
-}
-
 /// True if `err` (from a trapped `wasmtime` call) is specifically the
-/// epoch-interruption trap raised when a store's `set_epoch_deadline` bound
-/// was exceeded, as opposed to any other kind of wasm trap (unreachable,
-/// stack overflow, out-of-bounds access, ...).
-fn is_wasm_epoch_interrupt(err: &wasmtime::Error) -> bool {
+/// interrupt trap raised when a Store's execution deadline passed, as opposed
+/// to any other kind of wasm trap (unreachable, stack overflow, out-of-bounds
+/// access, ...).
+fn is_wasm_deadline_interrupt(err: &wasmtime::Error) -> bool {
     err.downcast_ref::<WasmtimeTrap>() == Some(&WasmtimeTrap::Interrupt)
 }
 
@@ -1893,11 +1839,8 @@ pub struct RunOptions {
     pub test_path: Option<String>,
     pub can_block: bool,
     /// Wall-clock bound for `ExecutionBackend::WasmAot` execution, enforced
-    /// in-process via wasmtime epoch interruption (see
-    /// `run_with_wasm_aot_inner`). `None` means "no caller-specified bound";
-    /// execution still runs under epoch interruption but with an
-    /// effectively-unbounded deadline, so it behaves as before this field
-    /// existed. Ignored by other backends.
+    /// in-process by interrupting the Store (see `execution_deadline`).
+    /// `None` means "no caller-specified bound". Ignored by other backends.
     pub timeout_ms: Option<u64>,
 }
 
@@ -2540,7 +2483,7 @@ impl WasmAgentGroup {
         let mut may_retry_corrupt_cache = true;
 
         loop {
-            // Host compilation cannot be interrupted by a Wasm epoch. Do not
+            // Host compilation cannot be interrupted by a Store deadline. Do not
             // spawn a worker if it consumed the remaining parent budget.
             self.execution_control.remaining()?;
             let (commands_tx, commands_rx) = std::sync::mpsc::channel();
@@ -3929,7 +3872,6 @@ impl Engine {
         } else {
             Default::default()
         };
-        ensure_wasm_epoch_ticker(&engine);
         let module_started = std::time::Instant::now();
         let function_cache_before = trace_wasm
             .then(cranelift_function_cache)
@@ -3975,7 +3917,6 @@ impl Engine {
                 }
                 engine = shared_size_optimized_wasm_engine()?;
                 native_mode = WasmNativeCompilationMode::SizeOptimized;
-                ensure_wasm_epoch_ticker(&engine);
                 wasm_runtime_link::compile_modules(
                     &engine,
                     program,
@@ -4129,12 +4070,6 @@ impl Engine {
             },
         );
         store.limiter(|state| &mut state.limits);
-        // The engine has epoch interruption enabled process-wide (see
-        // `shared_wasm_engine`); every store must set an explicit deadline or
-        // it traps immediately (deadline defaults to epoch 0, which has
-        // already "elapsed"). Instantiation and export lookup are setup, not
-        // user-program execution, so keep them outside the execution bound.
-        store.set_epoch_deadline(u64::MAX / 2);
         let host_imports_started = std::time::Instant::now();
         let host_source = match program.runtime {
             Some(runtime) => WasmModuleSource::runtime(runtime, runtime_image_policy),
@@ -4165,6 +4100,13 @@ impl Engine {
                 WasmtimeMemory::new(&mut store, private_memory_type).map_err(|err| {
                     EngineError::new(format!("wasmtime private-memory setup failed: {err}"))
                 })?;
+            // The regular-expression engine works only in this memory, so a
+            // deadline must be able to stop compiled code there too.
+            store.interrupt_on_memory(&private_memory).map_err(|err| {
+                EngineError::new(format!(
+                    "wasmtime private-memory deadline setup failed: {err}"
+                ))
+            })?;
             linker
                 .define(
                     &store,
@@ -4244,20 +4186,24 @@ impl Engine {
                 store.data_mut().native_source_compiler = Some(Arc::new(context));
             }
         }
+        // Instantiation and export lookup above are setup. From here until
+        // this guard is dropped, which is before the Store, compiled code
+        // that runs past the budget is interrupted.
         let execution_budget = execution_control.remaining()?;
-        let epoch_deadline_ticks = match execution_budget {
-            // The ticker's phase is independent of this Store. One guard
-            // tick ensures the deadline cannot expire before the requested
-            // wall time when arming happens just before a process-wide tick.
-            Some(remaining) => {
-                (remaining.as_millis() as u64)
-                    .div_ceil(WASM_EPOCH_TICK_MS)
-                    .max(1)
-                    + 1
-            }
-            None => u64::MAX / 2,
-        };
-        store.set_epoch_deadline(epoch_deadline_ticks);
+        #[cfg(not(unix))]
+        if execution_budget.is_some() {
+            return Err(EngineError::new(
+                "an execution timeout needs fault-based interruption, which this host does not provide",
+            ));
+        }
+        let _execution_deadline = execution_budget.and_then(|remaining| {
+            // A budget past the end of the clock never expires.
+            let deadline = std::time::Instant::now().checked_add(remaining)?;
+            Some(execution_deadline::ExecutionDeadline::arm(
+                store.interrupt_handle(),
+                deadline,
+            ))
+        });
         if let Some(agent_execution) = &agent_execution {
             agent_execution.ready.send(()).map_err(|_| {
                 EngineError::new("Test262 agent owner stopped before the agent became ready")
@@ -4272,7 +4218,7 @@ impl Engine {
                 let mut error = cause.clone();
                 error.message = format!("wasmtime host execution failed: {err:#}");
                 error
-            } else if is_wasm_epoch_interrupt(&err) {
+            } else if is_wasm_deadline_interrupt(&err) {
                 // Distinguish this from other traps with the same "timeout
                 // exceeded" phrasing the child-process/elapsed-time timeout
                 // path already uses (see
@@ -4283,7 +4229,7 @@ impl Engine {
                 EngineError::from_execution_failure(
                     EngineExecutionFailure::Timeout,
                     format!(
-                        "timeout exceeded after {}ms (wasm epoch interrupt, bound {}ms)",
+                        "timeout exceeded after {}ms (wasm deadline interrupt, bound {}ms)",
                         execution_started.elapsed().as_millis(),
                         timeout_ms.unwrap_or(0)
                     ),

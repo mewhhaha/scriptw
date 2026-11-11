@@ -11,7 +11,9 @@ fn assert_accessors(source: &str) {
     let backends = [ExecutionBackend::WasmAot];
     for backend in backends {
         for directive in ["", "'use strict';\n"] {
-            let source = format!("{directive}function check(value) {{ if (!value) throw Error('stack regression'); }}\n{source}\ntrue;");
+            let source = format!(
+                "{directive}function check(value) {{ if (!value) throw Error('stack regression'); }}\n{source}\ntrue;"
+            );
             let result = Engine::new(RealmBuilder::new().build())
                 .observe_script(
                     &source,

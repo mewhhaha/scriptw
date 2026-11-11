@@ -1,8 +1,5 @@
 const LOADER_SOURCE: &str = include_str!("../../src/module_loader.rs");
 const ENGINE_SOURCE: &str = include_str!("../../src/lib.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/module-entry-source-authority.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -89,14 +86,4 @@ fn parsed_entry_handoffs_cannot_accept_a_second_source_authority() {
     );
     assert!(!ENGINE_SOURCE.contains("source_override"));
     assert!(!ENGINE_SOURCE.contains("let entry = ModuleEntry"));
-}
-
-#[test]
-fn contract_records_the_entry_source_authority() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("ModuleEntry"));
-        assert!(evidence.contains("HostLoad"));
-        assert!(evidence.contains("InMemory"));
-        assert!(evidence.contains("entry_locator"));
-    }
 }

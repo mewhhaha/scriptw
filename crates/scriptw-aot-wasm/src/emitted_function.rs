@@ -92,6 +92,8 @@ pub(crate) enum FunctionIdentity {
     Script { id: FunctionId, name: String },
     /// The vector ABI adapter for a canonical body receiving arguments in locals.
     LocalArgumentsAdapter { id: FunctionId, name: String },
+    /// The vector ABI adapter for the one validated native local-argument body.
+    NativeLocalArgumentsAdapter(StandardBuiltinId),
     /// An auxiliary primitive-only attempt, retaining its real source callable.
     BinaryNumericSource { id: FunctionId, name: String },
     /// An independently prepared Script body with its distinct typed entry.
@@ -118,6 +120,9 @@ impl FunctionIdentity {
             Self::LocalArgumentsAdapter { id, name } => {
                 format!("js-arguments-adapter::{name}#{id}")
             }
+            Self::NativeLocalArgumentsAdapter(builtin) => {
+                format!("builtin-arguments-adapter::{}", builtin.debug_name())
+            }
             Self::Script { id, name } | Self::PreparedScript { id, name } if name.is_empty() => {
                 format!("js::{id}")
             }
@@ -138,7 +143,9 @@ impl FunctionIdentity {
             Self::ProgramInitialize => "program-initialize",
             Self::Script { .. } | Self::PreparedScript { .. } => "script",
             Self::BinaryNumericSource { .. } => "numeric-callback",
-            Self::LocalArgumentsAdapter { .. } => "arguments-adapter",
+            Self::LocalArgumentsAdapter { .. } | Self::NativeLocalArgumentsAdapter(_) => {
+                "arguments-adapter"
+            }
             Self::StandardBuiltin(_) => "builtin",
             Self::HostBuiltin(_) => "host-builtin",
             Self::RuntimeHelper(_) => "runtime-helper",
@@ -158,6 +165,7 @@ impl FunctionIdentity {
             Self::ProgramInitialize => StaticSignature::ProgramInitialize.type_index(),
             Self::Script { .. }
             | Self::LocalArgumentsAdapter { .. }
+            | Self::NativeLocalArgumentsAdapter(_)
             | Self::StandardBuiltin(_)
             | Self::HostBuiltin(_) => StaticSignature::JavaScriptFunction.type_index(),
             Self::PreparedScript { .. } => StaticSignature::PreparedScript.type_index(),
@@ -381,7 +389,7 @@ impl EmittedFunction {
         let (entry, body) = body.into_parts();
         let entry = entry
             .local_arguments()
-            .expect("canonical local arguments body requires its source-bound plan")
+            .expect("canonical local arguments body requires its owner-bound plan")
             .clone();
         let mut function = Self::new(entry.identity(), body);
         function.declaration = FunctionDeclaration::LocalArguments(entry);
@@ -926,13 +934,16 @@ mod tests {
                 name: "outer".to_string(),
             },
             FunctionIdentity::StandardBuiltin(StandardBuiltinId::MathMax),
+            FunctionIdentity::NativeLocalArgumentsAdapter(
+                StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
+            ),
             FunctionIdentity::HostBuiltin(HostBuiltinId::Print),
             FunctionIdentity::RuntimeHelper(RuntimeHelperId::TransientByteAlloc),
         ]
         .iter()
         .map(FunctionIdentity::wasm_name)
         .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(names.len(), 8);
+        assert_eq!(names.len(), 9);
     }
 
     #[test]

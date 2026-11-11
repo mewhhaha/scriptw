@@ -1,10 +1,10 @@
-//! The actual callable's published source entry is the guard, including across P.
+//! The actual callable's published typed entry is the guard, including across P.
 use super::*;
 use crate::function_entry::{LocalArgumentCallInputs, LocalArgumentsCallableRole};
 use crate::gc_types::{
-    ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema, FunctionObject,
-    FunctionObjectSchema, GcI32Constant, GcNullability, LocalArgumentsCallable, ValueLocals,
-    WideLocalArgumentsCallable,
+    CompletionLocals, ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema,
+    FunctionObject, FunctionObjectSchema, GcI32Constant, GcNullability, I32Local,
+    LocalArgumentsCallable, ValueLocals, WideLocalArgumentsCallable,
 };
 
 impl FunctionBuilder<'_> {
@@ -75,6 +75,98 @@ impl FunctionBuilder<'_> {
             values.push(value);
         }
         let result = schema.reserve_completion(function);
+        let references: Vec<_> = values.iter().collect();
+        let handled = self.emit_local_argument_call_values::<R>(
+            callee,
+            receiver,
+            &references,
+            known_target,
+            continuation,
+            &result,
+            function,
+        )?;
+
+        handled.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let list = self.emit_pre_evaluated_arg_vector(&references, function);
+        match continuation {
+            CallContinuation::Continue => self.emit_function_or_proxy_call_with_argv(
+                callee, receiver, &list, &result, function,
+            )?,
+            CallContinuation::Return => {
+                self.emit_prepared_tail_call(callee, receiver, &list, function)?;
+            }
+        }
+        list.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+
+        result.kind().load(function);
+        function.instruction(&Instruction::I32Const(CompletionKind::Throw as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        self.completion().copy_from(&result, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.emit_propagate_current_throw_if_needed(function);
+        output.copy_from(result.value(), function);
+        schema.release_i32_local(handled, function);
+        result.clear(function);
+        for value in values.into_iter().rev() {
+            value.clear(function);
+        }
+        Ok(true)
+    }
+
+    /// Borrow once-evaluated values. The owner chooses fallback allocation and
+    /// abrupt routing after this guard has preserved the whole call result.
+    pub(crate) fn emit_local_argument_call_from_values(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[&ValueLocals],
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        match arguments.len() {
+            0..=2 => self.emit_local_argument_call_values::<LocalArgumentsCallable>(
+                callee,
+                receiver,
+                arguments,
+                None,
+                &CallContinuation::Continue,
+                result,
+                function,
+            ),
+            3..=5 => self.emit_local_argument_call_values::<WideLocalArgumentsCallable>(
+                callee,
+                receiver,
+                arguments,
+                None,
+                &CallContinuation::Continue,
+                result,
+                function,
+            ),
+            _ => {
+                let handled = self.runtime_schema().reserve_i32_local(function);
+                handled.set_constant(0, function);
+                Ok(handled)
+            }
+        }
+    }
+
+    fn emit_local_argument_call_values<R: LocalArgumentsCallableRole>(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[&ValueLocals],
+        known_target: Option<&WasmFunctionMeta>,
+        continuation: &CallContinuation,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
         let handled = schema.reserve_i32_local(function);
         handled.set_constant(0, function);
         callee.tag().load(function);
@@ -126,7 +218,7 @@ impl FunctionBuilder<'_> {
         let direct = if let Some(meta) = known_target.filter(|meta| {
             meta.entry
                 .local_arguments()
-                .is_some_and(|entry| entry.arity() == R::ARITY)
+                .is_some_and(|entry| entry.is_source() && entry.arity() == R::ARITY)
         }) {
             let owner = schema.reserve_gc_local(function).initialize(
                 schema
@@ -184,7 +276,7 @@ impl FunctionBuilder<'_> {
                         result.store_call(
                             LocalArgumentCallInputs::<R>::call(
                                 receiver,
-                                &values,
+                                arguments,
                                 &undefined,
                                 &caller_realm,
                                 self.current_program(),
@@ -196,7 +288,7 @@ impl FunctionBuilder<'_> {
                         result.store_call(
                             LocalArgumentCallInputs::<R>::call(
                                 receiver,
-                                &values,
+                                arguments,
                                 &undefined,
                                 &caller_realm,
                                 self.current_program(),
@@ -210,7 +302,7 @@ impl FunctionBuilder<'_> {
                     None => result.store_call(
                         LocalArgumentCallInputs::<R>::call(
                             receiver,
-                            &values,
+                            arguments,
                             &undefined,
                             &caller_realm,
                             self.current_program(),
@@ -229,7 +321,7 @@ impl FunctionBuilder<'_> {
                 self.replace_current_realm(&realm, function);
                 let inputs = LocalArgumentCallInputs::<R>::call(
                     receiver,
-                    &values,
+                    arguments,
                     &undefined,
                     &caller_realm,
                     &calling_program,
@@ -267,37 +359,6 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
 
-        handled.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        let references: Vec<_> = values.iter().collect();
-        let list = self.emit_pre_evaluated_arg_vector(&references, function);
-        match continuation {
-            CallContinuation::Continue => self.emit_function_or_proxy_call_with_argv(
-                callee, receiver, &list, &result, function,
-            )?,
-            CallContinuation::Return => {
-                self.emit_prepared_tail_call(callee, receiver, &list, function)?;
-            }
-        }
-        list.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-
-        result.kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        self.completion().copy_from(&result, function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        self.emit_propagate_current_throw_if_needed(function);
-        output.copy_from(result.value(), function);
-        schema.release_i32_local(handled, function);
-        result.clear(function);
-        for value in values.into_iter().rev() {
-            value.clear(function);
-        }
-        Ok(true)
+        Ok(handled)
     }
 }

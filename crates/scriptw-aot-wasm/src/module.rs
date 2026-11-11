@@ -6,7 +6,7 @@ use wasm_encoder::{
 use crate::emit::MainFunctionCompilation;
 use crate::emitted_function::ModuleFunctionTable;
 use crate::gc_types::RuntimeModuleTypes;
-pub(crate) use crate::gc_types::{FinalizedModuleGlobals, GlobalLedger};
+pub(crate) use crate::gc_types::GlobalLedger;
 
 mod typed_array_element_kind;
 pub(crate) use typed_array_element_kind::{TypedArrayContentType, TypedArrayElementKind};
@@ -118,11 +118,6 @@ pub(crate) fn canonical_host_function_realm_slot(
         | HostBuiltinId::AgentMonotonicNow
         | HostBuiltinId::AgentLeaving => None,
     }
-}
-pub(crate) fn canonical_host_function_realm_slot_by_name(
-    name: &str,
-) -> Option<crate::functions::NonArrayRealmIntrinsicSlot> {
-    HostBuiltinId::from_global_name(name).and_then(canonical_host_function_realm_slot)
 }
 
 pub(crate) fn standard_builtin_constructor_realm_slot(
@@ -1256,11 +1251,6 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         | StandardBuiltinId::FunctionPrototype
         | StandardBuiltinId::FunctionPrototypeSymbolHasInstance => None,
     }
-}
-
-pub(crate) fn typed_array_constructor_bytes_per_element_entries() -> [(StandardBuiltinId, u64); 12]
-{
-    TypedArrayElementKind::ALL.map(|kind| (kind.constructor(), kind.bytes_per_element()))
 }
 
 pub(crate) fn host_builtin_by_name(name: &str) -> Option<HostBuiltinId> {

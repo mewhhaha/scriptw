@@ -18,12 +18,6 @@ equality, wildcard, default or invalid-getter fallback remains. Receiver and
 Realm validation, `%RegExp.prototype%` handling, internal-slot validation and
 the original-flags lookup remain shared and unchanged.
 
-## Durable evidence
-
-`regexp_flag_getter_structure.rs` pins the eight rows and lack of convenience
-capabilities, the sole byte projection, all shared algorithm anchors, the
-eight exact standard-dispatch producers and recursive source-wide censuses.
-
 ## Verification
 
 The bounded structure target passes all `3/3` tests, and the existing accessor

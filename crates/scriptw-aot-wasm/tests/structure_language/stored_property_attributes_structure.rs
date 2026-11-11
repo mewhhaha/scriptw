@@ -1,7 +1,4 @@
 const HEAP_SOURCE: &str = include_str!("../../src/heap.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/stored-property-attributes.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -64,15 +61,4 @@ fn one_exhaustive_projection_owns_both_descriptor_kinds() {
         "Self::Accessor{enumerable,configurable,}=>",
         "DescriptorWord::of_accessor(enumerable,configurable),"
     )));
-    assert!(compact.contains("pub(crate)constfndescriptor_kind_bits(self)->u32{"));
-    assert!(compact.contains("self.descriptor_word().bits()"));
-}
-
-#[test]
-fn task_and_contract_record_the_stored_attribute_boundary() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("StoredPropertyAttributes"));
-        assert!(evidence.contains("positional boolean"));
-        assert!(evidence.contains("Accessor"));
-    }
 }

@@ -3,22 +3,6 @@
 use super::*;
 use crate::async_pattern_source::{append_async_expression_states, AsyncPatternSource};
 
-pub(crate) fn append(
-    source: &Statement,
-    cursor: &mut u32,
-    awaits: &mut Vec<(u32, u32)>,
-    foreign_loop: bool,
-) -> Option<()> {
-    let mut points = Vec::new();
-    append_protocol(source, cursor, &mut points, foreign_loop)?;
-    awaits.extend(
-        points
-            .into_iter()
-            .map(|point| (point.suspend_state, point.resume_state)),
-    );
-    Some(())
-}
-
 pub(crate) fn variables(
     source: &[Variable],
     cursor: &mut u32,

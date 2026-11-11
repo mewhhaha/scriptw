@@ -19,7 +19,8 @@ Legacy FORCE/DISABLE environment variables do not change this policy.
 expiry before `Command::spawn`. The Wasm-AOT budget is the existing 300000 ms
 compilation allowance plus `timeout_ms`; SpecExec uses `timeout_ms`. This covers
 child admission, source materialization, parsing, lowering, emission, native
-compilation and execution. Epoch interruption remains an inner execution bound.
+compilation and execution. The Store's [execution deadline](execution-deadlines.md)
+remains an inner execution bound.
 Direct `Engine::compile_script`/`compile_module` have no whole-process timeout
 contract; embedding hosts supervise such requests themselves.
 

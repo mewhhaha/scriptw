@@ -57,8 +57,7 @@ fn shared_configuration() -> Value {
         "runtime_policy":"scriptw-required-wasmtime-experimental-v1",
         "consumer_compiler_enabled":false, "collector":"copying",
         "gc_initial_bytes":16777216u64, "worker_stack_bytes":WORKER_STACK_BYTES,
-        "max_wasm_stack_bytes":33554432u64, "store_memory_limit_bytes":1073741824u64,
-        "epoch_deadline":u64::MAX / 2})
+        "max_wasm_stack_bytes":33554432u64, "store_memory_limit_bytes":1073741824u64})
 }
 
 fn decorate(mut report: Value, adapter: &str) -> Value {

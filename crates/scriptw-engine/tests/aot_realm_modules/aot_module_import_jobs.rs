@@ -206,8 +206,11 @@ print('scheduled');
 
 #[test]
 fn dynamic_load_and_link_errors_reject_without_running_invalid_closures() {
-    assert_modules(&[
-        ("entry.js", r#"
+    assert_modules(
+        &[
+            (
+                "entry.js",
+                r#"
 globalThis.sharedCount = 0;
 globalThis.invalidBody = false;
 const checks = [[import('./syntax.js'), SyntaxError], [import('./missing.js'), TypeError], [import('./export.js'), SyntaxError]].map(([promise, ErrorType]) => promise.then(() => { throw 'fulfilled invalid graph'; }, error => {
@@ -220,14 +223,29 @@ Promise.all(checks).then(() => {
   if (globalThis.sharedCount !== 1 || globalThis.invalidBody) throw 'invalid graph evaluated';
   print('ok');
 });
-"#),
-        ("syntax.js", "import defer * as ns from './invalid.js'; globalThis.invalidBody = true;"),
-        ("invalid.js", "invalid syntax!"),
-        ("missing.js", "import './shared.js'; import defer * as ns from './absent.js'; globalThis.invalidBody = true;"),
-        ("export.js", "import { missing } from './shared.js'; globalThis.invalidBody = true;"),
-        ("valid.js", "export { value } from './shared.js';"),
-        ("shared.js", "globalThis.sharedCount++; export const value = 7;"),
-    ], &["ok"]);
+"#,
+            ),
+            (
+                "syntax.js",
+                "import defer * as ns from './invalid.js'; globalThis.invalidBody = true;",
+            ),
+            ("invalid.js", "invalid syntax!"),
+            (
+                "missing.js",
+                "import './shared.js'; import defer * as ns from './absent.js'; globalThis.invalidBody = true;",
+            ),
+            (
+                "export.js",
+                "import { missing } from './shared.js'; globalThis.invalidBody = true;",
+            ),
+            ("valid.js", "export { value } from './shared.js';"),
+            (
+                "shared.js",
+                "globalThis.sharedCount++; export const value = 7;",
+            ),
+        ],
+        &["ok"],
+    );
 }
 
 #[test]
@@ -395,8 +413,11 @@ fn static_deferred_dependency_syntax_fails_during_compile() {
 
 #[test]
 fn dynamic_host_load_errors_precede_link_errors_and_preserve_source_phase_syntax() {
-    assert_modules(&[
-        ("entry.js", r#"
+    assert_modules(
+        &[
+            (
+                "entry.js",
+                r#"
 const NativeTypeError = TypeError, NativeSyntaxError = SyntaxError;
 globalThis.invalidBody = false;
 globalThis.TypeError = function () { throw 'public TypeError constructor observed'; };
@@ -415,11 +436,26 @@ Promise.all(checks).then(() => {
   if (globalThis.invalidBody) throw 'invalid closure evaluated';
   print('host-load-kind:ok');
 });
-"#),
-        ("host.js", "import './ensure.js'; import source source from '<do not resolve>'; import source from from '<do not resolve>'; globalThis.invalidBody = true;"),
-        ("ensure.js", "import {missing} from './ensure.js'; globalThis.invalidBody = true;"),
-        ("parse.js", "invalid syntax!"),
-        ("link.js", "import {missing} from './value.js'; globalThis.invalidBody = true;"),
-        ("value.js", "export const value = 1; globalThis.invalidBody = true;"),
-    ], &["host-load-kind:ok"]);
+"#,
+            ),
+            (
+                "host.js",
+                "import './ensure.js'; import source source from '<do not resolve>'; import source from from '<do not resolve>'; globalThis.invalidBody = true;",
+            ),
+            (
+                "ensure.js",
+                "import {missing} from './ensure.js'; globalThis.invalidBody = true;",
+            ),
+            ("parse.js", "invalid syntax!"),
+            (
+                "link.js",
+                "import {missing} from './value.js'; globalThis.invalidBody = true;",
+            ),
+            (
+                "value.js",
+                "export const value = 1; globalThis.invalidBody = true;",
+            ),
+        ],
+        &["host-load-kind:ok"],
+    );
 }

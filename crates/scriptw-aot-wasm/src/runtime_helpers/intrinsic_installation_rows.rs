@@ -213,9 +213,6 @@ impl RuntimeHelperPropertyLayoutRow {
     pub(crate) fn payload1(&self) -> I32Local {
         self.payload[1]
     }
-    pub(crate) fn payload2(&self) -> I32Local {
-        self.payload[2]
-    }
     pub(crate) fn raw_key_hash(&self) -> I64Local {
         self.raw_key_hash
     }

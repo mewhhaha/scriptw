@@ -493,19 +493,6 @@ impl<'workspace> ChoiceCursor<'workspace> {
         self.local
     }
 
-    pub(in crate::builtins::regexp) fn copy_from(
-        self,
-        other: &ChoiceCursor<'_>,
-        function: &mut Function,
-    ) {
-        assert!(
-            core::ptr::eq(self.stack.workspace, other.stack.workspace),
-            "choice cursors retain one workspace"
-        );
-        other.local.load(function);
-        self.local.store(function);
-    }
-
     pub(in crate::builtins::regexp) fn move_to_previous(
         self,
         entry: &ChoiceEntry<'_>,
@@ -575,16 +562,6 @@ impl ChoiceEntry<'_> {
 
     pub(in crate::builtins::regexp) fn length(&self, output: I64Local, function: &mut Function) {
         self.load(0, function);
-        output.store(function);
-    }
-
-    pub(in crate::builtins::regexp) fn load_header(
-        &self,
-        word: ChoiceSnapshotWord,
-        output: I64Local,
-        function: &mut Function,
-    ) {
-        self.load(word.offset(), function);
         output.store(function);
     }
 
@@ -706,29 +683,6 @@ impl ChoiceEntry<'_> {
             self.stack.workspace.repeat_bytes,
             function,
         );
-    }
-}
-
-impl ChoiceSnapshot<'_> {
-    pub(in crate::builtins::regexp) fn template_view(&self) -> ChoiceSnapshotView<'_> {
-        ChoiceSnapshotView {
-            workspace: self.entry.stack.workspace,
-            address: self.entry.address,
-        }
-    }
-    pub(in crate::builtins::regexp) fn snapshot_slab_address(
-        &self,
-        output: I64Local,
-        function: &mut Function,
-    ) {
-        self.entry.address.load(function);
-        function.instruction(&Instruction::I64Const(SNAPSHOT_HEADER_BYTES as i64));
-        function.instruction(&Instruction::I64Add);
-        output.store(function);
-    }
-
-    pub(in crate::builtins::regexp) fn entry(&self) -> &ChoiceEntry<'_> {
-        &self.entry
     }
 }
 

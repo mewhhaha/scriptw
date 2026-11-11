@@ -6,7 +6,7 @@ mod profile_identity;
 mod record;
 
 pub use profile_identity::{LOCALE_WEEK_DATA_SHA256, LOCALE_WEEK_KERNEL_SHA256};
-pub use record::{InvalidLocaleWeekInfo, IsoWeekday, LocaleWeekInfo, LocaleWeekRequest};
+pub use record::{IsoWeekday, LocaleWeekInfo, LocaleWeekRequest};
 
 use core::fmt;
 

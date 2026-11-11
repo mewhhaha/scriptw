@@ -1,6 +1,5 @@
 //! A fixed own-key snapshot precedes per-key descriptor acquisition/publication.
 use super::*;
-use crate::gc_types::{CompletionLocals, ValueLocals};
 
 impl FunctionBuilder<'_> {
     pub(in crate::builtins) fn compile_object_get_own_property_descriptors_builtin(

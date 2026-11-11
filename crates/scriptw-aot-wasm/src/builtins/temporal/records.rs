@@ -1,6 +1,5 @@
 //! Concrete Temporal receiver admission and complete native abrupt publication.
 use super::*;
-use crate::gc_types::*;
 
 /// Only the eight real Temporal GC records implement this receiver contract.
 /// The record type fixes its diagnostic before any field can be projected.

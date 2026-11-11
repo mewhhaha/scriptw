@@ -30,7 +30,6 @@ export function state() { return value; }
         .build();
     let mut store = WasmtimeStore::new(&runtime.engine, runtime.new_state(realm, ()).unwrap());
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = WasmtimeLinker::new(&runtime.engine);
     runtime.register(&mut store, &mut linker).unwrap();
     let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();

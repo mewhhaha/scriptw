@@ -737,15 +737,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Return);
     }
 
-    pub(crate) fn emit_return_current_completion_if_throw(&mut self, function: &mut Function) {
-        self.completion().kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_return_current_completion(function);
-        function.instruction(&Instruction::End);
-    }
-
     pub(crate) fn emit_propagate_current_completion_if_throw(&mut self, function: &mut Function) {
         self.emit_propagate_current_throw_if_needed(function);
     }
@@ -757,23 +748,6 @@ impl<'a> FunctionBuilder<'a> {
         } else {
             self.emit_return_current_completion(function);
         }
-    }
-
-    pub(crate) fn emit_break_current_completion_if_throw(
-        &self,
-        depth: u32,
-        function: &mut Function,
-    ) {
-        self.completion().kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::Br(depth));
-        function.instruction(&Instruction::End);
-    }
-
-    pub(crate) fn emit_throw_from_value(&self, value: &ValueLocals, function: &mut Function) {
-        self.completion().set_throw(value, function);
     }
 
     pub(crate) fn emit_resume_after_finally(
@@ -991,6 +965,9 @@ impl<'a> FunctionBuilder<'a> {
             ControlFrameKind::Block => Instruction::Block(BlockType::Empty),
             ControlFrameKind::Loop => Instruction::Loop(BlockType::Empty),
         });
+        if matches!(kind, ControlFrameKind::Loop) {
+            self.emit_deadline_poll(function);
+        }
         let target = ControlTarget {
             frame: self.control_stack.len(),
             environment_depth: self.environment_depth,

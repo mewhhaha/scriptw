@@ -1,7 +1,7 @@
 //! Real vector bodies guard object construction and every projected read.
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
-use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -39,11 +39,16 @@ fn projected_count(body: &[Operator<'_>], arguments: u32) -> Option<(u32, usize)
         .windows(4)
         .enumerate()
         .filter_map(|(index, ops)| {
-            let [Operator::ArrayLen, Operator::LocalSet {
-                local_index: stored,
-            }, Operator::LocalGet {
-                local_index: loaded,
-            }, Operator::If { .. }] = ops
+            let [
+                Operator::ArrayLen,
+                Operator::LocalSet {
+                    local_index: stored,
+                },
+                Operator::LocalGet {
+                    local_index: loaded,
+                },
+                Operator::If { .. },
+            ] = ops
             else {
                 return None;
             };

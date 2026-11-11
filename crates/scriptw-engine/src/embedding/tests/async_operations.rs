@@ -34,7 +34,6 @@ fn async_store(runtime: &EmbeddedRuntime) -> WasmtimeStore<WasmStoreState> {
         runtime.new_state(RealmBuilder::new().build(), ()).unwrap(),
     );
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     store
 }
 
@@ -285,12 +284,13 @@ print('sync');
     let _promise = invoke(&instance, &mut store, "start", &[argument]);
     let (_, _, completion) = work.lock().unwrap().pop_front().unwrap();
     completion.resolve(ForeignValue::Number(2.0)).unwrap();
-    store.set_epoch_deadline(0);
+    let interrupt = store.interrupt_handle();
+    interrupt.interrupt();
     assert!(
         instance.pump(&mut store).is_err(),
         "pump must preserve the host's interruption policy"
     );
-    store.set_epoch_deadline(u64::MAX / 2);
+    interrupt.cancel();
     assert!(
         instance
             .pump(&mut store)

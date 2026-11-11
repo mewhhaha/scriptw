@@ -1,8 +1,8 @@
 //! Actual assigned-callable coverage, without a speculative call-site target.
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
-use scriptw_aot_wasm::{emit, GcHostField};
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, FunctionIr};
+use scriptw_aot_wasm::{GcHostField, emit};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{FunctionIr, lower};
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures,
 };

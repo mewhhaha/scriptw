@@ -2,9 +2,6 @@ const ARRAY_CLI_TESTS: &str = include_str!("../../../scriptw-cli/tests/cli/array
 const ARRAY_POP_OVERRIDE_FIXTURE: &str =
     include_str!("../../../scriptw-cli/tests/fixtures/wasm_array_pop_own_method_dispatch.js");
 
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/array-pop-algorithm-owner.md");
-
 #[test]
 fn pop_override_runtime_control_requires_generic_get_and_call_fallthrough() {
     for marker in [
@@ -24,14 +21,4 @@ fn pop_override_runtime_control_requires_generic_get_and_call_fallthrough() {
     }
     assert!(ARRAY_CLI_TESTS.contains("fn run_wasm_backend_calls_an_arrays_own_pop_method()"));
     assert!(ARRAY_CLI_TESTS.contains("fixture_path(\"wasm_array_pop_own_method_dispatch.js\")"));
-}
-
-#[test]
-fn task_and_contract_record_the_closed_pop_dispatch() {
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("PopMethodDispatch"));
-        assert!(evidence.contains("ArrayCanonical"));
-        assert!(evidence.contains("GenericGetCall"));
-        assert!(evidence.contains("sole"));
-    }
 }

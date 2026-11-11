@@ -12,11 +12,43 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
+- Bring retained RSC sync and async below 1 ms. Source `89a934d06891`
+  screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
+  processes per actor/case rather than final qualification; qualify it against
+  V8 with the eight-process campaign before refreshing the published panel.
+  [Fault-driven deadlines](benchmarks.md#fault-driven-deadlines-2026-11-11) and
+  [host-boundary screen](benchmarks.md#host-boundary-screen-2026-11-11). The complete
+  single-reference ABI prototype and its local-copy refinement regress both
+  cases and remain excluded. Measure conversion, classification and temporary
+  transport together before another representation change; wrapper-read counts
+  alone do not predict a win. Preserve exact number bits, TDZ, callable
+  distinctions, specialized numeric paths, natural GC and the complete clock.
+  [Results and measurement boundaries](benchmarks.md#single-reference-value-experiment-2026-11-10).
+  Owner: RSC compiler/runtime.
+- Close the remaining execution-deadline gaps. A deadline now removes access
+  to the Store's GC heap and private linear memory instead of relying on epoch
+  checks ([contract](contracts/execution-deadlines.md)). 570 runtime loops
+  touch neither and rely on being bounded; add a structural guard that
+  classifies the runtime module's loops and rejects a new one of that shape.
+  Delivery is exercised on Linux x86-64 only, and other hosts reject a
+  timeout. The pinned Test262 status has not been rerun with this mechanism.
+  Owner: Engine native policy.
+- Stop reading typed funcrefs out of GC structs on calls. Each `struct.get` of
+  an `ExecutableCode` entry is a Wasmtime libcall with a registry type check:
+  about 2.1% Fast / 3.0% Speed of request-window cycles. A funcref table
+  shared by R and P with an `i32` entry index and `call_indirect` is inline in
+  Wasmtime; it changes the `ExecutableCode` layout, publication, host-created
+  code and the runtime ABI. Owner: AOT call lowering.
+- Reduce copying-collection cost per request. A retained RSC Realm allocates
+  about 1.5 MB per request and collects every sixth request for about 1.85 ms;
+  the existing larger-capacity profiles trade resident memory for fewer
+  collections. Measure the collector's per-object cost and the retained graph
+  size before changing capacity policy. Owner: runtime value/storage
+  representation and collector patch.
 - Reduce the current Fast gaps on `args-unused.js` and `frame-compact.js`. Measure remaining full Number conversions, classify rows during projection, preserve original payloads, and branch once to integer or existing Number loops. Carry conditional domains through call slots and exact Add/Sub bounds; retain fractions, negative zero, nonfinite values, overflow and fallback. Owner: scalar-call planning.
 - Test amortizing `frame-compact.js` projection across its closed outer loop. Recount projection allocations and own-data probes on the current source, then prove intervening effects cannot invalidate rows before hoisting. Owner: scalar-call planning.
-- Measure the default `@@hasInstance` handler path before changing the call ABI. Source `0c2c10dac9c0` profiles place 7.3–10.0% of sample periods in the overlapping `has_instance` subtree. Test the existing native-code/same-Realm guard after observable handler lookup, preserving custom/proxy/foreign handlers, activation, caller reflection, bound targets and whole abrupt completion. The proposed shortcut has not been implemented or timed. Owner: runtime instance checks.
-- Reuse nonoverlapping SinglePass spill homes or reduce cross-block value transport. The current RSC `vn` uses a 208.8-KiB fixed stack allocation and 53 page probes with SinglePass; unchanged optimization with Backtracking uses 8.5 KiB and two probes. The excluded crossed-policy cohort lowers request time about 15% with Backtracking but adds about 2.1 seconds of native preparation. Count block-local versus cross-block/block-parameter homes before choosing a bounded compactor; preserve CFG lifetimes, GC/debug locations, argument slots, alignment and move order. Branch scratch slots do not explain these functions. [Evidence](react-architecture-current.json). Owner: compiler backend/spill homes.
-- Replace descriptor backing for ordinary dictionary data rows with direct Value fields, preserving PropertyEntry identity, hash/index and insertion order. One changed existing-data Set path performs three lookups and reserves six GC records; these are source-path counts, not measured frequency. Measure dictionary read/write/create traffic and allocation by owner first. Let PreparedOrdinaryDefinition own the entry and a borrowed property view; materialize immutable descriptors for genuine GetOwnProperty/Proxy snapshots. Keep deferred writeback and legacy-reflection descriptor/value identity owners intact. Add isolated write/create controls, then measure Get/Set/Define, enumeration, GC and complete RSC requests. Owner: ordinary object storage.
+- Reduce cross-block value transport or establish a stronger spill-home compaction hypothesis. The isolated block-local prototype reduces current Fast `vn`/`ft` fixed frames 213,856→200,864 B / 85,664→81,696 B, but request medians move only −0.35% / −0.97% (sync/async). Keep the fork outside the product. The anonymous static census lacks named-function/module and dynamic-frequency attribution; precompiled Backtracking R is outside it. Preserve CFG lifetimes, explicit GC roots, debug locations, argument slots, alignment and move order. [Evidence](react-architecture-current.json). Owner: compiler backend/spill homes.
+- Measure a guarded dictionary Set region for the same ordinary target/receiver. Existing own-data updates perform three lookups and construct four records after descriptor-edge reuse; these are source-path counts, not measured frequency. Reuse PreparedOrdinaryDefinition for one lookup and a live VALUE-edge update. Creation still needs its key/value, descriptor and entry records; admit it only after proving prototype absence. Preserve accessor/readonly/exotic fallback, snapshots, insertion order and deferred values. Measure eligible updates and creates separately before changing dictionary storage. Owner: ordinary object storage.
 
 - Measure type classification and singleton dispatch after strict-pair period
   projection. Prefer private binding facts and existing semantic kernels before
@@ -31,10 +63,10 @@ accepts `--case <file.js>`.
   and measured gains. Missing own indices can expose the real object through a
   prototype getter; preserve actual count, rooted snapshots and complete fallback.
   Owner: arguments binding and source-call planning.
-- Classify property-cache fallback families before widening coverage. Source `0c2c10dac9c0` request windows count 2,548/2,698 cached-helper entries and 1,275/1,362 generic fallbacks (sync/async); other exits are not a hit count. Separate eligibility, cold/evicted sites, compact/dictionary receivers, computed/static keys, inherited and absent results. Preserve live guards and the complete exotic fallback. [Counters](react-architecture-current.json). Owner: ordinary object storage.
+- Classify property-cache fallback families before widening coverage. Current source `9f2788b4af9f` request windows still count 2,548/2,698 cached-helper entries and 1,275/1,362 generic fallbacks (sync/async); other exits are not a hit count. Separate eligibility, cold/evicted sites, compact/dictionary receivers, computed/static keys, inherited and absent results. Preserve live guards and the complete exotic fallback. [Counters](react-architecture-current.json). Owner: ordinary object storage.
 - Attribute StoredValue decoding and binding writes before another list-storage
-  rewrite. The physical census does not identify allocation origins or prove a
-  representation change wins. Preserve deferred recipes, descriptor ownership
+  rewrite. Current sync requests still allocate 12,625 physical StoredValue records;
+  the census does not identify origins or prove a representation change wins. Preserve deferred recipes, descriptor ownership
   tokens and full numeric semantics; measure total request time and allocation.
   Owner: runtime value/storage representation.
 - Re-run fixed-yield width controls on the current source before attributing
@@ -47,10 +79,11 @@ accepts `--case <file.js>`.
 - Reduce duplicate descriptor snapshots on read-only packed-Array queries.
   Keep backing storage, values, attributes, holes and prototype behavior intact,
   with materialization retained for real writes. Measure repeated queries as well
-  as isolated reads. The historical physical census recorded 8,412 descriptor
-  reservations per synchronous request; it does not attribute them to this path. Owner: AOT Array internal methods.
-- Measure remaining descriptor snapshots, name-to-slot selection and executed
-  allocation after private `[[GetOwnProperty]]` transport. Use the matched
+  as isolated reads. The current physical census records 3,728 descriptor
+  allocations per synchronous request; it does not attribute them to this path. Owner: AOT Array internal methods.
+- Attribute the three remaining async Reflect definitions and remaining descriptor
+  snapshots, name-to-slot selection and executed allocation after direct internal
+  definition and private `[[GetOwnProperty]]` transport. Use the matched
   ordinary/JavaScript-function/native-constructor read situations and
   [sampled callers](react-attribution-current.json); preserve Proxy ordering,
   namespace TDZ, mapped arguments, typed arrays and execution Realm.

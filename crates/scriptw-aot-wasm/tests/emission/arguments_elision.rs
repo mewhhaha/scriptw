@@ -1,7 +1,7 @@
 //! Observe actual Arguments allocation and the unchanged ordinary entry bound.
 use crate::{linked_bodies::module_bodies, property_read_plans::Module};
-use scriptw_aot_wasm::{emit, WasmRuntimeValueTag};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{WasmRuntimeValueTag, emit};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{
     HeapType, Operator, Parser, Payload, TypeRef, UnpackedIndex, ValType, Validator, WasmFeatures,

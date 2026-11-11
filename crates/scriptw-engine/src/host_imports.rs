@@ -281,7 +281,6 @@ mod tests {
         );
         let (mut first, _) = linker(&engine, &module, key).unwrap();
         let mut first_store = WasmtimeStore::new(&engine, state(true));
-        first_store.set_epoch_deadline(u64::MAX / 2);
         let memory =
             WasmtimeMemory::new(&mut first_store, wasmtime::MemoryType::new(1, None)).unwrap();
         first
@@ -291,7 +290,6 @@ mod tests {
         let (mut second, outcome) = linker(&engine, &module, key).unwrap();
         assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Hit);
         let mut second_store = WasmtimeStore::new(&engine, state(false));
-        second_store.set_epoch_deadline(u64::MAX / 2);
         assert!(second.get(&mut second_store, "fresh", "memory").is_err());
         assert!(second.instantiate(&mut second_store, &module).is_err());
         for (linker, store, expected) in [

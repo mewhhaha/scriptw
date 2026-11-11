@@ -1,6 +1,6 @@
 //! Scheduling is shared typed Wasm code rather than copied into every caller.
 
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use std::collections::BTreeMap;
 use wasmparser::{KnownCustom, Name, Operator, Parser, Payload, TypeRef};

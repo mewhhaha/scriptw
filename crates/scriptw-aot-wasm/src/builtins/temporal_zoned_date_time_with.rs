@@ -7,7 +7,6 @@ use super::temporal_plain_date_time_methods::TemporalDateTimeFieldReadMode;
 use super::temporal_zone_provider::{
     TemporalOffsetBehavior, TemporalOffsetMatchBehavior, TemporalZonedAllocationInput,
 };
-use crate::gc_types::*;
 use crate::intrinsics::temporal::TemporalPrototypeSource;
 
 impl FunctionBuilder<'_> {

@@ -432,10 +432,6 @@ impl TemporalIslamicEraCalendar {
     }
 }
 
-/// ISO reference year used by explicitly ISO/Gregorian month-day branches.
-/// Other arithmetic domains complete their own calendar reference conversion.
-pub(crate) const TEMPORAL_GREGORIAN_MONTH_DAY_REFERENCE_YEAR: i64 = 1972;
-
 #[derive(Clone, Copy)]
 pub(super) enum TemporalCalendarCanonicalizationContext {
     PlainDateFamily,
@@ -861,24 +857,6 @@ pub(crate) enum GregoryEra {
 }
 
 impl GregoryEra {
-    /// Both eras, ordered by the sign of the ISO year that selects them:
-    /// positive first.
-    ///
-    /// The ordering is what the type is for. `era` and `eraYear` are two
-    /// accessors emitted under one `isoYear > 0` test, and each needs two arms.
-    /// Choosing those arms per accessor is what would let `era` answer `ce` on
-    /// the branch where `eraYear` counts backwards;
-    /// [`FunctionBuilder::emit_temporal_gregorian_era_field`] instead
-    /// destructures this one array for both and keys the arithmetic on the
-    /// era value rather than on branch position, so the pair cannot disagree
-    /// about which side of year 0 it is on. The boundary is: ISO year 1 is
-    /// `ce` 1, ISO year 0 is `bce` 1, ISO year -1 is `bce` 2.
-    ///
-    /// `Intl.DateTimeFormat` encodes the same boundary independently (see the
-    /// `display_year` computation in `builtins/intl_datetimeformat.rs`); the
-    /// integration note records that duplication.
-    pub(crate) const ALL: [Self; 2] = [Self::Ce, Self::Bce];
-
     const fn direction(self) -> EraDirection {
         match self {
             Self::Ce => EraDirection::Forward,
@@ -906,16 +884,6 @@ pub(crate) enum RocEra {
 }
 
 impl RocEra {
-    /// Both eras, ordered by the sign of the ROC year that selects them:
-    /// positive first. ROC 1 is ISO 1912, so the boundary the accessor tests
-    /// is `calendarYear > 0`, i.e. `isoYear > 1911`.
-    ///
-    /// Like [`GregoryEra::ALL`], the ordering is what the type is for:
-    /// [`FunctionBuilder::emit_temporal_roc_era_field`] destructures this one
-    /// array for both `era` and `eraYear` and keys the arithmetic on the era
-    /// value, so the pair cannot disagree about which side of ROC 1 it is on.
-    pub(crate) const ALL: [Self; 2] = [Self::Roc, Self::Broc];
-
     const fn direction(self) -> EraDirection {
         match self {
             Self::Roc => EraDirection::Forward,
@@ -2135,30 +2103,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    pub(crate) fn emit_temporal_calendar_era_field(
-        &mut self,
-        calendar: I64Local,
-        year: I64Local,
-        month: I64Local,
-        day: I64Local,
-        field: TemporalEraField,
-        output: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let iso = [year, month, day];
-        let date = self.emit_temporal_project_calendar_date(calendar, iso, function);
-        self.emit_temporal_projected_era_field(
-            calendar,
-            date.year(),
-            iso,
-            field,
-            output,
-            function,
-        )?;
-        date.release(self, function);
-        Ok(())
-    }
-
     /// Leaves an `i32` on the stack: 1 when the calendar payload names a
     /// calendar with a non-empty [`TemporalCalendarId::eras`].
     ///
@@ -2954,20 +2898,6 @@ impl<'a> FunctionBuilder<'a> {
         bits.store(function);
         output.set_number(bits, function);
         self.runtime_schema().release_i64_local(bits, function);
-    }
-
-    /// Solar calendar years depend on the complete ISO date.
-    pub(crate) fn emit_temporal_calendar_year(
-        &mut self,
-        calendar: I64Local,
-        iso: [I64Local; 3],
-        output: I64Local,
-        function: &mut Function,
-    ) {
-        let date = self.emit_temporal_project_calendar_date(calendar, iso, function);
-        date.year().load(function);
-        output.store(function);
-        date.release(self, function);
     }
 
     /// ISO alone defines a week-numbering system. Called after the ISO numeric

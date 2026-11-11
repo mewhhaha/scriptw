@@ -1,6 +1,6 @@
 use super::*;
 use crate::gc_types::{
-    ArrayBuffer, ArrayBufferSchema, BigIntConstruction, BigIntLimbArray, BigIntValue,
+    ArrayBufferSchema, BigIntConstruction, BigIntLimbArray, BigIntValue,
     BigIntValueSchema, BufferOwner, BufferOwnerKind, BufferOwnerSchema, BufferView,
     BufferViewSchema, ByteArray, GcHostImport, GcI32Constant, HostResource, HostResourceSchema,
     I64Local, RuntimeSchema, SharedArrayBufferSchema, TypedArrayObject, TypedArrayObjectSchema,

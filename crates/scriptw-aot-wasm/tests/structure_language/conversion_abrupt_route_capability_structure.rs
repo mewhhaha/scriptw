@@ -44,13 +44,10 @@ fn rust_sources(path: &Path, sources: &mut Vec<(PathBuf, String)>) {
 
 #[test]
 fn conversion_routes_keep_exact_nonduplicable_domains_and_complete_outputs() {
-    for (route, end) in [
-        ("ToPrimitiveAbruptRoute", "/// Where the Symbol throw"),
-        (
-            "PrimitiveToStringAbruptRoute",
-            "/// A primitive whose ToPrimitive",
-        ),
-    ] {
+    for (route, end) in [(
+        "ToPrimitiveAbruptRoute",
+        "/// A primitive whose ToPrimitive",
+    )] {
         let declaration = bounded(
             OPERATIONS_SOURCE,
             &format!("pub(crate) enum {route} {{"),
@@ -113,29 +110,7 @@ fn conversion_finishers_and_native_consumers_keep_their_abrupt_obligations() {
         "ToPrimitiveAbruptRoute::ActiveHandler=>self.emit_propagate_current_throw(function)"
     ));
     assert!(primitive.contains("ToPrimitiveAbruptRoute::ReturnCurrentFunction=>{self.emit_return_current_completion(function)}"));
-    let string = normalized(bounded(
-        OPERATIONS_SOURCE,
-        "pub(crate) fn emit_primitive_to_string_payload(",
-        "pub(crate) fn emit_bigint_to_radix_string_payload(",
-    ));
-    assert!(string.contains("route:PrimitiveToStringAbruptRoute,"));
-    assert!(string
-        .contains("self.emit_primitive_to_string_completion(input,result,function)?;matchroute{"));
-    for route in ["ActiveHandler", "ReturnCurrentFunction"] {
-        assert_eq!(
-            string
-                .matches(&format!("PrimitiveToStringAbruptRoute::{route}"))
-                .count(),
-            1
-        );
-        assert_eq!(
-            string
-                .matches(&format!("ToPrimitiveAbruptRoute::{route}"))
-                .count(),
-            1
-        );
-    }
-    for consumer in [&primitive, &string] {
+    for consumer in [&primitive] {
         assert!(!consumer.contains("_=>"));
         assert!(!consumer.contains("unreachable!"));
     }
@@ -163,11 +138,7 @@ fn conversion_finishers_and_native_consumers_keep_their_abrupt_obligations() {
     assert!(reject.contains("self.emit_af_settle(capability,PromiseSettlement::Reject,pending.value(),f)?;self.emit_branch_to_target(exit,f);"));
     // The dated contract still records the earlier route-domain migration.
     for evidence in [CONTRACT] {
-        for route in [
-            "ToPrimitiveAbruptRoute",
-            "PrimitiveToStringAbruptRoute",
-            "ToLengthAbruptRoute",
-        ] {
+        for route in ["ToPrimitiveAbruptRoute", "ToLengthAbruptRoute"] {
             assert!(evidence.contains(route));
         }
         assert!(evidence.contains("capability"));

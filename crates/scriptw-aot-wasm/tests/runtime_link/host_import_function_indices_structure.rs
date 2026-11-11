@@ -5,10 +5,6 @@ const PLANNING_SOURCE: &str = include_str!("../../src/planning.rs");
 const LIBRARY_SOURCE: &str = include_str!("../../src/lib.rs");
 const GC_HOST_SOURCE: &str = include_str!("../../src/gc_types/host.rs");
 const EMIT_SOURCE: &str = include_str!("../../src/emit/module_assembly.rs");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/host-import-function-indices-authority.md"
-);
-
 const ROLES: [(&str, &str, &str, &str); 26] = [
     (
         "NumberPowImportFunctionIndex",
@@ -633,17 +629,4 @@ fn named_registry_getters_are_the_only_raw_index_projections() {
             .count(),
         1
     );
-}
-
-#[test]
-fn contract_and_t02_own_the_authority() {
-    for marker in [
-        "HostImportFunctionIndices",
-        "host_import_function_indices_structure",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract marker `{marker}`");
-        assert!(CONTRACT.contains(marker), "task marker `{marker}`");
-    }
-    assert!(CONTRACT.contains("Transposing two values compiled"));
-    assert!(CONTRACT.contains("transpose two raw `Option<u32>` positions"));
 }

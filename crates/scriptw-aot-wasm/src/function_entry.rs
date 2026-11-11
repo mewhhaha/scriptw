@@ -44,7 +44,10 @@ enum EntryOrigin {
         id: FunctionId,
         kind: PreparedScriptKind,
     },
-    StandardBuiltin(StandardBuiltinId),
+    StandardBuiltin {
+        builtin: StandardBuiltinId,
+        local_arguments: Option<PlannedLocalArgumentsEntry>,
+    },
     HostBuiltin(HostBuiltinId),
 }
 
@@ -85,7 +88,7 @@ impl PlannedFunctionEntry {
         match &self.origin {
             EntryOrigin::User { binary_numeric, .. } => binary_numeric.as_ref(),
             EntryOrigin::PreparedScript { .. }
-            | EntryOrigin::StandardBuiltin(_)
+            | EntryOrigin::StandardBuiltin { .. }
             | EntryOrigin::HostBuiltin(_) => None,
         }
     }
@@ -94,10 +97,11 @@ impl PlannedFunctionEntry {
         match &self.origin {
             EntryOrigin::User {
                 local_arguments, ..
+            }
+            | EntryOrigin::StandardBuiltin {
+                local_arguments, ..
             } => local_arguments.as_ref(),
-            EntryOrigin::PreparedScript { .. }
-            | EntryOrigin::StandardBuiltin(_)
-            | EntryOrigin::HostBuiltin(_) => None,
+            EntryOrigin::PreparedScript { .. } | EntryOrigin::HostBuiltin(_) => None,
         }
     }
 
@@ -118,9 +122,24 @@ impl PlannedFunctionEntry {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn standard(builtin: StandardBuiltinId, wasm_index: u32) -> Self {
+        Self::standard_with_local_arguments(builtin, wasm_index, None)
+    }
+
+    pub(crate) fn standard_with_local_arguments(
+        builtin: StandardBuiltinId,
+        wasm_index: u32,
+        local_arguments: Option<PlannedLocalArgumentsEntry>,
+    ) -> Self {
+        if let Some(entry) = &local_arguments {
+            entry.require_builtin(builtin);
+        }
         Self {
-            origin: EntryOrigin::StandardBuiltin(builtin),
+            origin: EntryOrigin::StandardBuiltin {
+                builtin,
+                local_arguments,
+            },
             wasm_index,
         }
     }
@@ -138,7 +157,7 @@ impl PlannedFunctionEntry {
         match self.origin {
             EntryOrigin::User { .. } => true,
             EntryOrigin::PreparedScript { .. }
-            | EntryOrigin::StandardBuiltin(_)
+            | EntryOrigin::StandardBuiltin { .. }
             | EntryOrigin::HostBuiltin(_) => false,
         }
     }
@@ -172,7 +191,7 @@ impl PlannedFunctionEntry {
         match &self.origin {
             EntryOrigin::User { protocol, .. } => *protocol,
             EntryOrigin::PreparedScript { .. } => FunctionProtocolIr::OrdinaryCallOnly,
-            EntryOrigin::StandardBuiltin(builtin) => {
+            EntryOrigin::StandardBuiltin { builtin, .. } => {
                 if builtin.constructable() {
                     FunctionProtocolIr::OrdinaryCallAndConstruct
                 } else {
@@ -208,33 +227,9 @@ impl PlannedFunctionEntry {
                     PlannedBodyEntry::AsyncGenerator(AsyncGeneratorBodyEntry(self))
                 }
             },
-            EntryOrigin::StandardBuiltin(_) | EntryOrigin::HostBuiltin(_) => {
+            EntryOrigin::StandardBuiltin { .. } | EntryOrigin::HostBuiltin(_) => {
                 PlannedBodyEntry::Ordinary(OrdinaryBodyEntry(self))
             }
-        }
-    }
-
-    pub(crate) fn ordinary(&self) -> Result<OrdinaryBodyEntry<'_>, EmitError> {
-        match self.body() {
-            PlannedBodyEntry::Ordinary(entry) => Ok(entry),
-            PlannedBodyEntry::Generator(_)
-            | PlannedBodyEntry::Async(_)
-            | PlannedBodyEntry::AsyncGenerator(_)
-            | PlannedBodyEntry::PreparedScript(_) => Err(entry_error(
-                "ordinary body call requires an ordinary callable entry",
-            )),
-        }
-    }
-
-    pub(crate) fn asynchronous(&self) -> Result<AsyncBodyEntry<'_>, EmitError> {
-        match self.body() {
-            PlannedBodyEntry::Async(entry) => Ok(entry),
-            PlannedBodyEntry::Ordinary(_)
-            | PlannedBodyEntry::Generator(_)
-            | PlannedBodyEntry::AsyncGenerator(_)
-            | PlannedBodyEntry::PreparedScript(_) => Err(entry_error(
-                "async activation allocation requires an async entry",
-            )),
         }
     }
 
@@ -260,7 +255,9 @@ impl PlannedFunctionEntry {
                 id: id.clone(),
                 name: id.clone(),
             },
-            EntryOrigin::StandardBuiltin(id) => FunctionIdentity::StandardBuiltin(*id),
+            EntryOrigin::StandardBuiltin { builtin, .. } => {
+                FunctionIdentity::StandardBuiltin(*builtin)
+            }
             EntryOrigin::HostBuiltin(id) => FunctionIdentity::HostBuiltin(*id),
         }
     }

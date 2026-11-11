@@ -407,7 +407,7 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         ))
     };
     let shape = fields(GcLayout::CompactDataShape);
-    assert_eq!(shape.len(), 2);
+    assert_eq!(shape.len(), 3);
     assert!(shape.iter().all(|field| !field.mutable));
     assert_eq!(
         shape[0].element_type,
@@ -416,6 +416,11 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
     assert_eq!(
         shape[1].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::I32)
+    );
+    assert_eq!(
+        shape[2].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I32),
+        "the immutable OwnKeys order witness is part of the shared shape",
     );
     let CompositeInnerType::Array(keys) = &types[index(GcLayout::CompactShapeKeys) as usize]
         .composite_type

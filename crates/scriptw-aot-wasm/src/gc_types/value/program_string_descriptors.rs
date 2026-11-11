@@ -38,10 +38,6 @@ impl ProgramStringDescriptorTable {
         }
     }
 
-    pub(crate) fn count(&self) -> u32 {
-        self.count
-    }
-
     fn load_word(
         &self,
         schema: &RuntimeSchema,

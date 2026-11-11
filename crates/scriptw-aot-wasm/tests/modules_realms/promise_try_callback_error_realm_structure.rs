@@ -1,5 +1,3 @@
-const RUNTIME_ERROR_SOURCE: &str = include_str!("../../src/builtins/errors/runtime_error.rs");
-
 const PROMISE_SOURCE: &str = include_str!("../../src/builtins/promise.rs");
 
 const PROMISE_TRY_CALLBACK_TYPE_ERROR_SOURCE: &str =
@@ -65,32 +63,4 @@ fn promise_try_callback_type_error_proof_is_private_and_one_shot() {
             "impl {capability} for PromiseTryCallbackTypeErrorPrototypeLocal"
         )));
     }
-}
-
-#[test]
-fn active_builtin_realm_type_error_prototype_comes_from_the_defining_realm_catalog() {
-    let wrapper = between(
-        RUNTIME_ERROR_SOURCE,
-        "pub(crate) fn emit_load_active_builtin_realm_type_error_prototype(",
-        "\n    }\n",
-    );
-    assert!(wrapper.contains("ActiveBuiltinRealmPrototype::TypeError,"));
-    assert!(!wrapper.contains("Instruction::"));
-    let declaration = between(
-        RUNTIME_ERROR_SOURCE,
-        "pub(crate) enum ActiveBuiltinRealmPrototype {",
-        "}\n",
-    );
-    let variants = declaration
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>();
-    assert_eq!(variants, ["TypeError,", "SuppressedError,"]);
-    let mapping = between(
-        RUNTIME_ERROR_SOURCE,
-        "impl ActiveBuiltinRealmPrototype {",
-        "\n}\n",
-    );
-    assert!(!mapping.contains("_ =>"));
 }

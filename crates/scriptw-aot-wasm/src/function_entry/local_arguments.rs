@@ -1,4 +1,4 @@
-//! One canonical source body receives unobservable arguments in Wasm locals.
+//! One canonical body receives arguments proven unobservable in Wasm locals.
 
 use super::*;
 use crate::arguments_protocol::UnobservedStrictArguments;
@@ -91,6 +91,49 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn native_local_entry_is_closed_and_keeps_the_existing_runtime_prefix() {
+        use crate::function_layout::{FunctionIndexLayout, ModuleEntryRole};
+        use crate::runtime_artifact::ModuleKind;
+        let original = FunctionIndexLayout::new(
+            2,
+            1,
+            3,
+            4,
+            5,
+            0,
+            0,
+            0,
+            0,
+            ModuleKind::Runtime(crate::RuntimeSourceCompilationProfile::Portable),
+            ModuleEntryRole::RuntimeOnly,
+        );
+        let builtin = StandardBuiltinId::FunctionPrototypeSymbolHasInstance;
+        assert!(original.native_local_arguments_index(builtin).is_none());
+        let layout = original.with_standard_builtin_local_arguments(&[builtin]);
+        assert_eq!(
+            layout.first_program_index(),
+            original.first_program_index() + 1
+        );
+        assert_eq!(layout.standard_index(0), original.standard_index(0));
+        assert_eq!(layout.host_index(0), original.host_index(0));
+        for candidate in StandardBuiltinId::all_functions() {
+            assert_eq!(
+                layout.native_local_arguments_index(*candidate).is_some(),
+                *candidate == builtin
+            );
+        }
+        let index = layout.native_local_arguments_index(builtin).unwrap();
+        index.assert_body_index(original.first_program_index());
+        let entry = PlannedLocalArgumentsEntry::native_builtin(builtin, index);
+        assert!(!entry.is_source());
+        assert_eq!(entry.arity(), LocalArgumentsArity::Narrow);
+        assert!(entry.source_site_owner().is_err());
+        let planned = PlannedFunctionEntry::standard_with_local_arguments(builtin, 3, Some(entry));
+        assert_eq!(planned.protocol(), FunctionProtocolIr::OrdinaryCallOnly);
+        assert!(!planned.has_source_activation());
+    }
 }
 
 impl LocalArgumentsPlan {
@@ -111,9 +154,18 @@ impl LocalArgumentsPlan {
 
 #[derive(Debug, Clone)]
 pub(crate) struct PlannedLocalArgumentsEntry {
-    proof: LocalArgumentsPlan,
-    name: String,
+    owner: LocalArgumentsOwner,
     index: LocalArgumentsFunctionIndex,
+}
+
+#[derive(Debug, Clone)]
+enum LocalArgumentsOwner {
+    Source {
+        proof: LocalArgumentsPlan,
+        name: String,
+    },
+    // This native algorithm reads only arg0 and cannot observe argc or extras.
+    FunctionPrototypeSymbolHasInstance,
 }
 
 impl PlannedLocalArgumentsEntry {
@@ -123,28 +175,65 @@ impl PlannedLocalArgumentsEntry {
         index: LocalArgumentsFunctionIndex,
     ) -> Self {
         let entry = Self {
-            proof,
-            name: source.name.clone(),
+            owner: LocalArgumentsOwner::Source {
+                proof,
+                name: source.name.clone(),
+            },
             index,
         };
         entry.require_source(source);
         entry
     }
 
-    pub(super) fn require_source(&self, source: &FunctionIr) {
+    pub(crate) fn native_builtin(
+        builtin: StandardBuiltinId,
+        index: LocalArgumentsFunctionIndex,
+    ) -> Self {
         assert_eq!(
-            self.proof.source, source.id,
+            builtin,
+            StandardBuiltinId::FunctionPrototypeSymbolHasInstance
+        );
+        Self {
+            owner: LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance,
+            index,
+        }
+    }
+
+    pub(super) fn require_builtin(&self, builtin: StandardBuiltinId) {
+        assert!(matches!(
+            self.owner,
+            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance
+        ));
+        assert_eq!(
+            builtin,
+            StandardBuiltinId::FunctionPrototypeSymbolHasInstance
+        );
+    }
+
+    pub(crate) fn is_source(&self) -> bool {
+        matches!(self.owner, LocalArgumentsOwner::Source { .. })
+    }
+
+    pub(super) fn require_source(&self, source: &FunctionIr) {
+        let LocalArgumentsOwner::Source { proof, .. } = &self.owner else {
+            panic!("native local arguments proof cannot authorize a source body");
+        };
+        assert_eq!(
+            proof.source, source.id,
             "local arguments proof belongs to its source"
         );
         assert_eq!(
-            self.proof.parameter_count,
+            proof.parameter_count,
             source.params.len(),
             "local arguments proof retains its formal list"
         );
     }
 
     pub(crate) fn arity(&self) -> LocalArgumentsArity {
-        self.proof.arity
+        match &self.owner {
+            LocalArgumentsOwner::Source { proof, .. } => proof.arity,
+            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => LocalArgumentsArity::Narrow,
+        }
     }
 
     pub(crate) fn slot_count(&self) -> usize {
@@ -156,20 +245,41 @@ impl PlannedLocalArgumentsEntry {
     }
 
     pub(crate) fn identity(&self) -> FunctionIdentity {
-        FunctionIdentity::Script {
-            id: self.proof.source.clone(),
-            name: self.name.clone(),
+        match &self.owner {
+            LocalArgumentsOwner::Source { proof, name } => FunctionIdentity::Script {
+                id: proof.source.clone(),
+                name: name.clone(),
+            },
+            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => {
+                FunctionIdentity::StandardBuiltin(
+                    StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
+                )
+            }
         }
     }
 
     pub(super) fn adapter_identity(&self) -> FunctionIdentity {
-        FunctionIdentity::LocalArgumentsAdapter {
-            id: self.proof.source.clone(),
-            name: self.name.clone(),
+        match &self.owner {
+            LocalArgumentsOwner::Source { proof, name } => {
+                FunctionIdentity::LocalArgumentsAdapter {
+                    id: proof.source.clone(),
+                    name: name.clone(),
+                }
+            }
+            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => {
+                FunctionIdentity::NativeLocalArgumentsAdapter(
+                    StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
+                )
+            }
         }
     }
 
     pub(crate) fn source_site_owner(&self) -> Result<u32, EmitError> {
+        if !self.is_source() {
+            return Err(EmitError::unsupported(
+                "native local entry cannot own a program source site",
+            ));
+        }
         self.index.source_site_owner()
     }
 

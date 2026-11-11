@@ -147,6 +147,7 @@ impl NamedTimeZoneDataImage {
     pub(crate) fn country_profiles(&self) -> Arc<LocaleTimeZoneProfiles> {
         Arc::clone(&self.0.countries)
     }
+    #[cfg(test)]
     pub(crate) fn country_profiles_ref(&self) -> &LocaleTimeZoneProfiles {
         &self.0.countries
     }

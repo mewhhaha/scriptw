@@ -74,7 +74,7 @@ fn indexed_get_enters_its_typed_helper_domain_before_property_emission() {
     let body = bounded(
         OBJECTS,
         "pub(crate) fn compile_indexed_element_read_helper(",
-        "pub(crate) fn emit_typed_array_or_object_index_write_from_locals(",
+        "pub(crate) fn compile_property_write_to_locals(",
     );
     let start = body
         .find("self.begin_helper_body(RuntimeHelperId::IndexedElementRead)")

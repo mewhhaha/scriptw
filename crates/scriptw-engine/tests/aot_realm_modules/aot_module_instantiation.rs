@@ -483,8 +483,8 @@ fn module_global_references_keep_live_lexicals_getters_and_reference_order() {
     assert_modules(
         &[
             (
-            "entry.js",
-            r#"
+                "entry.js",
+                r#"
 import { imported, replaceImported } from './dependency.js';
 function readImported() { return imported; }
 function make() {

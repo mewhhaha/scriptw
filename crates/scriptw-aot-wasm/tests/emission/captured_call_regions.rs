@@ -4,7 +4,7 @@ use crate::{
     scalar_masked_rows::{loops, read_only},
 };
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 

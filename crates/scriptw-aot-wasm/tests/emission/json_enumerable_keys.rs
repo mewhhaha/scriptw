@@ -1,12 +1,12 @@
 //! JSON snapshots enumerable keys without observing ordinary property values.
 use crate::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{calls, Module},
+    property_read_plans::{Module, calls},
 };
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 

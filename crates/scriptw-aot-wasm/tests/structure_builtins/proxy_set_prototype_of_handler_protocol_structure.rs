@@ -1,6 +1,3 @@
-const CONTRACT_SOURCE: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/proxy-set-prototype-of-handler-protocol.md"
-);
 const CLI_OBJECT_SOURCE: &str = include_str!("../../../scriptw-cli/tests/cli/object.rs");
 const HANDLER_PROTOCOL_FIXTURE: &str = include_str!(
     "../../../scriptw-cli/tests/fixtures/wasm_proxy_set_prototype_of_handler_protocol.js"
@@ -168,22 +165,6 @@ fn assert_live_wasm_cli_test(source: &str, name: &str, fixture: &str) {
         1,
         "`{name}` must run its exact fixture"
     );
-}
-
-#[test]
-fn module_boundary_and_written_contract_pin_the_typed_acquisition() {
-    for marker in [
-        "Proxy `[[SetPrototypeOf]]` handler protocol",
-        "typed live-slot reader",
-        "`GetMethod(handler, \"setPrototypeOf\")`",
-        "wasm_proxy_set_prototype_of_handler_protocol.js",
-        "Verification pending",
-    ] {
-        assert!(
-            CONTRACT_SOURCE.contains(marker),
-            "contract marker `{marker}`"
-        );
-    }
 }
 
 #[test]

@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::gc_types::{
-    BigIntConstruction, BigIntLimbArray, BigIntValue, BigIntValueSchema, CompletionLocals, GcLocal,
+    BigIntConstruction, BigIntLimbArray, BigIntValue, BigIntValueSchema, CompletionLocals,
     I64Local, ValueLocals,
 };
 use crate::runtime_helpers::{

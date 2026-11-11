@@ -136,8 +136,12 @@ fn finite_templates_run_unchanged_pinned_wrapped_names_and_global_properties() {
     const PROPERTY: &str =
         include_str!("../../../../test262/vendor/test262/harness/propertyHelper.js");
     for fixture in [
-        include_str!("../../../../test262/vendor/test262/test/built-ins/ShadowRealm/WrappedFunction/name.js"),
-        include_str!("../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/globalthis-available-properties.js"),
+        include_str!(
+            "../../../../test262/vendor/test262/test/built-ins/ShadowRealm/WrappedFunction/name.js"
+        ),
+        include_str!(
+            "../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/globalthis-available-properties.js"
+        ),
     ] {
         assert_modes(&format!("{STA}\n{ASSERT}\n{PROPERTY}\n{fixture}\ntrue;"));
     }
@@ -253,8 +257,12 @@ fn returned_callable_hints_run_unchanged_pinned_nested_realm_fixtures() {
     const STA: &str = include_str!("../../../../test262/vendor/test262/harness/sta.js");
     const ASSERT: &str = include_str!("../../../../test262/vendor/test262/harness/assert.js");
     for fixture in [
-        include_str!("../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/nested-realms.js"),
-        include_str!("../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/wrapped-function-multiple-different-realms-nested.js"),
+        include_str!(
+            "../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/nested-realms.js"
+        ),
+        include_str!(
+            "../../../../test262/vendor/test262/test/built-ins/ShadowRealm/prototype/evaluate/wrapped-function-multiple-different-realms-nested.js"
+        ),
     ] {
         assert_modes(&format!("{STA}\n{ASSERT}\n{fixture}\ntrue;"));
     }

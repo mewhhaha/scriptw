@@ -1,5 +1,5 @@
 use super::*;
-use crate::generator_loop_control::GeneratorLoopControlError;
+use crate::generator_loop_control::{collect_mixed_suspensions, GeneratorLoopControlError};
 use crate::{BlockIr, ExprIr, GeneratorResumeModeIr, YieldForm};
 use boa_ast::statement::Switch as AstSwitch;
 use boa_ast::visitor::{VisitWith, Visitor};

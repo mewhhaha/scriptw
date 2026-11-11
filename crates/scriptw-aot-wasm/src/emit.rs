@@ -1,7 +1,7 @@
 use scriptw_ir::{
     direct_await_sequence_resume_state, AsyncDisposableScopeExecutionIr, AwaitSequenceError,
     DerivedConstructorActivationIr, FunctionExecutionKind, HostBuiltinId, ProgramIr, ScriptIr,
-    StandardBuiltinId, SyncDisposableScopeExecutionIr, ValueKind,
+    StandardBuiltinId, SyncDisposableScopeExecutionIr,
 };
 // `CodeSection` is deliberately absent from this list. Every code-section entry
 // now goes through `ModuleCode::push(EmittedFunction)`, which cannot be called
@@ -39,6 +39,17 @@ pub(crate) enum ControlFrameKind {
     If,
     Block,
     Loop,
+}
+
+/// Whether a body must stay stoppable by an execution deadline on its own.
+///
+/// Runtime helpers and builtins are bounded by a heap value they read, call
+/// into source code or work in linear memory. Source code can do none of
+/// those, so it stores to `DEADLINE_POLL_ADDRESS` instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeadlinePolls {
+    Runtime,
+    Source,
 }
 
 /// What a call site wants done with a throw the callee left behind.
@@ -182,19 +193,6 @@ enum FunctionModuleState<'a> {
 }
 
 impl<'a> FunctionModuleState<'a> {
-    fn parameter_count(&self) -> usize {
-        match self {
-            Self::Main(_, _) => StaticSignature::Main.parameter_count(),
-            Self::ProgramInitialize => StaticSignature::ProgramInitialize.parameter_count(),
-            Self::Internal(entry) => entry.local_arguments().map_or_else(
-                || entry.signature().parameter_count(),
-                |local| local.signature().parameter_count(),
-            ),
-            Self::PreparedScript(_, entry) => entry.signature().parameter_count(),
-            Self::RuntimeOperation(helper) => helper.parameter_types().len(),
-        }
-    }
-
     const fn return_abi(&self) -> ReturnAbi {
         match self {
             Self::Main(_, _) => ReturnAbi::MainExport,
@@ -380,6 +378,7 @@ pub(crate) struct FunctionBuilder<'a> {
     emitted_local_count: u32,
     pub(crate) environment_depth: u32,
     pub(crate) control_stack: Vec<ControlFrameKind>,
+    deadline_polls: DeadlinePolls,
     pub(crate) breakable_stack: Vec<ControlTarget>,
     pub(crate) loop_stack: Vec<LoopTargets>,
     pub(crate) label_stack: Vec<LabelTargets>,
@@ -2071,6 +2070,7 @@ impl<'a> FunctionBuilder<'a> {
             emitted_local_count: 0,
             environment_depth: 0,
             control_stack: Vec::new(),
+            deadline_polls: DeadlinePolls::Runtime,
             breakable_stack: Vec::new(),
             loop_stack: Vec::new(),
             label_stack: Vec::new(),
@@ -2264,18 +2264,6 @@ impl<'a> FunctionBuilder<'a> {
         MemArg {
             offset,
             align: 2,
-            memory_index,
-        }
-    }
-
-    pub(crate) const fn memarg16(offset: u64) -> MemArg {
-        Self::memarg16_in(0, offset)
-    }
-
-    pub(crate) const fn memarg16_in(memory_index: u32, offset: u64) -> MemArg {
-        MemArg {
-            offset,
-            align: 1,
             memory_index,
         }
     }

@@ -613,52 +613,6 @@ fn shared_memory_reaches_but_cannot_exceed_the_one_gibibyte_cap() {
     }
 }
 
-fn assert_epoch_ticker_advances(engine: &WasmtimeEngine) {
-    const EXPORTED_NOOP_WASM: &[u8] = &[
-        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03,
-        0x02, 0x01, 0x00, 0x07, 0x08, 0x01, 0x04, 0x74, 0x69, 0x63, 0x6b, 0x00, 0x00, 0x0a, 0x04,
-        0x01, 0x02, 0x00, 0x0b,
-    ];
-
-    ensure_wasm_epoch_ticker(engine);
-    let module =
-        WasmtimeModule::new(engine, EXPORTED_NOOP_WASM).expect("epoch probe module should compile");
-    let mut store = WasmtimeStore::new(engine, ());
-    let instance = wasmtime::Instance::new(&mut store, &module, &[])
-        .expect("epoch probe module should instantiate");
-    let tick = instance
-        .get_typed_func::<(), ()>(&mut store, "tick")
-        .expect("epoch probe function should exist");
-    store.set_epoch_deadline(1);
-
-    let timeout = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    loop {
-        match tick.call(&mut store, ()) {
-            Err(error) => {
-                assert!(
-                    is_wasm_epoch_interrupt(&error),
-                    "epoch probe should stop with an interrupt trap: {error}"
-                );
-                return;
-            }
-            Ok(()) if std::time::Instant::now() < timeout => {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Ok(()) => panic!("registered Wasmtime engine did not receive an epoch tick"),
-        }
-    }
-}
-
-#[test]
-fn epoch_ticker_advances_both_native_compilation_engines() {
-    let fast = shared_wasm_engine().expect("fast Wasmtime engine should initialize");
-    assert_epoch_ticker_advances(&fast);
-
-    let size_optimized = shared_size_optimized_wasm_engine()
-        .expect("size-optimized Wasmtime engine should initialize");
-    assert_epoch_ticker_advances(&size_optimized);
-}
-
 use std::sync::{atomic::AtomicU64, Arc, Mutex};
 use wasmparser::{Imports, Parser, Payload};
 
@@ -1175,7 +1129,6 @@ fn with_wasm_raw_main<T>(
         },
     );
     store.limiter(|state| &mut state.limits);
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = WasmtimeLinker::new(&wasm_engine);
     if let Some(private_memory_type) = modules.host().imports().find_map(|import| {
         (import.module() == WASM_HOST_IMPORT_NAMESPACE

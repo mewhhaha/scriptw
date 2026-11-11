@@ -5,9 +5,9 @@ use crate::{
     scalar_masked_rows::{loops, read_only, type_group_sizes},
 };
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{HeapType, Operator, UnpackedIndex, Validator, WasmFeatures};
 

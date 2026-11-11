@@ -18,7 +18,7 @@ key tokens permit non-rooting host lookup; every copying cycle invalidates them
 before movement, even when no weak edges exist. Other collectors reject the
 token capability by default.
 
-The changes are confined to `src/runtime/gc/enabled{.rs,/weakref.rs}`,
+The collector changes are confined to `src/runtime/gc/enabled{.rs,/weakref.rs}`,
 `src/runtime/vm/gc{.rs,/weak.rs,/gc_runtime.rs,/enabled/copying.rs,
 /enabled/copying/{weak.rs,marking.rs}}` and collection controls in
 `src/runtime/store/gc.rs`. They do not change the JIT heap-header or VMContext ABI.
@@ -35,6 +35,30 @@ sets with more headroom to reuse the existing heap. The public capacity metric
 and initial heap size are unchanged. Other collectors retain their previous
 growth policy. Native controls cover retained and temporary allocations, both
 semi-space orientations, denied growth, real OOM and reuse after full reclamation.
+
+`ArrayRef::new` fills a packed `i8` array's body with one byte fill instead of
+type-checking and writing each element through a `Val`
+(`src/runtime/gc/enabled/arrayref.rs`). Allocation, collection retry, the
+out-of-memory result and the stored bytes are unchanged; other element types
+keep the per-element path. ArrayBuffer backing allocation depends on this.
+
+`Store::interrupt_handle` stops compiled code without checks in that code
+(`src/runtime/vm/interrupt.rs`, with hooks in `src/runtime/{store.rs,func.rs}`,
+`src/runtime/vm/traphandlers.rs` and `src/runtime/vm/sys/unix/signals.rs`). A
+request removes access to the store's GC heap and to linear memories given to
+`Store::interrupt_on_memory`. The fault handler restores access and, for a
+faulting instruction in compiled code with a request pending, unwinds with
+`Trap::Interrupt` whether or not that instruction is a registered trap site;
+host code retries its access. Ranges are published in a fixed table of atomics
+before access is removed and cleared before the store frees the memory. Only
+memory that cannot relocate is watched. A request still pending at the next
+entry into compiled code is delivered there. A fault may interrupt an object's
+initialisation; this relies on the copying collector reaching objects from
+roots only and keeping its allocation pointer outside the heap. Nothing in the compiled-code or
+VMContext ABI changes. `tests/interrupt_handle.rs` covers GC-heap and
+linear-memory loops, host code reaching protected memory, idle requests,
+cancellation, store drop and concurrent stores. See the
+[deadline contract](../../docs/rust-rewrite/contracts/execution-deadlines.md).
 
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write

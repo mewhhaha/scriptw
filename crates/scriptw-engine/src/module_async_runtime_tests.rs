@@ -516,7 +516,6 @@ impl ModuleFixture {
             },
         );
         store.limiter(|state| &mut state.limits);
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker = WasmtimeLinker::<ModuleStore>::new(&self.engine);
         for import in self.runtime.imports() {
             match import.ty() {

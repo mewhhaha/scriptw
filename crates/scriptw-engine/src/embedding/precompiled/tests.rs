@@ -22,7 +22,6 @@ fn state(runtime: &EmbeddedRuntime) -> WasmtimeStore<WasmStoreState> {
         runtime.new_state(RealmBuilder::new().build(), ()).unwrap(),
     );
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     store
 }
 

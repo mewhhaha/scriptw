@@ -1,9 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/obsolete-builtin-emitter-removal.md");
-
 fn count_identifier(source: &str, identifier: &str) -> usize {
     source
         .split(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
@@ -102,18 +99,4 @@ fn live_neighboring_emitters_remain_owned_and_reachable() {
         1,
         "the sole MakeTime call belongs to the completed MakeDate factory"
     );
-}
-
-#[test]
-fn removal_has_frozen_source_evidence() {
-    for evidence in [CONTRACT] {
-        for hash in [
-            "e69fe8ffc2517b72e18a85800ae0556736ede49cf01cd12c29a563008d7d3767",
-            "df9bc99017d1ab0080f962469ea29e263e3d59c15ba720e2eacfe099dacca563",
-            "934f091b5e4b1e04057b0a56b51a7897dc1c2537057b748d4e4f01f411198471",
-        ] {
-            assert!(evidence.contains(hash));
-        }
-        assert!(evidence.contains("no new JavaScript behavior"));
-    }
 }

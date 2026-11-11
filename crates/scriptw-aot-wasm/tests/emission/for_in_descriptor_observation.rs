@@ -1,14 +1,14 @@
 //! ForIn consumes descriptor predicates without materializing an ordinary snapshot.
 use crate::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{calls, Module},
+    property_read_plans::{Module, calls},
     scalar_masked_rows::type_group_sizes,
 };
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
 use wasmparser::{HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures};
 
 #[test]
@@ -86,11 +86,23 @@ fn for_in_reads_flags_without_cloning_descriptors_and_keeps_exotic_lookup() {
         "one actual ordinary scalar enumerability arm"
     );
     let arm = arms[0];
-    assert!(
+    let tests_layout = |layout: u32| {
         arm.iter().any(|op| matches!(op,
         Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
-            if *index == compact)),
-        "compact storage is queried directly"
+            if *index == layout))
+    };
+    for sealed in [
+        GcSnapshotLayout::InlineCompactStorage,
+        GcSnapshotLayout::ArrayCompactStorage,
+    ] {
+        assert!(
+            tests_layout(runtime.witness_type(sealed)),
+            "compact storage is queried directly through its sealed layouts"
+        );
+    }
+    assert!(
+        !tests_layout(compact),
+        "a test against the open compact base would call the host subtype query"
     );
     assert!(arm.iter().any(|op| matches!(op,
         Operator::StructGet { struct_type_index, field_index }

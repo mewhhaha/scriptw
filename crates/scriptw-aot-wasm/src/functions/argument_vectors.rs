@@ -1,6 +1,6 @@
 use super::*;
 use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local, Nullable,
+    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local,
     StoredValue, ValueArray, ValueLocals,
 };
 

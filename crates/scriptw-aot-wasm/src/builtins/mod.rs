@@ -63,7 +63,7 @@ mod number;
 mod object;
 mod promise;
 pub(crate) use promise::{
-    AsyncExecutionRealmContext, AsyncGeneratorCompleteStepKind, ModuleReactionContinuation,
+    AsyncGeneratorCompleteStepKind, ModuleReactionContinuation,
 };
 mod proxy;
 mod reflect;

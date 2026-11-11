@@ -60,11 +60,18 @@ fn early_weak_errors_and_prototype_abrupt_completion_keep_order_and_realm() {
 #[test]
 fn valid_weak_construction_uses_real_slots_through_aliases_and_created_realms() {
     for source in [
-        "new WeakMap();", "new WeakSet();", "new WeakRef({});", "new FinalizationRegistry(function() {});",
+        "new WeakMap();",
+        "new WeakSet();",
+        "new WeakRef({});",
+        "new FinalizationRegistry(function() {});",
         "const realm = __scriptwCreateRealm().global; const C = realm.WeakMap; realm.WeakMap = null; Reflect.construct(C, []);",
         "const realm = __scriptwCreateRealm().global; const C = realm.WeakSet; realm.WeakSet = null; Reflect.construct(C, []);",
         "const realm = __scriptwCreateRealm().global; const C = realm.WeakRef; realm.WeakRef = null; Reflect.construct(C, [{}]);",
         "const realm = __scriptwCreateRealm().global; const C = realm.FinalizationRegistry; realm.FinalizationRegistry = null; Reflect.construct(C, [function() {}]);",
-        "new WeakRef(Symbol('unregistered'));", "new WeakRef(Symbol.iterator);", "new WeakRef(new Proxy({}, {}));",
-    ] { assert_normal(source, vec![]); }
+        "new WeakRef(Symbol('unregistered'));",
+        "new WeakRef(Symbol.iterator);",
+        "new WeakRef(new Proxy({}, {}));",
+    ] {
+        assert_normal(source, vec![]);
+    }
 }

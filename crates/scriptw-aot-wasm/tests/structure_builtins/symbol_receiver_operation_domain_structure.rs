@@ -1,8 +1,5 @@
 const SOURCE: &str = include_str!("../../src/builtins/symbol.rs");
 const STANDARD: &str = include_str!("../../src/builtins/standard.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/symbol-receiver-operation-ownership.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -379,23 +376,5 @@ fn symbol_prototype_callers_name_all_four_receiver_operations() {
             1,
             "fixed producer `{variant}`"
         );
-    }
-}
-
-#[test]
-fn contract_records_the_single_receiver_owner() {
-    for phrase in [
-        "seven production mentions",
-        "four receiver operations",
-        "sole consuming projection",
-        "Test262 remains deferred",
-    ] {
-        assert!(CONTRACT.contains(phrase), "contract missing `{phrase}`");
-    }
-    for evidence in [CONTRACT] {
-        assert!(evidence.contains("private `SymbolBuiltin`"));
-        assert!(evidence.contains("fixed Symbol entries"));
-        assert!(evidence.contains("source-equivalent"));
-        assert!(evidence.contains("no new Symbol behavior"));
     }
 }

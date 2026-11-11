@@ -4,8 +4,8 @@ use crate::{
     property_read_plans::Module,
     scalar_masked_rows::{loops, read_only, type_group_sizes},
 };
-use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};
-use scriptw_front::{parse, ParseOptions};
+use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -172,10 +172,18 @@ fn check(source: &str, names: &[(&str, Option<u32>)]) {
                 assert_eq!(preflight.iter().filter(|op| matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == backing)).count(), 2,
                     "each input supports its current canonical packed backing");
             }
-            assert!(!preflight.iter().any(|op| matches!(op,
-                Operator::F64Add | Operator::F64Sub | Operator::F64Mul | Operator::F64Div
-                | Operator::StructNew { .. } | Operator::ArrayNew { .. })),
-                "preflight compares current Values without source arithmetic or per-element allocation");
+            assert!(
+                !preflight.iter().any(|op| matches!(
+                    op,
+                    Operator::F64Add
+                        | Operator::F64Sub
+                        | Operator::F64Mul
+                        | Operator::F64Div
+                        | Operator::StructNew { .. }
+                        | Operator::ArrayNew { .. }
+                )),
+                "preflight compares current Values without source arithmetic or per-element allocation"
+            );
             assert_eq!(preflight.iter().filter(|op| matches!(op, Operator::Call { function_index } if *function_index == bigint)).count(), 1,
                 "the canonical all-kind kernel retains real BigInt equality");
             assert_eq!(

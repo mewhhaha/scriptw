@@ -48,16 +48,16 @@ These use plain request/response records; networking and Web APIs are outside th
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-**React 19.3.1 RSC · 2026-11-08**, source `453a9074fcac`; exact Flight output.
+**React 19.3.1 RSC · 2026-11-09**, source `9f2788b4af9f`; exact Flight output.
 
 | Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
 | --- | ---: | ---: | ---: |
-| Sync | 4.554 ms | 3.733 ms | 0.495 ms |
-| Async | 4.938 ms | 4.067 ms | 0.398 ms |
+| Sync | 4.304 ms | 3.537 ms | 0.255 ms |
+| Async | 4.719 ms | 3.876 ms | 0.280 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
-Eight fresh processes per policy in two balanced blocks; 3 warmups and 7 timed requests per mode. Full Flight serialization and consumption are timed; setup precedes the window, and JSON encoding and final output validation follow it. Fast and Speed are separately scored native policies; their optimization and register-allocation settings differ together. The async catalog adds a resolved Promise and markup and performs no I/O. [Phases, workload bounds and limits](docs/rust-rewrite/benchmarks.md#react-server-components) · [RSC identities](docs/rust-rewrite/rsc-current.json).
+Eight fresh processes per policy **and case**, in two balanced blocks; 100 warmups and 101 timed requests each. Rendering, Flight consumption and the fixture's sanity scan are timed; outer JSON encoding and exact comparison follow the clock. Fast/Speed use different optimization and register-allocation policies. The async case adds a resolved Promise and markup, with no I/O. [Means, tails, warmup curves and limits](docs/rust-rewrite/benchmarks.md#react-server-components) · [RSC identities](docs/rust-rewrite/rsc-current.json).
 
 **Focused performance situations · 2026-11-08**, source `453a9074fcac`: 21 standalone programs compare Fast, Speed and V8.
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json) · [RSC data](docs/rust-rewrite/rsc-current.json).
@@ -84,7 +84,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Scoped verification (**2026-11-08**, source `453a9074fcac`): 2,832 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun. Existing formatting and Intl issues remain owned; four AOT unit failures remain a historical owned gate.
+Scoped verification (**2026-11-11**, source `89a934d06891`): 8,582 selected native checks and 342 source guards pass, and every workspace target type-checks. Four emitter unit tests of bootstrap allocation counts fail, as they do on the committed tree. Full CI, Test262 and the remaining CLI and Test262-tooling units were not rerun. Existing formatting and Intl identity gates remain unverified.
 
 ## Caveats
 
@@ -99,8 +99,10 @@ Scoped verification (**2026-11-08**, source `453a9074fcac`): 2,832 broad checks,
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 53:** binding cells own mutable value fields; source functions
-  support a typed wide local-argument entry alongside the narrow entry.
+- **Runtime ABI 57:** compiled code has no deadline checks. An execution timeout
+  removes access to the Store's GC heap and private linear memory, and the fault
+  stops the code; this needs Unix signal handling and is exercised on Linux
+  x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
   Rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·

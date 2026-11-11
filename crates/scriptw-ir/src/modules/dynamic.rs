@@ -90,7 +90,7 @@ impl DynamicComponentIr {
 ///
 /// The returned set is intentionally wider than the artifact registry. Graph
 /// classification needs edges from every loaded unit to decide which units
-/// materialize; after that fixed point, `modules::graph::link` retains only
+/// materialize; after that fixed point, graph linking retains only
 /// components whose referrer can run.
 pub(super) fn discover_components(
     graph: &ModuleGraphIr,

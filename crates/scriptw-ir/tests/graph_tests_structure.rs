@@ -9,6 +9,7 @@ fn graph_tests_have_one_private_adjacent_owner_with_the_existing_namespace() {
         "#[cfg(test)]\nuse super::loaded_sources::{ModuleGraphSources, ModuleParse, ModuleSourceIr};",
         "#[cfg(test)]\n#[path = \"graph_tests.rs\"]\nmod tests;",
         "#[cfg(test)]\n#[path = \"graph_request_identity_tests.rs\"]\nmod request_identity_tests;",
+        "#[cfg(test)]\npub(crate) fn link(graph: &mut ModuleGraphIr) {",
     ];
     assert_eq!(
         GRAPH_SOURCE.matches("\n#[cfg(test)]\n").count(),

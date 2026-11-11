@@ -51,8 +51,6 @@ fn run() -> Result<(), String> {
             .stderr(stderr.clone())
             .build_p1();
         let mut store = Store::new(&engine, wasi);
-        // The parent enforces a wall-clock timeout. This host has no epoch ticker.
-        store.set_epoch_deadline(u64::MAX);
         let mut linker: Linker<WasiP1Ctx> = Linker::new(&engine);
         p1::add_to_linker_sync(&mut linker, |context| context).map_err(|e| e.to_string())?;
         let instance = linker

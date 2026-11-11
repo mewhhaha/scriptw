@@ -19,6 +19,7 @@ mod captured_call_regions;
 mod class_initializer_function_identity;
 mod compact_birth_layouts;
 mod constant_number_condition_emission;
+mod descriptor_edges;
 mod embedding;
 mod emit_golden;
 mod for_in_descriptor_observation;
@@ -27,8 +28,10 @@ mod foreign_functions;
 mod function_own_data_probe;
 mod guarded_push;
 mod has_instance_helper;
+mod has_instance_local_arguments;
 mod host_html_dda_structure;
 mod infallible_booleans;
+mod internal_definition;
 mod iterator_helper_dispatch;
 mod json_enumerable_keys;
 mod numeric_bitwise_emission;
@@ -66,3 +69,5 @@ mod typed_number_inputs;
 mod strict_arguments_projection;
 
 mod numeric_body;
+
+mod cell_call_fast_paths;

@@ -1116,23 +1116,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    pub(crate) fn emit_default_this(&mut self, value: &ValueLocals, function: &mut Function) {
-        self.emit_execution_global_object_to_locals(value, function);
-    }
-
-    pub(crate) fn emit_default_this_for_known_strictness(
-        &mut self,
-        strict: bool,
-        value: &ValueLocals,
-        function: &mut Function,
-    ) {
-        if strict {
-            value.set_undefined(function);
-        } else {
-            self.emit_default_this(value, function);
-        }
-    }
-
     pub(crate) fn compile_new_target_to_locals(
         &mut self,
         value: &ValueLocals,

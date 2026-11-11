@@ -1,7 +1,4 @@
 const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/typeof-static-kind-domain.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -57,7 +54,7 @@ fn runtime_typeof_preserves_exact_primitive_spellings_and_the_object_default() {
     let body = bounded(
         OPERATIONS_SOURCE,
         "pub(crate) fn emit_typeof_value(",
-        "pub(crate) fn emit_proxy_target_is_callable_for_typeof_i32(",
+        "pub(crate) fn emit_is_callable_i32(",
     );
     let compact = normalized(body);
     for (tag, spelling) in [
@@ -94,7 +91,7 @@ fn callable_objects_and_htmldda_override_the_default_in_spec_order() {
     let body = bounded(
         OPERATIONS_SOURCE,
         "pub(crate) fn emit_typeof_value(",
-        "pub(crate) fn emit_proxy_target_is_callable_for_typeof_i32(",
+        "pub(crate) fn emit_is_callable_i32(",
     );
     positions_in_order(
         body,
@@ -124,19 +121,5 @@ fn callable_objects_and_htmldda_override_the_default_in_spec_order() {
             callable.contains(capability),
             "callability lost {capability}"
         );
-    }
-}
-
-#[test]
-fn contract_records_the_runtime_value_typeof_owner() {
-    for source in [CONTRACT] {
-        for marker in [
-            "ValueLocals",
-            "compile_typeof_payload",
-            "emit_typeof_value",
-            "HTMLDDA",
-        ] {
-            assert!(source.contains(marker), "documentation lost {marker}");
-        }
     }
 }

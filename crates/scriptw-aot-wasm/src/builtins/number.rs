@@ -3,7 +3,7 @@
 use super::super::*;
 use crate::functions::OrdinaryDefaultPrototype;
 use crate::gc_types::{
-    GcNullability, GcOperand, PrimitiveBox, PrimitiveBoxSchema, StoredValue, ValueLocals,
+    GcNullability, GcOperand, PrimitiveBox, PrimitiveBoxSchema, StoredValue,
 };
 
 #[derive(Clone, Copy)]

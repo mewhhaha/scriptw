@@ -3,9 +3,6 @@ use std::path::Path;
 
 const JOURNAL_SOURCE: &str = include_str!("../src/attempt_journal.rs");
 const RUNNER_SOURCE: &str = include_str!("../src/lib.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-admitted-case-ownership.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -368,18 +365,4 @@ fn worker_moves_the_admitted_proof_once_then_retires_its_journal_slot() {
         count_identifier_in_rust_sources(&source_root, "run_case_entry"),
         3
     );
-}
-
-#[test]
-fn contract_and_t25_record_the_admission_ownership_closure() {
-    for marker in [
-        "`RunPhase -> QueuedCase -> CaseAdmission -> AdmittedCase` chain",
-        "consumes the `AdmittedCase`",
-        "does not claim process-death recovery",
-    ] {
-        assert!(
-            CONTRACT.contains(marker),
-            "missing contract marker `{marker}`"
-        );
-    }
 }

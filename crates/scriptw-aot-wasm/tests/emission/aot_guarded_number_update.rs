@@ -1,7 +1,7 @@
 use super::linked_bodies::{linked_bodies, runtime_function_imports};
-use scriptw_aot_wasm::{emit, WasmRuntimeValueTag};
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, ExprIr, NumericUpdateValueKind, StatementIr};
+use scriptw_aot_wasm::{WasmRuntimeValueTag, emit};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{ExprIr, NumericUpdateValueKind, StatementIr, lower};
 use wasmparser::{Operator, Parser, Payload, TypeRef, Validator, WasmFeatures};
 
 fn body_operators(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
@@ -54,8 +54,12 @@ fn assert_number_bypasses_conversion(body: &[Operator<'_>], conversion: u32) {
         .windows(4)
         .enumerate()
         .filter_map(|(position, operators)| match operators {
-            [Operator::LocalGet { .. }, Operator::I32Const { value }, Operator::I32Ne, Operator::If { .. }]
-                if *value == WasmRuntimeValueTag::Number as i32 => Some(position + 3),
+            [
+                Operator::LocalGet { .. },
+                Operator::I32Const { value },
+                Operator::I32Ne,
+                Operator::If { .. },
+            ] if *value == WasmRuntimeValueTag::Number as i32 => Some(position + 3),
             _ => None,
         })
         .filter(|&guard| guard < call)

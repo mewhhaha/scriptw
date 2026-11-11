@@ -135,7 +135,6 @@ fn requested_exports_link_once_and_runtime_keeps_unpublished_roots() {
     );
     let modules = modules(&engine, &p);
     let mut store = WasmtimeStore::new(&engine, state());
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = WasmtimeLinker::new(&engine);
     let (program, owner) = instantiate(&mut linker, &mut store, &modules).unwrap();
     assert_eq!(
@@ -201,7 +200,6 @@ fn foreign_namespace_is_untouched_and_other_store_definitions_still_fail() {
     linker.define(&first, "host", "f", function).unwrap();
     let mut other = WasmtimeStore::new(&engine, state());
     assert!(instantiate(&mut linker, &mut other, &modules).is_err());
-    first.set_epoch_deadline(u64::MAX / 2);
     let (program, _) = instantiate(&mut linker, &mut first, &modules).unwrap();
     assert_eq!(
         program

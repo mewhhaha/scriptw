@@ -9,48 +9,6 @@ pub(crate) enum EcmaTrimMode {
 }
 
 impl FunctionBuilder<'_> {
-    pub(crate) fn emit_ecmascript_trim_start_payload_from_locals(
-        &mut self,
-        string: &GcLocal<StringValue>,
-        function: &mut Function,
-    ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
-        self.emit_ecmascript_trim_payload_from_locals(string, EcmaTrimMode::Start, function)
-    }
-
-    pub(crate) fn emit_ecmascript_trim_end_payload_from_locals(
-        &mut self,
-        string: &GcLocal<StringValue>,
-        function: &mut Function,
-    ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
-        self.emit_ecmascript_trim_payload_from_locals(string, EcmaTrimMode::End, function)
-    }
-
-    pub(crate) fn emit_ecmascript_trim_both_payload_from_locals(
-        &mut self,
-        string: &GcLocal<StringValue>,
-        function: &mut Function,
-    ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
-        self.emit_ecmascript_trim_payload_from_locals(string, EcmaTrimMode::Both, function)
-    }
-
-    fn emit_ecmascript_trim_payload_from_locals(
-        &mut self,
-        string: &GcLocal<StringValue>,
-        mode: EcmaTrimMode,
-        function: &mut Function,
-    ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
-        let schema = self.runtime_schema();
-        let start = schema.reserve_i64_local(function);
-        let end = schema.reserve_i64_local(function);
-        self.emit_gc_string_trim_range_mode(string, start, end, mode, function);
-        let result = self.emit_gc_string_slice(string, start, end, function);
-        schema.release_i64_local(end, function);
-        schema.release_i64_local(start, function);
-        Ok(result)
-    }
-}
-
-impl FunctionBuilder<'_> {
     pub(crate) fn emit_gc_string_trim_range(
         &mut self,
         string: &GcLocal<StringValue>,

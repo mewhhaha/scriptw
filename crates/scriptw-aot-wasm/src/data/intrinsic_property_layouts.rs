@@ -31,11 +31,6 @@ impl RPropertyLayoutSpan {
     pub(crate) fn index_capacity(self) -> u32 {
         self.index_capacity
     }
-    pub(crate) fn emit(self, f: &mut Function) {
-        for word in [self.address, self.count, self.group_count] {
-            f.instruction(&Instruction::I32Const(word as i32));
-        }
-    }
 }
 
 /// Exact spans, rather than a byte interval admitting interior/fabricated layouts.
@@ -429,7 +424,7 @@ mod tests {
         let length = encode_row(&plan.properties()[0], &pool, &functions).unwrap();
         assert_eq!(
             length[4],
-            crate::intrinsics::IntrinsicPropertyRecipeKind::Number as u32
+            crate::intrinsics::property_layouts::IntrinsicPropertyRecipeKind::Number as u32
         );
         assert_eq!(
             u64::from(length[5]) | (u64::from(length[6]) << 32),
@@ -438,7 +433,7 @@ mod tests {
         let name = encode_row(&plan.properties()[1], &pool, &functions).unwrap();
         assert_eq!(
             name[4],
-            crate::intrinsics::IntrinsicPropertyRecipeKind::String as u32
+            crate::intrinsics::property_layouts::IntrinsicPropertyRecipeKind::String as u32
         );
         assert_eq!(
             name[5],

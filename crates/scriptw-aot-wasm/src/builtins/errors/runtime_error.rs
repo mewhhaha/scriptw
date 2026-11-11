@@ -2,7 +2,7 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     CompletionLocals, Environment, EnvironmentSchema, FunctionContext, FunctionContextSchema,
-    GcLocal, GcOperand, GcStackReference, NativeErrorObject, Nullable, RealmRecord, RuntimeSchema,
+    GcLocal, GcOperand, NativeErrorObject, Nullable, RealmRecord,
     StringValue, ValueLocals,
 };
 use crate::module::ThrowDiagnosticRole;
@@ -12,20 +12,6 @@ use crate::runtime_helpers::{
     RuntimeErrorObjectArguments, RuntimeErrorObjectParameters,
 };
 use scriptw_ir::NativeErrorKind;
-
-pub(crate) enum ActiveBuiltinRealmPrototype {
-    TypeError,
-    SuppressedError,
-}
-
-impl ActiveBuiltinRealmPrototype {
-    fn slot(self) -> NonArrayRealmIntrinsicSlot {
-        match self {
-            Self::TypeError => NonArrayRealmIntrinsicSlot::TypeErrorPrototype,
-            Self::SuppressedError => NonArrayRealmIntrinsicSlot::SuppressedErrorPrototype,
-        }
-    }
-}
 
 fn prototype_slot(kind: NativeErrorKind) -> NonArrayRealmIntrinsicSlot {
     match kind {
@@ -401,31 +387,6 @@ impl FunctionBuilder<'_> {
             result,
             function,
         )
-    }
-
-    pub(crate) fn emit_load_active_builtin_realm_type_error_prototype(
-        &mut self,
-        value: &ValueLocals,
-        function: &mut Function,
-    ) {
-        self.emit_load_active_builtin_realm_prototype(
-            ActiveBuiltinRealmPrototype::TypeError,
-            value,
-            function,
-        );
-    }
-    pub(crate) fn emit_load_active_builtin_realm_prototype(
-        &mut self,
-        prototype: ActiveBuiltinRealmPrototype,
-        value: &ValueLocals,
-        function: &mut Function,
-    ) {
-        let schema = self.runtime_schema();
-        let realm = schema
-            .reserve_gc_local(function)
-            .initialize(self.emit_current_function_realm(function), function);
-        self.emit_load_non_array_realm_intrinsic(&realm, prototype.slot(), value, function);
-        realm.clear(function);
     }
 
     fn emit_throw_type_error_without_message_with_prototype(

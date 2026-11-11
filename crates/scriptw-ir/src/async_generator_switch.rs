@@ -3,7 +3,7 @@
 use crate::async_generator_loop_control::validate_tape;
 use crate::async_generator_source::{AsyncGeneratorSourceRange, AsyncGeneratorSwitchSourceStates};
 use crate::generator_loop_control::{
-    checked_next_state, collect_mixed_suspensions, has_unowned_head_branch, mixed_sequence_end,
+    checked_next_state, has_unowned_head_branch, mixed_sequence_end,
 };
 use crate::generator_switch::GeneratorSwitchControlError;
 use crate::switch_storage::CheckedSwitchStorageIr;

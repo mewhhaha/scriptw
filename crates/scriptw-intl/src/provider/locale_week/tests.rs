@@ -1,3 +1,4 @@
+use super::record::InvalidLocaleWeekInfo;
 use super::*;
 use crate::CanonicalLocaleId;
 use sha2::{Digest as _, Sha256};

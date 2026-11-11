@@ -15,14 +15,8 @@ pub(crate) struct ProxyCreationExecutionRealm {
 }
 
 impl ProxyCreationExecutionRealm {
-    pub(crate) fn realm(&self) -> &GcLocal<RealmRecord> {
-        &self.realm
-    }
     pub(crate) fn object_prototype(&self) -> &ValueLocals {
         &self.object_prototype
-    }
-    pub(crate) fn function_prototype(&self) -> &ValueLocals {
-        &self.function_prototype
     }
 }
 
@@ -80,14 +74,6 @@ impl FunctionBuilder<'_> {
         self.completion().copy_from(&result, function);
         result.clear(function);
         Ok(())
-    }
-
-    pub(crate) fn emit_alloc_proxy_revocable_result_object(
-        &mut self,
-        realm: &ProxyCreationExecutionRealm,
-        function: &mut Function,
-    ) -> Result<GcStackReference<crate::gc_types::OrdinaryObject>, EmitError> {
-        self.emit_alloc_plain_object_with_prototype(Some(&realm.object_prototype), function)
     }
 
     /// A revoker is a native callable with its own captured Proxy. This value

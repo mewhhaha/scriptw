@@ -474,6 +474,9 @@ pub struct StoreOpaque {
     modules: ModuleRegistry,
     func_refs: FuncRefs,
     host_globals: TryPrimaryMap<DefinedGlobalIndex, StoreBox<VMHostGlobalContext>>,
+    /// Interrupt requests for this store; see `InterruptHandle`.
+    #[cfg(feature = "std")]
+    interrupt: std::sync::Arc<crate::runtime::vm::StoreInterrupt>,
     // GC-related fields.
     gc_store: Option<GcStore>,
     #[cfg(feature = "gc")]
@@ -732,6 +735,8 @@ impl<T> Store<T> {
             continuations: Vec::new(),
             instances: TryPrimaryMap::new(),
             signal_handler: None,
+            #[cfg(feature = "std")]
+            interrupt: std::sync::Arc::new(crate::runtime::vm::StoreInterrupt::new()),
             gc_store: None,
             #[cfg(feature = "gc")]
             gc_data: Default::default(),
@@ -774,6 +779,15 @@ impl<T> Store<T> {
         let store_data =
             <NonNull<ManuallyDrop<T>>>::from(&mut inner.data_no_provenance).cast::<()>();
         inner.inner.vm_store_context.store_data = store_data.into();
+        // The boxed store no longer moves, so its GC heap definition has its
+        // final address. A heap that may relocate is left unwatched: a range
+        // published for it could outlive the mapping.
+        #[cfg(feature = "std")]
+        if !engine.tunables().gc_heap_may_move {
+            inner.inner.interrupt.watch(crate::runtime::vm::SendSyncPtr::new(
+                NonNull::new(inner.inner.vm_store_context.gc_heap.get()).unwrap(),
+            ));
+        }
 
         inner.traitobj = StorePtr(Some(NonNull::from(&mut *inner)));
 
@@ -1048,6 +1062,39 @@ impl<T> Store<T> {
     #[cfg(feature = "async")]
     pub fn fuel_async_yield_interval(&mut self, interval: Option<u64>) -> Result<()> {
         self.inner.fuel_async_yield_interval(interval)
+    }
+
+    /// Returns a handle that can interrupt this store from any thread.
+    ///
+    /// See [`InterruptHandle`].
+    #[cfg(feature = "std")]
+    pub fn interrupt_handle(&self) -> InterruptHandle {
+        InterruptHandle(self.inner.interrupt.clone())
+    }
+
+    /// Makes an interrupt request also remove access to `memory`, so that
+    /// compiled code working only in that linear memory is interrupted too.
+    ///
+    /// # Errors
+    ///
+    /// Fails for a memory of another store, and for one that may relocate
+    /// when it grows (see [`Config::memory_may_move`](crate::Config)): a
+    /// range published for it could outlive the mapping.
+    #[cfg(feature = "std")]
+    pub fn interrupt_on_memory(&mut self, memory: &crate::Memory) -> Result<()> {
+        crate::ensure!(
+            memory.comes_from_same_store(&self.inner),
+            "the memory belongs to another store"
+        );
+        crate::ensure!(
+            !self.inner.engine().tunables().memory_may_move,
+            "a memory that may move cannot be watched for interrupts"
+        );
+        let definition = memory.vmimport(&self.inner).from.as_non_null();
+        self.inner
+            .interrupt
+            .watch(crate::runtime::vm::SendSyncPtr::new(definition));
+        Ok(())
     }
 
     /// Sets the epoch deadline to a certain number of ticks in the future.
@@ -1757,6 +1804,12 @@ impl StoreOpaque {
         }
     }
 
+    /// Consumes a pending interrupt request at an entry into compiled code.
+    #[cfg(feature = "std")]
+    pub(crate) fn take_pending_interrupt(&self) -> bool {
+        self.interrupt.is_pending() && self.interrupt.take_pending()
+    }
+
     #[cfg(all(feature = "std", any(unix, windows)))]
     pub fn set_signal_handler(&mut self, handler: Option<SignalHandler>) {
         self.signal_handler = handler;
@@ -2387,6 +2440,52 @@ impl<T: fmt::Debug> fmt::Debug for Store<T> {
     }
 }
 
+/// Interrupts a store's compiled code without checks in that code.
+///
+/// [`interrupt`](InterruptHandle::interrupt) removes access to the store's GC
+/// heap and to the memories given to
+/// [`Store::interrupt_on_memory`]. Compiled code then stops with
+/// [`Trap::Interrupt`](crate::Trap) at its next access to one of them, or at
+/// its next entry from the host. Host code running inside the store that
+/// reaches that memory first gets access back and continues, so a requester
+/// repeats `interrupt` until the execution it wants to stop has returned, then
+/// calls [`cancel`](InterruptHandle::cancel).
+///
+/// Compiled code that reaches none of that memory is not interrupted. The GC
+/// heap is watched only when it cannot relocate
+/// ([`Config::gc_heap_may_move`](crate::Config) is false). On hosts without
+/// fault-based traps only the entry check applies.
+#[cfg(feature = "std")]
+#[derive(Clone)]
+pub struct InterruptHandle(std::sync::Arc<crate::runtime::vm::StoreInterrupt>);
+
+#[cfg(feature = "std")]
+impl InterruptHandle {
+    /// Requests an interrupt, or removes heap access again for a pending one.
+    pub fn interrupt(&self) {
+        self.0.interrupt()
+    }
+
+    /// True while a request is neither delivered nor cancelled.
+    pub fn is_pending(&self) -> bool {
+        self.0.is_pending()
+    }
+
+    /// Withdraws an undelivered request and restores heap access.
+    pub fn cancel(&self) {
+        self.0.cancel()
+    }
+}
+
+#[cfg(feature = "std")]
+impl fmt::Debug for InterruptHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InterruptHandle")
+            .field("pending", &self.is_pending())
+            .finish()
+    }
+}
+
 impl<T> Drop for Store<T> {
     fn drop(&mut self) {
         self.run_manual_drop_routines();
@@ -2403,6 +2502,11 @@ impl Drop for StoreOpaque {
     fn drop(&mut self) {
         // NB it's important that this destructor does not access `self.data`.
         // That is deallocated by `Drop for Store<T>` above.
+
+        // No interrupt request may touch the GC heap's pages or this store's
+        // context once they are freed below.
+        #[cfg(feature = "std")]
+        self.interrupt.retire();
 
         unsafe {
             let allocator = self.engine.allocator();

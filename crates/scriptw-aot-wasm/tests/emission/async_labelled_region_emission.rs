@@ -1,6 +1,6 @@
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower, StatementIr};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{StatementIr, lower};
 
 #[test]
 fn complete_async_iterator_labels_use_their_original_continuation_owner() {

@@ -6,10 +6,9 @@ pub(in crate::builtins) use records::TemporalReceiverRecord;
 mod epoch;
 mod zoned_conversion;
 use super::temporal_options::{
-    Disambiguation, OffsetOption, StringValuedOption, TemporalOverflow, TemporalRoundingMode,
-    TemporalUnit, TemporalUnitOptionProperty, TemporalUnitSlot,
+    Disambiguation, OffsetOption, StringValuedOption, TemporalOverflow, TemporalRoundingMode, TemporalUnitOptionProperty,
 };
-use super::temporal_plain_date::{TemporalCalendarId, TemporalEraField, TemporalMonthFieldContext};
+use super::temporal_plain_date::{TemporalCalendarId, TemporalMonthFieldContext};
 use super::temporal_plain_time::NANOSECONDS_PER_TEMPORAL_DAY;
 use super::temporal_plain_year_month_methods::TemporalPartialDateRewrite;
 use super::temporal_zone_provider::*;
@@ -1476,45 +1475,6 @@ impl<'a> FunctionBuilder<'a> {
         self.completion().set_normal(self.completion().value(), f);
         string.clear(f);
         record.clear(f);
-        Ok(())
-    }
-    /// The concrete record supplies the zone, epoch and calendar without Get.
-    /// Its projection uses the same exact floor pair as native field getters.
-    pub(super) fn emit_temporal_zoned_date_time_wall_clock_fields(
-        &mut self,
-        record: &GcLocal<TemporalZonedDateTimeObject>,
-        fields: &[I64Local; 9],
-        calendar: &ValueLocals,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let value = schema.reserve_value_local(f);
-        value.set_reference(record, schema, f);
-        let branded = self.emit_temporal_branded_zoned_record_from_value(&value, f)?;
-        let instant = self.emit_temporal_normalized_instant_from_zoned_record(&branded, f)?;
-        let zone = self.emit_temporal_zone_from_zoned_record(&branded, f)?;
-        let snapshot = self.emit_temporal_zone_snapshot(&zone, &instant, f)?;
-        let iso = self.emit_temporal_zone_snapshot_iso_record(&snapshot, f)?;
-        for (source, destination) in iso.fields().iter().zip(fields) {
-            source.load(f);
-            destination.store(f);
-        }
-        let identifier = schema.reserve_gc_local(f).initialize(
-            schema
-                .struct_type::<TemporalZonedDateTimeObject>()
-                .field(TemporalZonedDateTimeObjectSchema::CALENDAR)
-                .read(record, schema, f)
-                .reference(),
-            f,
-        );
-        calendar.set_reference(&identifier, schema, f);
-        identifier.clear(f);
-        iso.release(self, f);
-        snapshot.release(self, f);
-        zone.release(self, f);
-        instant.release(self, f);
-        branded.release(f);
-        value.clear(f);
         Ok(())
     }
     pub(crate) fn emit_temporal_zoned_date_time_iso_field(

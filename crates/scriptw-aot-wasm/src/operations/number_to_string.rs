@@ -96,14 +96,6 @@ impl FormattingBuffer {
         schema.release_i32_local(value, function);
         schema.release_i32_local(index, function);
     }
-    pub(in crate::operations) fn read_i64_from_stack(
-        &self,
-        schema: &crate::gc_types::RuntimeSchema,
-        function: &mut Function,
-    ) {
-        self.read_i32_from_stack(schema, function);
-        function.instruction(&Instruction::I64ExtendI32U);
-    }
     pub(in crate::operations) fn write_from_stack(
         &self,
         schema: &crate::gc_types::RuntimeSchema,

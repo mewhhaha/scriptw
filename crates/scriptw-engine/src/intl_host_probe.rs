@@ -85,7 +85,6 @@ impl IntlHostProbe {
                     .build(),
             },
         );
-        store.set_epoch_deadline(u64::MAX / 2);
         let allocator = ArrayRefPre::new(&mut store, array.clone());
         let mut linker = WasmtimeLinker::new(&wasm_engine);
         wasm_gc_intl_host::link(&mut linker, &module).unwrap();

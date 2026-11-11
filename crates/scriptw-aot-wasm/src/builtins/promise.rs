@@ -231,14 +231,6 @@ impl<'a> FunctionBuilder<'a> {
         context.realm.clear(function);
     }
 
-    pub(crate) fn emit_async_execution_intrinsic_promise_allocation_context(
-        &mut self,
-        context: &AsyncExecutionRealmContext,
-        function: &mut Function,
-    ) -> PromiseAllocationContext {
-        self.emit_intrinsic_promise_allocation_context(context.realm(), function)
-    }
-
     fn emit_intrinsic_promise_allocation_context(
         &mut self,
         realm: &GcLocal<RealmRecord>,

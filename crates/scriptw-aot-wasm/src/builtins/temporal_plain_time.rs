@@ -124,21 +124,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    /// Leaves an `i32` on the stack: 1 when the value carries
-    /// `[[InitializedTemporalTime]]`.
-    pub(crate) fn emit_temporal_plain_time_brand_check_i32(
-        &self,
-        input: &ValueLocals,
-        function: &mut Function,
-    ) {
-        input.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            self.runtime_schema()
-                .reference_type::<TemporalPlainTimeObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-    }
-
     /// The `[[InitializedTemporalTime]]` brand check on `this`, leaving the six
     /// fields loaded. On failure it throws and returns, so callers may treat
     /// the fields as live afterwards.

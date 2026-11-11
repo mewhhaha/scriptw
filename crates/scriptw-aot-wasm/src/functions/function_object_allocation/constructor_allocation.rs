@@ -39,6 +39,7 @@ impl<'a> ConstructorAllocationPlan<'a> {
             | FunctionIdentity::Script { .. }
             | FunctionIdentity::BinaryNumericSource { .. }
             | FunctionIdentity::LocalArgumentsAdapter { .. }
+            | FunctionIdentity::NativeLocalArgumentsAdapter(_)
             | FunctionIdentity::PreparedScript { .. }
             | FunctionIdentity::RuntimeHelper(_) => false,
         };

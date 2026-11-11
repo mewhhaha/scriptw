@@ -32,7 +32,8 @@ The parent writes and flushes the bounded native request before starting the
 attempt clock. That clock starts before process spawn and covers worker startup,
 image hashing, JavaScript admission, Realm construction, parsing, compilation
 and execution. It applies to both Wasm-AOT and spec-exec, with no startup
-allowance. Wasm epoch interruption remains an additional child-side mechanism.
+allowance. The Store's [execution deadline](execution-deadlines.md) remains an
+additional child-side mechanism.
 Parent JSON loading and request serialization are outside the attempt deadline.
 
 The closed journal lifecycle is Header, Admitted, ordered PrintLine frames, then

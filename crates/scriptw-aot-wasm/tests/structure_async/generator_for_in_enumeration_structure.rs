@@ -70,10 +70,12 @@ fn inspect_actual_enumeration_artifact(source: &str) {
             let (nullable, cursor) = concrete_reference(cursor_edge.element_type)?;
             let cursor_fields = &structures.get(&cursor)?.fields;
             if !nullable
-                || cursor_fields.len() != 4
-                || cursor_fields[..3].iter().any(|field| !field.mutable)
-                || cursor_fields[3].mutable
+                || cursor_fields.len() != 6
+                || cursor_fields.iter().any(|field| !field.mutable)
                 || cursor_fields[2].element_type.unpack() != ValType::I32
+                || cursor_fields[5].element_type.unpack() != ValType::I64
+                || !concrete_reference(cursor_fields[4].element_type)
+                    .is_some_and(|(nullable, _)| nullable)
             {
                 return None;
             }
@@ -87,7 +89,7 @@ fn inspect_actual_enumeration_artifact(source: &str) {
             }
             let (nullable, visited) = concrete_reference(cursor_fields[3].element_type)?;
             let set = &structures.get(&visited)?.fields;
-            if nullable || set.len() != 8 || set[0].mutable {
+            if !nullable || set.len() != 8 || set[0].mutable {
                 return None;
             }
             let (nullable, entries) = concrete_reference(set[1].element_type)?;
@@ -120,8 +122,8 @@ fn inspect_actual_enumeration_artifact(source: &str) {
     );
     let (cell, cursor) = owners[0];
     let mut cursor_new = 0;
-    let mut cursor_read = [0; 4];
-    let mut cursor_write = [0; 4];
+    let mut cursor_read = [0; 6];
+    let mut cursor_write = [0; 6];
     let mut edge_loads = 0;
     let mut edge_publications_and_retirements = 0;
     // Shared cursor helpers live in R; source activation edges live in P.
@@ -168,8 +170,8 @@ fn inspect_actual_enumeration_artifact(source: &str) {
         "advance reads every persisted cursor field"
     );
     assert!(
-        cursor_write[..3].iter().all(|count| *count > 0) && cursor_write[3] == 0,
-        "native advance updates current/snapshot/index but never replaces its Set"
+        cursor_write.iter().all(|count| *count > 0),
+        "native advance updates the cursor and publishes its lazy Set and compact state"
     );
     assert!(
         edge_loads > 0 && edge_publications_and_retirements > 1,

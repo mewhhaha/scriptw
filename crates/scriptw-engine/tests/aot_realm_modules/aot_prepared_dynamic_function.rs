@@ -147,7 +147,9 @@ fn hoisted_hints_retain_execution_at_the_256_body_boundary() {
         .join(",");
     for prefix in ["", "'use strict';"] {
         assert_function_trace(
-            &format!("{prefix} [{literals}].forEach(function(body, index) {{ var body; if (index === 0 || index === 255) print(Function(body)()); }});"),
+            &format!(
+                "{prefix} [{literals}].forEach(function(body, index) {{ var body; if (index === 0 || index === 255) print(Function(body)()); }});"
+            ),
             &["0", "255"],
         );
     }

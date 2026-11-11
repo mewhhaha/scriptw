@@ -16,6 +16,13 @@ Host-normalized `ModuleKey` identity is distinct from source request spelling.
 Unicode identifier spelling has one shared authority. Reexports preserve the
 resolved target and live binding rather than taking an early value snapshot.
 
+Strict identifier calls with an authenticated cell location read that live cell
+before evaluating arguments, following import targets and checking TDZ. The
+held callee uses the existing dispatch with an undefined declarative receiver;
+target hints never replace its value. Numeric call rows repeat the read on each
+iteration. Unproven references, with/global selection and prepared direct eval
+retain their existing resolution. Location evidence proves no immutable value.
+
 Source-only JavaScript targets can be loaded and parsed without opening their
 dependencies. Unsupported static source bindings/forwarded source exports fail
 linking with SyntaxError; dynamic import.source rejects before evaluation,

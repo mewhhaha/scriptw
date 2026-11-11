@@ -88,6 +88,34 @@ impl FunctionBuilder<'_> {
                 return Ok(());
             }
         }
+        if matches!(identifier.strictness, Strictness::Strict) {
+            if let (
+                EnvironmentIdentifierResolutionStart::Cell(proof),
+                Operation::Call {
+                    args,
+                    direct_eval: None,
+                    callee_targets,
+                },
+            ) = (&resolution, &identifier.operation)
+            {
+                let callee = schema.reserve_value_local(function);
+                self.emit_read_module_cell_identifier(proof, &identifier.name, &callee, function)?;
+                let receiver = schema.reserve_value_local(function);
+                receiver.set_undefined(function);
+                self.emit_resolved_identifier_call(
+                    &callee,
+                    &receiver,
+                    args,
+                    callee_targets,
+                    continuation,
+                    output,
+                    function,
+                )?;
+                receiver.clear(function);
+                callee.clear(function);
+                return Ok(());
+            }
+        }
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(
@@ -334,39 +362,15 @@ impl FunctionBuilder<'_> {
                         let receiver = schema.reserve_value_local(function);
                         self.emit_environment_identifier_call_base(&reference, &receiver, function);
                         if direct_eval.is_none() {
-                            let targets = callee_targets.known_targets();
-                            let known_target = if targets.len() == 1 {
-                                targets
-                                    .iter()
-                                    .next()
-                                    .and_then(|id| self.functions.get(id))
-                                    .cloned()
-                            } else {
-                                None
-                            };
-                            let handled = match known_target.as_ref() {
-                                Some(meta) => self.try_emit_known_leaf_call_from_locals(
-                                    meta,
-                                    &value,
-                                    &receiver,
-                                    args,
-                                    continuation,
-                                    &value,
-                                    function,
-                                )?,
-                                None => false,
-                            };
-                            if !handled {
-                                self.emit_indirect_call_from_locals_with_known_target(
-                                    &value,
-                                    Some(&receiver),
-                                    args,
-                                    known_target.as_ref(),
-                                    continuation,
-                                    &value,
-                                    function,
-                                )?;
-                            }
+                            self.emit_resolved_identifier_call(
+                                &value,
+                                &receiver,
+                                args,
+                                callee_targets,
+                                continuation,
+                                &value,
+                                function,
+                            )?;
                         } else {
                             self.push_scope();
                             let (callee, callee_id) = self.retain_expression_operand(
@@ -413,6 +417,53 @@ impl FunctionBuilder<'_> {
         self.release_environment_identifier_reference(reference, function);
         value.clear(function);
         key.clear(function);
+        Ok(())
+    }
+
+    /// Both paths dispatch the held callee; a target hint never replaces its value.
+    fn emit_resolved_identifier_call(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        args: &[TypedExpr],
+        callee_targets: &scriptw_ir::FunctionTargetKnowledge,
+        continuation: &CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let targets = callee_targets.known_targets();
+        let known_target = if targets.len() == 1 {
+            targets
+                .iter()
+                .next()
+                .and_then(|id| self.functions.get(id))
+                .cloned()
+        } else {
+            None
+        };
+        let handled = match known_target.as_ref() {
+            Some(meta) => self.try_emit_known_leaf_call_from_locals(
+                meta,
+                callee,
+                receiver,
+                args,
+                continuation,
+                output,
+                function,
+            )?,
+            None => false,
+        };
+        if !handled {
+            self.emit_indirect_call_from_locals_with_known_target(
+                callee,
+                Some(receiver),
+                args,
+                known_target.as_ref(),
+                continuation,
+                output,
+                function,
+            )?;
+        }
         Ok(())
     }
 }

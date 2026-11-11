@@ -21,8 +21,6 @@ EXCLUDED = (
     "docs/rust-rewrite/scriptw-identity-map.tsv",
     "docs/rust-rewrite/scriptw-identity-migration.md",
     "docs/rust-rewrite/scriptw-frozen-history.json",
-    f"docs/rust-rewrite/{PREVIOUS}-identity-map.tsv",
-    f"docs/rust-rewrite/{PREVIOUS}-identity-migration.md",
     "scripts/check-scriptw-identity.sh", "scripts/check-no-legacy-js.sh",
     "scripts/check-readme-status-artifacts.sh",
     "scripts/tests/check-readme-status-artifacts.sh",
@@ -111,8 +109,7 @@ def main(path_pattern, token_pattern, word_pattern):
             # Gitlinks are directories: grep previously found no file content.
             if os.path.isdir(path):
                 continue
-            if (path in HISTORY['files'] or path.endswith('.md') or fnmatch.fnmatchcase(path, "docs/rust-rewrite/*.json")
-                    or fnmatch.fnmatchcase(path, "docs/rust-rewrite/verify-*.py")):
+            if path in HISTORY['files'] or path.endswith('.md') or fnmatch.fnmatchcase(path, "docs/rust-rewrite/*.json"):
                 try:
                     raw = Path(path).read_bytes()
                     normalized = audit_source(Path(path), raw)

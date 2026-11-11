@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Current React Server Components runtime</dc:title>
-    <dc:description>{"date": "2026-11-08", "inputs": {"/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "/home/jacobt/src/scriptw/crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs": "8b4cefbe236c5ccfc5823a382e47635d2eeac250250cc5c6901bcab1890bc9b1", "/home/jacobt/src/scriptw/docs/rust-rewrite/rsc-current.json": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e", "/home/jacobt/src/scriptw/scripts/benchmark_metrics.py": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "/home/jacobt/src/scriptw/scripts/limited_verification.py": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/rsc.js": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "/home/jacobt/src/scriptw/target/application-benchmarks-20261102/generated-v2/support.json": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build-argv.json": "fe97ce5597b074a6057d1510b6265a382848f8d61492a41eeaa3aa17537cd33d", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/build.stdout": "8457b217a11fa81328768892d5abdfcfa523dd8e42cd5193f3e803c5deeb1cfc", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/emission-finished-build.stdout": "811dc0cd4bc1841173647138ac0c62b2d7cdc4e662f8b7b873891cf7f27bdfb7", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/focused-complete/receipt.json": "40126cbc1a08dfd47922550a189278019091a5fa12b2faef601ee04eb23b7e5e", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen-finished/emission": "e6dc08651646219b9d3ff2bd0438cd7430b895bc56eb78ec7345d615d69eb266", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen-finished/emission-producer.json": "39f833fe16ffd608f8f0f86698d942bc03d32ed59da4d918214c2950d1de87dd", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/frozen/rsc_baseline-producer.json": "99ed01a2365f34eb6e39b06be1bafa3a8ae986cebe688e8eb549acb98f2eb654", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/common.py": "27d6727ba848a941a6b1081f5bbb3abfe69c87194d23525d2aba50fc44caad07", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/external-test-reuse-finished.json": "036833ff146f25a0069a0297a82a05ddd429a915824d5efd60cb2ea203ae47d6", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/freeze_source.py": "51057e0b4fc43ae22b8eab5438f1e1a2072ad10be87b5203dd5df3cf7234f05d", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/measure_rsc.py": "0840e56dfb509dffe43bf677b32f0cde3bcc0bda75c639798bb9b24914e0ac13", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/baseline/rsc-current.json": "62c45283fcc62e3ab23cc3fc83e29d345c142f7d4a3abf3d5d3b1918f42b7c8e", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/manifest.json": "17e36ec550641cc30b2fe2d8525a0415fb7be574ec56b47a7883d22aa190abd1", "/home/jacobt/src/scriptw/target/performance-architecture-20261108/tools/source-finished/tracked.patch": "7d4b9ea955703f85e5c1bad92f3320cb28e8b079a3fc35949efca0adf91870dd", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/build.stdout": "d80e81651980bde9cd3e1bf1d7b7acb34f00e8334b0f5a424404c465422f8375", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline": "c525c873b1a8d4864164e46faa7f1359d8af807d19a65fc6c8928297cc4d15a3", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/frozen/rsc_baseline-producer.json": "c73115061da82a5440f02448b65a7dcb8a26465c33e3173de255deefd7b2f04c", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/common.py": "f0f142dd5f88781b90eb9882f955fcfbd27fc5e6cb46a541c2887e9d0f757a10", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/aggregate.json": "f50014a6209d3360ef524ba30b3d87d3564371a45663305c4def84d8e1f6b3f6", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/block-0-rep-0-candidate/report.json": "d9f12c372442ec7fbcef4f0b2f43177cd13ec41ef4b4f0f7e17da7ecaccd87f9", "/home/jacobt/src/scriptw/target/performance-predicate-transport-20261108/tools/rsc-campaign-1/campaign.json": "500cc7231950e0a9671452c54c544b00ff0a13005927c241282976f4e4a6a51c", "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63", "/home/jacobt/src/scriptw/target/release/examples/rsc_baseline": "0a3805d2868f702cebf0b960fe37b0c73b98f2e92b10460dca3b56391c5d8082"}, "measurement": {"actors": ["baseline", "baseline-speed", "candidate", "candidate-speed", "v8"], "blocks": 2, "campaign": "target/performance-architecture-20261108/tools/rsc-campaign-1/campaign.json", "campaign_sha256": "0b36a76f2340fcdce9b2eafe7855b787ffb867bf1182295e93e72e7202b81e8a", "case_order": ["rsc-sync", "rsc-async"], "checked_flight_calls": 800, "clock": "retained applicationRun through complete Flight serialization and consumption; JSON encoding and exact validation outside request timing", "exact_output": "Both RSC cases were checked against the shared Node-generated JSON golden.", "execution_processes": 40, "process_order": [["baseline", "baseline-speed", "candidate", "candidate-speed", "v8"], ["v8", "candidate-speed", "candidate", "baseline-speed", "baseline"]], "processes_per_engine": 8, "processes_per_engine_per_block": 4, "samples": 7, "warmups": 3}, "source_report": "scriptw-rsc-current-v2"}</dc:description>
+    <dc:description>{"date": "2026-11-09", "inputs": {"adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf", "baseline-speed_host_sha256": "71d7d1e04b3eebc483ffc00a14c24493b7933ccb7d594e1c1d049b89a71477e1", "baseline_host_sha256": "71d7d1e04b3eebc483ffc00a14c24493b7933ccb7d594e1c1d049b89a71477e1", "benchmark_metrics_sha256": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "benchmark_rsc_sha256": "88ddd80deceb61fe519ab47bedd78be65217507cdb6aedefe7a30d4ea3fcefb1", "campaign_report_sha256": "fd69205f8b015fc2fb430d9a05656a06f6f1456809862aa673bfd181039cb683", "candidate-speed_host_sha256": "b62fb80e19474f867c7657f462043ae89ba2bd9b9b9d19944101e4b47c98a5c3", "candidate_host_sha256": "b62fb80e19474f867c7657f462043ae89ba2bd9b9b9d19944101e4b47c98a5c3", "host_source_sha256": "f0aaf18a66ce744445b53ef9c4cecfeacbe8fcc90dc12117658ffa1cda133a7c", "limited_verification_sha256": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "node_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "react_driver_sha256": "5c4d95b54e44f31a13a9a4880ac5255de632a2277b7d8ec9403e74919e3c0388", "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "time_sha256": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "calls_per_process": 201, "case_isolation": "one case per fresh process", "checked_calls_total": 16080, "clock": "per-request monotonic clock recorded by each retained host", "cpu_policy": "one CPU by inherited affinity; unchanged cpu.max retained in raw report, no finite quota claim", "measured_calls_per_engine_case": 808, "processes_per_block_per_case": 4, "processes_per_engine": 16, "processes_per_engine_per_case": 8, "samples": 101, "warmup_calls_per_engine_case": 800, "warmups": 100}, "source_report": "scriptw-rsc-current-v3"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -67,68 +67,68 @@ L 558.72 247.968
     </g>
     <g id="ytick_2">
      <g id="line2d_5">
-      <path d="M 63.36 219.090893
-L 558.72 219.090893
+      <path d="M 63.36 216.744795
+L 558.72 216.744795
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="223.269604" transform="rotate(-0 56.36 223.269604)">1</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="220.923506" transform="rotate(-0 56.36 220.923506)">1</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_7">
-      <path d="M 63.36 190.213787
-L 558.72 190.213787
+      <path d="M 63.36 185.52159
+L 558.72 185.52159
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="194.392498" transform="rotate(-0 56.36 194.392498)">2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="189.700301" transform="rotate(-0 56.36 189.700301)">2</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_9">
-      <path d="M 63.36 161.33668
-L 558.72 161.33668
+      <path d="M 63.36 154.298385
+L 558.72 154.298385
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="165.515391" transform="rotate(-0 56.36 165.515391)">3</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="158.477096" transform="rotate(-0 56.36 158.477096)">3</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_11">
-      <path d="M 63.36 132.459573
-L 558.72 132.459573
+      <path d="M 63.36 123.07518
+L 558.72 123.07518
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_12"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="136.638284" transform="rotate(-0 56.36 136.638284)">4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="127.253891" transform="rotate(-0 56.36 127.253891)">4</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_13">
-      <path d="M 63.36 103.582467
-L 558.72 103.582467
+      <path d="M 63.36 91.851975
+L 558.72 91.851975
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_14"/>
      <g id="text_8">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="107.761177" transform="rotate(-0 56.36 107.761177)">5</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="96.030686" transform="rotate(-0 56.36 96.030686)">5</text>
      </g>
     </g>
     <g id="ytick_7">
      <g id="line2d_15">
-      <path d="M 63.36 74.70536
-L 558.72 74.70536
+      <path d="M 63.36 60.62877
+L 558.72 60.62877
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_9">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="78.884071" transform="rotate(-0 56.36 78.884071)">6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="64.807481" transform="rotate(-0 56.36 64.807481)">6</text>
      </g>
     </g>
     <g id="text_10">
@@ -138,56 +138,56 @@ L 558.72 74.70536
    <g id="patch_3">
     <path d="M 85.876364 247.968
 L 150.208831 247.968
-L 150.208831 116.456372
-L 85.876364 116.456372
+L 150.208831 113.569244
+L 85.876364 113.569244
 z
 " clip-path="url(#p833538aeba)" style="fill: #3478a8"/>
    </g>
    <g id="patch_4">
     <path d="M 343.206234 247.968
 L 407.538701 247.968
-L 407.538701 105.368718
-L 343.206234 105.368718
+L 407.538701 100.623323
+L 343.206234 100.623323
 z
 " clip-path="url(#p833538aeba)" style="fill: #3478a8"/>
    </g>
    <g id="patch_5">
     <path d="M 150.208831 247.968
 L 214.541299 247.968
-L 214.541299 140.179146
-L 150.208831 140.179146
+L 214.541299 137.518925
+L 150.208831 137.518925
 z
 " clip-path="url(#p833538aeba)" style="fill: #4a9a79"/>
    </g>
    <g id="patch_6">
     <path d="M 407.538701 247.968
 L 471.871169 247.968
-L 471.871169 130.525933
-L 407.538701 130.525933
+L 471.871169 126.931901
+L 407.538701 126.931901
 z
 " clip-path="url(#p833538aeba)" style="fill: #4a9a79"/>
    </g>
    <g id="patch_7">
     <path d="M 214.541299 247.968
 L 278.873766 247.968
-L 278.873766 233.681311
-L 214.541299 233.681311
+L 278.873766 240.005755
+L 214.541299 240.005755
 z
 " clip-path="url(#p833538aeba)" style="fill: #d17b36"/>
    </g>
    <g id="patch_8">
     <path d="M 471.871169 247.968
 L 536.203636 247.968
-L 536.203636 236.482376
-L 471.871169 236.482376
+L 536.203636 239.219929
+L 471.871169 239.219929
 z
 " clip-path="url(#p833538aeba)" style="fill: #d17b36"/>
    </g>
    <g id="LineCollection_1">
-    <path d="M 118.042597 119.699155
-L 118.042597 110.264658
+    <path d="M 118.042597 114.897385
+L 118.042597 101.154742
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
-    <path d="M 375.372468 108.037136
+    <path d="M 375.372468 102.302944
 L 375.372468 95.7555
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
    </g>
@@ -198,54 +198,54 @@ L -3 -0
 " style="stroke: #555b61"/>
     </defs>
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="118.042597" y="119.699155" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="375.372468" y="108.037136" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="118.042597" y="114.897385" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="375.372468" y="102.302944" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="line2d_18">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="118.042597" y="110.264658" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="118.042597" y="101.154742" style="fill: #1f77b4; stroke: #555b61"/>
      <use xlink:href="#mf1cd270943" x="375.372468" y="95.7555" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="LineCollection_2">
-    <path d="M 182.375065 143.14367
-L 182.375065 138.359744
+    <path d="M 182.375065 138.441743
+L 182.375065 137.192003
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
-    <path d="M 439.704935 133.474835
-L 439.704935 127.424012
+    <path d="M 439.704935 128.173773
+L 439.704935 125.218247
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
    </g>
    <g id="line2d_19">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="182.375065" y="143.14367" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="439.704935" y="133.474835" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="182.375065" y="138.441743" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="439.704935" y="128.173773" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="line2d_20">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="182.375065" y="138.359744" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="439.704935" y="127.424012" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="182.375065" y="137.192003" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="439.704935" y="125.218247" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="LineCollection_3">
-    <path d="M 246.707532 234.198905
-L 246.707532 227.293378
+    <path d="M 246.707532 240.085671
+L 246.707532 239.859209
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
-    <path d="M 504.037403 236.616785
-L 504.037403 236.100029
+    <path d="M 504.037403 239.377435
+L 504.037403 239.132832
 " clip-path="url(#p833538aeba)" style="fill: none; stroke: #555b61"/>
    </g>
    <g id="line2d_21">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="246.707532" y="234.198905" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="504.037403" y="236.616785" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="246.707532" y="240.085671" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="504.037403" y="239.377435" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="line2d_22">
     <g clip-path="url(#p833538aeba)">
-     <use xlink:href="#mf1cd270943" x="246.707532" y="227.293378" style="fill: #1f77b4; stroke: #555b61"/>
-     <use xlink:href="#mf1cd270943" x="504.037403" y="236.100029" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="246.707532" y="239.859209" style="fill: #1f77b4; stroke: #555b61"/>
+     <use xlink:href="#mf1cd270943" x="504.037403" y="239.132832" style="fill: #1f77b4; stroke: #555b61"/>
     </g>
    </g>
    <g id="patch_9">
@@ -259,22 +259,22 @@ L 558.72 247.968
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_11">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="118.042597" y="103.102549" transform="rotate(-0 118.042597 103.102549)">4.554</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="118.042597" y="93.992632" transform="rotate(-0 118.042597 93.992632)">4.304</text>
    </g>
    <g id="text_12">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="375.372468" y="88.593391" transform="rotate(-0 375.372468 88.593391)">4.938</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="375.372468" y="88.593391" transform="rotate(-0 375.372468 88.593391)">4.719</text>
    </g>
    <g id="text_13">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="182.375065" y="131.197634" transform="rotate(-0 182.375065 131.197634)">3.733</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="182.375065" y="130.029893" transform="rotate(-0 182.375065 130.029893)">3.537</text>
    </g>
    <g id="text_14">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="439.704935" y="120.261903" transform="rotate(-0 439.704935 120.261903)">4.067</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="439.704935" y="118.056138" transform="rotate(-0 439.704935 118.056138)">3.876</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="246.707532" y="220.131268" transform="rotate(-0 246.707532 220.131268)">0.495</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="246.707532" y="232.697099" transform="rotate(-0 246.707532 232.697099)">0.255</text>
    </g>
    <g id="text_16">
-    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="504.037403" y="228.93792" transform="rotate(-0 504.037403 228.93792)">0.398</text>
+    <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle" x="504.037403" y="231.970723" transform="rotate(-0 504.037403 231.970723)">0.280</text>
    </g>
    <g id="text_17">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · retained RSC module</text>

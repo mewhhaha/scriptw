@@ -2,7 +2,7 @@
 //! retained through validation; the stored GC record is always complete.
 
 use super::*;
-use crate::gc_types::{I64Local, RuntimeSchema};
+use crate::gc_types::I64Local;
 
 mod typed_array;
 
@@ -207,8 +207,12 @@ impl FunctionBuilder<'_> {
                 .upcast::<crate::gc_types::PropertyValue>(),
             function,
         );
-        let getter = schema.reserve_value_local(function);
-        let setter = schema.reserve_value_local(function);
+        let getter = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let setter = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
         let accessor = schema.reserve_i32_local(function);
         let writable = schema.reserve_i32_local(function);
         let enumerable = schema.reserve_i32_local(function);
@@ -216,8 +220,6 @@ impl FunctionBuilder<'_> {
         let requested_data = schema.reserve_i32_local(function);
         let requested_accessor = schema.reserve_i32_local(function);
         let flags = schema.reserve_i32_local(function);
-        getter.set_undefined(function);
-        setter.set_undefined(function);
         for flag in [accessor, writable, enumerable, configurable] {
             function.instruction(&Instruction::I32Const(0));
             flag.store(function);
@@ -258,8 +260,20 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        self.emit_descriptor_value(&record, DescriptorField::Get, &getter, function);
-        self.emit_descriptor_value(&record, DescriptorField::Set, &setter, function);
+        // Completed descriptor snapshots already share these immutable edges.
+        // Keep the exact wrappers until an incoming field replaces one.
+        for (field, output) in [
+            (PropertyDescriptorSchema::GETTER, &getter),
+            (PropertyDescriptorSchema::SETTER, &setter),
+        ] {
+            output.replace(
+                schema
+                    .field(field)
+                    .read(&record, schema, function)
+                    .reference(),
+                function,
+            );
+        }
         record.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -275,8 +289,8 @@ impl FunctionBuilder<'_> {
         requested_accessor.load(function);
         accessor.store(function);
         value.replace(schema.stored_undefined(function).upcast(), function);
-        getter.set_undefined(function);
-        setter.set_undefined(function);
+        getter.replace(schema.stored_undefined(function), function);
+        setter.replace(schema.stored_undefined(function), function);
         function.instruction(&Instruction::I32Const(0));
         writable.store(function);
         self.pop_control(ControlFrameKind::If);
@@ -299,7 +313,12 @@ impl FunctionBuilder<'_> {
             if let Some(input) = presence.value() {
                 emit_presence(presence, function);
                 self.open_frame(ControlFrameKind::If, function);
-                output.copy_from(input, function);
+                output.replace(
+                    schema
+                        .struct_type::<StoredValue>()
+                        .from_value(input, function),
+                    function,
+                );
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
             }
@@ -319,18 +338,6 @@ impl FunctionBuilder<'_> {
             }
         }
 
-        let stored_getter = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&getter, function),
-            function,
-        );
-        let stored_setter = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&setter, function),
-            function,
-        );
         accessor.load(function);
         self.open_frame(ControlFrameKind::If, function);
         let output = output_slot.initialize(
@@ -338,8 +345,8 @@ impl FunctionBuilder<'_> {
                 (
                     GcOperand::accessor_descriptor_flags(enumerable, configurable),
                     GcOperand::reference(&value, schema),
-                    GcOperand::reference(&stored_getter, schema),
-                    GcOperand::reference(&stored_setter, schema),
+                    GcOperand::reference(&getter, schema),
+                    GcOperand::reference(&setter, schema),
                 ),
                 function,
             ),
@@ -351,8 +358,8 @@ impl FunctionBuilder<'_> {
                 (
                     GcOperand::data_descriptor_flags(writable, enumerable, configurable),
                     GcOperand::reference(&value, schema),
-                    GcOperand::reference(&stored_getter, schema),
-                    GcOperand::reference(&stored_setter, schema),
+                    GcOperand::reference(&getter, schema),
+                    GcOperand::reference(&setter, schema),
                 ),
                 function,
             ),
@@ -360,8 +367,6 @@ impl FunctionBuilder<'_> {
         );
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        stored_setter.clear(function);
-        stored_getter.clear(function);
         schema.release_i32_local(flags, function);
         schema.release_i32_local(requested_accessor, function);
         schema.release_i32_local(requested_data, function);
@@ -448,7 +453,10 @@ impl FunctionBuilder<'_> {
             configurable: Presence::Present(DescriptorFlag::BooleanPayload(configurable)),
             ..DescriptorObjectFields::empty()
         };
-        self.emit_define_property_or_throw(target, key, &fields, result, function)
+        let incoming = fields
+            .validate()
+            .expect("compiler-created definitions contain only data or accessor fields");
+        self.emit_define_property_or_throw(target, key, &incoming, result, function)
     }
     pub(crate) fn emit_object_define_data_with_configurable(
         &mut self,
@@ -482,18 +490,6 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(enumerable_flag, function);
         schema.release_i32_local(writable_flag, function);
         Ok(())
-    }
-    pub(crate) fn emit_object_define_data(
-        &mut self,
-        target: &ValueLocals,
-        key: &PropertyKeyLocals,
-        value: &ValueLocals,
-        result: &CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_object_define_data_with_configurable(
-            target, key, value, true, false, true, result, function,
-        )
     }
     pub(crate) fn emit_object_define_enumerable_data(
         &mut self,
@@ -532,7 +528,10 @@ impl FunctionBuilder<'_> {
             configurable: Presence::Present(DescriptorFlag::Known(true)),
             ..DescriptorObjectFields::empty()
         };
-        self.emit_define_own_property_from_fields(target, key, &fields, result, function)
+        let incoming = fields
+            .validate()
+            .expect("CreateDataProperty contains only normalized data fields");
+        self.emit_define_own_property_from_descriptor(target, key, &incoming, result, function)
     }
     pub(crate) fn emit_object_define_accessor_with_flag_local(
         &mut self,
@@ -552,17 +551,20 @@ impl FunctionBuilder<'_> {
             configurable: Presence::Present(DescriptorFlag::BooleanPayload(configurable)),
             ..DescriptorObjectFields::empty()
         };
-        self.emit_define_property_or_throw(target, key, &fields, result, function)
+        let incoming = fields
+            .validate()
+            .expect("compiler-created definitions contain only data or accessor fields");
+        self.emit_define_property_or_throw(target, key, &incoming, result, function)
     }
     fn emit_define_property_or_throw(
         &mut self,
         target: &ValueLocals,
         key: &PropertyKeyLocals,
-        fields: &DescriptorObjectFields<'_>,
+        incoming: &WasmDescriptor<'_>,
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_define_own_property_from_fields(target, key, fields, result, function)?;
+        self.emit_define_own_property_from_descriptor(target, key, incoming, result, function)?;
         result.kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
         function.instruction(&Instruction::I32Eq);
@@ -740,10 +742,10 @@ impl FunctionBuilder<'_> {
         )?;
         self.compile_nullish_tagged_i32(method.tag(), function)?;
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_define_own_property_from_fields(
+        self.emit_define_own_property_from_descriptor(
             slots.target(),
             key,
-            incoming.as_partial(),
+            incoming,
             result,
             function,
         )?;

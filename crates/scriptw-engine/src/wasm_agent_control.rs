@@ -1,4 +1,4 @@
-//! One parent execution budget for native agent waits and worker epochs.
+//! One parent execution budget for native agent waits and worker deadlines.
 
 use super::{EngineError, EngineExecutionFailure};
 use std::sync::{mpsc, Condvar, Mutex, OnceLock};

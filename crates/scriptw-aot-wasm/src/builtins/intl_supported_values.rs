@@ -1,7 +1,6 @@
 //! Checked native names become rooted Strings and one fresh called-Realm Array.
 use super::super::*;
 use crate::functions::ArgumentListConstruction;
-use crate::gc_types::*;
 use scriptw_intl::SupportedValuesKey;
 
 impl FunctionBuilder<'_> {

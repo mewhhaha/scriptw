@@ -258,6 +258,10 @@ path = "tests/host_segfault.rs"
 harness = false
 
 [[test]]
+name = "interrupt_handle"
+path = "tests/interrupt_handle.rs"
+
+[[test]]
 name = "pooling_alloc_near_oom"
 path = "tests/pooling_alloc_near_oom.rs"
 harness = false

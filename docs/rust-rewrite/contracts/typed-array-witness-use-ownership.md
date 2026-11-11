@@ -46,14 +46,6 @@ the private-slot roles.
 
 ## Durable guard
 
-`typed_array_witness_use_ownership_structure` performs a recursive
-Rust-lexical census that excludes comments and every Rust string/byte/C-string
-literal form. It pins the private attribute-free declaration, exact four
-variants, all current producer and consumer routes, the sole typed witness
-boundary, and the borrowed-validation-before-owned-result order. A lexical
-probe prevents comments, nested comments, raw identifiers and literals from
-making the census vacuous.
-
 The current inventory contains 54 view-carrier references, 41 constructors,
 two borrowed type boundaries, and 72 witness-use references. The 53 witness
 sites comprise one definition and 52 calls. The four route counts are

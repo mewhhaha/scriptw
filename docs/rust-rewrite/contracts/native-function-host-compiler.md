@@ -98,11 +98,11 @@ message-text classifier changes their origin or turns them into SyntaxError.
 
 The existing execution control is shared by Arc, armed once at the original
 execution-start instant, and checked before and after compiler phases and during
-source traversal. A native callback never arms a new clock, changes Store epoch
-configuration, resets the original deadline, or enlarges Store/resource limits.
+source traversal. A native callback never arms a new clock, requests or cancels
+a Store interrupt, resets the original deadline, or enlarges Store/resource limits.
 The native compile itself uses the existing compilation pool; an elapsed budget
-is reported before proceeding to subsequent phases. Existing epoch interruption
-continues to govern called Wasm.
+is reported before proceeding to subsequent phases. The existing
+[execution deadline](execution-deadlines.md) continues to govern called Wasm.
 
 No module/instance/source cache or unbounded retention vector is added. A native
 Module handle is local to one request; required live instances and code follow

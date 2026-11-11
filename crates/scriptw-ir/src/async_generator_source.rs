@@ -30,10 +30,9 @@ pub(crate) use for_of::{
 };
 pub(crate) use optional::AsyncGeneratorOptionalChainStates;
 pub(crate) use pattern::default_states as async_generator_pattern_default_states;
-pub(crate) use pattern::{
-    AsyncGeneratorArrayPatternSource, AsyncGeneratorArrayPatternSourceStates,
-    AsyncGeneratorPatternSource,
-};
+#[cfg(test)]
+pub(crate) use pattern::AsyncGeneratorArrayPatternSource;
+pub(crate) use pattern::{AsyncGeneratorArrayPatternSourceStates, AsyncGeneratorPatternSource};
 pub(crate) use resource::append_for_protocol as append_resource_scope_for_protocol;
 pub(crate) use resource::{
     AsyncGeneratorResourceRegistrationSource, AsyncGeneratorResourceScopeFinalizationSource,

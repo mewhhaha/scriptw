@@ -1,7 +1,7 @@
 //! Parsed-source executions and the Realm's GetTemplateObject cache.
 use super::*;
 use crate::gc_types::{
-    ArrayObject, FunctionContext, FunctionContextSchema, FunctionObject, GcLocal, GcOperand,
+    ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcOperand,
     GcStackReference, Nullable, OrdinaryObject, OrdinaryObjectSchema, PropertyDescriptor,
     RealmRecord, RealmRecordSchema, StoredValue, TemplateSiteTable, TemplateSource,
     TemplateSourceSchema, ValueLocals,
@@ -18,9 +18,6 @@ pub(crate) struct TemplateSourceExecution {
 }
 
 impl TemplateSourceExecution {
-    pub(crate) fn source(&self) -> TemplateSourceIr {
-        self.source
-    }
     pub(crate) fn capture(
         &self,
         schema: &crate::gc_types::RuntimeSchema,
@@ -221,65 +218,6 @@ impl FunctionBuilder<'_> {
         );
         self.template_source_execution = Some(owner);
         Ok(())
-    }
-
-    pub(crate) fn emit_fresh_template_function_value_payload(
-        &mut self,
-        meta: &WasmFunctionMeta,
-        realm: &GcLocal<RealmRecord>,
-        function: &mut Function,
-    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        let Some(source) = meta.template_source else {
-            return self.emit_source_function_in_realm_with_template_source(
-                meta,
-                realm,
-                crate::functions::FunctionPrototypeMaterialization::Automatic,
-                None,
-                function,
-            );
-        };
-        let owner = self.allocate_template_source(source, realm, function);
-        let value = self.emit_source_function_in_realm_with_template_source(
-            meta,
-            realm,
-            crate::functions::FunctionPrototypeMaterialization::Automatic,
-            Some(&owner),
-            function,
-        )?;
-        owner.clear(function);
-        Ok(value)
-    }
-
-    pub(crate) fn emit_template_function_from_class_context(
-        &mut self,
-        meta: &WasmFunctionMeta,
-        context: &GcLocal<FunctionContext>,
-        function: &mut Function,
-    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        let Some(source) = meta.template_source else {
-            return self.emit_function_value_payload(meta, function);
-        };
-        let schema = self.runtime_schema();
-        let owner = TemplateSourceExecution {
-            source,
-            owner: schema.reserve_gc_local(function).initialize(
-                schema
-                    .struct_type::<FunctionContext>()
-                    .field(FunctionContextSchema::TEMPLATE_SOURCE)
-                    .read(context, schema, function)
-                    .reference()
-                    .require_non_null(function),
-                function,
-            ),
-        };
-        let value = self.emit_function_value_payload_with_template_source(
-            meta,
-            crate::functions::FunctionPrototypeMaterialization::Automatic,
-            Some(&owner),
-            function,
-        )?;
-        owner.clear(function);
-        Ok(value)
     }
 
     pub(crate) fn emit_template_object(

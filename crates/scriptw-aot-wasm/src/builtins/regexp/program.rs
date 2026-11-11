@@ -119,12 +119,6 @@ impl ValidatedRegExpProgramLayoutLocals {
     pub(in crate::builtins) const fn end(&self) -> I64Local {
         self.sections.end
     }
-    pub(in crate::builtins) const fn split_count(&self) -> I64Local {
-        self.sections.split_count
-    }
-    pub(in crate::builtins) const fn repeatable_split_count(&self) -> I64Local {
-        self.sections.repeatable_split_count
-    }
     pub(in crate::builtins) const fn repeat_slot_count(&self) -> I64Local {
         self.sections.repeat_slot_count
     }

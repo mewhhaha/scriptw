@@ -43,7 +43,7 @@ SHARED_CONFIGURATION = dict(native_compilation_mode='size-optimized', register_a
     target='generic', wasm_backtrace_details='disable', wasmtime_version='47.0.0',
     runtime_policy='scriptw-required-wasmtime-experimental-v1', consumer_compiler_enabled=False,
     collector='copying', gc_initial_bytes=16 * 1024**2, worker_stack_bytes=64 * 1024**2,
-    max_wasm_stack_bytes=32 * 1024**2, store_memory_limit_bytes=1024**3, epoch_deadline=2**63 - 1)
+    max_wasm_stack_bytes=32 * 1024**2, store_memory_limit_bytes=1024**3)
 FAILURES = ('source-failed', 'precompile-failed', 'run-failed', 'checksum-mismatch')
 
 

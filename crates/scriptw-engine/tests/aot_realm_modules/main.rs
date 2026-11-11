@@ -27,6 +27,7 @@ mod aot_finite_function_constructor;
 mod aot_finite_indirect_eval;
 mod aot_fresh_script_global_lexicals;
 mod aot_global_error_caller_effects;
+mod aot_has_instance_local_entry_realm;
 mod aot_indirect_eval_admission;
 mod aot_intrinsic_receiver_observation;
 mod aot_json_modules;
@@ -60,3 +61,5 @@ mod aot_suppressed_error_constructor_realm;
 mod aot_text_modules;
 mod aot_throw_type_error_realm;
 mod aot_typed_array_constructor_error_realm;
+
+mod aot_cell_call_fast_paths;

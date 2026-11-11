@@ -12,7 +12,7 @@ failure rules. Compile-time reference algorithms and runtime emission must
 agree for non-finite, negative and large inputs.
 
 Unary plus performs ToNumber; unary minus and complement perform ToNumeric.
-`UnaryNumericKind` keeps Number and BigInt consumers separate, so complement
+Number and BigInt consumers stay separate, so complement
 cannot be encoded as binary XOR with a Number minus one. BigInt unsigned right
 shift remains a TypeError. Coercion and abrupt completion preserve operand
 order and the original thrown value.

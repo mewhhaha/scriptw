@@ -189,8 +189,15 @@ fn synchronous_modules_keep_the_selected_rejection_policy() {
         "async function background() { await 0; throw 'background'; } background(); print('finished');",
     ] {
         let outcome = Engine::new(RealmBuilder::new().build())
-            .observe_module(source, ignore_rejections(), execution()).unwrap();
-        assert!(matches!(outcome.completion, ObservedCompletion::Normal(_)), "{outcome:?}");
-        assert_eq!(outcome.output_events, vec![HostOutputEvent::PrintLine("finished".into())]);
+            .observe_module(source, ignore_rejections(), execution())
+            .unwrap();
+        assert!(
+            matches!(outcome.completion, ObservedCompletion::Normal(_)),
+            "{outcome:?}"
+        );
+        assert_eq!(
+            outcome.output_events,
+            vec![HostOutputEvent::PrintLine("finished".into())]
+        );
     }
 }

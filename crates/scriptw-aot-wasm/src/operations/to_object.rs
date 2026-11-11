@@ -29,28 +29,6 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    pub(crate) fn emit_value_to_function_realm_object_locals(
-        &mut self,
-        callee: &ValueLocals,
-        input: &ValueLocals,
-        result: &CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let current_realm = self.load_current_realm(function);
-        let realm_result = self.emit_get_function_realm(callee, function);
-        let realm = self.emit_route_function_realm_result(
-            realm_result,
-            crate::functions::FunctionRealmRevokedRoute::UseCurrentRealm {
-                realm: &current_realm,
-            },
-            function,
-        )?;
-        self.emit_value_to_object_in_realm_locals(realm.realm(), input, result, function)?;
-        self.release_resolved_function_realm_local(realm, function);
-        current_realm.clear(function);
-        Ok(())
-    }
-
     fn emit_value_to_object_in_realm_locals(
         &mut self,
         realm: &GcLocal<crate::gc_types::RealmRecord>,

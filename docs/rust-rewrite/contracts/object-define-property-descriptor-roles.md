@@ -15,6 +15,23 @@ call Reflect.defineProperty to decode it again. Exotic receivers retain their
 definition protocol, including observable Proxy descriptor objects and partial
 field presence. Refusal remains a Boolean for the original strictness owner.
 
+The same validated internal definition consumer handles CreateDataProperty,
+compiler-created data/accessor definitions and trap-absent Proxy forwarding.
+Concrete ordinary targets enter their canonical definition directly; data and
+runtime-partial definitions also admit Arrays. Known accessors retain Array
+dispatch in the fallback to avoid copying Array code into each source getter or
+setter. Other targets materialize the private descriptor carrier and retain their
+existing dispatch. Array length coercion, live length/writability and indexed publication
+remain owned by ArrayDefineOwnProperty. Forwarded descriptors keep their existing
+validation witness and runtime presence bits; public ToPropertyDescriptor
+conversion remains observable.
+
+Completed merges retain omitted getter/setter fields as their existing immutable
+StoredValue edges. Only a supplied field allocates a replacement; a descriptor
+kind change resets both edges to canonical undefined before applying fields.
+The containing descriptor remains a fresh mutable record. Snapshot independence
+and deferred PropertyValue identity do not depend on copying immutable wrappers.
+
 Object.defineProperties retains these same converted partial descriptors in
 private immutable GC records. Absent fields remain absent; conversion does not
 complete the descriptor or expose a JavaScript carrier. Complete
@@ -23,7 +40,8 @@ The collecting owner is consumed into the completed owner only after all
 observable conversion work. The apply phase accepts and consumes only that
 completed owner, preventing interleaved conversion and target mutation.
 
-The previous scalar TaggedLocals spelling guard is retired. Existing semantic
-controls and new GC Object controls remain required. No compilation or runtime
-verification occurred during this dry rewrite; final acceptance requires the
-complete source pass and the confirmed 4096 MiB aggregate cgroup budget.
+Emission controls inspect Array/ordinary data/accessor branches and the retained
+exotic fallback. Engine regressions cover inherited setters, value identity,
+accessor merging, Proxy presence/order, length conversion/rollback, foreign error
+realms, silent refusal and iterator closing.
+Run them under the verification resource limits in CONTRIBUTING.md.

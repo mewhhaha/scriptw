@@ -187,7 +187,6 @@ fn every_definition_producer_names_getter_and_setter_roles() {
         ),
         ("builtins/string/regexp_legacy.rs", [0, 1, 0, 0, 0]),
         ("functions/arguments_object.rs", [0, 0, 1, 0, 0]),
-        ("functions/throw_type_error.rs", [0, 0, 1, 0, 0]),
         ("intrinsics/binary_data.rs", [5, 0, 0, 0, 0]),
         ("intrinsics/errors.rs", [1, 0, 0, 0, 0]),
         ("intrinsics/intl.rs", [0, 1, 0, 0, 0]),
@@ -206,10 +205,10 @@ fn every_definition_producer_names_getter_and_setter_roles() {
     for (role, count) in [
         ("AccessorGetter::new(", 12),
         ("AccessorSetter::new(", 1),
-        ("AccessorGetterLocals::new(", 5),
-        ("AccessorSetterLocals::new(", 4),
+        ("AccessorGetterLocals::new(", 4),
+        ("AccessorSetterLocals::new(", 3),
         ("AccessorDescriptor::", 12),
-        ("AccessorDescriptorLocals::", 6),
+        ("AccessorDescriptorLocals::", 5),
     ] {
         assert_eq!(producers.matches(role).count(), count, "{role}");
     }

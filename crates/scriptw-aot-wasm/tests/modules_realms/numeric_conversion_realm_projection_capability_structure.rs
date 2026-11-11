@@ -5,10 +5,6 @@ const ERROR_SOURCE: &str = include_str!("../../src/builtins/errors/runtime_error
 const EMIT_SOURCE: &str = include_str!("../../src/emit.rs");
 const HELPERS_SOURCE: &str = include_str!("../../src/runtime_helpers.rs");
 const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/numeric-conversion-realm-projection-capability.md"
-);
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -196,19 +192,5 @@ fn numeric_errors_preserve_kind_and_use_the_execution_realm_error_factory() {
         "fn emit_numeric_conversion_syntax_error(",
     ] {
         assert!(!OPERATIONS_SOURCE.contains(forbidden));
-    }
-}
-
-#[test]
-fn contract_and_t04_record_the_source_equivalent_capability_closure() {
-    for marker in [
-        "one private, non-derived",
-        "helper ABI parameter 6",
-        "does not claim a completion-ABI redesign",
-    ] {
-        assert!(
-            CONTRACT.contains(marker),
-            "missing contract marker `{marker}`"
-        );
     }
 }

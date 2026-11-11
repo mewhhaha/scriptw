@@ -12,7 +12,7 @@ that state is absent from the type.
 
 One exhaustive `descriptor_word` projection delegates the variants to the
 heap-private `DescriptorWord::of_data` and `DescriptorWord::of_accessor`
-constructors, while `descriptor_kind_bits` projects only the stored bits. Both
+constructors. Both
 raw constructors are inaccessible outside `heap.rs`; no alternate
 crate-visible positional boolean route remains. The projection has no wildcard
 or fallback. All fourteen data producers and two accessor producers construct

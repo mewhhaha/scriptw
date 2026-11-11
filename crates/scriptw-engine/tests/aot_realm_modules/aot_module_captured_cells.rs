@@ -1,7 +1,7 @@
 use scriptw_engine::{
-    configure_compilation_jobs, configure_wasm_runtime, CompileOptions, EmbeddedEvaluation,
-    EmbeddedInstance, EmbeddedRuntime, Engine, ExecutionBackend, ForeignValue, HostOutputEvent,
-    JsCompletion, JsValue, ObservedCompletion, RealmBuilder, RunOptions, WasmStoreState,
+    CompileOptions, EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, Engine,
+    ExecutionBackend, ForeignValue, HostOutputEvent, JsCompletion, JsValue, ObservedCompletion,
+    RealmBuilder, RunOptions, WasmStoreState, configure_compilation_jobs, configure_wasm_runtime,
 };
 
 fn assert_output(source: &str, module: bool, expected: &[&str]) {
@@ -211,7 +211,6 @@ fn fresh_instance(
     let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();
     let mut store = wasmtime::Store::new(native, state);
     store.limiter(|state| state.limits_mut());
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = wasmtime::Linker::new(native);
     runtime.register(&mut store, &mut linker).unwrap();
     let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();

@@ -4,9 +4,6 @@ const PROCESS_SOURCE: &str = include_str!("../src/differential/worker_process.rs
 const ROOTED_SOURCE: &str = include_str!("../src/differential/rooted_snapshot.rs");
 const WORKER_CONTROLS: &str = include_str!("differential_worker_execution.rs");
 const HARNESS_SOURCE: &str = include_str!("../src/lib.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/differential-oracle-compile-boundary.md");
-
 const ORACLE_GATE: &str = "#[cfg(any(test,feature=\"spec-exec-oracle\"))]";
 
 fn normalized(source: &str) -> String {
@@ -165,17 +162,4 @@ fn test_only_mutation_and_feature_only_loader_have_explicit_boundaries() {
     assert!(feature_off.contains("Err(DifferentialError::OracleNotLinked)"));
     assert!(!feature_off.contains("runner.run("));
     assert!(!feature_off.contains("Engine::"));
-}
-
-#[test]
-fn boundary_has_frozen_source_evidence() {
-    for evidence in [CONTRACT] {
-        for hash in [
-            "8ed6a8721c8d157ea263418918138258a2e68a26670059923570f814b293b69e",
-            "bcecce80a7145d8c00525efc0bbfe0ec3b3a7110a6b7f8aa1590706231d21a89",
-        ] {
-            assert!(evidence.contains(hash));
-        }
-        assert!(evidence.contains("default product build"));
-    }
 }

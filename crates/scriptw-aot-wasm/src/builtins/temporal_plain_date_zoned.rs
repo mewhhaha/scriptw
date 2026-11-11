@@ -3,7 +3,6 @@ use super::super::*;
 use super::temporal::TemporalTimeZoneStringGoal;
 use super::temporal_options::Disambiguation;
 use super::temporal_zone_provider::TemporalZonedAllocationInput;
-use crate::gc_types::*;
 use crate::intrinsics::temporal::TemporalPrototypeSource;
 impl FunctionBuilder<'_> {
     pub(super) fn emit_temporal_plain_date_to_zoned_date_time(

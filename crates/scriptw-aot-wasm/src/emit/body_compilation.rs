@@ -45,9 +45,11 @@ impl<'a> FunctionBuilder<'a> {
             .expect("native builder owns a planned entry")
             .clone();
         let body = self.compile_builtin()?;
-        Ok(EmittedFunction::from_completed_callable(
-            CompletedCallableBody { entry, body },
-        ))
+        let completed = CompletedCallableBody { entry, body };
+        if completed.entry.local_arguments().is_some() {
+            return Ok(EmittedFunction::from_completed_local_arguments(completed));
+        }
+        Ok(EmittedFunction::from_completed_callable(completed))
     }
 
     pub(super) fn compile(&mut self) -> Result<Function, EmitError> {
@@ -69,6 +71,23 @@ impl<'a> FunctionBuilder<'a> {
             ));
         }
         self.compile_javascript_body(initializer)
+    }
+
+    /// Stores one byte to the private linear memory when this body is source
+    /// code; see `DeadlinePolls`.
+    pub(crate) fn emit_deadline_poll(&self, function: &mut Function) {
+        if self.deadline_polls == DeadlinePolls::Runtime {
+            return;
+        }
+        function.instruction(&Instruction::I32Const(
+            crate::heap::DEADLINE_POLL_ADDRESS as i32,
+        ));
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32Store8(MemArg {
+            offset: 0,
+            align: 0,
+            memory_index: 0,
+        }));
     }
 
     fn compile_javascript_body(
@@ -98,6 +117,12 @@ impl<'a> FunctionBuilder<'a> {
             }
         }
         let mut function = self.take_owned_body();
+        // A module without the runtime has no linear memory, and admits no
+        // loop and no function.
+        if self.uses_heap {
+            self.deadline_polls = DeadlinePolls::Source;
+        }
+        self.emit_deadline_poll(&mut function);
 
         self.push_scope();
         if self.uses_heap {

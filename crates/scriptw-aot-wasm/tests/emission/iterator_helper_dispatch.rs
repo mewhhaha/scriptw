@@ -78,7 +78,7 @@
 //! name-based route of its own.
 
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 
 /// Matches the worker stack the engine and Test262 runner already use.

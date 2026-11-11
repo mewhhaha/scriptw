@@ -9,7 +9,6 @@ use super::super::temporal_zoned_arithmetic::{
     CompletedTemporalStringRoundingLocals,
 };
 use super::*;
-use crate::gc_types::*;
 
 const INSTANT_LIMIT_SECONDS: i64 = 8_640_000_000_000;
 const NS: i64 = 1_000_000_000;
@@ -51,19 +50,6 @@ impl FunctionBuilder<'_> {
     ) -> Result<NormalizedTemporalInstantLocals, EmitError> {
         Ok(NormalizedTemporalInstantLocals {
             epoch: self.emit_temporal_epoch_from_value(input, f)?,
-        })
-    }
-
-    /// The input is an internal BigInt value, not an arbitrary JS argument.
-    /// Its representation and Instant range are checked here before a handle
-    /// is minted. Observable ToBigInt remains at each prescribed caller step.
-    pub(in crate::builtins) fn emit_temporal_normalized_instant_from_bigint(
-        &mut self,
-        input: &GcLocal<BigIntValue>,
-        f: &mut Function,
-    ) -> Result<NormalizedTemporalInstantLocals, EmitError> {
-        Ok(NormalizedTemporalInstantLocals {
-            epoch: self.emit_temporal_instant_validated_epoch(input, f)?,
         })
     }
 
@@ -249,9 +235,6 @@ impl TemporalIsoDateLocals {
             builder.runtime_schema().release_i64_local(local, f);
         }
     }
-}
-pub(crate) struct PreparedTemporalCalendarLocals {
-    value: ValueLocals,
 }
 pub(crate) struct TemporalCalendarSlotLocals {
     identifier: GcLocal<StringValue>,
@@ -691,25 +674,6 @@ impl FunctionBuilder<'_> {
             RuntimeErrorMessage::TEMPORAL_ZONEDDATETIME_CALENDAR_MUST_BE_A_STRING,
             f,
         )
-    }
-    pub(in crate::builtins) fn reserve_temporal_calendar_result(
-        &mut self,
-        f: &mut Function,
-    ) -> PreparedTemporalCalendarLocals {
-        let value = self.runtime_schema().reserve_value_local(f);
-        value.set_undefined(f);
-        PreparedTemporalCalendarLocals { value }
-    }
-    pub(in crate::builtins) fn emit_temporal_calendar_slot_from_value_into(
-        &mut self,
-        output: PreparedTemporalCalendarLocals,
-        input: &ValueLocals,
-        f: &mut Function,
-    ) -> Result<TemporalCalendarSlotLocals, EmitError> {
-        output.value.copy_from(input, f);
-        let result = self.emit_temporal_calendar_slot_from_value(&output.value, f)?;
-        output.value.clear(f);
-        Ok(result)
     }
     pub(in crate::builtins) fn emit_temporal_constructor_calendar_slot(
         &mut self,

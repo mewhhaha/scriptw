@@ -98,7 +98,7 @@ const RESUME_CASE_CHECKPOINT_INTERVAL: usize = 10;
 /// entry. Test262 workers persist for many cases, so this avoids a nested
 /// worker spawn for each compile, emit, and execution phase.
 const TEST262_WORKER_STACK_SIZE: usize = 64 * 1024 * 1024;
-// Wasmtime epoch interruption applies the configured timeout only after a
+// The Store's execution deadline applies the configured timeout only after a
 // Wasm-AOT module starts executing. An isolated child still needs a separate
 // finite allowance for parsing, lowering, emission, and cold native compile.
 const WASM_AOT_CHILD_COMPILE_ALLOWANCE_MS: u64 = 300_000;
@@ -5467,8 +5467,8 @@ fn run_one_case_with_execution(
             },
             test_path: Some(case.source_path.display().to_string()),
             can_block: !case.flags.contains("CanBlockIsFalse"),
-            // Epoch interruption bounds execution inside the selected case
-            // worker. The supervisor still owns that child's process deadline;
+            // The Store's execution deadline bounds execution inside the
+            // selected case worker. The supervisor still owns that child's process deadline;
             // neither source metadata nor this engine bound bypasses it.
             timeout_ms: Some(timeout_ms),
         };
@@ -5650,8 +5650,8 @@ fn run_one_case_with_execution(
     })();
 
     let duration_ms = start.elapsed().as_millis();
-    // Wasm-AOT execution has already been bounded by Wasmtime epoch
-    // interruption. The elapsed wall time also includes parsing, lowering,
+    // Wasm-AOT execution has already been bounded by the Store's execution
+    // deadline. The elapsed wall time also includes parsing, lowering,
     // Wasm emission, and native compilation, so applying the execution limit
     // to it would turn a successful cold compile into a false runtime timeout
     // and prevent the compiled module from reaching the cache.

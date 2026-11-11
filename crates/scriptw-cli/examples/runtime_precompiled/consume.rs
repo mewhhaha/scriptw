@@ -174,9 +174,6 @@ fn collect_observations<const WINDOWS: bool>(
             .map_err(|e| e.to_string())?;
         let mut store = wasmtime::Store::new(engine, state);
         store.limiter(|state| state.limits_mut());
-        // The outer driver enforces a process deadline. This example retains
-        // the required epoch checks and leaves epoch ticking to its owner.
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker = wasmtime::Linker::new(engine);
         let state_linker_ns = started.elapsed().as_nanos();
         let started = Instant::now();

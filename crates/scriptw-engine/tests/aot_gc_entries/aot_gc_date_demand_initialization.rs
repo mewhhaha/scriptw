@@ -363,7 +363,6 @@ export function localTime(){return savedDate.getHours()===1 && savedDate.getTime
         let state = runtime.new_state(realm(&reads), ()).unwrap();
         let mut store = wasmtime::Store::new(&engine, state);
         store.limiter(|state| state.limits_mut());
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker = wasmtime::Linker::new(&engine);
         runtime.register(&mut store, &mut linker).unwrap();
 

@@ -1,7 +1,9 @@
 use super::*;
 use crate::gc_types::{PropertyKeyTable, StringValue};
 
+mod compact;
 mod enumeration;
+mod initial_keys;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn compile_for_in(

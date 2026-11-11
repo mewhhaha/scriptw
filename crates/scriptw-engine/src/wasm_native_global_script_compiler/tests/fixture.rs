@@ -33,7 +33,6 @@ pub(super) fn store() -> WasmtimeStore<WasmHostState> {
         },
     );
     store.limiter(|s| &mut s.limits);
-    store.set_epoch_deadline(u64::MAX / 2);
     store
 }
 fn reference(ty: StructType, nullable: bool) -> ValType {

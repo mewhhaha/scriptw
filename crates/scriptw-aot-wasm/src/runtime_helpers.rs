@@ -1280,7 +1280,6 @@ runtime_helper_domain! {
     TemporalCalendarBalanceYearMonth / TemporalCalendarBalanceYearMonthArguments / TemporalCalendarBalanceYearMonthParameters / "temporal_calendar_balance_year_month" { calendar:I64,year:I64,month:I64 } => CalendarYearMonth;
     TemporalCalendarDifferenceDate / TemporalCalendarDifferenceDateArguments / TemporalCalendarDifferenceDateParameters / "temporal_calendar_difference_date" { calendar:I64,left_year:I64,left_month:I64,left_day:I64,right_year:I64,right_month:I64,right_day:I64,largest:I64 } => CalendarDifference;
     IndexedElementRead / IndexedElementReadArguments / IndexedElementReadParameters / "indexed_element_read" { target:Value,index:I64,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
-    IndexedElementWrite / IndexedElementWriteArguments / IndexedElementWriteParameters / "indexed_element_write" { target:Value,index:I64,key:Key,value:Value,strict:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ValueToPrimitiveDefault / ValueToPrimitiveDefaultArguments / ValueToPrimitiveDefaultParameters / "value_to_primitive_default" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ValueToPrimitiveNumber / ValueToPrimitiveNumberArguments / ValueToPrimitiveNumberParameters / "value_to_primitive_number" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ValueToPrimitiveString / ValueToPrimitiveStringArguments / ValueToPrimitiveStringParameters / "value_to_primitive_string" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1473,7 +1472,6 @@ impl RuntimeHelperId {
             Self::TemporalCalendarBalanceYearMonth => HelperOwner::Runtime,
             Self::TemporalCalendarDifferenceDate => HelperOwner::Runtime,
             Self::IndexedElementRead => HelperOwner::Runtime,
-            Self::IndexedElementWrite => HelperOwner::Runtime,
             Self::ValueToPrimitiveDefault => HelperOwner::Runtime,
             Self::ValueToPrimitiveNumber => HelperOwner::Runtime,
             Self::ValueToPrimitiveString => HelperOwner::Runtime,
@@ -1642,7 +1640,6 @@ impl RuntimeHelperId {
             Self::TemporalCalendarBalanceYearMonth => true,
             Self::TemporalCalendarDifferenceDate => true,
             Self::IndexedElementRead => true,
-            Self::IndexedElementWrite => true,
             Self::ValueToPrimitiveDefault => true,
             Self::ValueToPrimitiveNumber => true,
             Self::ValueToPrimitiveString => true,

@@ -8050,10 +8050,6 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    fn static_string_typed_expr(value: String) -> TypedExpr {
-        TypedExpr::from_info(Self::string_value_info(&value), ExprIr::String(value))
-    }
-
     fn lower_call_args(
         &mut self,
         function_id: &FunctionId,
@@ -13120,23 +13116,6 @@ impl<'a> ScriptLowerer<'a> {
         self.combine_relational(relational, lhs, rhs)
     }
 
-    fn heap_shape_has_prototype(shape: &HeapShape, target: &HeapShape) -> bool {
-        let mut current = match shape {
-            HeapShape::Object(object) => object.prototype.as_deref(),
-            HeapShape::Array(array) => array.prototype.as_deref(),
-        };
-        while let Some(shape) = current {
-            if shape == target {
-                return true;
-            }
-            current = match shape {
-                HeapShape::Object(object) => object.prototype.as_deref(),
-                HeapShape::Array(array) => array.prototype.as_deref(),
-            };
-        }
-        false
-    }
-
     fn lower_logical(
         &mut self,
         logical: LogicalOp,
@@ -13409,8 +13388,8 @@ impl<'a> ScriptLowerer<'a> {
     ///    `GlobalWrite` replaced.
     ///
     /// Testing a fold's precondition by **spelling alone** has already shipped
-    /// wrong answers here three times: the two recorded on
-    /// `identifier_is_builtin_native_error`, and a third at the
+    /// wrong answers here three times: twice in the since-removed builtin
+    /// NativeError identifier test, and a third time at the
     /// `Number.prototype.toPrecision` fold, where the new 21.1.3.5 step 5
     /// RangeError arm turned `function f(){ let Infinity = 5; return
     /// (1.5).toPrecision(Infinity); }` from a correct runtime answer into an
@@ -13445,30 +13424,6 @@ impl<'a> ScriptLowerer<'a> {
         };
         self.identifier_resolves_to_intrinsic_global(name)
             .then_some(value)
-    }
-
-    /// The native-error intrinsic `name` denotes, **if** the identifier really
-    /// resolves to the builtin.
-    ///
-    /// `NativeErrorKind::from_str(name).is_some()` tests the *spelling* of an
-    /// identifier and nothing else, but 9.1.1 resolves a name against the
-    /// environment before the global object, so a parameter named `TypeError`
-    /// shadows it. Two constant-folds keyed off the bare spelling and gave
-    /// silent wrong answers:
-    ///
-    /// - `function f(TypeError) { for (const k in TypeError) return k; } f({a:1})`
-    ///   elided the loop and answered `undefined` instead of `"a"`;
-    /// - `function g(RangeError) { return RangeError.propertyIsEnumerable("prototype"); }`
-    ///   folded to `false` whatever the argument was.
-    ///
-    /// Neither was introduced by the `NativeErrorKind` retrofit — the nine-arm
-    /// `matches!` it replaced was equally unguarded — but the retrofit is where
-    /// the asymmetry with `expression_is_builtin_symbol_intrinsic` above became
-    /// visible, and the guard is the same four clauses.
-    fn identifier_is_builtin_native_error(&self, name: &str) -> Option<NativeErrorKind> {
-        let kind = NativeErrorKind::from_str(name)?;
-        self.identifier_resolves_to_intrinsic_global(name)
-            .then_some(kind)
     }
 
     fn has_regexp_prototype_shape(target: &TypedExpr) -> bool {
@@ -13864,21 +13819,6 @@ impl<'a> ScriptLowerer<'a> {
         key: &str,
     ) -> Option<ObjectShapeProperty> {
         self.read_current_object_shape_property(target, key)
-    }
-
-    fn read_well_known_symbol_shape_property(
-        shape: Option<&HeapShape>,
-        symbol: WellKnownSymbol,
-    ) -> Option<ObjectShapeProperty> {
-        let shape = shape?;
-        let (properties, prototype) = match shape {
-            HeapShape::Object(shape) => (&shape.properties, shape.prototype.as_deref()),
-            HeapShape::Array(shape) => (&shape.properties, shape.prototype.as_deref()),
-        };
-        properties
-            .get(&shape_namespace_key(symbol))
-            .cloned()
-            .or_else(|| Self::read_well_known_symbol_shape_property(prototype, symbol))
     }
 
     fn read_well_known_symbol_shape(

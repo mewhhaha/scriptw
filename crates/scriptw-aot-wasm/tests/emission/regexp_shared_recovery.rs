@@ -1,5 +1,5 @@
 //! Inspect real R instructions: failure routes converge without cloning restoration.
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use std::collections::BTreeMap;
 use wasmparser::{Operator, Parser, Payload, TypeRef, Validator, WasmFeatures};
@@ -15,11 +15,16 @@ enum FrameKind {
 
 fn snapshot_load(ops: &[Operator<'_>], start: usize) -> Option<(u32, u64, u32)> {
     match ops.get(start..start + 4)? {
-        [Operator::LocalGet {
-            local_index: address,
-        }, Operator::I32WrapI64, Operator::I64Load { memarg }, Operator::LocalSet {
-            local_index: destination,
-        }] if memarg.memory == 0 && memarg.align == 0 => {
+        [
+            Operator::LocalGet {
+                local_index: address,
+            },
+            Operator::I32WrapI64,
+            Operator::I64Load { memarg },
+            Operator::LocalSet {
+                local_index: destination,
+            },
+        ] if memarg.memory == 0 && memarg.align == 0 => {
             Some((*address, memarg.offset, *destination))
         }
         _ => None,

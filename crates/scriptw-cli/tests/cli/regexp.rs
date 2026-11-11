@@ -855,7 +855,7 @@ fn run_wasm_backend_succeeds_for_regexp_runtime_pattern_valid_fixture() {
 /// This is the CLI-level form of the one Bug-outcome failure in the batch-7
 /// sweep, `annexB/built-ins/RegExp/prototype/compile/
 /// duplicate-named-capturing-groups-syntax.js`, and it covers three of the seven
-/// call sites of `emit_runtime_regexp_program_slots` — the constructor,
+/// entry points that compile a runtime pattern — the constructor,
 /// `compile`, and a `String.prototype` entry point.
 #[test]
 fn run_wasm_backend_succeeds_for_regexp_runtime_pattern_invalid_fixture() {

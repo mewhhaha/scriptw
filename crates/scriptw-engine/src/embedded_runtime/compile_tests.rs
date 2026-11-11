@@ -55,7 +55,6 @@ fn execute(native: &[u8], value: i32) {
     // from answer_wasm, directly or through Wasmtime's own compilation cache.
     let module = unsafe { Module::deserialize(&execution, native) }.unwrap();
     let mut store = wasmtime::Store::new(&execution, ());
-    store.set_epoch_deadline(1);
     let instance = wasmtime::Instance::new(&mut store, &module, &[]).unwrap();
     assert_eq!(
         instance

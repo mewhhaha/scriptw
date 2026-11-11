@@ -1,6 +1,6 @@
 use super::*;
 use crate::gc_types::{
-    CompletionLocals, GcLocal, GcOperand, I32Local, NonNullable, Nullable, ScalarValue,
+    GcLocal, GcOperand, I32Local, NonNullable, Nullable, ScalarValue,
     StringValue, ValueLocals,
 };
 use crate::operations::PropertyKeyLocals;

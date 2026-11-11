@@ -3453,8 +3453,9 @@ fn parse_test262_args(args: &[String]) -> Result<ParsedTest262Args, String> {
     };
 
     // Every product attempt, including a compile-only negative, runs in the
-    // current executable's exact single-case worker entry. Epoch interruption
-    // remains the inner execution timer; the supervisor owns the whole attempt.
+    // current executable's exact single-case worker entry. The Store's
+    // execution deadline remains the inner execution timer; the supervisor
+    // owns the whole attempt.
     config.case_runner_bin = Some(
         std::env::current_exe()
             .map_err(|error| format!("cannot select the current Test262 case worker: {error}"))?,
@@ -5139,8 +5140,8 @@ mod tests {
         assert_eq!(parsed.run_config.shard_count, 4);
         assert_eq!(parsed.filter.as_deref(), Some("language/expressions"));
         assert_eq!(parsed.config.timeout_ms, 50);
-        // Product default: in-process execution (wasmtime epoch interruption
-        // bounds Wasm-AOT hangs), not the child-process case runner. The
+        // Product default: in-process execution (the Store's execution
+        // deadline bounds Wasm-AOT hangs), not the child-process case runner. The
         // Whole-case execution is supervised through the selected CLI image.
         assert_eq!(
             parsed.config.case_runner_bin.as_ref(),

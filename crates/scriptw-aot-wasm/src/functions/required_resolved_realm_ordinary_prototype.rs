@@ -238,27 +238,6 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    pub(crate) fn emit_required_new_target_realm_ordinary_prototype(
-        &mut self,
-        new_target: &ValueLocals,
-        intrinsic: OrdinaryDefaultPrototype,
-        prototype: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let completion = self.runtime_schema().reserve_completion(function);
-        self.emit_required_function_realm_ordinary_prototype_completion(
-            new_target,
-            intrinsic,
-            &completion,
-            function,
-        )?;
-        self.completion().copy_from(&completion, function);
-        self.emit_propagate_current_throw_if_needed(function);
-        prototype.copy_from(completion.value(), function);
-        completion.clear(function);
-        Ok(())
-    }
-
     pub(super) fn emit_install_resolved_realm_ordinary_prototype(
         &mut self,
         prototype: ResolvedRealmOrdinaryPrototypeLocal,

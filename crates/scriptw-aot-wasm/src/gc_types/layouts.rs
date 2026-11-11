@@ -648,15 +648,21 @@ macro_rules! gc_layout_registry {
             pub(crate) fn javascript_tag(self) -> Option<crate::WasmRuntimeValueTag> {
                 match self { $(Self::$owner => gc_layout_registry!(@value_tag $kind $owner; $($field:$value,$mutability,$nullability;)*)),+ }
             }
+            /// Open layouts are the declared sums. Their schemas have no
+            /// allocating constructor, so every instance has a sealed layout.
+            const fn is_final(self) -> bool {
+                !matches!(self, Self::ObjectPropertyStorage | Self::CompactDataStorage | Self::PropertyValue | Self::JavaScriptObject)
+            }
+            const fn parent(self) -> Option<Self> {
+                match self { $(Self::$owner => gc_layout_registry!(@parent $($parent)?)),+ }
+            }
             pub(super) fn definition(self, layouts: &GcLayoutRegistry) -> SubType {
                 let inner = match self {
                     $(Self::$owner => gc_layout_registry!(@definition $kind $owner
                         layouts; $($field: $value, $mutability, $nullability;)*)),+
                 };
-                let is_final = !matches!(self, Self::ObjectPropertyStorage | Self::CompactDataStorage | Self::PropertyValue | Self::JavaScriptObject);
-                let supertype_idx = match self {
-                    $(Self::$owner => gc_layout_registry!(@parent layouts; $($parent)?)),+
-                };
+                let is_final = self.is_final();
+                let supertype_idx = self.parent().map(|parent| layouts.layout_index(parent));
                 SubType { is_final, supertype_idx,
                     composite_type: CompositeType { inner, shared: false,
                         descriptor: None, describes: None } }
@@ -674,8 +680,8 @@ macro_rules! gc_layout_registry {
             gc_layout_registry!(@object_subtype_proof $kind $owner; $($field:$value,$mutability,$nullability;)*);
         )+
     };
-    (@parent $layouts:ident;) => { None };
-    (@parent $layouts:ident; $parent:ident) => { Some($layouts.index::<$parent>().raw()) };
+    (@parent) => { None };
+    (@parent $parent:ident) => { Some(GcLayout::$parent) };
     (@subtype $owner:ident;) => {};
     (@subtype $owner:ident; $parent:ident) => {
         impl sealed::Subtype<$parent> for $owner {}
@@ -980,6 +986,8 @@ gc_layout_registry! {
         struct CompactDataShape => CompactDataShapeSchema {
             KEYS: GcRef<CompactShapeKeys>, Immutable, NonNullable;
             ATTRIBUTES: crate::heap::DescriptorWord, Immutable, NonNullable;
+            // No canonical Array-index key: physical insertion order is OwnKeys order.
+            OWN_KEYS_ORDERED: bool, Immutable, NonNullable;
         }
         array CompactShapeTable => CompactShapeTableSchema { ELEMENT: GcRef<CompactDataShape>, Mutable, Nullable; }
         array CompactShapePageTable => CompactShapePageTableSchema { ELEMENT: GcRef<CompactShapeTable>, Mutable, Nullable; }
@@ -1422,13 +1430,19 @@ gc_layout_registry! {
             VIEW: GcRef<BufferView>, Immutable, NonNullable;
             ELEMENT_KIND: crate::module::TypedArrayElementKind, Immutable, NonNullable;
         }
-        // Private ForIn cursor. Null current denotes completion; absent keys
-        // means this prototype level has not observed OwnPropertyKeys yet.
+        // Private ForIn cursor. Null current denotes completion. Captured compact
+        // storage owns an immutable key snapshot; otherwise absent keys means
+        // this prototype level has not observed OwnPropertyKeys yet. A nonnull
+        // visited Set permanently commits the cursor to generic enumeration.
+        // Before that, a <=64-entry initial snapshot records descriptor-found
+        // String keys in PREFIX_FOUND_BITS, including nonenumerables.
         struct ForInEnumerationRecord => ForInEnumerationRecordSchema {
             CURRENT: GcRef<StoredValue>, Mutable, NonNullable;
             REMAINING_KEYS: GcRef<PropertyKeyTable>, Mutable, Nullable;
             NEXT_KEY: I32Value, Mutable, NonNullable;
-            VISITED_SET: GcRef<SetObject>, Immutable, NonNullable;
+            VISITED_SET: GcRef<SetObject>, Mutable, Nullable;
+            COMPACT_STORAGE: GcRef<CompactDataStorage>, Mutable, Nullable;
+            PREFIX_FOUND_BITS: I64Value, Mutable, NonNullable;
         }
         struct IteratorRecord => IteratorRecordSchema {
             ITERATOR: GcRef<StoredValue>, Immutable, NonNullable;
@@ -2394,6 +2408,37 @@ gc_layout_registry! {
         // Unlike construction-only mutable metadata bytes, this data crosses
         // the typed host boundary and is physically immutable in Wasm.
         array NativeSourcePayloadArray => NativeSourcePayloadArraySchema { ELEMENT: I8Value, Immutable, NonNullable; }
+}
+
+impl GcLayout {
+    /// The sealed layouts below an open layout; empty for a sealed layout.
+    ///
+    /// Open layouts are never allocated, so a reference has an open layout
+    /// exactly when it has one of these. Wasmtime answers a test against a
+    /// sealed type with one inline header comparison, but calls the host
+    /// subtype query for every reference whose type is not the tested type
+    /// itself, which for an open layout is every reference.
+    pub(super) fn sealed_descendants(self) -> Vec<Self> {
+        if self.is_final() {
+            return Vec::new();
+        }
+        Self::ALL
+            .iter()
+            .copied()
+            .filter(|layout| layout.is_final() && layout.descends_from(self))
+            .collect()
+    }
+
+    fn descends_from(self, ancestor: Self) -> bool {
+        let mut current = self.parent();
+        while let Some(layout) = current {
+            if layout == ancestor {
+                return true;
+            }
+            current = layout.parent();
+        }
+        false
+    }
 }
 
 /// Indices are assigned before encoding the one mutually recursive graph.

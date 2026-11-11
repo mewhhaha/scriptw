@@ -372,11 +372,63 @@ impl ArrayRef {
         len: u32,
         asyncness: Asyncness,
     ) -> Result<Rooted<ArrayRef>> {
+        // A packed byte array holds no references and repeats one byte, so its
+        // body is filled at once rather than through `len` checked `Val`s.
+        if let (true, Val::I32(value)) = (allocator.ty.element_type().is_i8(), elem) {
+            let byte = *value as u8;
+            return store
+                .retry_after_gc_async(limiter, (), asyncness, |store, ()| {
+                    Self::new_filled_i8(store, allocator, byte, len)
+                })
+                .await;
+        }
         store
             .retry_after_gc_async(limiter, (), asyncness, |store, ()| {
                 Self::new_from_iter(store, allocator, RepeatN(elem, len))
             })
             .await
+    }
+
+    /// Allocate a new `i8` array with every element set to `byte`.
+    ///
+    /// Does not attempt a GC on OOM; leaves that to callers.
+    fn new_filled_i8(
+        store: &mut StoreOpaque,
+        allocator: &ArrayRefPre,
+        byte: u8,
+        len: u32,
+    ) -> Result<Rooted<ArrayRef>> {
+        assert_eq!(
+            store.id(),
+            allocator.store_id,
+            "attempted to use a `ArrayRefPre` with the wrong store"
+        );
+
+        let layout = allocator.layout();
+        let arrayref = store
+            .require_gc_store_mut()?
+            .alloc_uninit_array(allocator.type_index(), len, layout)
+            .context("unrecoverable error when allocating new `arrayref`")?
+            .map_err(|n| GcHeapOutOfMemory::new((), n))?;
+
+        let mut store = AutoAssertNoGc::new(store);
+        let filled = store
+            .require_gc_store_mut()?
+            .gc_object_data(arrayref.as_gc_ref())
+            .and_then(|data| data.slice_mut(layout.base_size, len))
+            .map(|body| body.fill(byte));
+
+        // If the fill failed then the array is not fully initialized, so we
+        // must eagerly deallocate it before the next GC.
+        match filled {
+            Ok(()) => Ok(Rooted::new(&mut store, arrayref.into())),
+            Err(e) => {
+                store
+                    .require_gc_store_mut()?
+                    .dealloc_uninit_array(arrayref)?;
+                Err(e)
+            }
+        }
     }
 
     /// Allocate a new array of the given elements.

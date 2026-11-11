@@ -63,7 +63,7 @@ fn canonical_router_prefers_a_typed_active_target_and_returns_only_without_one()
     let route = section(
         CONTROL_FLOW_SOURCE,
         "pub(crate) fn emit_propagate_current_throw(",
-        "pub(crate) fn emit_break_current_completion_if_throw(",
+        "pub(crate) fn emit_resume_after_finally(",
     );
 
     let resolve = route

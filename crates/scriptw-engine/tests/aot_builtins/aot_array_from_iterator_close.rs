@@ -150,7 +150,9 @@ function arrayLikeFailureTrace(stage) {
 fn proxy_property_definition_throw_closes_once_before_outer_catch_and_finally() {
     assert_array_from_trace(
         "failureTrace('define', 'normal');",
-        &["define/normal:get:iterator,construct:0,iterator,next,done,value,define:0:7:true:true:true,get:return,return:true,caught:true,finally"],
+        &[
+            "define/normal:get:iterator,construct:0,iterator,next,done,value,define:0:7:true:true:true,get:return,return:true,caught:true,finally",
+        ],
     );
 }
 
@@ -263,6 +265,8 @@ if (result[0] !== 11 || result[1] !== 12 || result.length !== 2)
   throw new Error('successful target values');
 print(trace.join(','));
 "#,
-        &["get:iterator,construct:0,iterator,next:0,map:1:0,define:0:11,next:1,map:2:1,define:1:12,next:2,set:length:2"],
+        &[
+            "get:iterator,construct:0,iterator,next:0,map:1:0,define:0:11,next:1,map:2:1,define:1:12,next:2,set:length:2",
+        ],
     );
 }

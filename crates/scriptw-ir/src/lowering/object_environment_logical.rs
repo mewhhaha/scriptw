@@ -21,46 +21,6 @@ impl LocatedIdentifierLogicalAssignment {
         )
     }
 
-    pub(super) fn into_declarative_read(
-        self,
-    ) -> Result<(TypedExpr, LocatedIdentifierReference), TypedExpr> {
-        let located = self.reject_definite_tdz()?;
-        match located.reference {
-            reference @ LocatedIdentifierReference::Declarative {
-                resolution: BindingResolution::Initialized(_),
-                ..
-            } => {
-                let LocatedIdentifierReference::Declarative {
-                    resolution: BindingResolution::Initialized(binding),
-                    ..
-                } = &reference
-                else {
-                    unreachable!("checked initialized reference")
-                };
-                let info = ValueInfo {
-                    kind: binding.kind,
-                    possible_kinds: binding.possible_kinds,
-                    heap_shape: binding.heap_shape.clone(),
-                    function_targets: binding.function_targets.clone(),
-                };
-                let read =
-                    TypedExpr::from_info(info, ExprIr::Identifier(binding.storage_name.clone()));
-                Ok((read, reference))
-            }
-            LocatedIdentifierReference::Declarative {
-                resolution: BindingResolution::Uninitialized(_),
-                ..
-            } => unreachable!("TDZ read is already abrupt"),
-            LocatedIdentifierReference::Declarative {
-                resolution: BindingResolution::Unresolvable,
-                ..
-            }
-            | LocatedIdentifierReference::Unresolvable => {
-                unreachable!("only the checked declarative source consumes this read")
-            }
-        }
-    }
-
     pub(super) fn reject_definite_tdz(self) -> Result<Self, TypedExpr> {
         let Self {
             reference,

@@ -3,9 +3,6 @@ use std::path::Path;
 
 const ERROR_SOURCE: &str = include_str!("../../src/builtins/errors.rs");
 const STANDARD_SOURCE: &str = include_str!("../../src/builtins/standard.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/error-builtin-dispatch-ownership.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -322,18 +319,4 @@ fn eleven_fixed_error_entries_own_every_raw_authority() {
             .count(),
         1
     );
-}
-
-#[test]
-fn contract_and_t24_record_the_source_equivalent_dispatch_closure() {
-    for marker in [
-        "private, non-derived `ErrorBuiltin`",
-        "nine exact constructor producers",
-        "claim the full Error or NativeErrors",
-    ] {
-        assert!(
-            CONTRACT.contains(marker),
-            "missing contract marker `{marker}`"
-        );
-    }
 }

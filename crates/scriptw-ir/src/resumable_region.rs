@@ -141,6 +141,7 @@ impl ResumableRegionIr {
             }
         }
     }
+    #[cfg(test)]
     pub(crate) fn as_mixed(&self) -> Option<&AsyncGeneratorLoopRegionIr> {
         match &self.0 {
             RegionOwner::AsyncGenerator(region)

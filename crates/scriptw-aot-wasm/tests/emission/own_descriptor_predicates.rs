@@ -1,14 +1,14 @@
 //! Boolean descriptor consumers need no snapshot or fresh argument-tail seed.
 use crate::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{calls, Module},
+    property_read_plans::{Module, calls},
 };
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
-    WasmRuntimeValueTag,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, WasmRuntimeValueTag,
+    emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
-use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
+use scriptw_front::{ParseOptions, parse};
+use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
 use wasmparser::{
     HeapType, Operator, Parser, Payload, TypeRef, UnpackedIndex, ValType, Validator, WasmFeatures,
 };

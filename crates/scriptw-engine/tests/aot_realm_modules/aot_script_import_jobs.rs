@@ -446,14 +446,35 @@ Promise.all(checks).then(() => {
 true;
 "#,
             ),
-            ("host.js", "import './ensure.js'; import source source from '<do not resolve>'; import source from from '<do not resolve>'; globalThis.invalidBody = true;"),
-            ("escaped-host.js", r"import source \u0066rom /* delimiter */ from '<do not resolve>'; globalThis.invalidBody = true;"),
-            ("ensure.js", "import {missing} from './ensure.js'; globalThis.invalidBody = true;"),
+            (
+                "host.js",
+                "import './ensure.js'; import source source from '<do not resolve>'; import source from from '<do not resolve>'; globalThis.invalidBody = true;",
+            ),
+            (
+                "escaped-host.js",
+                r"import source \u0066rom /* delimiter */ from '<do not resolve>'; globalThis.invalidBody = true;",
+            ),
+            (
+                "ensure.js",
+                "import {missing} from './ensure.js'; globalThis.invalidBody = true;",
+            ),
             ("invalid.js", r"import source from fr\u006fm './value.js';"),
-            ("resolved.js", "import source\r\nfrom\u{2028}from './value.js'; globalThis.invalidBody = true;"),
-            ("default.js", "import source from './value.js'; export default source;"),
-            ("escaped-default.js", r"import sour\u0063e from './value.js'; export default source;"),
-            ("mixed-default.js", "import source, {named as value} from './value.js'; export default source + value;"),
+            (
+                "resolved.js",
+                "import source\r\nfrom\u{2028}from './value.js'; globalThis.invalidBody = true;",
+            ),
+            (
+                "default.js",
+                "import source from './value.js'; export default source;",
+            ),
+            (
+                "escaped-default.js",
+                r"import sour\u0063e from './value.js'; export default source;",
+            ),
+            (
+                "mixed-default.js",
+                "import source, {named as value} from './value.js'; export default source + value;",
+            ),
             ("value.js", "export default 42; export const named = 1;"),
         ],
         &["contextual source grammar and error owners"],

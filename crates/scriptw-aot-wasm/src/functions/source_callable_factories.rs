@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::gc_types::{
-    BuiltinClosureCapture, FunctionObject, FunctionObjectSchema, GcLocal, GcOperand,
+    BuiltinClosureCapture, FunctionObject, GcLocal,
     GcStackReference, Nullable, RealmRecord, TemplateSource, ValueLocals,
 };
 
@@ -16,50 +16,6 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<GcStackReference<FunctionObject>, EmitError> {
         self.emit_validated_realm_constructor_record(meta, context, function)
-    }
-
-    pub(crate) fn emit_function_identity_payload(
-        &mut self,
-        id: &FunctionId,
-        function: &mut Function,
-    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        let canonical = StandardBuiltinId::from_function_id(id)
-            .and_then(crate::module::standard_builtin_function_realm_slot)
-            .or_else(|| {
-                HostBuiltinId::from_function_id(id)
-                    .and_then(crate::module::canonical_host_function_realm_slot)
-            })
-            .or_else(|| match DynamicSourceIntrinsic::from_function_id(id) {
-                Some(DynamicSourceIntrinsic::Function(kind)) => Some(match kind {
-                    DynamicFunctionKind::Ordinary => {
-                        NonArrayRealmIntrinsicSlot::FunctionConstructor
-                    }
-                    DynamicFunctionKind::Generator => {
-                        NonArrayRealmIntrinsicSlot::GeneratorFunctionConstructor
-                    }
-                    DynamicFunctionKind::Async => {
-                        NonArrayRealmIntrinsicSlot::AsyncFunctionConstructor
-                    }
-                    DynamicFunctionKind::AsyncGenerator => {
-                        NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionConstructor
-                    }
-                }),
-                Some(DynamicSourceIntrinsic::RealmEvalScript) | None => None,
-            });
-        if let Some(slot) = canonical {
-            let schema = self.runtime_schema();
-            let realm = self.load_current_realm(function);
-            let value = schema.reserve_value_local(function);
-            self.emit_load_non_array_realm_intrinsic(&realm, slot, &value, function);
-            let callable = value.cast_reference::<FunctionObject>(schema, function);
-            value.clear(function);
-            realm.clear(function);
-            return Ok(callable);
-        }
-        let meta = self.functions.get(id).cloned().ok_or_else(|| {
-            EmitError::unsupported(format!("unknown planned function identity {id}"))
-        })?;
-        self.emit_function_value_payload(&meta, function)
     }
 
     pub(crate) fn emit_function_value_payload(
@@ -92,48 +48,6 @@ impl FunctionBuilder<'_> {
         let realm = self.load_current_realm(function);
         let result = self.emit_source_function_record(meta, &realm, &captured, policy, function)?;
         realm.clear(function);
-        captured.clear(function);
-        Ok(result)
-    }
-
-    pub(crate) fn emit_function_value_payload_with_template_source(
-        &mut self,
-        meta: &WasmFunctionMeta,
-        policy: FunctionPrototypeMaterialization,
-        owner: Option<&crate::emit::TemplateSourceExecution>,
-        function: &mut Function,
-    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        let realm = self.load_current_realm(function);
-        let result = self.emit_source_function_in_realm_with_template_source(
-            meta, &realm, policy, owner, function,
-        )?;
-        realm.clear(function);
-        Ok(result)
-    }
-
-    pub(crate) fn emit_source_function_in_realm_with_template_source(
-        &mut self,
-        meta: &WasmFunctionMeta,
-        realm: &GcLocal<RealmRecord>,
-        policy: FunctionPrototypeMaterialization,
-        owner: Option<&crate::emit::TemplateSourceExecution>,
-        function: &mut Function,
-    ) -> Result<GcStackReference<FunctionObject>, EmitError> {
-        if meta.template_source != owner.map(|owner| owner.source()) {
-            return Err(EmitError::unsupported(
-                "function template source must match its captured source execution",
-            ));
-        }
-        let schema = self.runtime_schema();
-        let captured = match owner {
-            Some(owner) => schema
-                .reserve_gc_local::<TemplateSource, Nullable>(function)
-                .initialize(owner.capture(schema, function).nullable(), function),
-            None => schema
-                .reserve_gc_local::<TemplateSource, Nullable>(function)
-                .initialize_null(schema, function),
-        };
-        let result = self.emit_source_function_record(meta, realm, &captured, policy, function)?;
         captured.clear(function);
         Ok(result)
     }
@@ -282,19 +196,6 @@ impl FunctionBuilder<'_> {
         self.replace_current_realm(&caller_realm, function);
         caller_realm.clear(function);
         Ok(())
-    }
-
-    pub(crate) fn emit_function_handle_construct_with_argv(
-        &mut self,
-        callee: &ValueLocals,
-        new_target: &ValueLocals,
-        arguments: &GcLocal<crate::gc_types::ValueArray>,
-        result: &crate::gc_types::CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_function_or_proxy_construct_with_argv(
-            callee, new_target, arguments, result, function,
-        )
     }
 }
 

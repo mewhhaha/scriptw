@@ -277,7 +277,7 @@ fn literal_allocation_and_static_slot_publication_require_a_compiled_program() {
     let slots = normalize_rust(bounded(
         REGEXP_SOURCE,
         "    pub(crate) fn emit_regexp_program_slots(",
-        "    pub(crate) fn emit_runtime_regexp_program_slots(",
+        "    pub(super) fn compile_regexp_literal_to_value(",
     ))
     .routes;
     assert!(slots.contains("program:&RegExpProgram,"));

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::gc_types::{
-    BindingCell, BindingCellSchema, DirectEvalDerivedBindings, DirectEvalDerivedBindingsSchema,
+    BindingCell, DirectEvalDerivedBindings, DirectEvalDerivedBindingsSchema,
     DirectEvalExecutionContext, DirectEvalExecutionContextSchema, Environment, EnvironmentSchema,
     FunctionContext, FunctionContextSchema, GcLocal, GcOperand, NonNullable, Nullable, StoredValue,
     ValueLocals,

@@ -1,6 +1,5 @@
 //! Object.defineProperty consumes the sole validated descriptor owner.
 use super::*;
-use crate::gc_types::CompletionLocals;
 
 impl FunctionBuilder<'_> {
     pub(in crate::builtins) fn compile_object_define_property_builtin(

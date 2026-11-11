@@ -36,7 +36,6 @@ pub(super) fn observe(
         };
         let mut store = Store::new(engine, state);
         store.limiter(|state| &mut state.limits);
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker: Linker<State> = Linker::new(engine);
         let state_linker_ns = started.elapsed().as_nanos();
         let started = Instant::now();

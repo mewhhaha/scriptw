@@ -35,7 +35,7 @@ fn assert_scalar_execution_modes(source: &str) {
 }
 
 #[test]
-fn scalar_chunks_keep_epoch_deadlines_between_bounded_groups() {
+fn scalar_chunks_keep_deadlines_between_bounded_groups() {
     scriptw_engine::configure_compilation_jobs(1).expect("one compilation worker");
     for directive in ["", "\"use strict\";\n"] {
         for body in [

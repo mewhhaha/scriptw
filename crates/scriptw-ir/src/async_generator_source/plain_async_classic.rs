@@ -173,16 +173,6 @@ impl PlainAsyncClassicLoopSource<'_> {
             suspensions: awaits,
         })
     }
-    pub(crate) fn append(self, cursor: &mut u32, awaits: &mut Vec<(u32, u32)>) -> Option<()> {
-        let plan = self.plan(*cursor)?;
-        awaits.extend(
-            plan.suspensions()
-                .iter()
-                .map(|point| (point.suspend_state, point.resume_state)),
-        );
-        *cursor = plan.exit();
-        Some(())
-    }
     pub(crate) fn append_typed(
         self,
         cursor: &mut u32,

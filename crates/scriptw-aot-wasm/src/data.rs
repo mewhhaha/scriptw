@@ -299,7 +299,7 @@ pub(crate) const RUNTIME_REGEXP_ENTRY_KIND_PROGRAM: u64 = 0;
 /// **load-bearing at run time**. Before it, a pattern this compiler
 /// mis-classified as `InvalidSyntax` merely fell through to the runtime fallback
 /// matcher, which frequently answered it correctly. Now it throws a spurious
-/// SyntaxError at all seven `emit_runtime_regexp_program_slots` call sites.
+/// SyntaxError wherever a runtime pattern is compiled.
 /// `scriptw-ir/src/regexp.rs` has ~20 `invalid_syntax(` construction sites
 /// against ~7 `unsupported(` ones and none of them has been audited against the
 /// grammar, so the premise "`InvalidSyntax` means the spec says invalid" is
@@ -433,11 +433,6 @@ impl PoolBoundary {
 
     pub(crate) const fn static_len(self) -> usize {
         self.static_bytes
-    }
-
-    /// Linear-memory address of the first byte the program owns.
-    pub(crate) fn program_static_address(self) -> u32 {
-        STATIC_DATA_OFFSET + self.static_bytes as u32
     }
 }
 
@@ -2310,8 +2305,8 @@ impl CompilerOwnedPool {
         // and for the `var r = /[ab]/; function go() { r.compile("xy"); }`
         // spelling there is no *other* setter — so before this disjunct the
         // collected literal was written into a set that was never read, the
-        // table was never built, and `emit_runtime_regexp_program_slots`
-        // early-returned on a zero row count.
+        // table was never built, and the runtime slot lookup early-returned
+        // on a zero row count.
         //
         // Keyed off whether the script references those builtins, not off the
         // compiled-builtin set: every heap-backed module compiles all builtins,
@@ -4699,10 +4694,6 @@ impl StringPool {
     /// Segment index of the program's passive static bytes.
     pub(crate) const PROGRAM_STATIC_DATA_SEGMENT: u32 = 1;
 
-    pub(crate) fn program_static_len(&self) -> u32 {
-        (self.bytes.len() - self.compiler_owned.static_bytes) as u32
-    }
-
     pub(crate) fn module_bytes(
         &self,
         module: scriptw_ir::ModuleUnitId,
@@ -4812,17 +4803,6 @@ impl StringPool {
             string.offset
         );
         (((string.offset as u64) << 32) | string.len as u64) as i64
-    }
-
-    pub(crate) fn property_key_symbol_payload(&self, value: &str) -> i64 {
-        self.payload(value) | PROPERTY_KEY_SYMBOL_MARKER as i64
-    }
-
-    pub(crate) fn static_builtin_property_key_payload(&self, value: &str) -> i64 {
-        if value.starts_with("Symbol.") {
-            return self.property_key_symbol_payload(value);
-        }
-        self.payload(value)
     }
 
     pub(crate) const fn runtime_regexp_table(&self) -> Option<RuntimeRegExpProgramTable> {

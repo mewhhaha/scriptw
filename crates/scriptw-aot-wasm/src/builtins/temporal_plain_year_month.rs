@@ -19,7 +19,7 @@ use super::temporal_calendar_arithmetic::{
     CompletedTemporalPartialReferenceLocals, TemporalCalendarDateLocals,
 };
 use super::temporal_plain_date::{
-    TemporalCalendarArithmetic, TemporalCalendarId, TemporalCalendarMonthCode, TemporalEraField,
+    TemporalCalendarId, TemporalCalendarMonthCode,
 };
 use crate::intrinsics::temporal::{TemporalIntrinsicFamily, TemporalPrototypeSource};
 

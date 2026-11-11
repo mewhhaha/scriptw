@@ -383,7 +383,6 @@ mod tests {
             },
         );
         store.limiter(|state| &mut state.limits);
-        store.set_epoch_deadline(u64::MAX / 2);
         store
     }
 

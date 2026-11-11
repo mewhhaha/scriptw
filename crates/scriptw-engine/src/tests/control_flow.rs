@@ -290,7 +290,7 @@ fn wasm_backend_renders_a_heap_bigint_throw_completion() {
 }
 
 #[test]
-fn wasm_backend_wasm_aot_epoch_interruption_bounds_infinite_loop() {
+fn wasm_backend_wasm_aot_deadline_bounds_infinite_loop() {
     // CRITICAL correctness check for the in-process default execution
     // path (see `run_case_entry` in scriptw-test262 and
     // `run_with_wasm_aot_inner` above): a genuinely hanging Wasm-AOT
@@ -301,7 +301,7 @@ fn wasm_backend_wasm_aot_epoch_interruption_bounds_infinite_loop() {
     // Native compilation is intentionally outside the execution timeout
     // and can take several seconds for today's bootstrap-heavy artifact.
     // Prime both artifact and native-module caches so this assertion
-    // measures the epoch-interrupted execution boundary it names.
+    // measures the interrupted execution boundary it names.
     let warmup = engine
         .run_script(
             "while (true) {}",
@@ -329,19 +329,19 @@ fn wasm_backend_wasm_aot_epoch_interruption_bounds_infinite_loop() {
                 ..RunOptions::default()
             },
         )
-        .expect_err("an infinite loop must trap via epoch interruption, not hang");
+        .expect_err("an infinite loop must be interrupted at its deadline, not hang");
     let elapsed = start.elapsed();
     assert!(
         err.message().contains("timeout exceeded"),
         "expected a timeout-classified error, got: {err}"
     );
-    // Epoch ticks are WASM_EPOCH_TICK_MS (100ms) apart, so a 300ms bound
-    // should trip within a few ticks of that -- generous upper bound
-    // here to stay robust under a loaded CI/sandbox scheduler while
-    // still proving this is bounded, not "never returns".
+    // The loop has no call and no heap access of its own, so it is stopped
+    // through the store its source loop makes on every iteration. Generous
+    // upper bound to stay robust under a loaded scheduler while still
+    // proving this is bounded, not "never returns".
     assert!(
         elapsed < std::time::Duration::from_secs(10),
-        "epoch interruption should trap promptly, took {elapsed:?}"
+        "the deadline should interrupt promptly, took {elapsed:?}"
     );
 }
 

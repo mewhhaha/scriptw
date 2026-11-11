@@ -117,6 +117,13 @@ The inherited `%Function.prototype%[@@hasInstance]` function is therefore the
 ordinary handler for functions, while an own user-defined handler remains
 observable for arbitrary objects and functions.
 
+That exact builtin has one canonical native body accepting local arguments,
+with an adapter for its original vector entry. The operator can pass its held
+object value directly after the same lookup and callability checks. Native
+caller opacity, defining Realm, complete abrupt results and Proxy/bound/custom
+fallbacks remain required. The [local entry contract](local-arguments-call-entry.md)
+owns publication and transport; it does not authorize skipping this algorithm.
+
 ## `OrdinaryHasInstance`
 
 Calling the intrinsic with receiver `C` and first argument `O` performs

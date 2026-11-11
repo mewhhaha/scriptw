@@ -1,7 +1,7 @@
 //! AsyncIterator disposal owns complete Get/Call/PromiseResolve completions.
 use super::super::*;
 use crate::emit::AccessorThrowRouting;
-use crate::gc_types::{CompletionLocals, GcLocal, PromiseCapability, ValueLocals};
+use crate::gc_types::{CompletionLocals, GcLocal, PromiseCapability};
 
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_async_iterator_prototype_async_dispose(

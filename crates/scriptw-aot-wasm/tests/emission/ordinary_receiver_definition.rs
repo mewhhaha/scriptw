@@ -1,12 +1,12 @@
 //! Actual ordinary receivers define normalized fields through canonical storage.
 use crate::{
-    property_read_plans::{calls, Module},
+    property_read_plans::{Module, calls},
     scalar_masked_rows::type_group_sizes,
 };
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{HeapType, Operator, RefType, UnpackedIndex, ValType, Validator, WasmFeatures};
 

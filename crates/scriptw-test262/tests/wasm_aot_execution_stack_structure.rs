@@ -2,9 +2,6 @@ use std::fs;
 use std::path::Path;
 
 const OWNER_SOURCE: &str = include_str!("../src/lib.rs");
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-wasm-aot-execution-stack.md");
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -487,16 +484,4 @@ fn execution_stack_and_backend_are_exhaustive_before_owned_engine_routes() {
     assert!(!routing.contains("agent_prelude.expect("));
     assert!(!routing.contains("execution_backend =="));
     assert!(!routing.contains("_ =>"));
-}
-
-#[test]
-fn contract_and_t03_record_the_execution_stack_boundary() {
-    for evidence in [
-        "WasmAotExecutionStack::{DedicatedWorker, PersistentTest262Worker}",
-        "execute_cases_runs_wasm_aot_cases_on_persistent_workers",
-        "wasm_aot_enforces_async_done_output_after_jobs_drain",
-    ] {
-        assert!(CONTRACT.contains(evidence), "contract missing `{evidence}`");
-        assert!(CONTRACT.contains(evidence), "T03 missing `{evidence}`");
-    }
 }

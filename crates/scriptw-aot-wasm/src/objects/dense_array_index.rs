@@ -5,7 +5,7 @@
 //! the old dense graph stays rooted until every replacement node is complete.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexEntrySchema, ArrayIndexKeyConstruction,
+    ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexKeyConstruction,
     ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, IndexedTable,
 };
 

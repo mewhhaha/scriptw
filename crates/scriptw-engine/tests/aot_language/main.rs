@@ -29,10 +29,12 @@ mod aot_control_flow;
 mod aot_declaration_completion;
 mod aot_delete_reference;
 mod aot_dense_switch;
+mod aot_descriptor_edges;
 mod aot_destructuring_var_binding_order;
 mod aot_empty_function;
 mod aot_equality_operand_effects;
 mod aot_exact_context_budget;
+mod aot_execution_deadlines;
 mod aot_for_in_codegen;
 mod aot_for_in_visited_set;
 mod aot_for_of_head_completion;
@@ -98,3 +100,5 @@ mod aot_strict_arguments_projection;
 
 mod aot_captured_call_regions;
 mod aot_numeric_body;
+
+mod aot_compact_for_in;

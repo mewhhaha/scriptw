@@ -22,8 +22,7 @@ and String-to-BigInt conversion retain that shared whitespace authority.
 The structural guard checks the single internal type/reexport, builtin alias,
 private materializing core, named wrappers and complete whitespace domain.
 Compiled semantic and performance evidence belongs to its recorded source:
-see the [bulk-string checkpoint](../v8-baseline.md#second-execution-batch--published-2026-10-22)
-and [current verification inventory](../current-inventory.md).
+see the [current verification inventory](../current-inventory.md).
 
 The predecessor below describes the retired UTF-8 transport and narrower
 file-private policy. It remains historical evidence; current verification uses

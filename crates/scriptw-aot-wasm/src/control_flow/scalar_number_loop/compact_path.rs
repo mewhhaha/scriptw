@@ -866,8 +866,7 @@ impl RowScratch {
         self.inline.replace(
             self.base
                 .load(s, function)
-                .cast_subtype::<CompactDataStorage>(s, function)
-                .cast_subtype::<InlineCompactDataStorage>(s, function)
+                .cast_nested_subtype::<CompactDataStorage, InlineCompactDataStorage>(s, function)
                 .nullable(),
             function,
         );

@@ -87,7 +87,7 @@ impl RuntimeOrdinaryBodyEntry {
 /// Native callbacks are opaque callers. Only actual forwarding intrinsics
 /// are transparent; changing a source binding or a public method cannot grant
 /// another callable that intrinsic's identity.
-fn emit_opaque_native_caller(
+pub(super) fn emit_opaque_native_caller(
     callable: &GcLocal<FunctionObject>,
     schema: &RuntimeSchema,
     function: &mut Function,

@@ -1,5 +1,5 @@
 //! Packed passive images retain every literal's exact code-unit span.
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use std::collections::BTreeSet;
 use wasmparser::{DataKind, Parser, Payload};
 

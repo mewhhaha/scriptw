@@ -4,7 +4,7 @@ use std::{
 };
 
 use scriptw_ir::{
-    private_brand_key, private_data_key, AnnexBFunctionCopyTargetIr, ArithmeticBinaryOp,
+    AnnexBFunctionCopyTargetIr, ArithmeticBinaryOp,
     ArrayDestructuringElementIr, ArrayDestructuringPatternIr, BigIntBitwiseOp, BindingMode,
     BitwiseBinaryOp, BlockIr, CallableToStringRepresentation, CapturedOrdinaryPropertyWriteIr,
     ClassDefinitionIr, ClassElementDefinitionIr, ClassElementExecutionKind, ClassFieldKeyIr,
@@ -20,20 +20,19 @@ use scriptw_ir::{
     OrdinaryPropertyAssignmentIr, OrdinaryPropertyEagerCompoundAssignmentIr,
     OrdinaryPropertyGetCaptureIr, OrdinaryPropertyLogicalAssignmentIr,
     OrdinaryPropertyNumericUpdateIr, OwnedEnvBindingIr, PrivateNameId, PropertyKeyIr,
-    RelationalBinaryOp, ScriptIr, SpecOperationIr, SpreadArgumentIr, StandardBuiltinId,
+    RelationalBinaryOp, ScriptIr, SpecOperationIr, StandardBuiltinId,
     StatementIr, Strictness, SuspendedPropertyReferenceIr, SuspendedPropertyReferenceUse,
-    SwitchCaseIr, SyncDisposableResourcesIr, ToPrimitiveHint, TypedExpr, UnaryBitwiseOp,
+    SwitchCaseIr, ToPrimitiveHint, TypedExpr, UnaryBitwiseOp,
     UpdateReturnMode, ValueInfo, ValueKind, VarDeclaratorIr, WellKnownSymbol, YieldForm,
-    AGGREGATE_ERROR_NAME, ARRAY_BUFFER_NAME, ARRAY_NAME, ATOMICS_NAME, BOOLEAN_NAME,
+    AGGREGATE_ERROR_NAME, ARRAY_BUFFER_NAME, ARRAY_NAME, BOOLEAN_NAME,
     DATA_VIEW_NAME, DATE_NAME, ERROR_NAME, EVAL_ERROR_NAME, FLOAT16_ARRAY_NAME, FLOAT32_ARRAY_NAME,
-    FLOAT64_ARRAY_NAME, FUNCTION_NAME, GLOBAL_THIS_NAME, HOST_PARSE_FLOAT_FUNCTION_ID,
+    FLOAT64_ARRAY_NAME, FUNCTION_NAME, GLOBAL_THIS_NAME,
     INT16_ARRAY_NAME, INT32_ARRAY_NAME, INT8_ARRAY_NAME, INTL_NAMESPACE_CONSTRUCTORS,
     INTL_NAMESPACE_METHODS, IS_CONSTRUCTOR_NAME, JSON_NAME, JS_STRING_SURROGATE_SENTINEL,
-    LEXICAL_ARGUMENTS_NAME, LEXICAL_HOME_OBJECT_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
-    MAP_NAME, MATH_NAME, NUMBER_NAME, OBJECT_NAME, PRINT_NAME, PROMISE_NAME, PROXY_NAME,
+    LEXICAL_ARGUMENTS_NAME, LEXICAL_HOME_OBJECT_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME, MATH_NAME, NUMBER_NAME, OBJECT_NAME, PRINT_NAME,
     RANGE_ERROR_NAME, REFERENCE_ERROR_NAME, REFLECT_NAME, REGEXP_NAME,
-    SCRIPTW_GENERATOR_THROW_SLOT, SET_NAME, SHARED_ARRAY_BUFFER_NAME, STRING_NAME,
-    SUPPRESSED_ERROR_NAME, SYMBOL_NAME, SYNTAX_ERROR_NAME, TEMPORAL_NAMESPACE_CONSTRUCTORS,
+    SCRIPTW_GENERATOR_THROW_SLOT, SHARED_ARRAY_BUFFER_NAME, STRING_NAME,
+    SUPPRESSED_ERROR_NAME, SYNTAX_ERROR_NAME, TEMPORAL_NAMESPACE_CONSTRUCTORS,
     TEMPORAL_NOW_NAME, TEMPORAL_NOW_NAMESPACE_MEMBERS, TEMPORAL_ZONED_DATE_TIME_PROTOTYPE_METHODS,
     TYPE_ERROR_NAME, UINT16_ARRAY_NAME, UINT32_ARRAY_NAME, UINT8_ARRAY_NAME,
     UINT8_CLAMPED_ARRAY_NAME, URI_ERROR_NAME,
@@ -146,7 +145,7 @@ pub use emit::{
 };
 pub(crate) use emit::{
     AccessorThrowRouting, BindingStorage, CompletionKind, ControlFrameKind, ControlTarget,
-    FunctionBuilder, LabelTargets, LoopTargets, PropagateCallThrow, ReturnAbi,
+    FunctionBuilder, LabelTargets, LoopTargets, PropagateCallThrow,
 };
 pub use promise_rejection_policy::PromiseRejectionPolicy;
 // `FunctionBodySize` and `FunctionLocalCount` are part of the public face

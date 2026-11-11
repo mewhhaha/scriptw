@@ -109,7 +109,6 @@ impl RuntimeCompiler {
             },
         );
         store.limiter(|state| &mut state.limits);
-        store.set_epoch_deadline(u64::MAX / 2);
         let mut linker = WasmtimeLinker::new(&wasm_engine);
         for import in module.imports() {
             match import.ty() {

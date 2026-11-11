@@ -109,7 +109,7 @@ fn calendar_factories_perform_only_their_prescribed_operation() {
     let bag_factory = bounded(
         EXACT_SOURCE,
         "    pub(in crate::builtins) fn emit_temporal_calendar_slot_from_value(",
-        "    pub(in crate::builtins) fn reserve_temporal_calendar_result(",
+        "    pub(in crate::builtins) fn emit_temporal_constructor_calendar_slot(",
     );
     let constructor_factory = bounded(
         EXACT_SOURCE,

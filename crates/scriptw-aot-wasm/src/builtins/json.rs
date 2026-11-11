@@ -2,7 +2,6 @@
 use super::super::*;
 use crate::functions::{ArgumentListConstruction, NonArrayRealmIntrinsicSlot};
 use crate::gc_types::*;
-use crate::heap::DescriptorMask;
 use crate::runtime_helpers::{
     HelperParameters, JsonStringifyValueArguments, JsonStringifyValueParameters,
 };

@@ -1,4 +1,4 @@
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use std::collections::BTreeSet;
 use wasmparser::{Validator, WasmFeatures};

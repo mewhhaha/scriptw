@@ -263,16 +263,6 @@ impl ScriptLowerer<'_> {
         }
     }
 
-    /// Whether a fold that computes `%C.prototype%[name]`'s result at compile
-    /// time may still assume the builtin is the method that runs.
-    pub(super) fn intrinsic_method_is_proven(
-        &self,
-        prototype: IntrinsicPrototype,
-        name: &str,
-    ) -> bool {
-        self.intrinsic_method(prototype, name).proven().is_some()
-    }
-
     /// `receiver[name]` for an object receiver: its shape must resolve the
     /// name, through its own prototype chain, to the builtin `prototype`
     /// catalogues, and that prototype must still hold it. The shape alone is a

@@ -1,4 +1,4 @@
-//! The original vector ABI only unpacks arguments and tail-enters one source body.
+//! The vector ABI only unpacks arguments and tail-enters one canonical body.
 use super::*;
 
 pub(super) fn compile(
@@ -6,7 +6,7 @@ pub(super) fn compile(
     schema: &RuntimeSchema,
 ) -> Result<EmittedFunction, EmitError> {
     let entry = source.local_arguments().ok_or_else(|| {
-        EmitError::unsupported("local argument adapter requires its source-bound entry")
+        EmitError::unsupported("local argument adapter requires its owner-bound entry")
     })?;
     let mut function = Function::with_parameters(
         LocalDeclarations::from_types([]),

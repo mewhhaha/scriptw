@@ -4476,23 +4476,6 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_from_wrapper_prototype_shape() -> Box<HeapShape> {
-        let mut properties = BTreeMap::new();
-        properties.insert(
-            "return".to_string(),
-            ObjectShapeProperty::Data(Self::standard_builtin_value_info(
-                StandardBuiltinId::IteratorFromWrapperReturn,
-            )),
-        );
-        Box::new(HeapShape::Object(ObjectShape {
-            provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
-            prototype: Some(Self::iterator_prototype_shape()),
-            properties,
-            private_brands: BTreeSet::new(),
-            boxed_primitive: None,
-        }))
-    }
-
     pub(super) fn iterator_take_helper_shape() -> Box<HeapShape> {
         Box::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,

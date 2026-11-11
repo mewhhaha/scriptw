@@ -5,10 +5,6 @@ const PROMISE_FINALLY_COMPLETION: &str =
     include_str!("../../src/builtins/promise/promise_finally_completion.rs");
 const GENERATOR_REACTION_HELPERS: &str =
     include_str!("../../src/builtins/promise/scheduling_helpers/async_generator_reactions.rs");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/promise-resolve-realm-authority-ownership.md"
-);
-
 fn quoted_literal_end(source: &str, quote_start: usize, quote: u8) -> Option<usize> {
     let bytes = source.as_bytes();
     let mut offset = quote_start + 1;
@@ -346,18 +342,4 @@ fn four_producer_routes_preserve_await_generator_and_finally_ownership() {
             .count(),
         1
     );
-}
-
-#[test]
-fn contract_records_move_only_ownership_without_a_conformance_claim() {
-    for marker in [
-        "implements no cloning, copying, debugging",
-        "equality or default capability",
-        "an E0382 move error",
-        "ten exact authority identifiers",
-        "PromiseResolve Realm-context child",
-        "remain deferred to the shared batch",
-    ] {
-        assert!(CONTRACT.contains(marker), "contract marker `{marker}`");
-    }
 }

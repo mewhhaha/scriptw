@@ -2,9 +2,6 @@ const FUNCTIONS_SOURCE: &str = include_str!("../../src/functions.rs");
 const FUNCTION_ALLOCATION_SOURCE: &str =
     include_str!("../../src/functions/function_object_allocation.rs");
 const BOOTSTRAP_SOURCE: &str = include_str!("../../src/builtins/bootstrap.rs");
-const CONTRACT: &str =
-    include_str!("../../../../docs/rust-rewrite/contracts/function-prototype-materialization.md");
-
 fn normalized(source: &str) -> String {
     source
         .chars()
@@ -51,21 +48,6 @@ pub(crate) enum FunctionPrototypeMaterialization {
             "found `{forbidden}`"
         );
     }
-}
-
-#[test]
-fn contract_and_t09_record_the_exhaustive_source_equivalence() {
-    for marker in [
-        "seven producer sites",
-        "exhaustive two-arm projection",
-        "changes no emitted instruction",
-    ] {
-        assert!(
-            CONTRACT.contains(marker),
-            "missing contract marker `{marker}`"
-        );
-    }
-    assert!(CONTRACT.contains("FunctionPrototypeMaterialization::{Automatic, BootstrapSupplied}"));
 }
 
 #[test]

@@ -1,9 +1,9 @@
 //! Closed masked row loops reuse scalar storage and retain the generic continuation.
 use crate::{linked_bodies::module_bodies, property_read_plans::Module};
 use scriptw_aot_wasm::{
-    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
 };
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{HeapType, Operator, Parser, Payload, UnpackedIndex, Validator, WasmFeatures};
 

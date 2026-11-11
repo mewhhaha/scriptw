@@ -32,24 +32,6 @@ impl FindViaPredicateKind {
         }
     }
 
-    const fn array_method_name(&self) -> &'static str {
-        match self {
-            Self::Find => "Array.prototype.find",
-            Self::FindIndex => "Array.prototype.findIndex",
-            Self::FindLast => "Array.prototype.findLast",
-            Self::FindLastIndex => "Array.prototype.findLastIndex",
-        }
-    }
-
-    const fn typed_array_method_name(&self) -> &'static str {
-        match self {
-            Self::Find => "TypedArray.prototype.find",
-            Self::FindIndex => "TypedArray.prototype.findIndex",
-            Self::FindLast => "TypedArray.prototype.findLast",
-            Self::FindLastIndex => "TypedArray.prototype.findLastIndex",
-        }
-    }
-
     const fn array_predicate_not_callable_message(&self) -> RuntimeErrorMessage {
         match self {
             Self::Find => RuntimeErrorMessage::ARRAY_PROTOTYPE_FIND_PREDICATE_IS_NOT_CALLABLE,

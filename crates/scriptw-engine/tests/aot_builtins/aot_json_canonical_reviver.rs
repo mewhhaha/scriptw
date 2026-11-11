@@ -304,7 +304,9 @@ fn sequential_array_metadata_and_repeated_object_keys_keep_original_source_spell
 #[test]
 fn noncallable_reviver_proxies_are_ignored_without_any_observable_lookup() {
     assert_trace(
-        include_str!("../fixtures/json_canonical_reviver/noncallable_reviver_does_not_observe_proxy_traps.js"),
+        include_str!(
+            "../fixtures/json_canonical_reviver/noncallable_reviver_does_not_observe_proxy_traps.js"
+        ),
         &["coerce:string", "3:1:null:true:0"],
     );
 }
@@ -312,7 +314,9 @@ fn noncallable_reviver_proxies_are_ignored_without_any_observable_lookup() {
 #[test]
 fn revoking_callable_revivers_during_input_coercion_preserves_error_precedence() {
     assert_trace(
-        include_str!("../fixtures/json_canonical_reviver/revoked_callable_reviver_retains_parse_error_precedence.js"),
+        include_str!(
+            "../fixtures/json_canonical_reviver/revoked_callable_reviver_retains_parse_error_precedence.js"
+        ),
         &[
             "coerce:valid",
             "valid:false:true",

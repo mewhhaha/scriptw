@@ -2,7 +2,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use scriptw_aot_wasm::emit;
-use scriptw_front::{parse, ParseOptions};
+use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -11,11 +11,18 @@ use super::property_read_plans::Module;
 fn completion_kind(body: &[Operator<'_>]) -> u32 {
     body.windows(10)
         .find_map(|window| match window {
-            [Operator::I32Const { value: 0 }, Operator::LocalSet { .. },
-             Operator::I64Const { value: 0 }, Operator::LocalSet { .. },
-             Operator::RefNull { .. }, Operator::LocalSet { .. },
-             Operator::I32Const { value: 0 }, Operator::LocalSet { local_index },
-             Operator::I32Const { value: 0 }, Operator::LocalSet { .. }] => Some(*local_index),
+            [
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { .. },
+                Operator::I64Const { value: 0 },
+                Operator::LocalSet { .. },
+                Operator::RefNull { .. },
+                Operator::LocalSet { .. },
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { local_index },
+                Operator::I32Const { value: 0 },
+                Operator::LocalSet { .. },
+            ] => Some(*local_index),
             _ => None,
         })
         .expect("source body initializes one complete entry Completion")
@@ -47,8 +54,12 @@ fn check_guards(body: &[Operator<'_>]) -> usize {
     assert!(stack.is_empty());
     let mut guards = BTreeMap::new();
     for (index, window) in body.windows(4).enumerate() {
-        let [Operator::LocalGet { local_index }, Operator::I32Const { value: 1 }, Operator::I32Eq, Operator::If { .. }] =
-            window
+        let [
+            Operator::LocalGet { local_index },
+            Operator::I32Const { value: 1 },
+            Operator::I32Eq,
+            Operator::If { .. },
+        ] = window
         else {
             continue;
         };

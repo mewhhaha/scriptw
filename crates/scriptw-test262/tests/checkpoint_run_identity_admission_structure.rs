@@ -1,8 +1,4 @@
 const SOURCE: &str = include_str!("../src/lib.rs");
-const CONTRACT: &str = include_str!(
-    "../../../docs/rust-rewrite/contracts/test262-checkpoint-run-identity-admission.md"
-);
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -209,16 +205,4 @@ fn case_execution_and_resume_forward_one_admitted_identity() {
     assert!(comparison.contains("ifcheckpoint_identity!=expected_identity"));
     assert!(comparison.contains("expected_identity.terminal_run_kind()"));
     assert!(comparison.contains("expected_identity.matrix_path()"));
-}
-
-#[test]
-fn contract_records_the_admission_boundary_without_claiming_conformance() {
-    for phrase in [
-        "`CheckpointRunIdentity` is the opaque, producer-owned pairing",
-        "untrusted object into `CheckpointRunIdentityWire`",
-        "This invariant changes neither snapshot JSON shape",
-    ] {
-        assert!(CONTRACT.contains(phrase), "missing `{phrase}`");
-    }
-    assert!(CONTRACT.contains("cross one typed admission point"));
 }

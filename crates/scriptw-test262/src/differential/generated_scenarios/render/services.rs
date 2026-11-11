@@ -1,7 +1,6 @@
 //! The real objects stay inside the program. Only explicit primitive
 //! projections and hook events enter the existing completion/print observer.
 use super::*;
-use std::fmt::Write as _;
 
 // Exactly one Realm is created, independently of the action count. No action
 // mutates its intrinsics or depends on another action to establish a binding.

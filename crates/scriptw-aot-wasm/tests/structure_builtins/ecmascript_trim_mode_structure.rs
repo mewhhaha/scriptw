@@ -51,29 +51,6 @@ fn ecmascript_trim_mode_is_crate_internal_and_closed() {
             "{visibility} fn emit_ecmascript_trim_payload_from_locals"
         )));
     }
-    let core = bounded(
-        STRING_TRIM_SOURCE,
-        "    fn emit_ecmascript_trim_payload_from_locals(",
-        "\n    }\n}",
-    );
-    assert!(core.contains("mode: EcmaTrimMode,"));
-    assert!(!core.contains(": bool"));
-    assert!(!core.contains("trim_start"));
-    assert!(!core.contains("trim_end"));
-    assert!(!core.contains("_ =>"));
-    for (wrapper, mode) in [("start", "Start"), ("end", "End"), ("both", "Both")] {
-        let body = bounded(
-            STRING_TRIM_SOURCE,
-            &format!("pub(crate) fn emit_ecmascript_trim_{wrapper}_payload_from_locals("),
-            "\n    }",
-        );
-        assert_eq!(
-            body.matches("emit_ecmascript_trim_payload_from_locals(")
-                .count(),
-            1
-        );
-        assert_eq!(body.matches(&format!("EcmaTrimMode::{mode}")).count(), 1);
-    }
 }
 
 #[test]

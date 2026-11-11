@@ -1,9 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const CONTRACT: &str =
-    include_str!("../../../docs/rust-rewrite/contracts/test262-aggregate-evidence-requirement.md");
-
 fn source() -> String {
     fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs"))
         .expect("scriptw-test262 source should read")
@@ -148,12 +145,4 @@ fn all_three_aggregate_consumers_choose_an_exact_evidence_policy() {
             1
         );
     }
-}
-
-#[test]
-fn contract_records_the_closed_publication_evidence_boundary() {
-    assert!(CONTRACT.contains("AggregateEvidenceRequirement"));
-    assert!(CONTRACT
-        .contains("cargo test -p scriptw-test262 --test aggregate_evidence_requirement_structure"));
-    assert!(CONTRACT.contains("AggregateEvidenceRequirement"));
 }

@@ -1,12 +1,9 @@
 use super::*;
 use boa_ast::StatementList;
-use boa_interner::Sym;
 
 pub(crate) use crate::async_generator_source::{
-    AsyncGeneratorArrayPatternSource, AsyncGeneratorArrayPatternSourceStates,
     AsyncGeneratorClassicLoopSource, AsyncGeneratorExpressionSource, AsyncGeneratorFunctionSource,
-    AsyncGeneratorIfSource, AsyncGeneratorIfSourceStates, AsyncGeneratorLoopSourceStates,
-    AsyncGeneratorPatternSource, AsyncGeneratorSourceDomain, AsyncGeneratorSourceError,
+    AsyncGeneratorIfSource, AsyncGeneratorSourceDomain, AsyncGeneratorSourceError,
     AsyncGeneratorSourceRange,
 };
 
@@ -17,7 +14,7 @@ pub(crate) use crate::async_pattern_source::{
 
 pub(crate) use crate::async_with_source::{
     append_async_statement_protocol_items, append_async_statement_protocol_states,
-    append_async_statement_states, contains_plain_async_phase, AsyncWithSource,
+    contains_plain_async_phase, AsyncWithSource,
     AsyncWithSourceStates,
 };
 
@@ -39,12 +36,12 @@ pub(crate) use crate::generator_value_branch_source::{
     GeneratorArrayPatternSource, GeneratorArrayPatternSourceStates,
     GeneratorCompoundAssignmentOperation, GeneratorDeleteOperand, GeneratorExpressionSourcePlan,
     GeneratorGroupedOptionalInvocationSource, GeneratorGroupedOptionalReferenceSource,
-    GeneratorObjectPatternSource, GeneratorOptionalArgumentSource, GeneratorOptionalBaseSource,
+    GeneratorObjectPatternSource, GeneratorOptionalArgumentSource,
     GeneratorOptionalChainLink, GeneratorOptionalChainSource, GeneratorOptionalChainStates,
     GeneratorOptionalDeleteSource, GeneratorOptionalDeleteTerminal, GeneratorOptionalKeySource,
     GeneratorOptionalOperandSource, GeneratorPatternAssignmentSource,
     GeneratorPatternInitializerSource, GeneratorValueBranchAdmission, GeneratorValueBranchKind,
-    GeneratorValueBranchSource, GeneratorValueRegionStates,
+    GeneratorValueBranchSource,
 };
 
 #[path = "generator_switch_source.rs"]
@@ -339,21 +336,6 @@ pub(crate) fn async_generator_declaration_key(function: &AsyncGeneratorDeclarati
         span.start().pos(),
         span.end().pos()
     )
-}
-
-pub(crate) fn statement_list_item_function_declaration(
-    item: &StatementListItem,
-) -> Option<&FunctionDeclaration> {
-    match item {
-        StatementListItem::Declaration(declaration) => match declaration.as_ref() {
-            Declaration::FunctionDeclaration(function) => Some(function),
-            _ => None,
-        },
-        StatementListItem::Statement(statement) => match statement.as_ref() {
-            Statement::Labelled(labelled) => labelled_function_declaration(labelled),
-            _ => None,
-        },
-    }
 }
 
 /// Function declarations selected by Block/CaseBlock lexical instantiation.

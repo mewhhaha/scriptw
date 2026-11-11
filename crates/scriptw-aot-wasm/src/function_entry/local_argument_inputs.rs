@@ -1,4 +1,5 @@
-//! Strict source Call consumes its bounded rooted value triples without an argv.
+//! Published local entries consume borrowed rooted value triples without an argv.
+use super::runtime_dispatch::{emit_opaque_native_caller, NativeCallerBoundary};
 use super::*;
 use crate::gc_types::{
     ExecutableCode, ExecutableCodeSchema, FunctionLocal, FunctionObject, GcCallResult,
@@ -41,11 +42,11 @@ macro_rules! local_arguments_role {
 local_arguments_role!(LocalArgumentsCallable, Narrow, LOCAL_ARGUMENTS_ENTRY);
 local_arguments_role!(WideLocalArgumentsCallable, Wide, WIDE_LOCAL_ARGUMENTS_ENTRY);
 
-/// The published typed entry proves strict source semantics. Missing actuals
-/// are padded by the caller; no arguments object can observe the omitted argc.
+/// The published typed entry owns its bounded argument semantics. Missing
+/// actuals are padded; eligible entries cannot observe an omitted argc.
 pub(crate) struct LocalArgumentCallInputs<'a, R: LocalArgumentsCallableRole> {
     receiver: &'a ValueLocals,
-    arguments: &'a [ValueLocals],
+    arguments: &'a [&'a ValueLocals],
     padding: &'a ValueLocals,
     caller_realm: &'a GcLocal<RealmRecord>,
     calling_program: &'a ProgramInstanceLocals,
@@ -55,7 +56,7 @@ pub(crate) struct LocalArgumentCallInputs<'a, R: LocalArgumentsCallableRole> {
 impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
     pub(crate) fn call(
         receiver: &'a ValueLocals,
-        arguments: &'a [ValueLocals],
+        arguments: &'a [&'a ValueLocals],
         padding: &'a ValueLocals,
         caller_realm: &'a GcLocal<RealmRecord>,
         calling_program: &'a ProgramInstanceLocals,
@@ -81,8 +82,11 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcCallResult {
+        let boundary = NativeCallerBoundary::enter(callable, schema, function);
         self.emit(callable, schema, function);
-        schema.call_reference(entry, function)
+        let result = schema.call_reference(entry, function);
+        boundary.restore(schema, function);
+        result
     }
 
     pub(crate) fn emit_return_call(
@@ -92,6 +96,17 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
+        emit_opaque_native_caller(callable, schema, function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let boundary = NativeCallerBoundary::enter(callable, schema, function);
+        self.emit(callable, schema, function);
+        let completion = schema.reserve_completion(function);
+        completion.store_call(schema.call_reference(entry, function), function);
+        boundary.restore(schema, function);
+        completion.emit(function);
+        completion.clear(function);
+        function.instruction(&Instruction::Return);
+        function.instruction(&Instruction::End);
         self.emit(callable, schema, function);
         entry.load(function);
         function.instruction(&Instruction::ReturnCallRef(R::SIGNATURE.type_index()));
@@ -146,6 +161,7 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
         for index in 0..R::ARITY.slot_count() {
             self.arguments
                 .get(index)
+                .copied()
                 .unwrap_or(self.padding)
                 .emit(function);
         }

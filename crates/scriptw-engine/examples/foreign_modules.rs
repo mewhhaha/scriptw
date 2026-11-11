@@ -44,9 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
     let mut store = wasmtime::Store::new(&engine, state);
     store.limiter(|state| state.limits_mut());
-    // The embedder owns interruption. A service may instead advance engine
-    // epochs and choose a finite deadline, or configure/use Wasmtime fuel.
-    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker = wasmtime::Linker::<WasmStoreState>::new(&engine);
     linker.func_wrap("dd", "add", |a: f64, b: f64| a + b)?;
     runtime.register(&mut store, &mut linker)?;

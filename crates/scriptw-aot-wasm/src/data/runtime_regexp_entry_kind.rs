@@ -9,7 +9,7 @@ use super::*;
 /// on the **reader** side, which compared a raw `u64` against two of the three
 /// constants. A fourth `RUNTIME_REGEXP_ENTRY_KIND_FOO = 3` would have compiled
 /// cleanly next to its siblings and fallen through both comparisons in
-/// `emit_runtime_regexp_program_slots` as a miss — reinstating, one level down,
+/// `emit_regexp_program_slots` as a miss — reinstating, one level down,
 /// the exact silent-skip class this table exists to remove.
 ///
 /// So the *decision* the emitter makes is stated here, once, as an exhaustive

@@ -1,10 +1,6 @@
 const METHODS_SOURCE: &str = include_str!("../../src/builtins/temporal_zoned_date_time_methods.rs");
 const MOD_SOURCE: &str = include_str!("../../src/builtins/mod.rs");
 const STANDARD_SOURCE: &str = include_str!("../../src/builtins/standard.rs");
-const CONTRACT: &str = include_str!(
-    "../../../../docs/rust-rewrite/contracts/temporal-zoned-date-time-direction-dispatch.md"
-);
-
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -83,24 +79,4 @@ fn zoned_date_time_catalog_routes_use_four_fixed_family_entries() {
     assert!(!STANDARD_SOURCE.contains("TemporalZonedArithmeticOperation"));
     assert!(!STANDARD_SOURCE.contains("TemporalZonedDifferenceOperation"));
     assert!(!MOD_SOURCE.contains("pub(crate) use temporal_zoned_date_time_methods"));
-}
-
-#[test]
-fn zoned_date_time_dispatch_contract_records_exact_witnesses_and_nonclaims() {
-    for marker in [
-        "3/3",
-        "shared closed direction domains",
-        "four fixed entries",
-        "82f3f206759543894d9ec36a278938c4a17e3f0db2602df13f9c9e7c1f1756a0",
-        "0df4c7b1b768c8520b30f505c8d5c5f6e18d1a8dbee0dff7b08149f2aa3bbde2",
-        "8c95229bd602e45445a7c6ad5e2a89b3d120b903be74b73ac185782859d73cdf",
-        "historical closure introduced no new Temporal behavior",
-        "staged and unexecuted",
-        "does not close T22",
-    ] {
-        assert!(
-            CONTRACT.contains(marker),
-            "missing contract marker: {marker}"
-        );
-    }
 }

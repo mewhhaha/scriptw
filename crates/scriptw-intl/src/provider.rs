@@ -110,7 +110,7 @@ use crate::{
     LocaleTransformResult, LookupNamedTimeZone, LookupNamedTimeZoneRequest,
     LookupNamedTimeZoneResult, MaximizeLocale, MinimizeLocale, ResolveDateTimeLocale,
     ResolveTimeZone, ResolveTimeZoneRequest, ResolvedTimeZoneSnapshot, SelectDateTimeFormat,
-    SupportedDateTimeLocales, TimeZoneResolveError, TimeZoneSelection, UnknownTimeZone,
+    SupportedDateTimeLocales, TimeZoneResolveError,
 };
 
 /// Composite SHA-256 of exact locale, IANA transition/catalogue and CLDR name

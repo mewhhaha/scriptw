@@ -4,8 +4,7 @@ use crate::gc_types::*;
 use crate::intrinsics::IntrinsicKey;
 use crate::intrinsics::IntrinsicPropertyLayoutId;
 use crate::objects::{
-    AccessorDescriptor, AccessorDescriptorLocals, AccessorGetter, AccessorGetterLocals,
-    AccessorSetterLocals,
+    AccessorDescriptor, AccessorGetter,
 };
 use scriptw_ir::StandardBuiltinInstaller;
 

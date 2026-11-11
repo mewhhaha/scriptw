@@ -1,6 +1,6 @@
 # Compact ordinary data storage
 
-The current private runtime ABI is layout 51. Compact ordinary property storage
+The current private runtime ABI is layout 54. Compact ordinary property storage
 belongs to the single Wasm GC object model and requires the experimental
 Wasmtime GC/reference feature baseline. Layout 31 adds the inline representation
 and shared store kernel described in
@@ -144,6 +144,15 @@ extent. Each active slot passes the existing tag/scalar/reference validation.
 The observer synthesizes normal data descriptors and retains the existing
 identity tracking and traversal budgets without calling guest JavaScript.
 Shared shape-field access does not weaken these concrete snapshot witnesses.
+
+Compiled code does not test or cast a storage reference against the open
+compact base itself. A base test is the disjunction of the sealed inline and
+array layout tests; a base cast branches on those two and keeps the base cast
+as its trapping remainder. The base has no allocating constructor, so the two
+forms accept the same references. Wasmtime answers a sealed test with an inline
+header comparison, and a test against an open type with a host subtype query
+for every reference of another type. The typed cast and test helpers apply this
+to any open layout with at most four sealed descendants.
 
 ## Own-data read caches
 

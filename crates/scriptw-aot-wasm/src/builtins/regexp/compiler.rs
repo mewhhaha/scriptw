@@ -1043,38 +1043,6 @@ impl FunctionBuilder<'_> {
         self.emit_regexp_scratch_increment(idx, 1, function);
     }
 
-    /// Push i32 whether `pos` is class-initial: `start + 1`, or `start + 2`
-    /// when the class is negated. Callers guarantee `start < pos`, so the
-    /// `start + 1` load is in bounds.
-    fn emit_prescan_push_is_class_initial(
-        &self,
-        src_ptr: I64Local,
-        pos: I64Local,
-        start: I64Local,
-        cur: I64Local,
-        aux: I64Local,
-        function: &mut Function,
-    ) {
-        start.load(function);
-        function.instruction(&Instruction::I64Const(1));
-        function.instruction(&Instruction::I64Add);
-        cur.store(function);
-        self.emit_regexp_scratch_byte(src_ptr, cur, aux, function);
-        pos.load(function);
-        cur.load(function);
-        function.instruction(&Instruction::I64Eq);
-        aux.load(function);
-        function.instruction(&Instruction::I64Const(b'^' as i64));
-        function.instruction(&Instruction::I64Eq);
-        pos.load(function);
-        start.load(function);
-        function.instruction(&Instruction::I64Const(2));
-        function.instruction(&Instruction::I64Add);
-        function.instruction(&Instruction::I64Eq);
-        function.instruction(&Instruction::I32And);
-        function.instruction(&Instruction::I32Or);
-    }
-
     /// Throw when a character-class escape at `\\`(idx) starts a `-` range:
     /// `-` at `idx + dash_delta` followed by a real endpoint (present, not
     /// `]`) at `idx + end_delta`. A trailing or missing `-` leaves the `-`

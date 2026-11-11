@@ -2,7 +2,7 @@
 use super::super::*;
 use crate::functions::{NonArrayRealmIntrinsicSlot, OrdinaryDefaultPrototype};
 use crate::gc_types::{
-    ArgumentsObject, CompletionLocals, DateObject, GcLocal, GcNullability, I32Local,
+    ArgumentsObject, CompletionLocals, DateObject, GcLocal, GcNullability,
     NativeErrorObject, OrdinaryObject, PrimitiveBox, PrimitiveBoxSchema, RegExpObject, StoredValue,
     StringValue, ValueLocals,
 };

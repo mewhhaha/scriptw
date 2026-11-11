@@ -166,20 +166,6 @@ pub(crate) enum ToPrimitiveAbruptRoute {
     ReturnCurrentFunction,
 }
 
-/// Where the Symbol throw admitted by primitive `ToString` must go.
-///
-/// The route is required by the sole primitive-string emitter. A new consumer
-/// cannot accidentally inherit a function return when it sits beneath an
-/// in-function handler, and a new routing discipline must update the
-/// exhaustive match in the whole-completion routing emitter.
-pub(crate) enum PrimitiveToStringAbruptRoute {
-    /// Route the freshly-created TypeError to the active handler, or return it
-    /// when no handler exists.
-    ActiveHandler,
-    /// Return the current function's completion tuple on throw.
-    ReturnCurrentFunction,
-}
-
 /// A primitive whose ToPrimitive errors belong to the current function Realm.
 ///
 /// The private producer owns abrupt routing. Consumers either preserve the
@@ -204,17 +190,6 @@ fn validate_spec_operation_operands(
         operation.operand_domain_description(),
         operand_count,
     )))
-}
-
-/// The complete runtime result domain of `ToNumeric` for unary bitwise
-/// complement.
-///
-/// The emitted tag chooses one of these branches, while the exhaustive Rust
-/// match below makes adding another numeric representation a compiler error
-/// until its complement semantics are defined.
-enum UnaryNumericKind {
-    Number,
-    BigInt,
 }
 
 /// Catalog expressions produce a normal value or throw. Source calls keep
@@ -1013,16 +988,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
     }
 
-    pub(crate) fn emit_to_boolean_payload_from_expr(
-        &mut self,
-        expr: &TypedExpr,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.compile_truthy_i32(expr, function)?;
-        function.instruction(&Instruction::I64ExtendI32U);
-        Ok(())
-    }
-
     pub(crate) fn emit_to_boolean_payload_from_tagged_locals(
         &mut self,
         value: &ValueLocals,
@@ -1180,37 +1145,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::I32Or);
-        Ok(())
-    }
-
-    /// There used to be a `_with_extra_depth` twin of this, for call sites that
-    /// sat some number of untracked wasm blocks deeper than
-    /// `self.control_stack` reflected (e.g. already inside a manually-emitted
-    /// `If`), so that the internal throw propagation's `Br` reached the correct
-    /// active handler. Branch immediates come from the real label depth now, so
-    /// there is nothing for such a caller to declare and one entry point does
-    /// both jobs.
-    pub(crate) fn compile_expr_to_primitive_locals(
-        &mut self,
-        expr: &TypedExpr,
-        hint: ToPrimitiveHint,
-        output: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let input = schema.reserve_value_local(function);
-        let result = schema.reserve_completion(function);
-        self.compile_expr_to_value(expr, &input, function)?;
-        self.emit_tagged_to_primitive_locals(
-            hint,
-            &input,
-            &result,
-            ToPrimitiveAbruptRoute::ActiveHandler,
-            function,
-        )?;
-        output.copy_from(result.value(), function);
-        result.clear(function);
-        input.clear(function);
         Ok(())
     }
 
@@ -1508,26 +1442,6 @@ impl<'a> FunctionBuilder<'a> {
         primitive.value.clear(function);
     }
 
-    pub(crate) fn emit_current_function_realm_primitive_to_string_local(
-        &mut self,
-        primitive: CurrentFunctionRealmPrimitiveLocals,
-        output: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let result = schema.reserve_completion(function);
-        self.emit_value_to_string_payload(&primitive.value, &result, function)?;
-        self.finish_to_primitive_operation(
-            ToPrimitiveAbruptRoute::ReturnCurrentFunction,
-            &result,
-            function,
-        )?;
-        output.copy_from(result.value(), function);
-        result.clear(function);
-        primitive.value.clear(function);
-        Ok(())
-    }
-
     pub(crate) fn emit_is_primitive_tag_i32(&self, tag: I32Local, function: &mut Function) {
         tag.load(function);
         function.instruction(&Instruction::I32Const(
@@ -1814,32 +1728,6 @@ impl<'a> FunctionBuilder<'a> {
             function,
         );
         output.set_number(output.scalar(), function);
-    }
-
-    pub(crate) fn compile_expr_to_object_locals(
-        &mut self,
-        expr: &TypedExpr,
-        output: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let input = schema.reserve_value_local(function);
-        let pending = schema.reserve_completion(function);
-        self.compile_expr_to_value(expr, &input, function)?;
-        self.emit_value_to_object_locals(&input, &pending, function)?;
-        pending.kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        output.copy_from(pending.value(), function);
-        function.instruction(&Instruction::Else);
-        self.completion().copy_from(&pending, function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        pending.clear(function);
-        input.clear(function);
-        self.emit_propagate_current_throw_if_needed(function);
-        Ok(())
     }
 
     pub(crate) fn emit_to_integer_or_infinity_number_payload_from_number_payload(
@@ -2170,27 +2058,6 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i64_local(bits, function);
     }
 
-    pub(crate) fn compile_expr_to_number_payload(
-        &mut self,
-        expr: &TypedExpr,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let value = schema.reserve_value_local(function);
-        let pending = schema.reserve_completion(function);
-        self.compile_expr_to_value(expr, &value, function)?;
-        self.emit_value_to_number_payload(&value, &pending, function)?;
-        self.finish_to_primitive_operation(
-            ToPrimitiveAbruptRoute::ActiveHandler,
-            &pending,
-            function,
-        )?;
-        pending.value().scalar().load(function);
-        pending.clear(function);
-        value.clear(function);
-        Ok(())
-    }
-
     pub(crate) fn emit_to_uint32_i64_from_number_payload(
         &mut self,
         number_payload_local: crate::gc_types::I64Local,
@@ -2438,15 +2305,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         primitive.clear(function);
         Ok(())
-    }
-
-    pub(crate) fn emit_primitive_to_number_payload(
-        &mut self,
-        input: &ValueLocals,
-        result: &CompletionLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_primitive_to_number_completion(input, result, false, function)
     }
 
     fn emit_primitive_to_number_completion(
@@ -4179,23 +4037,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    pub(crate) fn emit_string_payload_compare_i32(
-        &mut self,
-        op: RelationalBinaryOp,
-        lhs: &GcLocal<StringValue>,
-        rhs: &GcLocal<StringValue>,
-        function: &mut Function,
-    ) {
-        self.emit_string_payload_utf16_compare_i32(lhs, rhs, function);
-        function.instruction(&Instruction::I32Const(0));
-        match op {
-            RelationalBinaryOp::LessThan => function.instruction(&Instruction::I32LtS),
-            RelationalBinaryOp::LessThanOrEqual => function.instruction(&Instruction::I32LeS),
-            RelationalBinaryOp::GreaterThan => function.instruction(&Instruction::I32GtS),
-            RelationalBinaryOp::GreaterThanOrEqual => function.instruction(&Instruction::I32GeS),
-        };
-    }
-
     pub(crate) fn emit_string_payload_utf16_compare_i32(
         &mut self,
         left: &GcLocal<StringValue>,
@@ -4378,14 +4219,6 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(())
-    }
-
-    pub(crate) fn emit_proxy_target_is_callable_for_typeof_i32(
-        &self,
-        value: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_is_callable_i32(value, function)
     }
 
     pub(crate) fn emit_is_callable_i32(
@@ -4599,29 +4432,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         value.clear(function);
         Ok(())
-    }
-
-    pub(crate) fn emit_primitive_to_string_payload(
-        &mut self,
-        input: &ValueLocals,
-        result: &CompletionLocals,
-        route: PrimitiveToStringAbruptRoute,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_primitive_to_string_completion(input, result, function)?;
-        match route {
-            PrimitiveToStringAbruptRoute::ActiveHandler => self.finish_to_primitive_operation(
-                ToPrimitiveAbruptRoute::ActiveHandler,
-                result,
-                function,
-            ),
-            PrimitiveToStringAbruptRoute::ReturnCurrentFunction => self
-                .finish_to_primitive_operation(
-                    ToPrimitiveAbruptRoute::ReturnCurrentFunction,
-                    result,
-                    function,
-                ),
-        }
     }
 
     pub(crate) fn emit_bigint_to_radix_string_payload(
@@ -6394,22 +6204,6 @@ impl<'a> FunctionBuilder<'a> {
         self.compile_expr_to_value(left, &left_value, function)?;
         self.compile_expr_to_value(right, &right_value, function)?;
         self.emit_tagged_payload_same_value_i32(&left_value, &right_value, function)?;
-        right_value.clear(function);
-        left_value.clear(function);
-        Ok(())
-    }
-
-    pub(crate) fn compile_same_value_zero_i32(
-        &mut self,
-        left: &TypedExpr,
-        right: &TypedExpr,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let left_value = self.runtime_schema().reserve_value_local(function);
-        let right_value = self.runtime_schema().reserve_value_local(function);
-        self.compile_expr_to_value(left, &left_value, function)?;
-        self.compile_expr_to_value(right, &right_value, function)?;
-        self.emit_tagged_payload_same_value_zero_i32(&left_value, &right_value, function)?;
         right_value.clear(function);
         left_value.clear(function);
         Ok(())

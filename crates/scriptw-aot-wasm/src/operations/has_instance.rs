@@ -273,6 +273,16 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        let handled = self.emit_local_argument_call_from_values(
+            &handler,
+            &constructor,
+            &[object],
+            &call_result,
+            function,
+        )?;
+        handled.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
         let arguments = self.emit_pre_evaluated_arg_vector(&[object], function);
         self.emit_function_handle_call_with_argv_inner(
             &handler,
@@ -283,6 +293,9 @@ impl FunctionBuilder<'_> {
             function,
         )?;
         arguments.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(handled, function);
         self.emit_has_instance_abrupt_exit(&call_result, result, exit, function);
         self.compile_truthy_tagged_i32(call_result.value(), function)?;
         boolean.store(function);

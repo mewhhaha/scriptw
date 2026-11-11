@@ -201,19 +201,6 @@ pub(super) fn append_registration_variables_for_protocol(
     Ok(())
 }
 
-pub(super) fn append_control_items(
-    items: &[StatementListItem],
-    states: &mut ResumableStateAllocator,
-    registrations: &mut Vec<AsyncGeneratorResourceRegistrationSource>,
-) -> Result<(), AsyncGeneratorSourceError> {
-    append_control_items_for_protocol(
-        items,
-        states,
-        registrations,
-        ResumableRegionProtocolIr::AsyncGenerator,
-    )
-}
-
 pub(super) fn append_control_items_for_protocol(
     items: &[StatementListItem],
     states: &mut ResumableStateAllocator,
