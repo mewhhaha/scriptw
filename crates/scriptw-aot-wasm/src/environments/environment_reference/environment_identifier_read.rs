@@ -23,6 +23,17 @@ macro_rules! environment_identifier_read_helper {
                 .reserve_gc_local(&mut function)
                 .initialize(parameters.record.load(schema, &mut function), &mut function);
             let value = schema.reserve_value_local(&mut function);
+            // An own data property of the global object needs no Reference.
+            let direct = self.emit_global_own_data_identifier_read_i32(
+                &parameters.name,
+                &record,
+                &value,
+                &mut function,
+            )?;
+            direct.load(&mut function);
+            function.instruction(&Instruction::I32Eqz);
+            schema.release_i32_local(direct, &mut function);
+            self.open_frame(ControlFrameKind::If, &mut function);
             // An abrupt search skips GetValue. Both paths reach the same
             // Reference retirement before returning the complete Completion.
             let exit = self.open_frame(ControlFrameKind::Block, &mut function);
@@ -43,6 +54,8 @@ macro_rules! environment_identifier_read_helper {
             self.pop_control(ControlFrameKind::Block);
             function.instruction(&Instruction::End);
             self.release_environment_identifier_reference(reference, &mut function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
             self.completion().commit_if_normal(&value, &mut function);
             value.clear(&mut function);
             self.pop_scope();

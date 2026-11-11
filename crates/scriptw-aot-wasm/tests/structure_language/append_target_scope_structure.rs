@@ -91,7 +91,9 @@ fn append_helpers_accept_only_the_ordinary_header_and_share_one_projection() {
         "        }",
     );
     assert!(array.contains("OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;"));
-    assert!(PROJECTION.contains("for layout in GcLayout::ALL"));
+    assert!(PROJECTION.contains("FREQUENT_OBJECT_LAYOUTS.iter().chain("));
+    assert!(PROJECTION.contains("GcLayout::ALL"));
+    assert!(PROJECTION.contains("for layout in ordered"));
     assert!(PROJECTION.contains("layout.object_projection()"));
     assert!(PROJECTION.contains("ObjectHeaderProjection::Own => {}"));
     assert!(PROJECTION.contains("ObjectHeaderProjection::Field(field) =>"));

@@ -165,3 +165,38 @@ print('ok');
 "#,
     );
 }
+
+#[test]
+fn direct_ordinary_has_instance_restarts_through_the_method_before_user_code() {
+    // The operator may skip calling the default method only while nothing
+    // observable runs. A "prototype" getter and a getPrototypeOf trap must
+    // still see the native method as their caller, and a method that an
+    // accessor produced must not be looked up a second time.
+    assert_script(
+        r#"
+function assert(value, message) { if (!value) throw new Error(message); }
+var lookups = 0, prototypeReads = 0, seen = 'unset', prototype = {};
+var callable = () => {};
+Object.defineProperty(callable, Symbol.hasInstance, {
+  get: function () { lookups++; return Function.prototype[Symbol.hasInstance]; }
+});
+function prototypeGetter() { prototypeReads++; seen = prototypeGetter.caller; return prototype; }
+Object.defineProperty(callable, 'prototype', { get: prototypeGetter });
+var candidate = Object.create(prototype);
+function trigger(value) { return value instanceof callable; }
+assert(trigger(candidate) === true, 'accessor prototype result');
+assert(lookups === 1 && prototypeReads === 1 && seen === null, 'one lookup, one read, native caller: ' + lookups + ' ' + prototypeReads + ' ' + seen);
+assert(trigger({}) === false && lookups === 2 && prototypeReads === 2 && seen === null, 'second use');
+
+var traps = 0, trapCaller = 'unset';
+function Plain() {}
+function trap(target) { traps++; trapCaller = trap.caller; return Plain.prototype; }
+var proxied = Object.create(new Proxy({}, { getPrototypeOf: trap }));
+function plain(value) { return value instanceof Plain; }
+assert(plain(new Plain()) === true && traps === 0, 'ordinary chain needs no trap');
+assert(plain(proxied) === true && traps === 1 && trapCaller === null, 'trap runs once under the native method: ' + traps + ' ' + trapCaller);
+assert(plain({}) === false && plain(proxied) === true && traps === 2, 'later uses');
+print('ok');
+"#,
+    );
+}

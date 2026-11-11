@@ -279,6 +279,114 @@ impl FunctionBuilder<'_> {
         Ok(reference)
     }
 
+    /// Reads a name that resolves to an own data property of an ordinary
+    /// global object, and reports whether it did. No record before the Global
+    /// Environment may bind the name or be a `with` object, and the global
+    /// lexical record must not declare it: HasProperty and Get then observe
+    /// nothing but that property. Every other case reports false and leaves
+    /// the search to ResolveBinding.
+    pub(super) fn emit_global_own_data_identifier_read_i32(
+        &mut self,
+        name: &GcLocal<StringValue>,
+        record: &GcLocal<Environment, Nullable>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let found = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        found.store(function);
+        let cursor = schema
+            .reserve_gc_local::<Environment, Nullable>(function)
+            .initialize(record.load(schema, function), function);
+        let parent = schema
+            .reserve_gc_local::<Environment, Nullable>(function)
+            .initialize_null(schema, function);
+        let entry = schema
+            .reserve_gc_local::<NamedBinding, Nullable>(function)
+            .initialize_null(schema, function);
+        let kind = schema.reserve_i32_local(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let walk = self.open_frame(ControlFrameKind::Loop, function);
+        parent.replace(
+            schema
+                .struct_type::<Environment>()
+                .field(EnvironmentSchema::PARENT)
+                .read(&cursor, schema, function)
+                .reference(),
+            function,
+        );
+        parent.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_find_own_named_binding(&cursor, name, &entry, function);
+        entry.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
+        let realm = schema
+            .reserve_gc_local::<RealmRecord, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::DEFINING_REALM)
+                    .read(&cursor, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        let global = schema
+            .reserve_gc_local::<StoredValue, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<RealmRecord>()
+                    .field(RealmRecordSchema::GLOBAL_OBJECT)
+                    .read(&realm, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        let base = schema.reserve_value_local(function);
+        self.emit_stored_value_to_locals(&global, &base, function);
+        let key = PropertyKeyLocals::from_string(schema, name, function);
+        let own = self.emit_ordinary_own_data_read_i32(&base, &key, value, function)?;
+        own.load(function);
+        found.store(function);
+        schema.release_i32_local(own, function);
+        key.clear(function);
+        base.clear(function);
+        global.clear(function);
+        realm.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema
+            .struct_type::<Environment>()
+            .field(EnvironmentSchema::KIND)
+            .read(&cursor, schema, function)
+            .store(kind, function);
+        kind.load(function);
+        function.instruction(&Instruction::I32Const(
+            NamedEnvironmentKind::WithObject.code(),
+        ));
+        function.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(done, function);
+        self.emit_find_own_named_binding(&cursor, name, &entry, function);
+        entry.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, function);
+        cursor.replace(parent.load(schema, function), function);
+        self.emit_branch_to_target(walk, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(kind, function);
+        entry.clear(function);
+        parent.clear(function);
+        cursor.clear(function);
+        Ok(found)
+    }
+
     /// A resolved global Reference holds the Global Environment Record, not
     /// whichever subrecord answered its original HasBinding. RHS execution or
     /// a preceding HasBinding trap can create a lexical shadow. Refresh only

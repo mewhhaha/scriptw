@@ -2023,11 +2023,23 @@ impl RuntimeSchema {
         base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
+        // A published entry is read in place. Only the first use of an
+        // ordinal enters the owner, which publishes it.
+        let output = self.reference_type::<StringValue>(GcNullability::NonNullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        emit_root_get(function, self.pooled_strings);
+        function.instruction(&Instruction::RefAsNonNull);
+        function.instruction(&Instruction::I32Const(index.ordinal() as i32));
+        function.instruction(&Instruction::ArrayGet(
+            self.array_type::<PooledStringTable>().type_index().raw(),
+        ));
+        function.instruction(&Instruction::BrOnNonNull(0));
         let ordinal = self.reserve_i32_local(function);
         ordinal.set_constant(index.ordinal() as i32, function);
-        let result = self.resolve_pooled_string_reference(ordinal, base, function);
+        let _ = self.resolve_pooled_string_reference(ordinal, base, function);
         self.release_i32_local(ordinal, function);
-        result
+        function.instruction(&Instruction::End);
+        GcStackReference::new()
     }
     pub(crate) fn resolve_pooled_string_reference(
         &self,

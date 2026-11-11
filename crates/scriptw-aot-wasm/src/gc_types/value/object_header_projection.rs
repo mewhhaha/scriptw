@@ -5,7 +5,34 @@ use crate::emit::FunctionBuilder;
 use crate::runtime_helpers::{HelperParameters, RuntimeHelperId};
 use crate::EmitError;
 
+/// Tested first: the layouts that most object operations actually meet.
+const FREQUENT_OBJECT_LAYOUTS: [GcLayout; 3] = [
+    GcLayout::OrdinaryObject,
+    GcLayout::ArrayObject,
+    GcLayout::FunctionObject,
+];
+
 impl RuntimeSchema {
+    /// An ordinary header is its own projection. Every other layout takes
+    /// `registered`, which must leave the projected header on the stack.
+    pub(crate) fn emit_ordinary_header_or_registered_projection(
+        &self,
+        value: &ValueLocals,
+        function: &mut Function,
+        registered: impl FnOnce(&mut Function),
+    ) -> GcStackReference<OrdinaryObject> {
+        let output = self.reference_type::<OrdinaryObject>(GcNullability::NonNullable);
+        value.reference.load(function);
+        function.instruction(&Instruction::RefTestNonNull(output.heap_type));
+        function.instruction(&Instruction::If(BlockType::Result(ValType::Ref(output))));
+        value.reference.load(function);
+        function.instruction(&Instruction::RefCastNonNull(output.heap_type));
+        function.instruction(&Instruction::Else);
+        registered(function);
+        function.instruction(&Instruction::End);
+        GcStackReference::new()
+    }
+
     /// Composite records share their declared OBJECT field, never a guessed
     /// cast. Only this module's registered body may emit the complete dispatch.
     fn emit_object_header_projection_kernel(
@@ -15,7 +42,12 @@ impl RuntimeSchema {
     ) -> GcStackReference<OrdinaryObject> {
         let output = self.reference_type::<OrdinaryObject>(GcNullability::NonNullable);
         let mut branches = 0usize;
-        for layout in GcLayout::ALL {
+        let ordered = FREQUENT_OBJECT_LAYOUTS.iter().chain(
+            GcLayout::ALL
+                .iter()
+                .filter(|layout| !FREQUENT_OBJECT_LAYOUTS.contains(layout)),
+        );
+        for layout in ordered {
             let Some(projection) = layout.object_projection() else {
                 continue;
             };

@@ -161,6 +161,20 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         storage.clear(&mut f);
         cache.clear(&mut f);
+        f.instruction(&Instruction::Else);
+        // A dictionary or intrinsic receiver answers its own data property
+        // here. Absence, accessors and exotic receivers keep the general Get.
+        let own_value = schema.reserve_value_local(&mut f);
+        let own =
+            self.emit_ordinary_header_own_data_read_i32(&object, &p.key, &own_value, &mut f)?;
+        own.load(&mut f);
+        handled.store(&mut f);
+        schema.release_i32_local(own, &mut f);
+        handled.load(&mut f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        result.set_normal(&own_value, &mut f);
+        f.instruction(&Instruction::End);
+        own_value.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         base.clear(&mut f);

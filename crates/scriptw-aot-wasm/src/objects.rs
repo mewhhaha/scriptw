@@ -1679,9 +1679,16 @@ impl<'a> FunctionBuilder<'a> {
             self.emit_primitive_string_length_read(target, key, result, function)?;
         string_length.load(function);
         self.emit_branch_if_to_target(exit, function);
+        // ToObject is the identity on an object; only primitives need its owner.
+        self.emit_is_heap_object_like_tag_i32(target.tag(), function);
+        self.open_frame(ControlFrameKind::If, function);
+        lookup.copy_from(target, function);
+        function.instruction(&Instruction::Else);
         self.emit_value_to_object_locals(target, &pending, function)?;
         self.emit_object_operation_abrupt_exit(&pending, result, exit, function);
         lookup.copy_from(pending.value(), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         lookup.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             schema
@@ -1727,6 +1734,75 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let exit = self.open_frame(ControlFrameKind::Block, function);
+        // Ordinary and function objects answer Get along their chain here,
+        // without a helper entry per hop: their own lookup and
+        // [[GetPrototypeOf]] observe nothing. The walk stops at the first
+        // accessor or other object kind. A later object then runs its
+        // complete [[Get]] with the original receiver; the first object
+        // continues below.
+        let cursor = schema.reserve_value_local(function);
+        let advanced = schema.reserve_i32_local(function);
+        cursor.copy_from(target, function);
+        function.instruction(&Instruction::I32Const(0));
+        advanced.store(function);
+        let leave = self.open_frame(ControlFrameKind::Block, function);
+        let hop = self.open_frame(ControlFrameKind::Loop, function);
+        let step = self.emit_ordinary_get_probe(&cursor, key, function)?;
+        step.emit_found_i32(function);
+        step.emit_getter_i32(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        result.set_normal(step.value(), function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        step.emit_supported_i32(function);
+        step.emit_found_i32(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(leave, function);
+        let parent = schema.reserve_value_local(function);
+        self.emit_ordinary_get_prototype_of(&cursor, &parent, function);
+        parent.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        result.initialize(function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        cursor.copy_from(&parent, function);
+        parent.clear(function);
+        function.instruction(&Instruction::I32Const(1));
+        advanced.store(function);
+        self.emit_branch_to_target(hop, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        step.clear(schema, function);
+        advanced.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        schema
+            .call_helper(
+                crate::runtime_helpers::ObjectReadArguments::new(
+                    &cursor,
+                    receiver,
+                    key,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(result, function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(advanced, function);
+        cursor.clear(function);
         let probe = self.emit_ordinary_get_probe(target, key, function)?;
         probe.emit_supported_i32(function);
         function.instruction(&Instruction::I32Eqz);
@@ -2258,6 +2334,16 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i32_local(compact, function);
+        let dictionary =
+            self.emit_dictionary_existing_data_write(target, receiver, key, value, function)?;
+        dictionary.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        boolean.set_constant(1, function);
+        self.emit_object_boolean_result(boolean, result, function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(dictionary, function);
         let packed =
             self.emit_packed_array_existing_data_write(target, receiver, key, value, function)?;
         packed.load(function);

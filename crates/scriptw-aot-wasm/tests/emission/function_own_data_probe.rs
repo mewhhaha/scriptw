@@ -54,27 +54,29 @@ fn assert_direct_function_header(body: &[Operator<'_>], function: u32, object: u
             arms.push(arm);
         }
     }
-    assert_eq!(
-        arms.len(),
-        1,
-        "one concrete FunctionObject header admission"
-    );
-    let arm = arms[0];
-    assert!(!arm.iter().any(|op| matches!(op,
-        Operator::StructGet { struct_type_index, field_index }
-            if *struct_type_index == object && *field_index == GcSnapshotField::ObjectProperties.index())),
-        "header admission cannot exclude the current ordinary dictionary storage");
+    // The own-data probe, the ordinary-chain walk and the prototype record
+    // each admit a callable; every admission has the same direct shape.
     assert!(
-        !arm.iter().any(|op| matches!(
-            op,
-            Operator::If { .. }
-                | Operator::Call { .. }
-                | Operator::CallRef { .. }
-                | Operator::RefTestNonNull { .. }
-                | Operator::StructNew { .. }
-        )),
-        "the proven callable projects its canonical header without another guard, call or snapshot"
+        !arms.is_empty(),
+        "a concrete FunctionObject header admission"
     );
+    for arm in arms {
+        assert!(!arm.iter().any(|op| matches!(op,
+            Operator::StructGet { struct_type_index, field_index }
+                if *struct_type_index == object && *field_index == GcSnapshotField::ObjectProperties.index())),
+            "header admission cannot exclude the current ordinary dictionary storage");
+        assert!(
+            !arm.iter().any(|op| matches!(
+                op,
+                Operator::If { .. }
+                    | Operator::Call { .. }
+                    | Operator::CallRef { .. }
+                    | Operator::RefTestNonNull { .. }
+                    | Operator::StructNew { .. }
+            )),
+            "the proven callable projects its canonical header without another guard, call or snapshot"
+        );
+    }
 }
 
 #[test]

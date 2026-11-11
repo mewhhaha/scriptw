@@ -1,7 +1,11 @@
 use super::*;
 use crate::emit::ControlTarget;
+use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
-    BoundFunction, BoundFunctionSchema, CompletionLocals, GcNullability, StoredValue,
+    BoundFunction, BoundFunctionSchema, CompactDataStorage, CompletionLocals, ExecutableCodeKind,
+    ExecutableCodeSchema, FunctionContextSchema, GcI32Constant, GcNullability,
+    IntrinsicPropertyStorage, IntrinsicPropertyStorageSchema, OrdinaryObject,
+    OrdinaryObjectSchema, StoredValue,
 };
 use crate::runtime_helpers::{
     HasInstanceArguments, HasInstanceParameters, HelperParameters, ObjectGetPrototypeOfArguments,
@@ -188,6 +192,19 @@ impl FunctionBuilder<'_> {
         let search = schema.reserve_value_local(function);
         let call_result = schema.reserve_completion(function);
         let boolean = schema.reserve_i32_local(function);
+        // Entering OrdinaryHasInstance without calling the default method is
+        // exact only while no user code can run: a getter or trap would see
+        // the operator, not the native method, as its caller. `direct` marks
+        // such an entry: 1 before the method was looked up, 2 once the
+        // lookup has produced it. The first step that could run user code
+        // moves that word to `call_method` and restarts through the real
+        // call; 2 keeps the resolved method so its lookup is not repeated.
+        let direct = schema.reserve_i32_local(function);
+        let call_method = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        direct.store(function);
+        function.instruction(&Instruction::I32Const(0));
+        call_method.store(function);
         constructor.copy_from(initial_constructor, function);
         entry.load(function);
         state_local.store(function);
@@ -206,6 +223,10 @@ impl FunctionBuilder<'_> {
         ));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
+        call_method.load(function);
+        function.instruction(&Instruction::I32Const(2));
+        function.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, function);
         self.emit_is_heap_object_like_tag_i32(constructor.tag(), function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -216,6 +237,22 @@ impl FunctionBuilder<'_> {
             function,
         )?;
         self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+
+        let inherited = self.emit_inherits_default_has_instance_i32(&constructor, function)?;
+        inherited.load(function);
+        schema.release_i32_local(inherited, function);
+        call_method.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        function.instruction(&Instruction::I32Const(
+            HasInstanceRuntimeState::OrdinaryHasInstance.runtime_code(),
+        ));
+        state_local.store(function);
+        direct.set_constant(1, function);
+        self.emit_branch_to_target(dispatch, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
 
@@ -271,6 +308,23 @@ impl FunctionBuilder<'_> {
             function,
         )?;
         self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        let default_method = self.emit_is_default_has_instance_method_i32(&handler, function);
+        default_method.load(function);
+        schema.release_i32_local(default_method, function);
+        call_method.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        function.instruction(&Instruction::I32Const(
+            HasInstanceRuntimeState::OrdinaryHasInstance.runtime_code(),
+        ));
+        state_local.store(function);
+        direct.set_constant(2, function);
+        self.emit_branch_to_target(dispatch, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         let handled = self.emit_local_argument_call_from_values(
@@ -338,6 +392,8 @@ impl FunctionBuilder<'_> {
             HasInstanceRuntimeState::InstanceofOperator.runtime_code(),
         ));
         state_local.store(function);
+        direct.set_constant(0, function);
+        call_method.set_constant(0, function);
         self.emit_branch_to_target(dispatch, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -351,6 +407,19 @@ impl FunctionBuilder<'_> {
         );
         let prototype_key = PropertyKeyLocals::from_string(schema, &string, function);
         string.clear(function);
+        let own_data =
+            self.emit_ordinary_own_data_read_i32(&constructor, &prototype_key, &prototype, function)?;
+        own_data.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(own_data, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_restart_through_method_if_direct(
+            direct,
+            call_method,
+            state_local,
+            dispatch,
+            function,
+        );
         self.emit_object_read_with_throw_routing(
             &constructor,
             &constructor,
@@ -359,9 +428,11 @@ impl FunctionBuilder<'_> {
             AccessorThrowRouting::LeaveInCompletion,
             function,
         )?;
-        prototype_key.clear(function);
         self.emit_has_instance_abrupt_exit(&call_result, result, exit, function);
         prototype.copy_from(call_result.value(), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        prototype_key.clear(function);
         self.emit_is_heap_object_like_tag_i32(prototype.tag(), function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -377,6 +448,47 @@ impl FunctionBuilder<'_> {
         search.copy_from(object, function);
         let walk = self.open_frame(ControlFrameKind::Loop, function);
         let base = self.runtime_helper_base()?;
+        // An ordinary header's [[GetPrototypeOf]] observes nothing; composite
+        // and exotic objects keep the shared owner.
+        search.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            search.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let next = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<OrdinaryObject>()
+                .field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        schema.prototype_reference_into(&next, call_result.value(), function);
+        next.clear(function);
+        header.clear(function);
+        function.instruction(&Instruction::Else);
+        search.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ProxyObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_restart_through_method_if_direct(
+            direct,
+            call_method,
+            state_local,
+            dispatch,
+            function,
+        );
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         schema
             .call_helper(
                 ObjectGetPrototypeOfArguments::new(
@@ -389,6 +501,8 @@ impl FunctionBuilder<'_> {
             )
             .store(&call_result, function);
         self.emit_has_instance_abrupt_exit(&call_result, result, exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         call_result.value().tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
         function.instruction(&Instruction::I32Eq);
@@ -418,6 +532,8 @@ impl FunctionBuilder<'_> {
         result.value().set_boolean(boolean, function);
         function.instruction(&Instruction::End);
         schema.release_i32_local(boolean, function);
+        schema.release_i32_local(call_method, function);
+        schema.release_i32_local(direct, function);
         call_result.clear(function);
         search.clear(function);
         prototype.clear(function);
@@ -425,6 +541,270 @@ impl FunctionBuilder<'_> {
         constructor.clear(function);
         schema.release_i32_local(state_local, function);
         Ok(())
+    }
+
+    /// True when GetMethod(C, @@hasInstance) can only reach this Realm's
+    /// %Function.prototype%. Each object from C up to that prototype must be
+    /// a function without an own @@hasInstance: a compact shape holds string
+    /// keys only, an intrinsic layout other than a %Function.prototype% has no
+    /// such row, and a dictionary is asked. That prototype's @@hasInstance is
+    /// immutable, so the operator's result is OrdinaryHasInstance(C, O).
+    fn emit_inherits_default_has_instance_i32(
+        &mut self,
+        constructor: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<crate::gc_types::I32Local, EmitError> {
+        const MAX_HOPS: i32 = 3;
+        let schema = self.runtime_schema();
+        let inherits = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        inherits.store(function);
+        let function_prototype_layout =
+            crate::intrinsics::IntrinsicPropertyLayoutId::FunctionPrototype;
+        if !self
+            .strings
+            .has_intrinsic_property_layout(function_prototype_layout)?
+        {
+            return Ok(inherits);
+        }
+        let function_prototype_address = self
+            .strings
+            .intrinsic_property_layout_span(function_prototype_layout)?
+            .address();
+        let cursor = schema.reserve_value_local(function);
+        cursor.copy_from(constructor, function);
+        let hops = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        hops.store(function);
+        let absent = schema.reserve_i32_local(function);
+        let realm = self.emit_execution_realm(function);
+        let function_prototype = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::FunctionPrototype,
+            &function_prototype,
+            function,
+        );
+        realm.clear(function);
+        let symbol = schema.reserve_gc_local(function).initialize(
+            self.emit_well_known_symbol_reference(
+                scriptw_ir::WellKnownSymbol::HasInstance,
+                function,
+            )?,
+            function,
+        );
+        let key = PropertyKeyLocals::from_symbol(schema, &symbol, function);
+        symbol.clear(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let walk = self.open_frame(ControlFrameKind::Loop, function);
+        cursor.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<FunctionObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, function);
+        let callable = schema.reserve_gc_local(function).initialize(
+            cursor.cast_reference::<FunctionObject>(schema, function),
+            function,
+        );
+        let header = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::OBJECT)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        callable.clear(function);
+        let storage = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        storage.is_subtype::<CompactDataStorage>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        absent.set_constant(1, function);
+        function.instruction(&Instruction::Else);
+        storage.is_subtype::<IntrinsicPropertyStorage>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let intrinsic = schema.reserve_gc_local(function).initialize(
+            storage
+                .load(schema, function)
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, function),
+            function,
+        );
+        schema
+            .field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(&intrinsic, schema, function)
+            .store(absent, function);
+        intrinsic.clear(function);
+        absent.load(function);
+        function.instruction(&Instruction::I32Const(function_prototype_address as i32));
+        function.instruction(&Instruction::I32Ne);
+        absent.store(function);
+        function.instruction(&Instruction::Else);
+        let dictionary_absent =
+            self.emit_ordinary_own_property_absent_i32(&cursor, &key, function)?;
+        dictionary_absent.load(function);
+        absent.store(function);
+        schema.release_i32_local(dictionary_absent, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        storage.clear(function);
+        absent.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, function);
+        let prototype = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        header.clear(function);
+        let _ = prototype.load(schema, function);
+        function_prototype.reference().load(function);
+        function.instruction(&Instruction::RefEq);
+        self.open_frame(ControlFrameKind::If, function);
+        inherits.set_constant(1, function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        hops.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        hops.store(function);
+        hops.load(function);
+        function.instruction(&Instruction::I32Const(MAX_HOPS));
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        schema.prototype_reference_into(&prototype, &cursor, function);
+        prototype.clear(function);
+        self.emit_branch_to_target(walk, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        key.clear(function);
+        function_prototype.clear(function);
+        schema.release_i32_local(absent, function);
+        schema.release_i32_local(hops, function);
+        cursor.clear(function);
+        Ok(inherits)
+    }
+
+    /// True for this execution Realm's own Function.prototype[@@hasInstance].
+    /// Calling it with receiver C is OrdinaryHasInstance(C, V), with errors in
+    /// the same Realm, so the operator may continue there without the call.
+    fn emit_is_default_has_instance_method_i32(
+        &mut self,
+        handler: &ValueLocals,
+        function: &mut Function,
+    ) -> crate::gc_types::I32Local {
+        let schema = self.runtime_schema();
+        let is_default = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        is_default.store(function);
+        handler.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<FunctionObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let callable = schema.reserve_gc_local(function).initialize(
+            handler.cast_reference::<FunctionObject>(schema, function),
+            function,
+        );
+        let code = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CODE)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        let context = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CONTEXT)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        let handler_realm = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionContextSchema::REALM)
+                .read(&context, schema, function)
+                .reference(),
+            function,
+        );
+        let kind = schema.reserve_i32_local(function);
+        let builtin = schema.reserve_i32_local(function);
+        schema
+            .field(ExecutableCodeSchema::KIND)
+            .read(&code, schema, function)
+            .store(kind, function);
+        schema
+            .field(ExecutableCodeSchema::STANDARD_BUILTIN)
+            .read(&code, schema, function)
+            .store(builtin, function);
+        kind.load(function);
+        function.instruction(&Instruction::I32Const(
+            ExecutableCodeKind::StandardBuiltin.encode(),
+        ));
+        function.instruction(&Instruction::I32Eq);
+        builtin.load(function);
+        function.instruction(&Instruction::I32Const(
+            scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance.encode(),
+        ));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::I32And);
+        let realm = self.emit_execution_realm(function);
+        let _ = handler_realm.load(schema, function);
+        let _ = realm.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32And);
+        is_default.store(function);
+        realm.clear(function);
+        schema.release_i32_local(builtin, function);
+        schema.release_i32_local(kind, function);
+        handler_realm.clear(function);
+        context.clear(function);
+        code.clear(function);
+        callable.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        is_default
+    }
+
+    /// Leaves a direct OrdinaryHasInstance before a step that could run user
+    /// code and restarts the operator so that it calls the method instead.
+    /// Nothing observable has happened yet: the steps so far read own data
+    /// and ordinary prototypes only.
+    fn emit_restart_through_method_if_direct(
+        &mut self,
+        direct: crate::gc_types::I32Local,
+        call_method: crate::gc_types::I32Local,
+        state: crate::gc_types::I32Local,
+        dispatch: ControlTarget,
+        function: &mut Function,
+    ) {
+        direct.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        direct.load(function);
+        call_method.store(function);
+        direct.set_constant(0, function);
+        function.instruction(&Instruction::I32Const(
+            HasInstanceRuntimeState::InstanceofOperator.runtime_code(),
+        ));
+        state.store(function);
+        self.emit_branch_to_target(dispatch, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
     }
 
     fn emit_has_instance_abrupt_exit(

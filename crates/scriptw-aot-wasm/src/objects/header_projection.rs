@@ -12,10 +12,12 @@ impl FunctionBuilder<'_> {
         let base = self
             .runtime_helper_base()
             .expect("object-header projection requires the registered Wasm-GC helper plan");
-        schema.helper_reference_on_stack(schema.call_helper(
-            crate::runtime_helpers::ObjectHeaderProjectionArguments::new(value),
-            base,
-            function,
-        ))
+        schema.emit_ordinary_header_or_registered_projection(value, function, |function| {
+            let _ = schema.helper_reference_on_stack(schema.call_helper(
+                crate::runtime_helpers::ObjectHeaderProjectionArguments::new(value),
+                base,
+                function,
+            ));
+        })
     }
 }

@@ -100,6 +100,68 @@ impl OrdinaryGetProbe {
 }
 
 impl FunctionBuilder<'_> {
+    /// Reads an own data property of an ordinary or function object into
+    /// `value` and reports whether it did. Absence, an accessor and every
+    /// other object kind report false and leave the Get to its owner.
+    pub(crate) fn emit_ordinary_own_data_read_i32(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let found = schema.reserve_i32_local(f);
+        let probe = self.emit_ordinary_get_probe(target, key, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Data, f);
+        found.store(f);
+        found.load(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        value.copy_from(probe.value(), f);
+        f.instruction(&Instruction::End);
+        probe.clear(schema, f);
+        Ok(found)
+    }
+
+    /// The same own data read for a header that the caller already selected.
+    pub(in crate::objects) fn emit_ordinary_header_own_data_read_i32(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let found = schema.reserve_i32_local(f);
+        let probe = OrdinaryGetProbe::new(schema, f);
+        self.emit_ordinary_get_from_header(object, key, &probe, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Data, f);
+        found.store(f);
+        found.load(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        value.copy_from(probe.value(), f);
+        f.instruction(&Instruction::End);
+        probe.clear(schema, f);
+        Ok(found)
+    }
+
+    /// True when an ordinary or function object has no own property `key`.
+    /// A present property and every other object kind report false.
+    pub(crate) fn emit_ordinary_own_property_absent_i32(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let absent = schema.reserve_i32_local(f);
+        let probe = self.emit_ordinary_get_probe(target, key, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Absent, f);
+        absent.store(f);
+        probe.clear(schema, f);
+        Ok(absent)
+    }
+
     /// Only these actual object kinds have entirely ordinary own properties.
     /// Primitive boxes keep their virtual String indices in the exotic path.
     pub(super) fn emit_ordinary_get_probe(

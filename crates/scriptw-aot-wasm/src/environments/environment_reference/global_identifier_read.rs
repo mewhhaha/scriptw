@@ -109,11 +109,20 @@ impl FunctionBuilder<'_> {
         let record = schema
             .reserve_gc_local::<Environment, Nullable>(function)
             .initialize(global.load(schema, function).nullable(), function);
+        let value = schema.reserve_value_local(function);
+        // An own data property of the global object needs no Reference.
+        let direct =
+            self.emit_global_own_data_identifier_read_i32(name, &record, &value, function)?;
+        direct.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(direct, function);
+        self.open_frame(ControlFrameKind::If, function);
         let reference = self
             .emit_resolve_environment_identifier_from_record(name, strictness, record, function)?;
-        let value = schema.reserve_value_local(function);
         self.emit_environment_identifier_get(&reference, read, &value, function)?;
         self.release_environment_identifier_reference(reference, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.completion().commit_if_normal(&value, function);
         value.clear(function);
         Ok(())

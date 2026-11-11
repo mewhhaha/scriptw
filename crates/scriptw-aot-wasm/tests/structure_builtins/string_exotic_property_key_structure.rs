@@ -114,8 +114,10 @@ fn backend_classifies_dynamic_keys_and_preserves_prototype_fallback() {
     let prototype = read
         .find("self.emit_ordinary_get_prototype_of(target, value, function);")
         .unwrap();
+    // The ordinary-chain walk before the probe also continues through
+    // ObjectRead; the general path's inherited read is the last one.
     let inherited = read
-        .find("crate::runtime_helpers::ObjectReadArguments::new(")
+        .rfind("crate::runtime_helpers::ObjectReadArguments::new(")
         .unwrap();
     assert!(probe < own && own < prototype && prototype < inherited);
     assert!(read.contains("receiver,"));

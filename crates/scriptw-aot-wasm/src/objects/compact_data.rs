@@ -1038,6 +1038,98 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// The same Set for a dictionary receiver: an existing writable own data
+    /// property takes the new value in place, which is all that OrdinarySet's
+    /// [[DefineOwnProperty]] with only [[Value]] present does to it. Misses
+    /// perform no mutation or completion.
+    pub(super) fn emit_dictionary_existing_data_write(
+        &mut self,
+        target: &ValueLocals,
+        receiver: &ValueLocals,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let handled = schema.reserve_i32_local(f);
+        f.instruction(&Instruction::I32Const(0));
+        handled.store(f);
+        target.reference().load(f);
+        receiver.reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        receiver.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let object = schema
+            .reserve_gc_local(f)
+            .initialize(receiver.cast_reference::<OrdinaryObject>(schema, f), f);
+        let base = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, schema, f)
+                .reference(),
+            f,
+        );
+        base.is_subtype::<OrdinaryPropertyStorage>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let entry = self.emit_ordinary_property_entry(&object, key, f)?;
+        let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        descriptor.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(descriptor.load(schema, f).require_non_null(f), f);
+        let flags = schema.reserve_i32_local(f);
+        schema
+            .field(PropertyDescriptorSchema::FLAGS)
+            .read(&present, schema, f)
+            .store(flags, f);
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let stored = schema.reserve_gc_local(f).initialize(
+            schema.struct_type::<StoredValue>().from_value(value, f),
+            f,
+        );
+        schema.field(PropertyDescriptorSchema::VALUE).write(
+            &present,
+            GcOperand::subtype_reference(&stored, schema),
+            schema,
+            f,
+        );
+        stored.clear(f);
+        handled.set_constant(1, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(flags, f);
+        present.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        descriptor.clear(f);
+        entry.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        base.clear(f);
+        object.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(handled)
+    }
+
     pub(crate) fn compile_ordinary_own_descriptor_helper(&mut self) -> Result<Function, EmitError> {
         let mut f = self.begin_helper_body(RuntimeHelperId::OrdinaryOwnDescriptor);
         let p = self
