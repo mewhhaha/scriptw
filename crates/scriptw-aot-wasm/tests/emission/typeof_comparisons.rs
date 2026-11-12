@@ -119,7 +119,7 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
     for (name, identity) in functions {
         let (_, body) = program.named(&identity);
         match name.as_str() {
-            "specStrict" | "specLoose" | "exprStrict" | "exprLoose" | "never" => {
+            "specStrict" | "specLoose" | "exprStrict" | "exprLoose" | "never" | "unresolved" => {
                 assert_eq!(
                     string_values(body),
                     0,
@@ -131,7 +131,7 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
                     "{name} compares the type directly"
                 );
             }
-            "dynamic" | "unresolved" => {
+            "dynamic" => {
                 assert!(
                     string_values(body) > 0,
                     "{name} retains its complete typeof fallback"

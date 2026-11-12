@@ -178,6 +178,8 @@ impl FunctionBuilder<'_> {
 
     /// Find only this record's live binding. The caller owns parent traversal
     /// and dispatches Object/Global Records through their actual HasBinding.
+    /// A name that is not the key's own String object is compared by its
+    /// cached raw hash first: Strings with different hashes differ.
     pub(crate) fn emit_find_own_named_binding<N: GcFieldNullability>(
         &mut self,
         environment: &GcLocal<Environment, N>,
@@ -187,6 +189,8 @@ impl FunctionBuilder<'_> {
     ) {
         let schema = self.runtime_schema();
         found.set_null(schema, function);
+        let key_hash = schema.reserve_i64_local(function);
+        let name_hash = schema.reserve_i64_local(function);
         let entries = schema
             .reserve_gc_local::<NamedBindingTable, Nullable>(function)
             .initialize(
@@ -201,6 +205,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::RefIsNull);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
+        self.emit_string_key_hash(key, key_hash, function);
         let count = schema.reserve_i32_local(function);
         schema
             .array_type::<NamedBindingTable>()
@@ -245,8 +250,24 @@ impl FunctionBuilder<'_> {
                 function,
             );
         let equal = schema.reserve_i32_local(function);
+        let _ = name.load(schema, function);
+        let _ = key.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        equal.store(function);
+        equal.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_string_key_hash(&name, name_hash, function);
+        name_hash.load(function);
+        key_hash.load(function);
+        function.instruction(&Instruction::I64Eq);
+        self.open_frame(ControlFrameKind::If, function);
         self.emit_string_payload_equality_i32(&name, key, function);
         equal.store(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         name.clear(function);
         equal.load(function);
         schema.release_i32_local(equal, function);
@@ -274,5 +295,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         entries.clear(function);
+        schema.release_i64_local(name_hash, function);
+        schema.release_i64_local(key_hash, function);
     }
 }

@@ -23,10 +23,12 @@ macro_rules! environment_identifier_read_helper {
                 .reserve_gc_local(&mut function)
                 .initialize(parameters.record.load(schema, &mut function), &mut function);
             let value = schema.reserve_value_local(&mut function);
-            // An own data property of the global object needs no Reference.
-            let direct = self.emit_global_own_data_identifier_read_i32(
+            // An own data property of the global object, or an unresolvable
+            // typeof operand, needs no Reference.
+            let direct = self.emit_global_identifier_direct_read_i32(
                 &parameters.name,
                 &record,
+                EnvironmentIdentifierRead::$read,
                 &value,
                 &mut function,
             )?;

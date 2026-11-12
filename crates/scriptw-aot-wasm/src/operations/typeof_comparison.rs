@@ -13,16 +13,41 @@ enum TypeofSpelling {
     Never,
 }
 
+/// What typeof inspects: an evaluated operand, or an identifier Reference
+/// that typeof reads itself, where an unresolvable name reads as undefined.
+enum TypeofOperand<'a> {
+    Value(&'a TypedExpr),
+    Reference(&'a TypedExpr),
+}
+
+impl<'a> TypeofOperand<'a> {
+    fn of(typeof_expression: &'a TypedExpr) -> Option<Self> {
+        match &typeof_expression.expr {
+            ExprIr::TypeOf { expr } => Some(Self::Value(expr)),
+            ExprIr::TypeOfUnresolvedIdentifier { .. } => Some(Self::Reference(typeof_expression)),
+            ExprIr::EnvironmentIdentifier(identifier)
+                if matches!(
+                    identifier.operation,
+                    scriptw_ir::EnvironmentIdentifierOperationIr::Typeof
+                ) =>
+            {
+                Some(Self::Reference(typeof_expression))
+            }
+            _ => None,
+        }
+    }
+}
+
 struct TypeofLiteralComparison<'a> {
-    operand: &'a TypedExpr,
+    operand: TypeofOperand<'a>,
     spelling: TypeofSpelling,
 }
 
 impl<'a> TypeofLiteralComparison<'a> {
     fn for_operands(left: &'a TypedExpr, right: &'a TypedExpr) -> Option<Self> {
         let (operand, spelling) = match (&left.expr, &right.expr) {
-            (ExprIr::TypeOf { expr }, ExprIr::String(spelling))
-            | (ExprIr::String(spelling), ExprIr::TypeOf { expr }) => (expr, spelling),
+            (_, ExprIr::String(spelling)) => (TypeofOperand::of(left)?, spelling),
+            (ExprIr::String(spelling), _) => (TypeofOperand::of(right)?, spelling),
             _ => return None,
         };
         let spelling = match spelling.as_str() {
@@ -52,10 +77,18 @@ impl FunctionBuilder<'_> {
         };
         // The literal is effect-free in either operand position. Keep the
         // complete operand evaluation, including TDZ and getter/call Throws.
-        // Unresolved-identifier typeof retains its own reference semantics.
+        // An identifier Reference keeps typeof's own read, in which an
+        // unresolvable name is undefined; only the String is omitted.
         let schema = self.runtime_schema();
         let value = schema.reserve_value_local(function);
-        self.compile_expr_to_value(plan.operand, &value, function)?;
+        match plan.operand {
+            TypeofOperand::Value(operand) => {
+                self.compile_expr_to_value(operand, &value, function)?
+            }
+            TypeofOperand::Reference(reference) => {
+                self.compile_typeof_reference_value(reference, &value, function)?
+            }
+        }
         let primitive = match plan.spelling {
             TypeofSpelling::Boolean => Some(WasmRuntimeValueTag::Boolean),
             TypeofSpelling::Number => Some(WasmRuntimeValueTag::Number),

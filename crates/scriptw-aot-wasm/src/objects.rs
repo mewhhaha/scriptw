@@ -41,6 +41,7 @@ mod module_namespace;
 mod native_constructor;
 mod object_literal_property;
 mod ordinary_get_probe;
+pub(crate) use ordinary_get_probe::OwnDataProbe;
 mod own_property;
 mod packed_array_builtin;
 mod packed_array_index;

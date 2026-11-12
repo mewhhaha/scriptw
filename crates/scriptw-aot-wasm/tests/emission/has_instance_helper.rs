@@ -165,8 +165,13 @@ fn both_has_instance_entries_share_one_typed_whole_completion_kernel() {
         ],
         "entry mode and two complete held Values"
     );
-    assert_eq!(helper_signature.params().len(), 10);
-    for (parameter, nullable) in helper_signature.params()[7..]
+    assert_eq!(
+        helper_signature.params()[7],
+        ValType::I32,
+        "the operator's record site, or none"
+    );
+    assert_eq!(helper_signature.params().len(), 11);
+    for (parameter, nullable) in helper_signature.params()[8..]
         .iter()
         .zip([false, true, false])
     {

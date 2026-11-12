@@ -3883,9 +3883,10 @@ impl FunctionMetaRegistry {
                 return Ok(site);
             }
             crate::emit::ProgramSiteKind::OwnDataRead => &self.next_own_data_read_site,
-            // Write records share the read records' table, so their sites
-            // share its dense index space.
-            crate::emit::ProgramSiteKind::OwnDataWrite => &self.next_own_data_read_site,
+            // Write and `instanceof` records share the read records' table,
+            // so their sites share its dense index space.
+            crate::emit::ProgramSiteKind::OwnDataWrite
+            | crate::emit::ProgramSiteKind::InstanceofPrototype => &self.next_own_data_read_site,
         };
         let site = next.get();
         next.set(

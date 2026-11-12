@@ -6,7 +6,7 @@ mod holder;
 mod write;
 
 impl FunctionBuilder<'_> {
-    pub(in crate::objects) fn emit_own_data_cache_site(
+    pub(crate) fn emit_own_data_cache_site(
         &mut self,
         site: I32Local,
         key: &ValueLocals,

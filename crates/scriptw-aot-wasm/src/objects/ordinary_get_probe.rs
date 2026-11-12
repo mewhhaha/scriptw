@@ -23,6 +23,26 @@ impl OrdinaryGetState {
     }
 }
 
+/// What one own-property probe of an ordinary header found: a data
+/// property, no property for the key, or something else (an accessor, or a
+/// key the header does not answer alone).
+#[derive(Clone, Copy)]
+pub(crate) enum OwnDataProbe {
+    Other,
+    Data,
+    Absent,
+}
+
+impl OwnDataProbe {
+    pub(crate) const fn code(self) -> i32 {
+        match self {
+            Self::Other => 0,
+            Self::Data => 1,
+            Self::Absent => 2,
+        }
+    }
+}
+
 #[must_use = "an ordinary Get observation owns a rooted payload and must be cleared"]
 pub(super) struct OrdinaryGetProbe {
     state: I32Local,
@@ -124,7 +144,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// The same own data read for a header that the caller already selected.
-    pub(in crate::objects) fn emit_ordinary_header_own_data_read_i32(
+    pub(crate) fn emit_ordinary_header_own_data_read_i32(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,
@@ -143,6 +163,52 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         probe.clear(schema, f);
         Ok(found)
+    }
+
+    /// One own-property probe of the selected ordinary header: a data value
+    /// is copied into `value`. The result word is an `OwnDataProbe` code.
+    pub(crate) fn emit_ordinary_header_own_data_probe_i32(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let result = schema.reserve_i32_local(f);
+        result.set_constant(OwnDataProbe::Other.code(), f);
+        let probe = OrdinaryGetProbe::new(schema, f);
+        self.emit_ordinary_get_from_header(object, key, &probe, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Data, f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        value.copy_from(probe.value(), f);
+        result.set_constant(OwnDataProbe::Data.code(), f);
+        f.instruction(&Instruction::Else);
+        probe.emit_state_i32(OrdinaryGetState::Absent, f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        result.set_constant(OwnDataProbe::Absent.code(), f);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::End);
+        probe.clear(schema, f);
+        Ok(result)
+    }
+
+    /// True when the selected ordinary header has no own property `key`.
+    /// A present property and an unsupported key report false.
+    pub(crate) fn emit_ordinary_header_own_property_absent_i32(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let absent = schema.reserve_i32_local(f);
+        let probe = OrdinaryGetProbe::new(schema, f);
+        self.emit_ordinary_get_from_header(object, key, &probe, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Absent, f);
+        absent.store(f);
+        probe.clear(schema, f);
+        Ok(absent)
     }
 
     /// True when an ordinary or function object has no own property `key`.

@@ -2,8 +2,11 @@ use super::global_environment::GlobalBindingFailure;
 use super::named_environment::NamedEnvironmentKind;
 use super::*;
 use crate::gc_types::{
-    NamedBinding, NamedBindingSchema, ObjectEnvironmentSchema, RealmRecordSchema,
+    GcNullability, JavaScriptObject, NamedBinding, NamedBindingSchema, ObjectEnvironmentSchema,
+    OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, RealmRecordSchema,
+    StringValueSchema,
 };
+use crate::objects::OwnDataProbe;
 use crate::operations::PropertyKeyLocals;
 use crate::runtime_helpers::{
     ObjectHasPropertyArguments, ObjectReadArguments, OrdinarySetArguments,
@@ -279,16 +282,22 @@ impl FunctionBuilder<'_> {
         Ok(reference)
     }
 
-    /// Reads a name that resolves to an own data property of an ordinary
-    /// global object, and reports whether it did. No record before the Global
-    /// Environment may bind the name or be a `with` object, and the global
-    /// lexical record must not declare it: HasProperty and Get then observe
-    /// nothing but that property. Every other case reports false and leaves
-    /// the search to ResolveBinding.
-    pub(super) fn emit_global_own_data_identifier_read_i32(
+    /// Completes a read without a Reference, and reports whether it did. The
+    /// walk stops at a `with` object, whose HasBinding can be observed. The
+    /// first record that names the binding holds it; an initialized binding
+    /// is the value, as GetBindingValue reads it, and an uninitialized one is
+    /// left to ResolveBinding, which throws. Otherwise the Global
+    /// Environment's object record answers: an own data property of an
+    /// ordinary global object is the value, as HasProperty and Get observe
+    /// nothing but that property. For `typeof`, a name that no object on the
+    /// global object's chain of ordinary headers has is unresolvable, which
+    /// HasProperty also decides without observable steps. Every other case
+    /// reports false and leaves the search to ResolveBinding.
+    pub(super) fn emit_global_identifier_direct_read_i32(
         &mut self,
         name: &GcLocal<StringValue>,
         record: &GcLocal<Environment, Nullable>,
+        read: EnvironmentIdentifierRead,
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<I32Local, EmitError> {
@@ -305,7 +314,6 @@ impl FunctionBuilder<'_> {
         let entry = schema
             .reserve_gc_local::<NamedBinding, Nullable>(function)
             .initialize_null(schema, function);
-        let kind = schema.reserve_i32_local(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
         let walk = self.open_frame(ControlFrameKind::Loop, function);
         parent.replace(
@@ -343,17 +351,30 @@ impl FunctionBuilder<'_> {
                     .require_non_null(function),
                 function,
             );
+        realm.clear(function);
         let base = schema.reserve_value_local(function);
         self.emit_stored_value_to_locals(&global, &base, function);
-        let key = PropertyKeyLocals::from_string(schema, name, function);
-        let own = self.emit_ordinary_own_data_read_i32(&base, &key, value, function)?;
-        own.load(function);
-        found.store(function);
-        schema.release_i32_local(own, function);
-        key.clear(function);
-        base.clear(function);
         global.clear(function);
-        realm.clear(function);
+        base.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            base.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let key = PropertyKeyLocals::from_string(schema, name, function);
+        self.emit_global_object_identifier_read(&header, name, &key, read, value, found, function)?;
+        key.clear(function);
+        header.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        base.clear(function);
+        function.instruction(&Instruction::Else);
+        self.emit_initialized_named_binding_read(&entry, value, found, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.emit_branch_to_target(done, function);
@@ -362,9 +383,7 @@ impl FunctionBuilder<'_> {
         schema
             .struct_type::<Environment>()
             .field(EnvironmentSchema::KIND)
-            .read(&cursor, schema, function)
-            .store(kind, function);
-        kind.load(function);
+            .read(&cursor, schema, function);
         function.instruction(&Instruction::I32Const(
             NamedEnvironmentKind::WithObject.code(),
         ));
@@ -373,18 +392,188 @@ impl FunctionBuilder<'_> {
         self.emit_find_own_named_binding(&cursor, name, &entry, function);
         entry.load(schema, function).is_null(function);
         function.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(done, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_initialized_named_binding_read(&entry, value, found, function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         cursor.replace(parent.load(schema, function), function);
         self.emit_branch_to_target(walk, function);
         self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        schema.release_i32_local(kind, function);
         entry.clear(function);
         parent.clear(function);
         cursor.clear(function);
         Ok(found)
+    }
+
+    /// GetBindingValue of a declarative named binding when it is initialized:
+    /// the cell's (or its import target's) value. An uninitialized binding
+    /// leaves `found` clear for ResolveBinding's ReferenceError.
+    fn emit_initialized_named_binding_read(
+        &mut self,
+        entry: &GcLocal<NamedBinding, Nullable>,
+        value: &ValueLocals,
+        found: I32Local,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let cell = schema
+            .reserve_gc_local::<BindingCell, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<NamedBinding>()
+                    .field(NamedBindingSchema::CELL)
+                    .read(entry, schema, function)
+                    .reference(),
+                function,
+            );
+        let initialized = self.emit_read_environment_cell(&cell, value, function);
+        initialized.load(function);
+        found.store(function);
+        schema.release_i32_local(initialized, function);
+        cell.clear(function);
+    }
+
+    /// The global object's part of a direct identifier read. The name's
+    /// String remembers where a dictionary last held it; that entry, when its
+    /// own key object confirms it, is the property, and one own-property probe
+    /// (which refreshes the memory) answers otherwise. A `typeof` operand the
+    /// global object lacks is unresolvable when no ordinary header on the
+    /// rest of its chain, up to a null [[Prototype]], has it either: it then
+    /// reads as undefined. Accessors, Proxies and other exotic objects leave
+    /// `found` clear.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_global_object_identifier_read(
+        &mut self,
+        header: &GcLocal<OrdinaryObject>,
+        name: &GcLocal<StringValue>,
+        key: &PropertyKeyLocals,
+        read: EnvironmentIdentifierRead,
+        value: &ValueLocals,
+        found: I32Local,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let storage = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(header, schema, function)
+                .reference(),
+            function,
+        );
+        storage.is_subtype::<OrdinaryPropertyStorage>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let dictionary = schema.reserve_gc_local(function).initialize(
+            storage
+                .load(schema, function)
+                .cast_subtype::<OrdinaryPropertyStorage>(schema, function),
+            function,
+        );
+        let hint = schema.reserve_i32_local(function);
+        schema
+            .field(StringValueSchema::ENTRY_HINT)
+            .read(name, schema, function)
+            .store(hint, function);
+        self.emit_dictionary_position_read(&dictionary, hint, key, value, found, function);
+        schema.release_i32_local(hint, function);
+        dictionary.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        storage.clear(function);
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let probe = self.emit_ordinary_header_own_data_probe_i32(header, key, value, function)?;
+        probe.load(function);
+        function.instruction(&Instruction::I32Const(OwnDataProbe::Data.code()));
+        function.instruction(&Instruction::I32Eq);
+        found.store(function);
+        if matches!(read, EnvironmentIdentifierRead::Typeof) {
+            probe.load(function);
+            function.instruction(&Instruction::I32Const(OwnDataProbe::Absent.code()));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            let edge = schema
+                .reserve_gc_local::<JavaScriptObject, Nullable>(function)
+                .initialize(
+                    schema
+                        .field(OrdinaryObjectSchema::PROTOTYPE)
+                        .read(header, schema, function)
+                        .reference(),
+                    function,
+                );
+            let absent = self.emit_ordinary_chain_lacks_key_i32(&edge, key, function)?;
+            edge.clear(function);
+            absent.load(function);
+            self.open_frame(ControlFrameKind::If, function);
+            value.set_undefined(function);
+            found.set_constant(1, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            schema.release_i32_local(absent, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        schema.release_i32_local(probe, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// True when no object on the chain that starts at `edge` has `key`,
+    /// decided by ordinary headers alone: each is an ordinary object without
+    /// an own `key`, up to a null [[Prototype]]. Any other object on the
+    /// chain, a Proxy included, reports false.
+    fn emit_ordinary_chain_lacks_key_i32(
+        &mut self,
+        edge: &GcLocal<JavaScriptObject, Nullable>,
+        key: &PropertyKeyLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let lacks = schema.reserve_i32_local(function);
+        lacks.set_constant(0, function);
+        let current = schema
+            .reserve_gc_local::<JavaScriptObject, Nullable>(function)
+            .initialize(edge.load(schema, function), function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let walk = self.open_frame(ControlFrameKind::Loop, function);
+        current.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
+        lacks.set_constant(1, function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        current.has_layout::<OrdinaryObject>(schema, function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            current.cast_layout::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let absent = self.emit_ordinary_header_own_property_absent_i32(&header, key, function)?;
+        absent.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(absent, function);
+        self.emit_branch_if_to_target(done, function);
+        current.replace(
+            schema
+                .field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        header.clear(function);
+        self.emit_branch_to_target(walk, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        current.clear(function);
+        Ok(lacks)
     }
 
     /// A resolved global Reference holds the Global Environment Record, not

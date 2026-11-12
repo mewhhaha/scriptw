@@ -1,6 +1,7 @@
 use super::*;
 use crate::environments::environment_reference::EnvironmentIdentifierRead;
 use crate::functions::CallContinuation;
+use crate::gc_types::Environment;
 use scriptw_ir::{
     EnvironmentCompoundOperationIr, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
     EnvironmentIdentifierResolutionStart,
@@ -60,6 +61,91 @@ impl FunctionBuilder<'_> {
             },
             id,
         )
+    }
+
+    /// The record where a dynamic read's ResolveBinding starts.
+    fn environment_identifier_read_record(
+        &mut self,
+        identifier: &EnvironmentIdentifierIr,
+        function: &mut Function,
+    ) -> Result<GcLocal<Environment, Nullable>, EmitError> {
+        let schema = self.runtime_schema();
+        match identifier.resolution_start() {
+            EnvironmentIdentifierResolutionStart::CurrentEnvironment => {
+                Ok(self.resolve_env_handle_local(0, function))
+            }
+            EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
+                let global = self.emit_source_global_environment_to_local(function);
+                let record = schema
+                    .reserve_gc_local(function)
+                    .initialize(global.load(schema, function).nullable(), function);
+                global.clear(function);
+                Ok(record)
+            }
+            EnvironmentIdentifierResolutionStart::Cell(proof) => {
+                Err(EmitError::unsupported(format!(
+                    "compiler invariant: proven cell read for {} missed its direct path",
+                    proof.storage_name()
+                )))
+            }
+        }
+    }
+
+    /// The value that `typeof` inspects for an identifier Reference: the
+    /// identifier's own typeof read, where an unresolvable name is undefined.
+    /// A literal comparison then needs no typeof String.
+    pub(crate) fn compile_typeof_reference_value(
+        &mut self,
+        reference: &TypedExpr,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        match &reference.expr {
+            ExprIr::TypeOfUnresolvedIdentifier { name } => self.emit_global_identifier_read(
+                name,
+                EnvironmentIdentifierRead::Typeof,
+                value,
+                function,
+            ),
+            ExprIr::EnvironmentIdentifier(identifier)
+                if matches!(
+                    identifier.operation,
+                    EnvironmentIdentifierOperationIr::Typeof
+                ) =>
+            {
+                if let EnvironmentIdentifierResolutionStart::Cell(proof) =
+                    &identifier.resolution_start()
+                {
+                    return self.emit_read_module_cell_identifier(
+                        proof,
+                        &identifier.name,
+                        value,
+                        function,
+                    );
+                }
+                let schema = self.runtime_schema();
+                let key = schema
+                    .reserve_gc_local::<StringValue, NonNullable>(function)
+                    .initialize(
+                        self.emit_interned_string_reference(&identifier.name, function)?,
+                        function,
+                    );
+                let record = self.environment_identifier_read_record(identifier, function)?;
+                self.emit_environment_identifier_read_from_record(
+                    &key,
+                    identifier.strictness,
+                    EnvironmentIdentifierRead::Typeof,
+                    record,
+                    value,
+                    function,
+                )?;
+                key.clear(function);
+                Ok(())
+            }
+            _ => Err(EmitError::unsupported(
+                "compiler invariant: a typeof Reference operand is an identifier",
+            )),
+        }
     }
 
     pub(crate) fn compile_environment_identifier_to_value(
@@ -193,35 +279,15 @@ impl FunctionBuilder<'_> {
                 };
                 // No source evaluation separates ResolveBinding and GetValue.
                 // Dynamic names keep both steps inside the shared runtime.
-                let record = match identifier.resolution_start() {
-                    EnvironmentIdentifierResolutionStart::CurrentEnvironment => {
-                        Some(self.resolve_env_handle_local(0, function))
-                    }
-                    EnvironmentIdentifierResolutionStart::GlobalEnvironment => {
-                        let global = self.emit_source_global_environment_to_local(function);
-                        let record = schema
-                            .reserve_gc_local(function)
-                            .initialize(global.load(schema, function).nullable(), function);
-                        global.clear(function);
-                        Some(record)
-                    }
-                    EnvironmentIdentifierResolutionStart::Cell(proof) => {
-                        return Err(EmitError::unsupported(format!(
-                            "compiler invariant: proven cell read for {} missed its direct path",
-                            proof.storage_name()
-                        )));
-                    }
-                };
-                if let Some(record) = record {
-                    self.emit_environment_identifier_read_from_record(
-                        &key,
-                        identifier.strictness,
-                        read,
-                        record,
-                        &value,
-                        function,
-                    )?;
-                }
+                let record = self.environment_identifier_read_record(identifier, function)?;
+                self.emit_environment_identifier_read_from_record(
+                    &key,
+                    identifier.strictness,
+                    read,
+                    record,
+                    &value,
+                    function,
+                )?;
                 if matches!(identifier.operation, Operation::Typeof) {
                     self.emit_typeof_value(&value, output, function)?;
                 } else {

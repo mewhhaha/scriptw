@@ -316,6 +316,9 @@ pub(crate) enum ProgramSiteKind<'a> {
     OwnDataRead,
     /// A static assignment's write record, kept in the read records' table.
     OwnDataWrite,
+    /// An `instanceof` operator's record of its constructor's own
+    /// "prototype", kept in the read records' table.
+    InstanceofPrototype,
 }
 
 #[derive(Clone, Copy)]

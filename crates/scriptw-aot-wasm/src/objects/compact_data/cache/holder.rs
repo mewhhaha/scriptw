@@ -144,7 +144,7 @@ impl FunctionBuilder<'_> {
     /// Reads the data value of the dictionary entry at `position` when that
     /// entry is live and holds exactly this key object. A deleted entry is a
     /// null slot, and an entry keeps its position for as long as it lives.
-    pub(super) fn emit_dictionary_position_read(
+    pub(crate) fn emit_dictionary_position_read(
         &mut self,
         storage: &GcLocal<OrdinaryPropertyStorage>,
         position: I32Local,
@@ -797,7 +797,7 @@ impl FunctionBuilder<'_> {
     /// row in the recorded value group; the value is read from this
     /// storage's own groups. A miss searches the layout and records a data
     /// row. Accessors and absent keys are left unhandled.
-    pub(super) fn emit_own_intrinsic_record_read(
+    pub(crate) fn emit_own_intrinsic_record_read(
         &mut self,
         intrinsic: &GcLocal<IntrinsicPropertyStorage>,
         key: &PropertyKeyLocals,

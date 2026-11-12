@@ -13,8 +13,9 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. The source with write records (ABI 63) runs a Speed sync request in
-  11.05M user instructions and about 4.8M cycles against 4.38M and 2.68M for Node 24
+  JIT. The source with `instanceof` records and direct identifier reads (ABI 65)
+  runs a Speed sync request in 10.21M user instructions and about 4.9M cycles
+  against 4.38M and 2.68M for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11)).
   Next, in measured order: Set beyond static-key sites (static String
@@ -23,9 +24,10 @@ accepts `--case <file.js>`.
   receiver twice and searches the %Object.prototype% layout on each add, and
   a chain with more than one holder above the receiver stays general); a
   leaner hit path in `helper::cached_property_read` (9.5% of cycles) and in
-  the write helper, which share the paged site lookup; a dedicated
-  `instanceof` path for plain constructors and a site record for its
-  `prototype` read; site records for global reads; the general Get for
+  the write helper, which share the paged site lookup; the remaining
+  helper-entry cost of `instanceof` and identifier reads (parameter transfer,
+  layout tests and the site lookup, still two to five times V8 per
+  operation) and an index for long named-binding tables; the general Get for
   computed keys; inline stores for proven captured cells; lazy function
   `prototype`, `length` and `name`; allocation volume, which drives the 9%
   spent collecting. Source `89a934d06891`

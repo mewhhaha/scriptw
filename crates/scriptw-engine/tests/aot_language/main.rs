@@ -45,6 +45,7 @@ mod aot_guarded_number_update;
 mod aot_has_instance_symbol_absence;
 mod aot_in_operand_order;
 mod aot_infallible_booleans;
+mod aot_instanceof_and_global_reads;
 mod aot_local_concat_length;
 mod aot_loose_equality_codegen;
 mod aot_numeric_call_rows;

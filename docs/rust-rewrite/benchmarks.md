@@ -367,6 +367,7 @@ They do not refresh the published panel.
 | Binding-name checks and `string[number]`, `6a1d8259f6ad` | 15.15M | 16.39M |
 | Integrated: position hints, shape transitions, call entries, builtin bodies, `0475e1a8ce97` | 11.20M | 12.05M |
 | Static assignment write records (ABI 63) | 11.05M | 11.89M |
+| `instanceof` front, direct global and named-binding reads (ABI 65) | 10.21M | 11.01M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -388,6 +389,24 @@ conversions and String operations. Static-key assignments then keep a
 per-site write record for an existing own slot and for an add by shape
 transition, which brings `u = {}; u.a = i; u.b = 2` to 1,980 instructions per
 iteration, `u = new P()` to 3,906 and `lit.b = i` to 691.
+
+`instanceof` then decides a plain function constructor without its state
+machine: the default `@@hasInstance` reached through at most three function
+objects without an own one, the constructor's own `"prototype"` read through
+a per-site record (a dictionary position or an intrinsic row group), and the
+candidate's chain walked through ordinary, Array and function headers; any
+other case restarts in the unchanged kernel. A dynamic identifier read
+returns an initialized binding found by name and the global object's own data
+property (through the String's position hint) without a Reference, a
+`typeof` operand that no ordinary header on the global object's chain has
+reads as undefined, a named-binding scan rejects names by cached hash before
+comparing code units, and `typeof x == "literal"` on an identifier compares
+the type without a String. Instructions per iteration (Speed, loop included)
+move from the ABI 63 source to ABI 65 as follows: `plain instanceof Map`
+2,113 to 1,270, `plain instanceof Int8Array` 1,985 to 1,451, `inst instanceof C`
+1,250 to 887, `u = Map` 626 to 485, `typeof NoSuchGlobal == "function"` 2,419
+to 1,089 and `typeof Map == "function"` 986 to 572. The first two include the
+global read of the constructor.
 
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position

@@ -19,7 +19,7 @@ impl OrdinaryPropertyQuery<'_> {
 }
 
 impl FunctionBuilder<'_> {
-    pub(in crate::objects) fn emit_ordinary_property_entry(
+    pub(crate) fn emit_ordinary_property_entry(
         &self,
         object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,
@@ -40,7 +40,7 @@ impl FunctionBuilder<'_> {
     /// from this dictionary: it has no buckets, or the key's first bucket is
     /// empty, which ends every probe for the key. A zero result proves
     /// nothing; the caller then asks the complete lookup.
-    pub(in crate::objects) fn emit_ordinary_property_index_lacks_key_i32(
+    pub(crate) fn emit_ordinary_property_index_lacks_key_i32(
         &mut self,
         storage: &GcLocal<OrdinaryPropertyStorage>,
         key: &PropertyKeyLocals,

@@ -110,9 +110,10 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<Environment, Nullable>(function)
             .initialize(global.load(schema, function).nullable(), function);
         let value = schema.reserve_value_local(function);
-        // An own data property of the global object needs no Reference.
+        // An own data property of the global object, or an unresolvable
+        // typeof operand, needs no Reference.
         let direct =
-            self.emit_global_own_data_identifier_read_i32(name, &record, &value, function)?;
+            self.emit_global_identifier_direct_read_i32(name, &record, read, &value, function)?;
         direct.load(function);
         function.instruction(&Instruction::I32Eqz);
         schema.release_i32_local(direct, function);
