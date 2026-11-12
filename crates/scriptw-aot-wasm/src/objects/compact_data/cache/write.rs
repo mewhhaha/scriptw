@@ -37,11 +37,28 @@ impl AddHolder {
     }
 }
 
+/// How a use proves that a dictionary holder lacks the key.
+#[derive(Clone, Copy)]
+pub(super) enum DictionaryAbsence {
+    /// The holder's key index, then a complete lookup when the index
+    /// cannot tell.
+    Lookup,
+    /// The holder's key index alone, which makes no call; when it cannot
+    /// tell, the absence stays unproven.
+    IndexOnly,
+}
+
 impl FunctionBuilder<'_> {
-    pub(crate) fn compile_cached_property_write_helper(&mut self) -> Result<Function, EmitError> {
-        let mut body = self.begin_helper_body(RuntimeHelperId::CachedPropertyWrite);
+    /// The complete static assignment after the hit entry declined: the
+    /// record's add, OrdinarySet and the record refresh.
+    pub(crate) fn compile_cached_property_write_miss_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut body = self.begin_helper_body(RuntimeHelperId::CachedPropertyWriteMiss);
         let p = self
-            .helper_parameters::<crate::runtime_helpers::CachedPropertyWriteParameters>(&mut body);
+            .helper_parameters::<crate::runtime_helpers::CachedPropertyWriteMissParameters>(
+                &mut body,
+            );
         let f = &mut body;
         let s = self.runtime_schema();
         let result = s.reserve_completion(f);
@@ -110,7 +127,7 @@ impl FunctionBuilder<'_> {
     /// The complete OrdinarySet with the site's original operands.
     fn emit_cached_write_general_set(
         &mut self,
-        p: &crate::runtime_helpers::CachedPropertyWriteParameters,
+        p: &crate::runtime_helpers::CachedPropertyWriteMissParameters,
         result: &CompletionLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
@@ -212,7 +229,14 @@ impl FunctionBuilder<'_> {
             .read(&object, s, f);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        let tail = self.emit_recorded_add_chain_tail(target, &object, key, cache, f)?;
+        let tail = self.emit_recorded_add_chain_tail(
+            target,
+            &object,
+            key,
+            cache,
+            DictionaryAbsence::Lookup,
+            f,
+        )?;
         tail.load(f);
         s.field(OwnDataReadCacheSchema::ADD_TAIL).read(cache, s, f);
         f.instruction(&Instruction::I32Eq);
@@ -275,12 +299,13 @@ impl FunctionBuilder<'_> {
 
     /// The live closed-tail word that ends the receiver's chain by the
     /// record's holder rule, or 0 when the live chain does not follow it.
-    fn emit_recorded_add_chain_tail(
+    pub(super) fn emit_recorded_add_chain_tail(
         &mut self,
         target: &ValueLocals,
         object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,
         cache: &GcLocal<OwnDataReadCache>,
+        absence: DictionaryAbsence,
         f: &mut Function,
     ) -> Result<I32Local, EmitError> {
         let s = self.runtime_schema();
@@ -319,25 +344,25 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         // An immutable shape lacks the key for as long as the holder has it.
-        base.is_subtype::<CompactDataStorage>(s, f);
+        // Its shape is read through the sealed layouts: a cast to the open
+        // compact base would keep a host subtype query in this path.
+        let shape = self.emit_compact_storage_shape(&base, f);
+        shape.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let compact = s
-            .reserve_gc_local(f)
-            .initialize(base.load(s, f).cast_subtype::<CompactDataStorage>(s, f), f);
-        s.field(CompactDataStorageSchema::SHAPE)
-            .read(&compact, s, f);
+        let _ = shape.load(s, f);
         s.field(OwnDataReadCacheSchema::ADD_HOLDER_SHAPE)
             .read(cache, s, f);
         f.instruction(&Instruction::RefEq);
         lacks.store(f);
-        compact.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        shape.clear(f);
         f.instruction(&Instruction::Else);
         // A dictionary holder answers by a live lookup of its own entries.
         base.is_subtype::<OrdinaryPropertyStorage>(s, f);
         self.open_frame(ControlFrameKind::If, f);
-        let absent = self.emit_dictionary_holder_lacks_key_i32(&present, &base, key, f)?;
+        let absent = self.emit_dictionary_holder_lacks_key_i32(&present, &base, key, absence, f)?;
         absent.load(f);
         lacks.store(f);
         s.release_i32_local(absent, f);
@@ -370,12 +395,13 @@ impl FunctionBuilder<'_> {
 
     /// Whether `holder`, whose storage `base` is a dictionary, has no own
     /// entry for `key`. An empty index bucket proves it without the call;
-    /// otherwise the complete lookup decides.
+    /// otherwise the complete lookup decides, unless `absence` declines it.
     fn emit_dictionary_holder_lacks_key_i32(
         &mut self,
         holder: &GcLocal<OrdinaryObject>,
         base: &GcLocal<ObjectPropertyStorage>,
         key: &PropertyKeyLocals,
+        absence: DictionaryAbsence,
         f: &mut Function,
     ) -> Result<I32Local, EmitError> {
         let s = self.runtime_schema();
@@ -388,15 +414,20 @@ impl FunctionBuilder<'_> {
         self.emit_ordinary_property_index_lacks_key_i32(&dictionary, key, f);
         absent.store(f);
         dictionary.clear(f);
-        absent.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let entry = self.emit_ordinary_property_entry(holder, key, f)?;
-        entry.load(s, f).is_null(f);
-        absent.store(f);
-        entry.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        match absence {
+            DictionaryAbsence::IndexOnly => {}
+            DictionaryAbsence::Lookup => {
+                absent.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, f);
+                let entry = self.emit_ordinary_property_entry(holder, key, f)?;
+                entry.load(s, f).is_null(f);
+                absent.store(f);
+                entry.clear(f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+            }
+        }
         Ok(absent)
     }
 
@@ -584,7 +615,13 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::Else);
         holder_base.is_subtype::<OrdinaryPropertyStorage>(s, f);
         self.open_frame(ControlFrameKind::If, f);
-        let absent = self.emit_dictionary_holder_lacks_key_i32(&present, &holder_base, key, f)?;
+        let absent = self.emit_dictionary_holder_lacks_key_i32(
+            &present,
+            &holder_base,
+            key,
+            DictionaryAbsence::Lookup,
+            f,
+        )?;
         absent.load(f);
         self.open_frame(ControlFrameKind::If, f);
         rule.set_constant(AddHolder::Dictionary.word(), f);

@@ -115,6 +115,7 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // storage and shape budget globals, and the compact define/allocate/index helpers.
 // Version 63 adds static assignment write records to the per-site record and
 // the cached property-write helper.
+// Version 64 flattens the per-site record table and adds cached miss kernels.
 // Version 65 passes the operator's record site to the HasInstance helper.
 const LAYOUT_VERSION: u32 = 65;
 

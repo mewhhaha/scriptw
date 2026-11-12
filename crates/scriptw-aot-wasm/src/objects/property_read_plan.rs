@@ -55,12 +55,13 @@ impl FunctionBuilder<'_> {
         }
     }
 
+    /// A static read's raw base is both its lookup target and its receiver,
+    /// so the helper takes it once.
     pub(crate) fn emit_planned_property_read(
         &mut self,
         target: &TypedExpr,
         key: &PropertyKeyIr,
-        lookup: &ValueLocals,
-        receiver: &ValueLocals,
+        base: &ValueLocals,
         key_value: &ValueLocals,
         result: &CompletionLocals,
         f: &mut Function,
@@ -76,20 +77,17 @@ impl FunctionBuilder<'_> {
                 let id = schema.reserve_i32_local(f);
                 site.emit(id, f);
                 // Selection admits only a compiler-owned static String key.
-                // The helper accepts a completed key, never raw coercible input.
+                // The helper accepts that String, never raw coercible input.
                 let name = schema.reserve_gc_local(f).initialize(
                     key_value.cast_reference::<crate::gc_types::StringValue>(schema, f),
                     f,
                 );
-                let canonical_key = PropertyKeyLocals::from_string(schema, &name, f);
-                name.clear(f);
                 schema
                     .call_helper(
                         crate::runtime_helpers::CachedPropertyReadArguments::new(
-                            lookup,
-                            receiver,
-                            &canonical_key,
+                            base,
                             id,
+                            &name,
                             self.current_environment(),
                             self.current_program(),
                         ),
@@ -97,7 +95,7 @@ impl FunctionBuilder<'_> {
                         f,
                     )
                     .store(result, f);
-                canonical_key.clear(f);
+                name.clear(f);
                 schema.release_i32_local(id, f);
                 Ok(true)
             }

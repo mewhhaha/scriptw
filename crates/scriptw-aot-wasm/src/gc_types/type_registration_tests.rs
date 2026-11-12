@@ -464,14 +464,12 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         cache[1].element_type,
         reference(GcLayout::CompactDataShape, true)
     );
+    // Shape sites keep a paged directory; the per-site records are one flat
+    // table that a hit indexes directly.
     for (table, element) in [
         (GcLayout::CompactShapeTable, GcLayout::CompactDataShape),
         (GcLayout::OwnDataReadCacheTable, GcLayout::OwnDataReadCache),
         (GcLayout::CompactShapePageTable, GcLayout::CompactShapeTable),
-        (
-            GcLayout::OwnDataReadCachePageTable,
-            GcLayout::OwnDataReadCacheTable,
-        ),
     ] {
         let CompositeInnerType::Array(table) = &types[index(table) as usize].composite_type.inner
         else {

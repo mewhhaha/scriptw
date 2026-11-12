@@ -290,7 +290,8 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
             else {
                 panic!("the selected ProgramInstance is an actual encoded struct");
             };
-            // The two mutable metadata roots now select page directories.
+            // The two mutable metadata roots select the shape sites' page
+            // directory and the per-site records' flat table.
             // Code/data and the original five hook fields remain immutable;
             // selecting an owner by requiring every field immutable loses P.
             let immutable_fields = owner_field_count
@@ -317,6 +318,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                     .expect("metadata uses the actual module/recursion-group type")
             };
             let mut metadata_types = BTreeSet::new();
+            let mut metadata_layers = Vec::new();
             for field in &owner.fields[immutable_fields..] {
                 assert!(
                     field.mutable,
@@ -331,28 +333,33 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                 );
                 let root = metadata_index(reference);
                 let mut index = root;
-                for layer in ["directory", "leaf page"] {
-                    let CompositeInnerType::Array(array) =
-                        &core_types[index as usize].composite_type.inner
-                    else {
-                        panic!("metadata {layer} must be an indexed GC array");
-                    };
-                    assert!(array.0.mutable, "metadata {layer} admits lazy publication");
+                let mut layers = 0;
+                while let CompositeInnerType::Array(array) =
+                    &core_types[index as usize].composite_type.inner
+                {
+                    assert!(array.0.mutable, "metadata tables admit lazy publication");
                     let StorageType::Val(ValType::Ref(element)) = array.0.element_type else {
-                        panic!("metadata {layer} contains typed references");
+                        panic!("metadata tables contain typed references");
                     };
                     assert!(element.is_nullable(), "unused metadata slots begin empty");
                     index = metadata_index(element);
+                    layers += 1;
                 }
                 assert!(
                     matches!(
                         &core_types[index as usize].composite_type.inner,
                         CompositeInnerType::Struct(_)
                     ),
-                    "metadata directory and leaf arrays end in records, never callable hooks"
+                    "metadata tables end in records, never callable hooks"
                 );
                 metadata_types.insert(root);
+                metadata_layers.push(layers);
             }
+            assert_eq!(
+                metadata_layers,
+                [2, 1],
+                "shape sites keep a directory of leaf pages; per-site records one flat table"
+            );
             assert_eq!(
                 metadata_types.len(),
                 2,

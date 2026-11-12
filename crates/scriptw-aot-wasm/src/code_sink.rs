@@ -648,6 +648,13 @@ impl Function {
         self.instruction(&Instruction::BrIf(depth.immediate()));
     }
 
+    /// Pops a null reference and branches to `label`; leaves any other
+    /// reference on the stack, refined to non-null.
+    pub(crate) fn branch_on_null_to_label(&mut self, label: LabelDepth) {
+        let depth = self.branch_depth_to(label);
+        self.instruction(&Instruction::BrOnNull(depth.immediate()));
+    }
+
     pub(crate) fn branch_table_to_labels(
         &mut self,
         labels: impl IntoIterator<Item = LabelDepth>,

@@ -271,3 +271,35 @@ print(log.join());
         "1,2,3,4,5,6,0,1,k,7,8,k,9,0,k,undefined,1,2,3,true,true,true,true,0,a,0,a,k:11,k:12,true,13,true,14,g",
     );
 }
+
+#[test]
+fn a_recorded_store_allocates_value_backing_only_through_the_complete_store() {
+    // A shape whose slots hold only undefined has neither scalar nor reference
+    // backing yet: the first number and the first object stored through the
+    // recorded slot must allocate it, and later null and zero overwrites must
+    // retire the old payloads. Inline (one or two keys) and array storage share
+    // one site; reads go through static read records of their own.
+    run(
+        r#"
+var log = [];
+function set(o, v) { o.c = v; }
+function get(o) { return o.c; }
+var wide = { a: undefined, b: undefined, c: undefined };
+var narrow = { c: undefined };
+set(wide, undefined); set(narrow, undefined); set(wide, undefined);
+log.push(String(get(wide)), String(get(narrow)));
+set(wide, 5); set(narrow, 6);
+log.push(get(wide), get(narrow), String(wide.a), String(wide.b));
+set(wide, "text"); set(narrow, { k: "object" });
+log.push(get(wide), get(narrow).k);
+set(wide, null); set(narrow, 0);
+log.push(String(get(wide)), get(narrow));
+set(wide, -0); set(narrow, NaN);
+log.push(1 / get(wide), String(get(narrow)));
+set(wide, true); set(narrow, 7.5);
+log.push(get(wide), get(narrow), Object.keys(wide).join(), Object.keys(narrow).join());
+print(log.join());
+"#,
+        "undefined,undefined,5,6,undefined,undefined,text,object,null,0,-Infinity,NaN,true,7.5,a,b,c,c",
+    );
+}

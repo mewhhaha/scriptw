@@ -1038,6 +1038,17 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
     }
 
+    /// The label of a target reached without unwinding anything, for the
+    /// branches that test an operand on the way (`br_on_null`, `br_on_cast`).
+    pub(crate) fn local_branch_label(&self, target: ControlTarget) -> crate::LabelDepth {
+        assert!(
+            target.environment_depth == self.environment_depth
+                && !self.generator_statement_list_branch_retires(target),
+            "an operand-testing branch cannot unwind environments or statement values"
+        );
+        target.label
+    }
+
     pub(crate) fn push_labels(
         &mut self,
         labels: &[String],

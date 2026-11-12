@@ -1038,8 +1038,8 @@ gc_layout_registry! {
             ADD_HOLDER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
             ADD_TAIL: I32Value, Mutable, NonNullable;
         }
+        // One flat table per ProgramInstance, indexed by site.
         array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }
-        array OwnDataReadCachePageTable => OwnDataReadCachePageTableSchema { ELEMENT: GcRef<OwnDataReadCacheTable>, Mutable, Nullable; }
         struct OrdinaryPropertyStorage: ObjectPropertyStorage => OrdinaryPropertyStorageSchema {
             ENTRIES: GcRef<PropertyTable>, Mutable, NonNullable;
             LENGTH: I32Value, Mutable, NonNullable;
@@ -1143,7 +1143,7 @@ gc_layout_registry! {
             LANGUAGE_FEATURE_POLICY: scriptw_ir::LanguageFeaturePolicy, Immutable, NonNullable;
             NATIVE_SOURCE_PAYLOAD: GcRef<NativeSourcePayloadArray>, Immutable, NonNullable;
             COMPACT_SHAPES: GcRef<CompactShapePageTable>, Mutable, Nullable;
-            OWN_DATA_READ_CACHES: GcRef<OwnDataReadCachePageTable>, Mutable, Nullable;
+            OWN_DATA_READ_CACHES: GcRef<OwnDataReadCacheTable>, Mutable, Nullable;
         }
         // Completed captures are immutable. The actual function/context cycle
         // is closed only after function allocation, so its back edge is mutable.

@@ -1088,6 +1088,152 @@ impl FunctionBuilder<'_> {
         tags.clear(f);
     }
 
+    /// The shape of a compact storage, null for any other storage. Each
+    /// sealed compact layout is identified by one inline cast test; the open
+    /// compact base, which Wasmtime tests by a host query, never is.
+    fn emit_compact_storage_shape(
+        &mut self,
+        base: &GcLocal<ObjectPropertyStorage>,
+        f: &mut Function,
+    ) -> GcLocal<CompactDataShape, Nullable> {
+        let schema = self.runtime_schema();
+        let shape = schema
+            .reserve_gc_local::<CompactDataShape, Nullable>(f)
+            .initialize_null(schema, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let other = self.open_frame(ControlFrameKind::Block, f);
+        let array = schema.reserve_gc_local(f).initialize(
+            base.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
+                schema,
+                self.local_branch_label(other),
+                f,
+            ),
+            f,
+        );
+        shape.replace(
+            schema
+                .field(ArrayCompactDataStorageSchema::SHAPE)
+                .read(&array, schema, f)
+                .reference()
+                .nullable(),
+            f,
+        );
+        array.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let inline = schema.reserve_gc_local(f).initialize(
+            base.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                schema,
+                self.local_branch_label(done),
+                f,
+            ),
+            f,
+        );
+        shape.replace(
+            schema
+                .field(InlineCompactDataStorageSchema::SHAPE)
+                .read(&inline, schema, f)
+                .reference()
+                .nullable(),
+            f,
+        );
+        inline.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        shape
+    }
+
+    /// The store above when no backing array has to be allocated for it: a
+    /// nonzero scalar needs the scalar backing and a non-null reference the
+    /// reference backing. Without one, branches to `unbacked` before writing
+    /// anything, leaving the allocation to the complete store.
+    fn emit_array_compact_backed_store_or_branch(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        unbacked: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let scalars = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(ArrayCompactDataStorageSchema::SCALARS)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        let references = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(ArrayCompactDataStorageSchema::REFERENCES)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        scalars.load(schema, f).is_null(f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        references.load(schema, f).is_null(f);
+        value.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(unbacked, f);
+        let tags = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(ArrayCompactDataStorageSchema::TAGS)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        schema.array_type::<CompactTagArray>().write(
+            &tags,
+            slot,
+            GcOperand::i32_local(value.tag()),
+            schema,
+            f,
+        );
+        tags.clear(f);
+        scalars.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(scalars.load(schema, f).require_non_null(f), f);
+        schema.array_type::<CompactScalarArray>().write(
+            &present,
+            slot,
+            GcOperand::i64_local(value.scalar()),
+            schema,
+            f,
+        );
+        present.clear(f);
+        f.instruction(&Instruction::End);
+        // A present backing takes every write, including a null overwrite
+        // that retires the old strong edge.
+        references.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema
+            .reserve_gc_local(f)
+            .initialize(references.load(schema, f).require_non_null(f), f);
+        schema.array_type::<CompactReferenceArray>().write(
+            &present,
+            slot,
+            GcOperand::eq_reference(value.reference()),
+            schema,
+            f,
+        );
+        present.clear(f);
+        f.instruction(&Instruction::End);
+        references.clear(f);
+        scalars.clear(f);
+    }
+
     /// Callback-free own data probe for the sole ordinary object model.
     /// Internal recipes may allocate and normalize in their defining Realm.
     /// Accessors and absence both miss, leaving full Get/descriptor consumers

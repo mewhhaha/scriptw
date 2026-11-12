@@ -1423,7 +1423,10 @@ fn emit_script_module_with_factory(
             PropertyValueResolve, compile_property_value_resolve_helper;
             ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;
+            CachedPropertyReadMiss, compile_cached_property_read_miss_helper;
             CachedPropertyWrite, compile_cached_property_write_helper;
+            CachedPropertyWriteMiss, compile_cached_property_write_miss_helper;
+            CachedPropertyAdd, compile_cached_property_add_helper;
         );
         register_runtime_helper!(OrdinaryPropertyFind, compile_ordinary_property_find_helper);
         register_runtime_helper!(

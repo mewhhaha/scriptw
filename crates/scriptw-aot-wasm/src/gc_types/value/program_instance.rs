@@ -209,10 +209,12 @@ pub(crate) struct ProgramInstanceLocals {
     owner: GcLocal<ProgramInstance>,
 }
 
-// Fixed 64-slot leaf pages keep dormant source sites from allocating one
+// Fixed 64-slot leaf pages keep dormant shape sites from allocating one
 // metadata reference each. Only the directory scales with highest_site / 64.
 const PROGRAM_CACHE_PAGE_SHIFT: i32 = 6;
 const PROGRAM_CACHE_PAGE_SIZE: i32 = 1 << PROGRAM_CACHE_PAGE_SHIFT;
+// The flat per-site record table starts with this many slots and doubles.
+const OWN_DATA_RECORDS_MINIMUM: i32 = 64;
 
 macro_rules! program_site_table {
     ($method:ident, $table:ident, $pages:ident, $field:ident) => {
@@ -396,12 +398,101 @@ impl ProgramInstanceLocals {
         CompactShapePageTable,
         COMPACT_SHAPES
     );
-    program_site_table!(
-        own_data_read_caches,
-        OwnDataReadCacheTable,
-        OwnDataReadCachePageTable,
-        OWN_DATA_READ_CACHES
-    );
+    /// The per-site record table: one flat array indexed by site, so a use
+    /// reaches its record with one array read. Null until the first record.
+    pub(crate) fn own_data_records(
+        &self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcLocal<OwnDataReadCacheTable, Nullable> {
+        schema.reserve_gc_local(function).initialize(
+            schema
+                .field(ProgramInstanceSchema::OWN_DATA_READ_CACHES)
+                .read(&self.owner, schema, function)
+                .reference(),
+            function,
+        )
+    }
+
+    /// The record table, grown to cover `site`. Growth at least doubles the
+    /// table, so registering every site of a P costs amortized constant work.
+    pub(crate) fn own_data_records_covering(
+        &self,
+        site: I32Local,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcLocal<OwnDataReadCacheTable> {
+        let table = schema.array_type::<OwnDataReadCacheTable>();
+        let records = self.own_data_records(schema, function);
+        let length = schema.reserve_i32_local(function);
+        let capacity = schema.reserve_i32_local(function);
+        length.set_constant(0, function);
+        records.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        table.length(&records, schema, function);
+        length.store(function);
+        function.instruction(&Instruction::End);
+        site.load(function);
+        length.load(function);
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        // The capacity is max(site + 1, 2 * length, the minimum).
+        site.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        capacity.store(function);
+        for doubled in [true, false] {
+            let candidate = |function: &mut Function| {
+                if doubled {
+                    length.load(function);
+                    function.instruction(&Instruction::I32Const(1));
+                    function.instruction(&Instruction::I32Shl);
+                } else {
+                    function.instruction(&Instruction::I32Const(OWN_DATA_RECORDS_MINIMUM));
+                }
+            };
+            candidate(function);
+            capacity.load(function);
+            function.instruction(&Instruction::I32GtU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            candidate(function);
+            capacity.store(function);
+            function.instruction(&Instruction::End);
+        }
+        let replacement = schema.reserve_gc_local(function).initialize(
+            table.filled(GcOperand::null(schema), capacity, function),
+            function,
+        );
+        length.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let previous = schema.reserve_gc_local(function).initialize(
+            records.load(schema, function).require_non_null(function),
+            function,
+        );
+        table.copy_prefix_from(&replacement, &previous, length, schema, function);
+        previous.clear(function);
+        function.instruction(&Instruction::End);
+        schema
+            .field(ProgramInstanceSchema::OWN_DATA_READ_CACHES)
+            .write(
+                &self.owner,
+                GcOperand::nullable_reference(&replacement, schema),
+                schema,
+                function,
+            );
+        records.replace(replacement.load(schema, function).nullable(), function);
+        replacement.clear(function);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(capacity, function);
+        schema.release_i32_local(length, function);
+        let covering = schema.reserve_gc_local(function).initialize(
+            records.load(schema, function).require_non_null(function),
+            function,
+        );
+        records.clear(function);
+        covering
+    }
 
     pub(crate) fn bind(
         schema: &RuntimeSchema,

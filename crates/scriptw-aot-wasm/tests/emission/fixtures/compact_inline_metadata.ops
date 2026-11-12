@@ -2,6 +2,8 @@
 # Source: 37cd4a8969d8e4baa7f1cd5bea040dd2a2ecac52f573edc07b31f1773cb2cb66
 # The open compact-base cast before the sealed inline cast is no longer emitted.
 # The loop header stores to the deadline poll byte.
+# Layout 64 drops the read-record page directory type (old index 94): later
+# types move down by one (97, 98, 148, 149 and 156 become 96, 97, 147, 148, 155).
 I32Const { value: 8 }
 I32Const { value: 0 }
 I32Store8 { memarg: MemArg { align: 0, max_align: 0, offset: 0, memory: 0 } }
@@ -51,14 +53,14 @@ RefNull { hty: Concrete(Module(78)) }
 LocalSet local15
 RefNull { hty: Concrete(Module(83)) }
 LocalSet local16
-RefNull { hty: Concrete(Module(156)) }
+RefNull { hty: Concrete(Module(155)) }
 LocalSet local17
-RefNull { hty: Concrete(Module(98)) }
+RefNull { hty: Concrete(Module(97)) }
 LocalSet local18
 Block { blockty: Empty }
 LocalGet local19
 LocalGet local8
-ArrayGet { array_type_index: 97 }
+ArrayGet { array_type_index: 96 }
 LocalSet local13
 LocalGet local13
 StructGet { struct_type_index: 63, field_index: 1 }
@@ -157,23 +159,23 @@ I32Const { value: 4 }
 I32Ne
 BrIf operator177
 LocalGet local12
-RefTestNonNull { hty: Concrete(Module(148)) }
+RefTestNonNull { hty: Concrete(Module(147)) }
 I32Eqz
 BrIf operator177
 LocalGet local12
-RefCastNonNull { hty: Concrete(Module(148)) }
+RefCastNonNull { hty: Concrete(Module(147)) }
 LocalSet local23
 LocalGet local23
 RefAsNonNull
-StructGet { struct_type_index: 148, field_index: 0 }
+StructGet { struct_type_index: 147, field_index: 0 }
 LocalSet local24
 LocalGet local24
 RefAsNonNull
 ArrayLen
 F64ConvertI32U
-RefNull { hty: Concrete(Module(149)) }
-LocalSet local24
 RefNull { hty: Concrete(Module(148)) }
+LocalSet local24
+RefNull { hty: Concrete(Module(147)) }
 LocalSet local23
 LocalSet local2
 I32Const { value: 1 }
@@ -181,9 +183,9 @@ LocalSet local9
 End
 RefNull { hty: Abstract { shared: false, ty: Eq } }
 LocalSet local12
-RefNull { hty: Concrete(Module(98)) }
+RefNull { hty: Concrete(Module(97)) }
 LocalSet local18
-RefNull { hty: Concrete(Module(156)) }
+RefNull { hty: Concrete(Module(155)) }
 LocalSet local17
 RefNull { hty: Concrete(Module(83)) }
 LocalSet local16

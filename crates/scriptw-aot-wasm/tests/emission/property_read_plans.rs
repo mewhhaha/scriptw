@@ -508,7 +508,11 @@ function repeatedRead(record, count, callback) {
             let fallback = program.imported_runtime_function(&runtime, definition);
             let (object_read_definition, _) = runtime.named("helper::object_read");
             let canonical_get = program.imported_runtime_function(&runtime, object_read_definition);
-            let (cached_definition, cached_body) = runtime.named("helper::cached_property_read");
+            let (cached_definition, entry_body) = runtime.named("helper::cached_property_read");
+            // The entry answers record hits; everything else is the miss
+            // kernel's, which registers records and keeps the complete Get.
+            let (miss_definition, cached_body) =
+                runtime.named("helper::cached_property_read_miss");
             let cache = program.imported_runtime_function(&runtime, cached_definition);
             let (_, own) = program.named("js::ownCandidate#");
             let (_, unresolved) = program.named("js::unresolvedRead#");
@@ -583,6 +587,27 @@ function repeatedRead(record, count, callback) {
                 calls(cached_body, object_read_definition),
                 "cache miss retains full Get with its canonical key and explicit receiver"
             );
+            assert_eq!(
+                runtime.function_type(cached_definition),
+                runtime.function_type(miss_definition),
+                "the entry forwards its exact operands to the miss kernel"
+            );
+            assert_eq!(
+                entry_body
+                    .iter()
+                    .filter(|op| matches!(op, Operator::Call { .. } | Operator::CallRef { .. }
+                        | Operator::ReturnCall { .. } | Operator::ReturnCallRef { .. }))
+                    .collect::<Vec<_>>(),
+                [&Operator::ReturnCall { function_index: miss_definition }],
+                "the hit entry makes no call but its tail call to the miss kernel"
+            );
+            assert!(
+                !entry_body.iter().any(|op| matches!(op, Operator::StructNew { .. }
+                    | Operator::StructNewDefault { .. } | Operator::ArrayNew { .. }
+                    | Operator::ArrayNewDefault { .. } | Operator::ArrayNewFixed { .. }
+                    | Operator::StructSet { .. } | Operator::ArraySet { .. })),
+                "a read hit allocates and registers nothing"
+            );
             assert!(
                 count(cached_body, |operator| matches!(
                     operator,
@@ -650,6 +675,35 @@ function repeatedRead(record, count, callback) {
             assert!(!cached_body.iter().any(|op| matches!(op,
                 Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
                     if *index == storage)), "a test against the open compact base would call the host subtype query");
+            // The entry identifies each sealed storage with one cast test
+            // after loading the receiver's current storage, and only then
+            // compares the record's shape; it never tests the open base.
+            let casts_to = |op: &Operator<'_>, layout: u32| matches!(op,
+                Operator::BrOnCast { to_ref_type, .. } | Operator::BrOnCastFail { to_ref_type, .. }
+                    if matches!(to_ref_type.heap_type(), HeapType::Concrete(index)
+                        if index.as_module_index() == Some(layout)));
+            let entry_storage = entry_body.iter().position(|op| matches!(op,
+                Operator::StructGet { struct_type_index, field_index }
+                    if *struct_type_index == object && *field_index == GcSnapshotField::ObjectProperties.index()))
+                .expect("the hit entry reloads the receiver's current own storage");
+            let array_storage = runtime.witness_type(GcSnapshotLayout::ArrayCompactStorage);
+            let array_cast = entry_storage + entry_body[entry_storage..].iter()
+                .position(|op| casts_to(op, array_storage))
+                .expect("the hit entry proves sealed Array storage by one cast test");
+            let shape_admission = array_cast + entry_body[array_cast..].iter()
+                .position(|op| matches!(op, Operator::RefEq))
+                .expect("the hit entry compares the live shape with the record's");
+            assert!(entry_body[array_cast..shape_admission].iter().any(|op| matches!(op,
+                Operator::StructGet { struct_type_index, .. } if *struct_type_index == cache_type)),
+                "current storage, then its sealed layout, then the record's shape");
+            assert!(entry_body[entry_storage..].iter().any(|op| casts_to(
+                op, runtime.witness_type(GcSnapshotLayout::InlineCompactStorage))),
+                "the hit entry proves sealed inline storage by one cast test");
+            assert!(!entry_body.iter().any(|op| casts_to(op, storage) || matches!(op,
+                Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                | Operator::RefCastNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
+                    if *index == storage)),
+                "the hit entry never tests the open compact base");
             let cache_call = repeated.iter().position(|op| matches!(op,
                 Operator::Call { function_index } if *function_index == cache)).unwrap();
             let loop_start = repeated.iter().enumerate().find_map(|(start, op)| {

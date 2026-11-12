@@ -760,7 +760,6 @@ impl<'a> FunctionBuilder<'a> {
                             &operands[0],
                             &PropertyKeyIr::StaticString(name.clone()),
                             &inputs[0],
-                            &inputs[0],
                             &inputs[1],
                             &pending,
                             function,

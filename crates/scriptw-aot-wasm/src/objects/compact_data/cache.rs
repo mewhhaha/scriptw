@@ -1,6 +1,7 @@
 //! A monomorphic cache owns only immutable shape/key metadata and a slot. Every
 //! use reloads the receiver's live storage and SoA values after intervening code.
 use super::*;
+mod entry;
 mod hit;
 mod holder;
 mod write;
@@ -13,11 +14,13 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> GcLocal<OwnDataReadCache> {
         let schema = self.runtime_schema();
-        let (table, slot) = self.current_program().own_data_read_caches(site, schema, f);
+        let table = self
+            .current_program()
+            .own_data_records_covering(site, schema, f);
         let found = schema.reserve_gc_local(f).initialize(
             schema
                 .array_type::<OwnDataReadCacheTable>()
-                .read(&table, slot, schema, f)
+                .read(&table, site, schema, f)
                 .reference(),
             f,
         );
@@ -52,7 +55,7 @@ impl FunctionBuilder<'_> {
         );
         schema.array_type::<OwnDataReadCacheTable>().write(
             &table,
-            slot,
+            site,
             GcOperand::nullable_reference(&cache, schema),
             schema,
             f,
@@ -67,15 +70,26 @@ impl FunctionBuilder<'_> {
             .initialize(found.load(schema, f).require_non_null(f), f);
         found.clear(f);
         table.clear(f);
-        schema.release_i32_local(slot, f);
         result
     }
 
-    pub(crate) fn compile_cached_property_read_helper(&mut self) -> Result<Function, EmitError> {
-        let mut f = self.begin_helper_body(RuntimeHelperId::CachedPropertyRead);
-        let p =
-            self.helper_parameters::<crate::runtime_helpers::CachedPropertyReadParameters>(&mut f);
+    /// The complete static read after the hit entry declined: registration,
+    /// the own and prototype stages, and the general Get. A static read
+    /// passes its raw base as both target and receiver.
+    pub(crate) fn compile_cached_property_read_miss_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CachedPropertyReadMiss);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::CachedPropertyReadMissParameters>(&mut f);
         let schema = self.runtime_schema();
+        let key = PropertyKeyLocals::from_string(schema, &parameters.key, &mut f);
+        let p = CachedReadOperands {
+            target: &parameters.target,
+            receiver: &parameters.target,
+            key: &key,
+            site: parameters.site,
+        };
         let result = schema.reserve_completion(&mut f);
         let handled = schema.reserve_i32_local(&mut f);
         let exit = self.open_frame(ControlFrameKind::Block, &mut f);
@@ -94,15 +108,12 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         f.instruction(&Instruction::I32Const(0));
         handled.store(&mut f);
-        // Only compiler-owned static string read sites call this kernel. Keep a
-        // value-tag guard here so no Symbol/object can ever enter a strong cache.
-        p.key.value().tag().load(&mut f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, &mut f);
-        // One record per site serves the own compact slot, the own dictionary
-        // position and the prototype stage. It holds only the key, shapes
-        // and integers; every value is reloaded from live storage.
+        // Only compiler-owned static String sites call this kernel, and the
+        // key parameter is typed as a String: no Symbol or object can ever
+        // enter a strong record. One record per site serves the own compact
+        // slot, the own dictionary position and the prototype stage. It
+        // holds only the key, shapes and integers; every value is reloaded
+        // from live storage.
         let cache = self.emit_own_data_cache_site(p.site, p.key.value(), &mut f);
         let header = self.emit_simple_data_header(&p.target, &mut f);
         header.load(schema, &mut f).is_null(&mut f);
@@ -283,8 +294,6 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         cache.clear(&mut f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         handled.load(&mut f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, &mut f);
@@ -302,8 +311,17 @@ impl FunctionBuilder<'_> {
         result.emit(&mut f);
         result.clear(&mut f);
         schema.release_i32_local(handled, &mut f);
-        p.release(&mut f);
+        key.clear(&mut f);
+        parameters.release(&mut f);
         f.instruction(&Instruction::End);
         Ok(self.finish_function(f))
     }
+}
+
+/// A static read's operands inside the miss kernel.
+struct CachedReadOperands<'a> {
+    target: &'a ValueLocals,
+    receiver: &'a ValueLocals,
+    key: &'a PropertyKeyLocals,
+    site: I32Local,
 }

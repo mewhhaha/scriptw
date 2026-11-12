@@ -1,28 +1,36 @@
-//! The encoded shared kernel bounds leaf allocation even for dormant sites.
+//! The per-site records live in one flat table that a hit indexes directly.
+//! Only the miss kernel grows it, at least doubling, so registering every
+//! site of a P costs amortized constant work; the hit entry never allocates.
 use super::*;
 use crate::gc_types::{GcNullability, GlobalLedger, OwnDataReadCacheTable, RuntimeModuleTypes};
 
 #[test]
-fn cached_read_allocates_fixed_pages_and_indexes_the_directory_by_page() {
+fn cached_read_grows_one_flat_record_table_and_its_entry_allocates_nothing() {
     let artifact = emit_script("function read(object){return object.value;} read({value:1});")
-        .expect("paged cache control emits");
+        .expect("record table control emits");
     expect_valid_module(&artifact, 1);
     let runtime = artifact.runtime().unwrap();
-    let target = function_names_in_bytes(runtime.bytes())
-        .into_iter()
-        .find_map(|(index, name)| (name == "helper::cached_property_read").then_some(index))
-        .unwrap();
+    let names = function_names_in_bytes(runtime.bytes());
+    let index_of = |wanted: &str| {
+        names
+            .iter()
+            .find_map(|(index, name)| (name == wanted).then_some(*index))
+            .unwrap()
+    };
+    let entry = index_of("helper::cached_property_read");
+    let miss = index_of("helper::cached_property_read_miss");
     let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
         .finalize_globals(GlobalLedger::new(), false, 0);
-    let wasm_encoder::HeapType::Concrete(leaf) = registered
+    let wasm_encoder::HeapType::Concrete(table) = registered
         .globals()
         .schema()
         .reference_type::<OwnDataReadCacheTable>(GcNullability::NonNullable)
         .heap_type
     else {
-        panic!("cache leaf is a declared GC array")
+        panic!("the record table is a declared GC array")
     };
     let mut index = 0;
+    let mut checked = 0;
     for payload in Parser::new(0).parse_all(runtime.bytes()) {
         match payload.unwrap() {
             Payload::ImportSection(imports) => {
@@ -38,50 +46,62 @@ fn cached_read_allocates_fixed_pages_and_indexes_the_directory_by_page() {
                     .count() as u32;
             }
             Payload::CodeSectionEntry(body) => {
-                if index == target {
+                if index == entry || index == miss {
                     let mut previous_constant = None;
-                    let mut previous_local = None;
-                    let mut constants = BTreeMap::new();
-                    let mut leaf_allocations = 0;
-                    let mut shifts = 0;
-                    let mut masks = 0;
+                    let mut table_allocations = 0;
+                    let mut other_allocations = 0;
+                    let mut doublings = 0;
+                    let mut minimum = 0;
+                    let mut table_reads = 0;
                     for operator in body.get_operators_reader().unwrap() {
                         let operator = operator.unwrap();
                         match operator {
-                            Operator::LocalSet { local_index } => {
-                                if let Some(value) = previous_constant {
-                                    constants.insert(local_index, value);
-                                } else {
-                                    constants.remove(&local_index);
-                                }
+                            Operator::ArrayNew { array_type_index }
+                                if array_type_index == table =>
+                            {
+                                table_allocations += 1
                             }
-                            Operator::ArrayNew { array_type_index } if array_type_index == leaf => {
-                                leaf_allocations += 1;
-                                assert_eq!(
-                                    previous_local.and_then(|local| constants.get(&local).copied()),
-                                    Some(64)
-                                );
+                            Operator::ArrayNew { .. }
+                            | Operator::ArrayNewDefault { .. }
+                            | Operator::ArrayNewFixed { .. }
+                            | Operator::StructNew { .. }
+                            | Operator::StructNewDefault { .. } => other_allocations += 1,
+                            Operator::ArrayGet { array_type_index }
+                                if array_type_index == table =>
+                            {
+                                table_reads += 1
                             }
-                            Operator::I32ShrU if previous_constant == Some(6) => shifts += 1,
-                            Operator::I32And if previous_constant == Some(63) => masks += 1,
+                            Operator::I32Shl if previous_constant == Some(1) => doublings += 1,
+                            Operator::I32Const { value: 64 } => minimum += 1,
                             _ => {}
                         }
                         previous_constant = match operator {
                             Operator::I32Const { value } => Some(value),
                             _ => None,
                         };
-                        previous_local = match operator {
-                            Operator::LocalGet { local_index } => Some(local_index),
-                            _ => None,
-                        };
                     }
-                    assert_eq!((leaf_allocations, shifts, masks), (1, 1, 1));
-                    return;
+                    if index == entry {
+                        assert_eq!(
+                            (table_allocations, other_allocations, table_reads),
+                            (0, 0, 1),
+                            "a hit reads its record with one table read and allocates nothing"
+                        );
+                    } else {
+                        assert_eq!(table_allocations, 1, "only the miss kernel grows the table");
+                        assert!(
+                            doublings >= 1 && minimum >= 1,
+                            "growth doubles from a minimum"
+                        );
+                    }
+                    checked += 1;
                 }
                 index += 1;
             }
             _ => {}
         }
     }
-    panic!("shared cache kernel is absent");
+    assert_eq!(
+        checked, 2,
+        "the hit entry and the miss kernel are both present"
+    );
 }

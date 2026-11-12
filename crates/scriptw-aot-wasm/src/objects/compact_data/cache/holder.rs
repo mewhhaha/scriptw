@@ -25,6 +25,15 @@ use crate::gc_types::{
 /// addresses are offsets into static data and never negative.
 pub(super) const NO_INTRINSIC_LAYOUT: i32 = -1;
 
+/// How a dictionary read takes a data value that is still a lazy recipe.
+#[derive(Clone, Copy)]
+pub(super) enum RecipeValues {
+    /// Resolve it through the resolver helper.
+    Resolve,
+    /// Leave it unread, so the read makes no call.
+    Decline,
+}
+
 /// How a use proves that the receiver has no own property for the key.
 #[derive(Clone, Copy)]
 pub(super) enum HolderReceiverKind {
@@ -153,6 +162,28 @@ impl FunctionBuilder<'_> {
         found: I32Local,
         f: &mut Function,
     ) {
+        self.emit_dictionary_position_read_with(
+            storage,
+            position,
+            key,
+            value,
+            found,
+            RecipeValues::Resolve,
+            f,
+        );
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn emit_dictionary_position_read_with(
+        &mut self,
+        storage: &GcLocal<OrdinaryPropertyStorage>,
+        position: I32Local,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        found: I32Local,
+        recipes: RecipeValues,
+        f: &mut Function,
+    ) {
         let schema = self.runtime_schema();
         found.set_constant(0, f);
         let length = schema.reserve_i32_local(f);
@@ -226,8 +257,32 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         schema.release_i32_local(flags, f);
         f.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_descriptor_data_value_into(&descriptor, value, f);
-        found.set_constant(1, f);
+        match recipes {
+            RecipeValues::Resolve => {
+                self.emit_descriptor_data_value_into(&descriptor, value, f);
+                found.set_constant(1, f);
+            }
+            RecipeValues::Decline => {
+                let data = schema.reserve_gc_local(f).initialize(
+                    schema
+                        .field(PropertyDescriptorSchema::VALUE)
+                        .read(&descriptor, schema, f)
+                        .reference(),
+                    f,
+                );
+                data.is_subtype::<StoredValue>(schema, f);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                let stored = schema.reserve_gc_local(f).initialize(
+                    data.load(schema, f).cast_subtype::<StoredValue>(schema, f),
+                    f,
+                );
+                self.emit_stored_value_to_locals(&stored, value, f);
+                stored.clear(f);
+                found.set_constant(1, f);
+                f.instruction(&Instruction::End);
+                data.clear(f);
+            }
+        }
         f.instruction(&Instruction::End);
         descriptor.clear(f);
         f.instruction(&Instruction::End);
@@ -724,7 +779,7 @@ impl FunctionBuilder<'_> {
     /// The value an intrinsic storage keeps for a value group once it has
     /// been materialized. A group still holding its recipe, or none, is left
     /// to the caller's search, which materializes it.
-    fn emit_materialized_intrinsic_group(
+    pub(super) fn emit_materialized_intrinsic_group(
         &mut self,
         intrinsic: &GcLocal<IntrinsicPropertyStorage>,
         group_index: I32Local,
@@ -957,7 +1012,7 @@ impl FunctionBuilder<'_> {
     /// An absence record holds the closed tail it was registered with as a
     /// negative slot word. The holder's layout or shape was just re-proved;
     /// the read is undefined when its chain still ends in that same tail.
-    fn emit_recorded_absence(
+    pub(super) fn emit_recorded_absence(
         &mut self,
         holder: &GcLocal<OrdinaryObject>,
         slot: I32Local,

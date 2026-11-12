@@ -26,6 +26,44 @@ fn is_test(op: &Operator<'_>, ty: u32) -> bool {
     matches!(op, Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) } if *index == ty)
 }
 
+fn is_cast_branch(op: &Operator<'_>, ty: u32) -> bool {
+    matches!(op, Operator::BrOnCast { to_ref_type, .. } | Operator::BrOnCastFail { to_ref_type, .. }
+        if matches!(to_ref_type.heap_type(), HeapType::Concrete(index) if index.as_module_index() == Some(ty)))
+}
+
+/// A hit entry admits a callable by one cast test and projects its header
+/// right after it, with no further guard, call or allocation.
+fn assert_cast_function_header(body: &[Operator<'_>], function: u32) {
+    let casts = (0..body.len())
+        .filter(|&index| is_cast_branch(&body[index], function))
+        .collect::<Vec<_>>();
+    assert!(
+        !casts.is_empty(),
+        "a concrete FunctionObject header admission"
+    );
+    for start in casts {
+        let projection = body[start..]
+            .iter()
+            .position(|op| matches!(op, Operator::StructGet { struct_type_index, field_index }
+                if *struct_type_index == function && *field_index == GcSnapshotField::FunctionObject.index()))
+            .map(|offset| start + offset)
+            .expect("the proven callable projects its canonical header");
+        assert!(
+            !body[start + 1..projection].iter().any(|op| matches!(
+                op,
+                Operator::If { .. }
+                    | Operator::Call { .. }
+                    | Operator::CallRef { .. }
+                    | Operator::RefTestNonNull { .. }
+                    | Operator::BrOnCast { .. }
+                    | Operator::StructGet { .. }
+                    | Operator::StructNew { .. }
+            )),
+            "the proven callable projects its canonical header without another guard, call or snapshot"
+        );
+    }
+}
+
 fn assert_direct_function_header(body: &[Operator<'_>], function: u32, object: u32) {
     let mut arms = Vec::new();
     for start in 0..body.len().saturating_sub(1) {
@@ -120,17 +158,27 @@ export function computed(fn, key, extra) { return fn[key]; }
             let function = runtime.witness_type(GcSnapshotLayout::Function);
             let object = runtime.witness_type(GcSnapshotLayout::Object);
             let (cache, cache_body) = runtime.named("helper::cached_property_read");
+            let (miss, miss_body) = runtime.named("helper::cached_property_read_miss");
             let (get, get_body) = runtime.named("helper::object_read");
-            for body in [cache_body, get_body] {
+            for body in [miss_body, get_body] {
                 assert_direct_function_header(body, function, object);
             }
+            assert_cast_function_header(cache_body, function);
             for layout in [GcSnapshotLayout::BoundFunction, GcSnapshotLayout::Proxy] {
                 let ty = runtime.witness_type(layout);
-                assert!(
-                    !cache_body.iter().any(|op| is_test(op, ty)),
-                    "cache header admission does not acquire BoundFunction or Proxy cases"
-                );
+                for body in [cache_body, miss_body] {
+                    assert!(
+                        !body
+                            .iter()
+                            .any(|op| is_test(op, ty) || is_cast_branch(op, ty)),
+                        "cache header admission does not acquire BoundFunction or Proxy cases"
+                    );
+                }
             }
+            assert!(
+                calls(cache_body, miss),
+                "the hit entry hands every other receiver to the miss kernel"
+            );
             let (find, _) = runtime.named("helper::ordinary_property_find");
             let (descriptor, _) = runtime.named("helper::object_get_own_property");
             assert!(
@@ -142,7 +190,7 @@ export function computed(fn, key, extra) { return fn[key]; }
                 "accessor/exotic misses retain private descriptors"
             );
             assert!(
-                calls(cache_body, get),
+                calls(miss_body, get),
                 "cache misses retain full Get with the original receiver"
             );
             let imported_cache = program.imported_runtime_function(&runtime, cache);

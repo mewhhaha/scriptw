@@ -1051,9 +1051,7 @@ impl<'a> FunctionBuilder<'a> {
         let key_value = schema.reserve_value_local(function);
         self.compile_property_key_operand(key, &key_value, function)?;
         let pending = schema.reserve_completion(function);
-        if !self.emit_planned_property_read(
-            target, key, receiver, receiver, &key_value, &pending, function,
-        )? {
+        if !self.emit_planned_property_read(target, key, receiver, &key_value, &pending, function)? {
             schema
                 .call_helper(
                     crate::runtime_helpers::DynamicPropertyReadArguments::new(

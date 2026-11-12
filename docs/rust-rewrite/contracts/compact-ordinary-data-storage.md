@@ -215,16 +215,23 @@ Each admitted static string read site can own a monomorphic cache in its
 ProgramInstance. Both the shaped PropertyRead carrier and canonical GetV with
 a literal String operand reach this seam. Operands retain their evaluation
 order; the compiler-owned literal String needs no observable key coercion.
-The runtime helper retains its twelve-input target Value, receiver Value,
-completed PropertyKey, site, Environment and ProgramInstance contract. It checks
-the actual String tag before cache registration; computed keys, super reads,
-Get and GetMethod retain their existing paths. Nullish errors and getter
-receivers keep their existing execution context and whole-Throw behavior.
+The runtime helper takes the raw base Value once (a static read's lookup
+target is also its receiver), the site, the key typed as a String, and the
+Environment and ProgramInstance, so no Symbol or object key can reach a record;
+computed keys, super reads, Get and GetMethod retain their existing paths.
+Nullish errors and getter receivers keep their existing execution context and
+whole-Throw behavior.
 
 Each P read calls the typed `CachedPropertyRead` helper with its ProgramInstance
-site and evaluated operands. R owns cache registration, live-storage guards,
-current-value loads, closed negative tails and complete Get. P retains no cache
-metadata root or duplicate storage-read path. The shared GC type prefix and full
+site and evaluated operands. That helper is a hit entry: it answers from an
+existing record when the live receiver proves it and otherwise tail-calls
+`CachedPropertyReadMiss` with the same operands. The entry makes no other call
+and registers, resolves and allocates nothing; the miss kernel owns cache
+registration, every remaining use of a record, closed negative tails and
+complete Get. Each entry answer re-proves exactly what the miss kernel's use of
+the same record proves (the record kinds are in `cache/holder.rs`); a recorded
+value that is still a recipe misses. P retains no cache metadata root or
+duplicate storage-read path. The shared GC type prefix and full
 Completion/helper/source/resumable contracts remain unchanged. All temporary
 roots clear before the read continues, including guard misses.
 
@@ -260,15 +267,16 @@ caller/arguments values keep their existing descriptor/StoredValue ownership
 and invocation updates. Accessors, absence, prototypes, bound functions and
 Proxies retain the complete Get path and original receiver/Realm semantics.
 
-Each ProgramInstance owns a typed directory for each cache kind. Indexed
-directories grow geometrically; nullable 64-slot leaf pages allocate on first
-use. Untouched pages allocate no leaf slots, while a touched page reserves all
-64 nullable slots. Individual metadata records allocate only when admitted.
-Warmed lookup uses the checked site index rather than traversing a registry.
-Directory storage scales with the highest per-kind site index divided by 64;
-leaf storage scales with touched pages. Cache polymorphism, startup allocation
-and large-program timing effects require separate measurement. No cache
-default-policy or performance claim follows from this representation contract.
+Each ProgramInstance owns one flat, nullable table of per-site records, indexed
+by site: a hit reaches its record with one checked array read. Only the miss
+kernel grows it, to at least twice its length and to cover the site (64 slots
+at first), so registering every site of a P costs amortized constant work and
+the table scales with the highest registered site. Individual records allocate
+only when admitted. Compact shape sites keep a typed directory of nullable
+64-slot leaf pages that allocate on first use. Cache polymorphism, startup
+allocation and large-program timing effects require separate measurement. No
+cache default-policy or performance claim follows from this representation
+contract.
 
 ## Static assignment write records
 
@@ -277,6 +285,11 @@ read would be cached gets its own site in the same per-ProgramInstance record
 table and calls the typed `CachedPropertyWrite` helper with the target,
 original receiver, completed key, value and site. Captured writes, `super`
 assignments, computed keys and every other Set caller keep `OrdinarySet`.
+Like the read helper, it is a call-free hit entry: it stores into an existing
+writable own slot whose value backing already exists, or proves an add (a
+dictionary holder only by its key index) and tail-calls `CachedPropertyAdd`,
+which extends the storage and returns true. Everything else tail-calls
+`CachedPropertyWriteMiss`, the complete kernel described below.
 
 The record holds only the key, shapes and integers. Its existing-own form is
 SHAPE and SLOT: a shape with the key at that slot under a writable attribute

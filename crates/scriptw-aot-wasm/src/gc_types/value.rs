@@ -253,6 +253,80 @@ impl<T: GcHeapType> GcLocal<T, Nullable> {
         ));
         function.instruction(&Instruction::LocalSet(self.index));
     }
+
+    /// The reference, after branching to `absent` when it is null.
+    pub(crate) fn non_null_or_branch(
+        &self,
+        absent: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<T> {
+        function.instruction(&Instruction::LocalGet(self.index));
+        function.branch_on_null_to_label(absent);
+        GcStackReference::new()
+    }
+}
+impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
+    /// The reference as the sealed layout `Sub`, after branching to `other`
+    /// for null and for every other layout: one inline header test, where a
+    /// test followed by a cast would compare the header twice.
+    pub(crate) fn sealed_subtype_or_branch<Sub: GcSubtype<T>>(
+        &self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<Sub> {
+        sealed_cast_or_branch::<Sub>(
+            Instruction::LocalGet(self.index),
+            schema.reference_type::<T>(GcNullability::Nullable),
+            schema,
+            other,
+            function,
+        )
+    }
+
+    /// `sealed_subtype_or_branch` for a sealed layout two declared levels
+    /// below `T`: the one test against `Sub` also proves `Middle`.
+    pub(crate) fn sealed_nested_subtype_or_branch<Middle: GcSubtype<T>, Sub: GcSubtype<Middle>>(
+        &self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<Sub> {
+        sealed_cast_or_branch::<Sub>(
+            Instruction::LocalGet(self.index),
+            schema.reference_type::<T>(GcNullability::Nullable),
+            schema,
+            other,
+            function,
+        )
+    }
+}
+
+/// Casts the reference that `load` pushes, of type `from`, to the sealed
+/// layout `T`, or branches to `other` without it.
+fn sealed_cast_or_branch<T: GcHeapType>(
+    load: Instruction<'static>,
+    from: RefType,
+    schema: &RuntimeSchema,
+    other: crate::LabelDepth,
+    function: &mut Function,
+) -> GcStackReference<T> {
+    assert!(
+        T::LAYOUT.sealed_descendants().is_empty(),
+        "one inline test identifies only a sealed layout"
+    );
+    let target = schema.reference_type::<T>(GcNullability::NonNullable);
+    function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(target))));
+    function.instruction(&load);
+    function.instruction(&Instruction::BrOnCast {
+        relative_depth: 0,
+        from_ref_type: from,
+        to_ref_type: target,
+    });
+    function.instruction(&Instruction::Drop);
+    function.branch_to_label(other);
+    function.instruction(&Instruction::End);
+    GcStackReference::new()
 }
 
 /// A declaration is consumed when a reference is initialized. Non-null locals
@@ -1557,6 +1631,23 @@ impl ValueLocals {
                 .heap_type,
         ));
         GcStackReference::new()
+    }
+    /// The reference as the sealed layout `T`, after branching to `other`
+    /// for every other reference, null included. Like `cast_reference`, the
+    /// test reads the reference itself, never the value tag.
+    pub(crate) fn sealed_reference_or_branch<T: JavaScriptReference>(
+        &self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<T> {
+        sealed_cast_or_branch::<T>(
+            Instruction::LocalGet(self.reference.index),
+            RefType::EQREF,
+            schema,
+            other,
+            function,
+        )
     }
     pub(crate) fn set_reference<T: JavaScriptReference>(
         &self,

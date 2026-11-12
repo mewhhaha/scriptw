@@ -367,7 +367,9 @@ They do not refresh the published panel.
 | Binding-name checks and `string[number]`, `6a1d8259f6ad` | 15.15M | 16.39M |
 | Integrated: position hints, shape transitions, call entries, builtin bodies, `0475e1a8ce97` | 11.20M | 12.05M |
 | Static assignment write records (ABI 63) | 11.05M | 11.89M |
+| [Record hit entries](#record-hit-entries-2026-11-12) (ABI 64) | 10.47M | 11.28M |
 | `instanceof` front, direct global and named-binding reads (ABI 65) | 10.21M | 11.01M |
+| Both of the two rows above together (ABI 65) | 9.62M | 10.39M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -455,16 +457,60 @@ dictionary definition path, a builtin call to the argument-vector call, the
 funcref and subtype host calls and receiver coercion, a closure to eager
 `length`/`name`/`prototype` definition, and a compound assignment to a
 captured variable to two runtime helpers even when the binding cell is proven.
-An own-property hit executes several hundred instructions in
+An own-property hit executed several hundred instructions in
 `helper::cached_property_read`: parameter transfer, the paged site lookup, a
 chain of layout tests for the header, and tag, scalar and reference array
-reads. A traced retained Realm keeps 1.67 MB live in a 16 MB heap, allocates
+reads; [record hit entries](#record-hit-entries-2026-11-12) cut that to about
+170. A traced retained Realm keeps 1.67 MB live in a 16 MB heap, allocates
 about 1.0 MB per request and collects every sixth request, so the collector's
 growth rule is not the cost; allocation volume is.
 
 `rsc_baseline` writes `program.cwasm` and `runtime.cwasm` beside the Wasm
 modules when `SCRIPTW_RSC_ARTIFACT_DIR` is set, so the native code of either
 policy can be disassembled with `objdump`.
+
+### Record hit entries (2026-11-12)
+
+ABI 64, measured as above (one retained Speed process per case; user
+instructions per request and per loop iteration are deterministic, cycles are
+not). Both Flight outputs stay exact.
+
+A static read or assignment now calls a small hit entry in front of the
+complete kernel. The entry reads the site's record from one flat per-program
+table (one checked array read instead of the paged directory), identifies the
+receiver and its storage by one inline cast test each (an ordinary object, a
+function, an Array, a String or a Number; array, inline, dictionary or
+intrinsic storage), answers what the record proves and otherwise tail-calls
+`helper::cached_property_read_miss` or `helper::cached_property_write_miss`
+with the same operands. The entries make no other call: a call is a safepoint,
+and an earlier cut that called the storage extension from the write entry (or
+kept the host subtype query of a cast to the open compact layout) spilled every
+reference parameter and cost a plain store 34 instructions. An add that the
+record proves now tail-calls `helper::cached_property_add`, which only extends
+the storage; proving adds in the entry still costs an existing-slot store 23
+instructions against a store-only entry (462) and saves more on each add. A
+static read passes its base once and its key as a String.
+
+| Loop body | Speed, ABI 63 | Speed, ABI 64 | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: |
+| `t += lit.b` (own property) | 659 | 405 | 258 |
+| `t += made.b` (own property of a `new P()` object) | 657 | 394 | — |
+| `lit.b = i` | 691 | 485 | 232 |
+| `u = made.m` (prototype method) | 1,233 | 537 | 230 |
+| `t += made.m(i)` | 1,696 | 1,002 | 492 |
+| `u = lit.zz` (absent) | 652 | 425 | — |
+| `u = text.indexOf` (String receiver) | 802 | 498 | — |
+| `u = Array.isArray` (global read plus own intrinsic row) | 1,167 | 960 | — |
+| `u = {}; u.a = i; u.b = 2` | 1,980 | 1,771 | 433 |
+| `u = new P()` (two fields) | 3,906 | 3,657 | 648 |
+
+The rest of an own hit is the Wasmtime code for its GC operations: each
+sealed-type test is about 13 instructions, each array element read about 14
+(the tag, scalar and reference reads of array storage are three), and every
+load of a non-null GC local repeats a null check. In request profiles,
+`helper::cached_property_read` drops from 10.5% to about 4.9% of samples own
+time and the miss kernel adds about 2.7%; most of the remaining miss time is
+the general Get for dictionary receivers that lack the key and for getters.
 
 ### Descriptor work and physical allocation
 
