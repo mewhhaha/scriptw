@@ -2348,6 +2348,11 @@ pub enum ExprIr {
     ArrayLiteral(Vec<TypedExpr>),
     ArrayAccumulation(ArrayAccumulationIr),
     Identifier(String),
+    /// GetValue of an identifier Reference that resolves in the Global
+    /// Environment Record, for a name the lowerer saw as a global property.
+    /// That sighting carries value knowledge, not existence: the backend
+    /// still performs HasBinding, so a deleted global throws a ReferenceError,
+    /// and as the operand of `TypeOf` it keeps typeof's unresolvable result.
     GlobalPropertyRead {
         name: String,
     },

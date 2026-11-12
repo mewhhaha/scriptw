@@ -118,31 +118,28 @@ print(log.join());
 
 #[test]
 fn a_global_read_follows_the_global_object_and_its_chain() {
-    // A global property replaced, deleted, redefined as an accessor and
-    // shadowed by a later global lexical declaration; an absent name later
-    // inherited, own, deleted and then asked through a Proxy prototype. The
-    // deleted property is a script-created global: a statically known
-    // builtin such as `Map` is read as a plain Get of the global object, so
-    // after its deletion that read yields undefined instead of throwing.
+    // A builtin global replaced, deleted (its read then throws), redefined
+    // as an accessor and shadowed by a later global lexical declaration; an
+    // absent name later inherited, own, deleted and then asked through a
+    // Proxy prototype.
     run_in_every_scope(
         r#"
 var log = [];
 var nativeMap = Map;
-globalThis.Shared = nativeMap;
-function read() { return Shared; }
+function read() { return Map; }
 function readLate() { return Late; }
 function typeLate() { return typeof Late == "string"; }
 function readMissing() { try { return String(Missing); } catch (error) { return error.constructor.name; } }
 function typeMissing() { return typeof Missing == "undefined"; }
 log.push(read() === nativeMap, read() === nativeMap);
-globalThis.Shared = 5;
+globalThis.Map = 5;
 log.push(read());
-delete globalThis.Shared;
-log.push(readMissingShared());
-function readMissingShared() { try { return String(Shared); } catch (error) { return error.constructor.name; } }
-Object.defineProperty(globalThis, "Shared", { get: function () { return this === globalThis ? "getter" : "wrong"; }, configurable: true });
-log.push(read(), typeof Shared);
-Object.defineProperty(globalThis, "Shared", { value: nativeMap, writable: true, configurable: true });
+delete globalThis.Map;
+log.push(readDeleted());
+function readDeleted() { try { return String(Map); } catch (error) { return error.constructor.name; } }
+Object.defineProperty(globalThis, "Map", { get: function () { return this === globalThis ? "getter" : "wrong"; }, configurable: true });
+log.push(read(), typeof Map);
+Object.defineProperty(globalThis, "Map", { value: nativeMap, writable: true, configurable: true });
 log.push(read() === nativeMap, Map === nativeMap);
 globalThis.Late = "object";
 log.push(readLate(), typeLate());

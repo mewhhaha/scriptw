@@ -40,7 +40,6 @@ impl<'a> ScriptLowerer<'a> {
             | ExprIr::ExecutionGlobalObject
             | ExprIr::Arguments
             | ExprIr::Identifier(_)
-            | ExprIr::GlobalPropertyRead { .. }
             | ExprIr::UpdateIdentifier { .. }
             | ExprIr::NewTarget => None,
             ExprIr::RegExpLiteral {
@@ -79,8 +78,10 @@ impl<'a> ScriptLowerer<'a> {
             }
             ExprIr::EnvironmentIdentifier(_) => Some(unknown_runtime_value_info()),
             // Global HasBinding/GetBindingValue can throw any value through
-            // prototype traps or accessors; typeof exempts absence only.
-            ExprIr::GlobalIdentifierRead { .. }
+            // prototype traps or accessors; typeof exempts absence only. A
+            // global the lowerer saw present may be deleted before the read.
+            ExprIr::GlobalPropertyRead { .. }
+            | ExprIr::GlobalIdentifierRead { .. }
             | ExprIr::TypeOfUnresolvedIdentifier { .. }
             | ExprIr::DeleteGlobalProperty { .. } => Some(unknown_runtime_value_info()),
             // No match here on purpose. `NativeErrorKind::constructor` is total

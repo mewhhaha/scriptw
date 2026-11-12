@@ -28,6 +28,7 @@ mod aot_constructor_throw_domain;
 mod aot_control_flow;
 mod aot_declaration_completion;
 mod aot_delete_reference;
+mod aot_deleted_global_bindings;
 mod aot_dense_switch;
 mod aot_descriptor_edges;
 mod aot_destructuring_var_binding_order;

@@ -4211,10 +4211,30 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let input = self.runtime_schema().reserve_value_local(function);
-        self.compile_expr_to_value(expr, &input, function)?;
+        self.compile_typeof_operand_to_value(expr, &input, function)?;
         self.emit_typeof_value(&input, output, function)?;
         input.clear(function);
         Ok(())
+    }
+
+    /// The value typeof classifies. A global identifier keeps its Reference
+    /// to typeof, for which an unresolvable name is undefined; every other
+    /// operand is evaluated as usual.
+    pub(crate) fn compile_typeof_operand_to_value(
+        &mut self,
+        expr: &TypedExpr,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        match &expr.expr {
+            ExprIr::GlobalPropertyRead { name } => self.emit_global_property_read(
+                name,
+                crate::environments::environment_reference::EnvironmentIdentifierRead::Typeof,
+                value,
+                function,
+            ),
+            _ => self.compile_expr_to_value(expr, value, function),
+        }
     }
 
     pub(crate) fn emit_typeof_value(

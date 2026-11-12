@@ -13,8 +13,9 @@ enum TypeofSpelling {
     Never,
 }
 
-/// What typeof inspects: an evaluated operand, or an identifier Reference
-/// that typeof reads itself, where an unresolvable name reads as undefined.
+/// What typeof inspects: an evaluated operand (a global identifier among them
+/// keeps its Reference), or an identifier Reference that typeof reads itself.
+/// Either way an unresolvable name reads as undefined.
 enum TypeofOperand<'a> {
     Value(&'a TypedExpr),
     Reference(&'a TypedExpr),
@@ -83,7 +84,7 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(function);
         match plan.operand {
             TypeofOperand::Value(operand) => {
-                self.compile_expr_to_value(operand, &value, function)?
+                self.compile_typeof_operand_to_value(operand, &value, function)?
             }
             TypeofOperand::Reference(reference) => {
                 self.compile_typeof_reference_value(reference, &value, function)?

@@ -79,25 +79,35 @@ fn with_bodies(
 
 #[derive(Debug)]
 struct Lookups {
-    object_reads: usize,
+    global_reads: usize,
     keys: BTreeMap<i32, usize>,
 }
 
 fn lookups(artifact: &WasmArtifact, name: &str) -> BTreeMap<String, Lookups> {
-    let object_read = helper(artifact, "helper::object_read");
+    // A global read that is not folded resolves the name at run time through
+    // one of the shared global identifier reads.
+    let global_reads = [
+        "helper::global_identifier_read_sloppy",
+        "helper::global_identifier_read_strict",
+        "helper::global_identifier_typeof_sloppy",
+        "helper::global_identifier_typeof_strict",
+    ]
+    .into_iter()
+    .filter_map(|name| helper(artifact, name))
+    .collect::<Vec<_>>();
     let resolve = helper(artifact, "helper::pooled_string_resolve");
     let mut result = BTreeMap::new();
     with_bodies(artifact, name, |variant, operators| {
         let mut lookup = Lookups {
-            object_reads: 0,
+            global_reads: 0,
             keys: BTreeMap::new(),
         };
         for (index, operator) in operators.iter().enumerate() {
             let Operator::Call { function_index } = operator else {
                 continue;
             };
-            if Some(*function_index) == object_read {
-                lookup.object_reads += 1;
+            if global_reads.contains(function_index) {
+                lookup.global_reads += 1;
             }
             if Some(*function_index) != resolve {
                 continue;
@@ -169,8 +179,11 @@ fn check_lookup_elimination(canonical: &WasmArtifact, writable: &WasmArtifact, n
         let control = controls
             .remove(&variant)
             .expect("same physical source variant");
-        assert_eq!(control.object_reads, folded.object_reads + 1,
-            "exactly the admitted global ObjectRead disappears in {variant}: {control:?} / {folded:?}");
+        assert_eq!(
+            control.global_reads,
+            folded.global_reads + 1,
+            "exactly the admitted global read disappears in {variant}: {control:?} / {folded:?}"
+        );
         // Removing the resolver also removes its lexical-TDZ diagnostic string.
         // Retained keys must keep their exact call counts; at least the source
         // key disappears, with no ordinal assumptions about the shared pool.
@@ -278,7 +291,7 @@ fn canonical_primitive_reads_return_constants_without_global_lookup() {
             canonical_and_writable(&format!("function read(){{return {name};}} read();"), name);
         check_lookup_elimination(&canonical, &writable, "read");
         for (variant, lookup) in lookups(&canonical, "read") {
-            assert_eq!(lookup.object_reads, 0, "no global lookup in {variant}");
+            assert_eq!(lookup.global_reads, 0, "no global lookup in {variant}");
         }
         with_bodies(&canonical, "read", |variant, operators| {
             check_returned_constant(variant, operators, tag as i32, bits);
@@ -325,7 +338,7 @@ fn absent_writable_function_and_mismatched_initializer_plans_decline() {
         let artifact = emit(&program).expect("noncanonical initializer control emits");
         for (variant, lookup) in lookups(&artifact, "read") {
             assert_eq!(
-                lookup.object_reads, 1,
+                lookup.global_reads, 1,
                 "initializer {replacement} retains the resolver in {variant}"
             );
             assert!(

@@ -12439,6 +12439,16 @@ impl<'a> ScriptLowerer<'a> {
                     let plan = self.with_environment_reference_plan(name.clone(), objects);
                     if is_bound {
                         let fallback = self.lower_identifier_name(name, false);
+                        if matches!(fallback.expr, ExprIr::GlobalPropertyRead { .. }) {
+                            // A global seen present here can still be deleted
+                            // first; typeof of its Reference reads undefined.
+                            return plan.typeof_value(TypedExpr::from_info(
+                                ValueInfo::new(ValueKind::String),
+                                ExprIr::TypeOf {
+                                    expr: Box::new(fallback),
+                                },
+                            ));
+                        }
                         return TypedExpr::from_info(
                             ValueInfo::new(ValueKind::String),
                             ExprIr::TypeOf {

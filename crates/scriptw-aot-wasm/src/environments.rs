@@ -1618,58 +1618,24 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
+    /// GetValue of an identifier that static resolution leaves to the Global
+    /// Environment Record. Knowing the name as a global at compile time proves
+    /// nothing at run time: ResolveBinding's HasBinding decides, so a deleted
+    /// global is unresolvable. Reading it throws a ReferenceError; typeof
+    /// reads undefined. The global identifier read answers an own data
+    /// property of an ordinary global object from one probe that observes
+    /// nothing, and leaves everything else to the complete Reference path.
     pub(crate) fn emit_global_property_read(
         &mut self,
         name: &str,
+        read: environment_reference::EnvironmentIdentifierRead,
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         if self.emit_immutable_global_read(name, value, function) {
             return Ok(());
         }
-        let schema = self.runtime_schema();
-        let key = schema
-            .reserve_gc_local::<StringValue, NonNullable>(function)
-            .initialize(
-                self.emit_interned_string_reference(name, function)?,
-                function,
-            );
-        let entry = schema
-            .reserve_gc_local::<crate::gc_types::NamedBinding, Nullable>(function)
-            .initialize_null(schema, function);
-        self.emit_global_lexical_entry_to_local(&key, &entry, function);
-        entry.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
-        self.open_frame(ControlFrameKind::If, function);
-        let object = schema.reserve_value_local(function);
-        self.emit_execution_global_object_to_locals(&object, function);
-        let property_key =
-            crate::operations::PropertyKeyLocals::from_string(schema, &key, function);
-        schema
-            .call_helper(
-                crate::runtime_helpers::ObjectReadArguments::new(
-                    &object,
-                    &object,
-                    &property_key,
-                    self.current_environment(),
-                    self.current_program(),
-                ),
-                self.runtime_helper_base()?,
-                function,
-            )
-            .store(self.completion(), function);
-        self.emit_propagate_current_throw_if_needed(function);
-        value.copy_from(self.completion().value(), function);
-        property_key.clear(function);
-        object.clear(function);
-        function.instruction(&Instruction::Else);
-        self.emit_global_lexical_read(&entry, value, function)?;
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        entry.clear(function);
-        key.clear(function);
-        self.emit_propagate_current_throw_if_needed(function);
-        Ok(())
+        self.emit_global_identifier_read(name, read, value, function)
     }
 
     pub(crate) fn emit_global_property_write(

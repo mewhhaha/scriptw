@@ -38,7 +38,7 @@ fn typeof_evaluates_its_whole_operand_once_before_observing_the_result() {
         body,
         &[
             "let input = self.runtime_schema().reserve_value_local(function);",
-            "self.compile_expr_to_value(expr, &input, function)?;",
+            "self.compile_typeof_operand_to_value(expr, &input, function)?;",
             "self.emit_typeof_value(&input, output, function)?;",
             "input.clear(function);",
         ],
@@ -47,6 +47,25 @@ fn typeof_evaluates_its_whole_operand_once_before_observing_the_result() {
     assert!(!body.contains("ValueKind::"));
     assert!(!body.contains("expr.kind"));
     assert!(!body.contains("compile_expr_payload"));
+
+    // The operand is evaluated once either way. A global identifier keeps
+    // its Reference, for which an unresolvable name reads as undefined;
+    // nothing is decided from the static kind.
+    let operand = bounded(
+        body,
+        "pub(crate) fn compile_typeof_operand_to_value(",
+        "\n    }\n",
+    );
+    positions_in_order(
+        operand,
+        &[
+            "match &expr.expr {",
+            "ExprIr::GlobalPropertyRead { name } => self.emit_global_property_read(",
+            "EnvironmentIdentifierRead::Typeof,",
+            "_ => self.compile_expr_to_value(expr, value, function),",
+        ],
+    );
+    assert_eq!(operand.matches("ExprIr::").count(), 1);
 }
 
 #[test]

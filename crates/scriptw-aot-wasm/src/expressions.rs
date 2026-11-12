@@ -959,9 +959,12 @@ impl<'a> FunctionBuilder<'a> {
                 self.compile_array_accumulation_payload(accumulation, output, function)?
             }
             ExprIr::Identifier(name) => self.compile_identifier_to_value(name, output, function)?,
-            ExprIr::GlobalPropertyRead { name } => {
-                self.emit_global_property_read(name, output, function)?
-            }
+            ExprIr::GlobalPropertyRead { name } => self.emit_global_property_read(
+                name,
+                crate::environments::environment_reference::EnvironmentIdentifierRead::Value,
+                output,
+                function,
+            )?,
             ExprIr::GlobalIdentifierRead { name } => self.emit_global_identifier_read(
                 name,
                 crate::environments::environment_reference::EnvironmentIdentifierRead::Value,
@@ -1524,11 +1527,15 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(storage) = self.lookup_binding(name) {
             return self.read_binding_to_locals(storage, output, function);
         }
-        if self.should_read_script_global_property(name) {
-            return self.emit_global_property_read(name, output, function);
-        }
-        if self.is_script_global_binding(name) && self.lookup_binding(name).is_none() {
-            return self.emit_global_property_read(name, output, function);
+        if self.should_read_script_global_property(name)
+            || (self.is_script_global_binding(name) && self.lookup_binding(name).is_none())
+        {
+            return self.emit_global_property_read(
+                name,
+                crate::environments::environment_reference::EnvironmentIdentifierRead::Value,
+                output,
+                function,
+            );
         }
         if let Some(host) = self.compiled_host_builtin_by_name(name) {
             let schema = self.runtime_schema();
