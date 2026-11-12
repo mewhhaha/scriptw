@@ -164,8 +164,85 @@ enum LocalArgumentsOwner {
         proof: LocalArgumentsPlan,
         name: String,
     },
-    // This native algorithm reads only arg0 and cannot observe argc or extras.
+    Native(NativeLocalArgumentsBuiltin),
+}
+
+/// Native algorithms that read at most the two narrow argument slots and
+/// never observe the argument count or any later argument. An absent argument
+/// is undefined in both ABIs, so the vector adapter and a direct local call
+/// reach the same algorithm. A body that reads the count or the vector cannot
+/// be compiled for this ABI (`BodyEntryLocals` rejects it at emission).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NativeLocalArgumentsBuiltin {
     FunctionPrototypeSymbolHasInstance,
+    ObjectGetPrototypeOf,
+    ObjectPrototypeHasOwnProperty,
+    ArrayIsArray,
+    NumberPrototypeToString,
+    StringPrototypeCharCodeAt,
+    StringPrototypeIndexOf,
+    StringPrototypeSlice,
+    MapPrototypeGet,
+    MapPrototypeHas,
+    MapPrototypeSet,
+    WeakMapPrototypeGet,
+    WeakMapPrototypeHas,
+    WeakMapPrototypeSet,
+}
+
+impl NativeLocalArgumentsBuiltin {
+    /// Declaration order is the order of the common R suffix of local bodies.
+    pub(crate) const ALL: [Self; 14] = [
+        Self::FunctionPrototypeSymbolHasInstance,
+        Self::ObjectGetPrototypeOf,
+        Self::ObjectPrototypeHasOwnProperty,
+        Self::ArrayIsArray,
+        Self::NumberPrototypeToString,
+        Self::StringPrototypeCharCodeAt,
+        Self::StringPrototypeIndexOf,
+        Self::StringPrototypeSlice,
+        Self::MapPrototypeGet,
+        Self::MapPrototypeHas,
+        Self::MapPrototypeSet,
+        Self::WeakMapPrototypeGet,
+        Self::WeakMapPrototypeHas,
+        Self::WeakMapPrototypeSet,
+    ];
+
+    pub(crate) const fn builtin(self) -> StandardBuiltinId {
+        match self {
+            Self::FunctionPrototypeSymbolHasInstance => {
+                StandardBuiltinId::FunctionPrototypeSymbolHasInstance
+            }
+            Self::ObjectGetPrototypeOf => StandardBuiltinId::ObjectGetPrototypeOf,
+            Self::ObjectPrototypeHasOwnProperty => StandardBuiltinId::ObjectPrototypeHasOwnProperty,
+            Self::ArrayIsArray => StandardBuiltinId::ArrayIsArray,
+            Self::NumberPrototypeToString => StandardBuiltinId::NumberPrototypeToString,
+            Self::StringPrototypeCharCodeAt => StandardBuiltinId::StringPrototypeCharCodeAt,
+            Self::StringPrototypeIndexOf => StandardBuiltinId::StringPrototypeIndexOf,
+            Self::StringPrototypeSlice => StandardBuiltinId::StringPrototypeSlice,
+            Self::MapPrototypeGet => StandardBuiltinId::MapPrototypeGet,
+            Self::MapPrototypeHas => StandardBuiltinId::MapPrototypeHas,
+            Self::MapPrototypeSet => StandardBuiltinId::MapPrototypeSet,
+            Self::WeakMapPrototypeGet => StandardBuiltinId::WeakMapPrototypeGet,
+            Self::WeakMapPrototypeHas => StandardBuiltinId::WeakMapPrototypeHas,
+            Self::WeakMapPrototypeSet => StandardBuiltinId::WeakMapPrototypeSet,
+        }
+    }
+
+    pub(crate) fn admits(builtin: Option<StandardBuiltinId>) -> bool {
+        builtin.and_then(Self::from_builtin).is_some()
+    }
+
+    pub(crate) fn from_builtin(builtin: StandardBuiltinId) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.builtin() == builtin)
+    }
+
+    pub(crate) const fn position(self) -> u32 {
+        self as u32
+    }
 }
 
 impl PlannedLocalArgumentsEntry {
@@ -189,25 +266,19 @@ impl PlannedLocalArgumentsEntry {
         builtin: StandardBuiltinId,
         index: LocalArgumentsFunctionIndex,
     ) -> Self {
-        assert_eq!(
-            builtin,
-            StandardBuiltinId::FunctionPrototypeSymbolHasInstance
-        );
+        let native = NativeLocalArgumentsBuiltin::from_builtin(builtin)
+            .expect("native local entry belongs to the closed admitted set");
         Self {
-            owner: LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance,
+            owner: LocalArgumentsOwner::Native(native),
             index,
         }
     }
 
     pub(super) fn require_builtin(&self, builtin: StandardBuiltinId) {
-        assert!(matches!(
-            self.owner,
-            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance
-        ));
-        assert_eq!(
-            builtin,
-            StandardBuiltinId::FunctionPrototypeSymbolHasInstance
-        );
+        let LocalArgumentsOwner::Native(native) = self.owner else {
+            panic!("source local arguments proof cannot authorize a native body");
+        };
+        assert_eq!(native.builtin(), builtin);
     }
 
     pub(crate) fn is_source(&self) -> bool {
@@ -232,7 +303,7 @@ impl PlannedLocalArgumentsEntry {
     pub(crate) fn arity(&self) -> LocalArgumentsArity {
         match &self.owner {
             LocalArgumentsOwner::Source { proof, .. } => proof.arity,
-            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => LocalArgumentsArity::Narrow,
+            LocalArgumentsOwner::Native(_) => LocalArgumentsArity::Narrow,
         }
     }
 
@@ -250,10 +321,8 @@ impl PlannedLocalArgumentsEntry {
                 id: proof.source.clone(),
                 name: name.clone(),
             },
-            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => {
-                FunctionIdentity::StandardBuiltin(
-                    StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
-                )
+            LocalArgumentsOwner::Native(native) => {
+                FunctionIdentity::StandardBuiltin(native.builtin())
             }
         }
     }
@@ -266,10 +335,8 @@ impl PlannedLocalArgumentsEntry {
                     name: name.clone(),
                 }
             }
-            LocalArgumentsOwner::FunctionPrototypeSymbolHasInstance => {
-                FunctionIdentity::NativeLocalArgumentsAdapter(
-                    StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
-                )
+            LocalArgumentsOwner::Native(native) => {
+                FunctionIdentity::NativeLocalArgumentsAdapter(native.builtin())
             }
         }
     }

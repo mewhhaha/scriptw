@@ -1,4 +1,6 @@
 use super::*;
+use crate::functions::NonArrayRealmIntrinsicSlot;
+use crate::module::TypedArrayElementKind;
 
 impl FunctionBuilder<'_> {
     fn emit_text_encoder_brand(
@@ -95,17 +97,14 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// encode(input): the UTF-8 length is counted first, so the result's
+    /// ArrayBuffer backing is allocated exactly once and written directly.
+    /// The Uint8Array and its ArrayBuffer take the current function Realm's
+    /// %Uint8Array.prototype% and %ArrayBuffer.prototype%, exactly what
+    /// constructing that Realm's %Uint8Array% with the length would select:
+    /// both constructors' "prototype" properties are non-writable and
+    /// non-configurable, and the fresh view is unobservable until returned.
     pub(crate) fn emit_text_encoder_encode(&mut self, f: &mut Function) -> Result<(), EmitError> {
-        self.emit_text_encoder_run(false, f)
-    }
-    pub(crate) fn emit_text_encoder_encode_into(
-        &mut self,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_text_encoder_run(true, f)
-    }
-
-    fn emit_text_encoder_run(&mut self, into: bool, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let argument = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
@@ -114,45 +113,352 @@ impl FunctionBuilder<'_> {
         let exit = self.open_frame(ControlFrameKind::Block, f);
         self.emit_text_encoder_brand(&output, exit, f)?;
         self.emit_builtin_arg_to_value(0, &argument, f);
-        // The optional encode input has an empty-string default; encodeInto's
-        // required DOMString converts even an explicit undefined.
-        if !into {
-            argument.tag().load(f);
-            f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
-            f.instruction(&Instruction::I32Eq);
-            self.open_frame(ControlFrameKind::If, f);
-            let empty = s
-                .reserve_gc_local(f)
-                .initialize(self.emit_interned_string_reference("", f)?, f);
-            argument.set_reference(&empty, s, f);
-            empty.clear(f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
+        // The optional input has an empty-string default.
+        argument.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let empty = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("", f)?, f);
+        argument.set_reference(&empty, s, f);
+        empty.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_value_to_string_payload(&argument, &pending, f)?;
+        self.emit_uint8_codec_abrupt_exit(&pending, &output, exit, f);
+        let input = self.emit_uint8_codec_string(pending.value(), &output, exit, f)?;
+        let count = s.reserve_i32_local(f);
+        let read = s.reserve_i32_local(f);
+        let written = s.reserve_i32_local(f);
+        let unit = s.reserve_i32_local(f);
+        let next_unit = s.reserve_i32_local(f);
+        let byte = s.reserve_i32_local(f);
+        let byte_length = s.reserve_i64_local(f);
+        input.length.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        count.store(f);
+        // Pass 1: the exact UTF-8 length. Lone surrogates become U+FFFD,
+        // which, like every other BMP scalar from U+0800, takes three bytes.
+        f.instruction(&Instruction::I64Const(0));
+        byte_length.store(f);
+        f.instruction(&Instruction::I32Const(0));
+        read.store(f);
+        let counted = self.open_frame(ControlFrameKind::Block, f);
+        let count_next = self.open_frame(ControlFrameKind::Loop, f);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(counted, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&input.units, read, s, f)
+            .store(unit, f);
+        encoder_increment(read, f);
+        byte_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Add);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x800));
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I64Add);
+        byte_length.store(f);
+        // A high surrogate followed by a low surrogate is one four-byte
+        // scalar: one more byte than the three already counted for it.
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0xfc00));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0xd800));
+        f.instruction(&Instruction::I32Eq);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&input.units, read, s, f)
+            .store(next_unit, f);
+        next_unit.load(f);
+        f.instruction(&Instruction::I32Const(0xfc00));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0xdc00));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        encoder_increment(read, f);
+        byte_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        byte_length.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(count_next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let realm = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_current_function_realm(f), f);
+        let buffer_prototype = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::ArrayBufferPrototype,
+            &buffer_prototype,
+            f,
+        );
+        let fixed = s.reserve_i32_local(f);
+        f.instruction(&Instruction::I32Const(0));
+        fixed.store(f);
+        let buffer = self.emit_binary_allocate_array_buffer(
+            &buffer_prototype,
+            byte_length,
+            byte_length,
+            fixed,
+            false,
+            &output,
+            exit,
+            f,
+        )?;
+        let bytes = s.reserve_gc_local(f).initialize(
+            s.field(ArrayBufferSchema::BYTES)
+                .read(&buffer, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        // Pass 2: write the bytes into the fresh private backing.
+        f.instruction(&Instruction::I32Const(0));
+        read.store(f);
+        f.instruction(&Instruction::I32Const(0));
+        written.store(f);
+        let encoded = self.open_frame(ControlFrameKind::Block, f);
+        let encode_next = self.open_frame(ControlFrameKind::Loop, f);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(encoded, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&input.units, read, s, f)
+            .store(unit, f);
+        encoder_increment(read, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_text_encoder_put(&bytes, written, unit, f);
+        self.emit_branch_to_target(encode_next, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x800));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        for (shift, prefix) in [(6, 0xc0), (0, 0x80)] {
+            unit.load(f);
+            if shift != 0 {
+                f.instruction(&Instruction::I32Const(shift));
+                f.instruction(&Instruction::I32ShrU);
+            } else {
+                f.instruction(&Instruction::I32Const(0x3f));
+                f.instruction(&Instruction::I32And);
+            }
+            f.instruction(&Instruction::I32Const(prefix));
+            f.instruction(&Instruction::I32Or);
+            byte.store(f);
+            self.emit_text_encoder_put(&bytes, written, byte, f);
         }
+        self.emit_branch_to_target(encode_next, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0xf800));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0xd800));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        // A surrogate: a valid pair is one supplementary scalar, and any
+        // other surrogate is the replacement character.
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0xdc00));
+        f.instruction(&Instruction::I32LtU);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&input.units, read, s, f)
+            .store(next_unit, f);
+        next_unit.load(f);
+        f.instruction(&Instruction::I32Const(0xfc00));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0xdc00));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        encoder_increment(read, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0xd800));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32Shl);
+        next_unit.load(f);
+        f.instruction(&Instruction::I32Const(0xdc00));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Add);
+        f.instruction(&Instruction::I32Const(0x10000));
+        f.instruction(&Instruction::I32Add);
+        unit.store(f);
+        for (shift, prefix) in [(18, 0xf0), (12, 0x80), (6, 0x80), (0, 0x80)] {
+            unit.load(f);
+            if shift != 0 {
+                f.instruction(&Instruction::I32Const(shift));
+                f.instruction(&Instruction::I32ShrU);
+            }
+            if prefix == 0x80 {
+                f.instruction(&Instruction::I32Const(0x3f));
+                f.instruction(&Instruction::I32And);
+            }
+            f.instruction(&Instruction::I32Const(prefix));
+            f.instruction(&Instruction::I32Or);
+            byte.store(f);
+            self.emit_text_encoder_put(&bytes, written, byte, f);
+        }
+        self.emit_branch_to_target(encode_next, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::I32Const(0xfffd));
+        unit.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        for (shift, prefix) in [(12, 0xe0), (6, 0x80), (0, 0x80)] {
+            unit.load(f);
+            if shift != 0 {
+                f.instruction(&Instruction::I32Const(shift));
+                f.instruction(&Instruction::I32ShrU);
+            }
+            if prefix == 0x80 {
+                f.instruction(&Instruction::I32Const(0x3f));
+                f.instruction(&Instruction::I32And);
+            }
+            f.instruction(&Instruction::I32Const(prefix));
+            f.instruction(&Instruction::I32Or);
+            byte.store(f);
+            self.emit_text_encoder_put(&bytes, written, byte, f);
+        }
+        self.emit_branch_to_target(encode_next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        bytes.clear(f);
+        let owner = s.reserve_gc_local(f).initialize(
+            s.struct_type::<BufferOwner>().construct(
+                (
+                    GcOperand::constant(BufferOwnerKind::ArrayBuffer),
+                    GcOperand::nullable_reference(&buffer, s),
+                    GcOperand::null(s),
+                ),
+                f,
+            ),
+            f,
+        );
+        let prototype = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::Uint8ArrayPrototype,
+            &prototype,
+            f,
+        );
+        let offset = s.reserve_i64_local(f);
+        f.instruction(&Instruction::I64Const(0));
+        offset.store(f);
+        let array = self.emit_binary_allocate_typed_array(
+            TypedArrayElementKind::Uint8,
+            &prototype,
+            &owner,
+            offset,
+            byte_length,
+            fixed,
+            f,
+        )?;
+        let result = s.reserve_value_local(f);
+        result.set_reference(&array, s, f);
+        output.set_normal(&result, f);
+        result.clear(f);
+        array.clear(f);
+        s.release_i64_local(offset, f);
+        prototype.clear(f);
+        owner.clear(f);
+        buffer.clear(f);
+        s.release_i32_local(fixed, f);
+        buffer_prototype.clear(f);
+        realm.clear(f);
+        s.release_i64_local(byte_length, f);
+        for local in [byte, next_unit, unit, written, read, count] {
+            s.release_i32_local(local, f);
+        }
+        input.clear(s, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.completion().copy_from(&output, f);
+        output.clear(f);
+        pending.clear(f);
+        argument.clear(f);
+        Ok(())
+    }
+
+    fn emit_text_encoder_put(
+        &self,
+        bytes: &GcLocal<ByteArray>,
+        written: I32Local,
+        byte: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        s.array_type::<ByteArray>()
+            .write(bytes, written, GcOperand::i32_local(byte), s, f);
+        written.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        written.store(f);
+    }
+    pub(crate) fn emit_text_encoder_encode_into(
+        &mut self,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let argument = s.reserve_value_local(f);
+        let pending = s.reserve_completion(f);
+        let output = s.reserve_completion(f);
+        output.initialize(f);
+        let exit = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_text_encoder_brand(&output, exit, f)?;
+        self.emit_builtin_arg_to_value(0, &argument, f);
+        // encodeInto's required DOMString converts even an explicit undefined.
         self.emit_value_to_string_payload(&argument, &pending, f)?;
         self.emit_uint8_codec_abrupt_exit(&pending, &output, exit, f);
         let input = self.emit_uint8_codec_string(pending.value(), &output, exit, f)?;
         let capacity = s.reserve_i64_local(f);
-        let destination = if into {
-            self.emit_builtin_arg_to_value(1, &argument, f);
-            let receiver = self.emit_uint8_codec_receiver(
-                Uint8ArrayCodecAccess::Write,
-                &argument,
-                &pending,
-                &output,
-                exit,
-                f,
-            )?;
-            self.emit_validate_typed_array_view(&receiver.object, capacity, &pending, f)?;
-            self.emit_uint8_codec_abrupt_exit(&pending, &output, exit, f);
-            Some(receiver)
-        } else {
-            input.length.load(f);
-            f.instruction(&Instruction::I64Const(3));
-            f.instruction(&Instruction::I64Mul);
-            capacity.store(f);
-            None
-        };
+        self.emit_builtin_arg_to_value(1, &argument, f);
+        let destination = self.emit_uint8_codec_receiver(
+            Uint8ArrayCodecAccess::Write,
+            &argument,
+            &pending,
+            &output,
+            exit,
+            f,
+        )?;
+        self.emit_validate_typed_array_view(&destination.object, capacity, &pending, f)?;
+        self.emit_uint8_codec_abrupt_exit(&pending, &output, exit, f);
         let result = self.emit_uint8_codec_decoded_list(capacity, capacity, f);
         let scalar = s.reserve_i32_local(f);
         let trailing = s.reserve_i32_local(f);
@@ -272,21 +578,17 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        if let Some(destination) = destination {
-            self.emit_uint8_codec_copy_bytes(
-                &destination.object,
-                &result.bytes,
-                result.written,
-                &pending,
-                &output,
-                exit,
-                f,
-            )?;
-            self.emit_uint8_codec_count_result(&result, &pending, &output, exit, f)?;
-            destination.clear(f);
-        } else {
-            self.emit_uint8_codec_static_result(&result, &pending, &output, exit, f)?;
-        }
+        self.emit_uint8_codec_copy_bytes(
+            &destination.object,
+            &result.bytes,
+            result.written,
+            &pending,
+            &output,
+            exit,
+            f,
+        )?;
+        self.emit_uint8_codec_count_result(&result, &pending, &output, exit, f)?;
+        destination.clear(f);
         result.clear(s, f);
         for local in [byte, trailing, scalar] {
             s.release_i32_local(local, f);
@@ -303,4 +605,11 @@ impl FunctionBuilder<'_> {
         argument.clear(f);
         Ok(())
     }
+}
+
+fn encoder_increment(local: I32Local, f: &mut Function) {
+    local.load(f);
+    f.instruction(&Instruction::I32Const(1));
+    f.instruction(&Instruction::I32Add);
+    local.store(f);
 }

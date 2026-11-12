@@ -46,6 +46,7 @@ mod packed_array_builtin;
 mod packed_array_index;
 mod plain_data_literal;
 pub(crate) use plain_data_literal::MAX_COMPACT_DATA_FIELDS;
+pub(crate) use compact_data::MAX_COMPACT_SHAPE_KEYS;
 mod runtime_helpers;
 mod simple_own_data_read;
 mod sparse_array_index;
@@ -960,8 +961,10 @@ impl<'a> FunctionBuilder<'a> {
             &prototype,
             function,
         );
+        // Every member defines through [[DefineOwnProperty]], so plain data
+        // members keep the fresh object compact until another kind promotes it.
         let object = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?,
+            self.emit_alloc_compact_object_with_prototype(&prototype, function)?,
             function,
         );
         let target = schema.reserve_value_local(function);
@@ -2660,6 +2663,33 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         self.emit_object_boolean_result(boolean, result, function);
         self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        // An ordinary receiver's [[GetOwnProperty]] is callback-free. Where the
+        // compact kernel applies, it performs this whole step: a present
+        // default data property is writable and takes the value through
+        // {[[Value]]}, and an absent eligible key is created by
+        // CreateDataProperty. It declines without mutation otherwise.
+        receiver.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let object = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let handled = self.emit_compact_data_define_call(&object, key, value, function)?;
+        object.clear(function);
+        handled.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_object_boolean_result(handled, result, function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(handled, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         let descriptor = self.emit_proxy_target_own_descriptor(receiver, key, function)?;

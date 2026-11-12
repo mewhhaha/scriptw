@@ -51,6 +51,7 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeGlobalScriptSignature 
                 ))),
             ),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
+            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
         ],
     )
     .unwrap();
@@ -98,6 +99,7 @@ pub(super) fn string(
     let mut fields = vec![Val::I32(0); signature.string.fields().len()];
     fields[GcHostField::StringCodeUnits.definition().index() as usize] = Val::from(units);
     fields[GcHostField::StringRawKeyHash.definition().index() as usize] = Val::I64(0);
+    fields[GcHostField::StringEntryHint.definition().index() as usize] = Val::I32(-1);
     let pre = StructRefPre::new(&mut *store, signature.string.clone());
     StructRef::new(&mut *store, &pre, &fields).unwrap()
 }

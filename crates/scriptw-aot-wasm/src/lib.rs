@@ -79,7 +79,8 @@ pub use gc_types::{
     snapshot_function_protocol, snapshot_intrinsic_index, snapshot_symbol_index,
     ArrayIndexedStorageMode, GcHostField, GcHostFieldDefinition, GcHostImport, GcHostLayout,
     GcHostStorage, GcHostValue, GcHostValueStorage, GcSnapshotField, GcSnapshotLayout,
-    SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT, SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT,
+    SNAPSHOT_COMPACT_PROPERTY_LIMIT, SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
+    SNAPSHOT_ENTRY_REALM_EXPORT, SNAPSHOT_REALMS_EXPORT,
     SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT, SNAPSHOT_SYMBOLS_EXPORT,
 };
 mod generator_delegation;

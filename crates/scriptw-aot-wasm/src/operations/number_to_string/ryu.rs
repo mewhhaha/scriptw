@@ -1095,10 +1095,10 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
         let schema = self.runtime_schema();
-        let output = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference("0", function)?,
-            function,
-        );
+        // Every branch below assigns the result; only zero needs the pooled "0".
+        let output = schema
+            .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+            .initialize_null(schema, function);
         let absolute = schema.reserve_i64_local(function);
         let sign = schema.reserve_i64_local(function);
         let mantissa = schema.reserve_i64_local(function);
@@ -1120,7 +1120,8 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::If(BlockType::Empty));
         output.replace(
-            self.emit_interned_string_reference("NaN", function)?,
+            self.emit_interned_string_reference("NaN", function)?
+                .nullable(),
             function,
         );
         function.instruction(&Instruction::Else);
@@ -1128,12 +1129,14 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32WrapI64);
         function.instruction(&Instruction::If(BlockType::Empty));
         output.replace(
-            self.emit_interned_string_reference("-Infinity", function)?,
+            self.emit_interned_string_reference("-Infinity", function)?
+                .nullable(),
             function,
         );
         function.instruction(&Instruction::Else);
         output.replace(
-            self.emit_interned_string_reference("Infinity", function)?,
+            self.emit_interned_string_reference("Infinity", function)?
+                .nullable(),
             function,
         );
         function.instruction(&Instruction::End);
@@ -1176,23 +1179,30 @@ impl<'a> FunctionBuilder<'a> {
             self.runtime_helper_base()?,
             function,
         ));
-        output.replace(string, function);
+        output.replace(string.nullable(), function);
         schema.release_i32_local(negative, function);
         schema.release_i64_local(magnitude, function);
         function.instruction(&Instruction::Else);
         self.emit_ryu_shortest_decimal(absolute, mantissa, exponent, function);
         output.replace(
-            self.emit_ecmascript_decimal_string(sign, mantissa, exponent, function),
+            self.emit_ecmascript_decimal_string(sign, mantissa, exponent, function)
+                .nullable(),
             function,
         );
         function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Else);
+        output.replace(
+            self.emit_interned_string_reference("0", function)?
+                .nullable(),
+            function,
+        );
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
         schema.release_i64_local(exponent, function);
         schema.release_i64_local(mantissa, function);
         schema.release_i64_local(sign, function);
         schema.release_i64_local(absolute, function);
-        let result = output.load(schema, function);
+        let result = output.load(schema, function).require_non_null(function);
         output.clear(function);
         Ok(result)
     }

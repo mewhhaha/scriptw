@@ -99,11 +99,61 @@ impl FunctionBuilder<'_> {
         needle_length.load(f);
         f.instruction(&Instruction::I64Sub);
         bound.store(f);
+        let units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(input, s, f)
+                .reference(),
+            f,
+        );
+        let at = s.reserve_i32_local(f);
+        let first = s.reserve_i32_local(f);
+        first.set_constant(0, f);
+        needle_length.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let needle_units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(needle, s, f)
+                .reference(),
+            f,
+        );
+        at.set_constant(0, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&needle_units, at, s, f)
+            .store(first, f);
+        needle_units.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         cursor.load(f);
         bound.load(f);
         f.instruction(&Instruction::I64GtU);
         self.emit_branch_if_to_target(done, f);
+        // A position whose first unit differs cannot match a nonempty needle.
+        needle_length.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        cursor.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        at.store(f);
+        s.array_type::<CodeUnitArray>()
+            .read(&units, at, s, f)
+            .store(at, f);
+        at.load(f);
+        first.load(f);
+        f.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, f);
+        cursor.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        cursor.store(f);
+        self.emit_branch_to_target(next, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.emit_native_string_equal_at(
             input,
             needle,
@@ -127,6 +177,9 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
+        s.release_i32_local(first, f);
+        s.release_i32_local(at, f);
+        units.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         s.release_i32_local(equal, f);

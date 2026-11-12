@@ -41,6 +41,7 @@ impl NativeDirectEvalSignature {
         schema::peer(&schema::structure(message, true, Layout::String)?, &string)?;
         let units = schema::field_array(&string, Field::StringCodeUnits, false, Layout::CodeUnits)?;
         schema::field(&string, Field::StringRawKeyHash)?;
+        schema::field(&string, Field::StringEntryHint)?;
         let descriptor = schema::array(descriptor, false, Layout::ImmutableByteArray)?;
         let realm = schema::structure(realm, false, Layout::RealmRecord)?;
         let program = schema::structure(program, false, Layout::ProgramInstance)?;

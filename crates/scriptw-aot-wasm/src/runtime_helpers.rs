@@ -1210,6 +1210,9 @@ runtime_helper_domain! {
     IntrinsicPropertyValue / IntrinsicPropertyValueArguments / IntrinsicPropertyValueParameters / "intrinsic_property_value" { storage:(Ref IntrinsicPropertyStorage NonNullable),index:I32,setter:I32 } => (Ref PropertyValue NonNullable);
     CompactLiteralAllocate / CompactLiteralAllocateArguments / CompactLiteralAllocateParameters / "compact_literal_allocate" { prototype:Value,shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryObject NonNullable);
     CompactDataStore / CompactDataStoreArguments / CompactDataStoreParameters / "compact_data_store" { storage:(Ref CompactDataStorage NonNullable),slot:I32,value:Value } => Void;
+    CompactDataDefine / CompactDataDefineArguments / CompactDataDefineParameters / "compact_data_define" { object:(Ref OrdinaryObject NonNullable),key:Key,value:Value } => I32;
+    CompactObjectAllocate / CompactObjectAllocateArguments / CompactObjectAllocateParameters / "compact_object_allocate" { prototype:Value } => (Ref OrdinaryObject NonNullable);
+    CompactShapeIndex / CompactShapeIndexArguments / CompactShapeIndexParameters / "compact_shape_index" { shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryPropertyIndex NonNullable);
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
@@ -1348,7 +1351,7 @@ runtime_helper_domain! {
     GlobalVarDeclarationCheck / GlobalVarDeclarationCheckArguments / GlobalVarDeclarationCheckParameters / "global_var_declaration_check" { object:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     GlobalVarDeclarationInstall / GlobalVarDeclarationInstallArguments / GlobalVarDeclarationInstallParameters / "global_var_declaration_install" { object:Value,key:Key,deletable:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     NativeConstructorHeaderAllocate / NativeConstructorHeaderAllocateArguments / NativeConstructorHeaderAllocateParameters / "native_constructor_header_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
-    JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:(Ref StringValue NonNullable),context:(Ref JsonStringifyContext NonNullable),indent:I64,seen:(Ref ValueArray NonNullable),caller_program:Program } => Completion;
+    JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
 }
 
 impl RuntimeHelperId {
@@ -1393,6 +1396,9 @@ impl RuntimeHelperId {
             Self::IntrinsicPropertyFind | Self::IntrinsicPropertyValue => HelperOwner::Runtime,
             Self::CompactLiteralAllocate => HelperOwner::Runtime,
             Self::CompactDataStore => HelperOwner::Runtime,
+            Self::CompactDataDefine => HelperOwner::Runtime,
+            Self::CompactObjectAllocate => HelperOwner::Runtime,
+            Self::CompactShapeIndex => HelperOwner::Runtime,
             Self::IntrinsicDataPublish => HelperOwner::Runtime,
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
@@ -1561,6 +1567,9 @@ impl RuntimeHelperId {
             Self::IntrinsicPropertyFind | Self::IntrinsicPropertyValue => true,
             Self::CompactLiteralAllocate => true,
             Self::CompactDataStore => true,
+            Self::CompactDataDefine => true,
+            Self::CompactObjectAllocate => true,
+            Self::CompactShapeIndex => true,
             Self::IntrinsicDataPublish => true,
             Self::IntrinsicAccessorPublish => true,
             Self::PropertyValueResolve => true,

@@ -68,9 +68,14 @@ impl<'ir> PlainDataLiteral<'ir> {
             function,
         );
         // No existing object can enter this path. The private fresh object has
-        // no exposure before publication and every admitted field is new.
+        // no exposure before publication and every admitted field is new. An
+        // empty literal starts compact so later plain data adds stay shaped.
         let object = schema.reserve_gc_local(function).initialize(
-            builder.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?,
+            if self.fields.is_empty() {
+                builder.emit_alloc_compact_object_with_prototype(&prototype, function)?
+            } else {
+                builder.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?
+            },
             function,
         );
         let value = schema.reserve_value_local(function);

@@ -97,7 +97,11 @@ impl EscapedReply {
         values.extend(message.iter().map(|unit| Val::I32(i32::from(*unit))));
         let units_pre = ArrayRefPre::new(&mut *store, signature.units.clone());
         let units = ArrayRef::new_fixed(&mut *store, &units_pre, &values)?;
-        let initialized_fields = [GcHostField::StringCodeUnits, GcHostField::StringRawKeyHash];
+        let initialized_fields = [
+            GcHostField::StringCodeUnits,
+            GcHostField::StringRawKeyHash,
+            GcHostField::StringEntryHint,
+        ];
         let count = signature.string.fields().len();
         if GcHostLayout::String.field_count() != Some(initialized_fields.len() as u32) {
             return Err(abi_error(
@@ -107,6 +111,8 @@ impl EscapedReply {
         let mut fields = vec![Val::I32(0); count];
         fields[GcHostField::StringCodeUnits.definition().index() as usize] = Val::from(units);
         fields[GcHostField::StringRawKeyHash.definition().index() as usize] = Val::I64(0);
+        // No dictionary position is remembered for a fresh String.
+        fields[GcHostField::StringEntryHint.definition().index() as usize] = Val::I32(-1);
         let pre = StructRefPre::new(&mut *store, signature.string.clone());
         let string = StructRef::new(&mut *store, &pre, &fields)?;
         Ok(Self::Syntax(

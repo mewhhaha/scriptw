@@ -778,6 +778,7 @@ macro_rules! gc_layout_registry {
     (@writable_array IteratorZipEntries, $mutability:ident) => {};
     (@writable_array SegmentBoundaryTable, $mutability:ident) => {};
     (@writable_array ImmutableByteArray, $mutability:ident) => {};
+    (@writable_array CompactShapeKeys, $mutability:ident) => {};
     (@writable_array $owner:ident, Mutable) => {
         impl sealed::WritableArray for $owner {}
         impl GcWritableArray for $owner {}
@@ -988,10 +989,17 @@ gc_layout_registry! {
             ATTRIBUTES: crate::heap::DescriptorWord, Immutable, NonNullable;
             // No canonical Array-index key: physical insertion order is OwnKeys order.
             OWN_KEYS_ORDERED: bool, Immutable, NonNullable;
+            // Canonical one-key extensions in creation order, null-terminated
+            // and bounded. A cache of further shapes only; never values.
+            TRANSITIONS: GcRef<CompactShapeTable>, Mutable, Nullable;
+            // Lazily derived open-addressing index of KEYS by raw key hash:
+            // zero is empty, other buckets are slots plus one. Never values.
+            INDEX: GcRef<OrdinaryPropertyIndex>, Mutable, Nullable;
         }
         array CompactShapeTable => CompactShapeTableSchema { ELEMENT: GcRef<CompactDataShape>, Mutable, Nullable; }
         array CompactShapePageTable => CompactShapePageTableSchema { ELEMENT: GcRef<CompactShapeTable>, Mutable, Nullable; }
-        array CompactShapeKeys => CompactShapeKeysSchema { ELEMENT: GcRef<StringValue>, Immutable, NonNullable; }
+        // Written only by private construction before the owning shape exists.
+        array CompactShapeKeys => CompactShapeKeysSchema { ELEMENT: GcRef<StringValue>, Mutable, NonNullable; }
         array CompactTagArray => CompactTagArraySchema { ELEMENT: I8Value, Mutable, NonNullable; }
         array CompactScalarArray => CompactScalarArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         array CompactReferenceArray => CompactReferenceArraySchema { ELEMENT: AnyGcRef, Mutable, Nullable; }
@@ -1375,6 +1383,10 @@ gc_layout_registry! {
             // Raw UTF-16 hash, before the property/collection key tag mix.
             // Zero is unprepared; a real zero hash is safely recomputed.
             RAW_KEY_HASH: I64Value, Mutable, NonNullable;
+            // Where a dictionary last held an entry keyed by this very String
+            // object. Only a guess: a lookup uses it after finding this
+            // object as the key of the live entry at that position.
+            ENTRY_HINT: I32Value, Mutable, NonNullable;
         }
         array CodeUnitArray => CodeUnitArraySchema { ELEMENT: I16Value, Mutable, NonNullable; }
         struct BigIntValue => BigIntValueSchema {
@@ -2015,11 +2027,20 @@ gc_layout_registry! {
             PARENT: GcRef<JsonReviverFrame>, Immutable, Nullable;
             ROLE: crate::builtins::JsonReviverPropertyRole, Immutable, NonNullable;
         }
+        // One serialization's private UTF-16 output; units past LENGTH are spare.
+        struct StringAccumulator => StringAccumulatorSchema {
+            UNITS: GcRef<CodeUnitArray>, Mutable, NonNullable;
+            LENGTH: I32Value, Mutable, NonNullable;
+        }
+        array JsonStringifyStack => JsonStringifyStackSchema { ELEMENT: AnyGcRef, Mutable, Nullable; }
         struct JsonStringifyContext => JsonStringifyContextSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             REPLACER: GcRef<StoredValue>, Immutable, NonNullable;
             PROPERTY_LIST: GcRef<ValueArray>, Immutable, Nullable;
             GAP: GcRef<StringValue>, Immutable, NonNullable;
+            OUTPUT: GcRef<StringAccumulator>, Immutable, NonNullable;
+            // The enclosing containers; its live prefix is the current indent.
+            STACK: GcRef<JsonStringifyStack>, Mutable, NonNullable;
         }
 
         struct NativeErrorObject: JavaScriptObject => NativeErrorObjectSchema {

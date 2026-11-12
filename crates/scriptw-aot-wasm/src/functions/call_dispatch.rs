@@ -190,7 +190,7 @@ impl FunctionBuilder<'_> {
         )?;
         self.emit_bind_metadata_abrupt_exit(&pending, result, done, function);
         let instance = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(Some(pending.value()), function)?,
+            self.emit_alloc_compact_object_with_prototype(pending.value(), function)?,
             function,
         );
         receiver.set_reference(&instance, schema, function);
@@ -433,6 +433,41 @@ impl FunctionBuilder<'_> {
         current.copy_from(callee, function);
         result.initialize(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
+        if let ProxyInvocation::Call = operation {
+            // A plain FunctionObject is callable and is not a Proxy, so the
+            // loop below would only forward it to FunctionCall, whose first
+            // iteration enters its ordinary body. Enter that body here. A
+            // resumable body has no ordinary entry and keeps the full path.
+            current.reference().load(function);
+            function.instruction(&Instruction::RefTestNonNull(
+                schema
+                    .reference_type::<FunctionObject>(GcNullability::NonNullable)
+                    .heap_type,
+            ));
+            self.open_frame(ControlFrameKind::If, function);
+            let callable = schema.reserve_gc_local(function).initialize(
+                current.cast_reference::<FunctionObject>(schema, function),
+                function,
+            );
+            let dispatch = RuntimeFunctionEntryDispatch::from_function(&callable, schema, function);
+            dispatch.ordinary(self, function, |entry, builder, function| {
+                // Every exit but the class-constructor TypeError leaves this
+                // body; that completion is the whole Call result.
+                builder.emit_ordinary_function_entry_tail_call(
+                    entry,
+                    receiver_or_new_target,
+                    arguments,
+                    result,
+                    function,
+                )?;
+                builder.emit_branch_to_target(done, function);
+                Ok(())
+            })?;
+            dispatch.release(function);
+            callable.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
         if let ProxyInvocation::Construct = operation {
             // Construct's public boundary validates the target before
             // newTarget. Retained capabilities are checked before revocation.

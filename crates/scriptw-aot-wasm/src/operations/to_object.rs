@@ -36,6 +36,12 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // ToObject is the identity on an object; only a primitive needs the
+        // outlined owner and its Realm.
+        self.emit_is_heap_object_like_tag_i32(input.tag(), function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        result.set_normal(input, function);
+        function.instruction(&Instruction::Else);
         self.runtime_schema()
             .call_helper(
                 crate::runtime_helpers::ValueToObjectArguments::new(realm, input),
@@ -43,6 +49,7 @@ impl FunctionBuilder<'_> {
                 function,
             )
             .store(result, function);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 

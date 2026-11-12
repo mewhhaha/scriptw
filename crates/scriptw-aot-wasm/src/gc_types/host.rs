@@ -212,6 +212,7 @@ impl HostFieldStorage for AnyGcRef {
 pub enum GcHostField {
     StringCodeUnits,
     StringRawKeyHash,
+    StringEntryHint,
     BigIntNegative,
     BigIntLimbs,
     StoredTag,
@@ -331,6 +332,7 @@ impl GcHostField {
             }
             Self::StringCodeUnits => reference_field(&StringValueSchema::CODE_UNITS),
             Self::StringRawKeyHash => scalar_field(&StringValueSchema::RAW_KEY_HASH),
+            Self::StringEntryHint => scalar_field(&StringValueSchema::ENTRY_HINT),
             Self::BigIntNegative => scalar_field(&BigIntValueSchema::NEGATIVE),
             Self::BigIntLimbs => reference_field(&BigIntValueSchema::LIMBS),
             Self::StoredTag => scalar_field(&StoredValueSchema::TAG),

@@ -283,8 +283,14 @@ fn catalog_expression_results_publish_whole_throw_only_on_the_cold_edge() {
                 Operator::Call { function_index } if *function_index == conversion)).unwrap();
             let [Operator::LocalSet { .. }, Operator::LocalSet { local_index: kind },
                 Operator::LocalSet { .. }, Operator::LocalSet { .. }, Operator::LocalSet { .. },
-                Operator::End, Operator::LocalGet { local_index: tested },
-                Operator::I32Const { value: 1 }, Operator::I32Eq, Operator::If { .. }, ..] = &numeric[call+1..] else {
+                after @ ..] = &numeric[call+1..] else {
+                panic!("the complete helper result is stored whole");
+            };
+            // The call sits inside the inline Number/undefined conversion
+            // arms; only the ends of those arms precede the kind test.
+            let after = &after[after.iter().take_while(|op| matches!(op, Operator::End)).count()..];
+            let [Operator::LocalGet { local_index: tested },
+                Operator::I32Const { value: 1 }, Operator::I32Eq, Operator::If { .. }, ..] = after else {
                 panic!("the complete helper result goes directly to one cold Throw edge");
             };
             assert_eq!(kind, tested, "the result's own kind controls its projection");

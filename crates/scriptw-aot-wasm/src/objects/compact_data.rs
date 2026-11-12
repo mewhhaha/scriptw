@@ -1,6 +1,8 @@
-//! Bounded fresh data literals share immutable string-only shapes. Mutable
-//! values remain strongly rooted in inline slots or tag/scalar/reference arrays. Structural
-//! mutation replaces the complete storage once; no PropertyEntry is fabricated.
+//! Bounded fresh data literals and objects grown by plain data adds share
+//! immutable string-only shapes. Mutable values remain strongly rooted in inline
+//! slots or tag/scalar/reference arrays. Every structural mutation publishes a
+//! new storage record: a plain data add moves to the canonical child shape, any
+//! other one replaces the complete storage once; no PropertyEntry is fabricated.
 use super::property_storage::PreparedOrdinaryPropertyKey;
 use super::*;
 use crate::gc_types::*;
@@ -8,6 +10,14 @@ use crate::gc_types::*;
 mod cache;
 mod native_function;
 mod shape;
+mod transition;
+pub(crate) use transition::MAX_COMPACT_SHAPE_KEYS;
+
+/// Shapes with at least this many keys probe through their derived index;
+/// shorter ones scan, which costs no more than one indexed lookup.
+const INDEXED_PROBE_MIN_KEYS: i32 = 3;
+/// Smallest index: at most 64 keys need at most 128 buckets.
+const MIN_INDEX_CAPACITY: i32 = 8;
 
 impl FunctionBuilder<'_> {
     /// Dictionary-entry consumers cannot observe a compact storage as an entry.
@@ -274,12 +284,60 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        let keys = self.emit_compact_shape_keys(storage, f);
+        let name = schema
+            .reserve_gc_local(f)
+            .initialize(key.value().cast_reference::<StringValue>(schema, f), f);
+        let hash = schema.reserve_i64_local(f);
+        self.emit_string_key_hash(&name, hash, f);
+        self.emit_compact_slot_probe_prepared(storage, &name, hash, slot, found, f);
+        schema.release_i64_local(hash, f);
+        name.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// Shape keys are compared by identity first. Every other candidate needs
+    /// equal contents, so a prepared nonzero hash that differs rejects it
+    /// without reading code units; an unprepared (zero) hash still compares.
+    /// Shapes with more keys look the key up through their derived index.
+    pub(super) fn emit_compact_slot_probe_prepared(
+        &mut self,
+        storage: &GcLocal<CompactDataStorage>,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        slot: I32Local,
+        found: I32Local,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        f.instruction(&Instruction::I32Const(0));
+        found.store(f);
+        let shape = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(CompactDataStorageSchema::SHAPE)
+                .read(storage, schema, f)
+                .reference(),
+            f,
+        );
+        let keys = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(CompactDataShapeSchema::KEYS)
+                .read(&shape, schema, f)
+                .reference(),
+            f,
+        );
         let length = schema.reserve_i32_local(f);
         schema
             .array_type::<CompactShapeKeys>()
             .length(&keys, schema, f);
         length.store(f);
+        length.load(f);
+        f.instruction(&Instruction::I32Const(INDEXED_PROBE_MIN_KEYS));
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_compact_indexed_probe(&shape, &keys, name, hash, slot, found, f);
+        f.instruction(&Instruction::Else);
         f.instruction(&Instruction::I32Const(0));
         slot.store(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
@@ -288,19 +346,16 @@ impl FunctionBuilder<'_> {
         length.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(exit, f);
-        let name = schema.reserve_gc_local(f).initialize(
+        let candidate = schema.reserve_gc_local(f).initialize(
             schema
                 .array_type::<CompactShapeKeys>()
                 .read(&keys, slot, schema, f)
                 .reference(),
             f,
         );
-        let actual = schema.reserve_value_local(f);
-        actual.set_reference(&name, schema, f);
-        self.emit_tagged_payload_same_value_i32(&actual, key.value(), f)?;
+        self.emit_compact_key_matches_i32(&candidate, name, hash, f);
         found.store(f);
-        actual.clear(f);
-        name.clear(f);
+        candidate.clear(f);
         found.load(f);
         self.emit_branch_if_to_target(exit, f);
         slot.load(f);
@@ -312,11 +367,271 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        schema.release_i32_local(length, f);
-        keys.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        Ok(())
+        schema.release_i32_local(length, f);
+        keys.clear(f);
+        shape.clear(f);
+    }
+
+    /// Open addressing over the shape's derived index: an empty bucket proves
+    /// absence, and an occupied bucket names a slot whose key is compared
+    /// exactly as in the linear scan. Capacity guarantees an empty bucket.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_compact_indexed_probe(
+        &mut self,
+        shape: &GcLocal<CompactDataShape>,
+        keys: &GcLocal<CompactShapeKeys>,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        slot: I32Local,
+        found: I32Local,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let buckets = schema.array_type::<OrdinaryPropertyIndex>();
+        let derived = schema
+            .reserve_gc_local::<OrdinaryPropertyIndex, Nullable>(f)
+            .initialize(
+                schema
+                    .field(CompactDataShapeSchema::INDEX)
+                    .read(shape, schema, f)
+                    .reference(),
+                f,
+            );
+        derived.load(schema, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let built = schema.helper_reference_on_stack(schema.call_helper(
+            crate::runtime_helpers::CompactShapeIndexArguments::new(shape),
+            self.runtime_helper_base()
+                .expect("compact probes require the registered shape index kernel"),
+            f,
+        ));
+        derived.replace(built.nullable(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let index = schema
+            .reserve_gc_local(f)
+            .initialize(derived.load(schema, f).require_non_null(f), f);
+        derived.clear(f);
+        let mask = schema.reserve_i32_local(f);
+        buckets.length(&index, schema, f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        mask.store(f);
+        let bucket = schema.reserve_i32_local(f);
+        hash.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        mask.load(f);
+        f.instruction(&Instruction::I32And);
+        bucket.store(f);
+        let exit = self.open_frame(ControlFrameKind::Block, f);
+        let repeat = self.open_frame(ControlFrameKind::Loop, f);
+        buckets.read(&index, bucket, schema, f).store(slot, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(exit, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        slot.store(f);
+        let candidate = schema.reserve_gc_local(f).initialize(
+            schema
+                .array_type::<CompactShapeKeys>()
+                .read(keys, slot, schema, f)
+                .reference(),
+            f,
+        );
+        self.emit_compact_key_matches_i32(&candidate, name, hash, f);
+        found.store(f);
+        candidate.clear(f);
+        found.load(f);
+        self.emit_branch_if_to_target(exit, f);
+        bucket.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        mask.load(f);
+        f.instruction(&Instruction::I32And);
+        bucket.store(f);
+        self.emit_branch_to_target(repeat, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(bucket, f);
+        schema.release_i32_local(mask, f);
+        index.clear(f);
+    }
+
+    /// Builds and publishes a shape's index: a power-of-two bucket array more
+    /// than twice the key count, so every probe meets an empty bucket. Keys are
+    /// distinct and immutable, so one build serves the shape's lifetime.
+    pub(crate) fn compile_compact_shape_index_helper(&mut self) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::CompactShapeIndex);
+        let p =
+            self.helper_parameters::<crate::runtime_helpers::CompactShapeIndexParameters>(&mut f);
+        let schema = self.runtime_schema();
+        let buckets = schema.array_type::<OrdinaryPropertyIndex>();
+        let keys = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .field(CompactDataShapeSchema::KEYS)
+                .read(&p.shape, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let count = schema.reserve_i32_local(&mut f);
+        schema
+            .array_type::<CompactShapeKeys>()
+            .length(&keys, schema, &mut f);
+        count.store(&mut f);
+        let capacity = schema.reserve_i32_local(&mut f);
+        capacity.set_constant(MIN_INDEX_CAPACITY, &mut f);
+        let sized = self.open_frame(ControlFrameKind::Block, &mut f);
+        let doubling = self.open_frame(ControlFrameKind::Loop, &mut f);
+        capacity.load(&mut f);
+        count.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32GtU);
+        self.emit_branch_if_to_target(sized, &mut f);
+        capacity.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Shl);
+        capacity.store(&mut f);
+        self.emit_branch_to_target(doubling, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let index = schema.reserve_gc_local(&mut f).initialize(
+            buckets.filled(GcOperand::i32(0), capacity, &mut f),
+            &mut f,
+        );
+        let slot = schema.reserve_i32_local(&mut f);
+        let bucket = schema.reserve_i32_local(&mut f);
+        let ordinal = schema.reserve_i32_local(&mut f);
+        let hash = schema.reserve_i64_local(&mut f);
+        slot.set_constant(0, &mut f);
+        let done = self.open_frame(ControlFrameKind::Block, &mut f);
+        let each = self.open_frame(ControlFrameKind::Loop, &mut f);
+        slot.load(&mut f);
+        count.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, &mut f);
+        let key = schema.reserve_gc_local(&mut f).initialize(
+            schema
+                .array_type::<CompactShapeKeys>()
+                .read(&keys, slot, schema, &mut f)
+                .reference(),
+            &mut f,
+        );
+        self.emit_string_key_hash(&key, hash, &mut f);
+        key.clear(&mut f);
+        hash.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        capacity.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32And);
+        bucket.store(&mut f);
+        let placed = self.open_frame(ControlFrameKind::Block, &mut f);
+        let probing = self.open_frame(ControlFrameKind::Loop, &mut f);
+        buckets.read(&index, bucket, schema, &mut f).store(ordinal, &mut f);
+        ordinal.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(placed, &mut f);
+        bucket.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        capacity.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32And);
+        bucket.store(&mut f);
+        self.emit_branch_to_target(probing, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        slot.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        ordinal.store(&mut f);
+        buckets.write(&index, bucket, GcOperand::i32_local(ordinal), schema, &mut f);
+        ordinal.load(&mut f);
+        slot.store(&mut f);
+        self.emit_branch_to_target(each, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        schema.field(CompactDataShapeSchema::INDEX).write(
+            &p.shape,
+            GcOperand::nullable_reference(&index, schema),
+            schema,
+            &mut f,
+        );
+        index.load(schema, &mut f);
+        schema.release_i64_local(hash, &mut f);
+        schema.release_i32_local(ordinal, &mut f);
+        schema.release_i32_local(bucket, &mut f);
+        schema.release_i32_local(slot, &mut f);
+        index.clear(&mut f);
+        schema.release_i32_local(capacity, &mut f);
+        schema.release_i32_local(count, &mut f);
+        keys.clear(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
+
+    /// Leaves SameValue(candidate, name) for two Strings on the stack. `hash`
+    /// is the name's prepared raw key hash.
+    pub(super) fn emit_compact_key_matches_i32(
+        &self,
+        candidate: &GcLocal<StringValue>,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        candidate.load(schema, f);
+        name.load(schema, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::Else);
+        let prepared = schema.reserve_i64_local(f);
+        schema
+            .field(StringValueSchema::RAW_KEY_HASH)
+            .read(candidate, schema, f)
+            .store_i64(prepared, f);
+        prepared.load(f);
+        hash.load(f);
+        f.instruction(&Instruction::I64Eq);
+        prepared.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Or);
+        f.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        self.emit_string_payload_equality_i32(candidate, name, f);
+        f.instruction(&Instruction::Else);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::End);
+        schema.release_i64_local(prepared, f);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Shape keys are long-lived; preparing their hash once lets every later
+    /// probe reject a different key without comparing contents.
+    pub(super) fn emit_prepare_compact_key_hash(
+        &mut self,
+        key: &GcLocal<StringValue>,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let hash = schema.reserve_i64_local(f);
+        self.emit_string_key_hash(key, hash, f);
+        schema.release_i64_local(hash, f);
     }
 
     pub(in crate::objects) fn emit_compact_value_at(

@@ -121,7 +121,16 @@ impl FunctionBuilder<'_> {
             .array_type::<OrdinaryPropertyIndex>()
             .length(&buckets, schema, function);
         capacity.store(function);
+        // A fresh String query first tries the position its key remembers.
+        let hinted = matches!(query, OrdinaryPropertyQuery::Fresh(_));
+        if hinted {
+            self.emit_string_key_entry_hint_probe(&storage, &entries, key, &output, function);
+        }
         capacity.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32Ne);
+        output.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
         match query {
             OrdinaryPropertyQuery::Fresh(_) => self.emit_property_key_hash(key, hash, function),
@@ -182,6 +191,9 @@ impl FunctionBuilder<'_> {
         self.emit_tagged_payload_same_value_i32(&actual, key.value(), function)?;
         self.open_frame(ControlFrameKind::If, function);
         output.replace(entry.load(schema, function).nullable(), function);
+        if hinted {
+            self.emit_string_key_entry_hint_store(key, position, function);
+        }
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         actual.clear(function);
@@ -215,6 +227,105 @@ impl FunctionBuilder<'_> {
         entries.clear(function);
         storage.clear(function);
         Ok(output)
+    }
+
+    /// Sets `output` to the live entry at the position the String key
+    /// remembers when that entry's key is this very String object. A
+    /// dictionary holds one entry per key, so that is the entry the hash
+    /// lookup would return; anything else leaves `output` null.
+    fn emit_string_key_entry_hint_probe(
+        &self,
+        storage: &GcLocal<OrdinaryPropertyStorage>,
+        entries: &GcLocal<PropertyTable>,
+        key: &PropertyKeyLocals,
+        output: &GcLocal<PropertyEntry, Nullable>,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        key.value().tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let name = schema.reserve_gc_local(function).initialize(
+            key.value()
+                .cast_reference::<crate::gc_types::StringValue>(schema, function),
+            function,
+        );
+        let hint = schema.reserve_i32_local(function);
+        schema
+            .field(crate::gc_types::StringValueSchema::ENTRY_HINT)
+            .read(&name, schema, function)
+            .store(hint, function);
+        name.clear(function);
+        // Every live entry sits below the insertion extent.
+        hint.load(function);
+        schema
+            .field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(storage, schema, function);
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let candidate = schema
+            .reserve_gc_local::<PropertyEntry, Nullable>(function)
+            .initialize(
+                schema
+                    .array_type::<PropertyTable>()
+                    .read(entries, hint, schema, function)
+                    .reference(),
+                function,
+            );
+        candidate.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let present = schema.reserve_gc_local(function).initialize(
+            candidate.load(schema, function).require_non_null(function),
+            function,
+        );
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PropertyEntrySchema::KEY)
+                .read(&present, schema, function)
+                .reference(),
+            function,
+        );
+        schema
+            .field(crate::gc_types::StoredValueSchema::REFERENCE)
+            .read(&stored, schema, function);
+        key.value().reference().load(function);
+        function.instruction(&Instruction::RefEq);
+        stored.clear(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        output.replace(present.load(schema, function).nullable(), function);
+        function.instruction(&Instruction::End);
+        present.clear(function);
+        function.instruction(&Instruction::End);
+        candidate.clear(function);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(hint, function);
+        function.instruction(&Instruction::End);
+    }
+
+    /// Remembers on a String key where its entry was just found.
+    fn emit_string_key_entry_hint_store(
+        &self,
+        key: &PropertyKeyLocals,
+        position: I32Local,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        key.value().tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let name = schema.reserve_gc_local(function).initialize(
+            key.value()
+                .cast_reference::<crate::gc_types::StringValue>(schema, function),
+            function,
+        );
+        schema
+            .field(crate::gc_types::StringValueSchema::ENTRY_HINT)
+            .write(&name, GcOperand::i32_local(position), schema, function);
+        name.clear(function);
+        function.instruction(&Instruction::End);
     }
 
     fn emit_ordinary_property_hash_bucket(

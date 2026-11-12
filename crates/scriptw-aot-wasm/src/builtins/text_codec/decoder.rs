@@ -452,54 +452,50 @@ impl FunctionBuilder<'_> {
         input_count.load(f);
         f.instruction(&Instruction::I32Add);
         total.store(f);
-        let bytes = s.reserve_gc_local(f).initialize(
+        // The input snapshot is already private; only a retained prefix
+        // needs a joined copy.
+        let bytes = s.reserve_gc_local(f).initialize(input.load(s, f), f);
+        prior_count.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let joined = s.reserve_gc_local(f).initialize(
             s.array_type::<ByteArray>()
                 .filled(GcOperand::i32(0), total, f),
             f,
         );
-        let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), total, f);
         f.instruction(&Instruction::I32Const(0));
         index.store(f);
-        let copied = self.open_frame(ControlFrameKind::Block, f);
-        let copy = self.open_frame(ControlFrameKind::Loop, f);
-        index.load(f);
-        total.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(copied, f);
-        index.load(f);
-        prior_count.load(f);
-        f.instruction(&Instruction::I32LtU);
-        self.open_frame(ControlFrameKind::If, f);
-        s.array_type::<ByteArray>()
-            .read(&prior, index, s, f)
-            .store(byte, f);
-        f.instruction(&Instruction::Else);
-        index.load(f);
-        prior_count.load(f);
-        f.instruction(&Instruction::I32Sub);
-        at.store(f);
-        s.array_type::<ByteArray>()
-            .read(input, at, s, f)
-            .store(byte, f);
+        s.array_type::<ByteArray>().copy_range_from(
+            &joined,
+            index,
+            &prior,
+            index,
+            prior_count,
+            s,
+            f,
+        );
+        s.array_type::<ByteArray>().copy_range_from(
+            &joined,
+            prior_count,
+            input,
+            index,
+            input_count,
+            s,
+            f,
+        );
+        bytes.replace(joined.load(s, f), f);
+        joined.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.array_type::<ByteArray>()
-            .write(&bytes, index, GcOperand::i32_local(byte), s, f);
-        index.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        index.store(f);
-        self.emit_branch_to_target(copy, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), total, f);
         f.instruction(&Instruction::I32Const(0));
         index.store(f);
         f.instruction(&Instruction::I32Const(0));
         written.store(f);
         f.instruction(&Instruction::I32Const(0));
         prior_count.store(f);
+        // The I/O queue is consumed; an already empty pending array is kept.
+        s.array_type::<ByteArray>().length(&prior, s, f);
+        self.open_frame(ControlFrameKind::If, f);
         let empty = s.reserve_gc_local(f).initialize(
             s.array_type::<ByteArray>()
                 .filled(GcOperand::i32(0), prior_count, f),
@@ -512,12 +508,34 @@ impl FunctionBuilder<'_> {
             f,
         );
         empty.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let decoded = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
         total.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(decoded, f);
+        // An ASCII byte after the BOM decision is its own scalar and code unit.
+        s.array_type::<ByteArray>()
+            .read(&bytes, index, s, f)
+            .store(byte, f);
+        byte.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32LtU);
+        bom_seen.load(f);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        construction.write(written, byte, s, f);
+        for local in [written, index] {
+            local.load(f);
+            f.instruction(&Instruction::I32Const(1));
+            f.instruction(&Instruction::I32Add);
+            local.store(f);
+        }
+        self.emit_branch_to_target(next, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         index.load(f);
         start.store(f);
         s.array_type::<ByteArray>()

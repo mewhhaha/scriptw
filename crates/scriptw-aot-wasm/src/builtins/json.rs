@@ -2,6 +2,7 @@
 use super::super::*;
 use crate::functions::{ArgumentListConstruction, NonArrayRealmIntrinsicSlot};
 use crate::gc_types::*;
+use crate::objects::PropertyKeyLocals;
 use crate::runtime_helpers::{
     HelperParameters, JsonStringifyValueArguments, JsonStringifyValueParameters,
 };
@@ -13,9 +14,7 @@ mod parse_array;
 mod parse_frame_state;
 mod quote;
 mod reviver;
-mod string_output;
 mod stringify;
-use string_output::StringOutputConstruction;
 mod stringify_replacer;
 use stringify_replacer::{
     JsonStringifyReplacerFunctionLocals, JsonStringifyReplacerInvocationLocals,
@@ -168,9 +167,8 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let key_value = s.reserve_value_local(f);
-        key_value.set_reference(key, s, f);
-        let property = self.emit_value_to_property_key_locals(&key_value, f)?;
+        // A String is already a property key; no conversion runs.
+        let property = PropertyKeyLocals::from_string(s, key, f);
         let result = s.reserve_completion(f);
         self.emit_object_read(holder, holder, &property, &result, f)?;
         self.completion().copy_from(&result, f);
@@ -178,9 +176,9 @@ impl FunctionBuilder<'_> {
         out.copy_from(result.value(), f);
         result.clear(f);
         property.clear(f);
-        key_value.clear(f);
         Ok(())
     }
+
     fn emit_json_define(
         &mut self,
         holder: &ValueLocals,
@@ -242,6 +240,112 @@ impl FunctionBuilder<'_> {
         );
         prototype.clear(f);
         Ok(object)
+    }
+    /// Enumerable own String keys are snapshotted before any descendant
+    /// callbacks. While every own key qualifies, the completed OwnKeys table
+    /// is itself the snapshot; the first rejected key starts a private
+    /// filtered table holding the accepted prefix and every later accepted
+    /// key. `count` receives the number of leading entries to serialize.
+    fn emit_json_enumerable_key_table(
+        &mut self,
+        holder: &ValueLocals,
+        count: I32Local,
+        f: &mut Function,
+    ) -> Result<GcLocal<PropertyKeyTable>, EmitError> {
+        let s = self.runtime_schema();
+        let keys = self.emit_object_own_property_keys(holder, f)?;
+        let total = s.reserve_i32_local(f);
+        let index = s.reserve_i32_local(f);
+        let copied = s.reserve_i32_local(f);
+        let found = s.reserve_i32_local(f);
+        let enumerable = s.reserve_i32_local(f);
+        let filtering = s.reserve_i32_local(f);
+        keys.length(total, s, f);
+        let table = keys.into_table();
+        json_i32(count, 0, f);
+        json_i32(index, 0, f);
+        json_i32(filtering, 0, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let next = self.open_frame(ControlFrameKind::Loop, f);
+        index.load(f);
+        total.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, f);
+        let key = self.emit_property_key_table_entry(&table, index, f)?;
+        json_i32(found, 0, f);
+        json_i32(enumerable, 0, f);
+        self.emit_json_tag_test(key.value(), WasmRuntimeValueTag::String, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_own_property_enumerability(holder, &key, found, enumerable, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        found.load(f);
+        enumerable.load(f);
+        f.instruction(&Instruction::I32And);
+        found.store(f);
+        found.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        filtering.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        // The first rejected key. Every earlier key was accepted, so the
+        // accepted prefix is exactly the table prefix.
+        let construction = PropertyKeyConstruction::allocate(s, s.reserve_gc_local(f), total, f);
+        json_i32(copied, 0, f);
+        let prefix_done = self.open_frame(ControlFrameKind::Block, f);
+        let prefix = self.open_frame(ControlFrameKind::Loop, f);
+        copied.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(prefix_done, f);
+        let accepted = self.emit_property_key_table_entry(&table, copied, f)?;
+        construction.write(copied, &accepted, s, f);
+        accepted.clear(f);
+        copied.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        copied.store(f);
+        self.emit_branch_to_target(prefix, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        json_i32(filtering, 1, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        filtering.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        construction.write(count, &key, s, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        count.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        key.clear(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        index.store(f);
+        self.emit_branch_to_target(next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        filtering.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        table.replace(construction.publish(s, f), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        for local in [filtering, enumerable, found, copied, index, total] {
+            s.release_i32_local(local, f);
+        }
+        Ok(table)
     }
     /// Enumerable own String keys are snapshotted before any descendant callbacks.
     fn emit_json_enumerable_keys(

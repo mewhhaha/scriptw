@@ -121,10 +121,15 @@ fn for_in_defers_the_canonical_set_until_compact_keys_need_generic_observation()
         structure(&runtime, compact).fields[0].element_type,
     ));
     let shape = structure(&runtime, shape);
-    assert_eq!(shape.fields.len(), 3);
+    assert_eq!(shape.fields.len(), 5);
     assert!(
         !shape.fields[2].mutable,
         "OwnKeys order is proven once at shape creation"
+    );
+    assert!(
+        shape.fields[..3].iter().all(|field| !field.mutable)
+            && shape.fields[3..].iter().all(|field| field.mutable),
+        "keys, attributes and order are immutable; only derived caches change"
     );
     let compact_keys = concrete(reference(shape.fields[0].element_type));
     let key_read = body.iter().position(|op| matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == compact_keys)).unwrap();

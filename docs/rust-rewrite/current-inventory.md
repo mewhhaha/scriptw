@@ -13,15 +13,19 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. Source `6a1d8259f6ad` runs a Speed sync request in 15.15M user
-  instructions against 4.38M for Node 24 `--jitless`
+  JIT. Source `0475e1a8ce97` runs a Speed sync request in 11.20M user
+  instructions and about 4.9M cycles against 4.38M and 2.68M for Node 24
+  `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11)).
-  Next, in measured order: transition shapes so property adds stop defining
-  dictionary entries; the builtin and method call path (argument vector,
-  funcref and subtype host calls, receiver coercion); inline stores for proven
-  captured cells; site records for `instanceof` and global reads, which need a
-  local absence proof for dictionary constructors; lazy function `prototype`,
-  `length` and `name`. Source `89a934d06891`
+  Next, in measured order: Set records for shaped receivers (plain data adds
+  now take [compact shape transitions](contracts/compact-ordinary-data-storage.md#shape-transitions-for-plain-data-adds),
+  but each [[Set]] still probes the receiver twice and walks a chain that is
+  not closed); a leaner hit path in `helper::cached_property_read` (9.5% of
+  cycles); a dedicated `instanceof` path for plain constructors and a site
+  record for its `prototype` read; site records for global reads; the general
+  Get for computed keys; inline stores for proven captured cells; lazy
+  function `prototype`, `length` and `name`; allocation volume, which drives
+  the 9% spent collecting. Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
   V8 with the eight-process campaign before refreshing the published panel.

@@ -173,7 +173,7 @@ impl FunctionBuilder<'_> {
         let object = schema
             .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
             .initialize(
-                self.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?,
+                self.emit_alloc_compact_object_with_prototype(&prototype, function)?,
                 function,
             );
         prototype.clear(function);

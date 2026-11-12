@@ -106,7 +106,14 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // The uncalled indexed element-write helper leaves R.
 // Version 58 widens the per-site read record: a dictionary entry position and
 // a prototype holder with its receiver rule, storage, shape, value and slot.
-const LAYOUT_VERSION: u32 = 58;
+// Version 59 gives a String the position of the dictionary entry last found
+// for it.
+// Version 60 appends further native local-argument bodies to R's suffix.
+// Version 61 gives JSON.stringify one shared output accumulator and cycle stack.
+// Version 62 adds compact shape transitions: shape transition tables and key
+// indexes, shape keys written at construction, the shared empty compact
+// storage and shape budget globals, and the compact define/allocate/index helpers.
+const LAYOUT_VERSION: u32 = 62;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

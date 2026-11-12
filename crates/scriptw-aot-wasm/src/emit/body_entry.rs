@@ -69,6 +69,9 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::IntrinsicPropertyValue
             | RuntimeHelperId::CompactLiteralAllocate
             | RuntimeHelperId::CompactDataStore
+            | RuntimeHelperId::CompactDataDefine
+            | RuntimeHelperId::CompactObjectAllocate
+            | RuntimeHelperId::CompactShapeIndex
             | RuntimeHelperId::IntrinsicDataPublish
             | RuntimeHelperId::IntrinsicAccessorPublish
             | RuntimeHelperId::IntrinsicAccessorAllocate

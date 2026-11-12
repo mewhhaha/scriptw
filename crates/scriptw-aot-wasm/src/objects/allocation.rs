@@ -24,6 +24,56 @@ impl FunctionBuilder<'_> {
         self.emit_allocate_object_header(prototype, ObjectPrototypeMutability::Mutable, function)
     }
 
+    /// A fresh plain ordinary object without own properties. It starts on the
+    /// shared empty compact storage, so plain data adds keep it compact along
+    /// canonical shapes. Exotic and composite headers keep the dictionary
+    /// allocator: their own-key and indexed paths never consult a shape.
+    pub(crate) fn emit_alloc_compact_object_with_prototype(
+        &self,
+        prototype: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<GcStackReference<OrdinaryObject>, EmitError> {
+        let schema = self.runtime_schema();
+        Ok(schema.helper_reference_on_stack(schema.call_helper(
+            crate::runtime_helpers::CompactObjectAllocateArguments::new(prototype),
+            self.runtime_helper_base()?,
+            function,
+        )))
+    }
+
+    pub(crate) fn compile_compact_object_allocate_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::CompactObjectAllocate);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::CompactObjectAllocateParameters>(
+                &mut function,
+            );
+        let schema = self.runtime_schema();
+        let storage = schema.reserve_gc_local(&mut function).initialize(
+            schema
+                .empty_compact_storage(&mut function)
+                .upcast::<crate::gc_types::CompactDataStorage>()
+                .upcast(),
+            &mut function,
+        );
+        let mutable = schema.reserve_i32_local(&mut function);
+        mutable.set_constant(ObjectPrototypeMutability::Mutable.word(), &mut function);
+        let object = self.emit_alloc_object_header_with_storage(
+            &parameters.prototype,
+            mutable,
+            &storage,
+            &mut function,
+        );
+        schema.release_i32_local(mutable, &mut function);
+        storage.clear(&mut function);
+        // Keep the actual header on the operand stack through root retirement.
+        let _ = object;
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     pub(crate) fn emit_alloc_immutable_prototype_object(
         &mut self,
         realm: &GcLocal<crate::gc_types::RealmRecord>,

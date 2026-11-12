@@ -310,13 +310,13 @@ fn sole_serialize_property_producer_constructs_roles_for_every_holder() {
             1
         );
     }
-    // Array/object share one container walk; it and the root wrapper use the same helper.
+    // Array/object share one container walk; it and the root use the same helper.
     assert!(source.contains(
-        "JsonStringifyValueArguments::new(holder,key,context,indent,seen,self.current_program(),)"
+        "JsonStringifyValueArguments::new(holder,key,context,indent,self.current_program())"
     ));
     let helpers = rust_code(HELPER_SOURCE).normalized;
     assert!(helpers.contains(
-        "JsonStringifyValue/JsonStringifyValueArguments/JsonStringifyValueParameters/\"json_stringify_value\"{holder:Value,key:(RefStringValueNonNullable),context:(RefJsonStringifyContextNonNullable),indent:I64,seen:(RefValueArrayNonNullable),caller_program:Program}=>Completion;"
+        "JsonStringifyValue/JsonStringifyValueArguments/JsonStringifyValueParameters/\"json_stringify_value\"{holder:Value,key:Value,context:(RefJsonStringifyContextNonNullable),indent:I64,caller_program:Program}=>Completion;"
     ));
     assert!(
         source.contains("self.emit_json_serialize_property(&parameters.holder,&parameters.key,")
@@ -334,13 +334,12 @@ fn sole_serialize_property_producer_constructs_roles_for_every_holder() {
         2
     );
     assert!(source.contains("self.emit_json_index_key(index,f)?"));
-    assert!(
-        source.contains("self.emit_argument_vector_entry_to_value(&list,scan_index,&key_value,f);")
-    );
+    assert!(source.contains("self.emit_argument_vector_entry_to_value(&list,item,&key_value,f);"));
     assert!(source.contains(
-        "self.emit_json_stringify_call(value,&name,context,child_depth,&descendants,&result,f,"
+        "self.emit_json_stringify_call(value,&key_value,context,child_depth,&result,f)?;"
     ));
-    assert!(source.contains("self.emit_json_define(&holder,&key,&value,false,f)?;"));
+    // A replacer function receives the root wrapper as its holder.
+    assert!(source.contains("self.emit_json_define(&holder,&empty,&value,false,f)?;"));
 }
 
 #[test]

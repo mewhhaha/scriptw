@@ -11,6 +11,7 @@ mod arguments_binding_protocol_ownership_structure;
 mod arguments_callee_descriptor_structure;
 mod arguments_index_descriptor_structure;
 mod compact_literal_layout_structure;
+mod compact_shape_transition_structure;
 mod completion_exit_structure;
 mod conversion_abrupt_route_capability_structure;
 mod descriptor_known_present_compatibility_structure;

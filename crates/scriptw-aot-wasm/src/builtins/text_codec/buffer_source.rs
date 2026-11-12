@@ -177,6 +177,28 @@ impl FunctionBuilder<'_> {
         let byte = s.reserve_i32_local(f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
+        // An ArrayBuffer's validated live window is one bulk copy. Shared
+        // backing keeps its per-byte host-memory reads below.
+        access.shared.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let source = s
+            .reserve_gc_local(f)
+            .initialize(access.bytes.load(s, f).require_non_null(f), f);
+        let zero = s.reserve_i32_local(f);
+        f.instruction(&Instruction::I32Const(0));
+        zero.store(f);
+        offset.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        at.store(f);
+        s.array_type::<ByteArray>()
+            .copy_range_from(&bytes, zero, &source, at, extent, s, f);
+        s.release_i32_local(zero, f);
+        source.clear(f);
+        length.load(f);
+        index.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);

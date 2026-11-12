@@ -1,6 +1,6 @@
 # Compact ordinary data storage
 
-The current private runtime ABI is layout 54. Compact ordinary property storage
+The current private runtime ABI is layout 59. Compact ordinary property storage
 belongs to the single Wasm GC object model and requires the experimental
 Wasmtime GC/reference feature baseline. Layout 31 adds the inline representation
 and shared store kernel described in
@@ -22,7 +22,8 @@ Test262 result.
 A genuine source literal with 1–16 unique static string data keys and a source
 execution environment creates fresh compact ordinary storage. Every source
 field has writable, enumerable and configurable attributes. Empty literals
-retain the ordinary empty allocator. Values evaluate once, left to right,
+start on the shared empty compact storage described under shape transitions.
+Values evaluate once, left to right,
 through normal expression and abrupt-completion emission. The compact allocator
 owns a fresh ordinary header with the exact source Realm's Object prototype.
 The object is not exposed while its values are being initialized. Duplicate,
@@ -73,11 +74,11 @@ prefix in its physical schema:
 - `ArrayCompactDataStorage` holds a nonnull tag-array reference and mutable
   nullable scalar-array and reference-array edges.
 
-The allocator selects inline storage for exactly one or two shape keys. Other
-shape lengths, including zero at the internal allocator boundary, select array
-storage. Empty source literals do not enter this compact allocator. An ordinary
-header's mutable property-storage reference owns the chosen concrete compact
-storage or an ordinary dictionary.
+The literal allocator selects inline storage for exactly one or two shape keys
+and exact-length array storage otherwise. Shape transitions keep the same
+split: one or two keys are inline, three or more use array storage whose
+backings may carry spare slots. An ordinary header's mutable property-storage
+reference owns the chosen concrete compact storage or an ordinary dictionary.
 
 Inline storage retains the complete generic value tuple for each slot. The two
 tag bytes occupy the low two bytes of `PACKED_TAGS`; both tags start Undefined,
@@ -89,11 +90,12 @@ complete scalar bits and reference, including null, while preserving sibling
 tag bits and fields. There is no numeric-only admission or per-write type
 promotion.
 
-Array storage owns one mutable-byte tag per key. Null scalar backing represents
-zero bits in every slot; the first nonzero scalar write allocates an exact
-shape-sized i64 array. Null reference backing represents null references in
-every slot; the first nonnull reference write allocates an exact shape-sized
-eqref array. Every present backing has exactly the shape extent. Once backing
+Array storage owns one mutable-byte tag per physical slot. The shape's key
+count is the logical extent; the tag array may be longer. Null scalar backing
+represents zero bits in every slot; the first nonzero scalar write allocates an
+i64 array of the tag array's length. Null reference backing represents null
+references in every slot; the first nonnull reference write allocates an eqref
+array of that length. Every present backing has the tag array's length. Once backing
 exists, later zero/null writes replace its old payload and clear old GC edges.
 Scalar and reference backings are independent and remain allocated after those
 writes.
@@ -118,8 +120,10 @@ An existing own data Set can update either compact representation when target
 and receiver are the same concrete ordinary object and the shape marks the
 property writable. This works on a nonextensible object because the property
 already exists. Misses and distinct receivers retain the ordinary Set path.
-Definition, attribute/accessor changes, Symbol insertion, new keys and deletion
-use one-way dictionary conversion.
+A complete default data definition of a new non-index String key moves to the
+canonical child shape as described below. Every other definition,
+attribute/accessor change, Symbol or array-index insertion, insertion past the
+transition bounds, and deletion use one-way dictionary conversion.
 
 Conversion roots the original compact graph and replacement dictionary until
 every original key, current value and data attribute has been published into
@@ -138,9 +142,9 @@ order and existing integer-key sorter.
 The native graph observer admits the exact canonical concrete inline or array
 storage type, rather than accepting an arbitrary subtype of the compact base.
 It checks the shape, data attributes and representation-specific extent.
-Inline storage must have one or two keys. Array tags and every present scalar
-or reference backing must match the key count, bounded by the supported compact
-extent. Each active slot passes the existing tag/scalar/reference validation.
+Inline storage must have one or two keys. Array tags must cover the key count,
+every present scalar or reference backing must match the tag array's length,
+and the key count is bounded by the supported compact extent of 64 keys. Each active slot passes the existing tag/scalar/reference validation.
 The observer synthesizes normal data descriptors and retains the existing
 identity tracking and traversal budgets without calling guest JavaScript.
 Shared shape-field access does not weaken these concrete snapshot witnesses.
@@ -153,6 +157,57 @@ forms accept the same references. Wasmtime answers a sealed test with an inline
 header comparison, and a test against an open type with a host subtype query
 for every reference of another type. The typed cast and test helpers apply this
 to any open layout with at most four sealed descendants.
+
+## Shape transitions for plain data adds
+
+Fresh ordinary objects without own properties start on one runtime-owned empty
+compact storage: empty object literals, every source object literal outside the
+compact literal plan, ordinary `[[Construct]]` receivers and object rest
+results. Its shape is the canonical empty default-data shape and it has no
+physical slot, so no store can reach it and all such objects share it until
+their first add. Exotic and composite headers (Arrays, functions, arguments
+objects, primitive wrappers, namespaces) keep the dictionary allocator, and
+builtins keep their existing allocators.
+
+Ordinary `[[DefineOwnProperty]]` first offers a statically complete data
+descriptor whose writable, enumerable and configurable flags are true (known,
+or runtime Boolean payloads tested at run time) to the R kernel
+`CompactDataDefine`. The kernel declines without mutation unless the key is a
+String, the storage is compact and its shape holds default data attributes. A
+present key takes the new value in place. An absent key further requires an
+extensible object, fewer than 64 shape keys, and, when no child exists yet, a
+key that is not a canonical array index, fewer than 64 children on the parent
+and a remaining runtime budget of created shapes (16,384). The kernel then
+publishes new storage for the canonical child shape. A declined definition runs
+the unchanged general algorithm, which promotes to a dictionary exactly where
+it did before. OrdinarySet reaches the kernel only through its receiver's
+`[[DefineOwnProperty]]` after the complete prototype walk, so inherited setters,
+read-only inherited properties and Proxies on the chain behave as before.
+
+Each shape owns a nullable, geometrically grown table of its children in
+creation order. The child for a key is found by key identity, then by equal
+String contents behind a prepared-hash prefilter, so objects built by the same
+sequence of adds share shapes whatever String objects spell their keys. A child
+repeats its parent's keys followed by the new key, inherits OWN_KEYS_ORDERED and
+the default attributes, and is never mutated afterwards; only the transition
+table changes, and it holds only shapes. Shapes and tables are shared by every
+Realm and ProgramInstance of one runtime and retain only primitive Strings.
+
+A storage record's SHAPE never changes: every add publishes a new record. Zero
+to one and one to two keys produce inline storage; two to three moves into array
+storage with eight slots. A later add shares the previous record's tag, scalar
+and reference arrays while a spare slot remains, and otherwise copies the live
+slots into arrays of twice the key count. The replaced record is unreachable
+from the object, so shared arrays keep a single owner, and ForIn's storage
+identity guard still observes every structural change.
+
+Compact probes compare each shape key by identity and then reject a key whose
+prepared raw key hash differs before comparing contents. Literal, native
+metadata and transition shapes prepare their keys' hashes when created. A shape
+with three or more keys probes through an open-addressing index of its keys by
+raw key hash, built once on first probe and kept on the shape like its
+transition table: a power-of-two bucket array more than twice the key count
+whose buckets hold slots plus one. One or two keys are scanned.
 
 ## Own-data read caches
 

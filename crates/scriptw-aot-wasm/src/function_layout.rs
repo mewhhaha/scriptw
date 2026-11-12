@@ -224,7 +224,8 @@ pub(crate) struct FunctionIndexLayout {
     standard: u32,
     host: u32,
     runtime_helpers: u32,
-    native_local_arguments: bool,
+    /// Bit `position()` of each compiled native local-arguments body.
+    native_local_arguments: u64,
     foreign_imports: u32,
     entry_role: ModuleEntryRole,
     program_initialize: bool,
@@ -270,7 +271,7 @@ impl FunctionIndexLayout {
             standard: count(standard),
             host: count(host),
             runtime_helpers: count(runtime_helpers),
-            native_local_arguments: false,
+            native_local_arguments: 0,
             foreign_imports: 0,
             entry_role,
             program_initialize: matches!(kind, ModuleKind::Program(_)),
@@ -355,24 +356,30 @@ impl FunctionIndexLayout {
         mut self,
         builtins: &[scriptw_ir::StandardBuiltinId],
     ) -> Self {
-        self.native_local_arguments =
-            builtins.contains(&scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance);
+        use crate::function_entry::NativeLocalArgumentsBuiltin;
+        self.native_local_arguments = builtins
+            .iter()
+            .filter_map(|builtin| NativeLocalArgumentsBuiltin::from_builtin(*builtin))
+            .fold(0, |bits, native| bits | (1u64 << native.position()));
         self.program_helper_end();
         self
     }
 
+    /// The compiled native local bodies follow the helpers in the closed
+    /// set's declaration order; absent builtins occupy no index.
     pub(crate) fn native_local_arguments_index(
         &self,
         builtin: scriptw_ir::StandardBuiltinId,
     ) -> Option<LocalArgumentsFunctionIndex> {
-        if !self.native_local_arguments
-            || builtin != scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance
-        {
+        let bit = 1u64
+            << crate::function_entry::NativeLocalArgumentsBuiltin::from_builtin(builtin)?
+                .position();
+        if self.native_local_arguments & bit == 0 {
             return None;
         }
         Some(LocalArgumentsFunctionIndex(Self::add(
-            self.runtime_helper_first(),
-            self.runtime_helpers,
+            Self::add(self.runtime_helper_first(), self.runtime_helpers),
+            (self.native_local_arguments & (bit - 1)).count_ones(),
         )))
     }
 
@@ -380,7 +387,7 @@ impl FunctionIndexLayout {
     fn foreign_import_first(&self) -> u32 {
         Self::add(
             Self::add(self.runtime_helper_first(), self.runtime_helpers),
-            u32::from(self.native_local_arguments),
+            self.native_local_arguments.count_ones(),
         )
     }
 

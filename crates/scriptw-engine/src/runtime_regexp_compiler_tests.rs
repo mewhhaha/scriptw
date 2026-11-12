@@ -204,7 +204,11 @@ impl RuntimeCompiler {
         StructRef::new(
             &mut self.store,
             &self.string_allocator,
-            &[WasmtimeVal::from(units), WasmtimeVal::I64(0)],
+            &[
+                WasmtimeVal::from(units),
+                WasmtimeVal::I64(0),
+                WasmtimeVal::I32(-1),
+            ],
         )
         .expect("actual compiler StringValue")
     }

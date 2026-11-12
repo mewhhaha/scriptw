@@ -23,6 +23,8 @@ use empty_arrays::{EmptyArrayGlobal, EmptyArrays};
 mod stored_undefined;
 use stored_undefined::StoredUndefinedGlobal;
 mod native_metadata_shapes;
+mod compact_shapes;
+use compact_shapes::CompactShapeGlobals;
 mod regexp_unicode_properties;
 use regexp_unicode_properties::RegExpUnicodePropertiesGlobal;
 mod normalization_tables;
@@ -421,6 +423,7 @@ impl RuntimeGcTypes {
         let stored_undefined = StoredUndefinedGlobal::declare(&self.layouts, &mut globals);
         let configurable_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
         let fixed_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
+        let compact_shapes = CompactShapeGlobals::declare(&self.layouts, &mut globals);
         let snapshot =
             snapshot.then(|| snapshot::SnapshotRoots::declare(&self.layouts, &mut globals));
         let module_guards_first = globals.len();
@@ -461,6 +464,7 @@ impl RuntimeGcTypes {
             stored_undefined,
             configurable_native_metadata,
             fixed_native_metadata,
+            compact_shapes,
             snapshot,
             module_guards: ModuleGuardGlobals {
                 first: module_guards_first,
@@ -790,6 +794,7 @@ pub(crate) struct RuntimeSchema {
     stored_undefined: StoredUndefinedGlobal,
     configurable_native_metadata: GcRootGlobal<CompactDataShape>,
     fixed_native_metadata: GcRootGlobal<CompactDataShape>,
+    compact_shapes: CompactShapeGlobals,
     snapshot: Option<snapshot::SnapshotRoots>,
     module_guards: ModuleGuardGlobals,
 }

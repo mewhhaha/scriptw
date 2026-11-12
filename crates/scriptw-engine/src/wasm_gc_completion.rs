@@ -411,6 +411,7 @@ mod tests {
                     ))),
                 ),
                 FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
+                FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
             ],
         )
         .expect("native String schema shape");
@@ -418,7 +419,11 @@ mod tests {
         StructRef::new(
             &mut *store,
             &pre,
-            &[WasmtimeVal::from(array), WasmtimeVal::I64(0)],
+            &[
+                WasmtimeVal::from(array),
+                WasmtimeVal::I64(0),
+                WasmtimeVal::I32(-1),
+            ],
         )
         .expect("native String record")
         .to_eqref()

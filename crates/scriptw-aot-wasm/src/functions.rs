@@ -46,9 +46,11 @@ pub(crate) use numeric_body::NumericBodyPlan;
 pub(crate) use numeric_leaf_call::BinaryNumericLeafPlan;
 pub(crate) use numeric_leaf_call::NumericLeafPlan;
 mod binary_numeric_callback;
+mod forwarded_call;
 mod native_call_guard;
 mod packed_join_call;
 mod packed_push_call;
+mod plain_call;
 mod source_callable_factories;
 use function_object_allocation::FunctionAllocationInputs;
 mod function_realm;
@@ -1334,10 +1336,11 @@ impl FunctionBuilder<'_> {
             return Ok(());
         }
         let list = self.emit_call_args_vector(arguments, function)?;
-        self.emit_indirect_call_with_argv_to_value(
+        self.emit_argv_call_to_value(
             callee,
             &receiver,
             &list,
+            plain_call::ArgvDispatch::Site(known_target),
             continuation,
             output,
             function,
@@ -1356,13 +1359,38 @@ impl FunctionBuilder<'_> {
         output: &crate::gc_types::ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_argv_call_to_value(
+            callee,
+            receiver,
+            list,
+            plain_call::ArgvDispatch::General,
+            continuation,
+            output,
+            function,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_argv_call_to_value(
+        &mut self,
+        callee: &crate::gc_types::ValueLocals,
+        receiver: &crate::gc_types::ValueLocals,
+        list: &crate::gc_types::GcLocal<crate::gc_types::ValueArray>,
+        dispatch: plain_call::ArgvDispatch<'_>,
+        continuation: &CallContinuation,
+        output: &crate::gc_types::ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let result = schema.reserve_completion(function);
         match continuation {
-            CallContinuation::Continue => self
-                .emit_function_or_proxy_call_with_argv(callee, receiver, list, &result, function)?,
+            CallContinuation::Continue => self.emit_dispatched_call_with_argv(
+                callee, receiver, list, dispatch, &result, function,
+            )?,
             CallContinuation::Return => {
-                self.emit_prepared_tail_call(callee, receiver, list, function)?;
+                self.emit_dispatched_tail_call_with_argv(
+                    callee, receiver, list, dispatch, function,
+                )?;
             }
         }
         // A normal call supplies an expression value, not a new statement
@@ -1402,14 +1430,27 @@ impl FunctionBuilder<'_> {
             function,
         )?;
         self.emit_propagate_current_throw_if_needed(function);
-        self.emit_indirect_call_from_locals(
-            &callee,
-            Some(&receiver),
-            arguments,
-            continuation,
-            output,
-            function,
-        )?;
+        let call_forwarding_candidate =
+            matches!(key, PropertyKeyIr::StaticString(name) if name == "call");
+        if !call_forwarding_candidate
+            || !self.try_emit_function_call_forwarding(
+                &callee,
+                &receiver,
+                arguments,
+                continuation,
+                output,
+                function,
+            )?
+        {
+            self.emit_indirect_call_from_locals(
+                &callee,
+                Some(&receiver),
+                arguments,
+                continuation,
+                output,
+                function,
+            )?;
+        }
         callee.clear(function);
         receiver.clear(function);
         Ok(())

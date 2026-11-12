@@ -585,7 +585,35 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// A complete default data definition first offers itself to the compact
+    /// transition kernel. Only a definition the kernel declines, without any
+    /// mutation, reaches the general algorithm and its dictionary promotion.
     pub(super) fn emit_ordinary_define_own_property(
+        &mut self,
+        header: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        descriptor: &WasmDescriptor<'_>,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let Some(handled) =
+            self.emit_try_compact_data_definition(header, key, descriptor, function)?
+        else {
+            return self
+                .emit_general_ordinary_define_own_property(header, key, descriptor, result, function);
+        };
+        handled.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_object_boolean_result(handled, result, function);
+        function.instruction(&Instruction::Else);
+        self.emit_general_ordinary_define_own_property(header, key, descriptor, result, function)?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.runtime_schema().release_i32_local(handled, function);
+        Ok(())
+    }
+
+    fn emit_general_ordinary_define_own_property(
         &mut self,
         header: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,

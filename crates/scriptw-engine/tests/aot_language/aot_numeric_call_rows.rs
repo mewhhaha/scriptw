@@ -23,8 +23,10 @@ fn assert_result(source: &str, expected: ObservedJsValue) {
     // allowing fixed code unrelated to the repeated calls. The AOT emission
     // controls separately enforce the tighter source-body and growth bounds.
     // Inspect the same validated artifact executed below; compile only once.
+    // The richest of these programs measures about 131 KiB since read and
+    // write sites test their common case before entering a runtime helper.
     assert!(
-        compilation.footprint.largest_code_body_bytes < 128 * 1024,
+        compilation.footprint.largest_code_body_bytes < 160 * 1024,
         "large ordinary source body: {:?}\n{source}",
         compilation.footprint
     );

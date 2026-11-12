@@ -152,6 +152,19 @@ impl FunctionBuilder<'_> {
         // values so the concatenation body and its temporary roots occur once.
         for value in [&left, &right] {
             value.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            // ToString(Number) is Number::toString, which cannot throw.
+            let text = schema.reserve_gc_local(function).initialize(
+                self.emit_number_to_string_payload(value.scalar(), function)?,
+                function,
+            );
+            value.set_reference(&text, schema, function);
+            text.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            value.tag().load(function);
             function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
             function.instruction(&Instruction::I32Ne);
             self.open_frame(ControlFrameKind::If, function);

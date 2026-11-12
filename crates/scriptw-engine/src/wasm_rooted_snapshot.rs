@@ -957,18 +957,21 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     let references = references
                         .map(|value| self.array(value, L::CompactReferences))
                         .transpose()?;
-                    if length > 16
-                        || tags.len(&*self.store).map_err(invariant)? != length
+                    // A growing object's arrays carry spare slots after the
+                    // shape's keys; all three backings share one capacity.
+                    let capacity = tags.len(&*self.store).map_err(invariant)?;
+                    if length > scriptw_aot_wasm::SNAPSHOT_COMPACT_PROPERTY_LIMIT
+                        || capacity < length
                         || scalars
                             .as_ref()
                             .map(|values| values.len(&*self.store).map_err(invariant))
                             .transpose()?
-                            .is_some_and(|count| count != length)
+                            .is_some_and(|count| count != capacity)
                         || references
                             .as_ref()
                             .map(|values| values.len(&*self.store).map_err(invariant))
                             .transpose()?
-                            .is_some_and(|count| count != length)
+                            .is_some_and(|count| count != capacity)
                     {
                         return Err(invariant("invalid array compact property extent"));
                     }

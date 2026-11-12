@@ -552,7 +552,10 @@ fn emit_script_module_with_factory(
                 entry,
                 module_package.schema(),
             )?);
-            native_local_argument_functions.push(builder.compile_builtin_callable()?);
+            let native = crate::function_entry::NativeLocalArgumentsBuiltin::from_builtin(*builtin)
+                .expect("native local entry belongs to the closed admitted set");
+            native_local_argument_functions
+                .push((native.position(), builder.compile_builtin_callable()?));
         } else {
             compiled_functions.push(builder.compile_builtin_callable()?);
         }
@@ -1406,6 +1409,9 @@ fn emit_script_module_with_factory(
             IntrinsicPropertyValue, compile_intrinsic_property_value_helper;
             CompactLiteralAllocate, compile_compact_literal_allocate_helper;
             CompactDataStore, compile_compact_data_store_helper;
+            CompactDataDefine, compile_compact_data_define_helper;
+            CompactObjectAllocate, compile_compact_object_allocate_helper;
+            CompactShapeIndex, compile_compact_shape_index_helper;
             NativeFunctionAllocate, compile_native_function_allocate_helper;
             NativeConstructorHeaderAllocate, compile_native_constructor_header_allocate_helper;
             IntrinsicAccessorAllocate, compile_intrinsic_accessor_allocate_helper;
@@ -1576,9 +1582,15 @@ fn emit_script_module_with_factory(
         "compiled runtime helper bodies were never emitted: {:?}",
         helper_bodies.keys().collect::<Vec<_>>()
     );
-    // The canonical native local body follows R's existing helper prefix.
-    // Its original builtin ordinal remains the vector adapter.
-    compiled_functions.extend(native_local_argument_functions);
+    // The canonical native local bodies follow R's existing helper prefix in
+    // the closed set's declaration order. Each original builtin ordinal
+    // remains its vector adapter.
+    native_local_argument_functions.sort_by_key(|(position, _)| *position);
+    compiled_functions.extend(
+        native_local_argument_functions
+            .into_iter()
+            .map(|(_, body)| body),
+    );
     program_functions.extend(program_helpers);
     module_package.append_functions(compiled_functions, program_functions);
     let runtime_global_types = module_package.runtime_global_types();

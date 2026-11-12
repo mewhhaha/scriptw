@@ -49,6 +49,7 @@ mod aot_legacy_accessor_definers;
 mod aot_live_prototype_consumers;
 mod aot_live_prototype_reference_consumers;
 mod aot_native_host_values;
+mod aot_native_local_arguments;
 mod aot_number_remainder;
 mod aot_number_string_hook_invocation;
 mod aot_number_to_bigint;

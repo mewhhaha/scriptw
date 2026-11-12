@@ -1171,6 +1171,12 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let base = self.runtime_helper_base()?;
+        // ToPrimitive returns a primitive input unchanged; only objects reach
+        // the helper's @@toPrimitive / OrdinaryToPrimitive body.
+        self.emit_is_primitive_tag_i32(input.tag(), function);
+        self.open_frame(ControlFrameKind::If, function);
+        result.set_normal(input, function);
+        function.instruction(&Instruction::Else);
         match hint {
             ToPrimitiveHint::Default => schema
                 .call_helper(
@@ -1206,6 +1212,8 @@ impl<'a> FunctionBuilder<'a> {
                 )
                 .store(result, function),
         }
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 
@@ -2250,6 +2258,26 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         if self.outline_value_to_number {
+            // ToNumber of a Number is the Number; of undefined, NaN.
+            input.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            result.set_normal(input, function);
+            function.instruction(&Instruction::Else);
+            input.tag().load(function);
+            function.instruction(&Instruction::I32Const(
+                WasmRuntimeValueTag::Undefined as i32,
+            ));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            let bits = schema.reserve_i64_local(function);
+            self.emit_nan_payload(function);
+            bits.store(function);
+            result.value().set_number(bits, function);
+            result.set_normal(result.value(), function);
+            schema.release_i64_local(bits, function);
+            function.instruction(&Instruction::Else);
             schema
                 .call_helper(
                     crate::runtime_helpers::ValueToNumberArguments::new(
@@ -2261,6 +2289,10 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )
                 .store(result, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
             return Ok(());
         }
         self.emit_value_to_number_composite(input, result, false, function)
@@ -2452,6 +2484,11 @@ impl<'a> FunctionBuilder<'a> {
         result: &crate::gc_types::CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A String or Symbol is already its own property key.
+        self.emit_is_property_key_i32(input.tag(), function);
+        self.open_frame(ControlFrameKind::If, function);
+        result.set_normal(input, function);
+        function.instruction(&Instruction::Else);
         self.runtime_schema()
             .call_helper(
                 crate::runtime_helpers::ValueToPropertyKeyArguments::new(
@@ -2463,6 +2500,8 @@ impl<'a> FunctionBuilder<'a> {
                 function,
             )
             .store(result, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 
@@ -2478,6 +2517,19 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_is_property_key_i32(input.tag(), function);
         self.open_frame(ControlFrameKind::If, function);
         result.set_normal(input, function);
+        function.instruction(&Instruction::Else);
+        input.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        // A Number is primitive and its ToString is Number::toString.
+        let text = schema.reserve_gc_local(function).initialize(
+            self.emit_number_to_string_payload(input.scalar(), function)?,
+            function,
+        );
+        result.value().set_reference(&text, schema, function);
+        result.set_normal(result.value(), function);
+        text.clear(function);
         function.instruction(&Instruction::Else);
         self.emit_tagged_to_primitive_locals_pending(
             ToPrimitiveHint::String,
@@ -2510,6 +2562,8 @@ impl<'a> FunctionBuilder<'a> {
             )
             .store(result, function);
         primitive.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -4293,6 +4347,13 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         if self.outline_value_to_string {
+            // ToString of a String is the String itself.
+            input.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            result.set_normal(input, function);
+            function.instruction(&Instruction::Else);
             schema
                 .call_helper(
                     crate::runtime_helpers::ValueToStringArguments::new(
@@ -4304,6 +4365,8 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )
                 .store(result, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
             return Ok(());
         }
         let primitive = schema.reserve_completion(function);
@@ -6025,6 +6088,16 @@ impl<'a> FunctionBuilder<'a> {
         let result = schema.reserve_i32_local(function);
         if self.outline_string_equality {
             if let Some(base) = self.runtime_helper_base {
+                // The same String object is equal, with or without ASCII case
+                // folding; everything else enters the outlined comparison,
+                // which rejects different lengths before reading code units.
+                let _ = left.load(schema, function);
+                let _ = right.load(schema, function);
+                function.instruction(&Instruction::RefEq);
+                result.store(function);
+                result.load(function);
+                function.instruction(&Instruction::I32Eqz);
+                function.instruction(&Instruction::If(BlockType::Empty));
                 schema
                     .call_helper(
                         crate::runtime_helpers::StringEqualityArguments::new(left, right, fold),
@@ -6032,6 +6105,7 @@ impl<'a> FunctionBuilder<'a> {
                         function,
                     )
                     .store(result, function);
+                function.instruction(&Instruction::End);
             } else {
                 self.emit_gc_string_equality(left, right, fold, result, function);
             }
@@ -6083,31 +6157,64 @@ impl<'a> FunctionBuilder<'a> {
         units.length(&right_units, schema, function);
         right_length.store(function);
 
+        let left_hash = schema.reserve_i64_local(function);
+        let right_hash = schema.reserve_i64_local(function);
         function.instruction(&Instruction::I32Const(1));
+        result.store(function);
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        // One shared backing is one content.
+        left_units.load(schema, function);
+        right_units.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::BrIf(0));
+        function.instruction(&Instruction::I32Const(0));
         result.store(function);
         left_length.load(function);
         right_length.load(function);
         function.instruction(&Instruction::I32Ne);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::BrIf(0));
+        // Prepared raw key hashes are a pure function of the code units, so
+        // two different prepared hashes prove different exact contents.
+        schema
+            .field(StringValueSchema::RAW_KEY_HASH)
+            .read(left, schema, function)
+            .store_i64(left_hash, function);
+        schema
+            .field(StringValueSchema::RAW_KEY_HASH)
+            .read(right, schema, function)
+            .store_i64(right_hash, function);
+        ascii_case_folding.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        left_hash.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        right_hash.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        left_hash.load(function);
+        right_hash.load(function);
+        function.instruction(&Instruction::I64Ne);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::BrIf(0));
+        function.instruction(&Instruction::I32Const(1));
         result.store(function);
-        function.instruction(&Instruction::Else);
         function.instruction(&Instruction::I32Const(0));
         index.store(function);
-        function.instruction(&Instruction::Block(BlockType::Empty));
+        ascii_case_folding.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Loop(BlockType::Empty));
         index.load(function);
         left_length.load(function);
         function.instruction(&Instruction::I32GeU);
-        function.instruction(&Instruction::BrIf(1));
+        function.instruction(&Instruction::BrIf(2));
         units
             .read(&left_units, index, schema, function)
             .store(left_unit, function);
         units
             .read(&right_units, index, schema, function)
             .store(right_unit, function);
-        ascii_case_folding.load(function);
-        function.instruction(&Instruction::If(BlockType::Empty));
         for unit in [left_unit, right_unit] {
             unit.load(function);
             function.instruction(&Instruction::I32Const(i32::from(b'A')));
@@ -6123,14 +6230,39 @@ impl<'a> FunctionBuilder<'a> {
             unit.store(function);
             function.instruction(&Instruction::End);
         }
-        function.instruction(&Instruction::End);
         left_unit.load(function);
         right_unit.load(function);
         function.instruction(&Instruction::I32Ne);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::I32Const(0));
         result.store(function);
-        function.instruction(&Instruction::Br(2));
+        function.instruction(&Instruction::Br(3));
+        function.instruction(&Instruction::End);
+        index.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        index.store(function);
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Else);
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        index.load(function);
+        left_length.load(function);
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::BrIf(2));
+        units
+            .read(&left_units, index, schema, function)
+            .store(left_unit, function);
+        units
+            .read(&right_units, index, schema, function)
+            .store(right_unit, function);
+        left_unit.load(function);
+        right_unit.load(function);
+        function.instruction(&Instruction::I32Ne);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Const(0));
+        result.store(function);
+        function.instruction(&Instruction::Br(3));
         function.instruction(&Instruction::End);
         index.load(function);
         function.instruction(&Instruction::I32Const(1));
@@ -6141,6 +6273,8 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
 
+        schema.release_i64_local(right_hash, function);
+        schema.release_i64_local(left_hash, function);
         schema.release_i32_local(right_unit, function);
         schema.release_i32_local(left_unit, function);
         schema.release_i32_local(index, function);

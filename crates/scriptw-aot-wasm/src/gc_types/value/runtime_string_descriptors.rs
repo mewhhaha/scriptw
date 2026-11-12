@@ -76,6 +76,7 @@ impl RuntimeStringDescriptorRowLocals {
             (
                 GcOperand::reference(&units, schema),
                 GcOperand::i64_local(self.raw_hash),
+                GcOperand::i32(-1),
             ),
             function,
         );

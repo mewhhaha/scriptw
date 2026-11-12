@@ -17,6 +17,7 @@ pub(super) fn string_types(engine: &WasmtimeEngine) -> (StructType, ArrayType) {
                 ))),
             ),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
+            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
         ],
     )
     .unwrap();

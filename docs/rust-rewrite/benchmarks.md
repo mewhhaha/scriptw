@@ -365,11 +365,25 @@ They do not refresh the published panel.
 | Direct `instanceof`, global reads and own data | 17.13M | 18.50M |
 | Read records and the closed-chain Set, `7c6998ed91b4` | 15.53M | 16.79M |
 | Binding-name checks and `string[number]`, `6a1d8259f6ad` | 15.15M | 16.39M |
+| Integrated: position hints, shape transitions, call entries, builtin bodies, `0475e1a8ce97` | 11.20M | 12.05M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
-Sync cycles per request are about 7.0M for `7c6998ed91b4` and 2.68M for Node
-24 `--jitless`.
+Sync cycles per request are about 7.0M for `7c6998ed91b4`, 4.7M to 5.1M for
+the integrated source (ABI 62) and 2.68M for Node 24 `--jitless`. The Fast
+policy runs the integrated source in 13.30M instructions and about 8.5M
+cycles.
+
+The integrated source adds, on top of the read records: a self-validating
+dictionary position on each String (a lookup first tries the entry position
+last found for that very String object); `instanceof` without the
+`@@hasInstance` dictionary probe while that Symbol has never been hashed;
+outlined key and object coercions skipped for keys and objects; compact shape
+transitions for plain data adds
+([contract](contracts/compact-ordinary-data-storage.md)); plain callees
+entered directly from the call owner, local builtin entries and call
+forwarding; and JSON serialization into one buffer with cheaper codecs,
+conversions and String operations.
 
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position
@@ -383,36 +397,37 @@ unit without the wrapper object.
 
 Single operations, each as the body of a `for` loop in a strict function whose
 objects are captured from the enclosing function. Values are user instructions
-per loop iteration, loop included. Speed is `6a1d8259f6ad`; Fast is the CLI
-default policy at `7c6998ed91b4`, whose native code is not optimized.
+per loop iteration, loop included. The integrated column is the merged
+source before its last size trim; Fast is the CLI default policy at
+`7c6998ed91b4`, whose native code is not optimized.
 
-| Loop body | Speed | Fast | Node 24 `--jitless` |
-| --- | ---: | ---: | ---: |
-| empty | 3 | 5 | 130 |
-| `if (i > 5) t = i` | 81 | 176 | 197 |
-| `t += id(i)` | 246 | 492 | 412 |
-| `t += lit.b` (own property) | 654 | 852 | 258 |
-| `lit.b = i` | 984 | 1,165 | 232 |
-| `u = made.m` (prototype method of a `new P()` object) | 1,948 | 2,114 | 230 |
-| `t += made.m(i)` | 2,408 | 2,870 | 492 |
-| `t += text.indexOf(":")` | 2,967 | 3,467 | 561 |
-| `t += map.get(mk)` | 2,501 | 2,952 | 471 |
-| `if (plain instanceof Int8Array) t++` | 2,721 | 2,920 | 483 |
-| `u = Map` (global) | 709 | 757 | 156 |
-| `if (typeof NoSuchGlobal == "function") t++` | 2,336 | 2,589 | 239 |
-| `u = { a: i, b: 2 }` | 816 | 1,025 | 356 |
-| `u = {}; u.a = i; u.b = 2` | 5,529 | 5,836 | 433 |
-| `u = new P()` (two fields) | 9,097 | 9,602 | 648 |
-| `u = function () { return i; }` | 8,212 | 8,679 | 300 |
-| `u = Object.keys(lit)` | 9,110 | 9,713 | 445 |
-| `u = JSON.stringify(lit)` | 19,250 | 19,655 | 2,342 |
-| `s += i` (captured accumulator) | 413 | 416 | 312 |
+| Loop body | Speed, integrated | Speed `6a1d8259f6ad` | Fast | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: | ---: |
+| empty | 3 | 3 | 5 | 130 |
+| `if (i > 5) t = i` | 81 | 81 | 176 | 197 |
+| `t += id(i)` | 246 | 246 | 492 | 412 |
+| `t += lit.b` (own property) | 655 | 654 | 852 | 258 |
+| `lit.b = i` | 780 | 984 | 1,165 | 232 |
+| `u = made.m` (prototype method of a `new P()` object) | 1,231 | 1,948 | 2,114 | 230 |
+| `t += made.m(i)` | 1,694 | 2,408 | 2,870 | 492 |
+| `t += text.indexOf(":")` | 1,714 | 2,967 | 3,467 | 561 |
+| `t += map.get(mk)` | 1,698 | 2,501 | 2,952 | 471 |
+| `if (plain instanceof Int8Array) t++` | 1,963 | 2,721 | 2,920 | 483 |
+| `u = Map` (global) | 617 | 709 | 757 | 156 |
+| `if (typeof NoSuchGlobal == "function") t++` | 2,376 | 2,336 | 2,589 | 239 |
+| `u = { a: i, b: 2 }` | 815 | 816 | 1,025 | 356 |
+| `u = {}; u.a = i; u.b = 2` | 4,516 | 5,529 | 5,836 | 433 |
+| `u = new P()` (two fields) | 7,845 | 9,097 | 9,602 | 648 |
+| `u = function () { return i; }` | 8,185 | 8,212 | 8,679 | 300 |
+| `u = Object.keys(lit)` | 7,693 | 9,110 | 9,713 | 445 |
+| `u = JSON.stringify(lit)` | 11,629 | 19,250 | 19,655 | 2,342 |
+| `s += i` (captured accumulator) | 414 | 413 | 416 | 312 |
 
 Compiled statements on locals and plain source calls are already cheaper than
-V8's interpreter. The gap is in operations that enter runtime helpers:
-2.5 to 8 times V8 for reads, writes, `instanceof`, globals and builtin calls,
-and 13 to 27 times for property adds, construction, closures and
-`Object.keys`. Profiles of the same loops attribute a property add to the
+V8's interpreter. The gap is in operations that enter runtime helpers: in the
+integrated source 2.5 to 5 times V8 for reads, writes, `instanceof`, globals
+and builtin calls, and 10 to 27 times for property adds, construction,
+closures and `Object.keys`. Profiles of the same loops attribute a property add to the
 dictionary definition path, a builtin call to the argument-vector call, the
 funcref and subtype host calls and receiver coercion, a closure to eager
 `length`/`name`/`prototype` definition, and a compound assignment to a

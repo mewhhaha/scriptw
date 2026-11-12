@@ -407,8 +407,16 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         ))
     };
     let shape = fields(GcLayout::CompactDataShape);
-    assert_eq!(shape.len(), 3);
-    assert!(shape.iter().all(|field| !field.mutable));
+    assert_eq!(shape.len(), 5);
+    // Keys, attributes and order never change; only the derived transition
+    // table and key index, which reference shapes and integers, are filled in.
+    assert!(shape[..3].iter().all(|field| !field.mutable));
+    assert!(shape[3..].iter().all(|field| field.mutable));
+    assert_eq!(shape[3].element_type, reference(GcLayout::CompactShapeTable, true));
+    assert_eq!(
+        shape[4].element_type,
+        reference(GcLayout::OrdinaryPropertyIndex, true)
+    );
     assert_eq!(
         shape[0].element_type,
         reference(GcLayout::CompactShapeKeys, false)
@@ -428,7 +436,8 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
     else {
         panic!("shape keys are a primitive string array");
     };
-    assert!(!keys.0.mutable);
+    // Written only by private construction before any shape publishes it.
+    assert!(keys.0.mutable);
     assert_eq!(keys.0.element_type, reference(GcLayout::StringValue, false));
     // Key; own compact shape and slot; own dictionary position; own
     // intrinsic layout address and value group; then the prototype record:

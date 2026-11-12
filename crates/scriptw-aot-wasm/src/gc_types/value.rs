@@ -13,11 +13,13 @@ mod object_header_projection;
 mod program_initialize;
 mod program_instance;
 mod prototype_reference;
+mod string_accumulator;
 pub(crate) use program_instance::{
     FunctionProgramOwner, ProgramInstanceHooks, ProgramInstanceImage, ProgramInstanceLocals,
     ProgramLiteralCount, ProgramLiteralIndex, ProgramLiteralRoots, ProgramMetadataBytes,
     ProgramMetadataView,
 };
+pub(crate) use string_accumulator::StringAccumulatorCursor;
 mod program_string_descriptors;
 mod runtime_string_descriptors;
 pub(crate) use program_string_descriptors::ProgramStringDescriptorTable;
@@ -801,28 +803,31 @@ impl GcStructType<ExecutableCode> {
                 metadata.standard_builtin.is_none() && metadata.host_builtin.is_some()
             }
         };
-        let local_arguments_valid = match (
-            local_arguments.is_some(),
-            wide_local_arguments.is_some(),
-        ) {
-            (false, false) => true,
-            (true, true) => false,
-            (narrow, _) => entry_execution == scriptw_ir::FunctionExecutionKind::Ordinary
-                && metadata.class_element_execution == scriptw_ir::ClassElementExecutionKind::None
-                && match metadata.kind {
-                    ExecutableCodeKind::JavaScript => {
-                        metadata.protocol
-                            == scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
-                    }
-                    ExecutableCodeKind::StandardBuiltin => narrow
-                        && metadata.standard_builtin
-                            == Some(
-                                scriptw_ir::StandardBuiltinId::FunctionPrototypeSymbolHasInstance,
-                            )
-                        && metadata.protocol == scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly,
-                    ExecutableCodeKind::HostBuiltin => false,
-                },
-        };
+        let local_arguments_valid =
+            match (local_arguments.is_some(), wide_local_arguments.is_some()) {
+                (false, false) => true,
+                (true, true) => false,
+                (narrow, _) => {
+                    entry_execution == scriptw_ir::FunctionExecutionKind::Ordinary
+                        && metadata.class_element_execution
+                            == scriptw_ir::ClassElementExecutionKind::None
+                        && match metadata.kind {
+                            ExecutableCodeKind::JavaScript => {
+                                metadata.protocol
+                                    == scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
+                            }
+                            ExecutableCodeKind::StandardBuiltin => {
+                                narrow
+                                    && crate::function_entry::NativeLocalArgumentsBuiltin::admits(
+                                        metadata.standard_builtin,
+                                    )
+                                    && metadata.protocol
+                                        == scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly
+                            }
+                            ExecutableCodeKind::HostBuiltin => false,
+                        }
+                }
+            };
         if metadata.protocol.execution_kind() != entry_execution
             || !origin_valid
             || (binary_numeric.is_some()
@@ -1320,7 +1325,7 @@ pub(crate) struct GcStackReference<T: GcHeapType, N: GcFieldNullability = NonNul
     shape: PhantomData<fn() -> (T, N)>,
 }
 impl<T: GcHeapType, N: GcFieldNullability> GcStackReference<T, N> {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self { shape: PhantomData }
     }
 }
@@ -3189,6 +3194,30 @@ where
         self.emit_set(function);
     }
 
+    /// Copies `length` elements from `source[source_index..]` to
+    /// `destination[destination_index..]`; the engine checks both ranges.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn copy_range_from<R: GcFieldNullability>(
+        &self,
+        destination: &GcLocal<T>,
+        destination_index: I32Local,
+        source: &GcLocal<T, R>,
+        source_index: I32Local,
+        length: I32Local,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        destination.load(schema, function);
+        destination_index.load(function);
+        source.load(schema, function);
+        source_index.load(function);
+        length.load(function);
+        function.instruction(&Instruction::ArrayCopy {
+            array_type_index_dst: self.type_index().raw(),
+            array_type_index_src: self.type_index().raw(),
+        });
+    }
+
     /// Copies the rooted prefix without exposing untyped array instructions.
     /// Source and destination have the same declared element and owner types.
     pub(crate) fn copy_prefix_from(
@@ -3209,6 +3238,101 @@ where
             array_type_index_src: self.type_index().raw(),
         });
     }
+}
+
+/// Code-unit copies at or below this length run element by element. A bulk
+/// `array.copy` of a dynamic length is a host `memmove` call whose fixed
+/// transition cost exceeds a short inline loop.
+const INLINE_CODE_UNIT_COPY_LIMIT: i32 = 8;
+/// Backings at or below this length are zero-filled inline. A constant zero
+/// fill operand makes the engine call its host `memset` for any length.
+const INLINE_CODE_UNIT_FILL_LIMIT: i32 = 16;
+/// The same inline zero fill for short array-index key tables.
+const INLINE_INDEX_KEY_FILL_LIMIT: i32 = 32;
+
+/// Leaves a zero-filled CodeUnitArray of `length` units on the stack.
+fn emit_code_unit_array_new(length: I32Local, schema: &RuntimeSchema, function: &mut Function) {
+    let array = schema.array_type::<CodeUnitArray>().type_index().raw();
+    let output = schema.reference_type::<CodeUnitArray>(GcNullability::NonNullable);
+    length.load(function);
+    function.instruction(&Instruction::I32Const(INLINE_CODE_UNIT_FILL_LIMIT));
+    function.instruction(&Instruction::I32LeU);
+    function.instruction(&Instruction::If(BlockType::Result(ValType::Ref(output))));
+    // Zero for every length in this arm, but not an engine constant.
+    length.load(function);
+    function.instruction(&Instruction::I32Const(5));
+    function.instruction(&Instruction::I32ShrU);
+    length.load(function);
+    function.instruction(&Instruction::ArrayNew(array));
+    function.instruction(&Instruction::Else);
+    function.instruction(&Instruction::I32Const(0));
+    length.load(function);
+    function.instruction(&Instruction::ArrayNew(array));
+    function.instruction(&Instruction::End);
+}
+
+/// Copies `length` units from `source[source_index..]` (index zero when
+/// absent) to `destination[destination_index..]`. Both ranges are checked by
+/// the engine's array bounds checks.
+fn emit_code_unit_copy(
+    destination: &GcLocal<CodeUnitArray>,
+    destination_index: Option<I32Local>,
+    source: &GcLocal<CodeUnitArray>,
+    source_index: Option<I32Local>,
+    length: I32Local,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
+    let array = schema.array_type::<CodeUnitArray>();
+    let start = |index: Option<I32Local>, function: &mut Function| match index {
+        Some(index) => index.load(function),
+        None => {
+            function.instruction(&Instruction::I32Const(0));
+        }
+    };
+    length.load(function);
+    function.instruction(&Instruction::I32Const(INLINE_CODE_UNIT_COPY_LIMIT));
+    function.instruction(&Instruction::I32LeU);
+    function.instruction(&Instruction::If(BlockType::Empty));
+    let offset = schema.reserve_i32_local(function);
+    function.instruction(&Instruction::I32Const(0));
+    offset.store(function);
+    function.instruction(&Instruction::Block(BlockType::Empty));
+    function.instruction(&Instruction::Loop(BlockType::Empty));
+    offset.load(function);
+    length.load(function);
+    function.instruction(&Instruction::I32GeU);
+    function.instruction(&Instruction::BrIf(1));
+    destination.load(schema, function);
+    start(destination_index, function);
+    offset.load(function);
+    function.instruction(&Instruction::I32Add);
+    source.load(schema, function);
+    start(source_index, function);
+    offset.load(function);
+    function.instruction(&Instruction::I32Add);
+    array.emit_get(function);
+    array.emit_set(function);
+    offset.load(function);
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32Add);
+    offset.store(function);
+    function.instruction(&Instruction::Br(0));
+    function.instruction(&Instruction::End);
+    function.instruction(&Instruction::End);
+    schema.release_i32_local(offset, function);
+    function.instruction(&Instruction::Else);
+    destination.load(schema, function);
+    start(destination_index, function);
+    source.load(schema, function);
+    start(source_index, function);
+    length.load(function);
+    let index = array.type_index().raw();
+    function.instruction(&Instruction::ArrayCopy {
+        array_type_index_dst: index,
+        array_type_index_src: index,
+    });
+    function.instruction(&Instruction::End);
 }
 
 pub(crate) struct StringConstruction {
@@ -3255,9 +3379,9 @@ impl StringConstruction {
         length: I32Local,
         function: &mut Function,
     ) -> Self {
-        let array = schema.array_type::<CodeUnitArray>();
+        emit_code_unit_array_new(length, schema, function);
         Self {
-            units: slot.initialize(array.filled(GcOperand::i32(0), length, function), function),
+            units: slot.initialize(GcStackReference::new(), function),
         }
     }
     pub(crate) fn write(
@@ -3282,16 +3406,15 @@ impl StringConstruction {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        self.units.load(schema, function);
-        destination_index.load(function);
-        source.load(schema, function);
-        function.instruction(&Instruction::I32Const(0));
-        length.load(function);
-        let index = schema.array_type::<CodeUnitArray>().type_index().raw();
-        function.instruction(&Instruction::ArrayCopy {
-            array_type_index_dst: index,
-            array_type_index_src: index,
-        });
+        emit_code_unit_copy(
+            &self.units,
+            Some(destination_index),
+            source,
+            None,
+            length,
+            schema,
+            function,
+        );
     }
     /// Copy a selected interval into private construction storage, keeping
     /// partial slices independent of their source backing allocation.
@@ -3304,16 +3427,15 @@ impl StringConstruction {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        self.units.load(schema, function);
-        destination_index.load(function);
-        source.load(schema, function);
-        source_index.load(function);
-        length.load(function);
-        let index = schema.array_type::<CodeUnitArray>().type_index().raw();
-        function.instruction(&Instruction::ArrayCopy {
-            array_type_index_dst: index,
-            array_type_index_src: index,
-        });
+        emit_code_unit_copy(
+            &self.units,
+            Some(destination_index),
+            source,
+            Some(source_index),
+            length,
+            schema,
+            function,
+        );
     }
 
     /// Fill a span with the exact UTF-16 prefix of a repeated immutable pattern.
@@ -3468,7 +3590,11 @@ impl StringConstruction {
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
         let result = schema.struct_type::<StringValue>().construct(
-            (GcOperand::reference(&self.units, schema), GcOperand::i64(0)),
+            (
+                GcOperand::reference(&self.units, schema),
+                GcOperand::i64(0),
+                GcOperand::i32(-1),
+            ),
             function,
         );
         self.units.clear(function);
@@ -3680,12 +3806,28 @@ impl ArrayIndexKeyConstruction {
         length: I32Local,
         function: &mut Function,
     ) -> Self {
-        let keys = schema.reserve_gc_local(function).initialize(
-            schema
-                .array_type::<ArrayIndexKeyTable>()
-                .filled(GcOperand::i64(0), length, function),
-            function,
-        );
+        let array = schema.array_type::<ArrayIndexKeyTable>().type_index().raw();
+        let output = schema.reference_type::<ArrayIndexKeyTable>(GcNullability::NonNullable);
+        length.load(function);
+        function.instruction(&Instruction::I32Const(INLINE_INDEX_KEY_FILL_LIMIT));
+        function.instruction(&Instruction::I32LeU);
+        function.instruction(&Instruction::If(BlockType::Result(ValType::Ref(output))));
+        // Zero in this arm, but not an engine constant: fill inline rather
+        // than through the host memset call.
+        length.load(function);
+        function.instruction(&Instruction::I32Const(6));
+        function.instruction(&Instruction::I32ShrU);
+        function.instruction(&Instruction::I64ExtendI32U);
+        length.load(function);
+        function.instruction(&Instruction::ArrayNew(array));
+        function.instruction(&Instruction::Else);
+        function.instruction(&Instruction::I64Const(0));
+        length.load(function);
+        function.instruction(&Instruction::ArrayNew(array));
+        function.instruction(&Instruction::End);
+        let keys = schema
+            .reserve_gc_local(function)
+            .initialize(GcStackReference::new(), function);
         Self { keys }
     }
     pub(crate) fn read(
@@ -3732,6 +3874,15 @@ pub(crate) struct PropertyKeyConstruction {
     keys: GcLocal<PropertyKeyTable>,
 }
 impl PropertyKeyConstruction {
+    /// The completed empty List. It has no slot, so it needs no placeholder.
+    pub(crate) fn empty(
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<PropertyKeyTable> {
+        schema
+            .array_type::<PropertyKeyTable>()
+            .fixed(std::iter::empty(), function)
+    }
     pub(crate) fn allocate(
         schema: &RuntimeSchema,
         slot: GcLocalSlot<PropertyKeyTable>,
@@ -3786,6 +3937,22 @@ impl PropertyKeyConstruction {
         schema
             .struct_type::<StoredValue>()
             .from_value(key.value(), function);
+        schema.array_type::<PropertyKeyTable>().emit_set(function);
+    }
+    /// Stores `snapshot`, an immutable StoredValue whose value is exactly
+    /// `key`, instead of wrapping the same key in a fresh snapshot.
+    pub(crate) fn write_snapshot(
+        &self,
+        index: I32Local,
+        snapshot: &GcLocal<StoredValue>,
+        key: &crate::operations::PropertyKeyLocals,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        let _ = key;
+        self.keys.load(schema, function);
+        index.load(function);
+        snapshot.load(schema, function);
         schema.array_type::<PropertyKeyTable>().emit_set(function);
     }
     pub(crate) fn publish(

@@ -3,10 +3,9 @@
 
 use super::*;
 use crate::gc_types::{
-    ArgumentsObject, ArgumentsObjectSchema, ArrayObject, CodeUnitArray,
-    I32Local, I64Local, IndexedTable,
-    ModuleNamespaceObject, PrimitiveBox, PrimitiveBoxSchema,
-    PropertyKeyConstruction, PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
+    ArgumentsObject, ArgumentsObjectSchema, ArrayObject, CodeUnitArray, I32Local, I64Local,
+    IndexedTable, ModuleNamespaceObject, PrimitiveBox, PrimitiveBoxSchema, PropertyKeyConstruction,
+    PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
 };
 use crate::runtime_helpers::{
     HelperParameters, ObjectOwnKeysArguments, ObjectOwnKeysParameters, RuntimeHelperId,
@@ -155,18 +154,9 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<CompletedOwnPropertyKeys, EmitError> {
         let schema = self.runtime_schema();
-        let zero = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(0));
-        zero.store(function);
-        let empty = PropertyKeyConstruction::allocate(
-            schema,
-            schema.reserve_gc_local(function),
-            zero,
-            function,
-        );
         let table = schema
             .reserve_gc_local(function)
-            .initialize(empty.publish(schema, function), function);
+            .initialize(PropertyKeyConstruction::empty(schema, function), function);
         let pending = schema.reserve_completion(function);
         pending.initialize(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
@@ -212,7 +202,6 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         self.emit_own_keys_propagate_throw(&pending, function);
         pending.clear(function);
-        schema.release_i32_local(zero, function);
         Ok(CompletedOwnPropertyKeys { table })
     }
 
@@ -229,6 +218,24 @@ impl FunctionBuilder<'_> {
         self.emit_propagate_current_throw(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+    }
+    /// Entry keys are immutable accepted snapshots; share them unchanged.
+    fn emit_own_keys_candidate_push_snapshot(
+        &self,
+        list: &GcLocal<crate::gc_types::ValueArray>,
+        count: I32Local,
+        stored: &GcLocal<StoredValue>,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        schema.array_type::<crate::gc_types::ValueArray>().write(
+            list,
+            count,
+            GcOperand::reference(stored, schema),
+            schema,
+            function,
+        );
+        self.emit_own_keys_increment(count, function);
     }
     fn emit_own_keys_increment(&self, index: I32Local, function: &mut Function) {
         index.load(function);
@@ -713,11 +720,8 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, &value, schema, function);
+        self.emit_own_keys_candidate_push_snapshot(&candidates, count, &stored, function);
         stored.clear(function);
-        self.emit_own_keys_candidate_push(&candidates, count, &value, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         entry.clear(function);
@@ -944,9 +948,14 @@ impl FunctionBuilder<'_> {
             schema
                 .struct_type::<StoredValue>()
                 .read_into(&stored, &value, schema, function);
-            stored.clear(function);
             let key = self.emit_value_to_property_key_locals(&value, function)?;
-            self.emit_property_key_array_index(&key, ordinal, is_index, function)?;
+            match tag {
+                WasmRuntimeValueTag::String => {
+                    self.emit_property_key_array_index(&key, ordinal, is_index, function)?;
+                }
+                // A Symbol is never an array index.
+                _ => is_index.set_constant(0, function),
+            }
             value.tag().load(function);
             function.instruction(&Instruction::I32Const(tag as i32));
             function.instruction(&Instruction::I32Eq);
@@ -954,10 +963,12 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Eqz);
             function.instruction(&Instruction::I32And);
             self.open_frame(ControlFrameKind::If, function);
-            construction.write(output_index, &key, schema, function);
+            // The candidate snapshot already holds exactly this key.
+            construction.write_snapshot(output_index, &stored, &key, schema, function);
             self.emit_own_keys_increment(output_index, function);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
+            stored.clear(function);
             key.clear(function);
             self.emit_own_keys_increment(index, function);
             function.instruction(&Instruction::Br(0));

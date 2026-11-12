@@ -153,7 +153,28 @@ impl FunctionBuilder<'_> {
             .known_targets()
             .iter()
             .any(|id| StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::MathImul));
-        if !numeric_imul_candidate
+        // `x.call(...)` syntax or target knowledge only nominates the
+        // forwarding guard; the actual callee's code identity decides, with
+        // these once-evaluated operands.
+        let call_forwarding_candidate = this_expression.is_some()
+            && (targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id)
+                    == Some(StandardBuiltinId::FunctionPrototypeCall)
+            }) || match &callee_expression.expr {
+                ExprIr::PropertyRead {
+                    key: PropertyKeyIr::StaticString(name),
+                    ..
+                } => name == "call",
+                ExprIr::SpecOperation {
+                    operation: scriptw_ir::SpecOperationIr::GetV,
+                    operands,
+                } => matches!(
+                    operands.get(1).map(|key| &key.expr),
+                    Some(ExprIr::String(name)) if name == "call"
+                ),
+                _ => false,
+            });
+        if (!numeric_imul_candidate
             || !self.try_emit_numeric_imul_call(
                 &callee,
                 &receiver,
@@ -161,7 +182,16 @@ impl FunctionBuilder<'_> {
                 continuation,
                 output,
                 function,
-            )?
+            )?)
+            && (!call_forwarding_candidate
+                || !self.try_emit_function_call_forwarding(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
         {
             self.emit_indirect_call_from_locals_with_known_target(
                 &callee,

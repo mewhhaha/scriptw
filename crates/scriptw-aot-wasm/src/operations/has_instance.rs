@@ -594,6 +594,14 @@ impl FunctionBuilder<'_> {
             function,
         );
         let key = PropertyKeyLocals::from_symbol(schema, &symbol, function);
+        // Every dictionary entry stores its key's hash, and a Symbol is given
+        // its hash identity the first time it is hashed. While @@hasInstance
+        // has none, no dictionary anywhere holds it as a key.
+        let symbol_hash = schema.reserve_i64_local(function);
+        schema
+            .field(crate::gc_types::SymbolValueSchema::KEY_HASH_ID)
+            .read(&symbol, schema, function)
+            .store_i64(symbol_hash, function);
         symbol.clear(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
         let walk = self.open_frame(ControlFrameKind::Loop, function);
@@ -646,11 +654,18 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Ne);
         absent.store(function);
         function.instruction(&Instruction::Else);
+        symbol_hash.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        absent.set_constant(1, function);
+        function.instruction(&Instruction::Else);
         let dictionary_absent =
             self.emit_ordinary_own_property_absent_i32(&cursor, &key, function)?;
         dictionary_absent.load(function);
         absent.store(function);
         schema.release_i32_local(dictionary_absent, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -692,6 +707,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         key.clear(function);
         function_prototype.clear(function);
+        schema.release_i64_local(symbol_hash, function);
         schema.release_i32_local(absent, function);
         schema.release_i32_local(hops, function);
         cursor.clear(function);

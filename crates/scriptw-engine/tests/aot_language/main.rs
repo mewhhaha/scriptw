@@ -42,6 +42,7 @@ mod aot_function_own_data_probe;
 mod aot_guarded_number_add;
 mod aot_guarded_number_relational;
 mod aot_guarded_number_update;
+mod aot_has_instance_symbol_absence;
 mod aot_in_operand_order;
 mod aot_infallible_booleans;
 mod aot_local_concat_length;
@@ -105,3 +106,5 @@ mod aot_captured_call_regions;
 mod aot_numeric_body;
 
 mod aot_compact_for_in;
+
+mod aot_shape_transitions;

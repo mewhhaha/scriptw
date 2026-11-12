@@ -202,25 +202,23 @@ macro_rules! runtime_family {
                 let schema = emitter.runtime_schema();
                 // The nullable code field is the branch predicate. A reference
                 // becomes non-null only within the branch that proved it exists.
-                schema
-                    .struct_type::<ExecutableCode>()
-                    .field(ExecutableCodeSchema::$field)
-                    .read(&self.code, schema, function)
-                    .callable();
-                function.instruction(&Instruction::RefIsNull);
-                function.instruction(&Instruction::I32Eqz);
-                emitter.open_frame(ControlFrameKind::If, function);
-                let code = schema
-                    .reserve_function_local::<$role, _>(function)
+                // Each typed field read is a host lookup; read it exactly once.
+                let optional = schema
+                    .reserve_function_local::<$role, Nullable>(function)
                     .initialize(
                         schema
                             .struct_type::<ExecutableCode>()
                             .field(ExecutableCodeSchema::$field)
                             .read(&self.code, schema, function)
-                            .callable()
-                            .require_non_null(function),
+                            .callable(),
                         function,
                     );
+                optional.load(function).is_null(function);
+                function.instruction(&Instruction::I32Eqz);
+                emitter.open_frame(ControlFrameKind::If, function);
+                let code = schema
+                    .reserve_function_local::<$role, _>(function)
+                    .initialize(optional.load(function).require_non_null(function), function);
                 let callable = schema
                     .reserve_gc_local(function)
                     .initialize(self.callable.load(schema, function), function);
@@ -229,6 +227,7 @@ macro_rules! runtime_family {
                 entry.clear(function);
                 emitter.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
+                optional.clear(function);
                 Ok(())
             }
         }

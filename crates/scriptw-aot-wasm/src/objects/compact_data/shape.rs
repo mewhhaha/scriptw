@@ -32,11 +32,11 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let mut keys = Vec::with_capacity(names.len());
         for name in names {
-            keys.push(
-                schema
-                    .reserve_gc_local(f)
-                    .initialize(self.emit_interned_string_reference(name, f)?, f),
-            );
+            let key = schema
+                .reserve_gc_local(f)
+                .initialize(self.emit_interned_string_reference(name, f)?, f);
+            self.emit_prepare_compact_key_hash(&key, f);
+            keys.push(key);
         }
         let key_table = schema.reserve_gc_local(f).initialize(
             schema
@@ -54,6 +54,8 @@ impl FunctionBuilder<'_> {
                             &scriptw_ir::decode_js_string_utf16(name),
                         )
                     })),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
                 ),
                 f,
             ),

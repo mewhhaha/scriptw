@@ -205,6 +205,40 @@ macro_rules! planned_callable_call {
     };
 }
 planned_callable_call!(OrdinaryBodyEntry, OrdinaryBodyInputs; NativeCallerBoundary);
+
+impl OrdinaryBodyEntry<'_> {
+    /// A planned source body is never an opaque native caller. Like general
+    /// dispatch, which tail-enters it, the call installs no native boundary.
+    pub(crate) fn emit_source_call(
+        &self,
+        callable: &GcLocal<FunctionObject>,
+        inputs: OrdinaryBodyInputs<'_>,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcCallResult {
+        assert!(
+            self.0.has_source_activation(),
+            "only a source body enters without a native caller boundary"
+        );
+        inputs.emit(callable, schema, function);
+        schema.call_entry(self.0, function)
+    }
+
+    pub(crate) fn emit_source_return_call(
+        &self,
+        callable: &GcLocal<FunctionObject>,
+        inputs: OrdinaryBodyInputs<'_>,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        assert!(
+            self.0.has_source_activation(),
+            "only a source body enters without a native caller boundary"
+        );
+        inputs.emit(callable, schema, function);
+        self.0.emit_direct_return_call_instruction(function);
+    }
+}
 planned_callable_call!(GeneratorBodyEntry, GeneratorBodyInputs);
 planned_callable_call!(AsyncBodyEntry, AsyncBodyInputs);
 planned_callable_call!(AsyncGeneratorBodyEntry, AsyncGeneratorBodyInputs);

@@ -67,6 +67,18 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
         function.instruction(&Instruction::End);
+        // Strings have no identity: an empty operand leaves the other
+        // operand as the whole result without copying it.
+        let result = schema
+            .reserve_gc_local(function)
+            .initialize(right.load(schema, function), function);
+        right_length.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        result.replace(left.load(schema, function), function);
+        function.instruction(&Instruction::Else);
+        left_length.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
         let output = StringConstruction::allocate(
             schema,
             schema.reserve_gc_local(function),
@@ -91,13 +103,17 @@ impl FunctionBuilder<'_> {
             schema,
             function,
         );
-        let value = output.publish(schema, function);
+        result.replace(output.publish(schema, function), function);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
         schema.release_i32_local(destination_index, function);
         schema.release_i32_local(total, function);
         schema.release_i32_local(right_length, function);
         schema.release_i32_local(left_length, function);
         right_units.clear(function);
         left_units.clear(function);
+        let value = result.load(schema, function);
+        result.clear(function);
         value
     }
 

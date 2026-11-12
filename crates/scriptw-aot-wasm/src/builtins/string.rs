@@ -704,6 +704,9 @@ impl FunctionBuilder<'_> {
                 }
                 StringSearchOperation::IndexOf|StringSearchOperation::StartsWith|StringSearchOperation::Includes=>{}
             }
+            let string_units=s.reserve_gc_local(f).initialize(s.field(StringValueSchema::CODE_UNITS).read(string,s,f).reference(),f);
+            let needle_units=s.reserve_gc_local(f).initialize(s.field(StringValueSchema::CODE_UNITS).read(&needle,s,f).reference(),f);
+            let at=s.reserve_i32_local(f);
             let next=b.open_frame(ControlFrameKind::Loop,f);
             cursor.load(f); length.load(f); needle_length.load(f); f.instruction(&Instruction::I64Sub); f.instruction(&Instruction::I64GtU); b.emit_branch_if_to_target(searched,f);
             f.instruction(&Instruction::I32Const(1)); equal.store(f);
@@ -711,8 +714,10 @@ impl FunctionBuilder<'_> {
             let compared=b.open_frame(ControlFrameKind::Block,f); let compare=b.open_frame(ControlFrameKind::Loop,f);
             offset.load(f); needle_length.load(f); f.instruction(&Instruction::I64GeU); b.emit_branch_if_to_target(compared,f);
             cursor.load(f); offset.load(f); f.instruction(&Instruction::I64Add); source_index.store(f);
-            b.emit_gc_string_code_unit_i32(string,source_index,f); unit.store(f);
-            b.emit_gc_string_code_unit_i32(&needle,offset,f); unit.load(f); f.instruction(&Instruction::I32Ne);
+            source_index.load(f); f.instruction(&Instruction::I32WrapI64); at.store(f);
+            s.array_type::<CodeUnitArray>().read(&string_units,at,s,f).store(unit,f);
+            offset.load(f); f.instruction(&Instruction::I32WrapI64); at.store(f);
+            s.array_type::<CodeUnitArray>().read(&needle_units,at,s,f); unit.load(f); f.instruction(&Instruction::I32Ne);
             b.open_frame(ControlFrameKind::If,f); f.instruction(&Instruction::I32Const(0)); equal.store(f); b.emit_branch_to_target(compared,f); b.pop_control(ControlFrameKind::If); f.instruction(&Instruction::End);
             offset.load(f); f.instruction(&Instruction::I64Const(1)); f.instruction(&Instruction::I64Add); offset.store(f); b.emit_branch_to_target(compare,f);
             b.pop_control(ControlFrameKind::Loop); f.instruction(&Instruction::End); b.pop_control(ControlFrameKind::Block); f.instruction(&Instruction::End);
@@ -730,7 +735,9 @@ impl FunctionBuilder<'_> {
                     cursor.load(f); f.instruction(&Instruction::I64Const(1)); f.instruction(&Instruction::I64Add); cursor.store(f); b.emit_branch_to_target(next,f);
                 }
             }
-            b.pop_control(ControlFrameKind::Loop); f.instruction(&Instruction::End); b.pop_control(ControlFrameKind::Block); f.instruction(&Instruction::End);
+            b.pop_control(ControlFrameKind::Loop); f.instruction(&Instruction::End);
+            s.release_i32_local(at,f); needle_units.clear(f); string_units.clear(f);
+            b.pop_control(ControlFrameKind::Block); f.instruction(&Instruction::End);
             match operation {
                 StringSearchOperation::IndexOf|StringSearchOperation::LastIndexOf=>{
                     found_index.load(f); f.instruction(&Instruction::F64ConvertI64S); f.instruction(&Instruction::I64ReinterpretF64); bits.store(f); result.set_number(bits,f);

@@ -17,7 +17,8 @@ mod local_argument_inputs;
 mod local_arguments;
 pub(crate) use local_argument_inputs::{LocalArgumentCallInputs, LocalArgumentsCallableRole};
 pub(crate) use local_arguments::{
-    LocalArgumentsArity, LocalArgumentsPlan, PlannedLocalArgumentsEntry,
+    LocalArgumentsArity, LocalArgumentsPlan, NativeLocalArgumentsBuiltin,
+    PlannedLocalArgumentsEntry,
 };
 mod runtime_dispatch;
 mod saved_activation_call;
@@ -175,6 +176,10 @@ impl PlannedFunctionEntry {
 
     pub(crate) fn emit_direct_call_instruction(&self, function: &mut Function) {
         function.instruction(&Instruction::Call(self.wasm_index));
+    }
+
+    pub(crate) fn emit_direct_return_call_instruction(&self, function: &mut Function) {
+        function.instruction(&Instruction::ReturnCall(self.wasm_index));
     }
 
     pub(crate) fn assert_body_index(&self, wasm_index: u32) {
