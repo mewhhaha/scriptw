@@ -313,29 +313,53 @@ impl<'a> FunctionBuilder<'a> {
         Ok(ReadyToWriteOrdinaryPropertyAssignmentLocals { reference, rhs })
     }
 
+    /// PutValue's [[Set]]. A static String site's R kernel first tries its
+    /// write record and otherwise runs this same OrdinarySet.
     fn emit_ordinary_reference_set(
         &mut self,
         reference: &CanonicalOrdinaryPropertyReferenceLocals,
         rhs: &ValueLocals,
+        site: Option<crate::emit::ProgramSiteId>,
         strictness: Strictness,
         message: RuntimeErrorMessage,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        schema
-            .call_helper(
-                crate::runtime_helpers::OrdinarySetArguments::new(
-                    &reference.target_object,
-                    &reference.base_and_receiver,
-                    &reference.property_key,
-                    rhs,
-                    self.current_environment(),
-                    self.current_program(),
-                ),
-                self.runtime_helper_base()?,
-                function,
-            )
-            .store(self.completion(), function);
+        if let Some(site) = site {
+            let id = schema.reserve_i32_local(function);
+            site.emit(id, function);
+            schema
+                .call_helper(
+                    crate::runtime_helpers::CachedPropertyWriteArguments::new(
+                        &reference.target_object,
+                        &reference.base_and_receiver,
+                        &reference.property_key,
+                        rhs,
+                        id,
+                        self.current_environment(),
+                        self.current_program(),
+                    ),
+                    self.runtime_helper_base()?,
+                    function,
+                )
+                .store(self.completion(), function);
+            schema.release_i32_local(id, function);
+        } else {
+            schema
+                .call_helper(
+                    crate::runtime_helpers::OrdinarySetArguments::new(
+                        &reference.target_object,
+                        &reference.base_and_receiver,
+                        &reference.property_key,
+                        rhs,
+                        self.current_environment(),
+                        self.current_program(),
+                    ),
+                    self.runtime_helper_base()?,
+                    function,
+                )
+                .store(self.completion(), function);
+        }
         self.emit_propagate_current_throw_if_needed(function);
         if strictness.throws_on_failed_set() {
             self.completion().value().scalar().load(function);
@@ -351,6 +375,7 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_put_value_from_ready_ordinary_property_assignment(
         &mut self,
         assignment: ReadyToWriteOrdinaryPropertyAssignmentLocals,
+        site: Option<crate::emit::ProgramSiteId>,
         strictness: Strictness,
         output: &ValueLocals,
         function: &mut Function,
@@ -359,6 +384,7 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_ordinary_reference_set(
             &reference,
             &rhs,
+            site,
             strictness,
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,
@@ -375,12 +401,17 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        let site = self.planned_property_write_site(
+            assignment.base_and_receiver(),
+            assignment.referenced_name(),
+        )?;
         let raw = self.evaluate_raw_ordinary_property_reference(assignment, function)?;
         let evaluated =
             self.evaluate_rhs_for_raw_ordinary_property_assignment(raw, assignment, function)?;
         let ready = self.canonicalize_raw_ordinary_property_assignment(evaluated, function)?;
         self.emit_put_value_from_ready_ordinary_property_assignment(
             ready,
+            site,
             assignment.strictness(),
             output,
             function,
@@ -413,9 +444,14 @@ impl<'a> FunctionBuilder<'a> {
         }
         self.open_frame(ControlFrameKind::If, function);
         self.compile_expr_to_value(assignment.rhs(), &rhs, function)?;
+        let site = self.planned_property_write_site(
+            assignment.base_and_receiver(),
+            assignment.referenced_name(),
+        )?;
         self.emit_ordinary_reference_set(
             &reference,
             &rhs,
+            site,
             assignment.strictness(),
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,
@@ -495,6 +531,7 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_ordinary_reference_set(
             &reference,
             &rhs,
+            None,
             write.strictness(),
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,
@@ -533,6 +570,7 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_put_value_from_ready_ordinary_property_reference(
         &mut self,
         ready: ReadyToWriteOrdinaryPropertyReferenceLocals,
+        site: Option<crate::emit::ProgramSiteId>,
         strictness: Strictness,
         output: &ValueLocals,
         function: &mut Function,
@@ -545,6 +583,7 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_ordinary_reference_set(
             &reference,
             &result,
+            site,
             strictness,
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,
@@ -562,12 +601,17 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        let site = self.planned_property_write_site(
+            mutation.base_and_receiver(),
+            mutation.referenced_name(),
+        )?;
         let raw = self.evaluate_raw_ordinary_property_reference(mutation, function)?;
         let read = self.emit_get_value_from_raw_ordinary_property_reference(raw, function)?;
         let ready =
             self.emit_result_from_read_ordinary_property_reference(read, mutation, function)?;
         self.emit_put_value_from_ready_ordinary_property_reference(
             ready,
+            site,
             mutation.strictness(),
             output,
             function,
@@ -667,9 +711,12 @@ impl<'a> FunctionBuilder<'a> {
             old_value,
             new_value,
         } = ready;
+        let site =
+            self.planned_property_write_site(update.base_and_receiver(), update.referenced_name())?;
         self.emit_ordinary_reference_set(
             &reference,
             &new_value,
+            site,
             update.strictness(),
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,

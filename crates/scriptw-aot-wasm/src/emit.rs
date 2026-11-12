@@ -314,6 +314,8 @@ pub(crate) enum ProgramSiteKind<'a> {
         attributes: crate::heap::DescriptorWord,
     },
     OwnDataRead,
+    /// A static assignment's write record, kept in the read records' table.
+    OwnDataWrite,
 }
 
 #[derive(Clone, Copy)]

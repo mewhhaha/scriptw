@@ -113,7 +113,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 62 adds compact shape transitions: shape transition tables and key
 // indexes, shape keys written at construction, the shared empty compact
 // storage and shape budget globals, and the compact define/allocate/index helpers.
-const LAYOUT_VERSION: u32 = 62;
+// Version 63 adds static assignment write records to the per-site record and
+// the cached property-write helper.
+const LAYOUT_VERSION: u32 = 63;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

@@ -94,12 +94,12 @@ fn transition_kernel_guards_precede_every_mutation() {
     let child = between(
         TRANSITION,
         "fn emit_compact_shape_child(",
-        "fn emit_compact_storage_extend(",
+        "pub(super) fn emit_compact_transition_lookup(",
     );
     ordered(
         child,
         &[
-            "self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);",
+            "self.emit_compact_transition_scan(&table, count, name, hash, &child, used, capacity, f);",
             "MAX_COMPACT_SHAPE_KEYS",
             "MAX_COMPACT_SHAPE_TRANSITIONS",
             "s.compact_shape_budget(f);",
@@ -110,6 +110,22 @@ fn transition_kernel_guards_precede_every_mutation() {
             "CompactDataShapeSchema::TRANSITIONS",
         ],
     );
+    // An existing child is found by key, and a lookup alone creates nothing.
+    let scan = between(
+        TRANSITION,
+        "fn emit_compact_transition_scan(",
+        "fn emit_compact_storage_extend(",
+    );
+    assert!(scan.contains("self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);"));
+    let lookup = between(
+        TRANSITION,
+        "pub(super) fn emit_compact_transition_lookup(",
+        "fn emit_compact_transition_scan(",
+    );
+    assert!(lookup.contains("self.emit_compact_transition_scan("));
+    for creation in ["construct(", "spend_compact_shape_budget", ".write("] {
+        assert!(!lookup.contains(creation) && !scan.contains(creation));
+    }
     // Storage is published only after the replacement owns the new value.
     let extend = between(
         TRANSITION,

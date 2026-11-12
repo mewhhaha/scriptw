@@ -36,6 +36,54 @@ impl FunctionBuilder<'_> {
             .initialize(entry, function))
     }
 
+    /// Leaves on the stack whether the key index alone proves `key` absent
+    /// from this dictionary: it has no buckets, or the key's first bucket is
+    /// empty, which ends every probe for the key. A zero result proves
+    /// nothing; the caller then asks the complete lookup.
+    pub(in crate::objects) fn emit_ordinary_property_index_lacks_key_i32(
+        &mut self,
+        storage: &GcLocal<OrdinaryPropertyStorage>,
+        key: &PropertyKeyLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let buckets = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryPropertyStorageSchema::INDEX)
+                .read(storage, schema, function)
+                .reference(),
+            function,
+        );
+        let capacity = schema.reserve_i32_local(function);
+        schema
+            .array_type::<OrdinaryPropertyIndex>()
+            .length(&buckets, schema, function);
+        capacity.store(function);
+        let absent = schema.reserve_i32_local(function);
+        absent.set_constant(1, function);
+        capacity.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        let hash = schema.reserve_i64_local(function);
+        self.emit_property_key_hash(key, hash, function);
+        let bucket = schema.reserve_i32_local(function);
+        Self::emit_ordinary_property_hash_bucket(hash, capacity, bucket, function);
+        schema
+            .array_type::<OrdinaryPropertyIndex>()
+            .read(&buckets, bucket, schema, function)
+            .store(absent, function);
+        absent.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        absent.store(function);
+        schema.release_i32_local(bucket, function);
+        schema.release_i64_local(hash, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        absent.load(function);
+        schema.release_i32_local(absent, function);
+        schema.release_i32_local(capacity, function);
+        buckets.clear(function);
+    }
+
     pub(crate) fn compile_ordinary_property_find_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::OrdinaryPropertyFind);
         let parameters = self

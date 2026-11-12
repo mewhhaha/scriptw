@@ -1223,6 +1223,7 @@ runtime_helper_domain! {
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
     CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,receiver:Value,key:Key,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    CachedPropertyWrite / CachedPropertyWriteArguments / CachedPropertyWriteParameters / "cached_property_write" { target:Value,receiver:Value,key:Key,value:Value,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     OrdinaryPropertyFind / OrdinaryPropertyFindArguments / OrdinaryPropertyFindParameters / "ordinary_property_find" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyEntry Nullable);
     OrdinaryPropertyAppend / OrdinaryPropertyAppendArguments / OrdinaryPropertyAppendParameters / "ordinary_property_append" { object:(Ref OrdinaryObject NonNullable),key:Key,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
     OrdinaryPropertyPrepare / OrdinaryPropertyPrepareArguments / OrdinaryPropertyPrepareParameters / "ordinary_property_prepare" { storage:(Ref OrdinaryPropertyStorage NonNullable),count:I32 } => I32;
@@ -1410,6 +1411,7 @@ impl RuntimeHelperId {
             Self::DeferredIntrinsicInstallRun => HelperOwner::Runtime,
             Self::ArgumentListAppend => HelperOwner::Runtime,
             Self::CachedPropertyRead => HelperOwner::Runtime,
+            Self::CachedPropertyWrite => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
             Self::OrdinaryPropertyAppend => HelperOwner::Runtime,
             Self::OrdinaryPropertyPrepare => HelperOwner::Runtime,
@@ -1581,6 +1583,7 @@ impl RuntimeHelperId {
             Self::DeferredIntrinsicInstallRun => true,
             Self::ArgumentListAppend => true,
             Self::CachedPropertyRead => true,
+            Self::CachedPropertyWrite => true,
             Self::OrdinaryPropertyFind => true,
             Self::OrdinaryPropertyAppend => true,
             Self::OrdinaryPropertyPrepare => true,

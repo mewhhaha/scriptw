@@ -270,6 +270,42 @@ leaf storage scales with touched pages. Cache polymorphism, startup allocation
 and large-program timing effects require separate measurement. No cache
 default-policy or performance claim follows from this representation contract.
 
+## Static assignment write records
+
+A plain, logical, compound or update assignment to a static String key whose
+read would be cached gets its own site in the same per-ProgramInstance record
+table and calls the typed `CachedPropertyWrite` helper with the target,
+original receiver, completed key, value and site. Captured writes, `super`
+assignments, computed keys and every other Set caller keep `OrdinarySet`.
+
+The record holds only the key, shapes and integers. Its existing-own form is
+SHAPE and SLOT: a shape with the key at that slot under a writable attribute
+word. Its add form is a parent shape that lacks the key and holds default data
+attributes, that shape's canonical child for the key, a holder rule and a
+closed-tail word. A use requires the receiver to be the target and an actual
+OrdinaryObject on compact storage with the recorded shape. The existing form
+then stores the value at the slot, exactly OrdinarySet's value-only
+[[DefineOwnProperty]] on the receiver. The add form further requires the
+object to be extensible and its live chain to lack the key: the prototype is
+the recorded closed tail (null, or an unmodified %Object.prototype% whose
+immutable layout lacked the key when recorded), or one actual OrdinaryObject
+holder that lacks the key, by the recorded compact shape or by a live lookup
+of its dictionary, above that tail. It then publishes storage for the child
+exactly as `CompactDataDefine` does. The result is the Boolean true that the
+general Set returns.
+
+Any failed guard runs `OrdinarySet` unchanged with the original operands.
+Only a normal true result on a receiver that was the target and compact
+refreshes the record, from immutable facts alone: the current shape's slot and
+attribute word, the previous shape's absence of the key and attribute word, an
+existing canonical child (a lookup never creates shapes), the holder's shape
+or dictionary absence and the tail's layout. Setters, read-only and data
+properties added anywhere on the chain, replaced prototypes, Proxies,
+non-extensible, sealed and frozen objects, attribute changes, deletion and
+foreign-Realm prototype mutation therefore all miss at the next use; strict
+failure still throws in the caller. `aot_property_write_records` changes each
+of these facts between two executions of one site.
+
 ## Closed numeric row loops
 
 The existing scalar Number-loop proof can borrow a dense canonical Array from a

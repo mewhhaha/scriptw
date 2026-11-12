@@ -1,5 +1,7 @@
 //! Static reads identify a ProgramInstance site and call the typed R cache kernel.
 //! R owns registration, live storage guards, value loads and complete Get fallback.
+//! Static assignments that would cache the same read get a write record site;
+//! R likewise owns its guards and the complete Set fallback.
 use super::*;
 use scriptw_ir::{HeapShape, HeapShapeProvenance};
 
@@ -34,6 +36,25 @@ impl PropertyReadPlan {
 }
 
 impl FunctionBuilder<'_> {
+    /// The write record site of an assignment to `target.key`, when the
+    /// same reference read would be cached: a compiler-owned static String
+    /// key on a base that can be an object.
+    pub(crate) fn planned_property_write_site(
+        &mut self,
+        target: &TypedExpr,
+        key: &PropertyKeyIr,
+    ) -> Result<Option<crate::emit::ProgramSiteId>, EmitError> {
+        if !self.has_source_execution_environment() {
+            return Ok(None);
+        }
+        match PropertyReadPlan::for_read(target, key) {
+            PropertyReadPlan::General => Ok(None),
+            PropertyReadPlan::CachedStaticString => self
+                .next_program_site(crate::emit::ProgramSiteKind::OwnDataWrite)
+                .map(Some),
+        }
+    }
+
     pub(crate) fn emit_planned_property_read(
         &mut self,
         target: &TypedExpr,

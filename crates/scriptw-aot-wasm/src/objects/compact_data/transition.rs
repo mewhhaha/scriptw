@@ -24,7 +24,7 @@ const INITIAL_TRANSITION_CAPACITY: i32 = 4;
 /// a new storage record over the same arrays instead of copying them.
 const INITIAL_ARRAY_CAPACITY: i32 = 8;
 
-fn default_data_attributes() -> crate::heap::DescriptorWord {
+pub(super) fn default_data_attributes() -> crate::heap::DescriptorWord {
     StoredPropertyAttributes::Data {
         writable: true,
         enumerable: true,
@@ -229,62 +229,7 @@ impl FunctionBuilder<'_> {
         );
         let used = s.reserve_i32_local(f);
         let capacity = s.reserve_i32_local(f);
-        used.set_constant(0, f);
-        capacity.set_constant(0, f);
-        let scanned = self.open_frame(ControlFrameKind::Block, f);
-        table.load(s, f).is_null(f);
-        self.emit_branch_if_to_target(scanned, f);
-        let present = s
-            .reserve_gc_local(f)
-            .initialize(table.load(s, f).require_non_null(f), f);
-        table_type.length(&present, s, f);
-        capacity.store(f);
-        let scan = self.open_frame(ControlFrameKind::Loop, f);
-        used.load(f);
-        capacity.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(scanned, f);
-        let entry = s
-            .reserve_gc_local::<CompactDataShape, Nullable>(f)
-            .initialize(table_type.read(&present, used, s, f).reference(), f);
-        entry.load(s, f).is_null(f);
-        self.emit_branch_if_to_target(scanned, f);
-        let candidate = s
-            .reserve_gc_local(f)
-            .initialize(entry.load(s, f).require_non_null(f), f);
-        let candidate_keys = s.reserve_gc_local(f).initialize(
-            s.field(CompactDataShapeSchema::KEYS)
-                .read(&candidate, s, f)
-                .reference(),
-            f,
-        );
-        // Every child extends this exact parent, so its new key is at `count`.
-        let candidate_key = s.reserve_gc_local(f).initialize(
-            s.array_type::<CompactShapeKeys>()
-                .read(&candidate_keys, count, s, f)
-                .reference(),
-            f,
-        );
-        self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);
-        self.open_frame(ControlFrameKind::If, f);
-        child.replace(candidate.load(s, f).nullable(), f);
-        self.emit_branch_to_target(scanned, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        used.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        used.store(f);
-        self.emit_branch_to_target(scan, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        candidate_key.clear(f);
-        candidate_keys.clear(f);
-        candidate.clear(f);
-        entry.clear(f);
-        present.clear(f);
+        self.emit_compact_transition_scan(&table, count, name, hash, &child, used, capacity, f);
 
         child.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
@@ -398,12 +343,118 @@ impl FunctionBuilder<'_> {
         Ok(child)
     }
 
+    /// The child of `shape`, which has `count` keys, already published for
+    /// `name`, or null. Looking up creates and publishes nothing.
+    pub(super) fn emit_compact_transition_lookup(
+        &mut self,
+        shape: &GcLocal<CompactDataShape>,
+        count: I32Local,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        f: &mut Function,
+    ) -> GcLocal<CompactDataShape, Nullable> {
+        let s = self.runtime_schema();
+        let child = s
+            .reserve_gc_local::<CompactDataShape, Nullable>(f)
+            .initialize_null(s, f);
+        let table = s
+            .reserve_gc_local::<CompactShapeTable, Nullable>(f)
+            .initialize(
+                s.field(CompactDataShapeSchema::TRANSITIONS)
+                    .read(shape, s, f)
+                    .reference(),
+                f,
+            );
+        let used = s.reserve_i32_local(f);
+        let capacity = s.reserve_i32_local(f);
+        self.emit_compact_transition_scan(&table, count, name, hash, &child, used, capacity, f);
+        s.release_i32_local(capacity, f);
+        s.release_i32_local(used, f);
+        table.clear(f);
+        child
+    }
+
+    /// Scans a parent's transition `table` for its child for `name` and
+    /// leaves it, or null, in `child`. `used` ends at the first entry not
+    /// scanned and `capacity` at the table length (both zero without one).
+    #[allow(clippy::too_many_arguments)]
+    fn emit_compact_transition_scan(
+        &mut self,
+        table: &GcLocal<CompactShapeTable, Nullable>,
+        count: I32Local,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        child: &GcLocal<CompactDataShape, Nullable>,
+        used: I32Local,
+        capacity: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let table_type = s.array_type::<CompactShapeTable>();
+        used.set_constant(0, f);
+        capacity.set_constant(0, f);
+        let scanned = self.open_frame(ControlFrameKind::Block, f);
+        table.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(scanned, f);
+        let present = s
+            .reserve_gc_local(f)
+            .initialize(table.load(s, f).require_non_null(f), f);
+        table_type.length(&present, s, f);
+        capacity.store(f);
+        let scan = self.open_frame(ControlFrameKind::Loop, f);
+        used.load(f);
+        capacity.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(scanned, f);
+        let entry = s
+            .reserve_gc_local::<CompactDataShape, Nullable>(f)
+            .initialize(table_type.read(&present, used, s, f).reference(), f);
+        entry.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(scanned, f);
+        let candidate = s
+            .reserve_gc_local(f)
+            .initialize(entry.load(s, f).require_non_null(f), f);
+        let candidate_keys = s.reserve_gc_local(f).initialize(
+            s.field(CompactDataShapeSchema::KEYS)
+                .read(&candidate, s, f)
+                .reference(),
+            f,
+        );
+        // Every child extends this exact parent, so its new key is at `count`.
+        let candidate_key = s.reserve_gc_local(f).initialize(
+            s.array_type::<CompactShapeKeys>()
+                .read(&candidate_keys, count, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);
+        self.open_frame(ControlFrameKind::If, f);
+        child.replace(candidate.load(s, f).nullable(), f);
+        self.emit_branch_to_target(scanned, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        used.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        used.store(f);
+        self.emit_branch_to_target(scan, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        candidate_key.clear(f);
+        candidate_keys.clear(f);
+        candidate.clear(f);
+        entry.clear(f);
+        present.clear(f);
+    }
+
     /// Publishes a new storage for `child` (one key more than `compact`) with
     /// `value` in its last slot. One or two keys stay inline; a SoA storage
     /// with a spare slot shares its arrays with the record it replaces, and
     /// only a full one copies into doubled arrays. The replaced record is no
     /// longer reachable from the object, so the shared arrays have one owner.
-    fn emit_compact_storage_extend(
+    pub(super) fn emit_compact_storage_extend(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
         compact: &GcLocal<CompactDataStorage>,

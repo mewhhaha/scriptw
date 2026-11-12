@@ -3,6 +3,7 @@
 use super::*;
 mod hit;
 mod holder;
+mod write;
 
 impl FunctionBuilder<'_> {
     pub(in crate::objects) fn emit_own_data_cache_site(
@@ -37,6 +38,11 @@ impl FunctionBuilder<'_> {
                     GcOperand::i32(holder::HolderReceiverKind::None.word()),
                     GcOperand::null(schema),
                     GcOperand::i32(holder::NO_INTRINSIC_LAYOUT),
+                    GcOperand::null(schema),
+                    GcOperand::i32(0),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::i32(write::AddHolder::None.word()),
                     GcOperand::null(schema),
                     GcOperand::i32(0),
                 ),

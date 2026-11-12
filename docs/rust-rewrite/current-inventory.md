@@ -13,19 +13,22 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. Source `0475e1a8ce97` runs a Speed sync request in 11.20M user
-  instructions and about 4.9M cycles against 4.38M and 2.68M for Node 24
+  JIT. The source with write records (ABI 63) runs a Speed sync request in
+  11.05M user instructions and about 4.8M cycles against 4.38M and 2.68M for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11)).
-  Next, in measured order: Set records for shaped receivers (plain data adds
-  now take [compact shape transitions](contracts/compact-ordinary-data-storage.md#shape-transitions-for-plain-data-adds),
-  but each [[Set]] still probes the receiver twice and walks a chain that is
-  not closed); a leaner hit path in `helper::cached_property_read` (9.5% of
-  cycles); a dedicated `instanceof` path for plain constructors and a site
-  record for its `prototype` read; site records for global reads; the general
-  Get for computed keys; inline stores for proven captured cells; lazy
-  function `prototype`, `length` and `name`; allocation volume, which drives
-  the 9% spent collecting. Source `89a934d06891`
+  Next, in measured order: Set beyond static-key sites (static String
+  assignments now take [write records](contracts/compact-ordinary-data-storage.md#static-assignment-write-records),
+  but a computed-key [[Set]] such as the walker's `f[c] = r` still probes the
+  receiver twice and searches the %Object.prototype% layout on each add, and
+  a chain with more than one holder above the receiver stays general); a
+  leaner hit path in `helper::cached_property_read` (9.5% of cycles) and in
+  the write helper, which share the paged site lookup; a dedicated
+  `instanceof` path for plain constructors and a site record for its
+  `prototype` read; site records for global reads; the general Get for
+  computed keys; inline stores for proven captured cells; lazy function
+  `prototype`, `length` and `name`; allocation volume, which drives the 9%
+  spent collecting. Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
   V8 with the eight-process campaign before refreshing the published panel.

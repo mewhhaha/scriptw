@@ -1024,6 +1024,19 @@ gc_layout_registry! {
             HOLDER_LAYOUT: I32Value, Mutable, NonNullable;
             HOLDER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
             HOLDER_SLOT: I32Value, Mutable, NonNullable;
+            // An assignment site's record. An existing writable own data
+            // property uses SHAPE and SLOT. An add by shape transition names
+            // the parent shape, which lacks the key, and its canonical child
+            // for the key; then how the receiver's prototype is proved to
+            // lack the key: as the closed tail itself, or as one ordinary
+            // holder (its compact shape, or a live dictionary lookup) whose
+            // own chain is that tail. The tail word is a negative read's.
+            // See `cache/write.rs`.
+            ADD_PARENT: GcRef<CompactDataShape>, Mutable, Nullable;
+            ADD_CHILD: GcRef<CompactDataShape>, Mutable, Nullable;
+            ADD_HOLDER: I32Value, Mutable, NonNullable;
+            ADD_HOLDER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
+            ADD_TAIL: I32Value, Mutable, NonNullable;
         }
         array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }
         array OwnDataReadCachePageTable => OwnDataReadCachePageTableSchema { ELEMENT: GcRef<OwnDataReadCacheTable>, Mutable, Nullable; }

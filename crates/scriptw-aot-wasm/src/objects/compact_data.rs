@@ -311,8 +311,6 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        f.instruction(&Instruction::I32Const(0));
-        found.store(f);
         let shape = schema.reserve_gc_local(f).initialize(
             schema
                 .field(CompactDataStorageSchema::SHAPE)
@@ -320,10 +318,27 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        self.emit_compact_shape_probe_prepared(&shape, name, hash, slot, found, f);
+        shape.clear(f);
+    }
+
+    /// The same probe of an immutable shape: where `name` is, if anywhere.
+    pub(super) fn emit_compact_shape_probe_prepared(
+        &mut self,
+        shape: &GcLocal<CompactDataShape>,
+        name: &GcLocal<StringValue>,
+        hash: I64Local,
+        slot: I32Local,
+        found: I32Local,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        f.instruction(&Instruction::I32Const(0));
+        found.store(f);
         let keys = schema.reserve_gc_local(f).initialize(
             schema
                 .field(CompactDataShapeSchema::KEYS)
-                .read(&shape, schema, f)
+                .read(shape, schema, f)
                 .reference(),
             f,
         );
@@ -336,7 +351,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(INDEXED_PROBE_MIN_KEYS));
         f.instruction(&Instruction::I32GeU);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_compact_indexed_probe(&shape, &keys, name, hash, slot, found, f);
+        self.emit_compact_indexed_probe(shape, &keys, name, hash, slot, found, f);
         f.instruction(&Instruction::Else);
         f.instruction(&Instruction::I32Const(0));
         slot.store(f);
@@ -371,7 +386,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         schema.release_i32_local(length, f);
         keys.clear(f);
-        shape.clear(f);
     }
 
     /// Open addressing over the shape's derived index: an empty bucket proves

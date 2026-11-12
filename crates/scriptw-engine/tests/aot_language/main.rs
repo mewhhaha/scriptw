@@ -57,6 +57,7 @@ mod aot_private_element_extensibility;
 mod aot_private_get_value_effects;
 mod aot_private_numeric_updates;
 mod aot_property_flow_boundaries;
+mod aot_property_write_records;
 mod aot_prototype_read_records;
 mod aot_public_class_fields;
 mod aot_remaining_invocation_references;

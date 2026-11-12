@@ -366,6 +366,7 @@ They do not refresh the published panel.
 | Read records and the closed-chain Set, `7c6998ed91b4` | 15.53M | 16.79M |
 | Binding-name checks and `string[number]`, `6a1d8259f6ad` | 15.15M | 16.39M |
 | Integrated: position hints, shape transitions, call entries, builtin bodies, `0475e1a8ce97` | 11.20M | 12.05M |
+| Static assignment write records (ABI 63) | 11.05M | 11.89M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -383,7 +384,10 @@ transitions for plain data adds
 ([contract](contracts/compact-ordinary-data-storage.md)); plain callees
 entered directly from the call owner, local builtin entries and call
 forwarding; and JSON serialization into one buffer with cheaper codecs,
-conversions and String operations.
+conversions and String operations. Static-key assignments then keep a
+per-site write record for an existing own slot and for an add by shape
+transition, which brings `u = {}; u.a = i; u.b = 2` to 1,980 instructions per
+iteration, `u = new P()` to 3,906 and `lit.b = i` to 691.
 
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position
