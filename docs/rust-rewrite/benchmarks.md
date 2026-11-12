@@ -354,18 +354,22 @@ compare and branch. This run does not replace the published situation panel.
 
 ### Read records and per-operation costs (2026-11-11)
 
-Source `7c6998ed91b4`, ABI 58. These are diagnostics from one retained Speed
-process per case on a machine running other builds, counted in user
-instructions per request (deterministic) and cycles per request (not). They do
-not refresh the published panel.
+Sources `7c6998ed91b4` (ABI 58) and `6a1d8259f6ad`. These are diagnostics from
+one retained Speed process per case on a machine running other builds, counted
+in user instructions per request (deterministic) and cycles per request (not).
+They do not refresh the published panel.
 
-| State | Sync instructions / cycles | Async instructions |
+| State | Sync instructions | Async instructions |
 | --- | ---: | ---: |
-| Fault-driven deadlines, `89a934d06891` | 20.12M / — | 21.65M |
-| Direct `instanceof`, global reads and own data | 17.13M / — | 18.50M |
-| Read records and the closed-chain Set, `7c6998ed91b4` | 15.53M / 6.98M | 16.79M |
-| Node 24 `--jitless` | 4.38M / 2.68M | — |
-| Node 24 with its JIT | 2.62M / — | — |
+| Fault-driven deadlines, `89a934d06891` | 20.12M | 21.65M |
+| Direct `instanceof`, global reads and own data | 17.13M | 18.50M |
+| Read records and the closed-chain Set, `7c6998ed91b4` | 15.53M | 16.79M |
+| Binding-name checks and `string[number]`, `6a1d8259f6ad` | 15.15M | 16.39M |
+| Node 24 `--jitless` | 4.38M | — |
+| Node 24 with its JIT | 2.62M | — |
+
+Sync cycles per request are about 7.0M for `7c6998ed91b4` and 2.68M for Node
+24 `--jitless`.
 
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position
@@ -373,38 +377,56 @@ confirmed by the entry's key), an own row of an intrinsic layout (the layout
 address and value group), and a data property or proven absence on the
 receiver's direct prototype. Every use re-proves the record against live
 storage; nothing invalidates it from outside. A Set on an ordinary object
-whose chain is closed skips the prototype walk.
+whose chain is closed skips the prototype walk. A named-binding scan compares
+identity and length before code units, and `string[number]` reads its code
+unit without the wrapper object.
 
-Single operations, each in a loop inside a strict function with captured
-state, at the `2c3f6db29` commit (before the read records). Values are user
-instructions per operation above each engine's cheapest loop. Scriptw's
-cheapest loop is its scalar loop, so its column also carries about 100
-instructions of ordinary loop overhead that the V8 column does not.
+Single operations, each as the body of a `for` loop in a strict function whose
+objects are captured from the enclosing function. Values are user instructions
+per loop iteration, loop included. Speed is `6a1d8259f6ad`; Fast is the CLI
+default policy at `7c6998ed91b4`, whose native code is not optimized.
 
-| Operation | Scriptw | Node 24 `--jitless` |
-| --- | ---: | ---: |
-| Read own property | 1,082 | 145 |
-| Read a prototype method | 1,985 | 116 |
-| Write own property | 1,164 | 101 |
-| Call a function / a method | 741 / 2,844 | 364 / 449 |
-| `text.indexOf(":")` | 7,724 | 447 |
-| `Map.prototype.get` | 5,479 | 356 |
-| `o instanceof Int8Array` | 2,792 | 356 |
-| Read a global constructor | 925 | 41 |
-| `{}` then two property adds | 7,012 | 416 |
-| `new P()` with two fields | 10,301 | 596 |
-| Create a closure | 8,831 | 249 |
-| `JSON.stringify` of a three-key object | 20,107 | 2,290 |
+| Loop body | Speed | Fast | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: |
+| empty | 3 | 5 | 130 |
+| `if (i > 5) t = i` | 81 | 176 | 197 |
+| `t += id(i)` | 246 | 492 | 412 |
+| `t += lit.b` (own property) | 654 | 852 | 258 |
+| `lit.b = i` | 984 | 1,165 | 232 |
+| `u = made.m` (prototype method of a `new P()` object) | 1,948 | 2,114 | 230 |
+| `t += made.m(i)` | 2,408 | 2,870 | 492 |
+| `t += text.indexOf(":")` | 2,967 | 3,467 | 561 |
+| `t += map.get(mk)` | 2,501 | 2,952 | 471 |
+| `if (plain instanceof Int8Array) t++` | 2,721 | 2,920 | 483 |
+| `u = Map` (global) | 709 | 757 | 156 |
+| `if (typeof NoSuchGlobal == "function") t++` | 2,336 | 2,589 | 239 |
+| `u = { a: i, b: 2 }` | 816 | 1,025 | 356 |
+| `u = {}; u.a = i; u.b = 2` | 5,529 | 5,836 | 433 |
+| `u = new P()` (two fields) | 9,097 | 9,602 | 648 |
+| `u = function () { return i; }` | 8,212 | 8,679 | 300 |
+| `u = Object.keys(lit)` | 9,110 | 9,713 | 445 |
+| `u = JSON.stringify(lit)` | 19,250 | 19,655 | 2,342 |
+| `s += i` (captured accumulator) | 413 | 416 | 312 |
 
-The gap is spread over basic operations rather than one hot spot. Profiles of
-the same loops attribute a property add to the dictionary definition path
-(about 1,000 cycles each), a builtin call to the argument-vector call, the
+Compiled statements on locals and plain source calls are already cheaper than
+V8's interpreter. The gap is in operations that enter runtime helpers:
+2.5 to 8 times V8 for reads, writes, `instanceof`, globals and builtin calls,
+and 13 to 27 times for property adds, construction, closures and
+`Object.keys`. Profiles of the same loops attribute a property add to the
+dictionary definition path, a builtin call to the argument-vector call, the
 funcref and subtype host calls and receiver coercion, a closure to eager
-`length`/`name`/`prototype` definition, and a write to a captured variable to a
-runtime helper even when the binding cell is proven. A traced retained Realm
-keeps 1.67 MB live in a 16 MB heap, allocates about 1.0 MB per request and
-collects every sixth request, so the collector's growth rule is not the cost;
-allocation volume is.
+`length`/`name`/`prototype` definition, and a compound assignment to a
+captured variable to two runtime helpers even when the binding cell is proven.
+An own-property hit executes several hundred instructions in
+`helper::cached_property_read`: parameter transfer, the paged site lookup, a
+chain of layout tests for the header, and tag, scalar and reference array
+reads. A traced retained Realm keeps 1.67 MB live in a 16 MB heap, allocates
+about 1.0 MB per request and collects every sixth request, so the collector's
+growth rule is not the cost; allocation volume is.
+
+`rsc_baseline` writes `program.cwasm` and `runtime.cwasm` beside the Wasm
+modules when `SCRIPTW_RSC_ARTIFACT_DIR` is set, so the native code of either
+policy can be disassembled with `objdump`.
 
 ### Descriptor work and physical allocation
 

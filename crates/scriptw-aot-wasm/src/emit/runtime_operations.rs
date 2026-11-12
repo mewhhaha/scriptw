@@ -54,6 +54,16 @@ impl<'a> FunctionBuilder<'a> {
         self.runtime_schema()
             .release_i32_local(found, &mut function);
         self.emit_branch_if_to_target(exit, &mut function);
+        let character = self.emit_raw_numeric_string_index_read(
+            &parameters.target,
+            &parameters.key,
+            &result,
+            &mut function,
+        );
+        character.load(&mut function);
+        self.runtime_schema()
+            .release_i32_local(character, &mut function);
+        self.emit_branch_if_to_target(exit, &mut function);
         let key = self.emit_value_to_property_key_locals_or_branch(
             &parameters.key,
             &result,

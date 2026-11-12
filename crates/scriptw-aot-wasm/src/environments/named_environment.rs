@@ -244,9 +244,35 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 function,
             );
+        // The same String object is the same name, and names of different
+        // lengths differ; only the rest compare code units.
         let equal = schema.reserve_i32_local(function);
+        let _ = name.load(schema, function);
+        let _ = key.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        equal.store(function);
+        equal.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        for string in [&name, key] {
+            let units = schema.reserve_gc_local(function).initialize(
+                schema
+                    .field(crate::gc_types::StringValueSchema::CODE_UNITS)
+                    .read(string, schema, function)
+                    .reference(),
+                function,
+            );
+            schema
+                .array_type::<crate::gc_types::CodeUnitArray>()
+                .length(&units, schema, function);
+            units.clear(function);
+        }
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
         self.emit_string_payload_equality_i32(&name, key, function);
         equal.store(function);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
         name.clear(function);
         equal.load(function);
         schema.release_i32_local(equal, function);

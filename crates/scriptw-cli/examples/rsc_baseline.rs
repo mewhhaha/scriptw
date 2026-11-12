@@ -295,6 +295,19 @@ fn run() -> Result<Value> {
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);
     }
     let native = wasmtime::Engine::new(&config)?;
+    if let Some(directory) = &artifact_directory {
+        // The native images under this policy, for disassembly.
+        fs::write(
+            directory.join("program.cwasm"),
+            native.precompile_module(&artifact.bytes)?,
+        )?;
+        if let Some(runtime) = &artifact.runtime {
+            fs::write(
+                directory.join("runtime.cwasm"),
+                native.precompile_module(runtime.bytes())?,
+            )?;
+        }
+    }
     let engine_setup_ns = started.elapsed().as_nanos();
     let configuration = json!({
         "wasmtime":"47.0.0",

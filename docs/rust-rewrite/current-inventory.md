@@ -13,7 +13,7 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. Source `7c6998ed91b4` runs a Speed sync request in 15.53M user
+  JIT. Source `6a1d8259f6ad` runs a Speed sync request in 15.15M user
   instructions against 4.38M for Node 24 `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11)).
   Next, in measured order: transition shapes so property adds stop defining

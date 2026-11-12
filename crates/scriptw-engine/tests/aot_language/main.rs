@@ -65,6 +65,7 @@ mod aot_scalar_masked_rows;
 mod aot_set_without_chain;
 mod aot_source_recursion;
 mod aot_string_addition;
+mod aot_string_index_read;
 mod aot_super_assignment_reference;
 mod aot_tail_call_environment;
 mod aot_thrown_exception_constructor;
