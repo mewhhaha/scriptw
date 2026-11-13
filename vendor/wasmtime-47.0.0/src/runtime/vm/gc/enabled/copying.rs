@@ -817,6 +817,12 @@ unsafe impl GcHeap for CopyingHeap {
         gc_ref.unchecked_copy()
     }
 
+    fn drop_gc_ref_is_noop(&self) -> bool {
+        // `drop_gc_ref` is the default `write_gc_ref(dest, None)`, a plain
+        // overwrite of a local below.
+        true
+    }
+
     fn write_gc_ref(
         &mut self,
         destination: &mut Option<VMGcRef>,

@@ -77,7 +77,7 @@ impl Entries {
         }
         let entry = self.entries.get(&wanted).copied();
         if let Some(entry) = entry {
-            if !entry.matches_key(&store, key)? {
+            if !entry.matches_fingerprint(&store, wanted)? {
                 return Err(wasmtime::Error::msg(
                     "weak collection key index identity mismatch",
                 ));

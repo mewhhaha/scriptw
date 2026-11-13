@@ -157,6 +157,13 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
     /// failures such as panics or incorrect results.
     fn clone_gc_ref(&mut self, gc_ref: &VMGcRef) -> VMGcRef;
 
+    /// Whether `drop_gc_ref` has no effect for this collector. A tracing
+    /// collector without reference counts can then release a batch of roots
+    /// without visiting each one.
+    fn drop_gc_ref_is_noop(&self) -> bool {
+        false
+    }
+
     /// Write barrier called whenever the runtime is nulling out a GC reference.
     ///
     /// Default implemented in terms of the `write_gc_ref` barrier.

@@ -171,6 +171,30 @@ impl GcEphemeron {
         }
     }
 
+    /// Test key identity against a token taken for that key in the current
+    /// epoch, without resolving the key's root again. Equal to `matches_key`
+    /// for the token's key; a token from another Store or epoch is an error.
+    pub fn matches_fingerprint(
+        &self,
+        store: impl AsContext,
+        fingerprint: GcWeakKeyFingerprint,
+    ) -> Result<bool> {
+        let store = store.as_context().0;
+        ensure!(
+            fingerprint.epoch == GcWeakHeapEpoch::checked(store)?,
+            "weak key token is not from this Store's current heap epoch"
+        );
+        match self.handle.live(store)? {
+            None => Ok(false),
+            Some(WeakGcEdge::Ephemeron { key, .. }) => {
+                Ok(key.as_ref().is_some_and(|key| key.as_raw_u32() == fingerprint.index))
+            }
+            Some(WeakGcEdge::Target { .. }) => {
+                unreachable!("typed ephemeron handle cannot name target")
+            }
+        }
+    }
+
     /// Upgrade the surviving value to a scoped strong root.
     pub fn value(&self, mut store: impl AsContextMut) -> Result<Option<Rooted<AnyRef>>> {
         let mut guard = AutoAssertNoGc::new(store.as_context_mut().0);

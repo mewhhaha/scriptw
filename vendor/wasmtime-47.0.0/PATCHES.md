@@ -73,7 +73,14 @@ on every operation ([measurements](../../docs/rust-rewrite/benchmarks.md#host-si
   is the shared accessor). `WeakGcRegistry::live` names a live slot without
   allocating an error on a miss; upgrades and values use it once instead of
   `contains` and then `get`. A fingerprint hashes only its heap index, which
-  agrees with `Eq`. Handles, epochs, identity checks and rooting are unchanged.
+  agrees with `Eq`. `GcEphemeron::matches_fingerprint` checks a hit's key
+  against the lookup's own token (same Store and epoch, so the same raw index
+  as `matches_key` compares) without resolving the key's root again. Handles,
+  epochs, identity checks and rooting are unchanged.
+- `GcHeap::drop_gc_ref_is_noop` (true for the copying collector, whose drop
+  is a plain local overwrite) lets a LIFO root scope release its roots at once
+  instead of calling the drop barrier per root, the upstream TODO in
+  `RootSet::exit_lifo_scope_slow`; other collectors keep the per-root drop.
 - `get_interned_func_ref`'s third argument is now the engine-level expected
   type, which compiled code loads from its `VMContext` type-id array (the
   vendored `wasmtime-internal-cranelift` translator passes it; the reserved

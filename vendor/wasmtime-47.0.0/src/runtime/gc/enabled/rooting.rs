@@ -518,10 +518,15 @@ impl RootSet {
     fn exit_lifo_scope_slow(&mut self, mut gc_store: Option<&mut GcStore>, scope: usize) {
         self.lifo_generation += 1;
 
-        // TODO: In the case where we have a tracing GC that doesn't need to
-        // drop barriers, this should really be:
-        //
-        //     self.lifo_roots.truncate(scope);
+        // A tracing collector whose drop barrier does nothing, or a store
+        // without a GC heap (only `i31ref`s), releases the roots at once.
+        if gc_store
+            .as_deref()
+            .is_none_or(|gc_store| gc_store.gc_heap.drop_gc_ref_is_noop())
+        {
+            self.lifo_roots.truncate(scope);
+            return;
+        }
 
         let mut lifo_roots = mem::take(&mut self.lifo_roots);
         for root in lifo_roots.drain(scope..) {
