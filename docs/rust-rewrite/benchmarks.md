@@ -412,6 +412,21 @@ move from the ABI 63 source to ABI 65 as follows: `plain instanceof Map`
 to 1,089 and `typeof Map == "function"` 986 to 572. The first two include the
 global read of the constructor.
 
+An `instanceof` source site then calls a call-free entry before the complete
+helper (ABI 68). The entry takes only the candidate's tag and reference, the
+constructor's reference and the site, reads the constructor's storage once
+for both facts the front proves there (no own `@@hasInstance`, and its own
+`"prototype"` at the recorded dictionary position or intrinsic value group),
+proves the default method on the rest of the constructor's chain and walks the
+candidate's chain. It answers true, false or nothing; only nothing makes the
+site call the complete helper, whose front still records the site. Every
+step only reads, so a declined answer has observed nothing. From `393716e0c`,
+`inst instanceof C` goes from 861 to 528 instructions per iteration (Speed,
+loop included). The entry's own time is about 3.3% of request cycles, where
+`helper::has_instance` was 4.7%: most of what remains is Wasmtime's code for
+the GC reads themselves (about 18 instructions per checked array element,
+about 12 per sealed type test, and a null check per field read).
+
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position
 confirmed by the entry's key), an own row of an intrinsic layout (the layout

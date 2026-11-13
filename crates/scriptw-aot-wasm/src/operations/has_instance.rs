@@ -4,14 +4,18 @@ use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, BoundFunction, BoundFunctionSchema, CompactDataStorage,
     CompletionLocals, ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema,
-    GcI32Constant, GcNullability, GcOperand, GcStackReference, IntrinsicPropertyStorage,
-    IntrinsicPropertyStorageSchema, JavaScriptObject, JavaScriptReference, NonNullable, Nullable,
-    OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, OwnDataReadCacheSchema,
-    PropertyEntrySchema, StoredValue, StoredValueSchema,
+    EqRefLocal, GcI32Constant, GcNullability, GcOperand, GcStackReference, GcSubtype,
+    IntrinsicPropertyStorage, IntrinsicPropertyStorageSchema, IntrinsicPropertyValueCache,
+    JavaScriptObject, JavaScriptReference, NonNullable, Nullable, OrdinaryObject,
+    OrdinaryObjectSchema, OrdinaryPropertyStorage, OrdinaryPropertyStorageSchema,
+    ObjectPropertyStorage, OwnDataReadCache, OwnDataReadCacheSchema, OwnDataReadCacheTable,
+    PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
+    PropertyTable, PropertyValue, RealmRecord, StoredValue, StoredValueSchema, SymbolValue,
+    SymbolValueSchema,
 };
 use crate::runtime_helpers::{
-    HasInstanceArguments, HasInstanceParameters, HelperParameters, ObjectGetPrototypeOfArguments,
-    RuntimeHelperId,
+    HasInstanceArguments, HasInstanceParameters, HelperParameters, InstanceofEntryArguments,
+    InstanceofEntryParameters, ObjectGetPrototypeOfArguments, RuntimeHelperId,
 };
 
 /// The site word of a request that has no operator site: the native method
@@ -80,6 +84,49 @@ impl ChainObject<'_> {
         match self {
             Self::Value(value) => value.cast_reference::<T>(schema, f),
             Self::Prototype(reference) => reference.cast_layout::<T>(schema, f),
+        }
+    }
+}
+
+/// An object on V's prototype chain as the entry sees it: V's reference
+/// word, or a [[Prototype]] edge.
+#[derive(Clone, Copy)]
+enum CandidateObject<'a> {
+    Reference(&'a EqRefLocal),
+    Prototype(&'a GcLocal<JavaScriptObject, Nullable>),
+}
+
+impl CandidateObject<'_> {
+    /// The object as the sealed layout `T`, after branching to `other` for
+    /// every other layout and for null: one inline header test.
+    fn sealed_layout_or_branch<T: JavaScriptReference + GcSubtype<JavaScriptObject>>(
+        self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        f: &mut Function,
+    ) -> GcStackReference<T> {
+        match self {
+            Self::Reference(reference) => reference.sealed_reference_or_branch::<T>(schema, other, f),
+            Self::Prototype(reference) => reference.sealed_subtype_or_branch::<T>(schema, other, f),
+        }
+    }
+}
+
+/// The entry's answer word: the operator's Boolean, or no answer, when the
+/// site goes on to the complete helper.
+#[derive(Clone, Copy)]
+enum EntryAnswer {
+    False,
+    True,
+    Undecided,
+}
+
+impl EntryAnswer {
+    const fn code(self) -> i32 {
+        match self {
+            Self::False => 0,
+            Self::True => 1,
+            Self::Undecided => 2,
         }
     }
 }
@@ -166,16 +213,74 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let (state, constructor, object, site) = match request {
+        let (state, constructor, object) = match request {
+            // A source operator asks its call-free entry first and calls the
+            // complete helper only when the entry has no answer.
             HasInstanceRequest::InstanceofOperator {
                 object,
                 constructor,
-                site,
+                site: Some(site),
+            } => {
+                let site_id = schema.reserve_i32_local(function);
+                site.emit(site_id, function);
+                let realm = self.emit_execution_realm(function);
+                let answer = schema.reserve_i32_local(function);
+                schema
+                    .call_helper(
+                        InstanceofEntryArguments::new(
+                            object.tag(),
+                            object.reference(),
+                            constructor.reference(),
+                            site_id,
+                            &realm,
+                            self.current_program(),
+                        ),
+                        self.runtime_helper_base()?,
+                        function,
+                    )
+                    .store(answer, function);
+                answer.load(function);
+                function.instruction(&Instruction::I32Const(EntryAnswer::Undecided.code()));
+                function.instruction(&Instruction::I32Eq);
+                function.instruction(&Instruction::If(BlockType::Empty));
+                let entry = schema.reserve_i32_local(function);
+                entry.set_constant(
+                    HasInstanceRuntimeState::InstanceofOperator.runtime_code(),
+                    function,
+                );
+                schema
+                    .call_helper(
+                        HasInstanceArguments::new(
+                            entry,
+                            object,
+                            constructor,
+                            site_id,
+                            &realm,
+                            self.current_environment(),
+                            self.current_program(),
+                        ),
+                        self.runtime_helper_base()?,
+                        function,
+                    )
+                    .store(result, function);
+                schema.release_i32_local(entry, function);
+                function.instruction(&Instruction::Else);
+                result.initialize(function);
+                result.value().set_boolean(answer, function);
+                function.instruction(&Instruction::End);
+                schema.release_i32_local(answer, function);
+                realm.clear(function);
+                schema.release_i32_local(site_id, function);
+                return Ok(());
+            }
+            HasInstanceRequest::InstanceofOperator {
+                object,
+                constructor,
+                site: None,
             } => (
                 HasInstanceRuntimeState::InstanceofOperator,
                 constructor,
                 object,
-                site,
             ),
             HasInstanceRequest::OrdinaryHasInstance {
                 constructor,
@@ -184,17 +289,13 @@ impl FunctionBuilder<'_> {
                 HasInstanceRuntimeState::OrdinaryHasInstance,
                 constructor,
                 object,
-                None,
             ),
         };
         let entry = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(state.runtime_code()));
         entry.store(function);
         let site_id = schema.reserve_i32_local(function);
-        match site {
-            Some(site) => site.emit(site_id, function),
-            None => site_id.set_constant(NO_INSTANCEOF_SITE, function),
-        }
+        site_id.set_constant(NO_INSTANCEOF_SITE, function);
         let realm = self.emit_execution_realm(function);
         schema
             .call_helper(
@@ -215,6 +316,634 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(site_id, function);
         schema.release_i32_local(entry, function);
         Ok(())
+    }
+
+    /// The operator's entry at a source site: the lean front's common case
+    /// answered from the site's record, with no call, write or allocation.
+    /// Every step only reads, so declining at any of them leaves nothing
+    /// observed: the entry then answers Undecided and the site calls
+    /// HasInstance, whose front records the site and whose state machine
+    /// owns the complete algorithm. The entry takes only the words it
+    /// reads, and returning instead of tail-calling leaves nothing to keep
+    /// for the kernel.
+    pub(crate) fn compile_instanceof_entry_helper(&mut self) -> Result<Function, EmitError> {
+        let mut body = self.begin_helper_body(RuntimeHelperId::InstanceofEntry);
+        let p = self.helper_parameters::<InstanceofEntryParameters>(&mut body);
+        let f = &mut body;
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_instanceof_entry_answer(
+            p.object_tag,
+            &p.object,
+            &p.constructor,
+            p.site,
+            &p.caller_execution_realm,
+            miss,
+            f,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.clear_helper_execution_realm(f);
+        p.release(f);
+        f.instruction(&Instruction::I32Const(EntryAnswer::Undecided.code()));
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(body))
+    }
+
+    /// Returns the operator's result when the lean front's proof holds and
+    /// the site's record locates C's "prototype"; otherwise branches to
+    /// `miss`. C is a function object whose chain reaches this Realm's
+    /// %Function.prototype% through function objects without an own
+    /// @@hasInstance, so GetMethod finds that prototype's immutable default
+    /// method and the result is OrdinaryHasInstance(C, V), in this Realm.
+    /// A primitive V is false without the "prototype" Get, which the entry
+    /// may still have read: every read here is unobservable. An object V's
+    /// chain is walked through ordinary, function and Array headers, whose
+    /// [[GetPrototypeOf]] observes nothing.
+    ///
+    /// Locals of proved non-null references stay nullable: reading a field
+    /// checks for null once, where a non-null local's load checks again.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_instanceof_entry_answer(
+        &mut self,
+        object_tag: crate::gc_types::I32Local,
+        object: &EqRefLocal,
+        constructor: &EqRefLocal,
+        site: crate::gc_types::I32Local,
+        realm: &GcLocal<RealmRecord>,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let function_prototype_layout =
+            crate::intrinsics::IntrinsicPropertyLayoutId::FunctionPrototype;
+        if !self
+            .strings
+            .has_intrinsic_property_layout(function_prototype_layout)?
+        {
+            return Ok(());
+        }
+        let function_prototype_address = self
+            .strings
+            .intrinsic_property_layout_span(function_prototype_layout)?
+            .address();
+        let callable = s
+            .reserve_gc_local::<FunctionObject, Nullable>(f)
+            .initialize(
+                constructor
+                    .sealed_reference_or_branch::<FunctionObject>(
+                        s,
+                        self.local_branch_label(miss),
+                        f,
+                    )
+                    .nullable(),
+                f,
+            );
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize(
+                s.field(FunctionObjectSchema::OBJECT)
+                    .read(&callable, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        callable.clear(f);
+        let prototype = s.reserve_value_local(f);
+        self.emit_own_prototype_or_branch(
+            &header,
+            site,
+            function_prototype_address,
+            &prototype,
+            miss,
+            f,
+        );
+        self.emit_inherited_default_has_instance_or_branch(
+            &header,
+            realm,
+            function_prototype_address,
+            miss,
+            f,
+        );
+        header.clear(f);
+        // OrdinaryHasInstance step 3: a primitive V is false whatever
+        // "prototype" holds.
+        emit_is_object_tag_i32(object_tag, f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        emit_return_answer(EntryAnswer::False, f);
+        f.instruction(&Instruction::End);
+        // A non-object "prototype" throws; the kernel owns that error.
+        emit_is_object_tag_i32(prototype.tag(), f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let next = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize_null(s, f);
+        let current = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize_null(s, f);
+        self.emit_chain_prototype_or_branch(CandidateObject::Reference(object), &next, miss, f);
+        let walk = self.open_frame(ControlFrameKind::Loop, f);
+        next.load(s, f).is_null(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        emit_return_answer(EntryAnswer::False, f);
+        f.instruction(&Instruction::End);
+        let _ = next.load(s, f);
+        prototype.reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        emit_return_answer(EntryAnswer::True, f);
+        f.instruction(&Instruction::End);
+        current.replace(next.load(s, f), f);
+        self.emit_chain_prototype_or_branch(CandidateObject::Prototype(&current), &next, miss, f);
+        self.emit_branch_to_target(walk, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        current.clear(f);
+        next.clear(f);
+        prototype.clear(f);
+        Ok(())
+    }
+
+    /// C's own storage, read once for two facts: it holds no @@hasInstance,
+    /// and its "prototype" data property is where the site's record says, as
+    /// the front's record read finds it. A dictionary entry at the recorded
+    /// position holds the record's key String itself; an intrinsic layout at
+    /// the recorded address other than %Function.prototype%'s is immutable
+    /// and keeps the row's materialized value in the recorded group. The
+    /// record table is the program's own and its site index is this
+    /// operator's alone, so the record was made by this site's front, for
+    /// "prototype". A site without its record, a dictionary that might hold
+    /// @@hasInstance, a value still held as a recipe, an accessor and every
+    /// other storage branch to `miss`.
+    fn emit_own_prototype_or_branch(
+        &mut self,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        site: crate::gc_types::I32Local,
+        function_prototype_address: u32,
+        prototype: &ValueLocals,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let label = self.local_branch_label(miss);
+        let records = self.current_program().own_data_records(s, f);
+        let table = s
+            .reserve_gc_local::<OwnDataReadCacheTable, Nullable>(f)
+            .initialize(records.non_null_or_branch(label, f).nullable(), f);
+        records.clear(f);
+        site.load(f);
+        s.array_type::<OwnDataReadCacheTable>().length(&table, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let slot = s.reserve_gc_local(f).initialize(
+            s.array_type::<OwnDataReadCacheTable>()
+                .read(&table, site, s, f)
+                .reference(),
+            f,
+        );
+        table.clear(f);
+        let record = s
+            .reserve_gc_local::<OwnDataReadCache, Nullable>(f)
+            .initialize(slot.non_null_or_branch(label, f).nullable(), f);
+        slot.clear(f);
+        let storage = s
+            .reserve_gc_local::<ObjectPropertyStorage, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(header, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        let read = self.open_frame(ControlFrameKind::Block, f);
+        let other = self.open_frame(ControlFrameKind::Block, f);
+        let dictionary = s
+            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(f)
+            .initialize(
+                storage
+                    .sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                        s,
+                        self.local_branch_label(other),
+                        f,
+                    )
+                    .nullable(),
+                f,
+            );
+        self.emit_has_instance_never_hashed_or_branch(miss, f);
+        // A dictionary entry keeps its position while it lives; a deleted
+        // entry is a null slot.
+        let position = s.reserve_i32_local(f);
+        s.field(OwnDataReadCacheSchema::DICTIONARY_POSITION)
+            .read(&record, s, f)
+            .store(position, f);
+        position.load(f);
+        s.field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(&dictionary, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let entries = s
+            .reserve_gc_local::<PropertyTable, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryPropertyStorageSchema::ENTRIES)
+                    .read(&dictionary, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        dictionary.clear(f);
+        position.load(f);
+        s.array_type::<PropertyTable>().length(&entries, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let slot = s.reserve_gc_local(f).initialize(
+            s.array_type::<PropertyTable>()
+                .read(&entries, position, s, f)
+                .reference(),
+            f,
+        );
+        entries.clear(f);
+        s.release_i32_local(position, f);
+        let entry = s
+            .reserve_gc_local::<PropertyEntry, Nullable>(f)
+            .initialize(slot.non_null_or_branch(label, f).nullable(), f);
+        slot.clear(f);
+        let stored_key = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize(
+                s.field(PropertyEntrySchema::KEY)
+                    .read(&entry, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        s.field(StoredValueSchema::REFERENCE)
+            .read(&stored_key, s, f);
+        stored_key.clear(f);
+        s.field(OwnDataReadCacheSchema::KEY).read(&record, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let descriptor = s
+            .reserve_gc_local::<PropertyDescriptor, Nullable>(f)
+            .initialize(
+                s.field(PropertyEntrySchema::DESCRIPTOR)
+                    .read(&entry, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        entry.clear(f);
+        s.field(PropertyDescriptorSchema::FLAGS)
+            .read(&descriptor, s, f);
+        f.instruction(&Instruction::I32Const(
+            crate::heap::DescriptorMask::ACCESSOR.as_i32(),
+        ));
+        f.instruction(&Instruction::I32And);
+        self.emit_branch_if_to_target(miss, f);
+        let data = s
+            .reserve_gc_local::<PropertyValue, Nullable>(f)
+            .initialize(
+                s.field(PropertyDescriptorSchema::VALUE)
+                    .read(&descriptor, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        descriptor.clear(f);
+        let stored = s.reserve_gc_local::<StoredValue, Nullable>(f).initialize(
+            data.sealed_subtype_or_branch::<StoredValue>(s, label, f)
+                .nullable(),
+            f,
+        );
+        data.clear(f);
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, prototype, s, f);
+        stored.clear(f);
+        self.emit_branch_to_target(read, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let intrinsic = s
+            .reserve_gc_local::<IntrinsicPropertyStorage, Nullable>(f)
+            .initialize(
+                storage
+                    .sealed_subtype_or_branch::<IntrinsicPropertyStorage>(s, label, f)
+                    .nullable(),
+                f,
+            );
+        let address = s.reserve_i32_local(f);
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(&intrinsic, s, f)
+            .store(address, f);
+        address.load(f);
+        f.instruction(&Instruction::I32Const(function_prototype_address as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(miss, f);
+        address.load(f);
+        s.field(OwnDataReadCacheSchema::LAYOUT).read(&record, s, f);
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, f);
+        s.release_i32_local(address, f);
+        let cache = s
+            .reserve_gc_local::<IntrinsicPropertyValueCache, Nullable>(f)
+            .initialize(
+                s.field(IntrinsicPropertyStorageSchema::CACHE)
+                    .read(&intrinsic, s, f)
+                    .reference(),
+                f,
+            );
+        intrinsic.clear(f);
+        let groups = s
+            .reserve_gc_local::<IntrinsicPropertyValueCache, Nullable>(f)
+            .initialize(cache.non_null_or_branch(label, f).nullable(), f);
+        cache.clear(f);
+        let group = s.reserve_i32_local(f);
+        s.field(OwnDataReadCacheSchema::GROUP)
+            .read(&record, s, f)
+            .store(group, f);
+        group.load(f);
+        s.array_type::<IntrinsicPropertyValueCache>()
+            .length(&groups, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let value = s
+            .reserve_gc_local::<PropertyValue, Nullable>(f)
+            .initialize(
+                s.array_type::<IntrinsicPropertyValueCache>()
+                    .read(&groups, group, s, f)
+                    .reference(),
+                f,
+            );
+        groups.clear(f);
+        s.release_i32_local(group, f);
+        let stored = s.reserve_gc_local::<StoredValue, Nullable>(f).initialize(
+            value
+                .sealed_subtype_or_branch::<StoredValue>(s, label, f)
+                .nullable(),
+            f,
+        );
+        value.clear(f);
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, prototype, s, f);
+        stored.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        storage.clear(f);
+        record.clear(f);
+    }
+
+    /// Branches to `miss` unless GetMethod(C, @@hasInstance) reaches this
+    /// Realm's %Function.prototype% from C's [[Prototype]] through function
+    /// objects without an own @@hasInstance, C and at most two more: the
+    /// kernel's bound. C's own storage was proved separately.
+    fn emit_inherited_default_has_instance_or_branch(
+        &mut self,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        realm: &GcLocal<RealmRecord>,
+        function_prototype_address: u32,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let function_prototype = self.emit_load_non_array_realm_intrinsic_stored(
+            realm,
+            NonArrayRealmIntrinsicSlot::FunctionPrototype,
+            f,
+        );
+        let target = s.reserve_value_local(f);
+        s.field(StoredValueSchema::REFERENCE)
+            .read(&function_prototype, s, f)
+            .store_eq(target.reference(), f);
+        function_prototype.clear(f);
+        let edge = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(header, s, f)
+                    .reference(),
+                f,
+            );
+        let holder = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
+        let hops = s.reserve_i32_local(f);
+        hops.set_constant(0, f);
+        let inherits = self.open_frame(ControlFrameKind::Block, f);
+        let hop = self.open_frame(ControlFrameKind::Loop, f);
+        let _ = edge.load(s, f);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        self.emit_branch_if_to_target(inherits, f);
+        hops.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        hops.store(f);
+        hops.load(f);
+        f.instruction(&Instruction::I32Const(MAX_DEFAULT_HAS_INSTANCE_HOPS));
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let callable = s
+            .reserve_gc_local::<FunctionObject, Nullable>(f)
+            .initialize(
+                edge.sealed_subtype_or_branch::<FunctionObject>(
+                    s,
+                    self.local_branch_label(miss),
+                    f,
+                )
+                .nullable(),
+                f,
+            );
+        holder.replace(
+            s.field(FunctionObjectSchema::OBJECT)
+                .read(&callable, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
+        callable.clear(f);
+        self.emit_lacks_own_has_instance_or_branch(&holder, function_prototype_address, miss, f);
+        edge.replace(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&holder, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_branch_to_target(hop, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(hops, f);
+        holder.clear(f);
+        edge.clear(f);
+        target.clear(f);
+    }
+
+    /// Branches to `miss` unless a function header provably lacks an own
+    /// @@hasInstance without a call: a compact shape holds String keys only,
+    /// an intrinsic layout other than %Function.prototype%'s has no such
+    /// row, and a dictionary cannot hold the Symbol while it has never been
+    /// hashed. A dictionary that might hold it is left to the front's index
+    /// probe.
+    fn emit_lacks_own_has_instance_or_branch(
+        &mut self,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        function_prototype_address: u32,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let storage = s
+            .reserve_gc_local::<ObjectPropertyStorage, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(header, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        let lacks = self.open_frame(ControlFrameKind::Block, f);
+        let other = self.open_frame(ControlFrameKind::Block, f);
+        let intrinsic = s
+            .reserve_gc_local::<IntrinsicPropertyStorage, Nullable>(f)
+            .initialize(
+                storage
+                    .sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
+                        s,
+                        self.local_branch_label(other),
+                        f,
+                    )
+                    .nullable(),
+                f,
+            );
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(&intrinsic, s, f);
+        intrinsic.clear(f);
+        f.instruction(&Instruction::I32Const(function_prototype_address as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(miss, f);
+        self.emit_branch_to_target(lacks, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        storage.is_subtype::<OrdinaryPropertyStorage>(s, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_has_instance_never_hashed_or_branch(miss, f);
+        self.emit_branch_to_target(lacks, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        storage.is_subtype::<CompactDataStorage>(s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        storage.clear(f);
+    }
+
+    /// Branches to `miss` once @@hasInstance has been hashed. Every
+    /// dictionary entry stores its key's hash, and a Symbol is given its
+    /// hash identity the first time it is hashed, so until then no
+    /// dictionary holds it.
+    fn emit_has_instance_never_hashed_or_branch(&mut self, miss: ControlTarget, f: &mut Function) {
+        let s = self.runtime_schema();
+        let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
+            s.well_known_symbol_reference(scriptw_ir::WellKnownSymbol::HasInstance, f)
+                .nullable(),
+            f,
+        );
+        s.field(SymbolValueSchema::KEY_HASH_ID).read(&symbol, s, f);
+        symbol.clear(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+    }
+
+    /// One [[GetPrototypeOf]] step of an ordinary object, a function or an
+    /// Array, none of which observes anything: the edge goes to `next`.
+    /// Every other object, a Proxy included, branches to `miss`.
+    fn emit_chain_prototype_or_branch(
+        &mut self,
+        subject: CandidateObject<'_>,
+        next: &GcLocal<JavaScriptObject, Nullable>,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let other = self.open_frame(ControlFrameKind::Block, f);
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize(
+                subject
+                    .sealed_layout_or_branch::<OrdinaryObject>(s, self.local_branch_label(other), f)
+                    .nullable(),
+                f,
+            );
+        next.replace(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let other = self.open_frame(ControlFrameKind::Block, f);
+        let callable = s
+            .reserve_gc_local::<FunctionObject, Nullable>(f)
+            .initialize(
+                subject
+                    .sealed_layout_or_branch::<FunctionObject>(s, self.local_branch_label(other), f)
+                    .nullable(),
+                f,
+            );
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize(
+                s.field(FunctionObjectSchema::OBJECT)
+                    .read(&callable, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        callable.clear(f);
+        next.replace(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let array = s
+            .reserve_gc_local::<ArrayObject, Nullable>(f)
+            .initialize(
+                subject
+                    .sealed_layout_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f)
+                    .nullable(),
+                f,
+            );
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize(
+                s.field(ArrayObjectSchema::OBJECT)
+                    .read(&array, s, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+        array.clear(f);
+        next.replace(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
     }
 
     pub(crate) fn compile_has_instance_helper(&mut self) -> Result<Function, EmitError> {
@@ -1376,4 +2105,35 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
     }
+}
+
+/// Returns the entry's answer.
+fn emit_return_answer(answer: EntryAnswer, f: &mut Function) {
+    f.instruction(&Instruction::I32Const(answer.code()));
+    f.instruction(&Instruction::Return);
+}
+
+/// The object tags are consecutive, so `emit_is_heap_object_like_tag_i32`'s
+/// four comparisons are one unsigned range test.
+const OBJECT_TAGS: [WasmRuntimeValueTag; 4] = [
+    WasmRuntimeValueTag::Object,
+    WasmRuntimeValueTag::Array,
+    WasmRuntimeValueTag::Function,
+    WasmRuntimeValueTag::Arguments,
+];
+const _: () = {
+    let mut index = 0;
+    while index < OBJECT_TAGS.len() {
+        assert!(OBJECT_TAGS[index] as i32 == OBJECT_TAGS[0] as i32 + index as i32);
+        index += 1;
+    }
+};
+
+/// Whether `tag` is one of `OBJECT_TAGS`.
+fn emit_is_object_tag_i32(tag: crate::gc_types::I32Local, f: &mut Function) {
+    tag.load(f);
+    f.instruction(&Instruction::I32Const(OBJECT_TAGS[0] as i32));
+    f.instruction(&Instruction::I32Sub);
+    f.instruction(&Instruction::I32Const(OBJECT_TAGS.len() as i32));
+    f.instruction(&Instruction::I32LtU);
 }

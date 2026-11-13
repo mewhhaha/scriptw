@@ -118,7 +118,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 64 flattens the per-site record table and adds cached miss kernels.
 // Version 65 passes the operator's record site to the HasInstance helper.
 // Version 67 adds the computed-key property-write helper.
-const LAYOUT_VERSION: u32 = 67;
+// Version 68 adds the call-free instanceof entry in front of HasInstance.
+const LAYOUT_VERSION: u32 = 68;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

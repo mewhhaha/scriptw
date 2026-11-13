@@ -1,4 +1,5 @@
-//! Operator sites and the native method share one whole-Completion R kernel.
+//! Operator sites and the native method share one whole-Completion R kernel;
+//! a source operator site enters it through a call-free entry that tail-calls it.
 use scriptw_aot_wasm::{WasmArtifact, emit};
 use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
@@ -144,14 +145,53 @@ fn both_has_instance_entries_share_one_typed_whole_completion_kernel() {
             >= 2,
         "bound-target transitions and the prototype walk stay inside the kernel"
     );
+    let entry = bodies.unique("helper::instanceof_entry");
+    let entry_code = operators(runtime, entry.index);
+    assert!(
+        !entry_code.iter().any(|op| matches!(
+            op,
+            Operator::Call { .. }
+                | Operator::CallRef { .. }
+                | Operator::CallIndirect { .. }
+                | Operator::ReturnCall { .. }
+                | Operator::ReturnCallRef { .. }
+                | Operator::ReturnCallIndirect { .. }
+        )),
+        "the entry makes no call, so it spills nothing at a safepoint"
+    );
     let imports = runtime_function_imports(&artifact.bytes, runtime);
-    let imported = imports
-        .iter()
-        .filter_map(|(&source, &target)| (target == helper.index).then_some(source))
-        .collect::<Vec<_>>();
-    assert_eq!(imported.len(), 1, "P imports the single actual R owner");
+    let imported = |target: u32| {
+        imports
+            .iter()
+            .filter_map(|(&source, &callee)| (callee == target).then_some(source))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(imported(entry.index).len(), 1, "P imports the single R entry");
+    let kernels = imported(helper.index);
+    assert_eq!(kernels.len(), 1, "P imports the single actual R owner");
+    let entry_signature = signature(runtime, entry.index);
+    assert_eq!(
+        signature(&artifact.bytes, imported(entry.index)[0]),
+        entry_signature
+    );
+    assert_eq!(
+        &entry_signature.params()[..4],
+        [
+            ValType::I32,
+            ValType::Ref(wasmparser::RefType::EQREF),
+            ValType::Ref(wasmparser::RefType::EQREF),
+            ValType::I32
+        ],
+        "the candidate's tag and reference, the constructor's reference and the site"
+    );
+    assert_eq!(entry_signature.params().len(), 6, "then the Realm and the program");
+    assert_eq!(
+        entry_signature.results(),
+        [ValType::I32],
+        "false, true or no answer; the site then calls the owner"
+    );
     let helper_signature = signature(runtime, helper.index);
-    assert_eq!(signature(&artifact.bytes, imported[0]), helper_signature);
+    assert_eq!(signature(&artifact.bytes, kernels[0]), helper_signature);
     assert_eq!(
         &helper_signature.params()[..7],
         [
@@ -202,14 +242,18 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
     let artifact = artifact();
     let runtime = artifact.runtime().unwrap().bytes();
     let bodies = linked_bodies(&artifact);
+    let entry = bodies.unique("helper::instanceof_entry");
     let helper = bodies.unique("helper::has_instance");
     let prototype = bodies.unique("helper::object_get_prototype_of");
     let imports = runtime_function_imports(&artifact.bytes, runtime);
-    let imported = *imports
-        .iter()
-        .find(|(_, target)| **target == helper.index)
-        .unwrap()
-        .0;
+    let import_of = |target: u32| {
+        *imports
+            .iter()
+            .find(|(_, callee)| **callee == target)
+            .unwrap()
+            .0
+    };
+    let (imported, kernel) = (import_of(entry.index), import_of(helper.index));
     let mut sizes = Vec::new();
     for (name, sites) in [("single", 1), ("repeated", 8)] {
         let matched = bodies
@@ -221,6 +265,11 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
         let body = matched[0];
         let code = operators(&artifact.bytes, body.index);
         assert_eq!(call_count(&code, imported), sites);
+        assert_eq!(
+            call_count(&code, kernel),
+            sites,
+            "each site calls the owner when its entry has no answer"
+        );
         assert!(
             body.calls()
                 .iter()

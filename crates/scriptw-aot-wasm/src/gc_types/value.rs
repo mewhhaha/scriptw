@@ -210,6 +210,27 @@ impl EqRefLocal {
         }));
         function.instruction(&Instruction::LocalSet(self.index));
     }
+    /// The reference as the sealed layout `T`, after branching to `other`
+    /// for every other reference, null included.
+    pub(crate) fn sealed_reference_or_branch<T: JavaScriptReference>(
+        &self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<T> {
+        sealed_cast_or_branch::<T>(
+            Instruction::LocalGet(self.index),
+            RefType::EQREF,
+            schema,
+            other,
+            function,
+        )
+    }
+    /// Clears a parameter-owned local and returns its slot.
+    pub(crate) fn release(self, function: &mut Function) {
+        self.clear(function);
+        function.release_typed_local(self.index);
+    }
 }
 
 /// An initialized rooted local. Its index cannot be used as a scalar operand.
@@ -2474,6 +2495,21 @@ impl RuntimeSchema {
         );
         F64Local { index }
     }
+    /// A lone reference operand, such as a value's reference word passed
+    /// without its tag and scalar.
+    pub(crate) fn parameter_eqref(&self, index: u32, function: &mut Function) -> EqRefLocal {
+        assert_eq!(
+            function.parameter_type(index),
+            Some(ValType::Ref(RefType::EQREF)),
+            "reference parameter mismatch"
+        );
+        let local = EqRefLocal {
+            index: function.reserve_typed_local(ValType::Ref(RefType::EQREF)),
+        };
+        function.instruction(&Instruction::LocalGet(index));
+        function.instruction(&Instruction::LocalSet(local.index));
+        local
+    }
     pub(crate) fn parameter_value(&self, index: u32, function: &mut Function) -> ValueLocals {
         assert_eq!(
             function.parameter_type(index),
@@ -3034,9 +3070,9 @@ impl<Owner: GcStructHeapType> GcStructType<Owner> {
 }
 
 impl GcStructType<StoredValue> {
-    pub(crate) fn read_into(
+    pub(crate) fn read_into<N: GcFieldNullability>(
         &self,
-        stored: &GcLocal<StoredValue>,
+        stored: &GcLocal<StoredValue, N>,
         destination: &ValueLocals,
         schema: &RuntimeSchema,
         function: &mut Function,

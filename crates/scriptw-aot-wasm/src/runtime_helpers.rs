@@ -830,6 +830,7 @@ macro_rules! helper_field {
     (@argument InstallationSpan) => { crate::data::RInstallationSpan };
     (@argument I32) => { I32Local };
     (@argument I64) => { I64Local };
+    (@argument EqRef) => { &'a crate::gc_types::EqRefLocal };
     (@argument (Ref $ty:ident $null:ident)) => { &'a GcLocal<$ty, $null> };
     (@parameter Program) => { GcLocal<ProgramInstance> };
     (@parameter Value) => { ValueLocals };
@@ -842,6 +843,7 @@ macro_rules! helper_field {
     (@parameter InstallationSpan) => { RuntimeHelperInstallationSpanParameter };
     (@parameter I32) => { I32Local };
     (@parameter I64) => { I64Local };
+    (@parameter EqRef) => { crate::gc_types::EqRefLocal };
     (@parameter (Ref $ty:ident $null:ident)) => { GcLocal<$ty, $null> };
     (@abi Program) => { &[AbiType::Gc(GcLayout::ProgramInstance, GcNullability::NonNullable)] };
     (@abi Value) => { &[AbiType::I32, AbiType::I64, AbiType::EqRef] };
@@ -854,6 +856,7 @@ macro_rules! helper_field {
     (@abi InstallationSpan) => { &[AbiType::I32, AbiType::I32] };
     (@abi I32) => { &[AbiType::I32] };
     (@abi I64) => { &[AbiType::I64] };
+    (@abi EqRef) => { &[AbiType::EqRef] };
     (@abi (Ref $ty:ident $null:ident)) => { &[AbiType::Gc(GcLayout::$ty, GcNullability::$null)] };
     (@emit $value:expr, $schema:ident, $function:ident, Program) => { { $value.reference($schema, $function); } };
     (@emit $value:expr, $schema:ident, $function:ident, Value) => { $value.emit($function) };
@@ -866,6 +869,7 @@ macro_rules! helper_field {
     (@emit $value:expr, $schema:ident, $function:ident, InstallationSpan) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I32) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I64) => { $value.load($function) };
+    (@emit $value:expr, $schema:ident, $function:ident, EqRef) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, (Ref $ty:ident $null:ident)) => { { $value.load($schema, $function); } };
     (@acquire $schema:ident, $index:ident, $function:ident, Program) => { $schema.parameter_gc::<ProgramInstance, NonNullable>($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, Value) => { $schema.parameter_value($index, $function) };
@@ -887,6 +891,7 @@ macro_rules! helper_field {
     (@acquire $schema:ident, $index:ident, $function:ident, InstallationSpan) => { RuntimeHelperInstallationSpanParameter::acquire($schema, $index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, I32) => { $schema.parameter_i32($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, I64) => { $schema.parameter_i64($index, $function) };
+    (@acquire $schema:ident, $index:ident, $function:ident, EqRef) => { $schema.parameter_eqref($index, $function) };
     (@acquire $schema:ident, $index:ident, $function:ident, (Ref $ty:ident $null:ident)) => { $schema.parameter_gc::<$ty, $null>($index, $function) };
     (@release $value:expr, $function:ident, Program) => { $value.clear($function) };
     (@release $value:expr, $function:ident, Value) => { $value.clear($function) };
@@ -899,6 +904,7 @@ macro_rules! helper_field {
     (@release $value:expr, $function:ident, InstallationSpan) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I32) => { { let _ = $value; } };
     (@release $value:expr, $function:ident, I64) => { { let _ = $value; } };
+    (@release $value:expr, $function:ident, EqRef) => { $value.release($function) };
     (@release $value:expr, $function:ident, (Ref $ty:ident $null:ident)) => { $value.clear($function) };
     (@reverse_release $self:ident, $function:ident;) => {};
     (@reverse_release $self:ident, $function:ident; $field:ident:$shape:tt $(,$rest:ident:$rest_shape:tt)*) => {
@@ -1344,6 +1350,7 @@ runtime_helper_domain! {
     RelationalComparison / RelationalComparisonArguments / RelationalComparisonParameters / "relational_comparison" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     LooseEquality / LooseEqualityArguments / LooseEqualityParameters / "loose_equality" { left:Value,right:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     HasInstance / HasInstanceArguments / HasInstanceParameters / "has_instance" { entry:I32,object:Value,constructor:Value,site:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    InstanceofEntry / InstanceofEntryArguments / InstanceofEntryParameters / "instanceof_entry" { object_tag:I32,object:EqRef,constructor:EqRef,site:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => I32;
     ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectOwnKeys / ObjectOwnKeysArguments / ObjectOwnKeysParameters / "object_own_keys" { target:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyKeys;
     ObjectGetOwnProperty / ObjectGetOwnPropertyArguments / ObjectGetOwnPropertyParameters / "object_get_own_property" { target:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyDescriptor;
@@ -1459,6 +1466,7 @@ impl RuntimeHelperId {
             Self::RelationalComparison => HelperOwner::Runtime,
             Self::LooseEquality => HelperOwner::Runtime,
             Self::HasInstance => HelperOwner::Runtime,
+            Self::InstanceofEntry => HelperOwner::Runtime,
             Self::ForInAdvance => HelperOwner::Runtime,
             Self::ObjectOwnKeys => HelperOwner::Runtime,
             Self::ObjectGetOwnProperty => HelperOwner::Runtime,
@@ -1635,6 +1643,7 @@ impl RuntimeHelperId {
             Self::RelationalComparison => true,
             Self::LooseEquality => true,
             Self::HasInstance => true,
+            Self::InstanceofEntry => true,
             Self::ForInAdvance => true,
             Self::ObjectOwnKeys => true,
             Self::ObjectGetOwnProperty => true,

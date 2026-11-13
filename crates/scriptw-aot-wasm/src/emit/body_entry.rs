@@ -146,6 +146,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RelationalComparison
             | RuntimeHelperId::LooseEquality
             | RuntimeHelperId::HasInstance
+            | RuntimeHelperId::InstanceofEntry
             | RuntimeHelperId::ForInAdvance
             | RuntimeHelperId::ObjectOwnKeys
             | RuntimeHelperId::ObjectGetOwnProperty

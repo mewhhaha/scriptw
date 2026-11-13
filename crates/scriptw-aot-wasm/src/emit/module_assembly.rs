@@ -1459,6 +1459,7 @@ fn emit_script_module_with_factory(
         register_runtime_helper!(RelationalComparison, compile_relational_comparison_helper);
         register_runtime_helper!(LooseEquality, compile_loose_equality_helper);
         register_runtime_helper!(HasInstance, compile_has_instance_helper);
+        register_runtime_helper!(InstanceofEntry, compile_instanceof_entry_helper);
         register_runtime_helper!(ForInAdvance, compile_for_in_advance_helper);
         register_runtime_helper!(ObjectOwnKeys, compile_object_own_keys_helper);
         register_runtime_helper!(ObjectGetOwnProperty, compile_object_get_own_property_helper);
