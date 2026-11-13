@@ -637,7 +637,7 @@ under.
 | `get_interned_func_ref` (typed funcref field read) | 2.4% | module-to-engine type lookup through the module 0.8%, side-table lookup and type check 0.6%, no-GC scope 0.3%; called from `vn` 0.9%, `helper::proxy_call` 0.7%, `createElement` 0.2%, `ft` 0.1% |
 | Embedding (host calls into the instance) | 2.1% | `call_inner` 0.7%, `execute` 0.4%, completion field reads 0.2%, fiber entry, export lookup |
 | `memory.fill` libcall | 0.8% | short `array.new_default` fills from `helper::coercive_add`, `ordinary_property_prepare`, `TextDecoder.decode`, `JSON.stringify` |
-| `ref.func` libcall | 0.6% | the `VMFuncRef` is recomputed on every request (`func_loc`, store code lookup); closure creation and stream builtins |
+| `ref.func` libcall | 0.6% | the `VMFuncRef` is recomputed on every `ref.func` (`func_loc`, store code lookup); closure creation and stream builtins |
 | `intern_func_ref_for_gc_heap` | 0.6% | SipHash of the `VMFuncRef` address |
 | Subtype query | 0.5% | `helper::ordinary_object_allocate`, `compact_literal_allocate`, `compact_object_allocate` |
 | Other | 1.4% | TextEncoder byte array 0.4%, measurement barrier 0.3%, float rounding 0.2%, clock 0.1%, `memory.copy` 0.1% |
@@ -646,6 +646,68 @@ under.
 under 0.2% (WeakMap table growth). The unresolved leaves of the
 frame-pointer profiles are libc's internal copy routines, the Wasm-to-host
 trampolines and this embedding layer.
+
+Source `2e2cbe732` removes host work without changing ABI 68, emitted P or R,
+or collection timing (vendored changes:
+[Wasmtime](../../vendor/wasmtime-47.0.0/PATCHES.md#per-operation-host-costs),
+[translator](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#funcref-reads-and-short-array-fills)):
+
+- Weak collections look a key up under a shared Store borrow, which cannot
+  collect: no no-GC scopes, one hash of the heap index (murmur3 finalizer
+  instead of SipHash), one table probe per operation, a hit's key checked
+  against the lookup's own token, and `get`/`has` borrow the resource instead
+  of cloning its `Arc`. A copying-heap root scope releases its roots at once
+  instead of calling a no-op drop barrier per root.
+- A typed funcref read passes the engine type its `VMContext` already holds,
+  so the libcall no longer translates the module type through the module; it
+  still checks the interned function's type. Funcref interning no longer uses
+  SipHash, an instance returns a `VMFuncRef` it has already written for a
+  repeated `ref.func`, and GC array fills of up to 64 equal bytes are stored
+  inline instead of calling `memory.fill`.
+- The copying collector tests a granule bitmap of ephemeron dependencies
+  before its binary search on each first copy, and copies survivors of up to
+  128 bytes with constant-size moves instead of `memmove`.
+
+| Speed, user instructions per request | `b9bbc012b` | `2e2cbe732` | Change |
+| --- | ---: | ---: | ---: |
+| Sync, median | 7,559,000 | 7,255,000 | −4.0% |
+| Sync, mean (includes collections) | 8,224,000 | 7,775,000 | −5.5% |
+| Async, median | 8,270,000 | 7,882,000 | −4.7% |
+| Async, mean | 9,030,000 | 8,478,000 | −6.1% |
+
+Medians are of 100 measured requests after 100 warmups; about one request in
+six collects, so medians exclude almost all collector work and the means
+carry it. On a quiet machine the source before the last two changes measured
+3.15M/3.35M sync cycles (median/mean) against 3.28M/3.58M, and 3.45M/3.66M
+async against 3.69M/4.00M. Three interleaved rounds of the final source were
+taken while other workloads loaded the machine and vary by up to 25% between
+rounds of one host; they are not used.
+
+| Loop body, Speed instructions per iteration | `b9bbc012b` | `2e2cbe732` |
+| --- | ---: | ---: |
+| `t += add1(i)` (closure call) | 645 | 566 |
+| `t += made.m(i)` | 999 | 921 |
+| `t += map.get(mk)` | 1,373 | 1,295 |
+| `if (weak.has(mk)) t++` | 2,430 | 1,920 |
+| `u = weak.get(mk)` | 3,183 | 2,356 |
+| `weak.set(mk, i)` (existing key) | 3,001 | 2,200 |
+| `u = function () { return i; }` | 8,201 | 5,121 |
+
+Every call through a function object reads its code funcref, which still
+costs one host call (about 80 instructions fewer than before). Of
+`weak.has`'s 1,920 instructions, about 920 are the method call and the
+property read of `weak.has`; the host import is most of the rest, dominated by
+Wasmtime's typed host-call boundary (call hooks, rooting each reference
+parameter, the kind assertions in its loaders).
+
+The same DWARF profile on the final source, taken under that load, charges
+17.0% of sampled cycles to host entries against 22.1%: collection 4.3%
+(`forward` 2.0% own, the copy now inline), weak collections 4.6%, funcref
+reads 1.7% (now mostly the side-table entry and its type check), `memory.fill`
+0.6% (string concatenations past 64 bytes), funcref interning 0.3% and
+`ref.func` 0.2%. The embedding's own work per host call (export lookup by
+name, `Func::ty`, `StructRefPre`/`ArrayRefPre`, dynamic argument checks,
+Realm field reads) is about 2% and unchanged.
 
 ### Descriptor work and physical allocation
 
