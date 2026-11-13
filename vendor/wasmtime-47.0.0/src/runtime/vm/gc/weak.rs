@@ -88,8 +88,17 @@ impl WeakGcRegistry {
         }
     }
 
+    /// The edge of a live slot; `None` for a stale generation or a retired
+    /// slot. Unlike `get`, a miss allocates no error.
+    pub(crate) fn live(&self, id: WeakGcSlotId) -> Option<&WeakGcEdge> {
+        match self.slots.get(id.index as usize) {
+            Some(slot) if slot.generation == id.generation => slot.edge.as_ref(),
+            _ => None,
+        }
+    }
+
     pub(crate) fn contains(&self, id: WeakGcSlotId) -> bool {
-        self.get(id).is_ok()
+        self.live(id).is_some()
     }
 
     pub(crate) fn remove(&mut self, id: WeakGcSlotId) -> Result<()> {

@@ -1842,6 +1842,18 @@ impl StoreOpaque {
         }
     }
 
+    /// Same as [`Self::optional_gc_store_mut`], but shared. A shared borrow
+    /// of the store cannot collect, so readers need no no-GC scope.
+    #[inline]
+    pub(crate) fn optional_gc_store(&self) -> Option<&GcStore> {
+        if cfg!(not(feature = "gc")) || !self.engine.features().gc_types() {
+            debug_assert!(self.gc_store.is_none());
+            None
+        } else {
+            self.gc_store.as_ref()
+        }
+    }
+
     /// Helper to assert that a GC store was previously allocated and is
     /// present.
     ///

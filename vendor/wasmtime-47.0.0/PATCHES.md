@@ -20,8 +20,9 @@ token capability by default.
 
 The collector changes are confined to `src/runtime/gc/enabled{.rs,/weakref.rs}`,
 `src/runtime/vm/gc{.rs,/weak.rs,/gc_runtime.rs,/enabled/copying.rs,
-/enabled/copying/{weak.rs,marking.rs}}` and collection controls in
-`src/runtime/store/gc.rs`. They do not change the JIT heap-header or VMContext ABI.
+/enabled/copying/{weak.rs,marking.rs}}`, collection controls in
+`src/runtime/store/gc.rs` and a shared GC-store accessor in
+`src/runtime/store.rs`. They do not change the JIT heap-header or VMContext ABI.
 The manifest adds an independent unit-test workspace, the existing local cache
 patch and matching dependency optimization profiles. Its separate lockfile pins
 the upstream test dependencies; it does not replace the root workspace lockfile.
@@ -59,6 +60,20 @@ VMContext ABI changes. `tests/interrupt_handle.rs` covers GC-heap and
 linear-memory loops, host code reaching protected memory, idle requests,
 cancellation, store drop and concurrent stores. See the
 [deadline contract](../../docs/rust-rewrite/contracts/execution-deadlines.md).
+
+## Per-operation host costs
+
+These changes remove per-call work from host paths the retained requests run
+on every operation ([measurements](../../docs/rust-rewrite/benchmarks.md#host-side-costs-2026-11-13)).
+
+- Weak readers take a shared Store borrow, which cannot collect:
+  `GcWeakKeyFingerprint::new`, `GcWeakHeapEpoch::current` and
+  `GcEphemeron::{is_live, matches_key, key_fingerprint}` accept
+  `impl AsContext` and enter no no-GC scope (`StoreOpaque::optional_gc_store`
+  is the shared accessor). `WeakGcRegistry::live` names a live slot without
+  allocating an error on a miss; upgrades and values use it once instead of
+  `contains` and then `get`. A fingerprint hashes only its heap index, which
+  agrees with `Eq`. Handles, epochs, identity checks and rooting are unchanged.
 
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
