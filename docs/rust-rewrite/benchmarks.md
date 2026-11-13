@@ -612,6 +612,41 @@ array accessors and a TextEncoder receiver) and `helper::object_read` from
 8.6% to 4.4%; the new `helper::computed_property_write` takes 3.2%, mostly
 Array element publication and the new storage record each add allocates.
 
+### Host-side costs (2026-11-13)
+
+Source `b9bbc012b` (ABI 68). Frame-pointer profiles stop at the first host
+frame, so earlier tables report host costs as leaves only. This profile
+unwinds with DWARF instead: 200 retained Speed sync windows after 100 warmups,
+one `cycles:u` sample per 50,000 cycles with a 16 KiB user-stack copy, `perf`
+on the second CPU. The host binary is linked by lld, whose text segment's
+virtual address differs from its file offset by one page; this `perf`'s libdw
+unwinder computes the module base from the file offset and reads the wrong
+unwind entries. The capture corrects the recorded text mapping and moves the
+two JIT mappings out of the way, so libdw follows host frames by their unwind
+tables and compiled frames by frame pointers; addresses are then resolved
+against the host's symbol table and the process's `perf` map. Sampling copies
+the stack and inflates cycles per window to 4.36M (3.64M unsampled); the
+shares are of sampled cycles, each sample charged to the host entry it runs
+under.
+
+| Family | Share | Where it goes |
+| --- | ---: | --- |
+| Compiled Wasm (P and R) | 77.9% | |
+| Copying collection | 6.9% | `forward` 3.6% own, of which about three quarters is the ephemeron marking's binary search over sorted dependencies on every first copy; object bytes through `memmove` 1.6%; field scan 0.6%; worklist 0.6%; dependency sort 0.2%; roots 0.2% |
+| WeakMap and WeakSet host imports | 6.5% | `get` 3.1%, `set` 2.8%, `has` 0.5%: SipHash of three words per lookup and two lookups per `get`, rehashing on growth (0.5%), three no-GC scopes per call, a cloned `Arc` and `Mutex` per call, and the typed host-call boundary (rooted parameters, results, scope exit, about 1.3%) |
+| `get_interned_func_ref` (typed funcref field read) | 2.4% | module-to-engine type lookup through the module 0.8%, side-table lookup and type check 0.6%, no-GC scope 0.3%; called from `vn` 0.9%, `helper::proxy_call` 0.7%, `createElement` 0.2%, `ft` 0.1% |
+| Embedding (host calls into the instance) | 2.1% | `call_inner` 0.7%, `execute` 0.4%, completion field reads 0.2%, fiber entry, export lookup |
+| `memory.fill` libcall | 0.8% | short `array.new_default` fills from `helper::coercive_add`, `ordinary_property_prepare`, `TextDecoder.decode`, `JSON.stringify` |
+| `ref.func` libcall | 0.6% | the `VMFuncRef` is recomputed on every request (`func_loc`, store code lookup); closure creation and stream builtins |
+| `intern_func_ref_for_gc_heap` | 0.6% | SipHash of the `VMFuncRef` address |
+| Subtype query | 0.5% | `helper::ordinary_object_allocate`, `compact_literal_allocate`, `compact_object_allocate` |
+| Other | 1.4% | TextEncoder byte array 0.4%, measurement barrier 0.3%, float rounding 0.2%, clock 0.1%, `memory.copy` 0.1% |
+
+`memcpy` is almost entirely the collector's object copy; the allocator is
+under 0.2% (WeakMap table growth). The unresolved leaves of the
+frame-pointer profiles are libc's internal copy routines, the Wasm-to-host
+trampolines and this embedding layer.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
