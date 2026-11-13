@@ -738,6 +738,16 @@ impl<'a> FunctionBuilder<'a> {
                         found.load(function);
                         schema.release_i32_local(found, function);
                         self.emit_branch_if_to_target(property_exit, function);
+                        // A String's own index reads its code unit without
+                        // the wrapper ToObject would allocate.
+                        if operands[0].possible_kinds.contains(ValueKind::String) {
+                            let character = self.emit_raw_numeric_string_index_read(
+                                &inputs[0], &inputs[1], &pending, function,
+                            );
+                            character.load(function);
+                            schema.release_i32_local(character, function);
+                            self.emit_branch_if_to_target(property_exit, function);
+                        }
                     }
                     if operands[1].possible_kinds.contains(ValueKind::String)
                         && !matches!(&operands[1].expr, ExprIr::String(_))

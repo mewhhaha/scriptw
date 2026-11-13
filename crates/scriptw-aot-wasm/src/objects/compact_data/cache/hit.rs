@@ -199,6 +199,12 @@ impl FunctionBuilder<'_> {
                 self.emit_branch_if_to_target(exit, f);
             }
             if let Some(key) = registration_key {
+                // The layout's index usually proves absence without the
+                // complete search, which decides only what it cannot.
+                let lacks = self.emit_intrinsic_layout_lacks_key_i32(&storage, key, f);
+                lacks.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, f);
                 let index = s.reserve_i32_local(f);
                 s.call_helper(
                     crate::runtime_helpers::IntrinsicPropertyFindArguments::new(&storage, key),
@@ -211,6 +217,9 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::I32GeS);
                 self.emit_branch_if_to_target(exit, f);
                 s.release_i32_local(index, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                s.release_i32_local(lacks, f);
             }
             mode.set_constant(NegativeCacheMode::ObjectPrototype.word(), f);
             s.release_i32_local(word, f);

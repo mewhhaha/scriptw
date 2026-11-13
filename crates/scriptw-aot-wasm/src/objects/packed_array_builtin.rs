@@ -269,7 +269,7 @@ impl FunctionBuilder<'_> {
     /// key, unless sealed intrinsic storage proves there are no Array-index keys.
     /// Mutation promotes that storage to a dictionary and restores those checks.
     /// Other exotics, proxies and longer chains decline without invoking traps.
-    fn emit_packed_push_prototypes_permit_append(
+    pub(in crate::objects) fn emit_packed_push_prototypes_permit_append(
         &mut self,
         receiver: &GcLocal<ArrayObject>,
         start: I64Local,

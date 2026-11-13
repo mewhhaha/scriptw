@@ -21,7 +21,9 @@ use crate::emit::ControlTarget;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, JavaScriptObject,
-    PrimitiveBox, PrimitiveBoxSchema, RealmRecord,
+    MapObject, MapObjectSchema, PrimitiveBox, PrimitiveBoxSchema, PromiseObject,
+    PromiseObjectSchema, RealmRecord, SetObject, SetObjectSchema, WeakMapObject,
+    WeakMapObjectSchema, WeakSetObject, WeakSetObjectSchema,
 };
 
 /// A compact storage of one of its two sealed layouts.
@@ -94,6 +96,30 @@ const PRIMITIVE_RECEIVERS: [(
     ),
 ];
 
+/// The primitives a walk boxes with the current Realm's prototype.
+const WALKED_PRIMITIVES: [(WasmRuntimeValueTag, NonArrayRealmIntrinsicSlot); 5] = [
+    (
+        WasmRuntimeValueTag::String,
+        NonArrayRealmIntrinsicSlot::StringPrototype,
+    ),
+    (
+        WasmRuntimeValueTag::Number,
+        NonArrayRealmIntrinsicSlot::NumberPrototype,
+    ),
+    (
+        WasmRuntimeValueTag::Boolean,
+        NonArrayRealmIntrinsicSlot::BooleanPrototype,
+    ),
+    (
+        WasmRuntimeValueTag::Symbol,
+        NonArrayRealmIntrinsicSlot::SymbolPrototype,
+    ),
+    (
+        WasmRuntimeValueTag::BigInt,
+        NonArrayRealmIntrinsicSlot::BigIntPrototype,
+    ),
+];
+
 impl FunctionBuilder<'_> {
     pub(crate) fn compile_cached_property_read_helper(&mut self) -> Result<Function, EmitError> {
         let mut body = self.begin_helper_body(RuntimeHelperId::CachedPropertyRead);
@@ -113,6 +139,8 @@ impl FunctionBuilder<'_> {
             .initialize_null(s, f);
         let miss = self.open_frame(ControlFrameKind::Block, f);
         let record = self.emit_site_record_or_branch(p.site, &key, miss, f);
+        // A record that does not apply leaves the live chain to the walk.
+        let walk = self.open_frame(ControlFrameKind::Block, f);
         let place = self.open_frame(ControlFrameKind::Block, f);
         let edge = self.open_frame(ControlFrameKind::Block, f);
 
@@ -124,12 +152,12 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::I32Const(tag as i32));
             f.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, f);
-            self.emit_receiver_rule_or_branch(&record, kind, None, miss, f);
+            self.emit_receiver_rule_or_branch(&record, kind, None, walk, f);
             let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
             let intrinsic = s.reserve_value_local(f);
             self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
             realm.clear(f);
-            let header = self.emit_realm_prototype_header_or_branch(&intrinsic, miss, f);
+            let header = self.emit_realm_prototype_header_or_branch(&intrinsic, walk, f);
             intrinsic.clear(f);
             holder.replace(header.load(s, f).nullable(), f);
             header.clear(f);
@@ -192,7 +220,7 @@ impl FunctionBuilder<'_> {
             self.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
             s.release_i32_local(slot, f);
-            self.emit_branch_to_target(miss, f);
+            self.emit_branch_to_target(walk, f);
             self.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
             // The live shape lacks the key.
@@ -200,7 +228,7 @@ impl FunctionBuilder<'_> {
                 &record,
                 HolderReceiverKind::Object,
                 Some(&shape),
-                miss,
+                walk,
                 f,
             );
             self.emit_prototype_edge(&object, &prototype, edge, f);
@@ -236,9 +264,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::If(BlockType::Empty));
         emit_return_normal(&value, f);
         f.instruction(&Instruction::End);
-        self.emit_empty_dictionary_or_branch(&dictionary, miss, f);
+        self.emit_empty_dictionary_or_branch(&dictionary, walk, f);
         dictionary.clear(f);
-        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, miss, f);
+        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, walk, f);
         self.emit_prototype_edge(&object, &prototype, edge, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
@@ -247,7 +275,7 @@ impl FunctionBuilder<'_> {
         let intrinsic = s.reserve_gc_local(f).initialize(
             base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
                 s,
-                self.local_branch_label(miss),
+                self.local_branch_label(walk),
                 f,
             ),
             f,
@@ -256,7 +284,7 @@ impl FunctionBuilder<'_> {
             .read(&intrinsic, s, f);
         s.field(OwnDataReadCacheSchema::LAYOUT).read(&record, s, f);
         f.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(miss, f);
+        self.emit_branch_if_to_target(walk, f);
         let group = s.reserve_i32_local(f);
         s.field(OwnDataReadCacheSchema::GROUP)
             .read(&record, s, f)
@@ -265,26 +293,16 @@ impl FunctionBuilder<'_> {
         self.emit_materialized_intrinsic_group(&intrinsic, group, &value, found, f);
         s.release_i32_local(group, f);
         intrinsic.clear(f);
-        self.emit_found_return_or_miss(found, &value, miss, f);
+        self.emit_found_return_or_miss(found, &value, walk, f);
         base.clear(f);
         object.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
 
-        // An Array: only its absence rule. Its indices and "length" are not
-        // in its header, and never get a record.
-        let array = s.reserve_gc_local(f).initialize(
-            p.target
-                .sealed_reference_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f),
-            f,
-        );
-        let object = s.reserve_gc_local(f).initialize(
-            s.field(ArrayObjectSchema::OBJECT)
-                .read(&array, s, f)
-                .reference(),
-            f,
-        );
-        array.clear(f);
+        // An Array, primitive wrapper, Map, WeakMap, Set, WeakSet or
+        // Promise: only its absence rule. An Array's or String wrapper's
+        // indices and "length" are not in its header, and never get a record.
+        let object = self.emit_composite_header_or_branch(&p.target, walk, f);
         let base = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
                 .read(&object, s, f)
@@ -299,7 +317,7 @@ impl FunctionBuilder<'_> {
                 &record,
                 HolderReceiverKind::Object,
                 Some(&shape),
-                miss,
+                walk,
                 f,
             );
             self.emit_prototype_edge(&object, &prototype, edge, f);
@@ -311,14 +329,14 @@ impl FunctionBuilder<'_> {
         let dictionary = s.reserve_gc_local(f).initialize(
             base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
                 s,
-                self.local_branch_label(miss),
+                self.local_branch_label(walk),
                 f,
             ),
             f,
         );
-        self.emit_empty_dictionary_or_branch(&dictionary, miss, f);
+        self.emit_empty_dictionary_or_branch(&dictionary, walk, f);
         dictionary.clear(f);
-        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, miss, f);
+        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, walk, f);
         self.emit_prototype_edge(&object, &prototype, edge, f);
         base.clear(f);
         object.clear(f);
@@ -326,7 +344,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
 
         // The receiver's live [[Prototype]] holds the place.
-        let header = self.emit_prototype_header_or_branch(&prototype, miss, f);
+        let header = self.emit_prototype_header_or_branch(&prototype, walk, f);
         holder.replace(header.load(s, f).nullable(), f);
         header.clear(f);
         self.pop_control(ControlFrameKind::Block);
@@ -334,9 +352,13 @@ impl FunctionBuilder<'_> {
         let present = s
             .reserve_gc_local(f)
             .initialize(holder.load(s, f).require_non_null(f), f);
-        self.emit_recorded_place_hit(&record, &present, &key, &value, found, miss, f)?;
+        self.emit_recorded_place_hit(&record, &present, &key, &value, found, walk, f)?;
         present.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         record.clear(f);
+        self.emit_static_read_walk(&p.target, &p.key, &value, miss, f);
+        emit_return_normal(&value, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         s.return_call_helper(
@@ -560,6 +582,84 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(body))
     }
 
+    /// A static read that no record answers: the call-free walk from the
+    /// live receiver, or from the current Realm's prototype for a primitive,
+    /// which ToObject would box with it. Falls through with the value of the
+    /// read; branches to `miss` for every case the walk cannot prove.
+    fn emit_static_read_walk(
+        &mut self,
+        target: &ValueLocals,
+        key: &GcLocal<StringValue>,
+        value: &ValueLocals,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        // The miss kernel prepares the key's hash.
+        let hash = s.reserve_i64_local(f);
+        s.field(StringValueSchema::RAW_KEY_HASH)
+            .read(key, s, f)
+            .store_i64(hash, f);
+        hash.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let index_free = s.reserve_i32_local(f);
+        self.emit_index_free_key_i32(key, f);
+        index_free.store(f);
+        let named = s.reserve_i32_local(f);
+        self.emit_header_named_key_i32(key, hash, f);
+        named.store(f);
+        let start = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
+        let begin = self.open_frame(ControlFrameKind::Block, f);
+        for (tag, slot) in WALKED_PRIMITIVES {
+            target.tag().load(f);
+            f.instruction(&Instruction::I32Const(tag as i32));
+            f.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, f);
+            if tag == WasmRuntimeValueTag::String {
+                // A String owns its indices and "length".
+                named.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.emit_branch_if_to_target(miss, f);
+            }
+            let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
+            let intrinsic = s.reserve_value_local(f);
+            self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
+            realm.clear(f);
+            let header = self.emit_realm_prototype_header_or_branch(&intrinsic, miss, f);
+            intrinsic.clear(f);
+            start.replace(header.load(s, f).nullable(), f);
+            header.clear(f);
+            self.emit_branch_to_target(begin, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        let header = self.emit_walk_receiver_header_or_branch(target, index_free, named, miss, f);
+        start.replace(header.load(s, f).nullable(), f);
+        header.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let first = s
+            .reserve_gc_local(f)
+            .initialize(start.load(s, f).require_non_null(f), f);
+        start.clear(f);
+        self.emit_chain_walk(
+            &first,
+            ChainKey::String { name: key, hash },
+            named,
+            ChainAnswer::Get,
+            value,
+            miss,
+            f,
+        );
+        first.clear(f);
+        s.release_i32_local(named, f);
+        s.release_i32_local(index_free, f);
+        s.release_i64_local(hash, f);
+    }
+
     /// The site's record, after branching to `miss` when the site has none
     /// yet. A record is made for its site's key; the key reference proves it.
     fn emit_site_record_or_branch(
@@ -642,6 +742,61 @@ impl FunctionBuilder<'_> {
             f,
         );
         function.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let object = s
+            .reserve_gc_local(f)
+            .initialize(header.load(s, f).require_non_null(f), f);
+        header.clear(f);
+        object
+    }
+
+    /// The ordinary header of an Array, primitive wrapper, Map, WeakMap,
+    /// Set, WeakSet or Promise, the composites whose named own properties
+    /// all live in that header; every other value branches to `other`.
+    fn emit_composite_header_or_branch(
+        &mut self,
+        target: &ValueLocals,
+        other: ControlTarget,
+        f: &mut Function,
+    ) -> GcLocal<OrdinaryObject> {
+        let s = self.runtime_schema();
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        macro_rules! composite {
+            ($layout:ty, $field:expr) => {{
+                let next = self.open_frame(ControlFrameKind::Block, f);
+                let composite = s.reserve_gc_local(f).initialize(
+                    target.sealed_reference_or_branch::<$layout>(
+                        s,
+                        self.local_branch_label(next),
+                        f,
+                    ),
+                    f,
+                );
+                header.replace(
+                    s.field($field)
+                        .read(&composite, s, f)
+                        .reference()
+                        .nullable(),
+                    f,
+                );
+                composite.clear(f);
+                self.emit_branch_to_target(done, f);
+                self.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+            }};
+        }
+        composite!(ArrayObject, ArrayObjectSchema::OBJECT);
+        composite!(PrimitiveBox, PrimitiveBoxSchema::OBJECT);
+        composite!(MapObject, MapObjectSchema::OBJECT);
+        composite!(WeakMapObject, WeakMapObjectSchema::OBJECT);
+        composite!(SetObject, SetObjectSchema::OBJECT);
+        composite!(WeakSetObject, WeakSetObjectSchema::OBJECT);
+        composite!(PromiseObject, PromiseObjectSchema::OBJECT);
+        self.emit_branch_to_target(other, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let object = s

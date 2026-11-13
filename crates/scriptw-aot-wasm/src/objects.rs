@@ -1681,6 +1681,10 @@ impl<'a> FunctionBuilder<'a> {
             self.emit_primitive_string_length_read(target, key, result, function)?;
         string_length.load(function);
         self.emit_branch_if_to_target(exit, function);
+        // An object whose live chain the call-free walk proves yields a data
+        // value or absence, which no receiver can observe; only a getter,
+        // which the walk declines, would see the receiver.
+        self.emit_computed_read_walk(target, key.value(), result, exit, function);
         // ToObject is the identity on an object; only primitives need its owner.
         self.emit_is_heap_object_like_tag_i32(target.tag(), function);
         self.open_frame(ControlFrameKind::If, function);

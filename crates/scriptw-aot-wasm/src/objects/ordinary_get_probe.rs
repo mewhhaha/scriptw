@@ -335,6 +335,12 @@ impl FunctionBuilder<'_> {
                 .cast_subtype::<IntrinsicPropertyStorage>(schema, f),
             f,
         );
+        // The layout's index usually proves absence without the complete
+        // search; the probe state is already Absent.
+        let lacks = self.emit_intrinsic_layout_lacks_key_i32(&intrinsic, key, f);
+        lacks.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         let index = schema.reserve_i32_local(f);
         schema
             .call_helper(
@@ -365,6 +371,9 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(index, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(lacks, f);
         intrinsic.clear(f);
         f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(object, key, f)?;

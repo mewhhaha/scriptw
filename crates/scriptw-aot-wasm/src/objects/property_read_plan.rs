@@ -10,24 +10,40 @@ enum PropertyReadPlan {
     CachedStaticString,
 }
 impl PropertyReadPlan {
+    /// A static read caches whenever its base may be an object or primitive
+    /// that a record or the call-free walk answers for: they read primitives
+    /// through their Realm's prototype without the wrapper ToObject would
+    /// allocate. Nullish bases and arguments objects keep the general read.
     fn for_read(target: &TypedExpr, key: &PropertyKeyIr) -> Self {
+        let general = scriptw_ir::KindSet::NULLISH
+            .union(scriptw_ir::KindSet::from_kind(ValueKind::Arguments));
+        if target.possible_kinds.is_subset_of(general) {
+            return Self::General;
+        }
+        Self::for_static_key(target, key)
+    }
+
+    /// A write record serves only an ordinary object receiver.
+    fn for_write(target: &TypedExpr, key: &PropertyKeyIr) -> Self {
+        if !target.possible_kinds.contains(ValueKind::Object) {
+            return Self::General;
+        }
+        Self::for_static_key(target, key)
+    }
+
+    fn for_static_key(target: &TypedExpr, key: &PropertyKeyIr) -> Self {
         match key {
-            PropertyKeyIr::StaticString(_) => {
-                if !target.possible_kinds.contains(ValueKind::Object) {
-                    return Self::General;
-                }
-                match target.heap_shape.as_deref() {
-                    Some(HeapShape::Object(shape)) => {
-                        if shape.provenance == HeapShapeProvenance::Program {
-                            Self::CachedStaticString
-                        } else {
-                            Self::General
-                        }
+            PropertyKeyIr::StaticString(_) => match target.heap_shape.as_deref() {
+                Some(HeapShape::Object(shape)) => {
+                    if shape.provenance == HeapShapeProvenance::Program {
+                        Self::CachedStaticString
+                    } else {
+                        Self::General
                     }
-                    Some(HeapShape::Array(_)) => Self::General,
-                    None => Self::CachedStaticString,
                 }
-            }
+                Some(HeapShape::Array(_)) => Self::General,
+                None => Self::CachedStaticString,
+            },
             PropertyKeyIr::ArrayLength
             | PropertyKeyIr::ArrayIndex(_)
             | PropertyKeyIr::StringExpr(_) => Self::General,
@@ -47,7 +63,7 @@ impl FunctionBuilder<'_> {
         if !self.has_source_execution_environment() {
             return Ok(None);
         }
-        match PropertyReadPlan::for_read(target, key) {
+        match PropertyReadPlan::for_write(target, key) {
             PropertyReadPlan::General => Ok(None),
             PropertyReadPlan::CachedStaticString => self
                 .next_program_site(crate::emit::ProgramSiteKind::OwnDataWrite)

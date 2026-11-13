@@ -129,6 +129,24 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64ExtendI32U);
         f.instruction(&Instruction::I64Xor);
         hash.store(f);
+        Self::emit_key_hash_finish(hash, f);
+    }
+
+    /// The same mix for a key whose tag is known.
+    pub(crate) fn emit_key_hash_constant_tag_mix(
+        &self,
+        tag: WasmRuntimeValueTag,
+        hash: I64Local,
+        f: &mut Function,
+    ) {
+        hash.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(tag.tag())));
+        f.instruction(&Instruction::I64Xor);
+        hash.store(f);
+        Self::emit_key_hash_finish(hash, f);
+    }
+
+    fn emit_key_hash_finish(hash: I64Local, f: &mut Function) {
         for (shift, multiplier) in [(33, -49064778989728563i64), (33, -4265267296055464877i64)] {
             hash.load(f);
             hash.load(f);

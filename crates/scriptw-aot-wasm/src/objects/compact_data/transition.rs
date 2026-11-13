@@ -206,7 +206,7 @@ impl FunctionBuilder<'_> {
     /// array-index key refuses it. Lookup is by key identity, then by equal
     /// contents, so objects built by the same adds share one shape.
     #[allow(clippy::too_many_arguments)]
-    fn emit_compact_shape_child(
+    pub(super) fn emit_compact_shape_child(
         &mut self,
         shape: &GcLocal<CompactDataShape>,
         keys: &GcLocal<CompactShapeKeys>,

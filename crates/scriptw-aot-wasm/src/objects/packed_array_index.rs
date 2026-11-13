@@ -127,6 +127,91 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         Ok(handled)
     }
+    /// OrdinarySet(A, index, V, A) on a concrete packed Array with an array
+    /// index below 2^32 - 1. A present element is writable default data, so
+    /// it takes the value. An absent one has no own property, so the Set
+    /// creates it on A when no prototype has the index (each Array
+    /// prototype without indexed elements, each intrinsic layout without
+    /// index keys, and each other ordinary prototype by lookup), with A
+    /// extensible and, past its length, a writable "length" that then
+    /// becomes index + 1: ArrayDefineOwnProperty's steps. Anything else
+    /// branches to `general` before any effect.
+    pub(in crate::objects) fn emit_packed_array_index_set_or_branch(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        index: I64Local,
+        value: &ValueLocals,
+        general: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let storage = self.emit_array_index_storage(array, f);
+        s.array_storage_is_packed(&storage, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        let found = s.reserve_i32_local(f);
+        found.set_constant(0, f);
+        self.emit_packed_array_present(&storage, index, found, f);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        // Unadmitted packed growth publishes nothing and leaves the Set.
+        let published = self.packed_number_write(&storage, index, value, f);
+        published.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        s.release_i32_local(published, f);
+        self.emit_branch_if_to_target(general, f);
+        f.instruction(&Instruction::Else);
+        let length = s.reserve_i64_local(f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .read(array, s, f)
+            .store_i64(length, f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64GeU);
+        s.field(ArrayObjectSchema::LENGTH_WRITABLE)
+            .read(array, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.emit_branch_if_to_target(general, f);
+        let header = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(array, s, f)
+                .reference(),
+            f,
+        );
+        s.field(OrdinaryObjectSchema::EXTENSIBLE)
+            .read(&header, s, f);
+        header.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        let end = s.reserve_i64_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        end.store(f);
+        let permitted = self.emit_packed_push_prototypes_permit_append(array, index, end, f)?;
+        permitted.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        s.release_i32_local(permitted, f);
+        self.emit_branch_if_to_target(general, f);
+        // No user code runs between admission and publication.
+        self.emit_array_indexed_publish_default_data(array, index, value, f)?;
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64GeU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        s.field(ArrayObjectSchema::LENGTH)
+            .write(array, GcOperand::i64_local(end), s, f);
+        f.instruction(&Instruction::End);
+        s.release_i64_local(end, f);
+        s.release_i64_local(length, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(found, f);
+        storage.clear(f);
+        Ok(())
+    }
+
     fn packed_backings(
         &self,
         storage: &GcLocal<ArrayObject>,

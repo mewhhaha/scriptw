@@ -370,6 +370,7 @@ They do not refresh the published panel.
 | [Record hit entries](#record-hit-entries-2026-11-12) (ABI 64) | 10.47M | 11.28M |
 | `instanceof` front, direct global and named-binding reads (ABI 65) | 10.21M | 11.01M |
 | Both of the two rows above together (ABI 65) | 9.62M | 10.39M |
+| [Chain walks and computed keys](#chain-walks-and-computed-keys-2026-11-13) (ABI 67) | 7.92M | 8.65M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -511,6 +512,76 @@ load of a non-null GC local repeats a null check. In request profiles,
 `helper::cached_property_read` drops from 10.5% to about 4.9% of samples own
 time and the miss kernel adds about 2.7%; most of the remaining miss time is
 the general Get for dictionary receivers that lack the key and for getters.
+
+### Chain walks and computed keys (2026-11-13)
+
+ABI 67, measured as above against the ABI 65 source `a4c9dfc22` (one retained
+Speed process per case; instructions are deterministic, cycles are not). Both
+Flight outputs stay exact.
+
+A request profile of the ABI 65 source, with each helper call attributed to
+its source site through the native return address and the site number it
+passes, located what the records did not cover (shares are of sampled
+cycles, inclusive):
+
+- `helper::ordinary_set`, 7.0%: the walker's Array appends `c[f] = ...` (4.2%),
+  its object adds `f[c] = r` (1.1%) and the property copy `o[i] = t[i]` in
+  `createElement` (1.0%). A computed key went through ToPropertyKey, which
+  writes an index as a decimal String, and the complete Set probed the
+  receiver twice and searched %Object.prototype%'s layout by a call.
+- `helper::cached_property_read_miss`, 5.6%: `arguments.length` in
+  `createElement` (1.4%; the entry knew no arguments object), the function
+  component's `r.$$typeof` twice in `et` (1.1%) and `n.defaultProps` (0.7%;
+  a function's dictionary lacking the key), WeakMap `get`, `set` and `has`
+  reads in `vn` (0.8%; the entry knew no Map or WeakMap header), and getters
+  that records do not cover (`byteLength`, `size`, module getters).
+- `helper::object_read` called from compiled code: absent Symbol keys
+  (`o[Symbol.asyncIterator]` in `vn` 1.4%, `n[Symbol.iterator]` in `rr` 0.6%,
+  `i[X]` in `Wi`) walked to %Object.prototype% by the general Get, and
+  `o[o.length - 1]` on a String in `vn` boxed the String first (1.1% under
+  `value_to_object`).
+
+What changed ([contract](contracts/compact-ordinary-data-storage.md#chain-walks-and-computed-keys)):
+a call-free walk of the live prototype chain (compact shapes by identity and
+prepared hash, dictionaries by their key index, intrinsic layouts by their
+static String index or the absence of Symbol rows) answers a static read
+that its record does not, and every general Get, before any other work; the
+static entry recognises Map, WeakMap, Set, WeakSet, Promise and primitive
+wrapper headers by the absence rule it applied to Arrays, and arguments
+objects through the walk; a plain computed-key assignment calls one R kernel
+with the raw key, which stores or appends an Array element and adds a String
+key by shape transition once the walk proves the chain lacks it; the layout
+probe precedes every complete intrinsic search in registration and in the
+ordinary Get probe; a computed GetV reads a String's index without the
+wrapper; and every static read base that may be an object or primitive
+(except an arguments object) takes a record site, so a Number reads its
+methods through Number.prototype without a wrapper.
+
+| Loop body | Speed, ABI 65 | Speed, ABI 67 | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: |
+| `t += lit[key]` | 604 | 616 | 323 |
+| `lit[key] = i` | 811 | 674 | 261 |
+| `arr[i & 63] = i` | 1,358 | 715 | 296 |
+| `u = {}; u[key] = i` | 2,545 | 1,384 | 357 |
+| `u = []; u[0] = i; u[1] = i` | 7,141 | 2,137 | 669 |
+| `u = {}; for (var k in two) u[k] = two[k]` (two keys) | 6,783 | 4,424 | 1,247 |
+| `u = lit.zz` (absent, compact receiver) | 425 | 424 | 229 |
+| `u = fnobj.zz` (absent, function receiver) | 2,780 | 884 | 228 |
+| `u = dictobj.zz` (absent, dictionary receiver) | 2,021 | 693 | 233 |
+| `u = (i & 1 ? lit : two).c` (own, then absent, at one site) | 1,271 | 780 | 276 |
+| `u = weak.get` (WeakMap method) | 965 | 558 | 229 |
+| `u = lit[symI]` (absent Symbol) | 2,016 | 822 | 301 |
+| `u = lit[strk]` (absent computed String) | 1,445 | 1,038 | 303 |
+| `u = i.toString(16)` (Number-typed receiver) | 5,091 | 1,785 | 556 |
+| `t += lit.b` (own, record hit) | 405 | 404 | — |
+| `u = made.m` (prototype method, record hit) | 537 | 534 | — |
+
+Node's loop alone costs 197 instructions per iteration against Scriptw's 81.
+In the request profile `helper::ordinary_set` falls from 7.0% to 0.9%,
+`helper::cached_property_read_miss` from 5.6% to 1.4% (now getters, typed
+array accessors and a TextEncoder receiver) and `helper::object_read` from
+8.6% to 4.4%; the new `helper::computed_property_write` takes 3.2%, mostly
+Array element publication and the new storage record each add allocates.
 
 ### Descriptor work and physical allocation
 

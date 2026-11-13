@@ -408,6 +408,19 @@ impl<'a> FunctionBuilder<'a> {
         let raw = self.evaluate_raw_ordinary_property_reference(assignment, function)?;
         let evaluated =
             self.evaluate_rhs_for_raw_ordinary_property_assignment(raw, assignment, function)?;
+        if site.is_none()
+            && matches!(
+                assignment.referenced_name(),
+                PropertyKeyIr::StringExpr(_) | PropertyKeyIr::ArrayIndex(_)
+            )
+        {
+            return self.emit_computed_put_value(
+                evaluated,
+                assignment.strictness(),
+                output,
+                function,
+            );
+        }
         let ready = self.canonicalize_raw_ordinary_property_assignment(evaluated, function)?;
         self.emit_put_value_from_ready_ordinary_property_assignment(
             ready,
@@ -416,6 +429,55 @@ impl<'a> FunctionBuilder<'a> {
             output,
             function,
         )
+    }
+
+    /// PutValue of a computed key after its RHS. R's computed write kernel
+    /// performs the base check, ToObject, ToPropertyKey and [[Set]] in that
+    /// order, first answering what live storage proves without converting.
+    fn emit_computed_put_value(
+        &mut self,
+        assignment: EvaluatedRawOrdinaryPropertyAssignmentLocals,
+        strictness: Strictness,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let EvaluatedRawOrdinaryPropertyAssignmentLocals { reference, rhs } = assignment;
+        let EvaluatedRawOrdinaryPropertyReferenceLocals {
+            base_and_receiver,
+            referenced_name,
+        } = reference;
+        let schema = self.runtime_schema();
+        schema
+            .call_helper(
+                crate::runtime_helpers::ComputedPropertyWriteArguments::new(
+                    &base_and_receiver,
+                    &referenced_name,
+                    &rhs,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(self.completion(), function);
+        self.emit_propagate_current_throw_if_needed(function);
+        if strictness.throws_on_failed_set() {
+            self.completion().value().scalar().load(function);
+            function.instruction(&Instruction::I64Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            self.emit_expression_native_error(
+                NativeErrorKind::TypeError,
+                RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
+                function,
+            )?;
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        output.copy_from(&rhs, function);
+        rhs.clear(function);
+        referenced_name.clear(function);
+        base_and_receiver.clear(function);
+        Ok(())
     }
 
     fn compile_ordinary_property_logical_assignment_to_value(

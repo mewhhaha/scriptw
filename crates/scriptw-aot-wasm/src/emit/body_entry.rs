@@ -86,7 +86,8 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::CachedPropertyReadMiss
             | RuntimeHelperId::CachedPropertyWrite
             | RuntimeHelperId::CachedPropertyWriteMiss
-            | RuntimeHelperId::CachedPropertyAdd => {}
+            | RuntimeHelperId::CachedPropertyAdd
+            | RuntimeHelperId::ComputedPropertyWrite => {}
             // These bodies call their physical typed kernel directly. Their
             // public facades retain registered call boundaries for recursion.
             RuntimeHelperId::TransientByteAlloc

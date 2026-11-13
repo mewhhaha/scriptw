@@ -8,9 +8,12 @@ use super::*;
 use crate::gc_types::*;
 
 mod cache;
+mod chain;
+mod computed;
 mod native_function;
 mod shape;
 mod transition;
+use chain::{ChainAnswer, ChainKey};
 pub(crate) use transition::MAX_COMPACT_SHAPE_KEYS;
 
 /// Shapes with at least this many keys probe through their derived index;

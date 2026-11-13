@@ -319,6 +319,58 @@ foreign-Realm prototype mutation therefore all miss at the next use; strict
 failure still throws in the caller. `aot_property_write_records` changes each
 of these facts between two executions of one site.
 
+## Chain walks and computed keys
+
+A read that no record answers, every general Get and the chain proof of a
+computed-key add first try a call-free walk of the live prototype chain
+(`objects/compact_data/chain.rs`). It retains nothing between uses. Each
+object on the chain must be an ordinary object or a function (and, as the
+receiver, a Map, WeakMap, Set, WeakSet or Promise, or an arguments object for
+a key that starts with no decimal digit, since only its indices live outside
+its header); an Array or primitive wrapper qualifies only for a key that
+starts with no decimal digit and whose hash differs from "length"'s, because
+those own their indices and "length" outside the header. Every other object, a Proxy included, declines. Each
+object's live storage then decides:
+
+- a compact shape is scanned (one or two keys) or probed through its derived
+  index, comparing keys by identity; a key whose prepared hash differs cannot
+  have equal contents, and an equal or unprepared hash declines;
+- a dictionary tries the position the String remembers, then its key index,
+  whose empty bucket ends every probe; a tombstone is passed over, an entry
+  with an equal hash and another String object declines, and a Symbol that
+  has never been hashed is the key of no entry;
+- an intrinsic layout's String index (always at least half empty) proves a
+  String absent the same way, and a layout without Symbol rows lacks every
+  Symbol; a row that may match declines.
+
+A data property found on any object answers the read; an accessor or a value
+still held as a recipe declines; a null [[Prototype]] answers undefined. No
+code runs between the storage reads, so the answer is OrdinaryGet's, and data
+values do not depend on the receiver. The static read entry walks only after
+its site has a record, so the miss kernel still registers one on first use;
+its primitive receivers start at the current Realm's prototype, and every
+non-nullish static read base except an arguments object now takes a record
+site. The same layout probe runs before the complete intrinsic search in
+negative registration and in the ordinary Get probe.
+
+A plain assignment `o[k] = v` with a computed key calls the R kernel
+`ComputedPropertyWrite` with the raw base, the raw key and the value after the
+RHS (layout 67). A Number key that is an array index below 2^32 − 1 on a
+concrete packed Array stores a present element in place; an absent element is
+created when the Array is extensible, its "length" is writable or the index
+is below it, and every prototype permits the index (Array prototypes without
+indexed elements, intrinsic layouts without index keys, other ordinary
+prototypes by lookup), raising "length" past it. A String key on an actual
+OrdinaryObject on compact storage is probed once: a present key takes the
+value under a writable attribute word; an absent key is added by the
+canonical child shape when the shape holds default data attributes, the
+object is extensible and the walk proves that no prototype has the key. A
+dictionary receiver takes an existing writable data property's value. Every
+other case runs PutValue's general steps in order: a nullish base throws,
+ToObject, ToPropertyKey, then OrdinarySet with the original base as receiver.
+`aot_walked_property_access` changes each fact these paths rely on between
+two executions of one site.
+
 ## Closed numeric row loops
 
 The existing scalar Number-loop proof can borrow a dense canonical Array from a

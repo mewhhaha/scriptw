@@ -1227,6 +1227,7 @@ runtime_helper_domain! {
     CachedPropertyWrite / CachedPropertyWriteArguments / CachedPropertyWriteParameters / "cached_property_write" { target:Value,receiver:Value,key:Key,value:Value,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     CachedPropertyWriteMiss / CachedPropertyWriteMissArguments / CachedPropertyWriteMissParameters / "cached_property_write_miss" { target:Value,receiver:Value,key:Key,value:Value,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     CachedPropertyAdd / CachedPropertyAddArguments / CachedPropertyAddParameters / "cached_property_add" { object:(Ref OrdinaryObject NonNullable),storage:(Ref CompactDataStorage NonNullable),child:(Ref CompactDataShape NonNullable),count:I32,value:Value } => Completion;
+    ComputedPropertyWrite / ComputedPropertyWriteArguments / ComputedPropertyWriteParameters / "computed_property_write" { target:Value,key:Value,value:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     OrdinaryPropertyFind / OrdinaryPropertyFindArguments / OrdinaryPropertyFindParameters / "ordinary_property_find" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyEntry Nullable);
     OrdinaryPropertyAppend / OrdinaryPropertyAppendArguments / OrdinaryPropertyAppendParameters / "ordinary_property_append" { object:(Ref OrdinaryObject NonNullable),key:Key,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
     OrdinaryPropertyPrepare / OrdinaryPropertyPrepareArguments / OrdinaryPropertyPrepareParameters / "ordinary_property_prepare" { storage:(Ref OrdinaryPropertyStorage NonNullable),count:I32 } => I32;
@@ -1418,6 +1419,7 @@ impl RuntimeHelperId {
             Self::CachedPropertyWrite => HelperOwner::Runtime,
             Self::CachedPropertyWriteMiss => HelperOwner::Runtime,
             Self::CachedPropertyAdd => HelperOwner::Runtime,
+            Self::ComputedPropertyWrite => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
             Self::OrdinaryPropertyAppend => HelperOwner::Runtime,
             Self::OrdinaryPropertyPrepare => HelperOwner::Runtime,
@@ -1593,6 +1595,7 @@ impl RuntimeHelperId {
             Self::CachedPropertyWrite => true,
             Self::CachedPropertyWriteMiss => true,
             Self::CachedPropertyAdd => true,
+            Self::ComputedPropertyWrite => true,
             Self::OrdinaryPropertyFind => true,
             Self::OrdinaryPropertyAppend => true,
             Self::OrdinaryPropertyPrepare => true,
