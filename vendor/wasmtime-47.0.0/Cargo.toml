@@ -14,6 +14,8 @@
 
 [patch.crates-io]
 wasmtime-internal-cache = { path = "../wasmtime-internal-cache-47.0.0" }
+# The runtime's funcref read expects the vendored translator's engine type.
+wasmtime-internal-cranelift = { path = "../wasmtime-internal-cranelift-47.0.0" }
 
 # Match the host dependency profile when running collector unit tests alone.
 [profile.dev]

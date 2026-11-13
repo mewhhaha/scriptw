@@ -24,8 +24,12 @@ The collector changes are confined to `src/runtime/gc/enabled{.rs,/weakref.rs}`,
 `src/runtime/store/gc.rs` and a shared GC-store accessor in
 `src/runtime/store.rs`. They do not change the JIT heap-header or VMContext ABI.
 The manifest adds an independent unit-test workspace, the existing local cache
-patch and matching dependency optimization profiles. Its separate lockfile pins
-the upstream test dependencies; it does not replace the root workspace lockfile.
+patch, the vendored translator (the runtime's typed funcref read expects the
+engine type that translator passes) and matching dependency optimization
+profiles. Its separate lockfile pins the upstream test dependencies; it does not
+replace the root workspace lockfile. On this Linux host the five upstream
+`pagemap` tests fail in that workspace with and without these patches; the
+`PAGEMAP_SCAN` results they assert are kernel-dependent.
 
 The copying collector's allocation-failure policy uses the current active
 semi-space rather than the physical backing-memory size. It still tries
