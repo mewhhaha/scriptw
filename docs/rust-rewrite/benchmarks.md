@@ -427,6 +427,16 @@ loop included). The entry's own time is about 3.3% of request cycles, where
 the GC reads themselves (about 18 instructions per checked array element,
 about 12 per sealed type test, and a null check per field read).
 
+The inline check of a global's remembered dictionary entry now identifies the
+global object and its dictionary by one cast test each, checks each proved
+reference for null once, and leaves a value still held as a recipe to the
+shared read, which resolves it in place: `u = Map` 388 to 318 and `typeof Map
+== "function"` 473 to 404. With the entry, `plain instanceof Map` and `plain
+instanceof Int8Array`, which include the global read, go from 1,156 to 703 and
+from 1,337 to 820, and the retained request runs in 9.26M (sync) and 10.00M
+(async) instructions instead of 9.58M and 10.35M. On top of the chain walks
+(ABI 67, 7.88M and 8.61M) the two changes measure 7.56M and 8.27M.
+
 A static read site keeps one record that holds only its key, shapes and
 integers. It answers an own compact slot, an own dictionary entry (a position
 confirmed by the entry's key), an own row of an intrinsic layout (the layout

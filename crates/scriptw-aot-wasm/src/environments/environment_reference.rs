@@ -3,9 +3,12 @@ use super::named_environment::NamedEnvironmentKind;
 use super::*;
 use crate::gc_types::{
     GcNullability, JavaScriptObject, NamedBinding, NamedBindingSchema, ObjectEnvironmentSchema,
-    OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, RealmRecordSchema,
-    StoredValueSchema, StringValueSchema,
+    ObjectPropertyStorage, OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage,
+    OrdinaryPropertyStorageSchema, PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry,
+    PropertyEntrySchema, PropertyTable, PropertyValue, RealmRecordSchema, StoredValueSchema,
+    StringValueSchema,
 };
+use crate::heap::DescriptorMask;
 use crate::objects::OwnDataProbe;
 use crate::operations::PropertyKeyLocals;
 use crate::runtime_helpers::{
@@ -413,9 +416,15 @@ impl FunctionBuilder<'_> {
     /// answered without a call when that record has no declarative names at
     /// all and the global object is an ordinary dictionary whose entry at the
     /// name's remembered position is a data property keyed by this very
-    /// String. HasBinding and GetBindingValue then observe nothing but that
-    /// property. Every other case reports false and leaves the read to the
-    /// shared runtime, whose probe also refreshes the remembered position.
+    /// String and holding a value. HasBinding and GetBindingValue then observe
+    /// nothing but that property. Every other case, a value still held as a
+    /// recipe included, reports false and leaves the read to the shared
+    /// runtime, whose probe also refreshes the remembered position and
+    /// resolves the recipe in place.
+    ///
+    /// Each layout is identified by one inline cast test, and locals of
+    /// proved non-null references stay nullable, so a field read checks for
+    /// null once.
     pub(crate) fn emit_global_object_hint_read_i32<N: GcFieldNullability>(
         &mut self,
         global: &GcLocal<Environment, N>,
@@ -426,6 +435,8 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let found = schema.reserve_i32_local(function);
         found.set_constant(0, function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let label = self.local_branch_label(done);
         // A String no dictionary has held keeps a negative position.
         let hint = schema.reserve_i32_local(function);
         schema
@@ -434,82 +445,168 @@ impl FunctionBuilder<'_> {
             .store(hint, function);
         hint.load(function);
         function.instruction(&Instruction::I32Const(0));
-        function.instruction(&Instruction::I32GeS);
+        function.instruction(&Instruction::I32LtS);
         let _ = schema
             .struct_type::<Environment>()
             .field(EnvironmentSchema::NAMED_BINDINGS)
             .read(global, schema, function)
             .reference()
             .is_null(function);
-        function.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(done, function);
         let realm = schema
-            .reserve_gc_local::<RealmRecord, NonNullable>(function)
+            .reserve_gc_local::<RealmRecord, Nullable>(function)
             .initialize(
                 schema
                     .struct_type::<Environment>()
                     .field(EnvironmentSchema::DEFINING_REALM)
                     .read(global, schema, function)
-                    .reference()
-                    .require_non_null(function),
+                    .reference(),
                 function,
             );
-        let stored = schema
-            .reserve_gc_local::<StoredValue, NonNullable>(function)
+        let slot = schema
+            .reserve_gc_local::<StoredValue, Nullable>(function)
             .initialize(
                 schema
                     .struct_type::<RealmRecord>()
                     .field(RealmRecordSchema::GLOBAL_OBJECT)
                     .read(&realm, schema, function)
-                    .reference()
-                    .require_non_null(function),
+                    .reference(),
                 function,
             );
         realm.clear(function);
         let base = schema.reserve_value_local(function);
         schema
             .field(StoredValueSchema::REFERENCE)
-            .read(&stored, schema, function)
+            .read(&slot, schema, function)
             .store_eq(base.reference(), function);
-        stored.clear(function);
-        base.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
+        slot.clear(function);
+        let header = schema
+            .reserve_gc_local::<OrdinaryObject, Nullable>(function)
+            .initialize(
+                base.sealed_reference_or_branch::<OrdinaryObject>(schema, label, function)
+                    .nullable(),
+                function,
+            );
+        base.clear(function);
+        let storage = schema
+            .reserve_gc_local::<ObjectPropertyStorage, Nullable>(function)
+            .initialize(
+                schema
+                    .field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&header, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        header.clear(function);
+        let dictionary = schema
+            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(function)
+            .initialize(
+                storage
+                    .sealed_subtype_or_branch::<OrdinaryPropertyStorage>(schema, label, function)
+                    .nullable(),
+                function,
+            );
+        storage.clear(function);
+        // A dictionary entry keeps its position while it lives; a deleted
+        // entry is a null slot.
+        hint.load(function);
+        schema
+            .field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(&dictionary, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        let entries = schema
+            .reserve_gc_local::<PropertyTable, Nullable>(function)
+            .initialize(
+                schema
+                    .field(OrdinaryPropertyStorageSchema::ENTRIES)
+                    .read(&dictionary, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        dictionary.clear(function);
+        hint.load(function);
+        schema
+            .array_type::<PropertyTable>()
+            .length(&entries, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        let slot = schema.reserve_gc_local(function).initialize(
             schema
-                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        self.open_frame(ControlFrameKind::If, function);
-        let header = schema.reserve_gc_local(function).initialize(
-            base.cast_reference::<OrdinaryObject>(schema, function),
-            function,
-        );
-        let storage = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(OrdinaryObjectSchema::PROPERTIES)
-                .read(&header, schema, function)
+                .array_type::<PropertyTable>()
+                .read(&entries, hint, schema, function)
                 .reference(),
             function,
         );
-        header.clear(function);
-        storage.is_subtype::<OrdinaryPropertyStorage>(schema, function);
-        self.open_frame(ControlFrameKind::If, function);
-        let dictionary = schema.reserve_gc_local(function).initialize(
-            storage
-                .load(schema, function)
-                .cast_subtype::<OrdinaryPropertyStorage>(schema, function),
-            function,
-        );
-        let key = PropertyKeyLocals::from_string(schema, name, function);
-        self.emit_dictionary_position_read(&dictionary, hint, &key, value, found, function);
+        entries.clear(function);
+        let entry = schema
+            .reserve_gc_local::<PropertyEntry, Nullable>(function)
+            .initialize(slot.non_null_or_branch(label, function).nullable(), function);
+        slot.clear(function);
+        let key = schema
+            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .initialize(
+                schema
+                    .field(PropertyEntrySchema::KEY)
+                    .read(&entry, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        schema
+            .field(StoredValueSchema::REFERENCE)
+            .read(&key, schema, function);
         key.clear(function);
-        dictionary.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        storage.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        base.clear(function);
-        self.pop_control(ControlFrameKind::If);
+        let _ = name.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, function);
+        let descriptor = schema
+            .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
+            .initialize(
+                schema
+                    .field(PropertyEntrySchema::DESCRIPTOR)
+                    .read(&entry, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        entry.clear(function);
+        schema
+            .field(PropertyDescriptorSchema::FLAGS)
+            .read(&descriptor, schema, function);
+        function.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
+        function.instruction(&Instruction::I32And);
+        self.emit_branch_if_to_target(done, function);
+        let data = schema
+            .reserve_gc_local::<PropertyValue, Nullable>(function)
+            .initialize(
+                schema
+                    .field(PropertyDescriptorSchema::VALUE)
+                    .read(&descriptor, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        descriptor.clear(function);
+        let stored = schema
+            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .initialize(
+                data.sealed_subtype_or_branch::<StoredValue>(schema, label, function)
+                    .nullable(),
+                function,
+            );
+        data.clear(function);
+        schema
+            .struct_type::<StoredValue>()
+            .read_into(&stored, value, schema, function);
+        stored.clear(function);
+        found.set_constant(1, function);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         schema.release_i32_local(hint, function);
         Ok(found)

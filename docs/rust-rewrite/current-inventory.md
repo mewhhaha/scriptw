@@ -20,15 +20,17 @@ accepts `--case <file.js>`.
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
   [hit entries](benchmarks.md#record-hit-entries-2026-11-12),
   [chain walks](benchmarks.md#chain-walks-and-computed-keys-2026-11-13)).
-  Next, in measured order: `instanceof`, about 1,150 instructions per test
-  against 433, of which the serializer runs about twenty per plain object;
+  Next, in measured order: `instanceof`, about 700 instructions per test
+  against 433 after its call-free entry (the rest is Wasmtime's code for the
+  entry's GC reads and the global read of the constructor, 318 against 156),
+  of which the serializer runs about twenty per plain object;
   the collector (9% of cycles; allocation volume drives it) and WeakMap
   operations, which cross into the host and hash with SipHash (3.6%); reading
   a function reference from an object, a host call on every such read (2.5%);
   accessors, which no record covers (typed-array `byteLength`, Set `size`,
   module getters); computed reads of an own property, about twice V8; a
   computed add, about 1,000 instructions; identifier reads that start at the
-  current environment and `typeof` of a missing global (1,122 against 239);
+  current environment and `typeof` of a missing global (969 against 239);
   inline stores for proven captured cells; lazy function `prototype`,
   `length` and `name`; closure creation and `Object.keys`.
  Source `89a934d06891`
