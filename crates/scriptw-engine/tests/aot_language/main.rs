@@ -40,6 +40,7 @@ mod aot_for_in_codegen;
 mod aot_for_in_visited_set;
 mod aot_for_of_head_completion;
 mod aot_function_own_data_probe;
+mod aot_global_object_hint_reads;
 mod aot_guarded_number_add;
 mod aot_guarded_number_relational;
 mod aot_guarded_number_update;

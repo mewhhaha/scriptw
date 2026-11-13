@@ -51,6 +51,11 @@ impl FunctionBuilder<'_> {
         // Only the source caller can select its lexical Global Environment.
         // Error construction separately retains that caller's execution Realm.
         let global = self.emit_source_global_environment_to_local(function);
+        let found = self.emit_global_object_hint_read_i32(&global, &key, value, function)?;
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(found, function);
+        self.open_frame(ControlFrameKind::If, function);
         let realm = self.emit_execution_realm(function);
         let base = self.runtime_helper_base()?;
         let strictness = if self.is_current_function_strict() {
@@ -90,10 +95,12 @@ impl FunctionBuilder<'_> {
             }
         }
         realm.clear(function);
-        global.clear(function);
-        key.clear(function);
         self.emit_propagate_current_throw_if_needed(function);
         value.copy_from(self.completion().value(), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        global.clear(function);
+        key.clear(function);
         Ok(())
     }
 

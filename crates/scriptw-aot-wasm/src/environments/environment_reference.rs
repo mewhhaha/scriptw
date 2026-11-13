@@ -4,7 +4,7 @@ use super::*;
 use crate::gc_types::{
     GcNullability, JavaScriptObject, NamedBinding, NamedBindingSchema, ObjectEnvironmentSchema,
     OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, RealmRecordSchema,
-    StringValueSchema,
+    StoredValueSchema, StringValueSchema,
 };
 use crate::objects::OwnDataProbe;
 use crate::operations::PropertyKeyLocals;
@@ -406,6 +406,112 @@ impl FunctionBuilder<'_> {
         entry.clear(function);
         parent.clear(function);
         cursor.clear(function);
+        Ok(found)
+    }
+
+    /// A read at a site that resolves from the Global Environment Record,
+    /// answered without a call when that record has no declarative names at
+    /// all and the global object is an ordinary dictionary whose entry at the
+    /// name's remembered position is a data property keyed by this very
+    /// String. HasBinding and GetBindingValue then observe nothing but that
+    /// property. Every other case reports false and leaves the read to the
+    /// shared runtime, whose probe also refreshes the remembered position.
+    pub(crate) fn emit_global_object_hint_read_i32<N: GcFieldNullability>(
+        &mut self,
+        global: &GcLocal<Environment, N>,
+        name: &GcLocal<StringValue>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let found = schema.reserve_i32_local(function);
+        found.set_constant(0, function);
+        // A String no dictionary has held keeps a negative position.
+        let hint = schema.reserve_i32_local(function);
+        schema
+            .field(StringValueSchema::ENTRY_HINT)
+            .read(name, schema, function)
+            .store(hint, function);
+        hint.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32GeS);
+        let _ = schema
+            .struct_type::<Environment>()
+            .field(EnvironmentSchema::NAMED_BINDINGS)
+            .read(global, schema, function)
+            .reference()
+            .is_null(function);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        let realm = schema
+            .reserve_gc_local::<RealmRecord, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::DEFINING_REALM)
+                    .read(global, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        let stored = schema
+            .reserve_gc_local::<StoredValue, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<RealmRecord>()
+                    .field(RealmRecordSchema::GLOBAL_OBJECT)
+                    .read(&realm, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        realm.clear(function);
+        let base = schema.reserve_value_local(function);
+        schema
+            .field(StoredValueSchema::REFERENCE)
+            .read(&stored, schema, function)
+            .store_eq(base.reference(), function);
+        stored.clear(function);
+        base.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            base.cast_reference::<OrdinaryObject>(schema, function),
+            function,
+        );
+        let storage = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&header, schema, function)
+                .reference(),
+            function,
+        );
+        header.clear(function);
+        storage.is_subtype::<OrdinaryPropertyStorage>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let dictionary = schema.reserve_gc_local(function).initialize(
+            storage
+                .load(schema, function)
+                .cast_subtype::<OrdinaryPropertyStorage>(schema, function),
+            function,
+        );
+        let key = PropertyKeyLocals::from_string(schema, name, function);
+        self.emit_dictionary_position_read(&dictionary, hint, &key, value, found, function);
+        key.clear(function);
+        dictionary.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        storage.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        base.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(hint, function);
         Ok(found)
     }
 

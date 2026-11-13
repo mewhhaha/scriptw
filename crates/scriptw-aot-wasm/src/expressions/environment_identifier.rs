@@ -63,6 +63,50 @@ impl FunctionBuilder<'_> {
         )
     }
 
+    /// ResolveBinding and GetValue of a dynamic identifier read. A read that
+    /// starts at the Global Environment Record first tries the global
+    /// object's remembered entry; the shared runtime owns everything else.
+    fn emit_environment_identifier_read_value(
+        &mut self,
+        identifier: &EnvironmentIdentifierIr,
+        key: &GcLocal<StringValue>,
+        read: EnvironmentIdentifierRead,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let record = self.environment_identifier_read_record(identifier, function)?;
+        if !matches!(
+            identifier.resolution_start(),
+            EnvironmentIdentifierResolutionStart::GlobalEnvironment
+        ) {
+            return self.emit_environment_identifier_read_from_record(
+                key,
+                identifier.strictness,
+                read,
+                record,
+                value,
+                function,
+            );
+        }
+        let schema = self.runtime_schema();
+        let found = self.emit_global_object_hint_read_i32(&record, key, value, function)?;
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(found, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_environment_identifier_read_from_record(
+            key,
+            identifier.strictness,
+            read,
+            record,
+            value,
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
     /// The record where a dynamic read's ResolveBinding starts.
     fn environment_identifier_read_record(
         &mut self,
@@ -130,12 +174,10 @@ impl FunctionBuilder<'_> {
                         self.emit_interned_string_reference(&identifier.name, function)?,
                         function,
                     );
-                let record = self.environment_identifier_read_record(identifier, function)?;
-                self.emit_environment_identifier_read_from_record(
+                self.emit_environment_identifier_read_value(
+                    identifier,
                     &key,
-                    identifier.strictness,
                     EnvironmentIdentifierRead::Typeof,
-                    record,
                     value,
                     function,
                 )?;
@@ -279,14 +321,8 @@ impl FunctionBuilder<'_> {
                 };
                 // No source evaluation separates ResolveBinding and GetValue.
                 // Dynamic names keep both steps inside the shared runtime.
-                let record = self.environment_identifier_read_record(identifier, function)?;
-                self.emit_environment_identifier_read_from_record(
-                    &key,
-                    identifier.strictness,
-                    read,
-                    record,
-                    &value,
-                    function,
+                self.emit_environment_identifier_read_value(
+                    identifier, &key, read, &value, function,
                 )?;
                 if matches!(identifier.operation, Operation::Typeof) {
                     self.emit_typeof_value(&value, output, function)?;

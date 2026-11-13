@@ -5,7 +5,7 @@ use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::{EqualityBinaryOp, ExprIr, SpecOperationIr, StatementIr, lower};
 use wasmparser::{Operator, Validator, WasmFeatures};
 
-const SOURCE_FUNCTIONS: [&str; 8] = [
+const SOURCE_FUNCTIONS: [&str; 9] = [
     "specStrict",
     "specLoose",
     "exprStrict",
@@ -14,6 +14,7 @@ const SOURCE_FUNCTIONS: [&str; 8] = [
     "dynamic",
     "bare",
     "unresolved",
+    "unresolvedRead",
 ];
 
 fn calls(body: &[Operator<'_>], callee: u32) -> usize {
@@ -51,6 +52,7 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
                 export function dynamic(value, spelling, extra) { return typeof value === spelling; }
                 export function bare(value, unused, extra) { return typeof value; }
                 export function unresolved(value, unused, extra) { return typeof missingTypeofBinding === "undefined"; }
+                export function unresolvedRead(value, unused, extra) { return missingTypeofBinding; }
             "#, ParseOptions::module()).unwrap();
             let mut program = lower(&parsed);
             assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
@@ -95,6 +97,9 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
                         };
                     }
                     "bare" => assert!(matches!(result.expr, ExprIr::TypeOf { .. })),
+                    "unresolvedRead" => {
+                        assert!(matches!(result.expr, ExprIr::EnvironmentIdentifier(_)));
+                    }
                     _ => panic!("unexpected source function"),
                 }
             }
@@ -116,13 +121,26 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
     let program = Module::read(&artifact.bytes, true);
     let (equality, _) = runtime.named("helper::string_equality");
     let equality = program.imported_runtime_function(&runtime, equality);
+    // The global read itself holds its name as a String-keyed property key.
+    // The comparison around it must add no String Value of its own.
+    let read_identity = &functions
+        .iter()
+        .find(|(name, _)| name == "unresolvedRead")
+        .expect("global read control")
+        .1;
+    let read_strings = string_values(program.named(read_identity).1);
     for (name, identity) in functions {
         let (_, body) = program.named(&identity);
         match name.as_str() {
             "specStrict" | "specLoose" | "exprStrict" | "exprLoose" | "never" | "unresolved" => {
+                let key_strings = if name == "unresolved" {
+                    read_strings
+                } else {
+                    0
+                };
                 assert_eq!(
                     string_values(body),
-                    0,
+                    key_strings,
                     "{name} must not materialize typeof or literal String Values"
                 );
                 assert_eq!(
@@ -145,6 +163,9 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
                 string_values(body) > 0,
                 "a returned typeof still produces its observable String"
             ),
+            "unresolvedRead" => {
+                assert_eq!(calls(body, equality), 0, "{name} is a plain global read")
+            }
             _ => unreachable!(),
         }
     }
