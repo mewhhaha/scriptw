@@ -13,25 +13,25 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. The source with record hit entries and the `instanceof` front (ABI 65)
-  runs a Speed sync request in 9.62M user instructions against 4.38M
+  JIT. The source with chain walks and the computed-key write kernel (ABI 67)
+  runs a Speed sync request in 7.88M user instructions against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
-  [hit entries](benchmarks.md#record-hit-entries-2026-11-12)).
-  Next, in measured order: Set beyond static-key sites (static String
-  assignments now take [write records](contracts/compact-ordinary-data-storage.md#static-assignment-write-records),
-  but a computed-key [[Set]] such as the walker's `f[c] = r` still probes the
-  receiver twice and searches the %Object.prototype% layout on each add, and
-  a chain with more than one holder above the receiver stays general); read
-  misses that reach the general Get (dictionary receivers that lack the key,
-  getters) and Number-typed receivers, which box on every method read; the
-  remaining helper-entry cost of `instanceof` and identifier reads (parameter
-  transfer, layout tests and the site lookup, still two to five times V8 per
-  operation) and an index for long named-binding tables; the general Get for
-  computed keys; inline stores for proven captured cells; lazy function
-  `prototype`, `length` and `name`; allocation volume, which drives the 9%
-  spent collecting. Source `89a934d06891`
+  [hit entries](benchmarks.md#record-hit-entries-2026-11-12),
+  [chain walks](benchmarks.md#chain-walks-and-computed-keys-2026-11-13)).
+  Next, in measured order: `instanceof`, about 1,150 instructions per test
+  against 433, of which the serializer runs about twenty per plain object;
+  the collector (9% of cycles; allocation volume drives it) and WeakMap
+  operations, which cross into the host and hash with SipHash (3.6%); reading
+  a function reference from an object, a host call on every such read (2.5%);
+  accessors, which no record covers (typed-array `byteLength`, Set `size`,
+  module getters); computed reads of an own property, about twice V8; a
+  computed add, about 1,000 instructions; identifier reads that start at the
+  current environment and `typeof` of a missing global (1,122 against 239);
+  inline stores for proven captured cells; lazy function `prototype`,
+  `length` and `name`; closure creation and `Object.keys`.
+ Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
   V8 with the eight-process campaign before refreshing the published panel.
@@ -220,6 +220,16 @@ accepts `--case <file.js>`.
   construct a LIFO `Rooted` from an `OwnedRooted` index. Collector tests use a
   scoped view after collection; that preserves their coverage without repairing
   the separate public API defect.
+- **Deleted global behind a script `var`:** a write to a top-level `var`
+  whose configurable global property was deleted re-creates the property
+  where strict code must throw a ReferenceError (`var Map; delete
+  globalThis.Map; var Map = 1`, also as a `for (var ... in ...)` target), and
+  a top-level `for (var n of ...)` body reads a stale local copy after
+  `globalThis.n = 9`. Both come from keeping script `var` bindings in locals
+  mirrored to the global object by an unchecked Set
+  (`emit_global_property_write`); reads of such names are exact since the
+  run-time global resolution. Owner: the local-copy-plus-mirror design of
+  script `var` bindings.
 
 ## Conformance boundaries
 

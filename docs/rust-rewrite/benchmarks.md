@@ -370,7 +370,8 @@ They do not refresh the published panel.
 | [Record hit entries](#record-hit-entries-2026-11-12) (ABI 64) | 10.47M | 11.28M |
 | `instanceof` front, direct global and named-binding reads (ABI 65) | 10.21M | 11.01M |
 | Both of the two rows above together (ABI 65) | 9.62M | 10.39M |
-| [Chain walks and computed keys](#chain-walks-and-computed-keys-2026-11-13) (ABI 67) | 7.92M | 8.65M |
+| Globals resolved at run time, remembered global entries read at the site (ABI 65) | 9.58M | 10.35M |
+| [Chain walks and computed keys](#chain-walks-and-computed-keys-2026-11-13) (ABI 67), on the row above | 7.88M | 8.61M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -517,7 +518,9 @@ the general Get for dictionary receivers that lack the key and for getters.
 
 ABI 67, measured as above against the ABI 65 source `a4c9dfc22` (one retained
 Speed process per case; instructions are deterministic, cycles are not). Both
-Flight outputs stay exact.
+Flight outputs stay exact. On `a4c9dfc22` alone the change measures 7.92M sync
+and 8.65M async; with the run-time global resolution underneath it, 7.88M and
+8.61M.
 
 A request profile of the ABI 65 source, with each helper call attributed to
 its source site through the native return address and the site number it
