@@ -5,8 +5,86 @@ use super::values::{dynamic_completion, retained_value};
 use super::*;
 use scriptw_aot_wasm::GcHostField;
 use wasmtime::{
-    ArrayRef, ArrayRefPre, EqRef, Func, Rooted, StorageType, StructRef, StructRefPre, Val,
+    ArrayRef, ArrayRefPre, ArrayType, EqRef, Func, Global, Rooted, StorageType, StructRef,
+    StructRefPre, Val,
 };
+
+/// What the bridges retained requests enter on every call need from the
+/// instance: handles, types and allocators that are fixed once P and R are
+/// instantiated in their Store. Looking them up by name, rebuilding the
+/// call bridge's `FuncType` and re-registering its allocators per call was
+/// most of the embedding's own cost. An absent or malformed bridge is left
+/// `None` and the per-call path reports it as before.
+pub(super) struct Bridges {
+    call: Option<CallBridge>,
+    promise: Option<(Func, usize)>,
+    realm: Option<Global>,
+    pub(super) module_status: Option<WasmtimeExtern>,
+}
+
+struct CallBridge {
+    function: Func,
+    results: usize,
+    arguments: ArrayRefPre,
+    stored: StructRefPre,
+}
+
+impl Bridges {
+    pub(super) fn new(
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+        program: &Instance,
+        roots: &Instance,
+    ) -> Self {
+        let call = roots
+            .get_func(&mut *store, "scriptw.embed.call")
+            .and_then(|function| CallBridge::new(store, function).ok());
+        let promise = roots
+            .get_func(&mut *store, "scriptw.embed.promise")
+            .map(|function| (function, function.ty(&*store).results().len()));
+        Bridges {
+            call,
+            promise,
+            realm: roots.get_global(&mut *store, scriptw_aot_wasm::SNAPSHOT_ENTRY_REALM_EXPORT),
+            module_status: program
+                .get_export(&mut *store, scriptw_aot_wasm::MODULE_EVALUATION_STATUS_EXPORT),
+        }
+    }
+}
+
+impl CallBridge {
+    fn new(
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+        function: Func,
+    ) -> Result<Self, EngineError> {
+        let ty = function.ty(&*store);
+        let results = ty.results().len();
+        let arguments: ArrayType = ty
+            .params()
+            .nth(6)
+            .and_then(|p| {
+                p.as_ref()
+                    .and_then(|r| r.heap_type().as_concrete_array())
+                    .cloned()
+            })
+            .ok_or_else(|| EngineError::new("embedding call has no canonical argument array"))?;
+        let StorageType::ValType(ValType::Ref(element)) = arguments.element_type() else {
+            return Err(EngineError::new(
+                "embedding argument array has wrong storage",
+            ));
+        };
+        let stored = element
+            .heap_type()
+            .as_concrete_struct()
+            .cloned()
+            .ok_or_else(|| EngineError::new("embedding argument is not a StoredValue"))?;
+        Ok(CallBridge {
+            function,
+            results,
+            stored: StructRefPre::new(&mut *store, stored),
+            arguments: ArrayRefPre::new(&mut *store, arguments),
+        })
+    }
+}
 
 impl EmbeddedInstance {
     pub(super) fn check_store(
@@ -29,7 +107,7 @@ impl EmbeddedInstance {
     fn check_ready(&self, store: &mut WasmtimeStore<WasmStoreState>) -> Result<(), EngineError> {
         self.check_store(store)?;
         if matches!(
-            read_module_entry_status(&self.program, store)?,
+            module_entry_status(self.bridges.module_status.clone(), store)?,
             Some(WasmModuleEvaluationStatus::Pending | WasmModuleEvaluationStatus::NotStarted)
         ) {
             return Err(EngineError::new(
@@ -56,8 +134,8 @@ impl EmbeddedInstance {
         store: &mut impl AsContextMut<Data = WasmStoreState>,
     ) -> Result<(Rooted<EqRef>, Option<Rooted<EqRef>>, Rooted<EqRef>), EngineError> {
         let realm = self
-            .roots
-            .get_global(&mut *store, scriptw_aot_wasm::SNAPSHOT_ENTRY_REALM_EXPORT)
+            .bridges
+            .realm
             .ok_or_else(|| EngineError::new("compiled program has no embedding Realm root"))?
             .get(&mut *store);
         let realm = eqref(store, realm)?
@@ -81,7 +159,19 @@ impl EmbeddedInstance {
         function: Func,
         inputs: &[Val],
     ) -> Result<Vec<Val>, EngineError> {
-        let mut results = vec![Val::I32(0); function.ty(&*store).results().len()];
+        let results = function.ty(&*store).results().len();
+        self.execute_with(store, function, results, inputs)
+    }
+
+    /// `execute` for a bridge whose result count is already known.
+    fn execute_with(
+        &self,
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+        function: Func,
+        results: usize,
+        inputs: &[Val],
+    ) -> Result<Vec<Val>, EngineError> {
+        let mut results = vec![Val::I32(0); results];
         if let Err(error) = function.call(&mut *store, inputs, &mut results) {
             if let Some(state) = store.as_context_mut().data_mut().embedding.as_mut() {
                 state.phase = StorePhase::Failed;
@@ -266,28 +356,15 @@ impl EmbeddedInstance {
         receiver: Option<&JsValue>,
         arguments: &[JsValue],
     ) -> Result<JsCompletion, EngineError> {
-        let function = self.function(store, "scriptw.embed.call", false)?;
-        let ty = function
-            .ty(&*store)
-            .params()
-            .nth(6)
-            .and_then(|p| {
-                p.as_ref()
-                    .and_then(|r| r.heap_type().as_concrete_array())
-                    .cloned()
-            })
-            .ok_or_else(|| EngineError::new("embedding call has no canonical argument array"))?;
-        let StorageType::ValType(ValType::Ref(element)) = ty.element_type() else {
-            return Err(EngineError::new(
-                "embedding argument array has wrong storage",
-            ));
+        let built;
+        let bridge = match &self.bridges.call {
+            Some(bridge) => bridge,
+            None => {
+                let function = self.function(store, "scriptw.embed.call", false)?;
+                built = CallBridge::new(store, function)?;
+                &built
+            }
         };
-        let stored = element
-            .heap_type()
-            .as_concrete_struct()
-            .cloned()
-            .ok_or_else(|| EngineError::new("embedding argument is not a StoredValue"))?;
-        let struct_allocator = StructRefPre::new(&mut *store, stored);
         u32::try_from(arguments.len())
             .map_err(|_| EngineError::new("argument count exceeds Wasm32"))?;
         let mut elements = Vec::new();
@@ -301,11 +378,10 @@ impl EmbeddedInstance {
             fields[GcHostField::StoredScalar.definition().index() as usize] = scalar;
             fields[GcHostField::StoredReference.definition().index() as usize] = reference;
             let value =
-                StructRef::new(&mut *store, &struct_allocator, &fields).map_err(embedded_error)?;
+                StructRef::new(&mut *store, &bridge.stored, &fields).map_err(embedded_error)?;
             elements.push(Val::AnyRef(Some(value.to_anyref())));
         }
-        let array_allocator = ArrayRefPre::new(&mut *store, ty);
-        let args = ArrayRef::new_fixed(&mut *store, &array_allocator, &elements)
+        let args = ArrayRef::new_fixed(&mut *store, &bridge.arguments, &elements)
             .map_err(embedded_error)?;
         let mut inputs = callable.arguments(store)?.to_vec();
         let undefined;
@@ -319,7 +395,7 @@ impl EmbeddedInstance {
         inputs.push(Val::AnyRef(Some(args.to_anyref())));
         let (realm, environment, program) = self.context(store)?;
         inputs.extend(context_arguments(realm, environment, program));
-        let results = self.execute(store, function, &inputs)?;
+        let results = self.execute_with(store, bridge.function, bridge.results, &inputs)?;
         dynamic_completion(store, &results)
     }
 
@@ -361,8 +437,15 @@ impl EmbeddedInstance {
         run_on_execution_stack(|| {
             let mut roots = wasmtime::RootScope::new(store);
             let inputs = value.arguments(&mut roots)?;
-            let function = self.function(&mut roots, "scriptw.embed.promise", false)?;
-            let results = self.execute(&mut roots, function, &inputs)?;
+            let results = match self.bridges.promise {
+                Some((function, results)) => {
+                    self.execute_with(&mut roots, function, results, &inputs)?
+                }
+                None => {
+                    let function = self.function(&mut roots, "scriptw.embed.promise", false)?;
+                    self.execute(&mut roots, function, &inputs)?
+                }
+            };
             let Some(Val::I32(state)) = results.get(5) else {
                 return Err(EngineError::new("Promise bridge has wrong status storage"));
             };
@@ -475,7 +558,7 @@ impl EmbeddedInstance {
                 ],
             )?;
             if matches!(
-                read_module_entry_status(&self.program, &mut roots)?,
+                module_entry_status(self.bridges.module_status.clone(), &mut roots)?,
                 Some(WasmModuleEvaluationStatus::Pending)
             ) {
                 return Ok(EmbeddedEvaluation::Pending);

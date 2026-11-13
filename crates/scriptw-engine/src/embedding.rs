@@ -429,6 +429,7 @@ impl EmbeddedRuntime {
         let main = program
             .get_typed_func::<(), GcMainCompletion>(&mut *store, "main")
             .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?;
+        let bridges = operations::Bridges::new(&mut *store, &program, &roots);
         let state = store.data_mut().embedding.as_mut().unwrap();
         state.phase = StorePhase::Instantiated;
         Ok(EmbeddedInstance {
@@ -436,6 +437,7 @@ impl EmbeddedRuntime {
             program,
             roots,
             store: Arc::clone(&state.store),
+            bridges,
         })
     }
 }
@@ -447,6 +449,8 @@ pub struct EmbeddedInstance {
     program: Instance,
     roots: Instance,
     store: Arc<()>,
+    /// Bridge handles fixed for the instance's lifetime, looked up once.
+    bridges: operations::Bridges,
 }
 
 impl EmbeddedInstance {
@@ -524,7 +528,7 @@ impl EmbeddedInstance {
                 completion,
             )?);
         }
-        match read_module_entry_status(&self.program, &mut roots)? {
+        match module_entry_status(self.bridges.module_status.clone(), &mut roots)? {
             Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
             Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(
                 "embedded Module did not reach evaluation completion",

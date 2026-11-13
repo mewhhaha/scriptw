@@ -4394,7 +4394,17 @@ fn read_module_entry_status(
     instance: &wasmtime::Instance,
     store: &mut impl wasmtime::AsContextMut<Data = WasmHostState>,
 ) -> Result<Option<WasmModuleEvaluationStatus>, EngineError> {
-    let Some(exported) = instance.get_export(&mut *store, MODULE_EVALUATION_STATUS_EXPORT) else {
+    let exported = instance.get_export(&mut *store, MODULE_EVALUATION_STATUS_EXPORT);
+    module_entry_status(exported, store)
+}
+
+/// The status a program's `MODULE_EVALUATION_STATUS_EXPORT` export holds now;
+/// an instance's exports are fixed, so callers may look the export up once.
+fn module_entry_status(
+    exported: Option<WasmtimeExtern>,
+    store: &mut impl wasmtime::AsContextMut<Data = WasmHostState>,
+) -> Result<Option<WasmModuleEvaluationStatus>, EngineError> {
+    let Some(exported) = exported else {
         return Ok(None);
     };
     let WasmtimeExtern::Global(exported) = exported else {
