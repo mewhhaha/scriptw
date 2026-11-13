@@ -14,9 +14,9 @@ accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
   JIT. The source with chain walks, the computed-key write kernel and the
-  call-free `instanceof` entry (ABI 68), with the host-side reductions and
-  static site records kept in P globals (ABI 69),
-  runs a Speed sync request in 6.72M user instructions (median) against 4.38M
+  call-free `instanceof` entry (ABI 68), with the host-side reductions,
+  static site records kept in P globals (ABI 69) and inline funcref reads,
+  runs a Speed sync request in 6.61M user instructions (median) against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
@@ -32,10 +32,11 @@ accepts `--case <file.js>`.
   entry's GC reads and the global read of the constructor, 318 against 156),
   of which the serializer runs about twenty per plain object;
   WeakMap operations, which still cross into the host (about 1,000
-  instructions of a `has`; 4.6% of profiled cycles); the collector (4.3%,
-  carried by the one request in six that collects); reading a function
-  reference from an object, still a host call on every such read (1.7%); the
-  embedding's per-call work (about 2%);
+  instructions of a `has`, most of it Wasmtime's typed host-call boundary;
+  about 5% of profiled cycles); the collector (about 4–6%, carried by the
+  requests that collect); the embedding's remaining per-call type checks
+  (dynamic argument checks, struct field type checks, `RegisteredType` roots;
+  about 2%);
   accessors, which no record covers (typed-array `byteLength`, Set `size`,
   module getters); computed reads of an own property, about twice V8; a
   computed add, about 1,000 instructions; identifier reads that start at the
@@ -63,26 +64,26 @@ accepts `--case <file.js>`.
   Delivery is exercised on Linux x86-64 only, and other hosts reject a
   timeout. The pinned Test262 status has not been rerun with this mechanism.
   Owner: Engine native policy.
-- Stop reading typed funcrefs out of GC structs on calls. Each `struct.get` of
-  an `ExecutableCode` entry is a Wasmtime libcall; it now receives the engine
-  type from the `VMContext` and only looks up and type-checks the side-table
-  entry, about 1.7% of Speed sync profiled cycles
-  ([host-side costs](benchmarks.md#host-side-costs-2026-11-13)). Removing the
-  call needs either a JIT-visible copy of the funcref side table (its base and
-  length reachable from compiled code, kept current as the table grows) or a
-  funcref table shared by R and P with an `i32` entry index and
-  `call_indirect`, which is inline in Wasmtime but changes the
-  `ExecutableCode` layout, publication, host-created code and the runtime ABI.
-  Owner: AOT call lowering.
-- Reduce copying-collection cost per request. A retained RSC Realm allocates
-  about 1.0 MB per request with 1.67 MB live and collects every sixth request;
-  the existing larger-capacity profiles trade resident memory for fewer
+- Shorten typed funcref reads from GC structs further. Each `struct.get` of an
+  `ExecutableCode` entry now reads the interned table inline (bounds check,
+  entry load, registered-type compare) and calls Wasmtime only for a subtype
+  or a bad id ([host-side costs](benchmarks.md#host-side-costs-2026-11-13)).
+  A funcref table shared by R and P with an `i32` entry index and
+  `call_indirect` would drop the type compare and the extra loads; it changes
+  the `ExecutableCode` layout, publication, host-created code and the runtime
+  ABI. Owner: AOT call lowering.
+- Reduce copying-collection cost per request. A retained RSC Realm's compiled
+  code allocates about 10,200 objects and 480 KB per sync request (11,200 and
+  535 KB async; StoredValue boxes are 30% of the objects) with about 1.67 MB
+  live; the existing larger-capacity profiles trade resident memory for fewer
   collections. The per-copy ephemeron search and `memmove` calls are gone
   ([host-side costs](benchmarks.md#host-side-costs-2026-11-13)); what remains
   is copying the same long-lived startup graph every time. A nursery with a
-  card-marking store barrier would stop that, at a store per reference write
-  in every request, so it mostly moves means rather than medians. Owner:
-  runtime value/storage representation and collector patch.
+  card-marking store barrier would stop that. A sync request makes about
+  12,200 reference stores into existing objects (13,200 async), 4% of them
+  into objects older than the last collection, so an unfiltered card mark
+  would add roughly 0.5% to every request's instructions. Owner: runtime
+  value/storage representation and collector patch.
 - Reduce the current Fast gaps on `args-unused.js` and `frame-compact.js`. Measure remaining full Number conversions, classify rows during projection, preserve original payloads, and branch once to integer or existing Number loops. Carry conditional domains through call slots and exact Add/Sub bounds; retain fractions, negative zero, nonfinite values, overflow and fallback. Owner: scalar-call planning.
 - Test amortizing `frame-compact.js` projection across its closed outer loop. Recount projection allocations and own-data probes on the current source, then prove intervening effects cannot invalidate rows before hoisting. Owner: scalar-call planning.
 - Reduce cross-block value transport or establish a stronger spill-home compaction hypothesis. The isolated block-local prototype reduces current Fast `vn`/`ft` fixed frames 213,856→200,864 B / 85,664→81,696 B, but request medians move only −0.35% / −0.97% (sync/async). Keep the fork outside the product. The anonymous static census lacks named-function/module and dynamic-frequency attribution; precompiled Backtracking R is outside it. Preserve CFG lifetimes, explicit GC roots, debug locations, argument slots, alignment and move order. [Evidence](react-architecture-current.json). Owner: compiler backend/spill homes.

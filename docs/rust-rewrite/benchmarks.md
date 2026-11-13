@@ -375,6 +375,7 @@ They do not refresh the published panel.
 | Call-free `instanceof` entry and one-cast global entry check (ABI 68) | 7.56M | 8.27M |
 | [Host-side](#host-side-costs-2026-11-13) weak lookups, funcref reads, root scopes and collector copies (ABI 68) | 7.26M | 7.88M |
 | [Site records in P](#site-records-in-p-2026-11-13) (ABI 69), on the row above | 6.72M | 7.32M |
+| Inline interned funcref reads, plain references and cached embedding bridges (ABI 69), on the row above | 6.61M | 7.20M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -710,6 +711,50 @@ reads 1.7% (now mostly the side-table entry and its type check), `memory.fill`
 `ref.func` 0.2%. The embedding's own work per host call (export lookup by
 name, `Func::ty`, `StructRefPre`/`ArrayRefPre`, dynamic argument checks,
 Realm field reads) is about 2% and unchanged.
+
+A second host-side step (still ABI 68 when measured, P and R unchanged)
+removes the remaining funcref host call and part of the embedding's per-call
+work
+([Wasmtime](../../vendor/wasmtime-47.0.0/PATCHES.md#inline-funcref-reads-and-plain-references),
+[translator](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#funcref-reads-and-short-array-fills)):
+
+- The interned funcref table is a dense vector whose base and length the
+  runtime publishes in the copying heap's JIT-visible data whenever it grows.
+  A typed funcref field read returns the entry inline when it is null or its
+  registered type equals the expected engine type, exactly the cases the
+  libcall answers without a subtype query, and calls the libcall otherwise.
+- The copying collector's references are plain copies, so `GcStore` no
+  longer makes virtual clone, drop and expose calls for them, and the
+  externref parameter loader checks its kind with one header read.
+- `EmbeddedInstance` keeps the call and Promise bridges, their result counts,
+  the call bridge's argument allocators, the entry Realm global and the
+  module status export from instantiation instead of looking them up per
+  call. One retained request makes two host-to-Wasm entries in its window
+  (the call of `run` and one Promise query; the harness's `encode` call
+  follows outside it).
+
+| Speed, user instructions per request, on ABI 68 | before | after | Change |
+| --- | ---: | ---: | ---: |
+| Sync, median | 7,255,000 | 7,147,000 | −1.5% |
+| Sync, mean | 7,775,000 | 7,667,000 | −1.4% |
+| Async, median | 7,882,000 | 7,767,000 | −1.5% |
+| Async, mean | 8,478,000 | 8,363,000 | −1.4% |
+
+| Loop body, Speed instructions per iteration, on ABI 68 | before | after |
+| --- | ---: | ---: |
+| `t += add1(i)` (closure call) | 566 | 473 |
+| `t += made.m(i)` | 921 | 827 |
+| `t += map.get(mk)` | 1,295 | 1,202 |
+| `if (weak.has(mk)) t++` | 1,920 | 1,831 |
+| `u = weak.get(mk)` | 2,356 | 2,241 |
+| `weak.set(mk, i)` (existing key) | 2,200 | 2,115 |
+
+Each call through a function object saves about 93 instructions. Closure
+allocation (5,121 and 5,177 in two runs of the earlier host, 5,289 now) is
+dominated by collections inside the loop and varies by about 60 between runs.
+`get_interned_func_ref` no longer appears in the request profile.
+
+Rebased onto ABI 69 the step measures as the state table shows.
 
 ### Site records in P (2026-11-13)
 
