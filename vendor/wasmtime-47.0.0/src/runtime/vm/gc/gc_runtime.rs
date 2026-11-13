@@ -157,6 +157,26 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
     /// failures such as panics or incorrect results.
     fn clone_gc_ref(&mut self, gc_ref: &VMGcRef) -> VMGcRef;
 
+    /// Whether `clone_gc_ref` is a plain copy and `drop_gc_ref` and
+    /// `expose_gc_ref_to_wasm` have no effect, as for a tracing collector
+    /// without reference counts or over-approximated roots. `GcStore` reads
+    /// this once and then skips those calls.
+    fn refs_are_plain_copies(&self) -> bool {
+        false
+    }
+
+    /// Record where compiled code can read the Store's interned funcref table
+    /// (`FuncRefTable::view`). Collectors whose compiled code reads that
+    /// table inline keep it in their JIT-visible heap data; others ignore it.
+    ///
+    /// # Safety
+    ///
+    /// The view must describe the Store's live table until the next call or
+    /// until the heap is detached.
+    unsafe fn set_func_ref_table_view(&mut self, view: super::FuncRefTableView) {
+        let _ = view;
+    }
+
     /// Whether `drop_gc_ref` has no effect for this collector. A tracing
     /// collector without reference counts can then release a batch of roots
     /// without visiting each one.

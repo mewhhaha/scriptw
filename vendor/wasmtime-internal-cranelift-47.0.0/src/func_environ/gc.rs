@@ -373,17 +373,25 @@ pub fn read_field_at_addr(
                         _ => unreachable!("not a function heap type"),
                     };
 
-                    let vmctx = func_env.vmctx_val(&mut builder.cursor());
-
                     let func_ref_id = builder.ins().load(ir::types::I32, flags, addr, 0);
-                    let get_interned_func_ref = func_env
-                        .builtin_functions
-                        .get_interned_func_ref(builder.func);
-
-                    let call_inst = builder
-                        .ins()
-                        .call(get_interned_func_ref, &[vmctx, func_ref_id, expected_ty]);
-                    builder.func.dfg.first_result(call_inst)
+                    if func_env.tunables.collector == Some(Collector::Copying) {
+                        copying::translate_read_interned_func_ref(
+                            func_env,
+                            builder,
+                            func_ref_id,
+                            expected_ty,
+                            matches!(r.heap_type, WasmHeapType::ConcreteFunc(_)),
+                        )
+                    } else {
+                        let vmctx = func_env.vmctx_val(&mut builder.cursor());
+                        let get_interned_func_ref = func_env
+                            .builtin_functions
+                            .get_interned_func_ref(builder.func);
+                        let call_inst = builder
+                            .ins()
+                            .call(get_interned_func_ref, &[vmctx, func_ref_id, expected_ty]);
+                        builder.func.dfg.first_result(call_inst)
+                    }
                 }
                 WasmHeapTopType::Cont => {
                     // TODO(#10248) GC integration for stack switching

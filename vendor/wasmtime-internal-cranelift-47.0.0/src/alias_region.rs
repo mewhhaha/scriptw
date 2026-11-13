@@ -2541,6 +2541,43 @@ where
         )
     }
 
+    /// Emit a load of the interned funcref table's entry count from the
+    /// copying collector's heap data. Not read-only: the table grows across
+    /// calls into the host.
+    pub fn vmcopying_heap_data_func_refs_len(
+        &mut self,
+        cursor: &mut FuncCursor<'_>,
+        copying_heap_data: ir::Value,
+    ) -> ir::Value {
+        let offset = crate::copying_heap_data::FUNC_REFS_LEN;
+        let region = self.vmcopying_heap_data_region(cursor.func, offset);
+        cursor.ins().load(
+            ir::types::I32,
+            ir::MemFlagsData::trusted().with_alias_region(Some(region)),
+            copying_heap_data,
+            i32::try_from(offset).unwrap(),
+        )
+    }
+
+    /// Emit a load of the interned funcref table's first-entry address from
+    /// the copying collector's heap data.
+    pub fn vmcopying_heap_data_func_refs(
+        &mut self,
+        cursor: &mut FuncCursor<'_>,
+        copying_heap_data: ir::Value,
+    ) -> ir::Value {
+        let offset = crate::copying_heap_data::func_refs(u32::from(
+            self.offsets.get_ptr_size().size(),
+        ));
+        let region = self.vmcopying_heap_data_region(cursor.func, offset);
+        cursor.ins().load(
+            self.pointer_type,
+            ir::MemFlagsData::trusted().with_alias_region(Some(region)),
+            copying_heap_data,
+            i32::try_from(offset).unwrap(),
+        )
+    }
+
     /// Emit a store to the copying collector's bump pointer.
     pub fn store_vmcopying_heap_data_bump_ptr(
         &mut self,

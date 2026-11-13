@@ -526,7 +526,7 @@ impl VMGcRef {
             Val::FuncRef(f) => {
                 let f = f.map(|f| SendSyncPtr::new(f.vm_func_ref(store)));
                 let gcstore = store.require_gc_store_mut()?;
-                let id = unsafe { gcstore.func_ref_table.intern(f) };
+                let id = unsafe { gcstore.intern_func_ref(f) };
                 gcstore
                     .gc_object_data(self)?
                     .write_u32(offset, id.into_raw())
@@ -610,7 +610,7 @@ impl VMGcRef {
             Val::FuncRef(f) => {
                 let f = f.map(|f| SendSyncPtr::new(f.vm_func_ref(store)));
                 let gcstore = store.require_gc_store_mut()?;
-                let id = unsafe { gcstore.func_ref_table.intern(f) };
+                let id = unsafe { gcstore.intern_func_ref(f) };
                 gcstore
                     .gc_object_data(self)?
                     .write_u32(offset, id.into_raw())

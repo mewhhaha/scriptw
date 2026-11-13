@@ -32,6 +32,21 @@ use wasmtime_environ::{
 pub use builder::builder;
 
 pub mod isa_builder;
+
+/// Fields the vendored runtime appends to the copying collector's
+/// `VMCopyingHeapData`, after wasmtime-environ's bump pointer (0) and
+/// active-space end (4). Compiled code reads the interned funcref table
+/// through them; the runtime's layout tests check these offsets.
+pub mod copying_heap_data {
+    /// Offset of the table's entry count, a `u32`.
+    pub const FUNC_REFS_LEN: u32 = 8;
+
+    /// Offset of the address of the table's first entry, a pointer-sized
+    /// value: the first pointer-aligned offset after the count.
+    pub const fn func_refs(pointer_bytes: u32) -> u32 {
+        (FUNC_REFS_LEN + 4).next_multiple_of(pointer_bytes)
+    }
+}
 mod obj;
 pub use obj::*;
 mod compiled_function;

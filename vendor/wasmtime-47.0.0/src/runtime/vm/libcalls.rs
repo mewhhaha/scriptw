@@ -557,12 +557,7 @@ unsafe fn intern_func_ref_for_gc_heap(
     let func_ref = func_ref.cast::<VMFuncRef>();
     let func_ref = NonNull::new(func_ref).map(SendSyncPtr::new);
 
-    let func_ref_id = unsafe {
-        store
-            .require_gc_store_mut()?
-            .func_ref_table
-            .intern(func_ref)
-    };
+    let func_ref_id = unsafe { store.require_gc_store_mut()?.intern_func_ref(func_ref) };
     Ok(func_ref_id.into_raw())
 }
 

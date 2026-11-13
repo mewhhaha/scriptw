@@ -25,6 +25,99 @@ pub struct CopyingCompiler {
     layouts: CopyingTypeLayouts,
 }
 
+/// Read the `VMFuncRef` that a GC heap field's interned funcref id names.
+///
+/// The runtime publishes the Store's interned funcref table in
+/// `VMCopyingHeapData` (`crate::copying_heap_data`). An id below its length
+/// reads the entry inline. A null entry is the null funcref; a non-null entry
+/// whose registered type equals the expected engine type (or any entry, when
+/// the field is an untyped `funcref`) is the result. Those are exactly the
+/// results `get_interned_func_ref` returns without a subtype query. Anything
+/// else, an id out of range or a type that differs, calls that libcall, which
+/// keeps its complete subtype check and its traps.
+pub(super) fn translate_read_interned_func_ref(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    func_ref_id: ir::Value,
+    expected_ty: ir::Value,
+    typed: bool,
+) -> ir::Value {
+    let pointer_type = func_env.pointer_type();
+    let heap_data = CopyingCompiler::load_vmcopying_heap_data_ptr(func_env, builder);
+    let len = func_env
+        .alias_regions
+        .vmcopying_heap_data_func_refs_len(&mut builder.cursor(), heap_data);
+
+    let entry_block = builder.create_block();
+    let slow_block = builder.create_block();
+    let done_block = builder.create_block();
+    let result = builder.append_block_param(done_block, pointer_type);
+
+    let in_range = builder.ins().icmp(
+        ir::condcodes::IntCC::UnsignedLessThan,
+        func_ref_id,
+        len,
+    );
+    builder.ins().brif(in_range, entry_block, &[], slow_block, &[]);
+
+    builder.switch_to_block(entry_block);
+    builder.seal_block(entry_block);
+    let base = func_env
+        .alias_regions
+        .vmcopying_heap_data_func_refs(&mut builder.cursor(), heap_data);
+    let index = if pointer_type == ir::types::I32 {
+        func_ref_id
+    } else {
+        builder.ins().uextend(pointer_type, func_ref_id)
+    };
+    let offset = builder
+        .ins()
+        .imul_imm_u(index, i64::from(pointer_type.bytes()));
+    let entry_addr = builder.ins().iadd(base, offset);
+    let entry = builder
+        .ins()
+        .load(pointer_type, ir::MemFlagsData::trusted(), entry_addr, 0);
+    if typed {
+        let check_block = builder.create_block();
+        builder
+            .ins()
+            .brif(entry, check_block, &[], done_block, &[entry.into()]);
+        builder.switch_to_block(check_block);
+        builder.seal_block(check_block);
+        let actual_ty = func_env.alias_regions.vmfuncref_type_index(
+            &mut builder.cursor(),
+            ir::MemFlagsData::trusted().with_readonly(),
+            entry,
+        );
+        let same = builder.ins().icmp(
+            ir::condcodes::IntCC::Equal,
+            actual_ty,
+            expected_ty,
+        );
+        builder
+            .ins()
+            .brif(same, done_block, &[entry.into()], slow_block, &[]);
+    } else {
+        builder.ins().jump(done_block, &[entry.into()]);
+    }
+
+    builder.switch_to_block(slow_block);
+    builder.seal_block(slow_block);
+    let vmctx = func_env.vmctx_val(&mut builder.cursor());
+    let get_interned_func_ref = func_env
+        .builtin_functions
+        .get_interned_func_ref(builder.func);
+    let call_inst = builder
+        .ins()
+        .call(get_interned_func_ref, &[vmctx, func_ref_id, expected_ty]);
+    let slow_result = builder.func.dfg.first_result(call_inst);
+    builder.ins().jump(done_block, &[slow_result.into()]);
+
+    builder.switch_to_block(done_block);
+    builder.seal_block(done_block);
+    result
+}
+
 impl CopyingCompiler {
     /// Load the pointer to the `VMCopyingHeapData` from vmctx.
     fn load_vmcopying_heap_data_ptr(

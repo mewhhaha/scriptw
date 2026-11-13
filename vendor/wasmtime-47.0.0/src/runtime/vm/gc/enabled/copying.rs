@@ -190,6 +190,15 @@ struct VMCopyingHeapDataInner {
     bump_ptr: u32,
     /// End of the active semi-space.
     active_space_end: u32,
+    /// Number of entries in the Store's interned funcref table
+    /// (`FuncRefTable::view`). The two fields above are wasmtime-environ's
+    /// layout; this one and `func_refs` follow it, at the offsets the vendored
+    /// translator's `copying_heap_data` module defines.
+    func_refs_len: u32,
+    /// Address of the first funcref table entry, a nullable `*mut VMFuncRef`.
+    /// Compiled code reads an entry inline when the id is below
+    /// `func_refs_len`.
+    func_refs: usize,
 }
 
 #[derive(Default)]
@@ -215,6 +224,12 @@ impl VMCopyingHeapData {
 
     fn set_active_space_end(&mut self, val: u32) {
         self.inner.get_mut().active_space_end = val;
+    }
+
+    fn set_func_refs(&mut self, view: crate::vm::FuncRefTableView) {
+        let inner = self.inner.get_mut();
+        inner.func_refs_len = view.len;
+        inner.func_refs = view.base;
     }
 }
 
@@ -767,6 +782,8 @@ unsafe impl GcHeap for CopyingHeap {
 
         self.set_bump_ptr(0);
         self.set_active_space_end(0);
+        // The next Store publishes its own table.
+        self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView { base: 0, len: 0 });
 
         let CopyingHeap {
             no_gc_count,
@@ -815,6 +832,16 @@ unsafe impl GcHeap for CopyingHeap {
         // The copying collector doesn't use reference counting; cloning is a
         // simple copy.
         gc_ref.unchecked_copy()
+    }
+
+    fn refs_are_plain_copies(&self) -> bool {
+        // Cloning is `unchecked_copy`, dropping overwrites a local and
+        // exposing has no over-approximated root list.
+        true
+    }
+
+    unsafe fn set_func_ref_table_view(&mut self, view: crate::vm::FuncRefTableView) {
+        self.vmctx_data.set_func_refs(view);
     }
 
     fn drop_gc_ref_is_noop(&self) -> bool {
@@ -1405,25 +1432,41 @@ mod tests {
 
     #[test]
     fn vm_copying_heap_data_size() {
+        // wasmtime-environ describes the two-field prefix; the funcref view
+        // fields follow it.
         assert_eq!(
             HostPtr.size_of_vmcopying_heap_data() as usize,
-            core::mem::size_of::<VMCopyingHeapData>(),
+            core::mem::offset_of!(VMCopyingHeapDataInner, func_refs_len),
         );
         assert_eq!(
-            HostPtr.size_of_vmcopying_heap_data() as usize,
+            core::mem::size_of::<VMCopyingHeapData>(),
             core::mem::size_of::<VMCopyingHeapDataInner>(),
         );
     }
 
     #[test]
     fn vm_copying_heap_data_align() {
-        assert_eq!(
-            HostPtr.align_of_vmcopying_heap_data() as usize,
-            core::mem::align_of::<VMCopyingHeapData>(),
+        assert!(
+            core::mem::align_of::<VMCopyingHeapDataInner>()
+                >= HostPtr.align_of_vmcopying_heap_data() as usize
         );
         assert_eq!(
-            HostPtr.align_of_vmcopying_heap_data() as usize,
+            core::mem::align_of::<VMCopyingHeapData>(),
             core::mem::align_of::<VMCopyingHeapDataInner>(),
+        );
+    }
+
+    #[cfg(feature = "cranelift")]
+    #[test]
+    fn vm_copying_heap_data_func_refs_offsets() {
+        use wasmtime_cranelift::copying_heap_data;
+        assert_eq!(
+            copying_heap_data::FUNC_REFS_LEN as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, func_refs_len),
+        );
+        assert_eq!(
+            copying_heap_data::func_refs(core::mem::size_of::<usize>() as u32) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, func_refs),
         );
     }
 

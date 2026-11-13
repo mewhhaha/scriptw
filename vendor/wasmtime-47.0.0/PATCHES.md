@@ -110,6 +110,34 @@ These are in `src/runtime/vm/{libcalls.rs,instance.rs,gc/func_ref.rs}`.
   by size instead of a `memmove` call; larger objects still call it. The
   semi-spaces are disjoint, and an overlap keeps `memmove` semantics.
 
+## Inline funcref reads and plain references
+
+- The interned funcref table is a dense vector of nullable `VMFuncRef`
+  pointers (ids are indices; entries are never removed) instead of a slab.
+  `GcStore::intern_func_ref` interns and, when the table grew, publishes its
+  base and length to the heap (`GcHeap::set_func_ref_table_view`); a new
+  `GcStore` publishes its empty table and `detach` clears the view, so a
+  pooled heap never describes another Store's table.
+- The copying collector keeps that view in `VMCopyingHeapData` after
+  wasmtime-environ's two fields: a `u32` length at offset 8 and the first
+  entry's address at the next pointer-aligned offset (16 on 64-bit hosts).
+  The vendored translator's `copying_heap_data` module defines the same
+  offsets and the layout tests compare them. Compiled code reads an entry
+  inline when the id is below the length: a null entry is the null funcref,
+  and a non-null entry whose registered type equals the expected engine type
+  (or any entry, for an untyped `funcref`) is the result. Those are exactly
+  the values `get_interned_func_ref` returns without a subtype query; every
+  other case still calls it with its complete check and traps.
+- `GcHeap::refs_are_plain_copies` (true for the copying collector) is read
+  once into `GcStore`, whose `clone_gc_ref`, `drop_gc_ref` and
+  `expose_gc_ref_to_wasm` then copy or do nothing without a virtual call.
+  `ExternRef::from_cloned_gc_ref` checks the externref-or-anyref kind with one
+  header read instead of two.
+
+These are in `src/runtime/vm/{gc.rs,libcalls.rs}`,
+`src/runtime/vm/gc/{func_ref.rs,gc_ref.rs,gc_runtime.rs,enabled/copying.rs}`
+and `src/runtime/gc/enabled/externref.rs`.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

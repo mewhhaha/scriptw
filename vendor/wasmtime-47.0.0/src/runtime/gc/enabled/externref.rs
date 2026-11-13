@@ -12,6 +12,7 @@ use crate::{
     store::{AutoAssertNoGc, StoreOpaque, StoreResourceLimiter},
 };
 use core::any::Any;
+use wasmtime_environ::VMGcKind;
 use core::mem;
 use core::mem::MaybeUninit;
 
@@ -419,9 +420,15 @@ impl ExternRef {
         gc_ref: VMGcRef,
     ) -> Rooted<Self> {
         if !gc_ref.is_i31() {
+            // One header read answers both kind tests of `is_extern_ref` and
+            // `is_any_ref` (whose `i31` case cannot apply here).
             assert!(
-                gc_ref.is_extern_ref(&*store.unwrap_gc_store().gc_heap)
-                    || gc_ref.is_any_ref(&*store.unwrap_gc_store().gc_heap),
+                gc_ref
+                    .gc_header(&*store.unwrap_gc_store().gc_heap)
+                    .is_some_and(|header| {
+                        let kind = header.kind();
+                        kind.matches(VMGcKind::ExternRef) || kind.matches(VMGcKind::AnyRef)
+                    }),
                 "GC reference {gc_ref:#p} should be an externref or anyref"
             );
         }

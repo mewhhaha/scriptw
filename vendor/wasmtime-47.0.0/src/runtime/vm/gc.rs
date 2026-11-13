@@ -29,7 +29,7 @@ pub(crate) use weak::*;
 use crate::hash_map::HashMap;
 use crate::module::ModuleRegistry;
 use crate::prelude::*;
-use crate::runtime::vm::{GcHeapAllocationIndex, VMMemoryDefinition};
+use crate::runtime::vm::{GcHeapAllocationIndex, SendSyncPtr, VMFuncRef, VMMemoryDefinition};
 use crate::store::Asyncness;
 use crate::type_registry::RegisteredType;
 use core::any::Any;
@@ -59,6 +59,11 @@ pub struct GcStore {
 
     /// The function-references table for this GC heap.
     pub func_ref_table: FuncRefTable,
+
+    /// Whether `gc_heap` clones references by copying them and has no drop or
+    /// expose barriers (`GcHeap::refs_are_plain_copies`), read once here so
+    /// the per-reference wrappers below skip their virtual calls.
+    plain_refs: bool,
 
     /// The total allocated bytes recorded after the last GC collection.
     /// `None` if no collection has been performed yet. Used by the
@@ -104,22 +109,54 @@ impl GcStore {
     ) -> Self {
         let host_data_table = ExternRefHostDataTable::default();
         let func_ref_table = FuncRefTable::default();
+        let plain_refs = gc_heap.refs_are_plain_copies();
 
         let _ = &gc_zeal_alloc_counter;
 
-        Self {
+        let mut store = Self {
             #[cfg(feature = "gc")]
             weak_gc: WeakGcRegistry::default(),
             allocation_index,
             gc_heap,
             host_data_table,
             func_ref_table,
+            plain_refs,
             last_post_gc_allocated_bytes: None,
             #[cfg(gc_zeal)]
             gc_zeal_alloc_counter,
             #[cfg(gc_zeal)]
             gc_zeal_alloc_counter_init: gc_zeal_alloc_counter,
+        };
+        // A pooled heap may still describe its previous Store's table.
+        store.publish_func_ref_table();
+        store
+    }
+
+    /// Intern a `funcref` for the GC heap and publish the grown table to the
+    /// collector, so compiled code never reads a stale view.
+    ///
+    /// # Safety
+    ///
+    /// Same as [`FuncRefTable::intern`].
+    pub unsafe fn intern_func_ref(
+        &mut self,
+        func_ref: Option<SendSyncPtr<VMFuncRef>>,
+    ) -> FuncRefTableId {
+        let len = self.func_ref_table.view().len;
+        // SAFETY: forwarded contract.
+        let id = unsafe { self.func_ref_table.intern(func_ref) };
+        if self.func_ref_table.view().len != len {
+            self.publish_func_ref_table();
         }
+        id
+    }
+
+    fn publish_func_ref_table(&mut self) {
+        let view = self.func_ref_table.view();
+        // SAFETY: the view describes this Store's table, which outlives the
+        // heap's use of it: it is republished whenever it grows and replaced
+        // when the heap is detached.
+        unsafe { self.gc_heap.set_func_ref_table_view(view) };
     }
 
     /// Get the `VMMemoryDefinition` for this GC heap.
@@ -174,6 +211,8 @@ impl GcStore {
     pub fn clone_gc_ref(&mut self, gc_ref: &VMGcRef) -> VMGcRef {
         if gc_ref.is_i31() {
             gc_ref.copy_i31()
+        } else if self.plain_refs {
+            gc_ref.unchecked_copy()
         } else {
             self.gc_heap.clone_gc_ref(gc_ref)
         }
@@ -250,7 +289,7 @@ impl GcStore {
 
     /// Drop the given GC reference, performing drop barriers as necessary.
     pub fn drop_gc_ref(&mut self, gc_ref: VMGcRef) {
-        if !gc_ref.is_i31() {
+        if !gc_ref.is_i31() && !self.plain_refs {
             self.gc_heap.drop_gc_ref(gc_ref);
         }
     }
@@ -262,7 +301,7 @@ impl GcStore {
     #[must_use]
     pub fn expose_gc_ref_to_wasm(&mut self, gc_ref: VMGcRef) -> Result<NonZeroU32> {
         let raw = gc_ref.as_raw_non_zero_u32();
-        if !gc_ref.is_i31() {
+        if !gc_ref.is_i31() && !self.plain_refs {
             log::trace!("exposing GC ref to Wasm: {gc_ref:p}");
             self.gc_heap.expose_gc_ref_to_wasm(gc_ref)?;
         }

@@ -73,6 +73,14 @@ signatures and Wasm semantics.
   the module-level index the runtime then had to translate through the
   module. An untyped `funcref` still passes the reserved index. The runtime
   still checks the interned function's type against it.
+- `src/func_environ/gc{.rs,/copying.rs}`, `src/alias_region.rs`, `src/lib.rs`:
+  with the copying collector, that read first looks the id up inline in the
+  interned funcref table the runtime publishes in `VMCopyingHeapData` (offsets
+  in the public `copying_heap_data` module): an id below the published length
+  yields its entry when the entry is null or, for a concrete expected type,
+  when the entry's registered `type_index` equals the expected engine type;
+  every other case calls `get_interned_func_ref` as before. The length and
+  base are reloaded after any call, since only host code grows the table.
 - `src/func_environ.rs`: a byte-fillable GC array fill (`array.new`,
   `array.new_default`, `array.fill` of a non-reference element whose bytes are
   all equal) of at most 64 bytes is stored inline, eight bytes at a time and
