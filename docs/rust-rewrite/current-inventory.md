@@ -13,8 +13,9 @@ to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-
 accepts `--case <file.js>`.
 
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
-  JIT. The source with chain walks and the computed-key write kernel (ABI 67)
-  runs a Speed sync request in 7.88M user instructions against 4.38M
+  JIT. The source with chain walks, the computed-key write kernel and the
+  call-free `instanceof` entry (ABI 68)
+  runs a Speed sync request in 7.56M user instructions against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),

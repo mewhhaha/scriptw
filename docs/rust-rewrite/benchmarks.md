@@ -372,6 +372,7 @@ They do not refresh the published panel.
 | Both of the two rows above together (ABI 65) | 9.62M | 10.39M |
 | Globals resolved at run time, remembered global entries read at the site (ABI 65) | 9.58M | 10.35M |
 | [Chain walks and computed keys](#chain-walks-and-computed-keys-2026-11-13) (ABI 67), on the row above | 7.88M | 8.61M |
+| Call-free `instanceof` entry and one-cast global entry check (ABI 68) | 7.56M | 8.27M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
