@@ -95,11 +95,13 @@ fn fulfilled_array_from_async_stages_share_one_physical_commit_and_drive() {
             "all fulfilled routes share one index publication"
         );
         let commit = commits[0];
-        assert!(commit >= 7);
+        assert!(commit >= 6);
+        // The struct.set itself traps on a null state; no separate
+        // ref.as_non_null precedes its operands.
         assert!(
-            matches!(&ops[commit-7..=commit], [
+            matches!(&ops[commit-6..=commit], [
             Operator::LocalGet{local_index:a},Operator::I64Const{value:1},Operator::I64Add,
-            Operator::LocalSet{local_index:b},Operator::LocalGet{..},Operator::RefAsNonNull,Operator::LocalGet{local_index:c},Operator::StructSet{..}
+            Operator::LocalSet{local_index:b},Operator::LocalGet{..},Operator::LocalGet{local_index:c},Operator::StructSet{..}
         ] if a==b && b==c),
             "the shared publication increments the same real index once"
         );

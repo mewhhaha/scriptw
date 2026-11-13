@@ -313,11 +313,9 @@ pub(crate) enum ProgramSiteKind<'a> {
         names: &'a [&'a str],
         attributes: crate::heap::DescriptorWord,
     },
-    OwnDataRead,
-    /// A static assignment's write record, kept in the read records' table.
-    OwnDataWrite,
     /// An `instanceof` operator's record of its constructor's own
-    /// "prototype", kept in the read records' table.
+    /// "prototype", kept in the ProgramInstance's record table. Static
+    /// property sites keep theirs in P globals instead.
     InstanceofPrototype,
 }
 
@@ -2114,6 +2112,21 @@ impl<'a> FunctionBuilder<'a> {
         &mut self,
         kind: ProgramSiteKind<'_>,
     ) -> Result<ProgramSiteId, EmitError> {
+        self.require_genuine_source_site()?;
+        Ok(ProgramSiteId(self.functions.next_program_site_index(kind)?))
+    }
+
+    /// The global that holds a new static property site's record in this
+    /// module.
+    pub(crate) fn next_site_record(
+        &mut self,
+    ) -> Result<crate::gc_types::SiteRecordGlobal, EmitError> {
+        self.require_genuine_source_site()?;
+        let position = self.functions.next_site_record()?;
+        self.runtime_schema().site_record_global(position)
+    }
+
+    fn require_genuine_source_site(&self) -> Result<(), EmitError> {
         match &self.module_state {
             FunctionModuleState::Main(_, _) => {}
             FunctionModuleState::PreparedScript(_, entry)
@@ -2137,7 +2150,7 @@ impl<'a> FunctionBuilder<'a> {
                 ));
             }
         }
-        Ok(ProgramSiteId(self.functions.next_program_site_index(kind)?))
+        Ok(())
     }
 
     pub(crate) fn has_source_execution_environment(&self) -> bool {

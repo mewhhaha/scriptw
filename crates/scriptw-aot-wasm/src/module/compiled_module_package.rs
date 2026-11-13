@@ -211,6 +211,7 @@ impl CompiledModulePackage {
             exports,
             data,
             imported_globals,
+            site_records,
         } = sections;
         let CallableFunctionTableSections { elements } = callable_function_table;
 
@@ -220,7 +221,11 @@ impl CompiledModulePackage {
         if let Some(memories) = memories {
             module.section(&memories);
         }
-        module.section(&runtime.globals().defined_section(imported_globals));
+        module.section(
+            &runtime
+                .globals()
+                .defined_section(imported_globals, site_records),
+        );
         module.section(&exports);
         module.section(&elements);
         if let Some(data) = &data {
@@ -265,6 +270,9 @@ pub(crate) struct ModuleAssemblySections {
     /// Globals the module imports from the runtime; the global section
     /// declares only the ones after them.
     imported_globals: u32,
+    /// How many site record globals the module's functions use; they end
+    /// the global section.
+    site_records: u32,
 }
 
 impl ModuleAssemblySections {
@@ -276,6 +284,7 @@ impl ModuleAssemblySections {
         exports: ExportSection,
         data: Option<DataSection>,
         imported_globals: u32,
+        site_records: u32,
     ) -> Self {
         Self {
             imports,
@@ -284,6 +293,7 @@ impl ModuleAssemblySections {
             exports,
             data,
             imported_globals,
+            site_records,
         }
     }
 }
@@ -303,6 +313,7 @@ const _: fn(
     Option<MemorySection>,
     ExportSection,
     Option<DataSection>,
+    u32,
     u32,
 ) -> ModuleAssemblySections = ModuleAssemblySections::new;
 const _: fn(

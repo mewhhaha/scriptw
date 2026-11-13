@@ -285,16 +285,13 @@ fn aot_typestate_forces_raw_key_get_result_and_putvalue_transitions() {
     assert!(!evaluate.contains("emit_value_to_property_key_locals("));
     let canonical = gc_body(
         "fn canonicalize_ordinary_property_reference(",
-        "fn emit_get_value_from_raw_ordinary_property_reference(",
+        "fn emit_coercible_target_object(",
     );
     positions_in_order(
         &canonical,
         &[
             "letEvaluatedRawOrdinaryPropertyReferenceLocals{",
-            "self.compile_nullish_tagged_i32(",
-            "self.emit_expression_native_error(",
-            "self.emit_value_to_object_locals(",
-            "self.emit_propagate_current_throw_if_needed(function);",
+            "self.emit_coercible_target_object(&base_and_receiver,nullish_message,function)?;",
             "self.emit_value_to_property_key_locals(",
             "referenced_name.clear(function);",
             "Ok(CanonicalOrdinaryPropertyReferenceLocals{",
@@ -306,13 +303,43 @@ fn aot_typestate_forces_raw_key_get_result_and_putvalue_transitions() {
             .count(),
         1
     );
+    // Nullish rejection, then ToObject, before any observable key coercion.
+    let coercible = gc_body(
+        "fn emit_coercible_target_object(",
+        "fn static_read_site_name<'k>(",
+    );
+    positions_in_order(
+        &coercible,
+        &[
+            "self.compile_nullish_tagged_i32(",
+            "self.emit_expression_native_error(",
+            "self.emit_value_to_object_locals(",
+            "self.emit_propagate_current_throw_if_needed(function);",
+            "Ok(target_object)",
+        ],
+    );
+    assert!(!coercible.contains("emit_value_to_property_key_locals("));
     let get = gc_body(
         "fn emit_get_value_from_raw_ordinary_property_reference(",
         "fn evaluate_rhs_for_raw_ordinary_property_assignment(",
     );
+    // A static read site reads the raw base (its R kernel throws for a
+    // nullish one) before the reference is canonicalized for the write.
     positions_in_order(
         &get,
         &[
+            "ifletSome((base,name))=read_site{",
+            "self.emit_planned_property_read(",
+            "self.emit_propagate_current_throw_if_needed(function);",
+            "old_value.copy_from(self.completion().value(),function);",
+            "self.canonicalize_ordinary_property_reference(",
+            "returnOk(ReadOrdinaryPropertyReferenceLocals{",
+        ],
+    );
+    positions_in_order(
+        &get,
+        &[
+            "returnOk(ReadOrdinaryPropertyReferenceLocals{",
             "self.canonicalize_ordinary_property_reference(",
             "ObjectReadArguments::new(",
             "&reference.target_object,",

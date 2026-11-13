@@ -575,9 +575,11 @@ fn physical_canonical_intl_reads_ensure_the_same_realm_before_table_access() {
                 else {
                     panic!("ensure receives its actual defining Realm");
                 };
+                // The field read itself traps on null; no separate
+                // ref.as_non_null precedes it.
                 let [Operator::LocalGet {
                     local_index: read_realm,
-                }, Operator::RefAsNonNull] = &ops[projection - 2..projection]
+                }] = &ops[projection - 1..projection]
                 else {
                     panic!("table projection receives its actual defining Realm");
                 };

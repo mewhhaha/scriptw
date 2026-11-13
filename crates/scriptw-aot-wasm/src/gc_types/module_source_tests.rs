@@ -17,7 +17,7 @@ fn declared_fields(
         .collect();
     let mut module = wasm_encoder::Module::new();
     module.section(runtime.types());
-    module.section(&runtime.globals().defined_section(0));
+    module.section(&runtime.globals().defined_section(0, 0));
     let bytes = module.finish();
     Validator::new_with_features(WasmFeatures::all())
         .validate_all(&bytes)

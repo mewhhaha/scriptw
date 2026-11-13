@@ -62,13 +62,17 @@ impl FunctionBuilder<'_> {
         let f = &mut body;
         let s = self.runtime_schema();
         let result = s.reserve_completion(f);
-        // Only compiler-owned static String sites call this kernel. Keep a
-        // value-tag guard so no Symbol or object can ever enter a record.
-        p.key.value().tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        let cache = self.emit_own_data_cache_site(p.site, p.key.value(), f);
+        // Only compiler-owned static String sites have records, and a
+        // record's key is typed as a String: no Symbol or object can ever
+        // enter a record.
+        let cache = &p.record;
+        let name = s.reserve_gc_local(f).initialize(
+            s.field(OwnDataReadCacheSchema::KEY)
+                .read(cache, s, f)
+                .reference(),
+            f,
+        );
+        let key = PropertyKeyLocals::from_string(s, &name, f);
         let handled = s.reserve_i32_local(f);
         let previous = s
             .reserve_gc_local::<CompactDataShape, Nullable>(f)
@@ -76,9 +80,9 @@ impl FunctionBuilder<'_> {
         self.emit_recorded_write(
             &p.target,
             &p.receiver,
-            &p.key,
+            &key,
             &p.value,
-            &cache,
+            cache,
             handled,
             &previous,
             f,
@@ -87,7 +91,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         self.emit_object_boolean_result(handled, &result, f);
         f.instruction(&Instruction::Else);
-        self.emit_cached_write_general_set(&p, &result, f)?;
+        self.emit_cached_write_general_set(&p, &key, &result, f)?;
         // Only a normal, successful Set on a receiver that was compact
         // refreshes the record.
         previous.load(s, f).is_null(f);
@@ -104,7 +108,7 @@ impl FunctionBuilder<'_> {
         let parent = s
             .reserve_gc_local(f)
             .initialize(previous.load(s, f).require_non_null(f), f);
-        self.emit_write_record_refresh(&p.target, &p.key, &cache, &parent, f)?;
+        self.emit_write_record_refresh(&p.target, &key, cache, &parent, f)?;
         parent.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -112,11 +116,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         previous.clear(f);
         s.release_i32_local(handled, f);
-        cache.clear(f);
-        f.instruction(&Instruction::Else);
-        self.emit_cached_write_general_set(&p, &result, f)?;
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        key.clear(f);
+        name.clear(f);
         result.emit(f);
         result.clear(f);
         p.release(f);
@@ -128,6 +129,7 @@ impl FunctionBuilder<'_> {
     fn emit_cached_write_general_set(
         &mut self,
         p: &crate::runtime_helpers::CachedPropertyWriteMissParameters,
+        key: &PropertyKeyLocals,
         result: &CompletionLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
@@ -136,7 +138,7 @@ impl FunctionBuilder<'_> {
                 crate::runtime_helpers::OrdinarySetArguments::new(
                     &p.target,
                     &p.receiver,
-                    &p.key,
+                    key,
                     &p.value,
                     self.current_environment(),
                     self.current_program(),

@@ -358,14 +358,57 @@ impl GlobalLedger {
             .collect()
     }
 
-    /// The section declaring every global after the first `skip`.
-    fn section_after(&self, skip: u32) -> GlobalSection {
+    /// The section declaring every global after the first `skip`, then the
+    /// module's `site_records` record globals.
+    fn section_after(&self, skip: u32, site_records: u32, schema: &RuntimeSchema) -> GlobalSection {
         let mut section = GlobalSection::new();
         for (global_type, init) in &self.entries[skip as usize..] {
             section.global(*global_type, init);
         }
+        let record = schema.reference_type::<OwnDataReadCache>(GcNullability::Nullable);
+        for _ in 0..site_records {
+            section.global(
+                GlobalType {
+                    val_type: ValType::Ref(record),
+                    mutable: true,
+                    shared: false,
+                },
+                &ConstExpr::ref_null(record.heap_type),
+            );
+        }
         section
     }
+}
+
+/// The global that holds one static property site's record: null until the
+/// site's first use. A module's record globals follow all its other globals,
+/// in the order its functions asked for them.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SiteRecordGlobal {
+    index: u32,
+}
+
+impl SiteRecordGlobal {
+    /// Pushes the record, null until the site stores one.
+    pub(crate) fn load(
+        self,
+        _schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<OwnDataReadCache, Nullable> {
+        function.instruction(&Instruction::GlobalGet(self.index));
+        GcStackReference::new()
+    }
+
+    pub(crate) fn store(self, value: GcStackReference<OwnDataReadCache>, function: &mut Function) {
+        let GcStackReference { .. } = value;
+        function.instruction(&Instruction::GlobalSet(self.index));
+    }
+}
+
+/// Where a module's site record globals start.
+#[derive(Debug, PartialEq, Eq)]
+struct SiteRecordGlobals {
+    first: u32,
 }
 
 /// The runtime-visible GC portion of the module's central type registry.
@@ -469,6 +512,9 @@ impl RuntimeGcTypes {
             module_guards: ModuleGuardGlobals {
                 first: module_guards_first,
                 count: module_guard_count,
+            },
+            site_records: SiteRecordGlobals {
+                first: globals.len(),
             },
         };
         FinalizedModuleGlobals {
@@ -797,6 +843,7 @@ pub(crate) struct RuntimeSchema {
     compact_shapes: CompactShapeGlobals,
     snapshot: Option<snapshot::SnapshotRoots>,
     module_guards: ModuleGuardGlobals,
+    site_records: SiteRecordGlobals,
 }
 
 /// The once-guard globals, declared after every root.
@@ -819,6 +866,21 @@ impl RuntimeSchema {
         Ok(crate::planning::ModuleUnitGuard::new(
             self.module_guards.first + unit,
         ))
+    }
+
+    /// The module's site record global at `position`.
+    pub(crate) fn site_record_global(
+        &self,
+        position: u32,
+    ) -> Result<SiteRecordGlobal, crate::EmitError> {
+        let index = self
+            .site_records
+            .first
+            .checked_add(position)
+            .ok_or_else(|| {
+                crate::EmitError::unsupported("site record globals exceed the Wasm index space")
+            })?;
+        Ok(SiteRecordGlobal { index })
     }
 
     pub(crate) fn layouts(&self) -> &GcLayoutRegistry {
@@ -896,6 +958,7 @@ impl FinalizedModuleGlobals {
     fn declare_global_prelude_phase(&mut self) {
         assert!(self.global_prelude_phase.is_none());
         self.global_prelude_phase = Some(GlobalScriptPreludePhase::declare(&mut self.section));
+        self.runtime_schema.site_records.first = self.section.len();
     }
     pub(crate) fn global_prelude_phase(&self) -> Option<GlobalScriptPreludePhase> {
         self.global_prelude_phase
@@ -914,15 +977,26 @@ impl FinalizedModuleGlobals {
     /// Borrowed encoding of the globals after the imported prefix. The raw
     /// encoder stays inside this owner and cannot be cloned or extended by a
     /// module assembly caller.
-    pub(crate) fn defined_section(&self, imported: u32) -> impl Section + '_ {
+    ///
+    /// `site_records` record globals, one per static property site of the
+    /// module's functions, end the section.
+    pub(crate) fn defined_section<'a>(
+        &'a self,
+        imported: u32,
+        site_records: u32,
+    ) -> impl Section + 'a {
         struct DefinedGlobalSection<'a> {
             ledger: &'a GlobalLedger,
             imported: u32,
+            site_records: u32,
+            schema: &'a RuntimeSchema,
         }
 
         impl Encode for DefinedGlobalSection<'_> {
             fn encode(&self, sink: &mut Vec<u8>) {
-                self.ledger.section_after(self.imported).encode(sink);
+                self.ledger
+                    .section_after(self.imported, self.site_records, self.schema)
+                    .encode(sink);
             }
         }
 
@@ -935,6 +1009,8 @@ impl FinalizedModuleGlobals {
         DefinedGlobalSection {
             ledger: &self.section,
             imported,
+            site_records,
+            schema: &self.runtime_schema,
         }
     }
 }
@@ -960,7 +1036,7 @@ mod tests {
         let runtime = registered.finalize_globals(GlobalLedger::new(), false, 0);
         let mut module = wasm_encoder::Module::new();
         module.section(runtime.types());
-        module.section(&runtime.globals().defined_section(0));
+        module.section(&runtime.globals().defined_section(0, 0));
         let bytes = module.finish();
         wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
             .validate_all(&bytes)

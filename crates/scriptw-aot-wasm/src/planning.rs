@@ -3849,8 +3849,12 @@ pub(crate) struct FunctionMetaRegistry {
     /// Immutable birth layouts share a slot across source bodies in this P.
     /// Values and prototypes never enter this compile-time identity.
     compact_shape_sites: std::cell::RefCell<BTreeMap<(Vec<String>, u32), u32>>,
-    /// Read caches retain their own dense, per-source-site namespace.
+    /// `instanceof` records retain their own dense, per-source-site
+    /// namespace in the ProgramInstance's record table.
     next_own_data_read_site: std::cell::Cell<u32>,
+    /// How many static property sites of this module keep their record in
+    /// a global of their own; each new site takes the next one.
+    site_records: std::cell::Cell<u32>,
     foreign_imports: crate::foreign::ForeignImportPlan,
     module_graph: Option<ModuleGraphPlan>,
     prepared_dynamic_functions: Vec<scriptw_ir::PreparedDynamicFunction>,
@@ -3882,11 +3886,7 @@ impl FunctionMetaRegistry {
                 shapes.insert(key, site);
                 return Ok(site);
             }
-            crate::emit::ProgramSiteKind::OwnDataRead => &self.next_own_data_read_site,
-            // Write and `instanceof` records share the read records' table,
-            // so their sites share its dense index space.
-            crate::emit::ProgramSiteKind::OwnDataWrite
-            | crate::emit::ProgramSiteKind::InstanceofPrototype => &self.next_own_data_read_site,
+            crate::emit::ProgramSiteKind::InstanceofPrototype => &self.next_own_data_read_site,
         };
         let site = next.get();
         next.set(
@@ -3894,6 +3894,22 @@ impl FunctionMetaRegistry {
                 .ok_or_else(|| EmitError::unsupported("program cache sites exceed u32"))?,
         );
         Ok(site)
+    }
+
+    /// The position of a new static property site's record global.
+    pub(crate) fn next_site_record(&self) -> Result<u32, EmitError> {
+        let position = self.site_records.get();
+        self.site_records.set(
+            position
+                .checked_add(1)
+                .ok_or_else(|| EmitError::unsupported("site records exceed u32"))?,
+        );
+        Ok(position)
+    }
+
+    /// How many record globals the module's functions use.
+    pub(crate) fn site_record_count(&self) -> u32 {
+        self.site_records.get()
     }
 
     pub(crate) fn with_foreign_imports(mut self, plan: crate::foreign::ForeignImportPlan) -> Self {
@@ -3941,6 +3957,7 @@ impl FunctionMetaRegistry {
         Self {
             compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
+            site_records: std::cell::Cell::new(0),
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,
             prepared_dynamic_functions,

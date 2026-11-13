@@ -14,7 +14,7 @@ fn encoded(kind: ModuleKind<'_>) -> (FinalizedRuntimeModule, Vec<u8>) {
         RuntimeModuleTypes::register(kind).finalize_globals(GlobalLedger::new(), false, 0);
     let mut module = wasm_encoder::Module::new();
     module.section(runtime.types());
-    module.section(&runtime.globals().defined_section(0));
+    module.section(&runtime.globals().defined_section(0, 0));
     let bytes = module.finish();
     Validator::new_with_features(WasmFeatures::all())
         .validate_all(&bytes)
@@ -633,7 +633,7 @@ fn packed_array_storage_uses_distinct_mutable_raw_bits_and_presence_arrays() {
     let mut functions = wasm_encoder::FunctionSection::new();
     functions.function(constructor_signature.type_index());
     module.section(&functions);
-    module.section(&runtime.globals().defined_section(0));
+    module.section(&runtime.globals().defined_section(0, 0));
     let mut code = wasm_encoder::CodeSection::new();
     code.function(&constructor);
     module.section(&code);
@@ -829,7 +829,7 @@ fn dictionary_publication_refines_the_nullable_local_before_nonnull_base_storage
         let mut functions = wasm_encoder::FunctionSection::new();
         functions.function(RuntimeHelperId::OrdinaryPropertyStorageEnsure.type_index());
         module.section(&functions);
-        module.section(&runtime.globals().defined_section(0));
+        module.section(&runtime.globals().defined_section(0, 0));
         let mut code = wasm_encoder::CodeSection::new();
         code.function(&body.into_body());
         module.section(&code);

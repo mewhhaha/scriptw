@@ -1228,11 +1228,12 @@ runtime_helper_domain! {
     DeferredIntrinsicInstallRun / DeferredIntrinsicInstallRunArguments / DeferredIntrinsicInstallRunParameters / "deferred_intrinsic_install_run" { target:Value,realm:(Ref RealmRecord NonNullable),rows:InstallationSpan } => Void;
     NativeFunctionAllocate / NativeFunctionAllocateArguments / NativeFunctionAllocateParameters / "native_function_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
     ArgumentListAppend / ArgumentListAppendArguments / ArgumentListAppendParameters / "argument_list_append" { values:(Ref ValueArray NonNullable),length:I32,stored:(Ref StoredValue NonNullable) } => (Ref ValueArray NonNullable);
-    CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,site:I32,key:(Ref StringValue NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
-    CachedPropertyReadMiss / CachedPropertyReadMissArguments / CachedPropertyReadMissParameters / "cached_property_read_miss" { target:Value,site:I32,key:(Ref StringValue NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
-    CachedPropertyWrite / CachedPropertyWriteArguments / CachedPropertyWriteParameters / "cached_property_write" { target:Value,receiver:Value,key:Key,value:Value,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
-    CachedPropertyWriteMiss / CachedPropertyWriteMissArguments / CachedPropertyWriteMissParameters / "cached_property_write_miss" { target:Value,receiver:Value,key:Key,value:Value,site:I32,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    CachedPropertyRead / CachedPropertyReadArguments / CachedPropertyReadParameters / "cached_property_read" { target:Value,record:(Ref OwnDataReadCache NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    CachedPropertyReadMiss / CachedPropertyReadMissArguments / CachedPropertyReadMissParameters / "cached_property_read_miss" { target:Value,record:(Ref OwnDataReadCache NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    CachedPropertyWrite / CachedPropertyWriteArguments / CachedPropertyWriteParameters / "cached_property_write" { target:Value,receiver:Value,value:Value,record:(Ref OwnDataReadCache NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
+    CachedPropertyWriteMiss / CachedPropertyWriteMissArguments / CachedPropertyWriteMissParameters / "cached_property_write_miss" { target:Value,receiver:Value,value:Value,record:(Ref OwnDataReadCache NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     CachedPropertyAdd / CachedPropertyAddArguments / CachedPropertyAddParameters / "cached_property_add" { object:(Ref OrdinaryObject NonNullable),storage:(Ref CompactDataStorage NonNullable),child:(Ref CompactDataShape NonNullable),count:I32,value:Value } => Completion;
+    CachedPropertyRecord / CachedPropertyRecordArguments / CachedPropertyRecordParameters / "cached_property_record" { key:(Ref StringValue NonNullable) } => (Ref OwnDataReadCache NonNullable);
     ComputedPropertyWrite / ComputedPropertyWriteArguments / ComputedPropertyWriteParameters / "computed_property_write" { target:Value,key:Value,value:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     OrdinaryPropertyFind / OrdinaryPropertyFindArguments / OrdinaryPropertyFindParameters / "ordinary_property_find" { object:(Ref OrdinaryObject NonNullable),key:Key } => (Ref PropertyEntry Nullable);
     OrdinaryPropertyAppend / OrdinaryPropertyAppendArguments / OrdinaryPropertyAppendParameters / "ordinary_property_append" { object:(Ref OrdinaryObject NonNullable),key:Key,descriptor:(Ref PropertyDescriptor NonNullable) } => Void;
@@ -1426,6 +1427,7 @@ impl RuntimeHelperId {
             Self::CachedPropertyWrite => HelperOwner::Runtime,
             Self::CachedPropertyWriteMiss => HelperOwner::Runtime,
             Self::CachedPropertyAdd => HelperOwner::Runtime,
+            Self::CachedPropertyRecord => HelperOwner::Runtime,
             Self::ComputedPropertyWrite => HelperOwner::Runtime,
             Self::OrdinaryPropertyFind => HelperOwner::Runtime,
             Self::OrdinaryPropertyAppend => HelperOwner::Runtime,
@@ -1603,6 +1605,7 @@ impl RuntimeHelperId {
             Self::CachedPropertyWrite => true,
             Self::CachedPropertyWriteMiss => true,
             Self::CachedPropertyAdd => true,
+            Self::CachedPropertyRecord => true,
             Self::ComputedPropertyWrite => true,
             Self::OrdinaryPropertyFind => true,
             Self::OrdinaryPropertyAppend => true,

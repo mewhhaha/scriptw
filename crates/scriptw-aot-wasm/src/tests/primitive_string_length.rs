@@ -106,10 +106,12 @@ fn primitive_length_branches<'a>(
                 let branch = then_branch(operators, i + 4);
                 // ArrayLen also bounds packed storage and compact shape keys.
                 // Only this actual String's rooted UTF-16 units prove length.
-                branch.windows(6).any(|ops| matches!(ops,
+                // `array.len` itself traps on null; no separate
+                // ref.as_non_null precedes it.
+                branch.windows(5).any(|ops| matches!(ops,
                     [Operator::StructGet { struct_type_index, field_index },
                      Operator::LocalSet { local_index: stored },
-                     Operator::LocalGet { local_index: loaded }, Operator::RefAsNonNull,
+                     Operator::LocalGet { local_index: loaded },
                      Operator::ArrayLen, Operator::I64ExtendI32U]
                     if *struct_type_index == string && *field_index == units && stored == loaded
                 )).then_some(branch)

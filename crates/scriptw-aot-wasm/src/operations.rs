@@ -521,6 +521,9 @@ impl<'a> FunctionBuilder<'a> {
         if self.try_compile_intrinsic_array_get_v(operation, operands, output, function)? {
             return Ok(());
         }
+        if self.try_compile_static_get_v(operation, operands, output, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let mut inputs = Vec::with_capacity(operands.len());
         for operand in operands {
@@ -761,24 +764,28 @@ impl<'a> FunctionBuilder<'a> {
                     }
                 }
                 // Source operands already completed in order. A static String
-                // key needs no observable coercion, and the guarded own-data
-                // arm proves an actual object. Its complete miss kernel owns
-                // primitive boxing, nullish errors and getter receiver rules.
-                let planned_get_v = if operation == SpecOperationIr::GetV {
-                    if let ExprIr::String(name) = &operands[1].expr {
+                // key needs no observable coercion; the read site's miss
+                // kernel owns primitive boxing, nullish errors and getter
+                // receiver rules. Only a "length" key, whose String and Array
+                // reads precede it, reaches the site here.
+                let planned_get_v = match &operands[1].expr {
+                    ExprIr::String(name)
+                        if operation == SpecOperationIr::GetV
+                            && self.plans_static_read(
+                                &operands[0],
+                                &PropertyKeyIr::StaticString(name.clone()),
+                            ) =>
+                    {
                         self.emit_planned_property_read(
                             &operands[0],
-                            &PropertyKeyIr::StaticString(name.clone()),
+                            name,
                             &inputs[0],
-                            &inputs[1],
                             &pending,
                             function,
-                        )?
-                    } else {
-                        false
+                        )?;
+                        true
                     }
-                } else {
-                    false
+                    _ => false,
                 };
                 let key = if !planned_get_v {
                     match operation {
@@ -980,6 +987,37 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(boolean, function);
         result.project(self, output, inputs, function);
         Ok(())
+    }
+
+    /// GetV with a literal String key through the site's record. The key
+    /// operand is a compiler-owned String whose evaluation observes nothing,
+    /// so only the base is evaluated; the site's miss kernel owns primitive
+    /// boxing, nullish errors and getter receivers. A "length" key keeps
+    /// the general path's String and Array length reads.
+    fn try_compile_static_get_v(
+        &mut self,
+        operation: SpecOperationIr,
+        operands: &[TypedExpr],
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        if operation != SpecOperationIr::GetV {
+            return Ok(false);
+        }
+        let ExprIr::String(name) = &operands[1].expr else {
+            return Ok(false);
+        };
+        let key = PropertyKeyIr::StaticString(name.clone());
+        if name == "length" || !self.plans_static_read(&operands[0], &key) {
+            return Ok(false);
+        }
+        let schema = self.runtime_schema();
+        let base = schema.reserve_value_local(function);
+        self.compile_expr_to_value(&operands[0], &base, function)?;
+        let pending = schema.reserve_completion(function);
+        self.emit_planned_property_read(&operands[0], name, &base, &pending, function)?;
+        SpecOperationResultLocals::Expression(pending).project(self, output, vec![base], function);
+        Ok(true)
     }
 
     fn emit_spec_operation_abrupt_exit(

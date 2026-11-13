@@ -1048,10 +1048,14 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let key_value = schema.reserve_value_local(function);
-        self.compile_property_key_operand(key, &key_value, function)?;
         let pending = schema.reserve_completion(function);
-        if !self.emit_planned_property_read(target, key, receiver, &key_value, &pending, function)? {
+        if let (true, PropertyKeyIr::StaticString(name)) =
+            (self.plans_static_read(target, key), key)
+        {
+            self.emit_planned_property_read(target, name, receiver, &pending, function)?;
+        } else {
+            let key_value = schema.reserve_value_local(function);
+            self.compile_property_key_operand(key, &key_value, function)?;
             schema
                 .call_helper(
                     crate::runtime_helpers::DynamicPropertyReadArguments::new(
@@ -1065,6 +1069,7 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )
                 .store(&pending, function);
+            key_value.clear(function);
         }
         pending.kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
@@ -1076,7 +1081,6 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         pending.clear(function);
-        key_value.clear(function);
         self.emit_propagate_current_throw_if_needed(function);
         Ok(())
     }

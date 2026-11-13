@@ -373,6 +373,8 @@ They do not refresh the published panel.
 | Globals resolved at run time, remembered global entries read at the site (ABI 65) | 9.58M | 10.35M |
 | [Chain walks and computed keys](#chain-walks-and-computed-keys-2026-11-13) (ABI 67), on the row above | 7.88M | 8.61M |
 | Call-free `instanceof` entry and one-cast global entry check (ABI 68) | 7.56M | 8.27M |
+| [Host-side](#host-side-costs-2026-11-13) weak lookups, funcref reads, root scopes and collector copies (ABI 68) | 7.26M | 7.88M |
+| [Site records in P](#site-records-in-p-2026-11-13) (ABI 69), on the row above | 6.72M | 7.32M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -708,6 +710,106 @@ reads 1.7% (now mostly the side-table entry and its type check), `memory.fill`
 `ref.func` 0.2%. The embedding's own work per host call (export lookup by
 name, `Func::ty`, `StructRefPre`/`ArrayRefPre`, dynamic argument checks,
 Realm field reads) is about 2% and unchanged.
+
+### Site records in P (2026-11-13)
+
+ABI 69 (one retained Speed process per case; instructions are
+deterministic, cycles are not). Both Flight outputs stay exact. The code-size
+comparison and the per-operation rows below were measured on top of the ABI
+68 source `b9bbc012b`; rebased onto the [host-side
+reductions](#host-side-costs-2026-11-13) (`b848e28b7`, still ABI 68 and
+7.26M/7.88M) the change measures 6.720M sync and 7.317M async
+instructions per request, with P 4,755,827 bytes against 4,537,470.
+
+Where a record hit went. On `d11274eb4` (ABI 67) the loop `t += lit.b` (an
+own data property of a three-key literal, so array compact storage) executes
+404 instructions per iteration, 81 of them the loop and about 15 the
+addition. Counted along the executed path of the native code:
+
+| Part | Instructions |
+| --- | ---: |
+| Reading the captured `lit` (environment chain, binding cell, TDZ check) | 56 |
+| P: the key String from the pooled-string table, its cast to `StringValue` | 50 |
+| P: argument setup, the call, the five-word completion and its throw check | 19 |
+| R entry prologue and stack arguments | 28 |
+| Record fetch: the ProgramInstance table, two bounds checks, the record and its key | 39 |
+| Receiver: primitive tag tests, sealed OrdinaryObject test, PROPERTIES, sealed array-storage test | 40 |
+| Shape proof and slot sign | 14 |
+| Value: tag, scalar and reference array reads, each with its own null and bounds checks | 70 |
+| Result packing, epilogue and return | 25 |
+
+An earlier in-place read did not pay because it kept the record behind the
+paged and then flat ProgramInstance table (a struct read, a nullable array,
+a bounds-checked element read and a key check: about 40 instructions before
+any proof) and kept the key String as an operand; the call it saved was only
+a third of the hit.
+
+What changed ([contract](contracts/compact-ordinary-data-storage.md#static-site-records-in-p)):
+
+- Each static read and assignment site keeps its record in a global of the
+  module that compiles it, read with one load. R's new record helper makes
+  it on the site's first use; R alone fills it.
+- A read site whose base may be an object answers inline an own data value
+  of an actual OrdinaryObject whose array-layout compact storage has the
+  record's shape. A plain assignment stores inline into an existing writable
+  own slot of such storage when the storage already has every backing the
+  value needs. Everything else calls the hit entry with the base and the
+  record: no site number, no key operand and no table.
+- Compound, logical and update assignments read through a static read site,
+  and a literal-key GetV evaluates only its base before its site.
+- Array compact value loads and stores read each backing once without a
+  temporary local, and GC field and array accesses on locals no longer
+  repeat the access's own null check with a separate `ref.as_non_null`, which
+  Wasmtime compiled as a second test and branch on every access.
+
+Code size. A read site that proved an own slot of either compact layout and
+an absence inline was about 350 Wasm operators, and P grew by a fifth. With
+the site code holding no temporary copies, one build compared which sites
+answer inline through switches removed afterwards. "Computed cache" is a
+computed `o[k]` site keeping the last String key, shape and slot its probe
+found in three P globals:
+
+| Reads inline | Writes inline | Computed cache | Sync | Async | P bytes | Native preparation |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| ABI 68, `b9bbc012b` | | | 7.559M | 8.270M | 4,537,470 | 7.58 s |
+| both layouts | both layouts | yes | 7.010M | 7.700M | 5,002,344 | 8.91 s |
+| both layouts | both layouts | no | 7.014M | 7.695M | 4,976,618 | 9.14 s |
+| array layout | array layout | yes | 7.002M | 7.681M | 4,788,874 | 8.76 s |
+| array layout | both layouts | yes | 7.019M | 7.700M | 4,838,871 | 8.79 s |
+| array layout | array layout | no | 7.017M | 7.698M | 4,763,902 | 8.63 s |
+| array layout | none | no | 7.073M | 7.757M | 4,697,907 | 8.36 s |
+| none | array layout | no | 7.034M | 7.707M | 4,491,662 | 7.04 s |
+| none | none | yes | 7.077M | 7.753M | 4,449,713 | 7.32 s |
+
+The inline layout (one or two keys) and the computed cache do not pay for
+their code here: the cache takes `t += lit[key]` from 616 to 387
+instructions per iteration but moves the request by at most 15K. The
+shipped source answers the array layout inline at reads and writes: 7.054M
+sync and 7.736M async instructions per request, P 4,755,827 bytes (4.8% over
+`b9bbc012b`, 4.5% over `d11274eb4`'s 4,550,856) and 8.27 s of native
+preparation. That is about 37K instructions above the same configuration
+behind the switches, with 8 KB less P (one block fewer per site), so it is
+not more work per site; differences of that order also separate
+configurations of the same intent in the table and were not traced further.
+On this request the inline read alone is worth about 17K instructions (0.2%)
+for 272 KB of P and 1.6 s of preparation against inline writes only; the
+per-operation rows are where it pays.
+
+| Loop body | Speed, ABI 68 | Speed, ABI 69 | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: |
+| `t += lit.b` (own, three-key literal) | 404 | 260 | 258 |
+| `t += made.b` (own, two-field `new P()`) | 393 | 341 | — |
+| `lit.b = i` | 485 | 277 | 232 |
+| `u = made.m` (prototype method) | 534 | 454 | 230 |
+| `u = lit.zz` (absent) | 424 | 355 | 229 |
+| `t += lit[key]` | 616 | 603 | 323 |
+| `if (tagged.$$typeof === SYM) t++` | 476 | 340 | — |
+
+`made.b` has two fields, so its storage has the inline layout, which the
+site leaves to the entry: answered at the site it measured 246; through the
+entry it gains from the record global and the removed key operand alone. A
+`t += lit.b` iteration now executes as many instructions as under V8's
+interpreter (260 against 258), whose loop alone costs 197 against 81.
 
 ### Descriptor work and physical allocation
 

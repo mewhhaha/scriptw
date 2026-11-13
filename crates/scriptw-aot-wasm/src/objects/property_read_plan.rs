@@ -1,5 +1,6 @@
-//! Static reads identify a ProgramInstance site and call the typed R cache kernel.
-//! R owns registration, live storage guards, value loads and complete Get fallback.
+//! Static reads keep a per-site record in a P global: the site answers a
+//! recorded own compact slot inline and otherwise calls the typed R hit
+//! entry with the record. R owns registration and the complete Get fallback.
 //! Static assignments that would cache the same read get a write record site;
 //! R likewise owns its guards and the complete Set fallback.
 use super::*;
@@ -59,62 +60,40 @@ impl FunctionBuilder<'_> {
         &mut self,
         target: &TypedExpr,
         key: &PropertyKeyIr,
-    ) -> Result<Option<crate::emit::ProgramSiteId>, EmitError> {
+    ) -> Result<Option<crate::gc_types::SiteRecordGlobal>, EmitError> {
         if !self.has_source_execution_environment() {
             return Ok(None);
         }
         match PropertyReadPlan::for_write(target, key) {
             PropertyReadPlan::General => Ok(None),
-            PropertyReadPlan::CachedStaticString => self
-                .next_program_site(crate::emit::ProgramSiteKind::OwnDataWrite)
-                .map(Some),
+            PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some),
         }
     }
 
-    /// A static read's raw base is both its lookup target and its receiver,
-    /// so the helper takes it once.
+    /// Whether a read of `target.key` goes through a static read site.
+    pub(crate) fn plans_static_read(&self, target: &TypedExpr, key: &PropertyKeyIr) -> bool {
+        self.has_source_execution_environment()
+            && matches!(
+                PropertyReadPlan::for_read(target, key),
+                PropertyReadPlan::CachedStaticString
+            )
+    }
+
+    /// A planned static read of `target.name`: the site's record answers or
+    /// the R hit entry does. A static read's raw base is both its lookup
+    /// target and its receiver, and its compiler-owned String key needs no
+    /// coercion, so the key is materialized only when R makes the site's
+    /// record. Only a base that may be an object can be the actual
+    /// OrdinaryObject the site's inline proof answers.
     pub(crate) fn emit_planned_property_read(
         &mut self,
         target: &TypedExpr,
-        key: &PropertyKeyIr,
+        name: &str,
         base: &ValueLocals,
-        key_value: &ValueLocals,
         result: &CompletionLocals,
         f: &mut Function,
-    ) -> Result<bool, EmitError> {
-        if !self.has_source_execution_environment() {
-            return Ok(false);
-        }
-        match PropertyReadPlan::for_read(target, key) {
-            PropertyReadPlan::General => Ok(false),
-            PropertyReadPlan::CachedStaticString => {
-                let site = self.next_program_site(crate::emit::ProgramSiteKind::OwnDataRead)?;
-                let schema = self.runtime_schema();
-                let id = schema.reserve_i32_local(f);
-                site.emit(id, f);
-                // Selection admits only a compiler-owned static String key.
-                // The helper accepts that String, never raw coercible input.
-                let name = schema.reserve_gc_local(f).initialize(
-                    key_value.cast_reference::<crate::gc_types::StringValue>(schema, f),
-                    f,
-                );
-                schema
-                    .call_helper(
-                        crate::runtime_helpers::CachedPropertyReadArguments::new(
-                            base,
-                            id,
-                            &name,
-                            self.current_environment(),
-                            self.current_program(),
-                        ),
-                        self.runtime_helper_base()?,
-                        f,
-                    )
-                    .store(result, f);
-                name.clear(f);
-                schema.release_i32_local(id, f);
-                Ok(true)
-            }
-        }
+    ) -> Result<(), EmitError> {
+        let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);
+        self.emit_static_read_site(name, may_be_ordinary, base, result, f)
     }
 }

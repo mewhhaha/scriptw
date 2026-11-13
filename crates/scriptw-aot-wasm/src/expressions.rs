@@ -229,22 +229,9 @@ impl<'a> FunctionBuilder<'a> {
             base_and_receiver,
             referenced_name,
         } = reference;
-        let schema = self.runtime_schema();
-        self.compile_nullish_tagged_i32(base_and_receiver.tag(), function)?;
-        self.open_frame(ControlFrameKind::If, function);
-        self.emit_expression_native_error(NativeErrorKind::TypeError, nullish_message, function)?;
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        // The boxed target and original primitive receiver remain distinct.
         // Nullish rejection precedes observable ToPropertyKey in this transition.
-        let target_object = schema.reserve_value_local(function);
-        let pending = schema.reserve_completion(function);
-        pending.initialize(function);
-        self.emit_value_to_object_locals(&base_and_receiver, &pending, function)?;
-        self.completion().copy_from(&pending, function);
-        self.emit_propagate_current_throw_if_needed(function);
-        target_object.copy_from(pending.value(), function);
-        pending.clear(function);
+        let target_object =
+            self.emit_coercible_target_object(&base_and_receiver, nullish_message, function)?;
         let property_key = self.emit_value_to_property_key_locals(&referenced_name, function)?;
         referenced_name.clear(function);
         Ok(CanonicalOrdinaryPropertyReferenceLocals {
@@ -254,13 +241,82 @@ impl<'a> FunctionBuilder<'a> {
         })
     }
 
+    /// A reference's base after its nullish check and ToObject. The boxed
+    /// target and the original primitive receiver remain distinct.
+    fn emit_coercible_target_object(
+        &mut self,
+        base_and_receiver: &ValueLocals,
+        nullish_message: RuntimeErrorMessage,
+        function: &mut Function,
+    ) -> Result<ValueLocals, EmitError> {
+        let schema = self.runtime_schema();
+        self.compile_nullish_tagged_i32(base_and_receiver.tag(), function)?;
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_expression_native_error(NativeErrorKind::TypeError, nullish_message, function)?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        let target_object = schema.reserve_value_local(function);
+        let pending = schema.reserve_completion(function);
+        pending.initialize(function);
+        self.emit_value_to_object_locals(base_and_receiver, &pending, function)?;
+        self.completion().copy_from(&pending, function);
+        self.emit_propagate_current_throw_if_needed(function);
+        target_object.copy_from(pending.value(), function);
+        pending.clear(function);
+        Ok(target_object)
+    }
+
+    /// The base and static key of a reference whose GetValue takes a static
+    /// read site.
+    fn static_read_site_name<'k>(
+        &self,
+        base: &'k TypedExpr,
+        key: &'k PropertyKeyIr,
+    ) -> Option<(&'k TypedExpr, &'k str)> {
+        match key {
+            PropertyKeyIr::StaticString(name) if self.plans_static_read(base, key) => {
+                Some((base, name))
+            }
+            _ => None,
+        }
+    }
+
+    /// GetValue of a reference that a later PutValue updates. A static read
+    /// site reads the raw base, throwing for a nullish one exactly as the
+    /// canonical read would; ToObject and ToPropertyKey of its String key,
+    /// which observe nothing for a base that did not throw, then canonicalize
+    /// the reference for the write.
     fn emit_get_value_from_raw_ordinary_property_reference(
         &mut self,
         reference: EvaluatedRawOrdinaryPropertyReferenceLocals,
+        read_site: Option<(&TypedExpr, &str)>,
         function: &mut Function,
     ) -> Result<ReadOrdinaryPropertyReferenceLocals, EmitError> {
         let schema = self.runtime_schema();
         let old_value = schema.reserve_value_local(function);
+        if let Some((base, name)) = read_site {
+            let pending = schema.reserve_completion(function);
+            self.emit_planned_property_read(
+                base,
+                name,
+                &reference.base_and_receiver,
+                &pending,
+                function,
+            )?;
+            self.completion().copy_from(&pending, function);
+            pending.clear(function);
+            self.emit_propagate_current_throw_if_needed(function);
+            old_value.copy_from(self.completion().value(), function);
+            let reference = self.canonicalize_ordinary_property_reference(
+                reference,
+                RuntimeErrorMessage::CANNOT_READ_PROPERTIES_OF_NULL_OR_UNDEFINED,
+                function,
+            )?;
+            return Ok(ReadOrdinaryPropertyReferenceLocals {
+                reference,
+                old_value,
+            });
+        }
         let reference = self.canonicalize_ordinary_property_reference(
             reference,
             RuntimeErrorMessage::CANNOT_READ_PROPERTIES_OF_NULL_OR_UNDEFINED,
@@ -313,37 +369,31 @@ impl<'a> FunctionBuilder<'a> {
         Ok(ReadyToWriteOrdinaryPropertyAssignmentLocals { reference, rhs })
     }
 
-    /// PutValue's [[Set]]. A static String site's R kernel first tries its
-    /// write record and otherwise runs this same OrdinarySet.
+    /// PutValue's [[Set]]. A static String site first tries its write record
+    /// and otherwise runs this same OrdinarySet.
     fn emit_ordinary_reference_set(
         &mut self,
         reference: &CanonicalOrdinaryPropertyReferenceLocals,
         rhs: &ValueLocals,
-        site: Option<crate::emit::ProgramSiteId>,
+        site: Option<crate::gc_types::SiteRecordGlobal>,
         strictness: Strictness,
         message: RuntimeErrorMessage,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         if let Some(site) = site {
-            let id = schema.reserve_i32_local(function);
-            site.emit(id, function);
-            schema
-                .call_helper(
-                    crate::runtime_helpers::CachedPropertyWriteArguments::new(
-                        &reference.target_object,
-                        &reference.base_and_receiver,
-                        &reference.property_key,
-                        rhs,
-                        id,
-                        self.current_environment(),
-                        self.current_program(),
-                    ),
-                    self.runtime_helper_base()?,
-                    function,
-                )
-                .store(self.completion(), function);
-            schema.release_i32_local(id, function);
+            let result = schema.reserve_completion(function);
+            self.emit_static_write_site(
+                site,
+                &reference.target_object,
+                &reference.base_and_receiver,
+                &reference.property_key,
+                rhs,
+                &result,
+                function,
+            )?;
+            self.completion().copy_from(&result, function);
+            result.clear(function);
         } else {
             schema
                 .call_helper(
@@ -360,6 +410,17 @@ impl<'a> FunctionBuilder<'a> {
                 )
                 .store(self.completion(), function);
         }
+        self.emit_set_completion_checks(strictness, message, function)
+    }
+
+    /// After a [[Set]] into the current completion: its Throw, then a strict
+    /// assignment's TypeError for false.
+    fn emit_set_completion_checks(
+        &mut self,
+        strictness: Strictness,
+        message: RuntimeErrorMessage,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         self.emit_propagate_current_throw_if_needed(function);
         if strictness.throws_on_failed_set() {
             self.completion().value().scalar().load(function);
@@ -375,7 +436,7 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_put_value_from_ready_ordinary_property_assignment(
         &mut self,
         assignment: ReadyToWriteOrdinaryPropertyAssignmentLocals,
-        site: Option<crate::emit::ProgramSiteId>,
+        site: Option<crate::gc_types::SiteRecordGlobal>,
         strictness: Strictness,
         output: &ValueLocals,
         function: &mut Function,
@@ -405,6 +466,13 @@ impl<'a> FunctionBuilder<'a> {
             assignment.base_and_receiver(),
             assignment.referenced_name(),
         )?;
+        if let (Some(site), PropertyKeyIr::StaticString(name)) =
+            (site, assignment.referenced_name())
+        {
+            return self.compile_static_property_assignment_to_value(
+                assignment, site, name, output, function,
+            );
+        }
         let raw = self.evaluate_raw_ordinary_property_reference(assignment, function)?;
         let evaluated =
             self.evaluate_rhs_for_raw_ordinary_property_assignment(raw, assignment, function)?;
@@ -429,6 +497,59 @@ impl<'a> FunctionBuilder<'a> {
             output,
             function,
         )
+    }
+
+    /// `base.name = rhs` at a static write site. The base, then the RHS; the
+    /// site's record then answers the [[Set]] of an existing writable own
+    /// data property, and otherwise the complete PutValue checks and boxes the
+    /// base. The site's String key, whose evaluation and ToPropertyKey observe
+    /// nothing, is the record's.
+    fn compile_static_property_assignment_to_value(
+        &mut self,
+        assignment: &OrdinaryPropertyAssignmentIr,
+        site: crate::gc_types::SiteRecordGlobal,
+        name: &str,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let base_and_receiver = schema.reserve_value_local(function);
+        self.compile_expr_to_value(assignment.base_and_receiver(), &base_and_receiver, function)?;
+        let rhs = schema.reserve_value_local(function);
+        self.compile_expr_to_value(assignment.rhs(), &rhs, function)?;
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let record =
+            self.emit_static_assignment_hit(site, name, &base_and_receiver, &rhs, done, function)?;
+        let target_object = self.emit_coercible_target_object(
+            &base_and_receiver,
+            RuntimeErrorMessage::CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT,
+            function,
+        )?;
+        let result = schema.reserve_completion(function);
+        self.emit_static_write_call(
+            &record,
+            &target_object,
+            &base_and_receiver,
+            &rhs,
+            &result,
+            function,
+        )?;
+        self.completion().copy_from(&result, function);
+        result.clear(function);
+        self.emit_set_completion_checks(
+            assignment.strictness(),
+            RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        // Both the inline store and the complete PutValue retire the record.
+        record.clear(function);
+        output.copy_from(&rhs, function);
+        target_object.clear(function);
+        rhs.clear(function);
+        base_and_receiver.clear(function);
+        Ok(())
     }
 
     /// PutValue of a computed key after its RHS. R's computed write kernel
@@ -488,10 +609,12 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let raw = self.evaluate_raw_ordinary_property_reference(assignment, function)?;
+        let read_site = self
+            .static_read_site_name(assignment.base_and_receiver(), assignment.referenced_name());
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
         let rhs = schema.reserve_value_local(function);
         match assignment.op() {
             LogicalBinaryOp::And | LogicalBinaryOp::Or => {
@@ -539,7 +662,7 @@ impl<'a> FunctionBuilder<'a> {
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, None, function)?;
         for (name, value) in [
             (
                 capture.receiver_storage_name(),
@@ -632,7 +755,7 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_put_value_from_ready_ordinary_property_reference(
         &mut self,
         ready: ReadyToWriteOrdinaryPropertyReferenceLocals,
-        site: Option<crate::emit::ProgramSiteId>,
+        site: Option<crate::gc_types::SiteRecordGlobal>,
         strictness: Strictness,
         output: &ValueLocals,
         function: &mut Function,
@@ -668,7 +791,10 @@ impl<'a> FunctionBuilder<'a> {
             mutation.referenced_name(),
         )?;
         let raw = self.evaluate_raw_ordinary_property_reference(mutation, function)?;
-        let read = self.emit_get_value_from_raw_ordinary_property_reference(raw, function)?;
+        let read_site =
+            self.static_read_site_name(mutation.base_and_receiver(), mutation.referenced_name());
+        let read =
+            self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
         let ready =
             self.emit_result_from_read_ordinary_property_reference(read, mutation, function)?;
         self.emit_put_value_from_ready_ordinary_property_reference(
@@ -722,13 +848,14 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_get_numeric_value_from_raw_ordinary_property_reference(
         &mut self,
         raw: EvaluatedRawOrdinaryPropertyReferenceLocals,
+        read_site: Option<(&TypedExpr, &str)>,
         value_kind: NumericUpdateValueKind,
         function: &mut Function,
     ) -> Result<ReadOrdinaryPropertyNumericUpdateLocals, EmitError> {
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
         self.emit_numeric_reference_old_value(value_kind, &old_value, function)?;
         Ok(ReadOrdinaryPropertyNumericUpdateLocals {
             reference,
@@ -803,8 +930,11 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let raw = self.evaluate_raw_ordinary_property_reference(update, function)?;
+        let read_site =
+            self.static_read_site_name(update.base_and_receiver(), update.referenced_name());
         let read = self.emit_get_numeric_value_from_raw_ordinary_property_reference(
             raw,
+            read_site,
             update.value_kind(),
             function,
         )?;

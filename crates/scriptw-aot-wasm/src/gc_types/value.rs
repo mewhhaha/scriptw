@@ -265,6 +265,15 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
         function.release_typed_local(self.index);
     }
 }
+impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
+    /// Pushes the reference as the operand of an instruction that itself
+    /// traps on null (`struct.get`/`set`, `array.get`/`set`/`len`/`copy`).
+    /// The `ref.as_non_null` of [`Self::load`] would repeat that check:
+    /// Wasmtime emits both, and either one traps a null reference alike.
+    fn access(&self, function: &mut Function) {
+        function.instruction(&Instruction::LocalGet(self.index));
+    }
+}
 impl<T: GcHeapType> GcLocal<T, Nullable> {
     pub(crate) fn set_null(&self, schema: &RuntimeSchema, function: &mut Function) {
         function.instruction(&Instruction::RefNull(
@@ -1562,6 +1571,16 @@ impl<T: GcHeapType> GcStackReference<T, Nullable> {
     }
     pub(crate) fn require_non_null(self, function: &mut Function) -> GcStackReference<T> {
         function.instruction(&Instruction::RefAsNonNull);
+        GcStackReference::new()
+    }
+    /// The reference, after branching to `absent` when it is null; the
+    /// branch carries nothing.
+    pub(crate) fn non_null_or_branch(
+        self,
+        absent: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<T> {
+        function.branch_on_null_to_label(absent);
         GcStackReference::new()
     }
 }
@@ -3182,10 +3201,21 @@ where
     pub(crate) fn read<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<O, R>,
-        schema: &RuntimeSchema,
+        _schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcFieldRead<V, N> {
-        owner.load(schema, function);
+        owner.access(function);
+        self.emit_get(function);
+        GcFieldRead { shape: PhantomData }
+    }
+    /// Reads the field of the owner reference on top of the stack, which
+    /// no local needs to hold.
+    pub(crate) fn read_top<R: GcFieldNullability>(
+        &self,
+        owner: GcStackReference<O, R>,
+        function: &mut Function,
+    ) -> GcFieldRead<V, N> {
+        let GcStackReference { .. } = owner;
         self.emit_get(function);
         GcFieldRead { shape: PhantomData }
     }
@@ -3200,10 +3230,10 @@ where
         &self,
         owner: &GcLocal<O, R>,
         value: GcOperand<'_, V, N>,
-        schema: &RuntimeSchema,
+        _schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        owner.load(schema, function);
+        owner.access(function);
         value.emit(function);
         self.emit_set(function);
     }
@@ -3277,20 +3307,32 @@ where
     pub(crate) fn length<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<T, R>,
-        schema: &RuntimeSchema,
+        _schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        owner.load(schema, function);
+        owner.access(function);
         function.instruction(&Instruction::ArrayLen);
     }
     pub(crate) fn read<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<T, R>,
         index: I32Local,
-        schema: &RuntimeSchema,
+        _schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcFieldRead<V, N> {
-        owner.load(schema, function);
+        owner.access(function);
+        index.load(function);
+        self.emit_get(function);
+        GcFieldRead { shape: PhantomData }
+    }
+    /// Reads `owner[index]` of the array reference on top of the stack.
+    pub(crate) fn read_top<R: GcFieldNullability>(
+        &self,
+        owner: GcStackReference<T, R>,
+        index: I32Local,
+        function: &mut Function,
+    ) -> GcFieldRead<V, N> {
+        let GcStackReference { .. } = owner;
         index.load(function);
         self.emit_get(function);
         GcFieldRead { shape: PhantomData }
@@ -3312,10 +3354,23 @@ where
         owner: &GcLocal<T, R>,
         index: I32Local,
         value: GcOperand<'_, V, N>,
-        schema: &RuntimeSchema,
+        _schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        owner.load(schema, function);
+        owner.access(function);
+        index.load(function);
+        value.emit(function);
+        self.emit_set(function);
+    }
+    /// Writes `owner[index]` of the array reference on top of the stack.
+    pub(crate) fn write_top<R: GcFieldNullability>(
+        &self,
+        owner: GcStackReference<T, R>,
+        index: I32Local,
+        value: GcOperand<'_, V, N>,
+        function: &mut Function,
+    ) {
+        let GcStackReference { .. } = owner;
         index.load(function);
         value.emit(function);
         self.emit_set(function);

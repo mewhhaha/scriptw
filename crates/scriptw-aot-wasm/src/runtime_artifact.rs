@@ -119,7 +119,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 65 passes the operator's record site to the HasInstance helper.
 // Version 67 adds the computed-key property-write helper.
 // Version 68 adds the call-free instanceof entry in front of HasInstance.
-const LAYOUT_VERSION: u32 = 68;
+// Version 69 keeps static property site records in P globals and passes the
+// record, not the site and key, to the cached read helpers.
+const LAYOUT_VERSION: u32 = 69;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

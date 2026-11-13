@@ -127,7 +127,14 @@ impl FunctionBuilder<'_> {
             .helper_parameters::<crate::runtime_helpers::CachedPropertyReadParameters>(&mut body);
         let f = &mut body;
         let s = self.runtime_schema();
-        let key = PropertyKeyLocals::from_string(s, &p.key, f);
+        let record = &p.record;
+        let name = s.reserve_gc_local(f).initialize(
+            s.field(OwnDataReadCacheSchema::KEY)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        let key = PropertyKeyLocals::from_string(s, &name, f);
         let value = s.reserve_value_local(f);
         let found = s.reserve_i32_local(f);
         // The prototype that holds the recorded place, and its header.
@@ -138,7 +145,10 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize_null(s, f);
         let miss = self.open_frame(ControlFrameKind::Block, f);
-        let record = self.emit_site_record_or_branch(p.site, &key, miss, f);
+        s.field(OwnDataReadCacheSchema::SLOT).read(record, s, f);
+        f.instruction(&Instruction::I32Const(super::UNVISITED_SLOT));
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(miss, f);
         // A record that does not apply leaves the live chain to the walk.
         let walk = self.open_frame(ControlFrameKind::Block, f);
         let place = self.open_frame(ControlFrameKind::Block, f);
@@ -152,7 +162,7 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::I32Const(tag as i32));
             f.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, f);
-            self.emit_receiver_rule_or_branch(&record, kind, None, walk, f);
+            self.emit_receiver_rule_or_branch(record, kind, None, walk, f);
             let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
             let intrinsic = s.reserve_value_local(f);
             self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
@@ -181,14 +191,14 @@ impl FunctionBuilder<'_> {
             let storage = self.emit_compact_storage_or_branch(layout, &base, other, f);
             let shape = s.reserve_gc_local(f).initialize(storage.shape(s, f), f);
             let _ = shape.load(s, f);
-            s.field(OwnDataReadCacheSchema::SHAPE).read(&record, s, f);
+            s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
             f.instruction(&Instruction::RefEq);
             self.open_frame(ControlFrameKind::If, f);
             // The recorded shape has the key at a nonnegative slot; a
             // negative slot is the closed tail beyond a shape that lacks it.
             let slot = s.reserve_i32_local(f);
             s.field(OwnDataReadCacheSchema::SLOT)
-                .read(&record, s, f)
+                .read(record, s, f)
                 .store(slot, f);
             slot.load(f);
             f.instruction(&Instruction::I32Const(0));
@@ -199,7 +209,7 @@ impl FunctionBuilder<'_> {
                     self.emit_array_compact_value_at(array, slot, &value, f)
                 }
                 CompactStorage::Inline(inline) => {
-                    self.emit_inline_compact_value_at(inline, slot, &value, f)
+                    self.emit_inline_compact_recorded_value_at(inline, slot, &value, f)
                 }
             }
             emit_return_normal(&value, f);
@@ -225,7 +235,7 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::End);
             // The live shape lacks the key.
             self.emit_receiver_rule_or_branch(
-                &record,
+                record,
                 HolderReceiverKind::Object,
                 Some(&shape),
                 walk,
@@ -248,7 +258,7 @@ impl FunctionBuilder<'_> {
         );
         let position = s.reserve_i32_local(f);
         s.field(OwnDataReadCacheSchema::DICTIONARY_POSITION)
-            .read(&record, s, f)
+            .read(record, s, f)
             .store(position, f);
         self.emit_dictionary_position_read_with(
             &dictionary,
@@ -266,7 +276,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.emit_empty_dictionary_or_branch(&dictionary, walk, f);
         dictionary.clear(f);
-        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, walk, f);
+        self.emit_receiver_rule_or_branch(record, HolderReceiverKind::Object, None, walk, f);
         self.emit_prototype_edge(&object, &prototype, edge, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
@@ -282,12 +292,12 @@ impl FunctionBuilder<'_> {
         );
         s.field(IntrinsicPropertyStorageSchema::ADDRESS)
             .read(&intrinsic, s, f);
-        s.field(OwnDataReadCacheSchema::LAYOUT).read(&record, s, f);
+        s.field(OwnDataReadCacheSchema::LAYOUT).read(record, s, f);
         f.instruction(&Instruction::I32Ne);
         self.emit_branch_if_to_target(walk, f);
         let group = s.reserve_i32_local(f);
         s.field(OwnDataReadCacheSchema::GROUP)
-            .read(&record, s, f)
+            .read(record, s, f)
             .store(group, f);
         found.set_constant(0, f);
         self.emit_materialized_intrinsic_group(&intrinsic, group, &value, found, f);
@@ -314,7 +324,7 @@ impl FunctionBuilder<'_> {
             let storage = self.emit_compact_storage_or_branch(layout, &base, other, f);
             let shape = s.reserve_gc_local(f).initialize(storage.shape(s, f), f);
             self.emit_receiver_rule_or_branch(
-                &record,
+                record,
                 HolderReceiverKind::Object,
                 Some(&shape),
                 walk,
@@ -336,7 +346,7 @@ impl FunctionBuilder<'_> {
         );
         self.emit_empty_dictionary_or_branch(&dictionary, walk, f);
         dictionary.clear(f);
-        self.emit_receiver_rule_or_branch(&record, HolderReceiverKind::Object, None, walk, f);
+        self.emit_receiver_rule_or_branch(record, HolderReceiverKind::Object, None, walk, f);
         self.emit_prototype_edge(&object, &prototype, edge, f);
         base.clear(f);
         object.clear(f);
@@ -352,20 +362,18 @@ impl FunctionBuilder<'_> {
         let present = s
             .reserve_gc_local(f)
             .initialize(holder.load(s, f).require_non_null(f), f);
-        self.emit_recorded_place_hit(&record, &present, &key, &value, found, walk, f)?;
+        self.emit_recorded_place_hit(record, &present, &key, &value, found, walk, f)?;
         present.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        record.clear(f);
-        self.emit_static_read_walk(&p.target, &p.key, &value, miss, f);
+        self.emit_static_read_walk(&p.target, &name, &value, miss, f);
         emit_return_normal(&value, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         s.return_call_helper(
             crate::runtime_helpers::CachedPropertyReadMissArguments::new(
                 &p.target,
-                p.site,
-                &p.key,
+                &p.record,
                 self.current_environment(),
                 self.current_program(),
             ),
@@ -377,6 +385,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(found, f);
         value.clear(f);
         key.clear(f);
+        name.clear(f);
         p.release(f);
         f.instruction(&Instruction::End);
         Ok(self.finish_function(body))
@@ -403,7 +412,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(miss, f);
-        let record = self.emit_site_record_or_branch(p.site, &p.key, miss, f);
+        let record = &p.record;
         let object = s.reserve_gc_local(f).initialize(
             p.target.sealed_reference_or_branch::<OrdinaryObject>(
                 s,
@@ -428,7 +437,7 @@ impl FunctionBuilder<'_> {
             // at the recorded slot and its one attribute word is writable
             // data, so OrdinarySet only replaces [[Value]] on O itself.
             let _ = shape.load(s, f);
-            s.field(OwnDataReadCacheSchema::SHAPE).read(&record, s, f);
+            s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
             f.instruction(&Instruction::RefEq);
             self.open_frame(ControlFrameKind::If, f);
             let present = s
@@ -443,7 +452,7 @@ impl FunctionBuilder<'_> {
             self.emit_branch_if_to_target(miss, f);
             let slot = s.reserve_i32_local(f);
             s.field(OwnDataReadCacheSchema::SLOT)
-                .read(&record, s, f)
+                .read(record, s, f)
                 .store(slot, f);
             slot.load(f);
             f.instruction(&Instruction::I32Const(0));
@@ -454,7 +463,7 @@ impl FunctionBuilder<'_> {
                     self.emit_array_compact_backed_store_or_branch(array, slot, &p.value, miss, f)
                 }
                 CompactStorage::Inline(inline) => {
-                    self.emit_inline_compact_store_at(inline, slot, &p.value, f)
+                    self.emit_inline_compact_recorded_store_at(inline, slot, &p.value, f)
                 }
             }
             s.release_i32_local(slot, f);
@@ -478,7 +487,7 @@ impl FunctionBuilder<'_> {
             .initialize(shape.load(s, f).require_non_null(f), f);
         let _ = parent.load(s, f);
         s.field(OwnDataReadCacheSchema::ADD_PARENT)
-            .read(&record, s, f);
+            .read(record, s, f);
         f.instruction(&Instruction::RefEq);
         s.field(OrdinaryObjectSchema::EXTENSIBLE)
             .read(&object, s, f);
@@ -486,18 +495,26 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(miss, f);
         // A dictionary holder is proved by its key index alone: the entry
-        // makes no call.
+        // makes no call. The record names the site's key.
+        let name = s.reserve_gc_local(f).initialize(
+            s.field(OwnDataReadCacheSchema::KEY)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        let key = PropertyKeyLocals::from_string(s, &name, f);
         let tail = self.emit_recorded_add_chain_tail(
             &p.target,
             &object,
-            &p.key,
-            &record,
+            &key,
+            record,
             DictionaryAbsence::IndexOnly,
             f,
         )?;
+        key.clear(f);
+        name.clear(f);
         tail.load(f);
-        s.field(OwnDataReadCacheSchema::ADD_TAIL)
-            .read(&record, s, f);
+        s.field(OwnDataReadCacheSchema::ADD_TAIL).read(record, s, f);
         f.instruction(&Instruction::I32Ne);
         tail.load(f);
         f.instruction(&Instruction::I32Eqz);
@@ -508,7 +525,7 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<CompactDataShape, Nullable>(f)
             .initialize(
                 s.field(OwnDataReadCacheSchema::ADD_CHILD)
-                    .read(&record, s, f)
+                    .read(record, s, f)
                     .reference(),
                 f,
             );
@@ -544,16 +561,14 @@ impl FunctionBuilder<'_> {
         parent.clear(f);
         base.clear(f);
         object.clear(f);
-        record.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         s.return_call_helper(
             crate::runtime_helpers::CachedPropertyWriteMissArguments::new(
                 &p.target,
                 &p.receiver,
-                &p.key,
                 &p.value,
-                p.site,
+                &p.record,
                 self.current_environment(),
                 self.current_program(),
             ),
@@ -658,45 +673,6 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(named, f);
         s.release_i32_local(index_free, f);
         s.release_i64_local(hash, f);
-    }
-
-    /// The site's record, after branching to `miss` when the site has none
-    /// yet. A record is made for its site's key; the key reference proves it.
-    fn emit_site_record_or_branch(
-        &mut self,
-        site: I32Local,
-        key: &PropertyKeyLocals,
-        miss: ControlTarget,
-        f: &mut Function,
-    ) -> GcLocal<OwnDataReadCache> {
-        let s = self.runtime_schema();
-        let label = self.local_branch_label(miss);
-        let records = self.current_program().own_data_records(s, f);
-        let table = s
-            .reserve_gc_local(f)
-            .initialize(records.non_null_or_branch(label, f), f);
-        records.clear(f);
-        site.load(f);
-        s.array_type::<OwnDataReadCacheTable>().length(&table, s, f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(miss, f);
-        let entry = s.reserve_gc_local(f).initialize(
-            s.array_type::<OwnDataReadCacheTable>()
-                .read(&table, site, s, f)
-                .reference(),
-            f,
-        );
-        table.clear(f);
-        let record = s
-            .reserve_gc_local(f)
-            .initialize(entry.non_null_or_branch(label, f), f);
-        entry.clear(f);
-        s.field(OwnDataReadCacheSchema::KEY).read(&record, s, f);
-        key.value().reference().load(f);
-        f.instruction(&Instruction::RefEq);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(miss, f);
-        record
     }
 
     /// The ordinary header of an actual ordinary object or function; every
@@ -1093,7 +1069,7 @@ impl FunctionBuilder<'_> {
                     self.emit_array_compact_value_at(array, slot, value, f)
                 }
                 CompactStorage::Inline(inline) => {
-                    self.emit_inline_compact_value_at(inline, slot, value, f)
+                    self.emit_inline_compact_recorded_value_at(inline, slot, value, f)
                 }
             }
             found.set_constant(1, f);

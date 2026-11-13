@@ -1427,6 +1427,7 @@ fn emit_script_module_with_factory(
             CachedPropertyWrite, compile_cached_property_write_helper;
             CachedPropertyWriteMiss, compile_cached_property_write_miss_helper;
             CachedPropertyAdd, compile_cached_property_add_helper;
+            CachedPropertyRecord, compile_cached_property_record_helper;
             ComputedPropertyWrite, compile_computed_property_write_helper;
         );
         register_runtime_helper!(OrdinaryPropertyFind, compile_ordinary_property_find_helper);
@@ -1880,6 +1881,7 @@ fn emit_script_module_with_factory(
                 ModuleKind::Program(_) => runtime_global_types.len() as u32,
                 ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => 0,
             },
+            function_metas.site_record_count(),
         ),
     );
     let mut debug_dump = vec![

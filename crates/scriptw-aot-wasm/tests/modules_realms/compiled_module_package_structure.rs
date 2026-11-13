@@ -146,9 +146,15 @@ fn package_lifecycle_is_consume_once_and_compile_time_checked() {
         "impl FinalizedModuleGlobals {",
         "fn emit_root_get",
     );
-    assert!(globals_view.contains("fn defined_section(&self, imported: u32) -> impl Section + '_"));
+    // The borrowed encoder takes the imported prefix and the module's site
+    // record count as plain integers; callers cannot reach the ledger.
+    assert!(globals_view.contains(
+        "fn defined_section<'a>(\n        &'a self,\n        imported: u32,\n        site_records: u32,\n    ) -> impl Section + 'a"
+    ));
     assert!(globals_view.contains("ledger: &'a GlobalLedger"));
-    assert!(globals_view.contains("self.ledger.section_after(self.imported).encode(sink)"));
+    assert!(globals_view.contains(
+        ".section_after(self.imported, self.site_records, self.schema)\n                    .encode(sink)"
+    ));
     assert!(globals_view.contains("ledger: &self.section"));
     assert!(!globals_view.contains("-> GlobalSection"));
     assert!(!globals_view.contains("-> &GlobalLedger"));
@@ -232,7 +238,7 @@ fn package_lifecycle_is_consume_once_and_compile_time_checked() {
             "lost entry-role ownership guard: {role}"
         );
     }
-    assert!(publish.contains("runtime.globals().defined_section(imported_globals)"));
+    assert!(publish.contains(".defined_section(imported_globals, site_records)"));
     assert!(OWNER_SOURCE.contains("let (functions, code, function_table) = code.finish();"));
 
     let code_owner = bounded(

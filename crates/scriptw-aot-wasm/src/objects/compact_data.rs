@@ -728,6 +728,20 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         self.emit_check_inline_compact_slot(storage, slot, f);
+        self.emit_inline_compact_recorded_value_at(storage, slot, value, f);
+    }
+
+    /// The value at a slot that a site record proves for this storage's
+    /// shape: the record holds the slot it found by probing that very
+    /// immutable shape, so the slot lies within the shape's extent and the
+    /// extent check above would repeat the proof.
+    fn emit_inline_compact_recorded_value_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
         let schema = self.runtime_schema();
         schema
             .field(InlineCompactDataStorageSchema::PACKED_TAGS)
@@ -772,60 +786,42 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let tags = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::TAGS)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
-        let scalars = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::SCALARS)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
-        let references = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::REFERENCES)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
+        let tags = schema
+            .field(ArrayCompactDataStorageSchema::TAGS)
+            .read(storage, schema, f)
+            .reference();
         schema
             .array_type::<CompactTagArray>()
-            .read(&tags, slot, schema, f)
+            .read_top(tags, slot, f)
             .store(value.tag(), f);
+        // An absent backing holds a zero word and a null reference in every
+        // slot. Each backing is read once and held by no local.
         value.scalar().set_constant(0, f);
-        scalars.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema
-            .reserve_gc_local(f)
-            .initialize(scalars.load(schema, f).require_non_null(f), f);
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let scalars = schema
+            .field(ArrayCompactDataStorageSchema::SCALARS)
+            .read(storage, schema, f)
+            .reference()
+            .non_null_or_branch(absent, f);
         schema
             .array_type::<CompactScalarArray>()
-            .read(&present, slot, schema, f)
+            .read_top(scalars, slot, f)
             .store_i64(value.scalar(), f);
-        present.clear(f);
         f.instruction(&Instruction::End);
         value.reference().clear(f);
-        references.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema
-            .reserve_gc_local(f)
-            .initialize(references.load(schema, f).require_non_null(f), f);
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let references = schema
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(storage, schema, f)
+            .reference()
+            .non_null_or_branch(absent, f);
         schema
             .array_type::<CompactReferenceArray>()
-            .read(&present, slot, schema, f)
+            .read_top(references, slot, f)
             .store_eq(value.reference(), f);
-        present.clear(f);
         f.instruction(&Instruction::End);
-        references.clear(f);
-        scalars.clear(f);
-        tags.clear(f);
     }
 
     /// Repeated literal/native metadata stores marshal only the original value
@@ -885,6 +881,18 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         self.emit_check_inline_compact_slot(storage, slot, f);
+        self.emit_inline_compact_recorded_store_at(storage, slot, value, f);
+    }
+
+    /// The store at a slot that a site record proves for this storage's
+    /// shape, as for [`Self::emit_inline_compact_recorded_value_at`].
+    fn emit_inline_compact_recorded_store_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
         let schema = self.runtime_schema();
         let shift = schema.reserve_i32_local(f);
         slot.load(f);
@@ -1159,82 +1167,93 @@ impl FunctionBuilder<'_> {
         unbacked: crate::emit::ControlTarget,
         f: &mut Function,
     ) {
+        let stored = self.emit_array_compact_backed_store_i32(storage, slot, value, f);
+        stored.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.runtime_schema().release_i32_local(stored, f);
+        self.emit_branch_if_to_target(unbacked, f);
+    }
+
+    /// The same store, leaving whether it was made (false when a backing it
+    /// needs is absent, having written nothing). Every temporary root is
+    /// clear on both outcomes.
+    fn emit_array_compact_backed_store_i32(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> I32Local {
         let schema = self.runtime_schema();
-        let scalars = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::SCALARS)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
-        let references = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::REFERENCES)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
-        scalars.load(schema, f).is_null(f);
+        let stored = schema.reserve_i32_local(f);
+        // A nonzero word needs the scalar backing and a non-null reference
+        // the reference backing; each backing is read where it is used and
+        // held by no local.
+        schema
+            .field(ArrayCompactDataStorageSchema::SCALARS)
+            .read(storage, schema, f)
+            .reference()
+            .is_null(f);
         value.scalar().load(f);
         f.instruction(&Instruction::I64Eqz);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32And);
-        references.load(schema, f).is_null(f);
+        schema
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(storage, schema, f)
+            .reference()
+            .is_null(f);
         value.reference().load(f);
         f.instruction(&Instruction::RefIsNull);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Or);
-        self.emit_branch_if_to_target(unbacked, f);
-        let tags = schema.reserve_gc_local(f).initialize(
-            schema
-                .field(ArrayCompactDataStorageSchema::TAGS)
-                .read(storage, schema, f)
-                .reference(),
-            f,
-        );
-        schema.array_type::<CompactTagArray>().write(
-            &tags,
+        f.instruction(&Instruction::I32Eqz);
+        stored.store(f);
+        stored.load(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        let tags = schema
+            .field(ArrayCompactDataStorageSchema::TAGS)
+            .read(storage, schema, f)
+            .reference();
+        schema.array_type::<CompactTagArray>().write_top(
+            tags,
             slot,
             GcOperand::i32_local(value.tag()),
-            schema,
             f,
         );
-        tags.clear(f);
-        scalars.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema
-            .reserve_gc_local(f)
-            .initialize(scalars.load(schema, f).require_non_null(f), f);
-        schema.array_type::<CompactScalarArray>().write(
-            &present,
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let scalars = schema
+            .field(ArrayCompactDataStorageSchema::SCALARS)
+            .read(storage, schema, f)
+            .reference()
+            .non_null_or_branch(absent, f);
+        schema.array_type::<CompactScalarArray>().write_top(
+            scalars,
             slot,
             GcOperand::i64_local(value.scalar()),
-            schema,
             f,
         );
-        present.clear(f);
         f.instruction(&Instruction::End);
         // A present backing takes every write, including a null overwrite
         // that retires the old strong edge.
-        references.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema
-            .reserve_gc_local(f)
-            .initialize(references.load(schema, f).require_non_null(f), f);
-        schema.array_type::<CompactReferenceArray>().write(
-            &present,
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let references = schema
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(storage, schema, f)
+            .reference()
+            .non_null_or_branch(absent, f);
+        schema.array_type::<CompactReferenceArray>().write_top(
+            references,
             slot,
             GcOperand::eq_reference(value.reference()),
-            schema,
             f,
         );
-        present.clear(f);
         f.instruction(&Instruction::End);
-        references.clear(f);
-        scalars.clear(f);
+        f.instruction(&Instruction::End);
+        stored
     }
 
     /// Callback-free own data probe for the sole ordinary object model.

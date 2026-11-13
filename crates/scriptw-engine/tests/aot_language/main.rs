@@ -114,3 +114,4 @@ mod aot_numeric_body;
 mod aot_compact_for_in;
 
 mod aot_shape_transitions;
+mod aot_static_site_records;

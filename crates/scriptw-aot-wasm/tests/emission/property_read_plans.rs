@@ -514,6 +514,8 @@ function repeatedRead(record, count, callback) {
             let (miss_definition, cached_body) =
                 runtime.named("helper::cached_property_read_miss");
             let cache = program.imported_runtime_function(&runtime, cached_definition);
+            let (maker_definition, maker_body) = runtime.named("helper::cached_property_record");
+            let record_maker = program.imported_runtime_function(&runtime, maker_definition);
             let (_, own) = program.named("js::ownCandidate#");
             let (_, unresolved) = program.named("js::unresolvedRead#");
             let (_, repeated) = program.named("js::repeatedRead#");
@@ -556,11 +558,18 @@ function repeatedRead(record, count, callback) {
                     Operator::Call { function_index } if *function_index == cache)), 1,
                     "each source read calls the actual typed R cache kernel once");
                 assert!(!body.iter().any(|op| matches!(op,
-                    Operator::StructGet { struct_type_index, .. }
-                    | Operator::StructSet { struct_type_index, .. }
+                    Operator::StructSet { struct_type_index, .. }
                     | Operator::StructNew { struct_type_index }
                         if *struct_type_index == program_cache_type)),
-                    "P reads and writes no cache metadata; R owns registration and proof");
+                    "P writes no record field and allocates no record; R owns registration");
+                assert!(body.iter().all(|op| !matches!(op,
+                    Operator::StructGet { struct_type_index, field_index }
+                        if *struct_type_index == program_cache_type && !matches!(field_index, 1 | 2))),
+                    "P reads only a record's shape and slot");
+                assert!(body.iter().any(|op| matches!(op,
+                    Operator::GlobalGet { .. })) && body.iter().any(|op| matches!(op,
+                    Operator::Call { function_index } if *function_index == record_maker)),
+                    "the site keeps its record in a global and asks R to make it on first use");
             }
             let (boxing, _) = runtime.named("helper::value_to_object");
             assert!(!calls(unresolved, program.imported_runtime_function(&runtime, boxing)),
@@ -654,8 +663,11 @@ function repeatedRead(record, count, callback) {
             assert!(calls(cached_body, find),
                 "negative registration proves absence in sealed Object.prototype rows");
             assert_eq!(count(cached_body, |op| matches!(op,
+                Operator::StructNew { struct_type_index } if *struct_type_index == cache_type)), 0,
+                "the miss kernel fills the site's record and allocates none");
+            assert_eq!(count(maker_body, |op| matches!(op,
                 Operator::StructNew { struct_type_index } if *struct_type_index == cache_type)), 1,
-                "R alone lazily registers the canonical cache metadata record");
+                "R's record helper alone allocates the canonical record");
             let (allocate, _) = runtime.named("helper::compact_literal_allocate");
             let object = concrete_reference_type(runtime.function_type(allocate).results()[0]);
             let live_storage = cached_body.iter().position(|op| matches!(op,

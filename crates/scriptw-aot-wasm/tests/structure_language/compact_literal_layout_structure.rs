@@ -6,6 +6,7 @@ const LITERAL: &str = include_str!("../../src/objects/plain_data_literal.rs");
 const READ: &str = include_str!("../../src/objects/property_read_plan.rs");
 const CACHE: &str = include_str!("../../src/objects/compact_data/cache.rs");
 const HIT: &str = include_str!("../../src/objects/compact_data/cache/hit.rs");
+const SITE: &str = include_str!("../../src/objects/compact_data/cache/site.rs");
 
 fn between<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
@@ -30,7 +31,7 @@ fn literal_layout_identity_is_ordered_keys_and_complete_attributes_only() {
     let registration = between(
         PLANNING,
         "crate::emit::ProgramSiteKind::CompactShape { names, attributes } => {",
-        "crate::emit::ProgramSiteKind::OwnDataRead =>",
+        "crate::emit::ProgramSiteKind::InstanceofPrototype =>",
     );
     assert!(normalized(registration).contains(concat!(
         "letkey=(names.iter().map(|name|(*name).to_owned()).collect(),",
@@ -61,13 +62,21 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     assert!(LITERAL.contains("CompactLiteralAllocateArguments::new(&prototype, &shape)"));
     assert!(LITERAL.contains("builder.emit_compact_store_at(&storage, slot, &value, f)"));
 
-    // Read caches stay distinct per source site and prove current storage,
-    // shape and key before loading this receiver's current value.
-    assert!(PLANNING
-        .contains("crate::emit::ProgramSiteKind::OwnDataRead => &self.next_own_data_read_site"));
-    assert!(READ.contains("self.next_program_site(crate::emit::ProgramSiteKind::OwnDataRead)"));
-    assert!(READ.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
+    // Read records stay distinct per source site, in the site's own P
+    // global, and prove current storage, shape and key before loading this
+    // receiver's current value.
+    assert!(PLANNING.contains("site_records: std::cell::Cell::new(0),"));
+    assert!(EMIT.contains("let position = self.functions.next_site_record()?;"));
+    assert!(EMIT.contains("self.runtime_schema().site_record_global(position)"));
+    assert!(READ.contains("PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some)"));
+    assert!(READ.contains("let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);"));
+    assert!(READ.contains("self.emit_static_read_site(name, may_be_ordinary, base, result, f)"));
+    assert!(SITE.contains("let global = self.next_site_record()?;"));
+    assert!(SITE.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
     assert!(!READ.contains("OwnDataReadCacheSchema"));
+    // The site reads only the record's shape and slot; R fills records.
+    assert!(!SITE.contains(".write(record"));
+    assert!(SITE.contains("crate::runtime_helpers::CachedPropertyRecordArguments::new(&name)"));
     assert!(CACHE.contains(".field(OrdinaryObjectSchema::PROPERTIES)"));
     assert!(HIT.contains(".field(CompactDataStorageSchema::SHAPE)"));
     assert!(HIT.contains(".field(OwnDataReadCacheSchema::KEY)"));
