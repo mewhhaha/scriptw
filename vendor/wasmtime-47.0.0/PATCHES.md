@@ -89,6 +89,16 @@ on every operation ([measurements](../../docs/rust-rewrite/benchmarks.md#host-si
 
 These are in `src/runtime/vm/{libcalls.rs,instance.rs,gc/func_ref.rs}`.
 
+- Ephemeron marking keeps one bit per `ALIGN` granule of every dependency's
+  original index, built before the flip with the rest of its storage. A first
+  copy tests that bit before its binary search, so copying an object that no
+  edge depends on no longer searches the sorted dependencies. The filter is
+  conservative: every recorded index has its bit set, and the search still
+  decides.
+- `copy` moves survivors of up to 128 bytes with constant-size copies chosen
+  by size instead of a `memmove` call; larger objects still call it. The
+  semi-spaces are disjoint, and an overlap keeps `memmove` semantics.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

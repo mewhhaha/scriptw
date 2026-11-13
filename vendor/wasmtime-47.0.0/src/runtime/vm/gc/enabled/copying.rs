@@ -236,6 +236,44 @@ fn externref_to_copying(externref: &VMExternRef) -> &TypedGcRef<VMCopyingExternR
     gc_ref.as_typed_unchecked()
 }
 
+/// Copy one object's bytes from the idle into the active semi-space. The two
+/// ranges are already bounds-checked and lie in disjoint semi-spaces; an
+/// overlap would be heap corruption and keeps `memmove` semantics.
+///
+/// Most survivors are a few `ALIGN` chunks, where a `memmove` call costs more
+/// than the copy. A constant-size copy compiles to inline moves, and a copy
+/// loop would be turned back into a call, so small sizes dispatch on size.
+fn copy_object(heap: &mut [u8], from: usize, to: usize, size: usize) {
+    let (source, destination) = if from + size <= to {
+        let (low, high) = heap.split_at_mut(to);
+        (&low[from..from + size], &mut high[..size])
+    } else if to + size <= from {
+        let (low, high) = heap.split_at_mut(from);
+        (&high[..size], &mut low[to..to + size])
+    } else {
+        heap.copy_within(from..from + size, to);
+        return;
+    };
+    fn fixed<const N: usize>(destination: &mut [u8], source: &[u8]) {
+        match (destination.first_chunk_mut::<N>(), source.first_chunk::<N>()) {
+            (Some(destination), Some(source)) => *destination = *source,
+            // Both slices are exactly `size` bytes, the arm's `N`.
+            _ => unreachable!("fixed-size object copy of the wrong length"),
+        }
+    }
+    match size {
+        16 => fixed::<16>(destination, source),
+        32 => fixed::<32>(destination, source),
+        48 => fixed::<48>(destination, source),
+        64 => fixed::<64>(destination, source),
+        80 => fixed::<80>(destination, source),
+        96 => fixed::<96>(destination, source),
+        112 => fixed::<112>(destination, source),
+        128 => fixed::<128>(destination, source),
+        _ => destination.copy_from_slice(source),
+    }
+}
+
 /// Round a raw GC-heap byte length down to a usable capacity.
 ///
 /// The result is a multiple of `2 * ALIGN` so that each semi-space (half the
@@ -572,7 +610,7 @@ survived collection, since the active space is the same size as the idle space",
         {
             bail_bug!("corrupt gc heap");
         }
-        heap.copy_within(from_start..from_start + size_usize, to_start);
+        copy_object(heap, from_start, to_start, size_usize);
 
         // Set the forwarding ref in the old (idle-space) object.
         self.index_mut(header_and_forwarding_ref(from_ref))?
