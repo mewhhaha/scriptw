@@ -18,7 +18,8 @@ use cranelift_frontend::FunctionBuilder;
 use smallvec::{SmallVec, smallvec};
 use wasmtime_environ::{
     Collector, GcArrayLayout, GcLayout, GcStructLayout, GcTypeLayouts, I31_DISCRIMINANT,
-    ModuleInternedTypeIndex, TagIndex, TypeIndex, VMGcKind, WasmCompositeInnerType,
+    ModuleInternedTypeIndex, TagIndex, TypeIndex, VMGcKind, VMSharedTypeIndex,
+    WasmCompositeInnerType,
     WasmHeapTopType, WasmHeapType, WasmRefType, WasmResult, WasmStorageType, WasmValType,
     wasm_unsupported,
 };
@@ -344,9 +345,19 @@ pub fn read_field_at_addr(
                         .translate_read_gc_reference(func_env, builder, r, addr, flags)?
                 }
                 WasmHeapTopType::Func => {
+                    // The libcall checks the interned function against the
+                    // engine-level type, which this module's `VMContext`
+                    // already maps from the field's declared type; the
+                    // reserved index asks for an untyped `funcref`.
                     let expected_ty = match r.heap_type {
-                        WasmHeapType::Func => ModuleInternedTypeIndex::reserved_value(),
-                        WasmHeapType::ConcreteFunc(ty) => ty.unwrap_module_type_index(),
+                        WasmHeapType::Func => builder.ins().iconst(
+                            ir::types::I32,
+                            i64::from(VMSharedTypeIndex::reserved_value().as_bits()),
+                        ),
+                        WasmHeapType::ConcreteFunc(ty) => func_env.module_interned_to_shared_ty(
+                            &mut builder.cursor(),
+                            ty.unwrap_module_type_index(),
+                        ),
                         WasmHeapType::NoFunc => {
                             let null = builder.ins().iconst(func_env.pointer_type(), 0);
                             if !r.nullable {
@@ -361,9 +372,6 @@ pub fn read_field_at_addr(
                         }
                         _ => unreachable!("not a function heap type"),
                     };
-                    let expected_ty = builder
-                        .ins()
-                        .iconst(ir::types::I32, i64::from(expected_ty.as_bits()));
 
                     let vmctx = func_env.vmctx_val(&mut builder.cursor());
 

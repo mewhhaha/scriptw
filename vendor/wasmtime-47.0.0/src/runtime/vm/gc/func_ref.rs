@@ -18,6 +18,7 @@ use wasmtime_core::{
     alloc::PanicOnOom,
     slab::{Id, Slab},
 };
+use core::hash::{BuildHasherDefault, Hasher};
 use wasmtime_environ::VMSharedTypeIndex;
 
 /// An identifier into the `FuncRefTable`.
@@ -37,11 +38,51 @@ impl FuncRefTableId {
     }
 }
 
+/// Hasher for interned `VMFuncRef` addresses. They are host pointers, not
+/// guest-chosen bytes, so the keyed SipHash default only cost each
+/// `struct.new` or `struct.set` of a `funcref`; the murmur3 finalizer spreads
+/// the aligned addresses over the table's bucket bits.
+#[derive(Default)]
+struct FuncRefAddressHasher(u64);
+
+impl Hasher for FuncRefAddressHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.0 = self.0.rotate_left(8) ^ u64::from(byte);
+        }
+    }
+
+    fn write_u64(&mut self, word: u64) {
+        self.0 = self.0.rotate_left(32) ^ word;
+    }
+
+    fn write_usize(&mut self, word: usize) {
+        self.write_u64(word as u64);
+    }
+
+    fn write_isize(&mut self, word: isize) {
+        self.write_u64(word as u64);
+    }
+
+    fn finish(&self) -> u64 {
+        let mut hash = self.0;
+        hash ^= hash >> 33;
+        hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
+        hash ^= hash >> 33;
+        hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+        hash ^ (hash >> 33)
+    }
+}
+
 /// Side table mapping `FuncRefTableId`s that can be stored in the GC heap to
 /// raw `VMFuncRef`s.
 #[derive(Default)]
 pub struct FuncRefTable {
-    interned: HashMap<Option<SendSyncPtr<VMFuncRef>>, FuncRefTableId>,
+    interned: HashMap<
+        Option<SendSyncPtr<VMFuncRef>>,
+        FuncRefTableId,
+        BuildHasherDefault<FuncRefAddressHasher>,
+    >,
     slab: Slab<Option<SendSyncPtr<VMFuncRef>>>,
 }
 

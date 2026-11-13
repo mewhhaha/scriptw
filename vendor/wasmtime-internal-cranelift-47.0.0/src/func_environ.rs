@@ -3926,14 +3926,18 @@ impl FuncEnvironment<'_> {
         if entity.allows_memset(self)
             && let Some(value) = self.fill_value_as_memset(builder, elem_ty, value)
         {
-            self.raw_bulk_memory_operation(
-                builder,
-                BulkOp::MemoryFill {
-                    dst: dst_elem_addr,
-                    val: value,
-                    len: copy_byte_len,
-                },
-            );
+            if let CheckedEntity::Array { .. } = entity {
+                self.emit_array_memset(builder, dst_elem_addr, value, copy_byte_len);
+            } else {
+                self.raw_bulk_memory_operation(
+                    builder,
+                    BulkOp::MemoryFill {
+                        dst: dst_elem_addr,
+                        val: value,
+                        len: copy_byte_len,
+                    },
+                );
+            }
             return Ok(());
         }
 
@@ -4050,6 +4054,102 @@ impl FuncEnvironment<'_> {
         builder.seal_block(loop_block);
         builder.seal_block(continue_block);
         Ok(())
+    }
+
+    /// Fill `len` bytes of a GC array's bounds-checked elements at `dst` with
+    /// the byte `val`. Up to `INLINE_ARRAY_FILL_MAX_BYTES` the bytes are stored
+    /// inline, eight at a time and then singly: most `array.new_default` and
+    /// `array.new` requests are short, and the `memory.fill` libcall's fixed
+    /// host transition costs more than such a fill. Longer fills keep the
+    /// libcall and its host `memset`. Both paths write the same bytes.
+    fn emit_array_memset(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        dst: ir::Value,
+        val: ir::Value,
+        len: ir::Value,
+    ) {
+        const INLINE_ARRAY_FILL_MAX_BYTES: i64 = 64;
+        let pointer_ty = self.pointer_type();
+        let region = self.alias_regions.gc_heap_region(builder.func);
+        // Not `trusted()`: the elements of a byte array start at an address
+        // that need not be word-aligned, so the word stores must not claim it.
+        let flags = ir::MemFlagsData::new()
+            .with_notrap()
+            .with_endianness(Endianness::Little)
+            .with_alias_region(Some(region));
+
+        let short_block = builder.create_block();
+        let call_block = builder.create_block();
+        let words_block = builder.create_block();
+        let word_block = builder.create_block();
+        let bytes_block = builder.create_block();
+        let byte_block = builder.create_block();
+        let join_block = builder.create_block();
+
+        let is_short = builder.ins().icmp_imm_u(
+            IntCC::UnsignedLessThanOrEqual,
+            len,
+            INLINE_ARRAY_FILL_MAX_BYTES,
+        );
+        builder.ins().brif(is_short, short_block, &[], call_block, &[]);
+
+        builder.switch_to_block(call_block);
+        builder.seal_block(call_block);
+        self.raw_bulk_memory_operation(builder, BulkOp::MemoryFill { dst, val, len });
+        builder.ins().jump(join_block, &[]);
+
+        // Short fill: splat the byte into a word, store whole words, then the
+        // remaining bytes.
+        builder.switch_to_block(short_block);
+        builder.seal_block(short_block);
+        let byte = builder.ins().uextend(I64, val);
+        let word = builder.ins().imul_imm_s(byte, 0x0101_0101_0101_0101);
+        builder.ins().jump(words_block, &[dst.into(), len.into()]);
+
+        builder.switch_to_block(words_block);
+        let addr = builder.append_block_param(words_block, pointer_ty);
+        let remaining = builder.append_block_param(words_block, pointer_ty);
+        let has_word = builder
+            .ins()
+            .icmp_imm_u(IntCC::UnsignedGreaterThanOrEqual, remaining, 8);
+        builder.ins().brif(
+            has_word,
+            word_block,
+            &[],
+            bytes_block,
+            &[addr.into(), remaining.into()],
+        );
+
+        builder.switch_to_block(word_block);
+        builder.seal_block(word_block);
+        builder.ins().store(flags, word, addr, 0);
+        let next_addr = builder.ins().iadd_imm_s(addr, 8);
+        let next_remaining = builder.ins().iadd_imm_s(remaining, -8);
+        builder
+            .ins()
+            .jump(words_block, &[next_addr.into(), next_remaining.into()]);
+        builder.seal_block(words_block);
+
+        builder.switch_to_block(bytes_block);
+        let addr = builder.append_block_param(bytes_block, pointer_ty);
+        let remaining = builder.append_block_param(bytes_block, pointer_ty);
+        builder
+            .ins()
+            .brif(remaining, byte_block, &[], join_block, &[]);
+
+        builder.switch_to_block(byte_block);
+        builder.seal_block(byte_block);
+        builder.ins().istore8(flags, val, addr, 0);
+        let next_addr = builder.ins().iadd_imm_s(addr, 1);
+        let next_remaining = builder.ins().iadd_imm_s(remaining, -1);
+        builder
+            .ins()
+            .jump(bytes_block, &[next_addr.into(), next_remaining.into()]);
+        builder.seal_block(bytes_block);
+
+        builder.switch_to_block(join_block);
+        builder.seal_block(join_block);
     }
 
     /// Tests to see whether `value`, stored as `ty`, can be extracted to a single

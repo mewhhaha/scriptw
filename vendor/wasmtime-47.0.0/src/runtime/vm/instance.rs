@@ -133,6 +133,13 @@ pub struct Instance {
     // but that type is currently footgun-y / isn't actually OOM-safe yet.
     passive_elements: TryVec<PassiveElementSegment>,
 
+    /// One bit per escaping defined function (`FuncRefIndex`) whose
+    /// `VMFuncRef` in the `VMContext` has been written. The values written
+    /// are fixed for the instance's lifetime, so `ref.func` and other
+    /// requests return an initialized entry without recomputing it. Zeroed at
+    /// allocation because the `VMContext` itself is not.
+    initialized_func_refs: TryVec<u64>,
+
     // TODO: add support for multiple memories; `wmemcheck_state` corresponds to
     // memory 0.
     #[cfg(feature = "wmemcheck")]
@@ -173,6 +180,11 @@ impl Instance {
         let module = req.runtime_info.env_module();
         let memory_tys = &module.memories;
         let mut passive_elements = TryVec::with_capacity(module.passive_elements.len())?;
+        let func_ref_words = module.num_escaped_funcs.div_ceil(64);
+        let mut initialized_func_refs = TryVec::with_capacity(func_ref_words)?;
+        for _ in 0..func_ref_words {
+            initialized_func_refs.push(0)?;
+        }
 
         #[cfg(feature = "wmemcheck")]
         let wmemcheck_state = if req.store.engine().config().wmemcheck {
@@ -206,6 +218,7 @@ impl Instance {
             memories: TryPrimaryMap::default(),
             tables: TryPrimaryMap::default(),
             passive_elements,
+            initialized_func_refs,
             #[cfg(feature = "wmemcheck")]
             wmemcheck_state,
             store: None,
@@ -871,7 +884,7 @@ impl Instance {
     /// Initializes a defined function's `VMFuncRef` in-place and then returns a
     /// pointer to that location.
     fn initialize_defined_funcref(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         registry: &ModuleRegistry,
         def_index: DefinedFuncIndex,
     ) -> Option<NonNull<VMFuncRef>> {
@@ -879,20 +892,33 @@ impl Instance {
         let index = module.func_index(def_index);
         let func = &module.functions[index];
         let type_index = func.signature.unwrap_engine_type_index();
-        let vmctx_offset = self.offsets().vmctx_func_ref(func.func_ref);
+        let func_ref = func.func_ref;
+        let vmctx_offset = self.offsets().vmctx_func_ref(func_ref);
         let array_to_wasm_key = FuncKey::ArrayToWasmTrampoline(module.module_index, def_index);
         let wasm_key = FuncKey::DefinedWasmFunction(module.module_index, def_index);
+        // `vmctx_func_ref` above has checked the index against
+        // `num_escaped_funcs`, which sized the bitmap.
+        let bit = usize::try_from(func_ref.as_u32()).unwrap();
+        let (word, mask) = (bit / 64, 1u64 << (bit % 64));
+        if self.initialized_func_refs[word] & mask != 0 {
+            // SAFETY: the offset is this function's `VMFuncRef` within our
+            // `VMContext`, written by the first request below.
+            return Some(unsafe { self.vmctx_plus_offset_raw::<VMFuncRef>(vmctx_offset) });
+        }
         // SAFETY: the type/offset/keys here are all valid for the defined
         // function at `def_index`.
-        unsafe {
-            self.initialize_and_return_funcref(
+        let initialized = unsafe {
+            self.as_mut().initialize_and_return_funcref(
                 registry,
                 type_index,
                 vmctx_offset,
                 array_to_wasm_key,
                 wasm_key,
             )
-        }
+        };
+        // SAFETY: Not moving data out of `self`.
+        unsafe { self.get_unchecked_mut() }.initialized_func_refs[word] |= mask;
+        initialized
     }
 
     fn get_start_func_ref(

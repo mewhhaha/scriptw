@@ -9,8 +9,9 @@ Its recorded upstream commit is
 The workspace selects this copy through `[patch.crates-io]`; dependency
 versions, target/ISA settings and generated machine-code policy are unchanged.
 
-The only modified upstream source is `src/compiler.rs`. The added private
-`src/compiler/context_pool.rs` and its tests own the idle scratch policy.
+The idle scratch policy modifies `src/compiler.rs`; the added private
+`src/compiler/context_pool.rs` and its tests own it. The translation changes
+below modify `src/func_environ{.rs,/gc.rs}`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -59,3 +60,22 @@ verifier failure followed by successful compilation, and cache count ownership.
 The patch has no measured RSS or latency claim before the coordinated native
 verification and memory campaign. Reducing reuse can increase compilation
 allocation work for larger functions or broad parallel compilation.
+
+## Funcref reads and short array fills
+
+Two translation changes accompany the vendored Wasmtime runtime
+([its notes](../wasmtime-47.0.0/PATCHES.md)); both keep the builtin
+signatures and Wasm semantics.
+
+- `src/func_environ/gc.rs`: reading a typed `funcref` from a GC struct or
+  array passes `get_interned_func_ref` the engine-level type that the field's
+  declared type maps to, loaded from the `VMContext` type-id array, instead of
+  the module-level index the runtime then had to translate through the
+  module. An untyped `funcref` still passes the reserved index. The runtime
+  still checks the interned function's type against it.
+- `src/func_environ.rs`: a byte-fillable GC array fill (`array.new`,
+  `array.new_default`, `array.fill` of a non-reference element whose bytes are
+  all equal) of at most 64 bytes is stored inline, eight bytes at a time and
+  then singly, instead of calling the `memory.fill` libcall. Longer fills keep
+  the libcall. Bounds checks precede both paths, and memories and tables are
+  unchanged.

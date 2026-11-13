@@ -551,7 +551,8 @@ unsafe fn intern_func_ref_for_gc_heap(
     use crate::{store::AutoAssertNoGc, vm::SendSyncPtr};
     use core::ptr::NonNull;
 
-    let mut store = AutoAssertNoGc::new(store.store_opaque_mut());
+    // SAFETY: interning only grows the side table; it never collects.
+    let mut store = unsafe { AutoAssertNoGc::disabled(store.store_opaque_mut()) };
 
     let func_ref = func_ref.cast::<VMFuncRef>();
     let func_ref = NonNull::new(func_ref).map(SendSyncPtr::new);
@@ -568,37 +569,35 @@ unsafe fn intern_func_ref_for_gc_heap(
 // Get the raw `VMFuncRef` pointer associated with a `FuncRefTableId` from an
 // earlier `intern_func_ref_for_gc_heap` call.
 //
+// The translated caller passes the expected type as the engine-level
+// `VMSharedTypeIndex` it loads from its `VMContext`'s type-id array (the
+// reserved value for an untyped `funcref`), so this call needs no lookup
+// through the instance's module. The registered type of the interned
+// `VMFuncRef` is still checked against it.
+//
 // This libcall may not GC.
 #[cfg(feature = "gc")]
 fn get_interned_func_ref(
     store: &mut dyn VMStore,
-    instance: InstanceId,
+    _instance: InstanceId,
     func_ref_id: u32,
-    module_interned_type_index: u32,
+    expected_engine_type: u32,
 ) -> Result<*mut u8> {
     use super::FuncRefTableId;
     use crate::store::AutoAssertNoGc;
-    use wasmtime_environ::{ModuleInternedTypeIndex, packed_option::ReservedValue};
+    use wasmtime_environ::{VMSharedTypeIndex, packed_option::ReservedValue};
 
-    let store = AutoAssertNoGc::new(store.store_opaque_mut());
+    // SAFETY: reading the side table neither allocates nor collects.
+    let store = unsafe { AutoAssertNoGc::disabled(store.store_opaque_mut()) };
 
     let func_ref_id = FuncRefTableId::from_raw(func_ref_id);
-    let module_interned_type_index = ModuleInternedTypeIndex::from_bits(module_interned_type_index);
+    let expected_engine_type = VMSharedTypeIndex::from_bits(expected_engine_type);
+    let table = &store.unwrap_gc_store().func_ref_table;
 
-    let func_ref = if module_interned_type_index.is_reserved_value() {
-        store
-            .unwrap_gc_store()
-            .func_ref_table
-            .get_untyped(func_ref_id)?
+    let func_ref = if expected_engine_type.is_reserved_value() {
+        table.get_untyped(func_ref_id)?
     } else {
-        let types = store.engine().signatures();
-        let engine_ty = store
-            .instance(instance)
-            .engine_type_index(module_interned_type_index);
-        store
-            .unwrap_gc_store()
-            .func_ref_table
-            .get_typed(types, func_ref_id, engine_ty)?
+        table.get_typed(store.engine().signatures(), func_ref_id, expected_engine_type)?
     };
 
     Ok(func_ref.map_or(core::ptr::null_mut(), |f| f.as_ptr().cast()))

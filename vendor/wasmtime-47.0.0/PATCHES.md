@@ -74,6 +74,20 @@ on every operation ([measurements](../../docs/rust-rewrite/benchmarks.md#host-si
   allocating an error on a miss; upgrades and values use it once instead of
   `contains` and then `get`. A fingerprint hashes only its heap index, which
   agrees with `Eq`. Handles, epochs, identity checks and rooting are unchanged.
+- `get_interned_func_ref`'s third argument is now the engine-level expected
+  type, which compiled code loads from its `VMContext` type-id array (the
+  vendored `wasmtime-internal-cranelift` translator passes it; the reserved
+  index still means an untyped `funcref`). The interned function's registered
+  type is still checked against it. The builtin's signature is unchanged and
+  only that argument's meaning changes; nothing else calls the builtin.
+- `get_interned_func_ref` and `intern_func_ref_for_gc_heap` cannot collect and
+  skip the no-GC scope bookkeeping in release builds. The intern table hashes
+  `VMFuncRef` addresses with a murmur3 finalizer instead of SipHash.
+- Each instance keeps one bit per escaping defined function whose `VMFuncRef`
+  it has written. The written values are fixed for the instance's lifetime, so
+  a repeated `ref.func` returns the entry instead of recomputing it.
+
+These are in `src/runtime/vm/{libcalls.rs,instance.rs,gc/func_ref.rs}`.
 
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
