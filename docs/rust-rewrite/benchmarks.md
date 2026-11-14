@@ -377,6 +377,7 @@ They do not refresh the published panel.
 | [Site records in P](#site-records-in-p-2026-11-13) (ABI 69), on the row above | 6.72M | 7.32M |
 | Inline interned funcref reads, plain references and cached embedding bridges (ABI 69), on the row above | 6.61M | 7.20M |
 | [Identifier cells, truncation and single casts](#identifier-cells-truncation-and-single-casts-2026-11-13) (ABI 69), on the row above | 6.44M | 7.02M |
+| [GC access code](#gc-access-code-2026-11-14): implicit null checks, wrapping element offsets (ABI 69), on the row above | 5.11M | 5.59M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -911,6 +912,79 @@ summary yet); a global read still loads its key String and re-proves its
 remembered entry with several dependent loads; the remaining test-and-cast
 pairs (StoredValue, two record kinds, scalar-loop entry guards) and the
 cached-read entry's arms on the request are uncounted.
+
+### GC access code (2026-11-14)
+
+On the [site-record row](#site-records-in-p-2026-11-13) with inline funcref
+reads (ABI 69, no layout change; 6.61M sync, 7.20M async), Wasmtime's own code for GC accesses carried a
+fifth of the request: an explicit null trap before every struct field and
+array length access, a 64-bit object-size computation with three overflow
+traps and a backwards offset behind every array element, and an `i31` test
+in casts of struct-typed references. The vendored translator and runtime now
+emit ([translator](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md),
+[runtime](../../vendor/wasmtime-47.0.0/PATCHES.md)):
+
+- no null check where the operand's validated type is non-nullable;
+- otherwise the field access or length load itself as the null check, through
+  reference 0 faulting in a 4 KiB null guard the copying heap keeps
+  inaccessible and never allocates. The guard comes out of the heap before the
+  semi-space split, so each 8 MiB semi-space has 2,032 fewer bytes and
+  collections start that much (0.02%) earlier;
+- array element addresses as `ref + base_size + index * elem_size` in wrapping
+  32-bit arithmetic after the `index < length` check, which keeps any address
+  a corrupt length allows inside the 4 GiB reservation plus guard;
+- `i31` tests only for operands typed `anyref`, `eqref` or `i31ref`.
+
+The first table bounds each part with unsound variants of the translator
+(temporary switches, not committed), the second measures the sound ones; one
+measurement build, P and R compiled at run time, Speed user instructions per
+request (median of 100 after 100 warmups), exact Flight output checked.
+
+| Unsound bound, from the old code (6.613M / 7.203M) | Sync | Async |
+| --- | ---: | ---: |
+| No null trap on struct fields and array lengths | 6.259M | 6.823M |
+| Element address without size arithmetic or heap check | 5.724M | 6.253M |
+| Both | 5.381M | 5.882M |
+| No `i31` tests in casts | 6.424M | 6.992M |
+| 4 GiB linear-memory reservation (no linear bounds checks) | 6.587M | 7.168M |
+| All of these | 5.155M | 5.624M |
+
+| Sound, each alone | Sync | Async |
+| --- | ---: | ---: |
+| Static non-null elision | 6.567M | 7.155M |
+| Static elision and implicit null checks | 6.259M | 6.823M |
+| Element offset as a checked 64-bit sum | 5.906M | 6.447M |
+| Element offset in wrapping 32-bit arithmetic | 5.713M | 6.241M |
+| `i31` tests by operand type | 6.529M | 7.110M |
+| All, final tree (R from its build image) | 5.270M | 5.761M |
+
+Implicit null checks reach the bound of removing the checks outright, and the
+wrapping offset is cheaper than both the checked sum and the unsound direct
+address. The linear-memory checks (0.4%) do not pay for a 4 GiB reservation
+per memory. Native code shrinks with the checks: P from 11.6 MB to 9.6 MB of
+text, R from 42.7 MB to 33.9 MB. Cycles could not be settled: the machine ran other
+projects' builds throughout, and the per-run cycle medians of four interleaved
+rounds (old, new) were 5.63/2.92, 3.56/3.40, 3.42/3.19 and 5.84/5.23M for sync
+and 3.72/3.89, 4.16/3.39, 4.11/3.83 and 6.46/6.25M for async: lower in seven
+of eight pairs (by 4–7% in the two quietest sync pairs), but no figure.
+
+| Loop body, Speed instructions per iteration | before | after |
+| --- | ---: | ---: |
+| `u = Map` (global read) | 311 | 243 |
+| `t += arr[i & 63]` | 558 | 492 |
+| `u = made.m` (prototype method) | 454 | 372 |
+| `if (plain instanceof Map) t++` (miss) | 685 | 505 |
+| `t += add1(i)` (closure call) | 454 | 392 |
+
+What remains of an array element access is the length load, which is also
+the null check, the source's own bounds branch, the Wasm `index < length`
+trap on the same two values, one `lea` and the load.
+
+On the [identifier-cell row](#identifier-cells-truncation-and-single-casts-2026-11-13)
+the two rounds together measure 5.11M sync and 5.59M async instructions per
+request (medians; means 5.60M and 6.24M, the difference being collections),
+with exact Flight output. Median cycles on the same loaded machine were 2.57M
+sync and 3.01M async.
 
 ### Descriptor work and physical allocation
 

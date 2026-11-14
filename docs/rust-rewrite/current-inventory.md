@@ -16,8 +16,9 @@ accepts `--case <file.js>`.
   JIT. The source with chain walks, the computed-key write kernel and the
   call-free `instanceof` entry (ABI 68), with the host-side reductions,
   static site records kept in P globals (ABI 69), inline funcref reads,
-  identifier cells, rounding-free truncation and single casts,
-  runs a Speed sync request in 6.44M user instructions (median) against 4.38M
+  identifier cells, rounding-free truncation, single casts and shorter GC
+  access code (implicit null checks, wrapping element offsets),
+  runs a Speed sync request in 5.11M user instructions (median) against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
@@ -25,14 +26,14 @@ accepts `--case <file.js>`.
   [chain walks](benchmarks.md#chain-walks-and-computed-keys-2026-11-13),
   [host-side costs](benchmarks.md#host-side-costs-2026-11-13),
   [site records](benchmarks.md#site-records-in-p-2026-11-13),
-  [identifier cells and truncation](benchmarks.md#identifier-cells-truncation-and-single-casts-2026-11-13)).
+  [identifier cells and truncation](benchmarks.md#identifier-cells-truncation-and-single-casts-2026-11-13),
+  [GC access code](benchmarks.md#gc-access-code-2026-11-14)).
   Decide whether static read sites keep their inline own-slot read: on this
   request it saves about 17K instructions (0.2%) for 272 KB of P (6%) and
   1.6 s of native preparation, while inline writes pay for themselves.
-  Next, in measured order: `instanceof`, about 700 instructions per test
-  against 433 after its call-free entry (the rest is Wasmtime's code for the
-  entry's GC reads and the global read of the constructor, 318 against 156),
-  of which the serializer runs about twenty per plain object;
+  Next, in measured order: `instanceof`, about 505 instructions per missing
+  test (685 before the shorter GC access code), of which the serializer runs
+  about twenty per plain object;
   WeakMap operations, which still cross into the host (about 1,000
   instructions of a `has`, most of it Wasmtime's typed host-call boundary;
   about 5% of profiled cycles); the collector (about 4–6%, carried by the
@@ -44,7 +45,10 @@ accepts `--case <file.js>`.
   computed add, about 1,000 instructions; identifier reads that start at the
   current environment and `typeof` of a missing global (969 against 239);
   inline stores for proven captured cells; lazy function `prototype`,
-  `length` and `name`; closure creation and `Object.keys`.
+  `length` and `name`; closure creation and `Object.keys`; the Wasm
+  `index < length` trap that repeats the source's own bounds branch on every
+  array element read, and the `is_subtype` libcall a cast to a non-final type
+  takes on a mismatch (about 0.6% of profiled cycles).
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
