@@ -353,6 +353,7 @@ fn emit_script_module_with_factory(
         script.prepared_scripts.clone(),
         crate::planning::ModuleGraphPlan::from_script(script)?,
     )
+    .with_module_import_bindings(script.declares_module_import_bindings())
     .with_foreign_imports(foreign_imports);
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
     let owned_pool;

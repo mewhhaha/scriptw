@@ -3855,6 +3855,10 @@ pub(crate) struct FunctionMetaRegistry {
     /// How many static property sites of this module keep their record in
     /// a global of their own; each new site takes the next one.
     site_records: std::cell::Cell<u32>,
+    /// Whether the program declares a module import binding, the only cell
+    /// whose TARGET ever links to another cell. True unless the program's
+    /// IR proves otherwise.
+    module_import_bindings: bool,
     foreign_imports: crate::foreign::ForeignImportPlan,
     module_graph: Option<ModuleGraphPlan>,
     prepared_dynamic_functions: Vec<scriptw_ir::PreparedDynamicFunction>,
@@ -3912,6 +3916,17 @@ impl FunctionMetaRegistry {
         self.site_records.get()
     }
 
+    /// Records whether the program declares any module import binding.
+    pub(crate) fn with_module_import_bindings(mut self, declared: bool) -> Self {
+        self.module_import_bindings = declared;
+        self
+    }
+
+    /// Whether some cell of this program may link to another module's cell.
+    pub(crate) fn declares_module_import_bindings(&self) -> bool {
+        self.module_import_bindings
+    }
+
     pub(crate) fn with_foreign_imports(mut self, plan: crate::foreign::ForeignImportPlan) -> Self {
         self.foreign_imports = plan;
         self
@@ -3958,6 +3973,7 @@ impl FunctionMetaRegistry {
             compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
             site_records: std::cell::Cell::new(0),
+            module_import_bindings: true,
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,
             prepared_dynamic_functions,

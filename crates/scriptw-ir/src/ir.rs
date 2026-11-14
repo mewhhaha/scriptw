@@ -4513,6 +4513,19 @@ impl ScriptIr {
     /// Number exponentiation emitted by the executable IR, including the
     /// Number arm of coercive operators. A typed BigInt-only binary operation
     /// uses its separate arithmetic helper.
+    /// Whether any module body of the program declares an import binding:
+    /// only those cells are ever linked to another module's cell.
+    pub fn declares_module_import_bindings(&self) -> bool {
+        let mut counts = IrSummaryCounts::default();
+        for body in self.executable_script_bodies() {
+            counts.visit_block(body);
+        }
+        for function in &self.functions {
+            counts.visit_function(function);
+        }
+        counts.module_import_bindings != 0
+    }
+
     pub fn has_scalar_exponentiation(&self) -> bool {
         let mut counts = IrSummaryCounts {
             scalar_exponentiation: Some(false),
@@ -4851,6 +4864,7 @@ struct IrSummaryCounts {
     async_switch_owners: usize,
     async_with_owners: usize,
     async_for_in_owners: usize,
+    module_import_bindings: usize,
     statements: usize,
     functions: usize,
     nested_functions: usize,
@@ -5159,7 +5173,10 @@ impl IrSummaryCounts {
                     self.track_storage(&binding.name);
                 }
             }
-            StatementIr::ModuleImportBinding(binding) => self.track_storage(&binding.name),
+            StatementIr::ModuleImportBinding(binding) => {
+                self.module_import_bindings += 1;
+                self.track_storage(&binding.name)
+            }
             StatementIr::ModuleUnitOnce { block, .. } => self.visit_block(block),
             StatementIr::Lexical { mode, name, init } => {
                 self.track_storage(name);

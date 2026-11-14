@@ -372,6 +372,23 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> I32Local {
         let schema = self.runtime_schema();
+        // A source body of a program that declares no import binding reads
+        // only cells whose TARGET is never linked: module linking sets it
+        // for import bindings alone.
+        if self.has_source_execution_environment()
+            && !self.functions.declares_module_import_bindings()
+        {
+            let initialized = schema.reserve_i32_local(function);
+            schema
+                .struct_type::<BindingCell>()
+                .field(BindingCellSchema::INITIALIZED)
+                .read(cell, schema, function)
+                .store(initialized, function);
+            schema
+                .struct_type::<BindingCell>()
+                .read_value(cell, value, schema, function);
+            return initialized;
+        }
         let source = schema
             .reserve_gc_local::<BindingCell, Nullable>(function)
             .initialize(cell.load(schema, function).nullable(), function);

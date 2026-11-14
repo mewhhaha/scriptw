@@ -65,9 +65,12 @@ fn strict_proven_cell_calls_and_numeric_rows_keep_live_target_tdz_and_typed_disp
         for name in ["root","owned","captured","rows"] {
             let (_,body)=p.named(&format!("js::{name}#"));
             assert_eq!(calls(body,generic),0,"{name}: no generic Reference GetValue");
-            for field in [target[0],initialized[0],GcHostField::BindingCellScalar.definition().index(),tag,GcHostField::BindingCellReference.definition().index()] {
+            for field in [initialized[0],GcHostField::BindingCellScalar.definition().index(),tag,GcHostField::BindingCellReference.definition().index()] {
                 assert!(body.iter().any(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==field)),"{name}: actual live field{field}");
             }
+            // This module imports nothing, so no cell's TARGET is ever linked:
+            // the read follows no import edge.
+            assert!(!body.iter().any(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==target[0])),"{name}: no import TARGET in a program without imports");
             assert!(calls(body,tdz)>0,"{name}: TDZ failure remains a whole abrupt completion");
         }
         let (_,fallback)=p.named("js::fallback#");
@@ -76,7 +79,7 @@ fn strict_proven_cell_calls_and_numeric_rows_keep_live_target_tdz_and_typed_disp
         let (call,_)=r.named("helper::function_call");
         let argv=concrete(r.function_type(call).params()[6]);
         let allocation=rows.iter().position(|op|matches!(op,Operator::ArrayNew{array_type_index}|Operator::ArrayNewFixed{array_type_index,..} if *array_type_index==argv)).expect("numeric row constructs its existing argv");
-        let read=rows.iter().position(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==target[0])).unwrap();
+        let read=rows.iter().position(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==initialized[0])).unwrap();
         let tdz_branch=rows.iter().position(|op|matches!(op,Operator::Call{function_index} if *function_index==tdz)).unwrap();
         assert!(read<tdz_branch && tdz_branch<allocation,"live callee and TDZ precede every argument vector");
     }).unwrap().join().unwrap();
